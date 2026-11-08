@@ -105,3 +105,9 @@ fn put(w:Writer&,value:blot_eval_core_eval::Options) {putRecord(w,value);}
 
 fn get(r:Reader&,out:blot_reuse_independent_call_proof::ScalarInput&) {getRecord(r,out);}
 fn put(w:Writer&,value:blot_reuse_independent_call_proof::ScalarInput) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_core_eval::CallSummaryKey&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_core_eval::CallSummaryKey) {putRecord(w,value);}
+
+fn get(r:Reader&,out:blot_eval_core_eval::Target&) {getRecord(r,out);}
+fn put(w:Writer&,value:blot_eval_core_eval::Target) {putRecord(w,value);}

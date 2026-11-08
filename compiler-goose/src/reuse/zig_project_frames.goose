@@ -17,7 +17,7 @@ fn checkLengths(metadata: i64, payload: i64) -> Error {
         payload > max_frame_bytes - 8 - metadata { return blot_error::Error.frame_too_large; }
     return blot_error::Error.none;
 }
-fn readRequestFrame(reader: blot_io::Reader, bytes: u8[>..<]&) -> RequestFrame, bool, Error {
+fn readRequestFrame(reader: blot_io::Reader, bytes: u8[>..]&) -> RequestFrame, bool, Error {
     var header: u8[8] = default<u8[8]>();
     let count, error = blot_io::read_short(reader, header);
     if error != blot_error::Error.none { return RequestFrame { bytes[..0], 0 , ..}, false, error; }
@@ -27,14 +27,14 @@ fn readRequestFrame(reader: blot_io::Reader, bytes: u8[>..<]&) -> RequestFrame, 
     let payload = blot_bytes::get_u32(header, 4) as i64;
     let checked = checkLengths(metadata, payload);
     if checked != blot_error::Error.none { return RequestFrame { bytes[..0], 0 , ..}, false, checked; }
-    bytes.clear(); bytes.resize(metadata + payload, 0);
-    let read = blot_io::read_all(reader, bytes);
+    // Retain the high-water allocation; only this frame prefix is live.
+    let length=metadata+payload;if bytes.len<length {bytes.resize(length,0);}
+    let read = blot_io::read_all(reader, bytes[..length]);
     if read != blot_error::Error.none {
-        bytes.clear();
         if read == blot_error::Error.end_of_stream { return RequestFrame { bytes[..0], 0 , ..}, false, blot_error::Error.truncated_frame; }
         return RequestFrame { bytes[..0], 0 , ..}, false, read;
     }
-    return RequestFrame { bytes, metadata , ..}, true, blot_error::Error.none;
+    return RequestFrame { bytes[..length], metadata , ..}, true, blot_error::Error.none;
 }
 fn readRequest(reader: blot_io::Reader, bytes: u8[>..<]&) -> bool, Error {
     var header: u8[8] = default<u8[8]>();

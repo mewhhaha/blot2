@@ -18,7 +18,9 @@ fn declaration(self_:CatalogModule,binding:u32)->blot_check_check::SourceDeclara
 }}
 fn resolved(self_:CatalogModule,node:u32)->u32 {match self_.owner {typed payload=>{return payload.value.resolved[node];},source payload=>{return payload.value.resolved[node];},_=>{abort("source resolution requires a live source catalog");}}}
 enum Editor {none,query{value:EditorQuery}}
-type BodyOffers=blot_support_pooled_map::Map<const u8[:],const blot_reuse_body_check_cache::Cache?>;
+// Offers retain identities, while the previous project retains cache ownership.
+struct BodyOffer {lease:u32=0,generation:u64=0}
+type BodyOffers=blot_support_pooled_map::Map<u32,BodyOffer>;
 struct DiagnosticBuffer {storage:Diagnostic[:]=default<Diagnostic[:]>(),items:Diagnostic[:]=default<Diagnostic[:]>()}
 struct Engine {
  slot:u32=0,generation:u64=0,live:bool=false,previous_bodies:BodyOffers=BodyOffers{..},retain_bodies:bool=false,source:Project=Project{..},result:CheckedProject=CheckedProject{..},diagnostics:DiagnosticBuffer=DiagnosticBuffer{..},
@@ -26,7 +28,7 @@ struct Engine {
  source_modules:blot_support::Option<SourceModule>[:]=default<blot_support::Option<SourceModule>[:]>(),compiled_catalogs:CompiledCatalog[:]=default<CompiledCatalog[:]>(),
 }
 reusable var engines:Engine[>..]=[];
-reusable[] var offer_slots:dictionary_slot<const u8[:],const blot_reuse_body_check_cache::Cache?>[>..]=[];
+reusable[] var offer_slots:dictionary_slot<u32,BodyOffer>[>..]=[];
 reusable[] var source_module_runs:blot_support::Option<SourceModule>[>..]=[];
 reusable[] var compiled_catalog_runs:CompiledCatalog[>..]=[];
 reusable[] var source_declaration_runs:blot_check_check::SourceDeclaration[>..]=[];
@@ -69,8 +71,23 @@ fn recoverModule(self_:Engine&,unit:u32)->bool,Error {
 }
 fn offerBodies(self_:Engine&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->Error {
  if !previous.present {return blot_error::Error.none;}let old=previous.value;if old.bodies.len!=old.names.owners.len {return blot_error::Error.none;}
- for &body,index in old.bodies {let filename=old.names.owner((index+1) as u32);if !filename.present {continue;}if blot_support_pooled_map::contains(self_.previous_bodies,filename.value) {blot_support_pooled_map::insert(self_.previous_bodies,filename.value,default<const blot_reuse_body_check_cache::Cache?>(),offer_slots);}else {let offered:const blot_reuse_body_check_cache::Cache? =body;blot_support_pooled_map::insert(self_.previous_bodies,filename.value,offered,offer_slots);}}return blot_error::Error.none;
+ for &body,index in old.bodies {
+  let filename=old.names.owner((index+1) as u32);if !filename.present {continue;}
+  // All current module filenames are already interned; unrelated old names cannot be requested.
+  let symbol,found=self_.source.symbols.lookup(filename.value);if !found {continue;}
+  var offer=BodyOffer{body.lease,body.generation};
+  if blot_support_pooled_map::contains(self_.previous_bodies,symbol) {offer=BodyOffer{..};}
+  blot_support_pooled_map::insert(self_.previous_bodies,symbol,offer,offer_slots);
+ }return blot_error::Error.none;
 }
+fn offeredBody(self_:const Engine&,filename:u32)->const blot_reuse_body_check_cache::Cache? {
+ let found .= blot_support_pooled_map::get(self_.previous_bodies,filename);if !found {return null;}let offer=found;
+ if offer.lease==0 {return null;}
+ assert(offer.lease-1<blot_reuse_body_check_cache::cache_states.len);
+ let state:const blot_reuse_body_check_cache::CacheState& =blot_reuse_body_check_cache::cache_states[offer.lease-1];
+ assert(state.live && state.generation==offer.generation);return state.canonical;
+}
+
 fn diagnostic(self_:Engine&,unit:u32,span:Span,code:Code)->Error {return self_.diagnostics.push(Diagnostic{unit:unit,span:span,code:code, ..});}
 fn checkOrdered(self_:Engine&,unit:u32,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->bool,Error {
  if self_.source.input_mode==blot_reuse_project::InputMode.source && unit==self_.source.entry {let issue=blot_check_check::sourceImportDiagnostic(self_.source.unit(unit).tree);if issue.present {if self_.diagnostics.items.len==0 {let error=self_.diagnostics.push(Diagnostic{unit:unit,span:issue.value.span,code:Code.semantic,semantic:blot_support::some(issue.value.code), ..});if error!=blot_error::Error.none {return false,error;}}return false,blot_error::Error.none;}}

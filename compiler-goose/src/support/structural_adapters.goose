@@ -5735,6 +5735,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::WordBuffe
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_project::WordBuffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::BodyNameContext)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_project_check::BodyNameContext) {hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::BodyOffer)->bool {return equalFields(left,right);}
+fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_project_check::BodyOffer) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::CatalogModule)->bool {return equalFields(left,right);}
 fn hash<StructuralSink>(sink:StructuralSink&,value:blot_reuse_project_check::CatalogModule) {hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::CheckedProject)->bool {return equalFields(left,right);}

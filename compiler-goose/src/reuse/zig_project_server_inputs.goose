@@ -27,26 +27,31 @@ struct InputReader {raw:json::Reader,depth:i64=0,failure:Error=blot_error::Error
 fn fail(self_:InputReader&,error:Error)->Error {if self_.failure==blot_error::Error.none {self_.failure=error;}return self_.failure;}
 fn character(self_:InputReader&,want:u8)->Error {if self_.raw.peek()!=want {return self_.fail(blot_error::Error.invalid_request);}self_.raw.pos++;return blot_error::Error.none;}
 fn readText(self_:InputReader&,owner:JsonOwner&)->const u8[:],Error {var decoded:u8[>..]=[];let bytes=self_.raw.read_string(decoded);if self_.raw.error.len!=0 || !utf8(bytes) {return default<const u8[:]>(),self_.fail(blot_error::Error.invalid_request);}let owned,error=blot_reuse_zig_project_server::alloc<u8>(owner,bytes.len);if error!=blot_error::Error.none {return default<const u8[:]>(),self_.fail(error);}for byte,index in bytes {owned[index]=byte;}return owned,blot_error::Error.none;}
-fn readValue(self_:InputReader&,value:const u8[:]& ,owner:JsonOwner&)->Error {let bytes,error=self_.readText(owner);if error!=blot_error::Error.none {return error;}value=bytes;return blot_error::Error.none;}
+fn readValue(self_:InputReader&,sample:const u8[:],owner:JsonOwner&)->const u8[:],Error {return self_.readText(owner);}
 fn readUnsigned(self_:InputReader&,maximum:u64)->u64,Error {
  let first=self_.raw.peek();var negative=false;if first=='-' {negative=true;self_.raw.pos++;}if self_.raw.pos==self_.raw.text.len {return 0,self_.fail(blot_error::Error.invalid_request);}var value:u64=0;var digits:i64=0;let leading=self_.raw.text[self_.raw.pos];
  while self_.raw.pos<self_.raw.text.len {let byte=self_.raw.text[self_.raw.pos];if byte<'0' || byte>'9' {break;}let digit=(byte-'0') as u64;if value>maximum/10 || (value==maximum/10 && digit>maximum%10) {return 0,self_.fail(blot_error::Error.invalid_request);}value=value*10+digit;digits++;self_.raw.pos++;}
  if digits==0 || (digits>1 && leading=='0') || (negative && value!=0) {return 0,self_.fail(blot_error::Error.invalid_request);}return value,blot_error::Error.none;
 }
-fn readValue(self_:InputReader&,value:u8&,owner:JsonOwner&)->Error {let number,error=self_.readUnsigned(255);if error!=blot_error::Error.none {return error;}value=number as u8;return blot_error::Error.none;}
-fn readValue(self_:InputReader&,value:u32&,owner:JsonOwner&)->Error {let number,error=self_.readUnsigned(4294967295);if error!=blot_error::Error.none {return error;}value=number as u32;return blot_error::Error.none;}
-fn readValue(self_:InputReader&,value:u64&,owner:JsonOwner&)->Error {let number,error=self_.readUnsigned(18446744073709551615);if error!=blot_error::Error.none {return error;}value=number;return blot_error::Error.none;}
-fn readValue(self_:InputReader&,value:bool&,owner:JsonOwner&)->Error {value=self_.raw.read_bool();if self_.raw.error.len!=0 {return self_.fail(blot_error::Error.invalid_request);}return blot_error::Error.none;}
-fn readValue<T>(self_:InputReader&,value:blot_support::Option<T>&,owner:JsonOwner&)->Error {if self_.raw.peek()=='n' {self_.raw.word("null");if self_.raw.error.len!=0 {return self_.fail(blot_error::Error.invalid_request);}value=blot_support::none<T>();return blot_error::Error.none;}var decoded=default<T>();let error=self_.readValue(decoded,owner);if error!=blot_error::Error.none {return error;}value=blot_support::some(decoded);return blot_error::Error.none;}
-fn readEnum<T>(self_:InputReader&,value:T&,owner:JsonOwner&)->Error {let name,error=self_.readText(owner);if error!=blot_error::Error.none {return error;}const for <N,V> in variants<T> {if name==N {value=V;return blot_error::Error.none;}}return self_.fail(blot_error::Error.invalid_request);}
-fn readValue(self_:InputReader&,value:RequestKind&,owner:JsonOwner&)->Error {return self_.readEnum(value,owner);}
-fn readValue(self_:InputReader&,value:blot_compilation_tier::Tier&,owner:JsonOwner&)->Error {return self_.readEnum(value,owner);}
-fn readValue(self_:InputReader&,value:blot_backend_native_assets::Kind&,owner:JsonOwner&)->Error {return self_.readEnum(value,owner);}
-fn readValue<T>(self_:InputReader&,value:const T[:]& ,owner:JsonOwner&)->Error {
- if self_.depth>=64 {return self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('[');if error!=blot_error::Error.none {self_.depth--;return error;}if self_.raw.peek()==']' {self_.raw.pos++;self_.depth--;value=default<const T[:]>();return blot_error::Error.none;}
+fn readValue(self_:InputReader&,sample:u8,owner:JsonOwner&)->u8,Error {let number,error=self_.readUnsigned(255);if error!=blot_error::Error.none {return 0,error;}return number as u8,blot_error::Error.none;}
+fn readValue(self_:InputReader&,sample:u32,owner:JsonOwner&)->u32,Error {let number,error=self_.readUnsigned(4294967295);if error!=blot_error::Error.none {return 0,error;}return number as u32,blot_error::Error.none;}
+fn readValue(self_:InputReader&,sample:u64,owner:JsonOwner&)->u64,Error {return self_.readUnsigned(18446744073709551615);}
+fn readValue(self_:InputReader&,sample:bool,owner:JsonOwner&)->bool,Error {let value=self_.raw.read_bool();if self_.raw.error.len!=0 {return false,self_.fail(blot_error::Error.invalid_request);}return value,blot_error::Error.none;}
+fn readValue<T>(self_:InputReader&,sample:blot_support::Option<T>,owner:JsonOwner&)->blot_support::Option<T>,Error {
+ if self_.raw.peek()=='n' {self_.raw.word("null");if self_.raw.error.len!=0 {return blot_support::none<T>(),self_.fail(blot_error::Error.invalid_request);}return blot_support::none<T>(),blot_error::Error.none;}
+ let decoded,error=self_.readValue(default<T>(),owner);if error!=blot_error::Error.none {return blot_support::none<T>(),error;}return blot_support::some<T>(decoded),blot_error::Error.none;
+}
+fn readEnum<T>(self_:InputReader&,sample:T,owner:JsonOwner&)->T,Error {let name,error=self_.readText(owner);if error!=blot_error::Error.none {return default<T>(),error;}const for <N,V> in variants<T> {if name==N {return V,blot_error::Error.none;}}return default<T>(),self_.fail(blot_error::Error.invalid_request);}
+fn readValue(self_:InputReader&,sample:RequestKind,owner:JsonOwner&)->RequestKind,Error {return self_.readEnum(sample,owner);}
+fn readValue(self_:InputReader&,sample:blot_compilation_tier::Tier,owner:JsonOwner&)->blot_compilation_tier::Tier,Error {return self_.readEnum(sample,owner);}
+fn readValue(self_:InputReader&,sample:blot_backend_native_assets::Kind,owner:JsonOwner&)->blot_backend_native_assets::Kind,Error {return self_.readEnum(sample,owner);}
+fn readValue<T>(self_:InputReader&,sample:const T[:],owner:JsonOwner&)->const T[:],Error {
+ if self_.depth>=64 {return default<const T[:]>(),self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('[');if error!=blot_error::Error.none {self_.depth--;return default<const T[:]>(),error;}if self_.raw.peek()==']' {self_.raw.pos++;self_.depth--;return default<const T[:]>(),blot_error::Error.none;}
  // Discover the vector length without allocating a recursive growing owner.
- var scan=self_.raw;var count:i64=0;loop {scan.skip();if scan.error.len!=0 || count==4096 {self_.depth--;return self_.fail(blot_error::Error.source_limit);}count++;let next=scan.peek();if next==',' {scan.pos++;continue;}if next!=']' {self_.depth--;return self_.fail(blot_error::Error.invalid_request);}break;}
- let values,error=blot_reuse_zig_project_server::alloc<T>(owner,count);if error!=blot_error::Error.none {self_.depth--;return self_.fail(error);}for &element,index in values {element=default<T>();let error=self_.readValue(element,owner);if error!=blot_error::Error.none {self_.depth--;return error;}if index+1<count {let error=self_.character(',');if error!=blot_error::Error.none {self_.depth--;return error;}}}let error=self_.character(']');self_.depth--;if error!=blot_error::Error.none {return error;}value=values;return blot_error::Error.none;
+ var scan=self_.raw;var count:i64=0;loop {scan.skip();if scan.error.len!=0 || count==4096 {self_.depth--;return default<const T[:]>(),self_.fail(blot_error::Error.source_limit);}count++;let next=scan.peek();if next==',' {scan.pos++;continue;}if next!=']' {self_.depth--;return default<const T[:]>(),self_.fail(blot_error::Error.invalid_request);}break;}
+ let values,error=blot_reuse_zig_project_server::alloc<T>(owner,count);if error!=blot_error::Error.none {self_.depth--;return default<const T[:]>(),self_.fail(error);}
+ for index in values.len {values[index]=default<T>();let element,error=self_.readValue(default<T>(),owner);if error!=blot_error::Error.none {self_.depth--;return default<const T[:]>(),error;}values[index]=element;if index+1<count {let error=self_.character(',');if error!=blot_error::Error.none {self_.depth--;return default<const T[:]>(),error;}}}
+ let error=self_.character(']');self_.depth--;if error!=blot_error::Error.none {return default<const T[:]>(),error;}return values,blot_error::Error.none;
 }
 fn wireName<T>(sample:T,name:const u8[:])->const u8[:] {return name;}
 fn wireName(sample:blot_backend_native_assets::Definition,name:const u8[:])->const u8[:] {if name=="ty" {return "type";}if name=="export_name" {return "export";}return name;}
@@ -55,22 +60,23 @@ fn required(sample:Request,name:const u8[:])->bool {return name=="kind" || name=
 fn required(sample:SourceRange,name:const u8[:])->bool {return name=="path" || name=="start" || name=="length";}
 fn required(sample:blot_reuse_project::Alias,name:const u8[:])->bool {return name=="prefix" || name=="root";}
 fn required(sample:blot_backend_native_assets::Definition,name:const u8[:])->bool {return name=="module" || name=="path" || name=="kind";}
-fn readRecord<T>(self_:InputReader&,value:T&,owner:JsonOwner&)->Error {
- if self_.depth>=64 {return self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('{');if error!=blot_error::Error.none {self_.depth--;return error;}var seen:dictionary<const u8[:],bool> =dictionary<const u8[:],bool>{};
- if self_.raw.peek()!='}' {loop {let name,error=self_.readText(owner);if error!=blot_error::Error.none {self_.depth--;return error;}if seen.contains(name) {self_.depth--;return self_.fail(blot_error::Error.duplicate_field);}seen.insert(name,true);let error=self_.character(':');if error!=blot_error::Error.none {self_.depth--;return error;}var matched=false;
-   const for <N,A> in fields<T> {if name==wireName(value,N) {matched=true;let error=self_.readValue(value.A,owner);if error!=blot_error::Error.none {self_.depth--;return error;}}}if !matched {self_.depth--;return self_.fail(blot_error::Error.unknown_field);}let next=self_.raw.peek();if next==',' {self_.raw.pos++;continue;}if next!='}' {self_.depth--;return self_.fail(blot_error::Error.invalid_request);}break;
- }}let error=self_.character('}');self_.depth--;if error!=blot_error::Error.none {return error;}const for <N,A> in fields<T> {if required(value,N) && !seen.contains(wireName(value,N)) {return self_.fail(blot_error::Error.missing_field);}}return blot_error::Error.none;
+fn readRecord<T>(self_:InputReader&,sample:T,owner:JsonOwner&)->T,Error {
+ var value=default<T>();
+ if self_.depth>=64 {return value,self_.fail(blot_error::Error.invalid_request);}self_.depth++;let error=self_.character('{');if error!=blot_error::Error.none {self_.depth--;return value,error;}var seen:dictionary<const u8[:],bool> =dictionary<const u8[:],bool>{};
+ if self_.raw.peek()!='}' {loop {let name,error=self_.readText(owner);if error!=blot_error::Error.none {self_.depth--;return value,error;}if seen.contains(name) {self_.depth--;return value,self_.fail(blot_error::Error.duplicate_field);}seen.insert(name,true);let error=self_.character(':');if error!=blot_error::Error.none {self_.depth--;return value,error;}var matched=false;
+   const for <N,A> in fields<T> {if name==wireName(value,N) {matched=true;let decoded,error=self_.readValue(value.A,owner);if error!=blot_error::Error.none {self_.depth--;return value,error;}value.A=decoded;}}if !matched {self_.depth--;return value,self_.fail(blot_error::Error.unknown_field);}let next=self_.raw.peek();if next==',' {self_.raw.pos++;continue;}if next!='}' {self_.depth--;return value,self_.fail(blot_error::Error.invalid_request);}break;
+ }}let error=self_.character('}');self_.depth--;if error!=blot_error::Error.none {return value,error;}const for <N,A> in fields<T> {if required(value,N) && !seen.contains(wireName(value,N)) {return value,self_.fail(blot_error::Error.missing_field);}}return value,blot_error::Error.none;
 }
-fn parseRequest(bytes:const u8[:])->ParsedRequest,Error {var result=ParsedRequest{..};var reader=InputReader{raw:json::reader(bytes),..};let error=reader.readValue(result.value,result.owner);if error!=blot_error::Error.none {result.deinit();return ParsedRequest{..},error;}if !reader.raw.finish() {result.deinit();return ParsedRequest{..},blot_error::Error.invalid_request;}return result,blot_error::Error.none;}
+fn parseRequest(bytes:const u8[:])->ParsedRequest,Error {var result=ParsedRequest{..};var reader=InputReader{raw:json::reader(bytes),..};let value,error=reader.readValue(default<Request>(),result.owner);if error!=blot_error::Error.none {result.deinit();return ParsedRequest{..},error;}result.value=value;if !reader.raw.finish() {result.deinit();return ParsedRequest{..},blot_error::Error.invalid_request;}return result,blot_error::Error.none;}
 
-fn readValue(self_:InputReader&,value:Request&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:Request,owner:JsonOwner&)->Request,Error {return self_.readRecord(sample,owner);}
 
-fn readValue(self_:InputReader&,value:SourceRange&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:SourceRange,owner:JsonOwner&)->SourceRange,Error {return self_.readRecord(sample,owner);}
 
-fn readValue(self_:InputReader&,value:blot_reuse_project::Alias&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:blot_reuse_project::Alias,owner:JsonOwner&)->blot_reuse_project::Alias,Error {return self_.readRecord(sample,owner);}
 
-fn readValue(self_:InputReader&,value:blot_backend_native_assets::Definition&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:blot_backend_native_assets::Definition,owner:JsonOwner&)->blot_backend_native_assets::Definition,Error {return self_.readRecord(sample,owner);}
 
-fn readValue(self_:InputReader&,value:blot_backend_native_assets::Options&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:blot_backend_native_assets::Options,owner:JsonOwner&)->blot_backend_native_assets::Options,Error {return self_.readRecord(sample,owner);}
 
-fn readValue(self_:InputReader&,value:blot_backend_storage_plan::Budgets&,owner:JsonOwner&)->Error {return self_.readRecord(value,owner);}
+fn readValue(self_:InputReader&,sample:blot_backend_storage_plan::Budgets,owner:JsonOwner&)->blot_backend_storage_plan::Budgets,Error {return self_.readRecord(sample,owner);}

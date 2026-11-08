@@ -111,8 +111,8 @@ fn value(self_: Shapes&, id: u32, expected: u32, depth: i64) -> Error {
     if self_.snapshot.value_evidence[id] != 0 { let actual, err = self_.evidence(self_.snapshot.value_evidence[id], 0); if err != blot_error::Error.none { return err; } if expected != actual { return blot_error::Error.invalid_artifact; } } return blot_error::Error.none;
 }
 struct Context<Units> { units: Units, snapshot: const Snapshot& }
-fn withShapes(context: Context&, store: blot_eval_type_evidence::Store&) -> Error {
-    let snapshot .= context.snapshot; var imported: u32[>..<]=[]; imported.resize(snapshot.evidence.nodes.len); for &value in imported { value = 0; }
+fn withShapes<Units>(context: Context<Units>&, store: blot_eval_type_evidence::Store&) -> Error {
+    let snapshot .= context.snapshot; var imported: u32[>..]=[]; imported.resize(snapshot.evidence.nodes.len); for &value in imported { value = 0; }
     var shapes = Shapes { units: context.units, snapshot: snapshot, store: store, imported: imported , ..}; let evidence = snapshot.evidence.view();
     for value, id in snapshot.values {
         if value.kind == blot_eval_eval_values::ValueKind.descriptor { if value.nominal == 0 || value.nominal >= evidence.nodes.len || value.len != 0 || value.bits != 0 { return blot_error::Error.invalid_artifact; } if snapshot.value_evidence[id] != 0 { let ty = evidence.node(snapshot.value_evidence[id]); if ty.tag != blot_eval_type_evidence::Tag.nominal || ty.a != blot_check_typed_staging::descriptor_identity.unit || ty.b != blot_check_typed_staging::descriptor_identity.decl { return blot_error::Error.invalid_artifact; } let args = evidence.children(snapshot.value_evidence[id]); if args.len != 1 || args[0] != value.nominal { return blot_error::Error.invalid_artifact; } } let imported, err = shapes.evidence(value.nominal as u32, 0); if err != blot_error::Error.none { return err; } }
@@ -127,9 +127,9 @@ fn withShapes(context: Context&, store: blot_eval_type_evidence::Store&) -> Erro
         }
     } return blot_error::Error.none;
 }
-fn validate(snapshot: const Snapshot&, units) -> Error {
+fn validate<Units>(snapshot: const Snapshot&, units: Units) -> Error {
     var previous: u32 = 0; for origin in snapshot.code_origins { if origin.value == 0 || origin.value <= previous || origin.value >= snapshot.values.len || snapshot.values[origin.value].kind != blot_eval_eval_values::ValueKind.code || origin.generator.unit == 0 || origin.generator.unit > units.len { return blot_error::Error.invalid_artifact; } let owner .= units[origin.generator.unit - 1].core; if origin.generator.node == 0 || origin.generator.node >= owner.nodes.len || origin.generator.node >= owner.spans.len { return blot_error::Error.invalid_artifact; } previous = origin.value; }
     for closure in snapshot.closures { if closure.staged >= snapshot.values.len || (closure.staged != 0 && snapshot.values[closure.staged].kind != blot_eval_eval_values::ValueKind.code) { return blot_error::Error.invalid_artifact; } }
     var staged = false; for value in snapshot.values { if value.kind == blot_eval_eval_values::ValueKind.code || value.kind == blot_eval_eval_values::ValueKind.descriptor { staged = true; break; } } if !staged { return blot_error::Error.none; }
-    var context = Context { units, snapshot , ..}; return blot_eval_type_evidence::withStore<Context>(context,withShapes);
+    var context = Context<Units> { units, snapshot , ..}; return blot_eval_type_evidence::withStore<Context<Units>>(context,withShapes);
 }

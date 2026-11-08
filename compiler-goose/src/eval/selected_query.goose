@@ -16,7 +16,7 @@ struct Source { unit: u32,identity: u32,origin: blot_eval_eval_values::ClosureOr
 fn source(value: blot_eval_eval_values::ClosureValue) -> Source { return Source {value.unit,value.identity,value.origin,value.applied,false}; }
 fn memberSource(target: blot_check_core::BindingRef) -> Source { return Source {target.unit,target.binding,blot_eval_eval_values::ClosureOrigin.named,0,true}; }
 fn fingerprint(value: Source,options: blot_eval_core_eval::Options,depth: i64) -> u64 {
- var hash=blot_support_wyhash::init(0); hash.value(value.unit); hash.value(value.identity); hash.value(blot_eval_eval_values::closureOriginCode(value.origin)); hash.value(value.applied); hash.value(value.member); blot_structural::hash(hash,options); hash.value(depth); return hash.final();
+ var hash=blot_support_wyhash::init(0); hash.value(value.unit); hash.value(value.identity); hash.value(blot_eval_eval_values::closureOriginCode(value.origin)); hash.value(value.applied); hash.value(value.member); blot_structural::hash(hash,options); blot_structural::hash(hash,depth); return hash.final();
 }
 struct Key { source: Source,input: u32,expected: u32,options: blot_eval_core_eval::Options,depth: i64 }
 fn deinit(self_: Key&) {}
@@ -34,7 +34,7 @@ fn complete(self_: Adapter,record: Record) -> bool {
 }
 fn bytes(self_: Adapter,record: Record) -> i64 { return blot_reuse_specialization_receipt::ownedBytes(record.dependencies); }
 fn allocateRecords(self_: Adapter,len: i64) -> Record[:],Error { return records.alloc_slice(len),blot_error::Error.none; }
-fn releaseRecords(self_: Adapter,values: const Record[:]) { if values.len==0 { return; } let first: const Record& =values[0]; let at=records.index_of(first); assert(at>=0); records.free_slice(records[at..at+values.len]); }
+fn releaseRecords(self_: Adapter,values: const Record[:]) { if values.len==0 { return; } records.free_slice(values); }
 fn recordBytes(self_: Adapter) -> i64 { return blot_host_layout::selected_query_record; }
 fn init() -> Table { return blot_reuse_semantic_query_table::init<Key,blot_reuse_specialization_receipt::Record,Result,Adapter>(Adapter {}); }
 fn remember(table: Table&,closure: blot_eval_eval_values::ClosureValue,owned: blot_reuse_specialization_receipt::Record) -> u32,bool,Error {

@@ -51,7 +51,7 @@ execution, Wasm comparison or Gdev run exists for the Goose compiler.
 
 The selected checker improves an earlier frozen185 failing prefix; it does not
 establish a full-build timing. Actual repair builds remain bounded to 120 seconds
-per stage. This checkpoint preserves exact frozen228 inputs with the accepted
+per stage. This checkpoint preserves exact frozen230 inputs with the accepted
 global-filter checker. Build222 stops after46.13s at hash/asset/decoder API errors;
 223 advances to an unused Instance slice-field escape after46.64s.224 removes
 those two unobserved fields; substitution still fills the caller-owned buffers.
@@ -100,6 +100,18 @@ its15s collection window is bounded and is not a complete remaining-error list.
 Later worker/archive/hash/cleanup fixes and request-reader API repairs are active.
 Latest diagnostic/cache-offer component laws qualify their recorded source hashes,
 including working-tree edits after228; whole compiler qualification remains pending.
+
+Frozen230 includes a return-value JSON reader with six explicit record heads,
+retaining readonly slices and avoiding writes through readonly-header references.
+Forty-five input cases, three reuse rounds and24 injected registration failures
+return every byte/record/link pool to zero on both binaries. A high-water native
+frame buffer grows only as needed; each Frame exposes its exact packet prefix.
+Split I/O, EOF/error, shorter-frame reuse and writer controls pass without packet
+copies. Proof terms clear at their actual local native-array owners before Store
+index/identity teardown; reusable-pool and live-slice shrink negatives reject.
+The tempting by-value aggregate clear helper passed positive but failed strict
+negatives, and was rejected. Build230 stops after17.77s with19 diagnostics across
+14 files in its15s collection window; protocol/schema and publication fixes continue.
 
 ScopeKey and three principal-interface enum hash hooks now match native golden
 streams. Decoder allocations dispatch by the actual owner type at121 generated

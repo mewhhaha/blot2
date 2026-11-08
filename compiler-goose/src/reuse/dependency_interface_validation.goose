@@ -257,7 +257,7 @@ fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
   let signature_error=value.header.signature().validateInto(proof_budget);if signature_error==blot_error::Error.out_of_memory {return signature_error;}if signature_error!=blot_error::Error.none {return blot_error::Error.invalid_artifact;}
   { let propagated_error = blot_check_numeric_proof_core::signatureTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.bindings[value.binding].ty,value.header); if propagated_error != blot_error::Error.none { return propagated_error; } }
  }
- remaining-=min(remaining,proof_budget.visits);proof_budget.deinit();
+ remaining-=min(remaining,proof_budget.visits);terms.clear();proof_budget.deinit();
  { let propagated_error = blot_check_associated_admission::interfaceWithBudget(owner,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }let source=blot_check_associated_admission::typesView(owner.graph);
  { let propagated_error = blot_eval_implementation_admission::scopes(source,owner,owner.implementation_predicates,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }
  var symbol_limit:i64=0;

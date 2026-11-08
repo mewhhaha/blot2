@@ -2,7 +2,7 @@
 // process-global packet buffer and are released before the next read.
 namespace blot_reuse_zig_project_server;
 import .zig_project_server;
-var request_bytes:u8[>..<]=[];
+var request_bytes:u8[>..]=[];
 struct Hello {kind:const u8[:]="hello",protocol:const u8[:]="blot-zig-project",version:u32=protocol_version,compilerIdentity:const u8[:],capabilities:const TextSlice[:],maxFrameBytes:i64=blot_reuse_zig_project_frames::max_frame_bytes}
 struct OpenReply {kind:const u8[:]="open",id:u32,epoch:const u8[:]=epoch,revision:u64=0}
 struct CloseReply {kind:const u8[:]="close",id:u32,epoch:const u8[:]=epoch,revision:u64}

@@ -91,7 +91,7 @@ fn validRecord(record:Record,snapshot:const Snapshot&)->Error {
 // interpreted only by that concrete factory, never as a foreign pointer.
 enum Archive<C> {inactive,live{units:const Unit[:],capture:Capture?,factory:C,token:u64,owner:blot_reuse_dependency_format::Owner}}
 fn capture<C>(self_:Archive<C>)->Capture& {match self_ {inactive=>{abort("inactive semantic archive");},live payload=>{let capture .= payload.capture;assert(capture!=null);return capture;}}}
-fn deinit<C>(self_:Archive<C>&) {match self_ {inactive=>{},live &payload=>{payload.factory.destroyArchiveCapture(payload.token);payload.owner.deinit();}}self_=Archive<C>.inactive {};}
+fn deinit<C>(self_:Archive<C>&) {match self_ {inactive=>{},live payload=>{var factory:C=payload.factory;factory.destroyArchiveCapture(payload.token);var owner=payload.owner;owner.deinit();}}self_=Archive<C>.inactive {};}
 fn decode<C>(factory:C&,compiler:Digest,bytes:const u8[:])->Archive<C>,Error {
  let decoded,error=blot_reuse_dependency_format::decodeWithLimits<Snapshot>(bytes,wireKey(compiler),limits);if error!=blot_error::Error.none {return Archive<C>.inactive {},error;}var snapshot=decoded;var moved=false;
  let units=snapshot.owner.mutable(snapshot.value.units);for &unit in units {let error=restoreCertificates(snapshot.owner,unit);if error!=blot_error::Error.none {let __cleanup_result_6_0: Archive<C> = Archive<C>.inactive {}; let __cleanup_result_6_1: Error = error; {if !moved {snapshot.deinit();}} return __cleanup_result_6_0, __cleanup_result_6_1;}}

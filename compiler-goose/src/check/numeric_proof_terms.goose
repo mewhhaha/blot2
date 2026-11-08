@@ -75,7 +75,7 @@ struct Store {
 fn init(terms: Term[>..]&, index: dictionary<Term, Id>&) -> Store {
     return Store { terms: terms, index: index, owner_id: blot_native::fresh_owner_id() , ..};
 }
-fn deinit(self_: Store&) { self_.terms.clear(); ::clear(self_.index); self_.owner_id = 0; }
+fn deinit(self_: Store&) { ::clear(self_.index); self_.owner_id = 0; }
 fn view(self_: const Store&) -> View { return termView(self_.terms,self_.owner_id); }
 fn termView(terms: Term[>..]&, owner_id: u64) -> View { return View { terms, owner_id , ..}; }
 fn charge(self_: Store&, amount: i64) -> blot_error::Error {
