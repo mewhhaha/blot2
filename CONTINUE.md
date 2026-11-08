@@ -27,20 +27,21 @@ retaining live reference/local provenance checks. Two frozen220 pairs measure
 sampled process memory essentially unchanged. These are failing-prefix gains,
 not completed compiler timings. The new candidate is pinned in the
 [global-filter receipt](benchmarks/evidence/qualification/2026-11-08-goose-global-filter.json),
-including its source delta and byte-exact tracked recipe reconstruction. Frozen247
-checkpoints numeric validation scopes and module lookup, scalar binding sorting,
-native read carriers, fixed editor stack arrays, and concrete borrow/API fixes.
-The completed whole run stops after88.40s with2 diagnostics: reusable numeric
-term rollback and a missing obligation scratch pool. C emission, linking and
-execution remain pending. Twelve independent diagnostic probe roots captured9
-errors in a120s capped run, exposing additional future checking paths; dummy
-arguments make those diagnostics investigation evidence, not whole qualification.
-Focused runtime/negative controls qualify exact sources and disclosed reductions.
-Numeric import now checks overlap by exact identity scans: O(n+m) comparisons
-instead of native O(1), no copy/allocation/fuel debit. Decoder snapshots add a
-temporary input copy; default timing labels need no allocation. The private
-checker retains its bounded1M clone experiment and separate100k tail traversal,
-with201 frontend/8 runtime parity controls. These are failing-prefix durations,
+including its source delta and byte-exact tracked recipe reconstruction. Frozen249
+checkpoints reusable numeric-term rollback using a live dictionary-count prefix:
+failed tail slots stay physically allocated and the next intern reuses exact IDs.
+Every view/copy/publication uses the live prefix; overlap still covers physical
+backing. Golden rollback, strict pool controls and publication checks pass their
+pinned fixtures. High-water aborted backing remains until owner destruction.
+The completed whole run stops after88.74s with2 diagnostics: nullable numeric Plan
+publication and global-loop storage provenance. C emission, linking and execution
+remain pending.64 strided diagnostic-only Engine roots captured20 diagnostics at
+a120s cap; dummy defaults caused known harness-only failures and borrow warnings
+that require valid-owner reproduction. Intrinsic checker API fixes are batched;
+all qualification limits remain explicit. Numeric overlap scans cost O(n+m),
+decoder snapshots add temporary input copies, and default timing labels add no
+allocation. The private checker retains bounded1M clone/separate100k tail limits
+with201 frontend/8 runtime parity controls. These are failing-prefix observations,
 not completed compiler timings.
 The prior nominal-identity/reachability
 measurements qualify their own separate frozen conditions.

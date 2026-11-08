@@ -151,7 +151,7 @@ fn lower(tree: const blot_parse_ast::Tree&, pool: const blot_parse_symbols::Pool
     if arity != input_kinds.len { return blot_support::Option<Owned> { false, default<Owned>() , ..}, blot_error::Error.proof_scope_escape; }
     let result, re = proposition(builder, at); if re != blot_error::Error.none { return blot_support::Option<Owned> { false, default<Owned>() , ..}, re; }
     if !result.present { let nested, ne = contains(builder, at, 0); if ne != blot_error::Error.none { return blot_support::Option<Owned> { false, default<Owned>() , ..}, ne; } if nested { return blot_support::Option<Owned> { false, default<Owned>() , ..}, blot_error::Error.invalid_proof_kind; } }
-    let borrowed = Owned { arity, builder.value_slots, builder.proof_slots, builder.kinds, builder.store.terms, builder.requirements, result , ..};
+    let borrowed = Owned { arity, builder.value_slots, builder.proof_slots, builder.kinds, blot_check_numeric_proof_terms::activeTerms(builder.store.terms,builder.store.index.count), builder.requirements, result , ..};
     var remaining = limits; remaining.visits -= builder.store.visits;
     let validity = signature(borrowed).validate(remaining); if validity != blot_error::Error.none { return blot_support::Option<Owned> { false, default<Owned>() , ..}, validity; }
     let owned, error = clone(borrowed, destination); return blot_support::Option<Owned> { error == blot_error::Error.none, owned , ..}, error;

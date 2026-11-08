@@ -41,10 +41,10 @@ fn use(self_: Builder&, value: Use) -> Error {
     if self_.uses.len >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; } self_.uses.push(value); return blot_error::Error.none;
 }
 fn alias(self_: Builder&, binding: u32, source: u32) -> Error { let error = self_.values.charge(1); if error != blot_error::Error.none { return error; } if !::contains(self_.sources,binding) && self_.sources.count >= self_.values.limits.terms { return blot_error::Error.proof_analysis_limit; } ::insert(self_.sources,binding,source); return blot_error::Error.none; }
-fn frontier(self_: const Builder&, headers: i64) -> Frontier { return Frontier { headers as u32, self_.values.terms.len as u32, self_.introductions.len as u32, self_.parameters.len as u32, self_.uses.len as u32, self_.sources.count as u32, self_.expressions.count as u32 , ..}; }
+fn frontier(self_: const Builder&, headers: i64) -> Frontier { return Frontier { headers as u32, self_.values.index.count as u32, self_.introductions.len as u32, self_.parameters.len as u32, self_.uses.len as u32, self_.sources.count as u32, self_.expressions.count as u32 , ..}; }
 fn take(self_: Builder&, destination: OwnedTables&) -> Owned, Error {
     let debits = destination.debits.len; let operands = destination.operands.len; let introductions = destination.introductions.len; let parameters = destination.parameters.len; let uses = destination.uses.len;
-    destination.debits.append(self_.debits[..]); destination.operands.append(self_.values.terms[..]); destination.introductions.append(self_.introductions[..]); destination.parameters.append(self_.parameters[..]); destination.uses.append(self_.uses[..]);
-    self_.debits.clear(); self_.values.terms.clear(); self_.introductions.clear(); self_.parameters.clear(); self_.uses.clear();
+    destination.debits.append(self_.debits[..]); destination.operands.append(blot_check_numeric_proof_terms::activeTerms(self_.values.terms,self_.values.index.count)); destination.introductions.append(self_.introductions[..]); destination.parameters.append(self_.parameters[..]); destination.uses.append(self_.uses[..]);
+    self_.debits.clear(); ::clear(self_.values.index); self_.introductions.clear(); self_.parameters.clear(); self_.uses.clear();
     return Owned { destination.debits[debits..], destination.operands[operands..], destination.introductions[introductions..], destination.parameters[parameters..], destination.uses[uses..] , ..}, blot_error::Error.none;
 }

@@ -76,8 +76,10 @@ fn init(terms: Term[>..]&, index: dictionary<Term, Id>&) -> Store {
     return Store { terms: terms, index: index, owner_id: blot_native::fresh_owner_id() , ..};
 }
 fn deinit(self_: Store&) { ::clear(self_.index); self_.owner_id = 0; }
-fn view(self_: const Store&) -> View { return termView(self_.terms,self_.owner_id); }
-fn termView(terms: Term[>..]&, owner_id: u64) -> View { return View { terms, owner_id , ..}; }
+fn view(self_: const Store&) -> View { return termView(self_.terms,self_.index.count,self_.owner_id); }
+// The index owns the live prefix; failed imports retain reusable backing capacity.
+fn activeTerms(terms:Term[>..]&,count:i64)->const Term[:] {return terms[..count];}
+fn termView(terms:Term[>..]&,count:i64,owner_id:u64)->View {return View{terms[..count],owner_id,..};}
 fn charge(self_: Store&, amount: i64) -> blot_error::Error {
     var available: i64 = 0;
     if self_.visits < self_.limits.visits { available = self_.limits.visits - self_.visits; }
@@ -106,14 +108,16 @@ recursive fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
         },
     }
     block { let saved = ::get(self_.index,term); if saved { return saved, blot_error::Error.none; } }
-    if self_.terms.len >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
-    self_.terms.push(term);
-    let id = self_.terms.len as u32;
+    if self_.index.count >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
+    let position=self_.index.count;
+    if position<self_.terms.len {self_.terms[position]=term;}
+    else {self_.terms.push(term);}
+    let id = (position+1) as u32;
     ::insert(self_.index,term,id);
     return id, blot_error::Error.none;
 }
 fn copyOwned(self_: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
-    let start = destination.len; destination.append(self_.terms);
+    let start = destination.len; destination.append(activeTerms(self_.terms,self_.index.count));
     return Owned { destination[start..], blot_native::fresh_owner_id() , ..}, blot_error::Error.none;
 }
 fn importProof(self_: Store&, source: View, proof: Proposition, boundary: Boundary, substitution: Substitution) -> Proposition, blot_error::Error {
@@ -147,12 +151,12 @@ fn importInto(self_: Store&, source: View, proofs: const Proposition[:], results
     let source_charge = charge(self_, source.terms.len); if source_charge != blot_error::Error.none { return source_charge; }
     let proof_charge = charge(self_, proofs.len); if proof_charge != blot_error::Error.none { return proof_charge; }
     for proof in proofs { let validity = proposition(source, proof); if validity != blot_error::Error.none { return validity; } }
-    let initial = self_.terms.len;
+    let initial = self_.index.count;
     var map: Id[>..] = []; for term in source.terms { map.push(0); }
     var context = Context { self_, source, map, substitution , ..};
     let error = importResults(context, proofs, results);
     if error != blot_error::Error.none {
-        while self_.terms.len > initial { let removed = self_.terms.pop(); assert(self_.index.remove(removed)); }
+        while self_.index.count > initial { let removed = self_.terms[self_.index.count-1]; assert(::remove(self_.index,removed)); }
     }
     return error;
 }

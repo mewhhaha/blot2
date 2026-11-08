@@ -155,7 +155,7 @@ fn proposition(self_: Order&, store: blot_check_numeric_proof_terms::Store&, val
 fn bounds(self_: Order&, store: blot_check_numeric_proof_terms::Store&) -> Error {
     let zero, ze = store.intern(Term { tag: blot_check_numeric_proof_terms::Tag.literal, a: 0 , ..}); if ze != blot_error::Error.none { return ze; }
     let maximum, me = store.intern(Term { tag: blot_check_numeric_proof_terms::Tag.literal, a: 0xffffffff , ..}); if me != blot_error::Error.none { return me; }
-    for term, ordinal in store.terms {
+    for term, ordinal in blot_check_numeric_proof_terms::activeTerms(store.terms,store.index.count) {
         if term.kind != blot_check_numeric_proof_terms::Kind.unsigned32 { continue; } let id = (ordinal + 1) as u32;
         let lower = edge(self_, zero, id, false); if lower != blot_error::Error.none { return lower; } let upper = edge(self_, id, maximum, false); if upper != blot_error::Error.none { return upper; }
         if term.tag != blot_check_numeric_proof_terms::Tag.literal { continue; }
@@ -192,7 +192,7 @@ fn reaches(self_: Order&, count: i64, requested: Edge) -> bool, Error {
     return false, blot_error::Error.none;
 }
 fn complements(self_: Order&, store: blot_check_numeric_proof_terms::Store&) -> Error {
-    if !self_.needs_complements { return blot_error::Error.none; } let count = store.terms.len;
+    if !self_.needs_complements { return blot_error::Error.none; } let count = store.index.count;
     if count == 0x7fffffffffffffff { return blot_error::Error.proof_analysis_limit; }
     var opposite: Id[>..] = []; for index in count + 1 { opposite.push(0); }
     for id in 1..count + 1 { if store.terms[id - 1].kind == blot_check_numeric_proof_terms::Kind.unsigned32 { let value, error = store.intern(Term { tag: blot_check_numeric_proof_terms::Tag.complement, a: id as u32 , ..}); if error != blot_error::Error.none { return error; } opposite[id] = value; } }
@@ -244,14 +244,14 @@ fn entailsGraph(graph: Order&, store: blot_check_numeric_proof_terms::Store&, fa
     let dual = complements(graph, store); if dual != blot_error::Error.none { return false, dual; }
     let bounded = bounds(graph, store); if bounded != blot_error::Error.none { return false, bounded; }
     let visits = store.visits - initial_visits; let spent = spend(graph, visits); if spent != blot_error::Error.none { return false, spent; } normalized_visits = visits;
-    let consistency = checkConsistency(graph, store.terms.len); if consistency != blot_error::Error.none { return false, consistency; }
+    let consistency = checkConsistency(graph, store.index.count); if consistency != blot_error::Error.none { return false, consistency; }
     for pair in unequal {
         let validity = store.view().proposition(Proposition { blot_check_numeric_proof_terms::Relation.eq, pair.left, pair.right , ..}); if validity != blot_error::Error.none { return false, validity; }
-        let forward, fe = reaches(graph, store.terms.len, Edge { Pair { pair.left, pair.right }, false , ..}); if fe != blot_error::Error.none { return false, fe; }
+        let forward, fe = reaches(graph, store.index.count, Edge { Pair { pair.left, pair.right }, false , ..}); if fe != blot_error::Error.none { return false, fe; }
         if forward { let added = edge(graph, pair.left, pair.right, true); if added != blot_error::Error.none { return false, added; } }
-        else { let reverse, re = reaches(graph, store.terms.len, Edge { Pair { pair.right, pair.left }, false , ..}); if re != blot_error::Error.none { return false, re; } if reverse { let added = edge(graph, pair.right, pair.left, true); if added != blot_error::Error.none { return false, added; } } }
+        else { let reverse, re = reaches(graph, store.index.count, Edge { Pair { pair.right, pair.left }, false , ..}); if re != blot_error::Error.none { return false, re; } if reverse { let added = edge(graph, pair.right, pair.left, true); if added != blot_error::Error.none { return false, added; } } }
     }
-    if unequal.len != 0 { let consistency = checkConsistency(graph, store.terms.len); if consistency != blot_error::Error.none { return false, consistency; } }
-    let forward, error = reaches(graph, store.terms.len, requested.forward); if error != blot_error::Error.none || !forward { return forward, error; }
-    if requested.reverse { return reaches(graph, store.terms.len, Edge { Pair { requested.forward.pair.right, requested.forward.pair.left }, false , ..}); } return true, blot_error::Error.none;
+    if unequal.len != 0 { let consistency = checkConsistency(graph, store.index.count); if consistency != blot_error::Error.none { return false, consistency; } }
+    let forward, error = reaches(graph, store.index.count, requested.forward); if error != blot_error::Error.none || !forward { return forward, error; }
+    if requested.reverse { return reaches(graph, store.index.count, Edge { Pair { requested.forward.pair.right, requested.forward.pair.left }, false , ..}); } return true, blot_error::Error.none;
 }
