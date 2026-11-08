@@ -12,7 +12,7 @@ import check.generative_schemes;
 import check.numeric_proof_bodies;
 import check.numeric_proof_contracts;
 import check.numeric_proof_headers;
-import check.numeric_proof_names;
+import check.numeric_proof_terms;
 import check.parameter_patterns;
 import check.type_store_snapshot;
 import check.types;
@@ -575,6 +575,8 @@ fn put<PacketWriter>(receiver:PacketWriter&,value:blot_reuse_project::Import) {i
 fn get<PacketReader>(receiver:PacketReader&,value:blot_reuse_project::Import&) {if !receiver.enter() {return;}get(receiver,value.declaration);get(receiver,value.target);get(receiver,value.path);get(receiver,value.namespace_);get(receiver,value.bindings);get(receiver,value.span);receiver.depth--;}
 fn put<PacketWriter>(receiver:PacketWriter&,value:blot_reuse_project::Lowering) {if !receiver.enter() {return;}put(receiver,value.io);put(receiver,value.workers);receiver.depth--;}
 fn get<PacketReader>(receiver:PacketReader&,value:blot_reuse_project::Lowering&) {if !receiver.enter() {return;}get(receiver,value.io);get(receiver,value.workers);receiver.depth--;}
+fn put<PacketWriter>(receiver:PacketWriter&,value:blot_reuse_project::Range) {if !receiver.enter() {return;}put(receiver,value.start);put(receiver,value.len);receiver.depth--;}
+fn get<PacketReader>(receiver:PacketReader&,value:blot_reuse_project::Range&) {if !receiver.enter() {return;}get(receiver,value.start);get(receiver,value.len);receiver.depth--;}
 fn put<PacketWriter>(receiver:PacketWriter&,value:blot_reuse_project_check::Diagnostic) {if !receiver.enter() {return;}put(receiver,value.unit);put(receiver,value.span);put(receiver,value.code);put(receiver,value.semantic);put(receiver,value.type_application);put(receiver,value.symbol);put(receiver,value.implicit_type_witness);put(receiver,value.source_terminator);put(receiver,value.numeric_literal);put(receiver,value.purity);put(receiver,value.detail);put(receiver,value.hole);put(receiver,value.explanation);put(receiver,value.contexts);put(receiver,value.context_len);put(receiver,value.source);receiver.depth--;}
 fn get<PacketReader>(receiver:PacketReader&,value:blot_reuse_project_check::Diagnostic&) {if !receiver.enter() {return;}get(receiver,value.unit);get(receiver,value.span);get(receiver,value.code);get(receiver,value.semantic);get(receiver,value.type_application);get(receiver,value.symbol);get(receiver,value.implicit_type_witness);get(receiver,value.source_terminator);get(receiver,value.numeric_literal);get(receiver,value.purity);get(receiver,value.detail);get(receiver,value.hole);get(receiver,value.explanation);get(receiver,value.contexts);get(receiver,value.context_len);get(receiver,value.source);receiver.depth--;}
 fn put<PacketWriter>(receiver:PacketWriter&,value:blot_reuse_project_check::Export) {if !receiver.enter() {return;}put(receiver,value.name);put(receiver,value.target);put(receiver,value.kind);put(receiver,value.catalog);receiver.depth--;}

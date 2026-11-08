@@ -12,7 +12,7 @@ import check.generative_schemes;
 import check.numeric_proof_bodies;
 import check.numeric_proof_contracts;
 import check.numeric_proof_headers;
-import check.numeric_proof_names;
+import check.numeric_proof_terms;
 import check.parameter_patterns;
 import check.type_store_snapshot;
 import check.types;

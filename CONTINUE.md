@@ -40,50 +40,35 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen405 is the current source checkpoint. RegionSnapshot is now only a
-lease/generation handle; its existing lease owns State and solver metadata.
-Restore creates one invocation-local payload view after solver restore succeeds.
-The rewrite removes400lines/15948bytes and reduces the static Session type proxy
-499→473 (SCC1→1); neither is a completed speed result. All70focused controls pass
-on both checkers. Actual solver source-nonmutation/error prefixes are reviewed;
-the fixture's20failure leaves are controlled, not full solver fault injection.
-Malformed tokens now reject before arena metadata use with existing scratch
-cleanup; their invalid-token allocation/mint prefix intentionally changes.
-Valid-path allocation and ID order are preserved. contractMethod now iterates
-scalar child count/IDs without copying. Its110.028s run clears that loop and
-reaches aggregate's equivalent child-slice borrow. Frozen394 reloads scalar IDs
-in aggregate/blockChildren/arrayOperation and borrows the live ragged header so
-written/reserved/published updates reach its owner. Frozen395 preserves resolver
-arity/provider order while reloading argument IDs. Exact source review passes.
-Its118.841s run reaches matchInputs iteration. Seven audited getter/callback
-cases and equivalent nested loops land in Frozen396; update paths/selectors use
-the same scalar reload protocol in397. Exact chained source review passes.
-Instrumented396 reaches a new update borrow after114.149s; its four untruncated
-samples cover ownership grow/store effects, TypeEq/array reachability and
-EscapingContinue AST traversal. They are not timing percentages. Frozen397 hits
-the120.269s cap with zero diagnostics and no C; it is incomplete and must not be
-repeated unchanged or counted as a pass. A private static EscapingContinue
-candidate is being qualified: its body uses no checker state, and dropping the
-unused this capture fits the callback's small buffer. It matches201frontend,
-8runtime/7focused cases and12emitted-C programs; the synthetic traversal drops
-819100allocations→0. However its398 whole attempt also times out120.291s with
-zero diagnostics/C on the same442authored inputs as397. It remains unselected;
-no whole gain is demonstrated. A dedicated non-owning AST child visitor is the
-next isolated prototype; all actual uses remain synchronous/copy-equivalent.
-That ChildVisitor candidate e083ca53 passes201frontend/8runtime/7focused/12C parity,
-19semantic+ASan/UBSan cases and removes synthetic callback allocations. Attempt399
-still times out120.299s with zero diagnostics/C on the same442authored inputs.
-It also remains unselected. Next: measure completed checking/effect-replay work
-inside the fixed cap and target repeated algorithmic work, without blind reruns.
-The gprofng prerequisite failed; no full profile was launched. Telemetry-only
-checker d8143f86 passes201frontend/8runtime/7focused/12C parity. Instrumented400
-retains five valid raw snapshots and reaps within119.657s. At114.914s it has
-13654specializations and17243normal body completions, but814.7million raw
-store examinations and12.78billion TypeEq entries. Held/slot fixedpoint work is
-small (1414/1908entries,max2sweeps). Checking progresses; prioritize repeated
-store-summary replay and type comparison work. Counters perturb timing; this
-is no speed result. No mutable-root cache, optimization or cap increase yet.
-No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
+Frozen406 is the current source checkpoint. Selected private checker 57bb3e81
+adds two bounded optimizations to 678b88: a call-local raw-store identity skip
+and visited-type buckets keyed only by kind/nominal declaration. Relevant
+store mappings and possible-match type comparisons retain their original
+order. It passes 201 frontend / 8 runtime / 7 focused / 12 emitted-C controls and eight extra store controls;
+8,192 raw-loop comparisons (also ASan/UBSan) and 300 visited-type laws pass. The
+tracked recipe reconstructs all 108 source files byte-exactly. Installed tools,
+the Zig oracle and siblings remain unchanged.
+
+Instrumented 400 finds 814.7 million raw-store examinations and 12.78 billion TypeEq
+entries by 114.914s while body checks continue progressing. Inner held/slot
+fixedpoint work is small. Telemetry time is no speed result. The selected
+optimizations restore diagnostic progress within the unchanged 120s cap; no
+completed compiler speed or parity result exists. Allocation-only prototypes
+398/399 remain unselected after capped whole attempts. Exact measurements,
+controls and rejected experiments remain in the linked global-filter receipt.
+
+Recent source fixes reload immutable pattern children as scalar IDs and narrow
+the borrowed Engine before cleanup.405 makes two fresh packet decode temporaries
+mutable before readonly use; 36 extracted decoder laws pass on both checkers.
+406 adds the generated Range codec and sends BodyOffers as symbol/presence/cache
+payload, reconstructing child ownership. Both checkers pass 20 offer laws and
+stale rejection; 750 ordinal comparisons agree. Normal generation reproduces
+all 440 source hashes. Its 102.180s run reaches initEngine retaining a
+source-rooted Project in the global engine pool. Trace actual Project ownership
+and borrowed compiled payload before repair; packet laws are not whole transport
+qualification. No compiler C/header/executable,
+executed-Wasm comparison or Gdev result exists for the port. Do not repeat capped
+inputs unchanged or increase the 120/300s stage/overall caps; first-error grace 3s.
 
 Current representation repairs use the existing Session→Generator Frame token
 with live generation, current-frame and exact registered Session/Generator/
@@ -240,38 +225,3 @@ separate. Recheck real integration after semantic changes with the tracked
 unrelated work and existing siblings; no new worktrees. Commit/push coherent
 checked batches to main and verify the remote. Environment publication and
 upstream comments require explicit requests.
-
-Private checker4548ebed now adds a raw-store identity fast path to678b88.
-The call-local class-membership set expires before slot rebinding; relevant
-events retain ordered live lookups and unrelated events retain classread
-normalization. Its201frontend/8runtime/7focused/12C checks, eight extra store
-controls and8192extracted-loop comparisons (also ASan/UBSan) pass. Same397
-authored inputs reach a new matchPattern slice-lifetime diagnostic in108.520s,
-where397/398/399 capped without diagnostics. This is restored diagnostic
-progress, not completed compilation or a measured speed percentage.
-
-Frozen402 changes matchPattern product children to scalar count/ID reloads,
-preserving initial bounds/arity checks, child read and recursive call order.
-Exact source review passes. Its120.348s attempt caps with zero diagnostics and
-no C/header/executable; whole qualification remains pending. Do not repeat
-unchanged. Next is isolated ArrayElemsReached visited-type bucketing.
-
-Selected private checker57bb3e81 adds traversal-local visited-type buckets
-(kind/nominal declaration only) to4548. All201frontend/8runtime/7focused/12C
-and eight store controls pass;300extracted differential laws preserve order
-and effect/error traces. Same402 authored inputs reach a new Engine? deinit
-overload error in100.647s; no program C/header/executable. This restores
-diagnostic progress, not a completed compilation speed result. The tracked
-recipe reconstructs its108source files byte-exactly without another build.
-
-Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
-same pointer and cleanup order. Source review and a focused executed control
-pass on official/private checkers. Its100.802s run reaches project_packet27
-read-only decoder-output reference assignment; no C/header/executable.
-
-Frozen405 makes two packet decode temporaries mutable before readonly use;
-no checker const-rule change. Exact inverse and36extracted decoder laws pass
-on both checkers, including cursor/error/owner cleanup. Its100.473s run clears
-that assignment and reaches missing project::Range codec. Review also finds
-stale path/Cache-pointer BodyOffers wire assumptions; generic byte laws do
-not qualify that boundary. Batch current-domain codec/offer repairs next.

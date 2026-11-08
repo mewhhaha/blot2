@@ -39,150 +39,45 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen405 is the current source checkpoint. Previous private checker
-`678b88bd…` checks exported roots before nonexports, retaining final export
-validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
-27 focused controls retain acceptance and error multisets (one ordering change).
-Two emitted-C/header host executions pass. The tracked builder reconstructs all
-108 source files byte-exactly, without offsets or fuzz. Installed tools, upstream
-checkout, siblings and the pinned Zig oracle remain unchanged.
+Frozen406 is the current source checkpoint. The selected private checker is
+`57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
+It retains 678b88's exported-root scheduling and adds a call-local raw-store
+identity skip plus traversal-local visited-type buckets. All 201 frontend,
+8 runtime / 7 focused / 12 emitted-C controls and eight extra store controls pass. 8,192 extracted store
+comparisons (also ASan/UBSan) and 300 visited-type laws preserve original order,
+relevant lookups and error/effect traces. The tracked recipe reconstructs all 108
+source files byte-exactly. Ordinary tools, siblings and Zig oracle are unchanged.
 
-The Session→Generator data edge uses the existing scalar Frame token. Lookup
-checks generation, live/current-frame state and exact registered Session,
-Generator and Workspace identities. Fourteen projected controls pass; the static
-declaration graph drops939→506, which is neither an instantiated-type count nor
-a completed compilation speed result. The retained importer stores destination
-and memo maps only; invocation-local readers borrow real leased or unleased
-source Views. Readonly Plan headers are forwarded explicitly. Invocation-owned
-layout import ends before recursive proof work. Two evaluator region records
-retain only their existing Frame IDs; full execution Frames travel separately.
+Telemetry 400 measures 814.7 million raw-store examinations and 12.78 billion TypeEq
+entries by 114.914s while body checking progresses; held/slot fixedpoint work is
+small. It is instrumented work evidence, not compiler timing. Static callback
+and ChildVisitor allocation prototypes remain unselected after capped 398/399.
+The raw-store candidate reaches a new pattern lifetime error in 108.520s; after
+its source repair, the type-bucket candidate reaches Engine? dispatch in 100.647s.
+These are failing-prefix progress, not completed compilation speed results.
 
-Owned-pool transfers preserve actual live ranges and payload identities. A pool
-range check or identity token alone never grants liveness. Pure constructors and
-typed stores preserve original evaluation, nonce-mint and cleanup order. New
-collector argument IDs are copied once into a dedicated invocation-owned run,
-then freed after the call on success or error. Its exact-helper nested controls
-pass on official/private Goose; the copying/allocation cost and physical OOM
-behavior remain unmeasured. Fixed scratch default initialization also adds
-unmeasured work relative to native undefined spare capacity.
+Source repairs keep current-frame/generation/owner identity guards, immutable
+catalog scalar reloads, live owned-pool receipts, existing lease ownership and
+callback cleanup/error ordering. RegionSnapshot is only its existing lease and
+generation; the lease owns State/solver metadata. Do not infer arbitrary live
+ownership from bounds or an ID, cache mutable roots, or patch generated output.
+The complete superseded repair narrative is pinned in
+[72295746](https://github.com/mewhhaha/blot2/blob/72295746740d1f74c8860129368b198023ffb23f/compiler-goose/port-notes/compilation.md).
+Qualification still applies only to its exact named source and fixture.
 
-Frozen377 shares the exact 31-field Constraint constructor between region-pool
-reconstitution and principal-name copying. Both retain their distinct original
-pools and copy/free order. Frozen378 reconstructs all 25 PrincipalGraph fields,
-keeping its original entry mint, allocation/copy order and byte accounting.
-StoreSnapshot is transferred through its existing live/generation lease and
-exact pointer/length validation of all 22 leased ranges, with State unchanged.
-The helper adds no allocation, clone, retain or ID mint. All 37 strict controls
-pass on official and selected Goose, including stale/reused leases, all redirected
-same-pool slices, foreign/stack slices and global publication/cleanup. Independent
-allocation/deinit mapping and complete graph-field inverses pass. Its98.842s
-actual run clears graph publication and reaches caller result retention.
-Frozen379 fixes the actual binding error: plain tuple binding snapshots a
-reference-returned graph; borrowed tuple binding keeps the pool header. Both
-checkers execute the distinction. Frozen380 applies the same exact correction
-to three audited mutable-reference results (cached unit Uses, importer and
-layout bridge), then makes NormalizePrincipal borrow its description instead
-of copying the whole carrier back. Only its final successful result mutates;
-cleanup has no observer and both callbacks are synchronous. Independent source
-reviews pass. Its98.034s run clears that boundary and reaches PrincipalVisit
-publication. Frozen381 rebuilds its three fields through the existing exact
-pool-slot/live-lease graph getter after successful reserve. All five producers
-supply live table-owned graphs; sticky/failure/length order is unchanged.
-Frozen382 replaces RetainOpen's whole callback copyback with its only changed
-accepted Boolean at the same point, including matching-error results. Its100.869s
-run clears that boundary and reaches withSchemeCopy's generic whole-carrier
-stores. Frozen383 borrows C directly but still fails the actual recursive
-boundary. Frozen384 also borrows SchemeFrame and removes its whole copyback.
-Exact two-callback/three-call-site reviews preserve partial error outputs; F
-runs before any frame-state saves, and later map saves/deinit have no frame
-observer or callback. Physical OOM timing remains unqualified. Its108.620s actual
-run clears withSchemeCopy and reaches a borrowed constructor in schemeImport.
-Frozen385 removes the unused Invocation.region field/formal/argument and adds
-token-identical diagnostic line breaks. Its101.563s run pinpoints the returned
-SchemeFrame payload binding. Frozen386 reconstructs its owned name and five
-live saved-map slices, preserving all counts, key, next and cleanup order; nine
-actual-schema controls pass on both checkers. Frozen388 transfers active scheme
-key bytes through their exact pool while normalizing ignored inactive headers.
-Three actual-map transfer controls pass on both checkers, covering growth,
-suspension, restore and final cleanup. Attempt387 was cancelled after57.352s
-without a diagnostic; it is not a pass, and no actual inactive-key UAF was
-established. Its102.504s run reaches summary-job RegionSnapshot publication.
-Frozen389 validates all57leased ranges and115Statefields;73strict controls pass
-on both checkers. Frozen390 borrows resumed snapshots; Frozen391 applies the
-argument-copy boundary at the remaining direct collectCall children slice.
-Its120.284s timeout includes one diagnostic and is not complete. Frozen392
-validates the registered Session at the partial-member constructor; its112.850s
-run reaches contractMethod's child-slice loop borrow.
-
-Frozen393 replaces RegionSnapshot's duplicated headers with a two-scalar
-lease/generation handle. Its existing lease owns State/solver metadata; one
-invocation-local view is constructed after successful solver restore. This
-removes400lines/15948bytes; the static Session proxy drops499→473 (SCC1→1), with
-no speed claim. All70controls pass on each checker across real schemas,
-57payloads, stale/invalid owners, actual release/solver deinit and20controlled
-failure prefixes. Full solver fault injection and ClosureRegion restore remain
-unqualified. Actual source proves restore errors mutate target state only and
-preserve the source owner; valid allocation/mint and restore-tail order stay
-unchanged. Invalid tokens intentionally reject before arena metadata, with the
-existing scratch cleanup but changed invalid-token allocation/mint prefix.
-The contract-method loop uses scalar count/reloaded IDs. Its110.028s run clears
-that boundary and reaches the equivalent aggregate child-slice borrow. Frozen394
-uses scalar count/ID reloads in three same-protocol loops and corrects the ragged
-header binding to preserve actual written/reserved/published mutations. Frozen395
-retains resolver bounds/arity/provider ordering and reloads scalar arguments at
-their original evaluation point. Exact chained source review passes, adding no
-allocation, copying or fuel. Its118.841s run reaches matchInputs' source iterator.
-Frozen396 covers the seven audited sites plus equivalent nested loops; Frozen397
-reloads update-path/selector records in both forward and reverse order. Independent
-source review preserves initial validation, resize, callback and cleanup order.
-Instrumented396 reaches a new update borrow after114.149s. Four untruncated stack
-samples show grow/store effect replay, TypeEq/ArrayElemsReached and EscapingContinue
-AST traversal under the export-first root; they do not establish phase shares.
-Ordinary397 hits120.269s without diagnostics/C/header/executable, so checking is
-incomplete. Do not repeat unchanged or raise the cap. A static EscapingContinue
-private candidate is being measured/qualified: exact body uses no checker state;
-removing its unused this capture reduces24B→16B and fits libstdc++'s small buffer.
-Synthetic allocation removal is measured: five rotated pairs fall12.646→6.223ms,
-819100allocations/frees→0. The isolated a071ca7d candidate matches201frontend,
-8runtime,7focused and12emitted-C programs, with independent108file/source review.
-Its398 attempt still times out120.291s with zero diagnostics/C versus397's
-120.269s timeout on matching442authored inputs. It remains unselected: no whole
-progress is demonstrated. The next prototype targets Node::Children's owning
-callback wrapper across synchronous visitors; retention, copy/mutable semantics
-and temporary lifetimes are audited for all50current calls/37overrides. Candidate
-e083ca53 changes only two headers, keeps override bodies/RunChildren unchanged,
-and matches201frontend/8runtime/7focused/12C programs. Nineteen semantic cases
-plus ASan/UBSan pass; synthetic medians12.373→4.655ms,819100allocations→0. Its399
-attempt still times out120.299s with zero diagnostics/C on matching442authored
-inputs. It remains unselected. Both valid allocation levers have no demonstrated
-whole-prefix progress under this censored cap. The next investigation measures
-completed specs/effect events/traversal work and repeated SCC/global-root replay;
-avoid unchanged blind reruns, larger caps and unchecked memoization. gprofng
-forced-stop controls produce no useful retained samples; its natural control
-warns of unreliable timing. That path is rejected before a full workload capture.
-Use a telemetry-only private build with a fixed scalar block readable before
-termination to distinguish completed body passes, SCC rounds, deferred/slot
-fixed-point sweeps and UsedAfter/AST work. No hot allocations/maps/strings or
-ownership changes belong in that measurement patch.
-No whole compiler C, header or executable has been emitted; source acceptance
-is not runtime qualification.
-
-A single 15-second post-error collection experiment returns only one diagnostic
-after110.572s. It is rejected; subsequent attempts restore three seconds within
-the same120/300-second caps. Semantic-only entry probes remain inconclusive
-(the revised probe hits20.071s with no diagnostic/C). The optional-global index
-passes controls but gains match zero-global noise; it is unselected. The narrower
-array-readiness gate passes correctness but regresses stresses4.2–4.5% versus
-controls within0.4%; it is unselected. Cross-event root memoization was rejected
-because store replay mutates provenance. Exact source/carrier limits and all
-failed, cancelled and timed-out runs remain in qualification evidence.
-
-The [preceding source checkpoint](https://github.com/mewhhaha/blot2/blob/a20bb37f4b1014bea338335e3802ebaaaad434af/compiler-goose/port-notes/compilation.md)
-retains earlier repair narratives and their explicit limitations. They qualify
-those exact sources and reduced carriers, not later revisions. The linked
-qualification receipts preserve original requirements, rejected experiments,
-source/toolchain hashes and incomplete runs. Source writing remains separate
-from full compiler/runtime qualification.
+405 narrowly changes two fresh packet-decoder temporaries to mutable byte slices;
+no checker const-rule change. 36 extracted codec laws pass on both checkers,
+including readonly record fields and error/cursor/owner cleanup. Its 100.473s
+attempt clears that assignment and reaches missing project::Range decoding.
+406 adds Range through the generator and fixes BodyOffers to logical symbol,
+presence and cache payload, reconstructing child-owned handles. Both checkers
+pass 20 offer laws plus stale rejection; 750 ordinal cases agree. Two normal
+generator runs match all 440 source hashes. Its 102.180s attempt reaches a new
+initEngine Project lifetime/global-store error. Trace real Project ownership and
+borrowed compiled payloads next. These packet controls do not qualify full engine
+transport. No compiler C/header/executable or executed-Wasm result yet.
+Keep 120/300s stage/overall caps and 3s first-error grace. A cap is incomplete;
+do not repeat unchanged inputs or report it as success.
 
 ## Qualified components and source repairs
 
@@ -294,7 +189,7 @@ its diagnostics qualify its recorded input tree only.
 The installed upstream Goose remains unchanged, SHA256
 `b27ab168cfc9bcd51e5801c5e0c2c520e98db9c2db54fe15d5206d3168c59bb2`.
 Repair attempts explicitly select the optional private checker, SHA256
-`678b88bdf038dae9fdf1366cf59aca5dfeaf046fb29de0b2fadf85359b703c19`.
+`57bb3e817a5edab895f90cb518812299f1076a49127c3509b37f57a45515e847`.
 The tracked recipe reconstructs all 108 selected source files byte-exactly; its
 accepted changes and independent controls are pinned in the receipt above.
 `tools/build_goose_checker.py` and `tools/goose-containment.patch` preserve its
@@ -360,46 +255,3 @@ Recoverable physical OOM and retention/allocation observation remain separate
 production requirements. Null/unavailable metrics do not close them. Full compiler,
 public API, executed Wasm, copied-worker, library and Gdev qualification remain
 pending. Subsecond compilation and 1–2MB Gdev Wasm remain unmet.
-
-Instrumented400 pins five raw work-counter snapshots within119.657s including
-cleanup, on unchanged397 authored inputs. The telemetry-only checker passes
-201frontend/8runtime/7focused/12C parity. By114.914s it completes17243body
-passes but examines814.7million raw stores and enters TypeEq12.78billion times;
-held/slot convergence work is small (max2sweeps). Target repeated store-summary
-replay and type comparison work next. Instrumented time is no speed result;
-no C/header/executable exists, and selected checker678b88 is unchanged.
-
-Private checker4548ebed now adds a raw-store identity fast path to678b88.
-The call-local class-membership set expires before slot rebinding; relevant
-events retain ordered live lookups and unrelated events retain classread
-normalization. Its201frontend/8runtime/7focused/12C checks, eight extra store
-controls and8192extracted-loop comparisons (also ASan/UBSan) pass. Same397
-authored inputs reach a new matchPattern slice-lifetime diagnostic in108.520s,
-where397/398/399 capped without diagnostics. This is restored diagnostic
-progress, not completed compilation or a measured speed percentage.
-
-Frozen402 changes matchPattern product children to scalar count/ID reloads,
-preserving initial bounds/arity checks, child read and recursive call order.
-Exact source review passes. Its120.348s attempt caps with zero diagnostics and
-no C/header/executable; whole qualification remains pending. Do not repeat
-unchanged. Next is isolated ArrayElemsReached visited-type bucketing.
-
-Selected private checker57bb3e81 adds traversal-local visited-type buckets
-(kind/nominal declaration only) to4548. All201frontend/8runtime/7focused/12C
-and eight store controls pass;300extracted differential laws preserve order
-and effect/error traces. Same402 authored inputs reach a new Engine? deinit
-overload error in100.647s; no program C/header/executable. This restores
-diagnostic progress, not a completed compilation speed result. The tracked
-recipe reconstructs its108source files byte-exactly without another build.
-
-Frozen404 narrows the borrowed nullable Engine before deinit, retaining the
-same pointer and cleanup order. Source review and a focused executed control
-pass on official/private checkers. Its100.802s run reaches project_packet27
-read-only decoder-output reference assignment; no C/header/executable.
-
-Frozen405 makes two packet decode temporaries mutable before readonly use;
-no checker const-rule change. Exact inverse and36extracted decoder laws pass
-on both checkers, including cursor/error/owner cleanup. Its100.473s run clears
-that assignment and reaches missing project::Range codec. Review also finds
-stale path/Cache-pointer BodyOffers wire assumptions; generic byte laws do
-not qualify that boundary. Batch current-domain codec/offer repairs next.

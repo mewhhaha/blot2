@@ -7,11 +7,13 @@ from source_model import clean,balanced,split
 from normalize_syntax import normalize,finish_syntax
 (R.parent/'build').mkdir(parents=True,exist_ok=True)
 D={};PATHS={}
-for path in R.rglob('*.goose'):
+for path in sorted(R.rglob('*.goose')):
  if path.name.startswith('_') or (path.parent == R and 'probe' in path.stem):continue
  s=clean(path.read_text());m=re.search(r'namespace\s+(\w+)\s*;',s)
  if not m:continue
- ns=m[1];PATHS.setdefault(ns,path.relative_to(R).with_suffix('').as_posix().replace('/','.'))
+ ns=m[1];module_path=path.relative_to(R).with_suffix('').as_posix().replace('/','.')
+ PATHS.setdefault(ns,module_path)
+ if ns=='blot_'+module_path.replace('.','_'):PATHS[ns]=module_path
  for m in re.finditer(r'\b(struct|enum|type)\s+(\w+)\s*(<[^>{}]+>)?\s*(\{|=)',s):
   kind,name,params,tok=m.groups();key=ns+'::'+name
   if tok=='=':
@@ -59,7 +61,7 @@ SPECIAL={
 ROOTS=[
  'blot_check_check::Checked','blot_parse_ast::Tree','blot_parse_symbols::Pool',
  'blot_check_check::ModuleOrigins','blot_reuse_project_check::Diagnostic','blot_reuse_project_check::Export',
- 'blot_reuse_project::Import','blot_reuse_project::Diagnostic','blot_reuse_project::Lowering','blot_reuse_project::InputMode',
+ 'blot_reuse_project::Range','blot_reuse_project::Import','blot_reuse_project::Diagnostic','blot_reuse_project::Lowering','blot_reuse_project::InputMode',
  'blot_reuse_frozen_dependency::Module','blot_reuse_body_check_cache::Cache',
  'blot_check_type_store_snapshot::Snapshot','blot_check_parameter_patterns::Node',
  'blot_reuse_body_check_cache::Chunk','blot_reuse_body_check_cache::Body',
