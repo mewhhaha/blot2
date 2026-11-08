@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen395 is the current source checkpoint. RegionSnapshot is now only a
+Frozen397 is the current source checkpoint. RegionSnapshot is now only a
 lease/generation handle; its existing lease owns State and solver metadata.
 Restore creates one invocation-local payload view after solver restore succeeds.
 The rewrite removes400lines/15948bytes and reduces the static Session type proxy
@@ -56,8 +56,15 @@ in aggregate/blockChildren/arrayOperation and borrows the live ragged header so
 written/reserved/published updates reach its owner. Frozen395 preserves resolver
 arity/provider order while reloading argument IDs. Exact source review passes.
 Its118.841s run reaches matchInputs iteration. Seven audited getter/callback
-cases and equivalent nested loops are next; a current stack profile will run
-inside that necessary attempt under the unchanged120-second stage cap.
+cases and equivalent nested loops land in Frozen396; update paths/selectors use
+the same scalar reload protocol in397. Exact chained source review passes.
+Instrumented396 reaches a new update borrow after114.149s; its four untruncated
+samples cover ownership grow/store effects, TypeEq/array reachability and
+EscapingContinue AST traversal. They are not timing percentages. Frozen397 hits
+the120.269s cap with zero diagnostics and no C; it is incomplete and must not be
+repeated unchanged or counted as a pass. A private static EscapingContinue
+candidate is being qualified: its body uses no checker state, and dropping the
+unused this capture fits the callback's small buffer. Full compile gain unmeasured.
 No compiler C/header/executable or executed-Wasm/Gdev result exists for the port.
 
 Current representation repairs use the existing Session→Generator Frame token

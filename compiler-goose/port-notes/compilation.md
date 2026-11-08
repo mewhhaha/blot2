@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen395 is the current source checkpoint. Selected private checker
+Frozen397 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -132,9 +132,17 @@ header binding to preserve actual written/reserved/published mutations. Frozen39
 retains resolver bounds/arity/provider ordering and reloads scalar arguments at
 their original evaluation point. Exact chained source review passes, adding no
 allocation, copying or fuel. Its118.841s run reaches matchInputs' source iterator.
-Seven audited callback-crossing getter sites plus equivalent nested loops are
-next. One necessary attempt will carry the existing append-safe stack profiler
-within the unchanged120/300-second caps; instrumented time is labeled separately.
+Frozen396 covers the seven audited sites plus equivalent nested loops; Frozen397
+reloads update-path/selector records in both forward and reverse order. Independent
+source review preserves initial validation, resize, callback and cleanup order.
+Instrumented396 reaches a new update borrow after114.149s. Four untruncated stack
+samples show grow/store effect replay, TypeEq/ArrayElemsReached and EscapingContinue
+AST traversal under the export-first root; they do not establish phase shares.
+Ordinary397 hits120.269s without diagnostics/C/header/executable, so checking is
+incomplete. Do not repeat unchanged or raise the cap. A static EscapingContinue
+private candidate is being measured/qualified: exact body uses no checker state;
+removing its unused this capture reduces24B→16B and fits libstdc++'s small buffer.
+Synthetic allocation removal is measured; completed compiler speed is unmeasured.
 No whole compiler C, header or executable has been emitted; source acceptance
 is not runtime qualification.
 
