@@ -570,7 +570,7 @@ fn mapCapturedFunction<M,R>(generator: Generator&, unit_id: u32, function_type: 
     let b = mapTypeDepth(generator, unit_id, mappings, rows, source.b, actual.b, span, 0); if b != blot_error::Error.none { return b; }
     return mapRow(generator, unit_id, mappings, rows, source.c, actual.c, span, true);
 }
-fn completedQueryLookup(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error {
+recursive fn completedQueryLookup(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<u32>(), blot_error::Error.none; }
     let query .= generator.query_state; if query { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return query.lookup(owned, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
 }
@@ -578,7 +578,7 @@ fn completedMemberLookup(generator: Generator&, session: blot_eval_core_eval::Se
     if !(session .== generator.evaluator) { return blot_support::none<u32>(), blot_error::Error.none; }
     let query .= generator.query_state; if query { let owned:Generator& =blot_compile_workspace::canonicalGenerator(generator); return query.lookupMember(owned, target, input, expected); } return blot_support::none<u32>(), blot_error::Error.none;
 }
-fn lookupSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedQueryLookup(generator, session, input, expected); }
+recursive fn lookupSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedQueryLookup(generator, session, input, expected); }
 fn lookupMemberSpecialization(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, input: u32, expected: u32) -> blot_support::Option<u32>, blot_error::Error { return completedMemberLookup(generator, session, target, input, expected); }
 fn constantLookup(generator: Generator&, session: blot_eval_core_eval::Session&, target: blot_check_core::BindingRef, inputs: blot_reuse_constant_receipt::Inputs) -> blot_support::Option<blot_reuse_constant_receipt::Lookup>, blot_error::Error {
     if !(session .== generator.evaluator) { return blot_support::none<blot_reuse_constant_receipt::Lookup>(), blot_error::Error.none; }

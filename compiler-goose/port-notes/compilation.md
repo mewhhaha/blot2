@@ -39,7 +39,7 @@ inputs. Live artifacts are published only when their hashes still match.
 The coordinator uses an explicit diagnostic collection window after the first error
 (currently 3 seconds from attempt 285; previously 15 and 45), then terminates the build and its compiler process group. A timeout is not a pass.
 
-Frozen342 is the current source checkpoint. Selected private checker
+Frozen348 is the current source checkpoint. Selected private checker
 `678b88bd…` checks exported roots before nonexports, retaining final export
 validation and every fixup. Its 201 frontend/8 runtime controls match exactly;
 27 focused controls retain acceptance and error multisets (one ordering change).
@@ -97,7 +97,19 @@ and handles two exact callback cycles with reviewed pure helpers. Its80.617s run
 reaches an owned recursive-result escape. A three-pool success-result receipt is
 followed by judgment-tail and lexical-bound repairs, exactOptions/depth hash
 goldens, owned specialization/proof transfer and retained-pointer narrowing.
-Actual34284.048s reaches proofmetadata descriptor iteration. The revised semantic-only entry probe with export-first checking still hit
+Actual34284.048s reaches proofmetadata descriptor iteration. Frozen346 repairs
+the records view and callable arguments, uses typed readonly empty views, and
+adds the existing private Session identity to its one-layout Probe. An exact
+17-head callback cycle uses reviewed factories and registered Tape/Observation
+owners, preserving null-before-release and cleanup order. Its97.810s run reaches
+a recovered-proof recursive assignment. A typed setter clears it. Frozen348
+splits physical-layout import from proof evaluation: only a Session-owned scalar
+evidence ID crosses the phase boundary. This avoids keeping local growers alive
+inside the callback cycle and removes obsolete Store/probe annotations/factory.
+Common statistics and semantic errors remain after both phases; freeing earlier
+changes allocation/OOM interleaving. The native-owner record prototype was
+rejected by both checkers. Its84.214s actual run reaches Candidate Plan-header
+retention; passing that small readonly view by value is next. The revised semantic-only entry probe with export-first checking still hit
 its20.071s cap without a diagnostic or C; no iteration shortcut is established. The optional-global index passes correctness controls but its
 synthetic gains match zero-global noise; it is unselected. Cross-event root memo
 was rejected because store replay mutates provenance. A semantic-only entry

@@ -40,7 +40,7 @@ direct-call controls stay within 2%. This is not whole-port performance evidence
 The tracked recipe reconstructs all 108 checker source files byte-exactly with no
 fuzz or offsets. Installed tools, upstream checkout and Zig oracle are unchanged.
 
-Frozen342 replaces Session's Generator backpointer with the existing scalar
+Frozen348 replaces Session's Generator backpointer with the existing scalar
 Frame token. Lookup retains live generation, current-frame, registry bounds and
 exact Session/Generator/Workspace identity checks. Three source files change;
 normal writers leave all generated adapters unchanged. Fourteen reduced Frame
@@ -77,7 +77,17 @@ three-pool reconstitution clears that return in334. Subsequent checked batches
 move the judgment tail, preserve lexical subspan bounds, fix specialization hash
 streams, reconstitute owned receipt/proof payloads, qualify local map dispatch,
 and narrow a retained-record local. Actual342 stops after84.048s at proof
-metadata descriptor iteration. No whole compiler success follows. Source and frontier differ,
+metadata descriptor iteration. Frozen346 fixes the actual records view/callback/typed-empty APIs, supplies the
+existing private Session identity to its one-layout Probe, and handles the exact
+17-function proof callback cycle. Registered Tape/Observation owners replace
+stack headers stored in Session; pointers clear before owners are released.
+Its97.810s run reaches a new recovered-proof recursive assignment. Frozen348
+uses a typed setter there and splits private layout import from proof evaluation.
+The scalar expected ID lives in Session evidence; importer/layout owners end
+before recursive proof work. This avoids unsupported recursive local growers
+without a new storage registry. Earlier frees change allocation interleaving.
+Its84.214s run reaches Candidate Plan-header retention.
+No whole compiler success follows. Source and frontier differ,
 so this is shorter repair iteration, not a paired full-compile speed result.
 Whole parsing passes 440 files. No program C/header/executable, executed-Wasm
 comparison or Gdev result exists for the port. Caps remain 120/300s with a 3s
