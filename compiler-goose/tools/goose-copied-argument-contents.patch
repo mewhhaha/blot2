@@ -1,0 +1,273 @@
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -507,6 +507,9 @@
+     // where every value has it, and a bound, a reference crossed and a back
+     // edge's result drop it.
+     bool classread = false;
++    // An unchanged contribution from a by-value argument's incoming contents.
++    // This is not an exact storage identity. Copies retain it, bounds drop it.
++    bool argcopy = false;
+     bool operator==(const RootAlt &) const = default;
+ };
+ 
+@@ -580,6 +583,7 @@
+             b.exact = b.exact && a.exact;
+             b.slotread = b.slotread && a.slotread;
+             b.classread = b.classread && a.classread;
++            b.argcopy = b.argcopy && a.argcopy;
+             if (b.from != a.from) b.from = nullptr;
+             return b != before;
+         }
+@@ -598,6 +602,7 @@
+         for (auto &a : alts) {
+             a.exact = false;
+             a.classread = false;
++            a.argcopy = false;
+         }
+     }
+     // Where a value was read out of (slotread, classread): nothing a
+@@ -607,6 +612,7 @@
+         for (auto &a : alts) {
+             a.slotread = false;
+             a.classread = false;
++            a.argcopy = false;
+         }
+     }
+     // One alternative, and it holds the pointee: the value names one array.
+@@ -2024,6 +2030,9 @@
+     // rooted at the class still names it as the container it was read out
+     // of (RootAlt::from).
+     bool classread = false;
++    // An unchanged contribution from a by-value argument's incoming contents.
++    // This is not an exact storage identity. Copies retain it, bounds drop it.
++    bool argcopy = false;
+ };
+ 
+ // A shrink, and a reference, slice or holder still used after it that only
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -1851,7 +1851,7 @@
+     // feeds back as it does a new root (Roots::Add).
+     void AddContents(VarDef *x, const RootAlt &a, bool classread, const VarDef *src) {
+         auto held = a.classread || (classread && src == a.root);
+-        if (x->contents.Add({ a.root, a.exact, a.from, a.slotread, held }))
++        if (x->contents.Add({ a.root, a.exact, a.from, a.slotread, held, a.argcopy }))
+             NoteFact(x, ActivationFloor(a.root));
+     }
+     // A reference or slice variable's binding grown by the places `rv` may
+@@ -2697,14 +2697,14 @@
+         TypeExpr *arrtype;
+         const map<VarDef *, vector<size_t>> &bycontainer;
+         set<VarDef *> held;
+-        set<pair<VarDef *, bool>> rooted;
++        set<tuple<VarDef *, bool, bool>> rooted;
+         bool trace = false;
+         void Trace(string_view kind, VarDef *holder = nullptr, VarDef *root = nullptr,
+                    bool exact = false, VarDef *src = nullptr, TypeExpr *pointee = nullptr,
+                    bool byteview = false, Line at = {});
+         bool Fits(TypeExpr *pointee, bool byteview);
+-        bool Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee, bool byteview);
+-        bool Class(VarDef *cr, bool exact, TypeExpr *pointee, bool byteview);
++        bool Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee, bool byteview, bool argcopy = false);
++        bool Class(VarDef *cr, bool exact, TypeExpr *pointee, bool byteview, bool argcopy = false);
+         bool Holds(VarDef *x, Line *where = nullptr);
+         bool Event(const StoreEvent &e);
+         bool Covered(VarDef *src, VarDef *root, bool exact);
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1522,6 +1522,7 @@
+             (!o.pointee || TypeEq(o.pointee, e.pointee)) &&
+             !o.reached == !e.reached && (!o.reached || TypeEq(o.reached, e.reached))) {
+             o.classread = o.classread && e.classread;
++            o.argcopy = o.argcopy && e.argcopy;
+             origin(m);
+             return;
+         }
+@@ -1635,6 +1636,7 @@
+         // held.
+         e.classread = IsClassRoot(e.src) && (copied || a.classread);
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+         e.reached = reached;
+@@ -1717,6 +1719,7 @@
+         e.src = src;
+         e.classread = classread;
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+         e.at = at->line;
+@@ -1731,13 +1734,17 @@
+     };
+     // A class root of the callee, as seen from here (classat), each root
+     // only a bound where the callee's was (Bounds).
+-    auto mapped = [&](VarDef *cr, bool exact) -> Roots {
++    auto mapped = [&](VarDef *cr, bool exact, bool argcopy = false) -> Roots {
+         Roots r;
+-        if (classat(cr, r) < 0) {
++        auto parameter = classat(cr, r);
++        if (parameter < 0) {
+             r.Set(cr, exact);
++            r.alts[0].argcopy = argcopy;
+             return r;
+         }
+-        return exact ? r : Bounds(r);
++        auto copied = argcopy && !spec->inprogress && !spec->incycle && !spec->sf->isrec &&
++                      !IsRefOrSlice(spec->argtypes[(size_t)parameter]);
++        return exact || copied ? r : Bounds(r);
+     };
+     // A class as the container a stored value was copied or read out of, as
+     // seen from here: the one container the argument, or the slice a view's
+@@ -1815,7 +1822,7 @@
+             continue;
+         }
+         auto e = raw;
+-        auto r = mapped(e.root, e.exact);
++        auto r = mapped(e.root, e.exact, e.argcopy);
+         auto src = source(e.src);
+         e.classread = e.classread && IsClassRoot(src);
+         Roots own;
+@@ -1830,6 +1837,7 @@
+             auto &a = r.alts[k];
+             e.root = a.root;
+             e.exact = a.exact;
++        e.argcopy = a.argcopy;
+             e.src = src;
+             if (k == 0) ReplaceStoreEventLog(i, e);
+             else AppendStoreEventLog(e);
+@@ -1854,7 +1862,7 @@
+             v.byteview = v.byteview || held.byteview;
+             v.freshview = held.freshview;
+         } else {
+-            v.TakeAlts(mapped(e.root, e.exact));
++            v.TakeAlts(mapped(e.root, e.exact, e.argcopy));
+         }
+         return v;
+     };
+@@ -1975,7 +1983,7 @@
+         }
+         auto from = storeevents.size();
+         replay.origin = (int)(&e - rec->classevents.data());
+-        applyevent(e, mapped(e.root, e.exact), true);
++        applyevent(e, mapped(e.root, e.exact, e.argcopy), true);
+         replay.origin = -1;
+         tag(from, (int)(&e - rec->classevents.data()));
+     }
+@@ -2046,6 +2054,7 @@
+         e.container = gd;
+         e.root = a.root;
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         if (!a.exact && a.from != gd) e.src = StoreSource(a.from);
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+@@ -2175,9 +2184,9 @@
+ // only bounds the storage, which then may be the array wherever the pointee
+ // fits it: nothing outlives a global.
+ inline bool TypeCheck::GlobalReach::Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee,
+-                                         bool byteview) {
++                                         bool byteview, bool argcopy) {
+     if (tc.IsClassRoot(r)) {
+-        auto hit = Class(r, exact, pointee, byteview);
++        auto hit = Class(r, exact, pointee, byteview, argcopy);
+         if (hit) Trace("root-class", nullptr, r, exact, from, pointee, byteview);
+         return hit;
+     }
+@@ -2201,8 +2210,8 @@
+ // one. A holder argument copied out of a container holds what that one
+ // does. A class no call reached stands for nothing.
+ inline bool TypeCheck::GlobalReach::Class(VarDef *cr, bool exact, TypeExpr *pointee,
+-                                          bool byteview) {
+-    if (!rooted.insert({ cr, exact }).second) return false;
++                                          bool byteview, bool argcopy) {
++    if (!rooted.insert({ cr, exact, argcopy }).second) return false;
+     auto it = tc.classuses.find(cr);
+     if (it == tc.classuses.end()) return false;
+     for (auto &u : it->second) {
+@@ -2212,7 +2221,7 @@
+         }
+         for (auto &a : u.roots.alts) {
+             if (u.src && Covered(u.src, a.root, a.exact)) continue;
+-            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview)) {
++            if (Root(a.root, a.exact && (exact || argcopy), a.from, pointee, byteview || u.byteview, (exact || argcopy) && a.argcopy)) {
+                 Trace("class-root", cr, a.root, a.exact && exact, u.src ? u.src : a.from,
+                       pointee, byteview || u.byteview);
+                 return true;
+@@ -2272,7 +2281,7 @@
+         }
+         if (Covered(e.src, e.root, e.exact)) return false;
+     }
+-    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview, e.argcopy);
+     if (hit) Trace("event-root", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
+     return hit;
+ }
+@@ -3091,6 +3100,7 @@
+             if (e.src) {
+                 e.root = e.src;
+                 e.exact = false;
++                e.argcopy = false;
+                 if (e.src->isglobal) e.pointee = nullptr;
+             }
+             if (e.root) f(e);
+@@ -3542,6 +3552,7 @@
+             for (auto a : held.alts) {
+                 a.from = nullptr;
+                 a.classread = false;
++                a.argcopy = false;
+                 if (!a.exact && ownclass(a.root)) {
+                     roots.Add(a);
+                     continue;
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -2877,7 +2877,7 @@
+     auto sameevents = [&](const StoreEvent &p, const StoreEvent &q) {
+         return p.container == q.container && p.root == q.root && p.src == q.src &&
+                p.exact == q.exact && p.byteview == q.byteview && p.bound == q.bound &&
+-               p.slot == q.slot && p.sliceref == q.sliceref && p.classread == q.classread &&
++               p.slot == q.slot && p.sliceref == q.sliceref && p.classread == q.classread && p.argcopy == q.argcopy &&
+                sametype(p.pointee, q.pointee) && sametype(p.reached, q.reached);
+     };
+     if (a.classevents.size() != b.classevents.size()) return why("class stores");
+@@ -3068,6 +3068,8 @@
+             // bounded by the class root, as an event of its own.
+             Roots held;
+             held.Set(cr, ra.heldexact, nullptr, ra.slotread);
++            held.alts[0].argcopy = cr && !sf->isrec && !spec->incycle;
++
+             RecordStore(vd, held, ra.byteview, nullptr);
+         }
+         spec->params.push_back(vd);
+@@ -3374,7 +3376,10 @@
+         // What a caller gets is the value, not the container of this
+         // activation it was read out of, which a cycle's next round would
+         // take for its own (RecordStore).
+-        for (auto &a : roots.alts) a.from = nullptr;
++        for (auto &a : roots.alts) {
++            a.from = nullptr;
++            if (!holder || tspec->incycle || tspec->sf->isrec) a.argcopy = false;
++        }
+         auto &rr = tspec->record.retroots[i];
+         for (auto &a : roots.alts) {
+             auto root = a.root;
+@@ -3417,6 +3422,7 @@
+     // else (CallResult).
+     m.Set(alt.root, alt.exact && (alt.root || !spec->inprogress), alt.from, alt.slotread);
+     m.alts[0].classread = alt.classread;
++    m.alts[0].argcopy = alt.argcopy;
+     m.writable = true;
+     if (!alt.root || alt.root->isglobal || alt.root->ownerspec) return m;
+     auto v = m;
+@@ -3427,7 +3433,9 @@
+         auto &a = argvals[p];
+         auto x = m;
+         auto ar = view ? a.held.AsRoots() : ClassArgRoots(spec->argtypes[p], a);
+-        x.TakeAlts(alt.exact ? ar : Bounds(ar));
++        auto copied = alt.argcopy && !view && !spec->inprogress && !spec->incycle &&
++                      !spec->sf->isrec && !IsRefOrSlice(spec->argtypes[p]);
++        x.TakeAlts(alt.exact || copied ? ar : Bounds(ar));
+         for (auto &xa : x.alts) xa.slotread = alt.slotread && xa.slotread;
+         if (alt.classread)
+             for (size_t k = 0; k < x.alts.size(); k++)

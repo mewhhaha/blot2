@@ -21,6 +21,8 @@ GLOBAL_EMPTY_FACTS_PATCH_SHA256 = "b9bb7c4887af567d14e2e8f358ab47b5cd145f4549883
 GLOBAL_EMPTY_FACTS_SOURCE_SHA256 = "f16a05773da3abe6574e88fff285e0acbdaa9ba907a14fbb71de0065b393f4f1"
 GLOBAL_REACH_TRACE_PATCH_SHA256 = "3ee503c4a45826c95952eb8e30a324bb596fce18f02bbba2080a636316454c96"
 GLOBAL_REACH_TRACE_SOURCE_SHA256 = "4866d8be47b3143544b50d2fd00c871b39944b6078840a390158fd0e14157f39"
+COPIED_ARGUMENT_CONTENTS_PATCH_SHA256 = "4a52c2c4c3fe2e9a34df54fdab46c1de6fe495ed01b3cd2e8042c6746d34ab10"
+COPIED_ARGUMENT_CONTENTS_SOURCE_SHA256 = "0535d5041072eb36209db614634b974386e9bf1889fdcdcfc7b3b88e310a8628"
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
 PATCH_SHA256 = "5168d0b9ad17328d8ada154c251c6bd3956ea801fdb61ff92f9427e38d4e4bfa"
 PATCHED_SOURCE_SHA256 = "652b36d0039864a5a2bc9f6220f86bf08da77624f53a650ff15fe61e6914eded"
@@ -238,6 +240,8 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.copied_argument_contents and not args.global_reach_trace:
+        raise RuntimeError("--copied-argument-contents requires the complete --global-reach-trace recipe")
     if args.global_reach_trace and not args.global_empty_facts:
         raise RuntimeError("--global-reach-trace requires --global-empty-facts")
     if args.global_empty_facts and (args.shrink_origins or not all((
@@ -349,6 +353,12 @@ def build(args):
             raise RuntimeError("global-reach-trace patch changed; review and update its pinned digest")
         identity["global_reach_trace_patch_sha256"] = GLOBAL_REACH_TRACE_PATCH_SHA256
         identity["global_reach_trace_source_sha256"] = GLOBAL_REACH_TRACE_SOURCE_SHA256
+    copied_argument_contents_patch = Path(__file__).with_name("goose-copied-argument-contents.patch")
+    if args.copied_argument_contents:
+        if digest(copied_argument_contents_patch) != COPIED_ARGUMENT_CONTENTS_PATCH_SHA256:
+            raise RuntimeError("copied-argument-contents patch changed; review its pinned digest")
+        identity["copied_argument_contents_patch_sha256"] = COPIED_ARGUMENT_CONTENTS_PATCH_SHA256
+        identity["copied_argument_contents_source_sha256"] = COPIED_ARGUMENT_CONTENTS_SOURCE_SHA256
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -458,6 +468,12 @@ def build(args):
                     "-d", str(work / "source"), "-i", str(global_reach_trace_patch),
                 ], work, 5))
                 patched_source_sha256 = checked_source(work / "source", identity["global_reach_trace_source_sha256"])
+            if args.copied_argument_contents:
+                stages.append(run_stage("copied-argument-contents-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(copied_argument_contents_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", COPIED_ARGUMENT_CONTENTS_SOURCE_SHA256)
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -508,6 +524,9 @@ def build(args):
             if args.global_reach_trace:
                 final_identity["global_reach_trace_patch_sha256"] = digest(global_reach_trace_patch)
                 final_identity["global_reach_trace_source_sha256"] = GLOBAL_REACH_TRACE_SOURCE_SHA256
+            if args.copied_argument_contents:
+                final_identity["copied_argument_contents_patch_sha256"] = digest(copied_argument_contents_patch)
+                final_identity["copied_argument_contents_source_sha256"] = COPIED_ARGUMENT_CONTENTS_SOURCE_SHA256
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -531,6 +550,10 @@ def main():
     parser.add_argument(
         "--cache-dir", type=Path, default=ROOT / "build/goose-port/private-checker",
         help="private build cache (default: ignored build/goose-port/private-checker)",
+    )
+    parser.add_argument(
+        "--copied-argument-contents", action="store_true",
+        help="preserve by-value argument contents across nonrecursive copies; requires --global-reach-trace",
     )
     parser.add_argument(
         "--global-reach-trace", action="store_true",

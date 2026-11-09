@@ -1,0 +1,208 @@
+{
+  "two_owners_unrelated": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 0
+    },
+    "run": true
+  },
+  "literal_control": {
+    "baseline": {
+      "exit": 0
+    },
+    "candidate": {
+      "exit": 0
+    }
+  },
+  "nested_copy": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 0
+    },
+    "run": true
+  },
+  "true_owner_a": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "true_owner_b": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "global_store": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 0
+    },
+    "run": true
+  },
+  "global_store_real": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "local_escape": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a79.2"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a79.2"
+    }
+  },
+  "alias_mutation": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "different_calls": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "deep_read": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "recursive": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "join_deep": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "global_different_calls": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "global_local_escape": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a79.2"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a79.2"
+    }
+  },
+  "nested_alias_mutation": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "byvalue_mutation": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "sameclass_alias_first_safe": {
+    "baseline": {
+      "exit": 0
+    },
+    "candidate": {
+      "exit": 0
+    }
+  },
+  "sameclass_alias_first_real": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "sameclass_holder_first_real": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  },
+  "multiowner_unsafe_branch": {
+    "baseline": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    },
+    "candidate": {
+      "exit": 1,
+      "section": "\u00a75.1"
+    }
+  }
+}

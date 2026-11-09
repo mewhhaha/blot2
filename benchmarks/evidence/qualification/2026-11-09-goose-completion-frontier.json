@@ -2361,20 +2361,6 @@
       "compiler-goose/tests/footprint_owner.goose": "acad168e114840b45be3321c17560e055760db9af877910d5b70f0218cb7aeea"
     }
   },
-  "unimplemented_checker_precision_proposal": {
-    "status": "Isolated prototype requested; not promoted",
-    "intent": "Preserve complete incoming argument contents across nonrecursive whole-record copies using a distinct proof bit, without changing exact storage identity",
-    "required_controls": [
-      "unrelated owner clear permitted",
-      "either real owner clear rejected",
-      "local escape",
-      "alias mutation",
-      "deep reference traversal",
-      "recursive owner-changing backedge",
-      "same specialization with different actual owners"
-    ],
-    "constraints": "Keep exact=false; proof joins by intersection and is cleared on reference traversal/weakening; no retained callee-local RootAlt.from"
-  },
   "whole_build_109": {
     "command": [
       "python3",
@@ -2466,5 +2452,20 @@
     "full_repair_replay": "Not qualified: existing proof-header guard stops full repair script before codec step; invoked codec author function directly",
     "whole_builds_receipt": "2026-11-10-goose-whole109-111.json.gz",
     "whole_compiler_executable": false
+  },
+  "copied_argument_contents_private_layer": {
+    "status": "Implemented optional private layer;21 focused cases,3 executions,24 semantic/runtime controls and24 empty-holder parity cases pass; not whole-port qualification",
+    "intent": "Preserve complete incoming argument contents across nonrecursive whole-record copies using a distinct proof bit, without changing exact storage identity",
+    "required_controls": [
+      "unrelated owner clear permitted",
+      "either real owner clear rejected",
+      "local escape",
+      "alias mutation",
+      "deep reference traversal",
+      "recursive owner-changing backedge",
+      "same specialization with different actual owners"
+    ],
+    "constraints": "Keep exact=false; proof joins by intersection and is cleared on reference traversal/weakening; no retained callee-local RootAlt.from",
+    "raw_receipt": "2026-11-10-goose-copied-argument-contents.json.gz"
   }
 }

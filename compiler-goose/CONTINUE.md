@@ -44,6 +44,14 @@ and 24 existing controls; bounded GlobalReach logging preserves on/off diagnosti
 Installed Goose and siblings remain unchanged. Newer selfhost Goose snapshots are
 not qualified for this port's native/packages/pool interfaces.
 
+The optional `--copied-argument-contents` layer preserves complete incoming
+by-value record contents without changing exact storage identity. It requires
+the full `--global-reach-trace` recipe. Independent review,21 focused lifetime
+controls,3 executed positives and both24-case existing control sets pass.
+Field reads and recursion remain conservative; whole111 still hits SessionCatalog.
+The installed compiler and qualified678 binary are unchanged. See
+[the exact tooling receipt](../benchmarks/evidence/qualification/2026-11-10-goose-copied-argument-contents.json.gz).
+
 Repair stages cap at 120s. After entry checks, final C emission may use 180s within
 the shared 300s whole-build cap. The actual builder regenerates source identity,
 emits C plus a host header and links the real Goose CLI/native OS adapters.
