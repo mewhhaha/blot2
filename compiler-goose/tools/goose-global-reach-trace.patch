@@ -1,0 +1,98 @@
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2700,0 +2701,4 @@
++        bool trace = false;
++        void Trace(string_view kind, VarDef *holder = nullptr, VarDef *root = nullptr,
++                   bool exact = false, VarDef *src = nullptr, TypeExpr *pointee = nullptr,
++                   bool byteview = false, Line at = {});
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2127,0 +2128,4 @@
++                    if (gd->name == "live_sessions" && arr->name == "payloads") {
++                        auto enabled = std::getenv("GOOSE_GLOBAL_REACH_TRACE");
++                        reach.trace = enabled && string_view(enabled) == "1";
++                    }
+@@ -2129,0 +2134 @@
++                    reach.Trace("failure", gd, arr, true, nullptr, nullptr, false, gs.at);
+@@ -2139,0 +2145,22 @@
++// Optional private diagnostics only: no TypeStr/type queries or changed traversal.
++inline void TypeCheck::GlobalReach::Trace(string_view kind, VarDef *holder, VarDef *root,
++                                         bool exact, VarDef *src, TypeExpr *pointee,
++                                         bool byteview, Line at) {
++    if (!trace) return;
++    static size_t lines = 0;
++    if (lines >= 160) return;
++    lines++;
++    auto name = [&](VarDef *v) {
++        if (!v) return string("<none>");
++        auto result = cat(v->name, "@", tc.Where(v->line));
++        auto owner = v->ownerspec ? v->ownerspec : v->classfrom ? v->classfrom->ownerspec : nullptr;
++        if (owner && owner->sf) result += cat("[", owner->sf->qname, "]");
++        return result;
++    };
++    fprintf(stderr, "GOOSE_GLOBAL_REACH kind=%.*s holder=%s root=%s exact=%d src=%s pointee_kind=%d byteview=%d at=%s\n",
++            (int)kind.size(), kind.data(), name(holder).c_str(), name(root).c_str(), (int)exact,
++            name(src).c_str(), pointee ? (int)pointee->kind : -1, (int)byteview,
++            tc.Where(at).c_str());
++    if (lines == 160) fprintf(stderr, "GOOSE_GLOBAL_REACH limit=160\n");
++}
++
+@@ -2152,4 +2179,18 @@
+-    if (tc.IsClassRoot(r)) return Class(r, exact, pointee, byteview);
+-    if (exact) return r == arr;
+-    if (from && !IsTemp(from)) return Holds(from);
+-    return Fits(pointee, byteview);
++    if (tc.IsClassRoot(r)) {
++        auto hit = Class(r, exact, pointee, byteview);
++        if (hit) Trace("root-class", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    if (exact) {
++        auto hit = r == arr;
++        if (hit) Trace("root-exact", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    if (from && !IsTemp(from)) {
++        auto hit = Holds(from);
++        if (hit) Trace("root-source", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    auto hit = Fits(pointee, byteview);
++    if (hit) Trace("root-bound", nullptr, r, exact, from, pointee, byteview);
++    return hit;
+@@ -2168 +2209,4 @@
+-        if (u.src && Holds(u.src)) return true;
++        if (u.src && Holds(u.src)) {
++            Trace("class-source", cr, nullptr, exact, u.src, pointee, byteview || u.byteview);
++            return true;
++        }
+@@ -2171 +2215,3 @@
+-            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview))
++            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview)) {
++                Trace("class-root", cr, a.root, a.exact && exact, u.src ? u.src : a.from,
++                      pointee, byteview || u.byteview);
+@@ -2172,0 +2219 @@
++            }
+@@ -2190 +2237,5 @@
+-                if (!a.exact || (a.root && Holds(a.root))) return true;
++                if (!a.exact || (a.root && Holds(a.root))) {
++                    Trace(a.exact ? "held-class-root" : "held-class-bound", x, a.root,
++                          a.exact, u.src ? u.src : a.from, nullptr, u.byteview);
++                    return true;
++                }
+@@ -2196,0 +2248 @@
++            Trace("holder-store", x, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
+@@ -2203,0 +2256,2 @@
++            Trace("holder-binding", x, a.root, a.exact, a.from, tc.PointeeOf(x->type),
++                  x->ref.byteview, x->line);
+@@ -2215 +2269,4 @@
+-        if (Holds(e.src)) return true;
++        if (Holds(e.src)) {
++            Trace("event-source", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
++            return true;
++        }
+@@ -2218 +2275,3 @@
+-    return Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    if (hit) Trace("event-root", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
++    return hit;

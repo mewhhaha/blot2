@@ -1,0 +1,35 @@
+{
+  "scope": "Optional private logging only; does not alter AST, traversal or acceptance. Not whole compiler/runtime qualification.",
+  "candidate": {
+    "binary_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
+    "patched_source_sha256": "4866d8be47b3143544b50d2fd00c871b39944b6078840a390158fd0e14157f39",
+    "build": [
+      {
+        "stage": "compile",
+        "exit": 0,
+        "seconds": 63.821
+      },
+      {
+        "stage": "link",
+        "exit": 0,
+        "seconds": 0.314
+      }
+    ]
+  },
+  "patch": {
+    "path": "compiler-goose/tools/goose-global-reach-trace.patch",
+    "sha256": "3ee503c4a45826c95952eb8e30a324bb596fce18f02bbba2080a636316454c96"
+  },
+  "controls": {
+    "new_precision_cases": 24,
+    "existing_semantic_cases": 24,
+    "all_passed": true,
+    "trace_on_off_diagnostics_identical": true,
+    "trace_lines": 6
+  },
+  "trace_contract": "GOOSE_GLOBAL_REACH_TRACE=1 selects live_sessions/payloads; successful edges only, no TypeStr/type-query calls,160-line cap, default off.",
+  "finding": "Copied failing source first reaches inactive_session_tables as an inexact untyped root through returned Session; source repair probes remain unqualified.",
+  "source_status": "Production checkpoint b3763778 remains20 executed passes/1Frame failure; no new production changes from cache/bootstrap probes.",
+  "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-global-reach-trace.json.gz",
+  "raw_receipt_sha256": "af45cbcda289e25b3be0fbb51708a88726be5c24a9e1a220aac053bf4f5971a0"
+}

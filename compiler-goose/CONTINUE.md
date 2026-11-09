@@ -94,4 +94,4 @@ includes real Frame.create/release and fails at the remaining Session context
 publication edge. Real Plan/outline/archive cleanup pass. Thirty restore functions
 fill fresh owner runs before publishing views; generic buffers preserve exact
 destinations, and ModuleStamps uses fixed pooled headers. Source remains an
-unqualified whole compiler; the targeted private GlobalReach trace is pending.
+unqualified whole compiler; the targeted private GlobalReach trace is qualified separately and does not change acceptance.

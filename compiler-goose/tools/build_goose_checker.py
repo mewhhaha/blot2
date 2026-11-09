@@ -19,6 +19,8 @@ ROOT = Path(__file__).resolve().parents[2]
 # This precision extension is qualified only on the complete 9ee recipe.
 GLOBAL_EMPTY_FACTS_PATCH_SHA256 = "b9bb7c4887af567d14e2e8f358ab47b5cd145f4549883e8ed9a7cb5313c9aa12"
 GLOBAL_EMPTY_FACTS_SOURCE_SHA256 = "f16a05773da3abe6574e88fff285e0acbdaa9ba907a14fbb71de0065b393f4f1"
+GLOBAL_REACH_TRACE_PATCH_SHA256 = "3ee503c4a45826c95952eb8e30a324bb596fce18f02bbba2080a636316454c96"
+GLOBAL_REACH_TRACE_SOURCE_SHA256 = "4866d8be47b3143544b50d2fd00c871b39944b6078840a390158fd0e14157f39"
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
 PATCH_SHA256 = "5168d0b9ad17328d8ada154c251c6bd3956ea801fdb61ff92f9427e38d4e4bfa"
 PATCHED_SOURCE_SHA256 = "652b36d0039864a5a2bc9f6220f86bf08da77624f53a650ff15fe61e6914eded"
@@ -236,6 +238,8 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.global_reach_trace and not args.global_empty_facts:
+        raise RuntimeError("--global-reach-trace requires --global-empty-facts")
     if args.global_empty_facts and (args.shrink_origins or not all((
             args.diagnostic_roots, args.runtime_observer, args.reachable_program,
             args.stable_closures, args.array_reach_gate, args.reference_closures,
@@ -339,6 +343,12 @@ def build(args):
             raise RuntimeError("global-empty-facts patch changed; review and update its pinned digest")
         identity["global_empty_facts_patch_sha256"] = GLOBAL_EMPTY_FACTS_PATCH_SHA256
         identity["global_empty_facts_source_sha256"] = GLOBAL_EMPTY_FACTS_SOURCE_SHA256
+    global_reach_trace_patch = Path(__file__).with_name("goose-global-reach-trace.patch")
+    if args.global_reach_trace:
+        if digest(global_reach_trace_patch) != GLOBAL_REACH_TRACE_PATCH_SHA256:
+            raise RuntimeError("global-reach-trace patch changed; review and update its pinned digest")
+        identity["global_reach_trace_patch_sha256"] = GLOBAL_REACH_TRACE_PATCH_SHA256
+        identity["global_reach_trace_source_sha256"] = GLOBAL_REACH_TRACE_SOURCE_SHA256
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -442,6 +452,12 @@ def build(args):
                     "-d", str(work / "source"), "-i", str(global_empty_facts_patch),
                 ], work, 5))
                 patched_source_sha256 = checked_source(work / "source", identity["global_empty_facts_source_sha256"])
+            if args.global_reach_trace:
+                stages.append(run_stage("global-reach-trace-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(global_reach_trace_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", identity["global_reach_trace_source_sha256"])
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -489,6 +505,9 @@ def build(args):
             if args.global_empty_facts:
                 final_identity["global_empty_facts_patch_sha256"] = digest(global_empty_facts_patch)
                 final_identity["global_empty_facts_source_sha256"] = GLOBAL_EMPTY_FACTS_SOURCE_SHA256
+            if args.global_reach_trace:
+                final_identity["global_reach_trace_patch_sha256"] = digest(global_reach_trace_patch)
+                final_identity["global_reach_trace_source_sha256"] = GLOBAL_REACH_TRACE_SOURCE_SHA256
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -512,6 +531,10 @@ def main():
     parser.add_argument(
         "--cache-dir", type=Path, default=ROOT / "build/goose-port/private-checker",
         help="private build cache (default: ignored build/goose-port/private-checker)",
+    )
+    parser.add_argument(
+        "--global-reach-trace", action="store_true",
+        help="include opt-in successful global ownership-path diagnostics; requires --global-empty-facts",
     )
     parser.add_argument(
         "--global-empty-facts", action="store_true",

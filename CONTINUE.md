@@ -101,6 +101,10 @@ controls and the existing 24 semantic controls with diagnostic/runtime/C parity.
 It invalidates facts across calls/stores and keeps alias/loop/recursive boundaries.
 Installed Goose is unchanged. See [the exact tooling evidence](benchmarks/evidence/qualification/2026-11-09-goose-global-empty-facts.json).
 
+A bounded optional GlobalReach trace now identifies successful ownership edges.
+It passes both24-control matrices and on/off diagnostic parity on the frozen
+copied reproducer; production source remains unchanged. See [trace evidence](benchmarks/evidence/qualification/2026-11-09-goose-global-reach-trace.json).
+
 Private checker tooling is checkpointed separately. Its holder index reaches the
 same diagnostic in 82.445s versus 104.824s on identical inputs in one pair; this
 is not a complete compilation ratio. The frame guard passes 147 laws in each
