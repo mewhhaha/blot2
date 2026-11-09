@@ -14,7 +14,8 @@ fn main() {
         capture.metadata().pools=blot_support::some(default<blot_reuse_code_artifacts::Pools>());
         assert(capture.metadata().pools.present);
         factory.destroyArchiveCapture(token);
+        blot_compile_workspace::clearBacking();
         blot_compile_workspace::resetBackingDescriptors();
     }
-    print("archive capture passed: live metadata publication, release, inactive readers and descriptor reset");
+    print("archive capture passed: live metadata publication, release, inactive readers and backing reset");
 }

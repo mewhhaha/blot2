@@ -14,8 +14,16 @@ struct State {
 fn init(state: State&,units: const blot_check_core::Module[:]) -> blot_error::Error {
     let initialized = state.store.reset(); if initialized != blot_error::Error.none { return initialized; } state.store.opaque_sources = units; state.store.closed.units = units;
     for source in units { let error = state.store.record_names.add(source); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.declined; } }
+    resetCaches(state); return blot_error::Error.none;
+}
+fn initEmpty(state:State&)->blot_error::Error {
+    let initialized=state.store.reset();if initialized!=blot_error::Error.none {return initialized;}
+    state.store.opaque_sources=default<const blot_check_core::Module[:]>();state.store.closed.units=default<const blot_check_core::Module[:]>();
+    resetCaches(state);return blot_error::Error.none;
+}
+fn resetCaches(state:State&) {
     state.row_keys.deinit(); state.template_keys.deinit(); state.static_keys.deinit(); state.instance_arguments.deinit(); state.instance_arguments = blot_eval_instance_arguments::init(state.instance_arguments.values,state.instance_arguments.spans);
-    state.connection_bound = false; return blot_error::Error.none;
+    state.connection_bound = false;
 }
 fn fromStore(store: blot_backend_layout::Store&,connection: blot_backend_layout_bridge::Store&,row_keys: blot_reuse_substitution_keys::Store&,template_keys: blot_reuse_substitution_keys::Store&,static_keys: blot_reuse_substitution_keys::Store&,instance_arguments: blot_eval_instance_arguments::Store&) -> State {
     State { store,connection,false,row_keys,template_keys,static_keys,instance_arguments }

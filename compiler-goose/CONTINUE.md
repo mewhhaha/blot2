@@ -88,3 +88,10 @@ All 19 executed laws pass, including repeated empty-session and archive-capture
 lifecycles. Archive law excludes clearBacking: resolved-body Store still borrows
 its grow-only payload owner permanently. General nonempty Session input ownership
 is also unresolved; no whole compiler executable exists.
+
+The current broad batch passes20 laws. The default21st law, empty_session, now
+includes real Frame.create/release and fails at the remaining Session context
+publication edge. Real Plan/outline/archive cleanup pass. Thirty restore functions
+fill fresh owner runs before publishing views; generic buffers preserve exact
+destinations, and ModuleStamps uses fixed pooled headers. Source remains an
+unqualified whole compiler; the targeted private GlobalReach trace is pending.

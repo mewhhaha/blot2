@@ -106,7 +106,7 @@ fn contains(self_: const TypedViewsMap&,key: ViewKey) -> bool { return self_.get
 fn insert(self_: TypedViewsMap&,key: ViewKey,value: ValueId) { var view=blot_support_pooled_map::Map<ViewKey,ValueId> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_TypedViewsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: TypedViewsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: TypedViewsMap&) { if self_.slots.len!=0 { pool_TypedViewsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<ViewKey,ValueId>[:]>(); self_.count=0; }
-fn restore(self_: TypedViewsMap&,slots: const dictionary_slot<ViewKey,ValueId>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_TypedViewsMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: TypedViewsMap&,slots: const dictionary_slot<ViewKey,ValueId>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_TypedViewsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct RecordTypesMap { count: i64=0,slots: dictionary_slot<RecordKey,u32>[:]=default<dictionary_slot<RecordKey,u32>[:]>() }
 reusable[] var pool_RecordTypesMap: dictionary_slot<RecordKey,u32>[>..]=[];
 fn get(self_: const RecordTypesMap&,key: RecordKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -114,7 +114,7 @@ fn contains(self_: const RecordTypesMap&,key: RecordKey) -> bool { return self_.
 fn insert(self_: RecordTypesMap&,key: RecordKey,value: u32) { var view=blot_support_pooled_map::Map<RecordKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordTypesMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecordTypesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RecordTypesMap&) { if self_.slots.len!=0 { pool_RecordTypesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RecordKey,u32>[:]>(); self_.count=0; }
-fn restore(self_: RecordTypesMap&,slots: const dictionary_slot<RecordKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_RecordTypesMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: RecordTypesMap&,slots: const dictionary_slot<RecordKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RecordTypesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct RecordShapesMap { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var pool_RecordShapesMap: dictionary_slot<u64,u32>[>..]=[];
 fn get(self_: const RecordShapesMap&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -122,7 +122,7 @@ fn contains(self_: const RecordShapesMap&,key: u64) -> bool { return self_.get(k
 fn insert(self_: RecordShapesMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordShapesMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: RecordShapesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RecordShapesMap&) { if self_.slots.len!=0 { pool_RecordShapesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
-fn restore(self_: RecordShapesMap&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_RecordShapesMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: RecordShapesMap&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RecordShapesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct State { owner_id: u64=0,generation: u64=0,live: bool=false,evidence: blot_eval_type_evidence::Store=blot_eval_type_evidence::Store {},collection_buffers: blot_eval_eval_collection_growth::Store=blot_eval_eval_collection_growth::Store {},values: ValuesBuffer=ValuesBuffer {},children: Words=Words {},closures: ClosuresBuffer=ClosuresBuffer {},code_origins: CodeOriginsBuffer=CodeOriginsBuffer {},value_evidence: Words=Words {},type_mappings: TypeMappingsBuffer=TypeMappingsBuffer {},row_mappings: RowMappingsBuffer=RowMappingsBuffer {},value_records: Words=Words {},record_layouts: RecordLayoutsBuffer=RecordLayoutsBuffer {},field_names: Words=Words {},record_shape_next: Words=Words {},typed_views: TypedViewsMap=TypedViewsMap {},specialized_closures: TypedViewsMap=TypedViewsMap {},record_types: RecordTypesMap=RecordTypesMap {},record_shapes: RecordShapesMap=RecordShapesMap {} }
 reusable var states: State[>..]=[];
 var inactive: State=State {};

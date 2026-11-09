@@ -14,7 +14,7 @@ fn contains(self_: const FactMap&,key: u64) -> bool { return self_.get(key)!=nul
 fn insert(self_: FactMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_FactMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: FactMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: FactMap&) { if self_.slots.len!=0 { pool_FactMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
-fn restore(self_: FactMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_FactMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: FactMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_FactMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct FactsState { answers: FactMap=FactMap {},owner_id: u64=0,lease_generation: u64=0,live: bool=false }
 reusable var Facts_states: FactsState[>..]=[];
 var inactive_Facts: FactsState=FactsState {};
@@ -55,7 +55,7 @@ fn contains(self_: const AnswerMap&,key: CacheKey) -> bool { return self_.get(ke
 fn insert(self_: AnswerMap&,key: CacheKey,value: u32) { var view=blot_support_pooled_map::Map<CacheKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_AnswerMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: AnswerMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: AnswerMap&) { if self_.slots.len!=0 { pool_AnswerMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CacheKey,u32>[:]>(); self_.count=0; }
-fn restore(self_: AnswerMap&,slots: const dictionary_slot<CacheKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_AnswerMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: AnswerMap&,slots: const dictionary_slot<CacheKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_AnswerMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct CacheState { answers: AnswerMap=AnswerMap {},owner_id: u64=0,generation: u16=0,physical: u64=0,max_depth: i64=0,lease_generation: u64=0,live: bool=false }
 reusable var Cache_states: CacheState[>..]=[];
 var inactive_Cache: CacheState=CacheState {};

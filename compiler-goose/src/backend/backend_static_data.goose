@@ -8,7 +8,7 @@ import support.pooled_buffer;
 type Error = blot_error::Error;
 struct SerializedKey { value: blot_eval_core_eval::ValueId,ty: blot_backend_layout::Id }
 fn hash(key: SerializedKey) -> u64 { ::hash((key.value as u64 << 32) | key.ty) }
-type Cache = blot_support_pooled_map::Map<SerializedKey,u32>;
+struct Cache {count:i64=0,slots:dictionary_slot<SerializedKey,u32>[:]=default<dictionary_slot<SerializedKey,u32>[:]>()}
 reusable[] var cache_slots: dictionary_slot<SerializedKey,u32>[>..] = [];
 fn get(self_: const Cache&,key: SerializedKey) -> u32? { blot_support_pooled_map::get(self_,key) }
 fn insert(self_: Cache&,key: SerializedKey,value: u32) -> Error { blot_support_pooled_map::insert(self_,key,value,cache_slots); return blot_error::Error.none; }

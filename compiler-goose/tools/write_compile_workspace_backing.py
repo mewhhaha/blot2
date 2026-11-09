@@ -42,10 +42,8 @@ def stripouter(t):
  t=t.strip()
  while t.startswith('(') and balanced(t,0,'(',')')==len(t)-1:t=t[1:-1].strip()
  return t
-special={}
 def defaults_expr(t,name):
  t=stripouter(t);imp(t)
- if t in special:return special[t]
  fs=info(t)
  if fs is None:return 'default<'+t+'>()'
  assigned=[]
@@ -67,7 +65,6 @@ def owner(name,t):
  name=re.sub(r'[^a-zA-Z0-9_]','_',name);t=stripouter(t);imp(t)
  if name in exprs:return name
  exprs[name]=t
- if t in special:return special[t]
  if '[>..' in t:
   init='[]';allowners.append((name,t,'grow'))
  elif t.startswith('dictionary<'):
@@ -88,6 +85,9 @@ for f,t,hd in info(gen):
  if f in gargs or hd:continue
  if t.endswith('&'):gargs[f]=owner('backing_generator_'+f,t[:-1])
  elif mandatory(t):gargs[f]=defaults_expr(t,'backing_generator_'+f)
+# Constructor fields execute in declaration order, including checked observers.
+wsargs={f:wsargs[f] for f,t,hd in info(ws) if f in wsargs}
+gargs={f:gargs[f] for f,t,hd in info(gen) if f in gargs}
 # All backing data is explicit, named and long lived. Releasing a frame clears
 # both Grow and dictionary containers; their high-water capacity belongs to this
 # process compiler backing and is reused by subsequent frames.
@@ -95,12 +95,14 @@ header='''// One active compiler attempt per process. Every growing owner is nam
 // retained publication data and captures live in separate typed owner pools.
 namespace blot_compile_workspace;
 '''
-used.update(['dictionary','backend.core_backend','backend.result_publication','eval.core_eval','reuse.artifact_capture','backend.optimized_bodies'])
+used.update(['dictionary','backend.core_backend','backend.result_publication','eval.core_eval','reuse.artifact_capture','backend.optimized_bodies','backend.resolved_body'])
 body=header+'\n'.join('import '+x+';' for x in sorted(used))+'\n\n'+'\n'.join(lines)+'\n\n'
 body+='fn makeGenerator(allocation_owner:u64,session:blot_eval_core_eval::Session&)->blot_backend_core_backend::Generator {return '+gen+'{'+','.join(k+':'+v for k,v in gargs.items())+',..};}\n'
 body+='fn makeWorkspace(allocation_owner:u64,generator:blot_backend_core_backend::Generator&,tables:blot_eval_core_eval::SessionTables,capture:blot_reuse_artifact_capture::Capture&,optimized:blot_backend_optimized_bodies::Capture&)->'+ws+' {return '+ws+'{'+','.join(k+':'+v for k,v in wsargs.items())+',..};}\n'
-body+='fn resetBackingDescriptors() {\n'+'\n'.join(' '+line[4:line.index(':')]+line[line.index(' = '):] for line in lines if line[4:line.index(':')] in record_types)+'\n}\n'
-body+='fn clearBacking() {\n'+'\n'.join(' '+n+'.clear();' for n,t,k in allowners)+'\n}\n'
+# Calls do not transfer ordered empty-holder facts across function boundaries.
+empty_plans=' blot_backend_resolved_body::entries=dictionary<blot_backend_resolved_body::NodeKey,blot_backend_resolved_body::Plan..&?>{..};\n blot_backend_resolved_body::slots=[];\n blot_backend_resolved_body::payloads=[];\n'
+body+='fn resetBackingDescriptors() {\n assert(blot_backend_resolved_body::payloads.len==0);\n'+empty_plans+'\n'.join(' '+line[4:line.index(':')]+line[line.index(' = '):] for line in lines if line[4:line.index(':')] in record_types)+'\n}\n'
+body+='fn clearBacking() {\n blot_backend_resolved_body::deinit();\n'+empty_plans+'\n'.join(' '+n+'.clear();' for n,t,k in allowners)+'\n}\n'
 (root/'driver/compile_workspace_backing.goose').write_text(body)
 import json
 (root.parent/'build/compile-workspace-backing-model.json').write_text(json.dumps({'workspace':wsargs,'generator':gargs,'records':record_types,'owners':allowners},indent=2))

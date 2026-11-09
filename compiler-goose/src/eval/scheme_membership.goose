@@ -22,7 +22,7 @@ fn contains(self_: const EntryMap&,key: Key) -> bool { return self_.get(key)!=nu
 fn insert(self_: EntryMap&,key: Key,value: List) { var view=blot_support_pooled_map::Map<Key,List> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_EntryMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: EntryMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: EntryMap&) { if self_.slots.len!=0 { pool_EntryMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Key,List>[:]>(); self_.count=0; }
-fn restore(self_: EntryMap&,slots: const dictionary_slot<Key,List>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_EntryMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: EntryMap&,slots: const dictionary_slot<Key,List>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_EntryMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct RetiredWords { values: u32[:]=default<u32[:]>(),next: u32=0 }
 reusable[] var membership_words: u32[>..]=[];
 reusable var retired_words: RetiredWords[>..]=[];

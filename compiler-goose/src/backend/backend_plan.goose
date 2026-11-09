@@ -94,7 +94,6 @@ fn clear(catalog:TemplateCatalog&) {blot_support_pooled_buffer::clear(catalog);c
 fn resize(catalog:TemplateCatalog&,length:i64) {blot_support_pooled_buffer::resize(catalog,length);catalog.len=length;}
 struct RuntimeSlot { global: u32,initializer: u32,active: bool = true }
 struct State {
-    bodies: blot_backend_resolved_body::Store<blot_backend_backend_emission::Plan>&,
     instances: KeyCache&,template_results: KeyCache&,template_catalog: TemplateCatalog&,template_instances: TemplateCache&,
     closures: ClosureCache&,closure_template_results: ClosureCache&,callables: CallableCache&,carrier_adapters: CarrierCache&,
     constructor_functions: ConstructorCache&,primitive_functions: PrimitiveCache&,operation_functions: OperationCache&,runtime_operations: blot_backend_runtime_operations::Store&,
@@ -105,7 +104,7 @@ struct State {
 }
 fn init(state: State&) { state.runtime_plan_confirmed = false; state.occurrence_plan_active = false; state.occurrence_plan_cells = default<const blot_check_core::BindingRef[:]>(); }
 fn deinit(state: State&) {
-    state.bodies.deinit();
+    blot_backend_resolved_body::deinit();
     state.instances.clear(); state.template_results.clear(); state.template_catalog.clear(); state.template_instances.clear(); state.closures.clear(); state.closure_template_results.clear(); state.callables.clear(); state.carrier_adapters.clear();
     state.constructor_functions.clear(); state.primitive_functions.clear(); state.operation_functions.clear(); state.runtime_operations.deinit(); state.host_functions.clear(); state.runtime_globals.clear(); state.startup_facts.deinit(); state.runtime_order.clear();
     state.array_proofs.each() { key,proof => proof.deinit(); } state.array_proofs.clear(); state.numeric_plans.each() { key,plan => plan.deinit(); } state.numeric_plans.clear(); state.facts.deinit(); state.discard_proofs.clear(); state.discard_flags.clear();

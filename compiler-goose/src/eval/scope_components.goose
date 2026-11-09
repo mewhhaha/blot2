@@ -43,7 +43,7 @@ fn contains(self_: const KeyMap&,key: u64) -> bool { return self_.get(key)!=null
 fn insert(self_: KeyMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_KeyMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: KeyMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: KeyMap&) { if self_.slots.len!=0 { pool_KeyMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
-fn restore(self_: KeyMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_KeyMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: KeyMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_KeyMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct GraphState { nodes: NodeBuffer=NodeBuffer {},edges: EdgeBuffer=EdgeBuffer {},work: WordBuffer=WordBuffer {},keys: KeyMap=KeyMap {},owner_id: u64=0,generation: u32=0,merges: i64=0,lease_generation: u64=0,live: bool=false }
 reusable var Graph_states: GraphState[>..]=[];
 var inactive_Graph: GraphState=GraphState {};

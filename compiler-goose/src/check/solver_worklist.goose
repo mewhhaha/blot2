@@ -49,7 +49,7 @@ fn insert(self_: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map:
 fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
 fn clear(self_: Heads&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: Heads&) { if self_.slots.len!=0 { head_slots.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
-fn restore(self_: Heads&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=head_slots.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: Heads&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=head_slots.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct State { entries: EntryBuffer=EntryBuffer {},ready: WordBuffer=WordBuffer {},pending: WordBuffer=WordBuffer {},links: LinkBuffer=LinkBuffer {},heads: Heads=Heads {},free: u32=none,remaining: i64=0,required: i64=0,waiting: i64=0,type_versions: i64=0,row_versions: i64=0,type_generation: u16=0,row_generation: u64=0,clock: blot_check_types::Cursor=0,subscriber_visits: u64=0,retained_watches: u64=0,refreshed_watches: u64=0,ready_word_scans: u64=0,lease_generation: u64=0,live: bool=false }
 reusable var states: State[>..]=[];
 var inactive: State=State {};

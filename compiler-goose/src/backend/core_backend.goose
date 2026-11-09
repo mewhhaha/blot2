@@ -1,5 +1,6 @@
 // Named code instances and constants share the checked immutable Core graph.
 namespace blot_backend_core_backend;
+import check.capability_flow;
 import parse.ast;
 import driver.compile_workspace;
 import .result_publication;
@@ -154,7 +155,7 @@ fn init(generator: Generator&, journal: blot_reuse_artifact_emitter::Recorder&?)
     if requests { let owner, error = generator.module.addGlobal(blot_backend_runtime_ir::SC_u32, 0, true); if error != blot_error::Error.none { return error; } generator.request_owner = blot_support::some(owner); }
     for source in generator.units {
         for closure in source.closures { if source.types.node(closure.parameter.ty).tag == blot_check_types::Tag.scoped { generator.scoped_effects = true; } }
-        for binding in source.bindings { if binding.capability_flow == blot_check_core::CapabilityFlow.spawn_task { generator.spawn_units = generator.units; } }
+        for binding in source.bindings { if binding.capability_flow == blot_check_capability_flow::Contract.spawn_task { generator.spawn_units = generator.units; } }
     }
     return blot_error::Error.none;
 }

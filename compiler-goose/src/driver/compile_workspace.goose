@@ -47,7 +47,7 @@ fn canonicalGenerator(source:Generator&)->Generator& {
 // Session backpointers borrow the existing active frame; they never retain it.
 fn generatorForSession(frame:Frame,session:blot_eval_core_eval::Session&)->Generator& {
  assert(frame.valid()&&frame==active);let state:FrameState& =frames[frame.slot-1];
- let registered .=state.generator;let registered_session .=state.session;assert(registered&&registered_session);
+ let registered_ref .=state.generator;let session_ref .=state.session;assert(registered_ref&&session_ref);let registered:Generator& =registered_ref;let registered_session:blot_eval_core_eval::Session& =session_ref;
  let generator:Generator& =canonicalGenerator(registered);
  assert(registered_session .== session && generator.evaluator .== session);
  return generator;
@@ -67,43 +67,46 @@ fn create(allocation_owner:u64)->Frame,Error {
 }
 fn construct(frame:Frame)->Error {
  assert(frame.valid()&&active==frame);let state:FrameState& =frames[frame.slot-1];
- // Empty catalogs are deliberate: no caller-owned input header is retained
- // before bindPublicationOwner and pinWorkspaceInputs establish real pins.
- let session,error=blot_eval_core_eval::initOwnedEmptySession(state.allocation_owner);if error!=blot_error::Error.none {return error;}assert(session);state.session .= session;
- let capture,token,error=state.factory.createArchiveCapture();if error!=blot_error::Error.none {return error;}assert(capture);state.capture .= capture;state.capture_token=token;
- let generator_index=generators.alloc_index(makeGenerator(state.allocation_owner,session));state.generator_slot=(generator_index+1) as u32;state.generator .= generators[generator_index];
- let prepared=state.generator.representations.init([]);if prepared!=blot_error::Error.none {return prepared;}state.prepared=true;
- state.generator.planning.init();let initialized=blot_backend_core_backend::init(state.generator,null);if initialized!=blot_error::Error.none {return initialized;}
- let workspace_index=workspaces.alloc_index(makeWorkspace(state.allocation_owner,state.generator,session.ownedSessionTables(),capture,activeOptimized()));state.workspace_slot=(workspace_index+1) as u32;state.workspace .= workspaces[workspace_index];
- return blot_backend_core_backend::bindPublicationOwner(state.workspace,state.generation);
+ // Empty catalogs precede the publication owner's real input pins.
+ let opened_session,error=blot_eval_core_eval::initOwnedEmptySession(state.allocation_owner);if error!=blot_error::Error.none {return error;}assert(opened_session!=null);let session:blot_eval_core_eval::Session& =opened_session;state.session .= session;
+ let opened_capture,token,error=state.factory.createArchiveCapture();if error!=blot_error::Error.none {return error;}assert(opened_capture!=null);let capture:blot_reuse_artifact_capture::Capture& =opened_capture;state.capture .= capture;state.capture_token=token;
+ let generator_index=generators.alloc_index(makeGenerator(state.allocation_owner,session));state.generator_slot=(generator_index+1) as u32;let generator:Generator& =generators[generator_index];state.generator .= generator;
+ let prepared=generator.representations.initEmpty();if prepared!=blot_error::Error.none {return prepared;}state.prepared=true;
+ generator.planning.init();let initialized=blot_backend_core_backend::init(generator,null);if initialized!=blot_error::Error.none {return initialized;}
+ let workspace_index=workspaces.alloc_index(makeWorkspace(state.allocation_owner,generator,session.ownedSessionTables(),capture,activeOptimized()));state.workspace_slot=(workspace_index+1) as u32;let workspace:Workspace& =workspaces[workspace_index];state.workspace .= workspace;
+ return blot_backend_core_backend::bindPublicationOwner(workspace,state.generation);
 }
 fn release(self_:Frame&)->Error {
  if self_.slot==0 {return blot_error::Error.none;}if !self_.valid() {return blot_error::Error.invalid_artifact;}let at=self_.slot-1;let state:FrameState& =frames[at];
  if state.references>1 {state.references--;self_=Frame{..};return blot_error::Error.none;}
- if state.workspace {if state.workspace.publication_owner.slot!=0&&!blot_backend_core_backend::publicationCanReclaim(state.workspace) {return blot_error::Error.invalid_artifact;}}
- assert(active==self_);destroyContexts(state);state.live=false;state.session .= null;state.generator .= null;state.workspace .= null;state.capture .= null;state.capture_token=0;
+ let workspace_ref .=state.workspace;if workspace_ref {let workspace:Workspace& =workspace_ref;if workspace.publication_owner.slot!=0&&!blot_backend_core_backend::publicationCanReclaim(workspace) {return blot_error::Error.invalid_artifact;}}
+ assert(active==self_);destroyContexts(self_);state.live=false;state.session .= null;state.generator .= null;state.workspace .= null;state.capture .= null;state.capture_token=0;
  frames.free(at);active=Frame{..};self_=Frame{..};return blot_error::Error.none;
 }
-fn destroyContexts(state:FrameState&) {
+fn destroyContexts(frame:Frame) {
+ assert(frame.valid() && active==frame);let state:FrameState& =frames[frame.slot-1];
  // Result.deinit or detachResult releases its workspace lease first. Capture
  // transfer may already have moved its metadata/token out of this frame.
  var publication=blot_backend_result_publication::Owner{..};
- if state.workspace {
-  let workspace .= state.workspace;assert(workspace);publication=workspace.publication_owner;
+ let workspace_ref .=state.workspace;
+ if workspace_ref {
+  let workspace:Workspace& =workspace_ref;publication=workspace.publication_owner;
   workspace.origins.deinit();workspace.candidate.deinit();workspace.vectors.deinit();
   workspace.replay_origins.deinit();workspace.replay_candidate.deinit();workspace.replay_vectors.deinit();workspace.replay_module.deinit();
   workspace.retained.deinit();workspace.principal_state.deinit();workspace.persisted_principals.deinit();workspace.query_state.deinit();workspace.constant_state.deinit();
   workspace.module_stamps.deinit();workspace.allocation_snapshot.deinit();workspace.startup_snapshot.deinit();workspace.explanation.deinit();
  }
- if state.generator {
-  state.generator.module.artifacts .= null;state.generator.artifacts .= null;state.generator.retained .= null;state.generator.principal_state .= null;state.generator.persisted_principals .= null;state.generator.query_state .= null;state.generator.constant_state .= null;state.generator.refinement_owner .= null;
+ let generator_ref .=state.generator;
+ if generator_ref {
+  let generator:Generator& =generator_ref;
+  generator.module.artifacts .= null;generator.artifacts .= null;generator.retained .= null;generator.principal_state .= null;generator.persisted_principals .= null;generator.query_state .= null;generator.constant_state .= null;generator.refinement_owner .= null;
   // Generator cleanup owns attempt tables; canonical Session ownership belongs
   // to this Frame and is released exactly once below.
-  state.generator.deinit();state.generator.units=default<const blot_check_core::Module[:]>();state.generator.spawn_units=default<const blot_check_core::Module[:]>();
+  generator.deinit();generator.units=default<const blot_check_core::Module[:]>();generator.spawn_units=default<const blot_check_core::Module[:]>();
  }
  if state.capture_token!=0 {assert(state.capture);state.factory.destroyArchiveCapture(state.capture_token);state.capture_token=0;state.capture .= null;}
  activeOptimized().deinit();
- if state.session {blot_eval_core_eval::deinitOwnedSession(state.session);state.session .= null;}
+ let session_ref .=state.session;if session_ref {let session:blot_eval_core_eval::Session& =session_ref;blot_eval_core_eval::deinitOwnedSession(session);state.session .= null;}
  if state.workspace_slot!=0 {workspaces.free(state.workspace_slot-1);state.workspace_slot=0;state.workspace .= null;}
  if state.generator_slot!=0 {generators.free(state.generator_slot-1);state.generator_slot=0;state.generator .= null;}
  clearBacking();resetBackingDescriptors();let released=blot_backend_result_publication::destroy(publication);assert(released==blot_error::Error.none);

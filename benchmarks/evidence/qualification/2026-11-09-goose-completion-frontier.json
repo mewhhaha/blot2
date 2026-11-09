@@ -418,6 +418,22 @@
         "empty_session": 4.944325489981566,
         "archive_capture": 3.775567606004188
       }
+    },
+    "frame_storage_family": {
+      "status": "20 pass /1Frame pending",
+      "changes": [
+        "Concrete single-workspace Plan storage replaces generic Store/Tables borrowed owner headers",
+        "Scope outline stores scalar lease and registered views; one body materialization for copy patch",
+        "30 map restores fill fresh runs before publishing headers across11files",
+        "Generic buffer writes use pool-rooted destination before item view publication",
+        "ModuleStamps uses fixed pooled header buffers rather than inline grow-only entries",
+        "Frame resource construction and cleanup bind nonnull views and resolve canonical owner by scalar key",
+        "Generated constructors follow declaration order; unit Uses stores validated pool allocation index; static-data Cache is nominal"
+      ],
+      "rejected_experiments": [
+        "Concrete TextMap growth rewrite did not affect error",
+        "Cache default/factory/context/bootstrap probes remain ignored copied-tree evidence; no production changes from them"
+      ]
     }
   },
   "latest_selected_frontier": {
@@ -455,8 +471,8 @@
   "latest_executed_laws": {
     "passed": true,
     "goose": {
-      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/goose",
-      "sha256": "54cfe71d2a9c80d8b6ef8a61586782707791cfcc76a259898961d6e32a9eb464"
+      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/6d8b64b168f4865a633de75a86b30cac1534783cbe8fb6ba27f84a7595e0784f/goose",
+      "sha256": "6e1c9b284979cfe8617d420cb7caa5e1acf8fe66a4fd48062511882120bb3025"
     },
     "cc": {
       "path": "/usr/bin/clang-23",
@@ -464,107 +480,112 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.2886719060188625,
-        "program_sha256": "fc15d284596c5bc06135e29f9be492638bcc9ec210e47c224b6f5884ee4ab3ae",
-        "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0"
+        "seconds": 0.48679053399246186,
+        "program_sha256": "893d85a4617ef14216f8e77890525f22406decaab6df9ea0cf997c281e6392ff",
+        "binary_sha256": "4bfc2ca37d891349839f7804d0de11bc28a93c9aeff533b145cfa766b0880de9"
       },
       "expectation": {
-        "seconds": 0.20691305099171586,
-        "program_sha256": "1a49692e57820540ca50fbf9d5e84e28d1d5229adaf9a081c4abe66c8335f230",
-        "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b"
+        "seconds": 0.2068840790016111,
+        "program_sha256": "db3c037efd8d25e53380bc371ef964513fa06b3dd3edcf64845206fc738abe0c",
+        "binary_sha256": "1838e7cf82e7b6fe126abee04bcb74487984073b5b236759af15c84fe01c548d"
       },
       "package_owner_frames": {
-        "seconds": 0.13434811600018293,
+        "seconds": 0.13348433299688622,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.7033118709805422,
-        "program_sha256": "7cce6851bd8320f33cde196572a6ea0a5c47d30a448c4fa55227e823ce7516c9",
-        "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82"
+        "seconds": 1.6992023029888514,
+        "program_sha256": "a7361862b3896df0db617d691fb68521260a1c1f97f14c30b0f1f9d0fd1d3df8",
+        "binary_sha256": "f473f51f2a3f626330378bb92a21d78689683be70eea4523847dda25e6c22575"
       },
       "proof_leases": {
-        "seconds": 3.6594141600071453,
-        "program_sha256": "b147fd8c167ed04db89883f7bb730e52f8c169912b946d4c9d0c8614be891c25",
-        "binary_sha256": "ee47e68ee498567b928be37d08257b38fe315ab9cc6c5f7283be4f157fe68963"
+        "seconds": 3.5034780070127454,
+        "program_sha256": "c81622366f24f4547622ab2f0f00418703b0f47e2703bf18d04539e35428c316",
+        "binary_sha256": "a04ae9221b7c2d1a239e96c99a7ad04ff170839afff19ae3532f291eddf46826"
       },
       "source_sort": {
-        "seconds": 0.13647795101860538,
+        "seconds": 0.140954595990479,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 3.514704173983773,
-        "program_sha256": "97cf2265a47961e9dd42650b10dbd6e868ebd592d959da0336ff59a99fb1321d",
-        "binary_sha256": "3252351c2e8d39c4480c10096a51ccc76d0c80f78ebbf7ecae6575255e8d4e68"
+        "seconds": 3.448707560019102,
+        "program_sha256": "d4ffb65add8e10411a8b80ffdd8c8033843099e29c052bc5f3a167440f07886c",
+        "binary_sha256": "fc9b009dc4ddafa4bee787b3176653ea17fcaa743c197d9ad9d11ff7f5a36faa"
       },
       "body_freeze": {
-        "seconds": 6.96426494300249,
-        "program_sha256": "13a4a0cfeed1c73df0e28962c98b3418ad2500c604926814d7453856dd620f69",
-        "binary_sha256": "ffb456a771396f1561be9310ee3ee8aa689e8c8298ae22fca1764b31bc1c9c33"
+        "seconds": 7.150592065008823,
+        "program_sha256": "8fd122b16ad3d8b4cd314e6544a46d0031f5cb67ac320af9d60108970e14886e",
+        "binary_sha256": "8ec42e129d892ceefdf9aa223e91e5da001e61acb474e548a8ec6f2881d48add"
       },
       "immutable_readers": {
-        "seconds": 3.992381969001144,
-        "program_sha256": "dda7d3b00fa5fa5d9f0ba3bef5b6433a3f6751b19b6215831bcc75d4230672e8",
-        "binary_sha256": "03c8542ca375d500e93ec676fbcbddf2e6083424e676aec775764c09c848a385"
+        "seconds": 4.042760009004269,
+        "program_sha256": "12f3e296e14198ada8e14649012d762cf8ede7760e15e51824b00b0d07b72766",
+        "binary_sha256": "709e85530f7dd4bbc6d927a45d8ce9216f113a41da67b82fd7027e77b34db51a"
       },
       "import_arena": {
-        "seconds": 4.012636726023629,
-        "program_sha256": "27a95e855702863e2124ab4c0ebb09946ade3c1d8d16ea62b419d8cce3bcccb2",
-        "binary_sha256": "599c4a537b2da29a8617e1606900509da56d2b7d418a5e70d59caaffcf9ddb3e"
+        "seconds": 3.545291457005078,
+        "program_sha256": "762acee71d9ee07a54068abe2fc5d1ef1a2efa46471d72372ae71e753ae97330",
+        "binary_sha256": "26834965fe0d9658b26365614b41b4b2b367d957ef22bde9f8bf0124702e8bae"
       },
       "source_validation_ownership": {
-        "seconds": 4.07855264301179,
-        "program_sha256": "e8a074b626a9edbefc393f03ae49fef004e3c79b0944f1e30c66c5bdd374b2db",
-        "binary_sha256": "f23f079a5421020f1b27a0afbe10e53a6951cb580ed1f330b27c7148da6a70dc"
+        "seconds": 4.020642410003347,
+        "program_sha256": "eae932c16286702fd52126c1e3e84a53c1c025b48d3b812c1d15d73c26f0a9e2",
+        "binary_sha256": "019d36dfc8d7b26cc718d3a6f094bd2370485380553d0957e12b8e2da990b1c1"
       },
       "editor_budget": {
-        "seconds": 6.200203885993687,
-        "program_sha256": "0b3ca1d9b5acd3b7e7c6c85764ccec5e3712109e8a307a694235b50558d01f6c",
-        "binary_sha256": "d6834d97679cb70ea1489fef5d582dd10f6bfc6dd849bf9064bd2c812b1dea1b"
+        "seconds": 6.101323012000648,
+        "program_sha256": "d270b490e3f46783841b150c62fd7984b0723190e446661eeb20db1d1b0a42d4",
+        "binary_sha256": "e990ab7268ff3f4248bcc9d1e804b782c701b757f18414150c51c7542b05d882"
       },
       "cache_root_frames": {
-        "seconds": 3.283309680991806,
-        "program_sha256": "126d9cefd69adf47bc064ada807311836a4b4ef3159b3447d141abb8fd79420f",
-        "binary_sha256": "53153039adf6b5c2b7c03059561119e96555ad556f7566d35dca6ab764b0f6c0"
+        "seconds": 3.2316769339959137,
+        "program_sha256": "be087da496a20319a766206415c8e5b22514b9cef0d8fb6f9fe16bafbbbf4d2e",
+        "binary_sha256": "04a5290e0de202e0a58f8e362dc9b06f821298f7cf251a00b7fd29fda6b03358"
       },
       "native_asset_metadata": {
-        "seconds": 4.5115298069722485,
-        "program_sha256": "15f126590d40693453ced620055b96b9d72fcd6a4e83b157420cda2cb4b1e018",
-        "binary_sha256": "1166577c87a88b979008ef83e9690427d62e14216abfd92f930245f88e765959"
+        "seconds": 4.559507284982828,
+        "program_sha256": "141037f4613397a1014faacb85df8cb633f799229115a9ba45de5f13c03b56c6",
+        "binary_sha256": "870ae134b88c80474c27ea94ce77c100126adfc411951cb03df3fdd118b3e07f"
       },
       "completion_probe": {
-        "seconds": 3.561230034014443,
-        "program_sha256": "686b4d63241ddb6eed3d28ceb61e5f603fbe3ab6c830fba7bcf2adc93bbdd6c4",
-        "binary_sha256": "3bfe06158516c16f2c0402eb1996140d449248bf6db6ebd983c07d3bbc92a129"
+        "seconds": 3.4919546199962497,
+        "program_sha256": "1721aa1e12d72013e00b4941cdb4c252ec21094dc748d55673cc9c2e918aab6f",
+        "binary_sha256": "e3e383f067edd54c53b50509b15c33776b55263ac07a357df15a47138162cb4d"
       },
       "completion_project_load": {
-        "seconds": 7.788656829012325,
-        "program_sha256": "3aa3773a62096bfd7ecc58106639e567e5919f57090a1db4d958ee9e2db29a44",
-        "binary_sha256": "43cb047b7cdd30fce697b98738951e51ce052d01cd8ceb3326d8843a33185558"
+        "seconds": 7.787252067995723,
+        "program_sha256": "d91b7984b327b912e3a1e069a88d1858b2b327dfc71782cf9640919ec259c06e",
+        "binary_sha256": "5e0f4f7cb701d66a3f981f5f958d1fe56cc90012979928daa789a716a8011467"
       },
       "dependency_ownership": {
-        "seconds": 37.92786843900103,
-        "program_sha256": "8b9f524cf8b85f62f936b447b81fadd0f2c267dcf885ad5d21e6ff2ee056ff5e",
-        "binary_sha256": "818317eba52c56dbbe777863dc2d0facb26fddd4af2b2fdf64917a7788a11cf5"
-      },
-      "empty_session": {
-        "seconds": 4.944325489981566,
-        "program_sha256": "68ad526c94c4655e335f35af336c04ce0f46657211f00986546bc947aedc0806",
-        "binary_sha256": "206067ec2276baffc4612d06a8489f128f1a8379967b05ac2e2f89ae11bd2218"
+        "seconds": 37.800618427980226,
+        "program_sha256": "14a1e03a5621c7f2cecc57b649ff6d2054cfe5b24162fd4c859aa3f1576e633d",
+        "binary_sha256": "ac6c9d07e92dc207b6628c1aef2bd869f9b15be1296582797bbfd4fea443a33c"
       },
       "archive_capture": {
-        "seconds": 3.775567606004188,
-        "program_sha256": "8166a07a7ff74061a0b6fd1b98ffb7a48ed0b2dbdf97f9b829a8371a0179d6f8",
-        "binary_sha256": "6df9a2d4b508c297848620f33a36e16b009e04d523928c50c325b7376a768e0f"
+        "seconds": 3.8864911920099985,
+        "program_sha256": "3afad0c1434f25be00b4908be5930fd27e54dfe86820075cf2a31346cd0accdf",
+        "binary_sha256": "04f36fd17a4934f5582ef0b30bd879aed4cca67d9f271eb2ad232ce38fc61e30"
+      },
+      "resolved_body": {
+        "seconds": 3.357399285014253,
+        "program_sha256": "bc5fb3bc80c6a13cadbd55a58e2b1f23706c8fd596d0da9e700f3889aef6984c",
+        "binary_sha256": "538507dcd6901142e0f677ed74cdf24bd604e42d91f3033d9b1c1db8f57cc590"
+      },
+      "wasm_scope_outline": {
+        "seconds": 3.9271663629915565,
+        "program_sha256": "52b0bbccaaf7d734bc60497112ec74a1eae587eda82bcd5339528437ee6a4fac",
+        "binary_sha256": "13ec222705c7538704c54f3fd2ab080dab108a66164a4e1c30f00036d0041267"
       }
     },
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_receipt_sha256": "10c45a297aa6fc54b0043d0cbeba396205bbd687c94784092989787f4df24e8e",
-    "scope": "19 real production helper C/link/execution families. Archive capture law excludes blocked clearBacking; whole compiler unavailable."
+    "raw_receipt_sha256": "85de574d8d9101d97b7cbbde026a1f955391a45f1438e9f3ee07454a6fee7698",
+    "scope": "20 executed laws pass; default21-law inventory remains incomplete because actual Frame lifecycle fails at one global Session context ownership edge."
   },
   "source_repair_sha256": {
-    "compiler-goose/src/backend/wasm_scope_outline.goose": "10c5d247befb922878052723979acdb87924721f259e691172727dd130484672",
+    "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
     "compiler-goose/src/check/capability_contract_source.goose": "948f1f003e8c6e883157733ae835f246b65090a539208b1e52d4c6baf90319b9",
     "compiler-goose/src/check/capability_flow.goose": "daa1d2ef2db79d9fafe6ecfc6f85af62ea47cb08273c46a81156dc2028a2d708",
     "compiler-goose/src/check/check.goose": "fe8596a48e6a57833bc48f17cc2381d9ad0355fa8279764d6c65f249e80a7c5e",
@@ -578,8 +599,8 @@
     "compiler-goose/src/check/source_sort.goose": "3963e8b9107f5b064539245e8e6b8ffbdbe62bc73c0a9cc1db3d0c00e6e30f23",
     "compiler-goose/src/check/usage_check.goose": "5cd6ff97d5af77cf39006219f3180dab64e3c1bb9e9d25c133168fee56e00c22",
     "compiler-goose/src/eval/closed_evidence_import.goose": "78bfe5001b57919e7d97cfffdb7c5c7b3db83d4e8e2ee6b7a0c1f23a39b544fa",
-    "compiler-goose/src/eval/core_eval.goose": "4104a687ed057a90e763f3d372b305b8274ab62498ae44774778d091aef03b22",
-    "compiler-goose/src/eval/implementation_evidence.goose": "acbe81fd3c371e00d07ccc5da951c0c90fa080ac4204754664a5842c1abefa40",
+    "compiler-goose/src/eval/core_eval.goose": "0b479b9621b4791752eca0695df02eaf64b12459009e4fbc53d20270ae80d089",
+    "compiler-goose/src/eval/implementation_evidence.goose": "642ad0586347b8140dddfe69624dcc207600c4c712eb48a44d137a2707fb53df",
     "compiler-goose/src/eval/implementation_predicates.goose": "0abae4a4261fbebe8dbb027f98519ad403189e702c01fb02d1b46cedcb5d89f3",
     "compiler-goose/src/eval/implementation_rows.goose": "2f445390115cb2a518ee7320f7f45df28cc940bb8d35714309ad6a5b3c83701a",
     "compiler-goose/src/eval/selected_implementation_admission.goose": "11c8eacdb50e76fd51f42dd3862d901ab1e215db49cd74c92116668cf594f729",
@@ -589,12 +610,12 @@
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "cc77ae7d4609f38ec2d3eb6ae29331467499602d7c1895183057f09689e98f2e",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "c34e758464a39e92f4427b99c6a52ff5227e4db7f95437a01dee81b3104c1b8c",
-    "compiler-goose/src/support/json_adapters.goose": "2b7bae9b894ce42a9ca13c6a5e19a0d70cb2b36c6685e185c294664e9ebf8c73",
-    "compiler-goose/src/support/structural_adapters.goose": "b532ecf8ea40b9e7a51ddfd7d635f3dd0e4ac42996f43d33b60cb717b0a60b35",
+    "compiler-goose/src/support/json_adapters.goose": "bb28dcb6e46b8692447ea428df14b61994b754312c6628f6b3eaa5fb520cac00",
+    "compiler-goose/src/support/structural_adapters.goose": "63d164f1aadffabff3d3b4fd5b615746867613691a5cf48d4b13b0fba16e4d3c",
     "compiler-goose/src/reuse/hole_diagnostics.goose": "0dbe397bc63bf0eea0870b886a4be44e6e734b1cfb15f326e707d804f1d413d6",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "76622aefcaf6466906e47f6deaeb583ea519665ced419b68b3303e876186bd02",
-    "compiler-goose/src/backend/backend_emission.goose": "83a10e7c142c39e11cf27e7e97fb77d1f6093652bc33431e48e1b69fbe4c9632",
-    "compiler-goose/src/backend/core_backend.goose": "441f4052d89e6f4cddd1f4f4c7cc72bbe25e735fa3f222eeebd4e68412637b52",
+    "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
+    "compiler-goose/src/backend/core_backend.goose": "1a9b45b2a43bc29f0ab9441929722f4e9be9a02413ad6ed0048026b50d78e5af",
     "compiler-goose/src/backend/scoped_backend.goose": "b8a7acc2d3b6db4aa52929be8da8ca91a8d92858030c505caca724a419df4d31",
     "compiler-goose/src/check/frozen_types.goose": "7bdffb9fcdc6079f1990d4c5c2c09a4a8331995439e772356eaffc0609710c23",
     "compiler-goose/src/check/parameter_patterns.goose": "9757bfe19e48733b1cec1a5d02fcab2d17d06d677b0f779b11ec08f15cc1ef01",
@@ -641,12 +662,12 @@
     "compiler-goose/src/backend/storage_calls.goose": "36aa3bbcddf51cc247c71c154edf285aeee9ed27d10c0afde18335aa8fd9a776",
     "compiler-goose/src/backend/storage_deferred_join.goose": "1d1d895714b9142920e29a71380eb54244a658ab0b2abd62d1bc52e8088a3c51",
     "compiler-goose/src/backend/storage_global_footprint.goose": "1926a0d15f42a45fc101e35ad6543779a93037d08a8f2b7e4ad05edd15cf7a25",
-    "compiler-goose/src/backend/unit_index.goose": "5273fa1e58cebff04182fd274db5333c2b68c74e659079f1ce5e81326a86bf70",
+    "compiler-goose/src/backend/unit_index.goose": "c887940e3a3c9b2736de030a41fb243f4730a904adf2230dd2a470a0284ec5c0",
     "compiler-goose/src/backend/wasm.goose": "a30b81d8b8612c425f82a5011efa4558cf693aba0a32999e794c60a5e3d001a7",
     "compiler-goose/src/check/core.goose": "83cf5fde517cdefd020914439e4b4fb7eca29330f0213869cfaa24d858765fbc",
     "compiler-goose/src/driver/cli_pipeline.goose": "9c02f342fecb67f6d990ab2f573a674d727aa06c91741a51fd5ba97115eda404",
-    "compiler-goose/src/driver/compile_workspace.goose": "3081456edaecbf4cbdb4ebc07b633cf36a10581516cfef237f65fcd972f30e3d",
-    "compiler-goose/src/driver/compile_workspace_backing.goose": "f7054e7eeb646da07b113ddcf6708b80948bc5dfc0ca345e0a8c91562c86dcf1",
+    "compiler-goose/src/driver/compile_workspace.goose": "71321c983df6474f98a8d0e6e2585a22957ef51f4243acaa28d4b68c4096ff1a",
+    "compiler-goose/src/driver/compile_workspace_backing.goose": "3395ccd7f45c2605db3c9c046c8212e482b1d3f124e7235d0a03f12a8c0104d6",
     "compiler-goose/src/driver/project_executor.goose": "1e51b26ba0cf013d842ec9486ad5ef0f47d2965246dc58b049c92cc670cabbe3",
     "compiler-goose/src/reuse/editor_completion.goose": "de3422692bea14c53df597ae27d32723a0db13b251ca2db87de3f60d14d1fe33",
     "compiler-goose/src/reuse/partial_dependency.goose": "c522b576b342c0e36b043d4ad5eff9cf062f267c03ff5e2ae62e7871b98fca6e",
@@ -668,15 +689,31 @@
     "compiler-goose/src/reuse/source_completion.goose": "a84822aabef611e61f622145b1b568c4e2cc0b9c3b978ed43ed0ee5abe68d84c",
     "compiler-goose/src/reuse/dependency_owned_headers.goose": "b9a5af079fe717fe786a5989910a39c693baa807f15d1cce16034bb1d385b8e5",
     "compiler-goose/src/backend/backend_checkpoint.goose": "89309d02b4185a5b2b1f9c110389988c7112ff0b0177b42026eee301dde9d599",
-    "compiler-goose/src/bootstrap_globals.goose": "6807800d97761721175a56d48f85b69e85e5a68fb6215ec305e30eaa53acd54a",
-    "compiler-goose/src/eval/completed_specialization_query.goose": "804b46fc1bcc1fa1455f1f95e080ae88c3a39edf261bd66a5c0f0c33e247ccc1",
+    "compiler-goose/src/bootstrap_globals.goose": "4abcc76fab35fdaa3efc082fe1c2997c7527aa390208237d6021d6212150b931",
+    "compiler-goose/src/eval/completed_specialization_query.goose": "6d9ed1da84e9c736dd637249e6ae5703f538a98079fdce57e8fbfdb618248846",
     "compiler-goose/src/reuse/artifact_capture.goose": "82afb2b25378b8be668e807dae60af0b3b8659a22ed9747cf7db5dc077119eec",
     "compiler-goose/src/reuse/artifact_fragment.goose": "dcb7745ca10c95f60d0be65fbaaf48a80a3189ecfb57cae0a7d4b9be1dd0ac10",
     "compiler-goose/src/reuse/independent_call_proof.goose": "699a07741791aee5689aee5eb6e37e6519a92922d5934edf36677702cf3aadda",
     "compiler-goose/src/reuse/independent_worker.goose": "68753de61978ac70be5283b34eae5cfadd80b54ef5218a02121aa83936b01961",
     "compiler-goose/src/reuse/principal_evidence_reuse.goose": "dbcb2e69d0c2c1a317e6a852ee86821380e089f89e9babd40474adedb159b3a2",
     "compiler-goose/src/reuse/refinement_receipt.goose": "4db40691548778909c26606e67cbce5fecdc56b039162464972751017bd283cf",
-    "compiler-goose/src/reuse/semantic_archive.goose": "dcd579b258d7117b31748c3676b529541c77592d4ee3932b2f7e242e984a293b"
+    "compiler-goose/src/reuse/semantic_archive.goose": "dcd579b258d7117b31748c3676b529541c77592d4ee3932b2f7e242e984a293b",
+    "compiler-goose/src/backend/backend_plan.goose": "833a45ac0dc596f5de7957933ffb27e577228cc707bf0449c1e1f59b51b19f0e",
+    "compiler-goose/src/backend/backend_representations.goose": "92575a04be6aa2db933212889c100ce2ab442435f1947709d2d29970ddfe04c8",
+    "compiler-goose/src/backend/backend_static_data.goose": "0db4deb908f42b178104560ae389523287ae131f47726fd7c0819d06c849b6bf",
+    "compiler-goose/src/backend/resolved_body.goose": "a5fdbec9872fbe14882168382e3f0a696f230a7a1e863670e30cd825cf7ad93c",
+    "compiler-goose/src/backend/safe_local_sinking.goose": "b8d30ce674d3c15cc2086bafd800f263380721ca1717e4430dc8b59aa72048a8",
+    "compiler-goose/src/check/solver_worklist.goose": "ff75a685ec89b0a8806fa4e2e218ff6002c5370746d3fb5cbda9299be84906c2",
+    "compiler-goose/src/eval/closed_source_types.goose": "d7138ef84668bae6c75e5ab1eeb87cfedc3c0ef0fe13a37f5be588592b9af079",
+    "compiler-goose/src/eval/eval_collection_growth.goose": "cf4f92d6644687281d6246439c45d51f1473a7a91748bfc8d9d7475437f28bcb",
+    "compiler-goose/src/eval/eval_values.goose": "65321913691c4be4ece1a845ff9146dd976daf034504e8ac709a43a0852b6996",
+    "compiler-goose/src/eval/evidence_import_cache.goose": "a3313595de158d508a908948b27ee0990298f522aa8f865302e77647861d995f",
+    "compiler-goose/src/eval/scheme_membership.goose": "bc9bfd2b7918a1fb4669d4e0b4fc58fcbfc1b2cb5553134d3d4656e3f09d797f",
+    "compiler-goose/src/eval/scope_components.goose": "7f03d489bd9d643b7f5bc14cb3f998361c06803b4f40a95572135585a8dff40e",
+    "compiler-goose/src/eval/specialization.goose": "cfe31afb9f93d75d5f57fc1c93db28ded750e1c9ff2a38bb39932f8dcc777235",
+    "compiler-goose/src/reuse/code_artifacts.goose": "9814daca5d4f9afd1f7cebafa760af58e717d51315be6dcc856d9dfe4607ad99",
+    "compiler-goose/src/reuse/projection_cache.goose": "d29911341c53c9f87160e942ec8bf23fcb86d319fe05c194513f007a3cbf6ca4",
+    "compiler-goose/src/support/pooled_buffer.goose": "f9eca274b22d366ee5c84b17644a05130b08e4f7169dcd416970052031fa576a"
   },
   "unqualified": [
     "whole compiler executable",
@@ -1493,5 +1530,106 @@
       "Completed validation receipt reconstructs graph from unique existing Owner registered runs",
       "Two multidimensional readonly slice defaults use typed empty headers"
     ]
+  },
+  "frame_frontier": {
+    "status": "compile failed; not executed",
+    "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz",
+    "raw_receipt_sha256": "5c2fa2cc7a945d8d3c7d2a47a16fdaadac344e6940d8a4c12220ec1d3314896c",
+    "remaining": "Actual Frame.create/release extends the empty-session law; one global owned_session_contexts-to-Plan payload lifetime diagnostic remains."
+  },
+  "selected_batch88": {
+    "partial": true,
+    "seconds": 102.615,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 102.437,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace.goose",
+            "line": 75,
+            "message": "error: optional value must be narrowed (if/guard/assert) before use"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
+            "line": 346,
+            "message": "error: cannot call blot_backend_resolved_body::deinit, which shrinks payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
+            "line": 349,
+            "message": "error: cannot assign payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace.goose",
+            "line": 64,
+            "message": "error: cannot call clearBacking, which shrinks payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
+            "line": 271,
+            "message": "error: cannot assign payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
+            "line": 272,
+            "message": "error: cannot assign backing_module_stamps: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace.goose",
+            "line": 64,
+            "message": "error: cannot call resetBackingDescriptors, which shrinks payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace.goose",
+            "line": 64,
+            "message": "error: cannot call resetBackingDescriptors, which shrinks backing_module_stamps: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/support/pooled_buffer.goose:14 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "11b2f7fd0da314ac979189305065b628e9ce0e9ccb90a55943cd955ee711d4de",
+        "source_unchanged": true,
+        "goose_sha256": "7ebe012b0c5637777a98dbb87e810e26e135cdacea058837703a53451d8ef910"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.356,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "11b2f7fd0da314ac979189305065b628e9ce0e9ccb90a55943cd955ee711d4de",
+        "source_unchanged": true,
+        "goose_sha256": "7ebe012b0c5637777a98dbb87e810e26e135cdacea058837703a53451d8ef910"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.354,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "11b2f7fd0da314ac979189305065b628e9ce0e9ccb90a55943cd955ee711d4de",
+        "source_unchanged": true,
+        "goose_sha256": "7ebe012b0c5637777a98dbb87e810e26e135cdacea058837703a53451d8ef910"
+      }
+    ],
+    "full_qualification": false
   }
 }

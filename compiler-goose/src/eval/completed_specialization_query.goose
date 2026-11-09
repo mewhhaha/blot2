@@ -124,7 +124,7 @@ fn contains(self_: const PlainMap&,key: u64) -> bool { return self_.get(key)!=nu
 fn insert(self_: PlainMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PlainMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: PlainMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: PlainMap&) { if self_.slots.len!=0 { pool_PlainMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
-fn restore(self_: PlainMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_PlainMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: PlainMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_PlainMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct CandidateTables { proofs: Proofs=Proofs {},plain: PlainMap=PlainMap {} }
 reusable var candidate_tables: CandidateTables[>..]=[];
 

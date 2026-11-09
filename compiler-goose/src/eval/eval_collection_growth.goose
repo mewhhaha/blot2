@@ -28,7 +28,7 @@ fn reserve(self_: BufferMap&,count: i64) -> blot_error::Error {
 }
 fn clear(self_: BufferMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: BufferMap&) { if self_.slots.len!=0 { pool_BufferMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Span,Span>[:]>(); self_.count=0; }
-fn restore(self_: BufferMap&,slots: const dictionary_slot<Span,Span>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=pool_BufferMap.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: BufferMap&,slots: const dictionary_slot<Span,Span>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_BufferMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct StoreState { buffers: BufferMap=BufferMap {},owner_id: u64=0,mutation_serial: u64=0,lease_generation: u64=0,live: bool=false }
 reusable var Store_states: StoreState[>..]=[];
 var inactive_Store: StoreState=StoreState {};

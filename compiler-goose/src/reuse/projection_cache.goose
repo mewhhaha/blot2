@@ -11,7 +11,7 @@ fn insert(self_: Answers&,key: u32,value: Answer) { blot_support_pooled_map::ins
 fn clear(self_: Answers&) { blot_support_pooled_map::clear(self_); }
 fn release(self_: Answers&) { blot_support_pooled_map::deinit(self_,answer_slots); }
 // Snapshot restoration preserves the original probe slots, including empties.
-fn restore(self_: Answers&,slots: const dictionary_slot<u32,Answer>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { self_.slots=answer_slots.alloc_slice(slots.len); for slot,index in slots { self_.slots[index]=slot; } } }
+fn restore(self_: Answers&,slots: const dictionary_slot<u32,Answer>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=answer_slots.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct State { answers: Answers=Answers {},labels: Answers=Answers {},generation: u64=0,live: bool=false }
 reusable var states: State[>..]=[];
 var inactive: State=State {};

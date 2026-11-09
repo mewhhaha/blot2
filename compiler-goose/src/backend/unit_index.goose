@@ -73,15 +73,15 @@ struct Flags { captured: bool = false,merge_branch: bool = false,merge_result: b
 struct Parent { node: u32 = 0,position: u32 = 0,count: u8 = 0 }
 struct Carry { loop_: u32 = 0,position: u32 = 0 }
 struct Need { parents: bool = false,flow: bool = false }
-struct Uses { references: Table<u32>,flags: Flags[:] = default<Flags[:]>(),parents: u64[:] = default<u64[:]>(),has_parents: bool = false,definitions: Table<u32>,inputs: Table<u32>,carries: Table<u32>,exits: Table<u32>,values: Table<Exit>,carry_loops: Carry[:] = default<Carry[:]>(),has_flow: bool = false }
+struct Uses { allocation_index:i64=-1,references: Table<u32>,flags: Flags[:] = default<Flags[:]>(),parents: u64[:] = default<u64[:]>(),has_parents: bool = false,definitions: Table<u32>,inputs: Table<u32>,carries: Table<u32>,exits: Table<u32>,values: Table<Exit>,carry_loops: Carry[:] = default<Carry[:]>(),has_flow: bool = false }
 reusable[] var owned_flags: Flags[>..] = [];
 reusable[] var owned_parents: u64[>..] = [];
 reusable[] var owned_carries: Carry[>..] = [];
 reusable var owned_uses: Uses[>..] = [];
 fn createUses(source: const blot_check_core::Module&,unit: u32) -> Uses&,Error {
-    let owner .= owned_uses.alloc_ref(Uses {..}); let initialized,error = initBase(source,unit); if error != blot_error::Error.none { owned_uses.free(owned_uses.index_of(owner)); return owner,error; } owner = initialized; return owner,blot_error::Error.none;
+    let index=owned_uses.alloc_index(Uses{..});let owner:Uses& =owned_uses[index];let initialized,error=initBase(source,unit);if error!=blot_error::Error.none {owned_uses.free(index);return owner,error;}owner=initialized;owner.allocation_index=index;return owner,blot_error::Error.none;
 }
-fn release(owner: Uses&) { owned_uses.free(owned_uses.index_of(owner)); }
+fn release(owner:Uses&) {let index=owner.allocation_index;assert(index>=0 && index<owned_uses.len);let registered:Uses& =owned_uses[index];assert(owner .== registered);owned_uses.free(index);}
 fn init(source: const blot_check_core::Module&,unit: u32) -> Uses,Error {
     let base,error = initBase(source,unit); if error != blot_error::Error.none { return base,error; } var result = base; let completed = result.ensure(source,unit,Need { true,true , ..}); if completed != blot_error::Error.none { result.deinit(); return Uses {..},completed; } return result,blot_error::Error.none;
 }
@@ -136,7 +136,7 @@ fn ensure(uses: Uses&,source: const blot_check_core::Module&,unit: u32,need: Nee
 fn deinit(uses: Uses&) {
     uses.references.deinit(); if uses.flags.len != 0 { owned_flags.free_slice(uses.flags); }
     if uses.parents.len != 0 { owned_parents.free_slice(uses.parents); }
-    uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { owned_carries.free_slice(uses.carry_loops); } uses = Uses {..};
+    uses.definitions.deinit(); uses.inputs.deinit(); uses.carries.deinit(); uses.exits.deinit(); uses.values.deinit(); if uses.carry_loops.len != 0 { owned_carries.free_slice(uses.carry_loops); } uses = Uses {allocation_index:uses.allocation_index,..};
 }
 fn flagsOf(uses: const Uses&,binding: u32) -> Flags { if binding < uses.flags.len { return uses.flags[binding]; } return Flags {..}; }
 fn parentOf(uses: const Uses&,id: u32) -> Parent { assert(uses.has_parents); if id >= uses.parents.len { return Parent {..}; } return unpackParent(uses.parents[id]); }

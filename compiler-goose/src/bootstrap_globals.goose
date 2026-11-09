@@ -16,7 +16,6 @@ var blot_reuse_code_artifacts::inactive_context_principal_queries:blot_reuse_pri
 var blot_reuse_code_artifacts::inactive_context_principal_graphs:blot_eval_core_eval::RetainedPrincipalGraphs=default<blot_eval_core_eval::RetainedPrincipalGraphs>();
 var blot_reuse_code_artifacts::inactive_context_specialization_queries:blot_eval_selected_query::Table=default<blot_eval_selected_query::Table>();
 var blot_reuse_code_artifacts::inactive_context_refinement_queries:blot_reuse_refinement_receipt::Table=default<blot_reuse_refinement_receipt::Table>();
-var blot_reuse_code_artifacts::inactive_context:blot_reuse_code_artifacts::Context=blot_reuse_code_artifacts::Context{..};
 
 var blot_reuse_artifact_emitter::inactive_Recorder_Record:blot_reuse_artifact_emitter::Recorder_Record=blot_reuse_artifact_emitter::Recorder_Record{..};
 var blot_reuse_artifact_emitter::inactive_Recorder_u8:blot_reuse_artifact_emitter::Recorder_u8=blot_reuse_artifact_emitter::Recorder_u8{..};

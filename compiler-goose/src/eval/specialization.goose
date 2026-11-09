@@ -1,5 +1,6 @@
 // Source obligations and representation expectations meet before emission.
 namespace blot_eval_specialization;
+import check.capability_flow;
 import parse.ast;
 import backend.backend_timing;
 import backend.core_backend;
@@ -113,7 +114,7 @@ fn namedSink(self_: Service&, key: blot_reuse_code_artifacts::Key, instances: co
     for row, index in source_rows[..key.count] { let e = mapRowSink(self_, unit_id, mappings, rows, row, key.effects[index], body.span, true); if e != blot_error::Error.none { return ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}, e; } }
     var full = key.result; var reverse = key.count as i64;
     while reverse > 0 { reverse--; let value, e = internFunction(self_, key.parameters[reverse], full, key.effects[reverse]); if e != blot_error::Error.none { return ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}, e; } full = value; }
-    if !key.dictionaries && source.binding(key.target.binding).capability_flow != blot_check_core::CapabilityFlow.consume_task {
+    if !key.dictionaries && source.binding(key.target.binding).capability_flow != blot_check_capability_flow::Contract.consume_task {
         let e = refineMappingsSink(self_, unit_id, blot_reuse_refinement_receipt::Root.body { key.target , ..}, full, mappings, rows, body.span); if e != blot_error::Error.none { return ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}, e; }
     }
     return ResolvedBody { source: key.target, root: body.root, mappings: mappings, rows: rows , ..}, blot_error::Error.none;

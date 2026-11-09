@@ -26,15 +26,15 @@ recursive fn reads(module: const blot_check_core::Module&,id: u32,wanted: u32,bu
         pattern_bind=>{ if !addCount(count,reads(module,node.b,wanted,budget)) || !addCount(count,reads(module,node.c,wanted,budget)) { return blot_support::none<u8>(); } },_=>{ return blot_support::none<u8>(); },
     } return blot_support::some(count);
 }
-fn plan<E>(module: const blot_check_core::Module&,uses: const blot_backend_unit_index::Uses&,root: u32,prepared: blot_backend_resolved_body::Store<E>&,body: u32) -> blot_error::Error {
+fn plan(module: const blot_check_core::Module&,uses: const blot_backend_unit_index::Uses&,root: u32,body: u32) -> blot_error::Error {
     var scope = root; let outer = module.node(scope); if outer.tag == blot_check_core::Tag.block_ && module.children(scope).len == 1 { let completion = module.node(module.children(scope)[0]); if completion.tag == blot_check_core::Tag.return_ && module.node(completion.a).tag == blot_check_core::Tag.block_ { scope = completion.a; } }
     let tag = module.node(scope).tag; if tag != blot_check_core::Tag.block_ && tag != blot_check_core::Tag.suite { return blot_error::Error.none; } let statements = module.children(scope); if statements.len > 256 { return blot_error::Error.none; }
     for statement,position in statements {
-        let node = module.node(statement); if node.tag != blot_check_core::Tag.bind || node.a >= module.bindings.len { continue; } if prepared.contains(body,statement) { continue; } let binding = module.binding(node.a);
+        let node = module.node(statement); if node.tag != blot_check_core::Tag.bind || node.a >= module.bindings.len { continue; } if blot_backend_resolved_body::contains(body,statement) { continue; } let binding = module.binding(node.a);
         if binding.kind != blot_reuse_principal_interface::Kind.local || binding.scheme.variables.len != 0 || binding.scheme.row_variables.len != 0 { continue; } let ty = module.types.node(binding.ty).tag; if ty != blot_check_types::Tag.unsigned32 && ty != blot_check_types::Tag.floating32 && ty != blot_check_types::Tag.boolean { continue; }
         let flags = uses.flagsOf(node.a); if flags.captured || flags.carried || flags.merge_branch || flags.merge_result { continue; } let references = uses.references.get(node.a); if references.len != 1 { continue; } let reference = references[0];
-        if position + 1 < statements.len { let next = statements[position + 1]; let consumer = module.node(next); if (consumer.tag == blot_check_core::Tag.return_ && consumer.a == reference) || (consumer.tag == blot_check_core::Tag.if_stmt && consumer.a == reference && module.branchMerges(next).len == 0) { prepared.setSink(body,node.a,node.b); continue; } }
+        if position + 1 < statements.len { let next = statements[position + 1]; let consumer = module.node(next); if (consumer.tag == blot_check_core::Tag.return_ && consumer.a == reference) || (consumer.tag == blot_check_core::Tag.if_stmt && consumer.a == reference && module.branchMerges(next).len == 0) { blot_backend_resolved_body::setSink(body,node.a,node.b); continue; } }
         var proof_budget: i64 = 128; if !stableInput(module,uses,node.b,proof_budget) { continue; } proof_budget = 128; if !blot_backend_function_facts::behavior(module,node.b,proof_budget).movable() { continue; }
-        var scan_budget: i64 = 512; var count: u8 = 0; var admitted = true; for later in statements[position + 1..] { if !addCount(count,reads(module,later,reference,scan_budget)) { admitted = false; break; } } if admitted && count == 1 { prepared.setSink(body,node.a,node.b); }
+        var scan_budget: i64 = 512; var count: u8 = 0; var admitted = true; for later in statements[position + 1..] { if !addCount(count,reads(module,later,reference,scan_budget)) { admitted = false; break; } } if admitted && count == 1 { blot_backend_resolved_body::setSink(body,node.a,node.b); }
     } return blot_error::Error.none;
 }
