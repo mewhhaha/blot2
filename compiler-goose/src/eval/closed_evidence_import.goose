@@ -102,4 +102,3 @@ fn pushBinder(self_: Importer&,value: u32) -> Error { self_.binders.push(value);
 fn pushBinder(self_: PooledImporter&,value: u32) -> Error { self_.binders.push(value); return self_.binders.failure; }
 fn resizeBinders(self_: Importer&,length: i64) { self_.binders.resize(length); }
 fn resizeBinders(self_: PooledImporter&,length: i64) { assert(length>=0&&length<=self_.binders.items.len); self_.binders.items=self_.binders.storage[..length]; }
-recursive fn withImporter<C,R,F>(source: blot_eval_type_evidence::View,destination: blot_check_types::Store,context: C&) -> R,Error { var importer=initPooled(source,destination); let result,error=F(context,importer); importer.deinit(); return result,error; }

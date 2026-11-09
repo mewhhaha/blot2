@@ -1,8 +1,14 @@
 # Owned-storage rewrite: active task index
 
-Current priority: implement language [RFC #46](https://github.com/mewhhaha/blot2/issues/46)
-in Zig first, then mirror the checked behavior in Goose. Track the complete
-target and pending stages in [the language migration](../docs/language/NEXT_MIGRATION.md).
+Current user priority: finish the Goose compiler experiment: repair lifetimes,
+build the real executable, then qualify request OOM/retention and differential
+behavior against Zig. Use large coherent source families and bounded verification
+at their boundaries. Native component laws do not qualify the compiler runtime.
+See [the current frontier](../CONTINUE.md).
+
+The language [RFC #46](https://github.com/mewhhaha/blot2/issues/46) continues to
+follow Zig first, then Goose. Track its complete remaining target in
+[the language migration](../docs/language/NEXT_MIGRATION.md).
 The named-function source migration covers std, Ink and Gdev: 8,964 functions
 across 782 source files, with 776 frontend/API passes and six expected rejections.
 See [the qualified scope](../benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).

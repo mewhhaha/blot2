@@ -9,7 +9,7 @@ fn failureOutcome(kind: blot_check_types::ObligationKind) -> blot_reuse_dispatch
  if kind==blot_check_types::ObligationKind.contract { return blot_reuse_dispatch_explanation::Outcome.requires_evidence; }
  if kind==blot_check_types::ObligationKind.effect_operation||kind==blot_check_types::ObligationKind.effect_rep||kind==blot_check_types::ObligationKind.effect_handler { return blot_reuse_dispatch_explanation::Outcome.incompatible_effect; } return blot_reuse_dispatch_explanation::Outcome.incompatible_type;
 }
-fn primitiveResult(evidence: const blot_eval_type_evidence::Store&,operator: blot_check_types::Operator,left: u32,right: u32) -> u32,bool {
+fn primitiveResult(evidence: blot_eval_type_evidence::Store,operator: blot_check_types::Operator,left: u32,right: u32) -> u32,bool {
  if operator==blot_check_types::Operator.none||left!=right { return 0,false; } let tag=evidence.node(left).tag;
  if tag!=blot_eval_type_evidence::Tag.unsigned32&&tag!=blot_eval_type_evidence::Tag.floating32&&tag!=blot_eval_type_evidence::Tag.boolean { return 0,false; }
  let equality=operator==blot_check_types::Operator.equal||operator==blot_check_types::Operator.not_equal;

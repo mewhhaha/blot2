@@ -3686,9 +3686,11 @@
   ],
   "oracle_source_manifest": "oracle.json#oracle_source_sha256",
   "remaining_production_work": [
-    "Runtime allocation integration: recoverable physical OOM and corresponding cleanup guarantees; unavailable in current Goose builtin allocation API.",
-    "Typed-pool retention bounds and allocation observation must be implemented or established in the selected Goose runtime; Zig class/lock statistics are not provided by the source adaptation."
+    "Produce and execute the complete Goose compiler; current whole C/header emission is capped and no executable exists.",
+    "Qualify integrated request OOM rollback, cache publication, retained revision retry and differential behavior with the real compiler; native components alone are qualified.",
+    "Propagate explicitly authenticated physical OOM from copied stage workers; generic worker exits and signals remain failures.",
+    "Measure typed-pool active payload, retained capacity and scratch bounds; current scoped runtime hooks provide operation totals and virtual reservations, not those quantities."
   ],
   "algorithm_first_pass_written": true,
-  "writing_barrier_note": "The user explicitly requested fixing and recompiling the port. Whole-program upstream-Goose parsing/name resolution passes; actual type/lifetime compilation repair is active. Scoped executed probes pass, but the full compiler has not produced a successful executable. Runtime recovered allocation failure remains separate production work."
+  "writing_barrier_note": "Verification is active. Repair and verify coherent production families; preserve the Zig oracle. Native observer, request-supervisor/transport and cache components have pinned tests, while complete compiler emission and execution remain pending. See CONTINUE.md for the current source/tool frontier."
 }

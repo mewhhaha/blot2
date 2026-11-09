@@ -144,9 +144,9 @@ fn sharedAuthority(self_: Solver&, views: Views&) -> bool, Error {
     self_.shared_authority = blot_support::some(captureAuthority(views)); return true, blot_error::Error.none;
 }
 fn sharedGoalOwners(key:const SharedGoal&)->bool {return key.producer_owner!=0 && (!key.origin_owner.present || key.origin_owner.value!=0);}
-fn sharedGoalHit(self_: Solver&, key: SharedGoal, depth: i64) -> bool { if !sharedGoalOwners(key) { return false; } { let optional_binding_78 .= self_.shared_goals.get(key); if optional_binding_78 { let proved_depth .= optional_binding_78; if depth > proved_depth { return false; } self_.shared_goal_hits += 1; return true;  } } return false; }
+fn sharedGoalHit(self_: Solver&, key: SharedGoal, depth: i64) -> bool { if !sharedGoalOwners(key) { return false; } { let scalar_lookup_1 .= self_.shared_goals.get(key); if scalar_lookup_1 {let optional_binding_78:i64=scalar_lookup_1; let proved_depth .= optional_binding_78; if depth > proved_depth { return false; } self_.shared_goal_hits += 1; return true;  } } return false; }
 fn rememberSharedGoal(self_: Solver&, key: SharedGoal, depth: i64) -> Error {
-    if !sharedGoalOwners(key) { return blot_error::Error.none; } { let optional_binding_77 .= self_.shared_goals.get(key); if optional_binding_77 { let proved_depth .= optional_binding_77; self_.shared_goals.insert(key, max(proved_depth, depth)); return blot_error::Error.none;  } }
+    if !sharedGoalOwners(key) { return blot_error::Error.none; } { let scalar_lookup_2 .= self_.shared_goals.get(key); if scalar_lookup_2 {let optional_binding_77:i64=scalar_lookup_2; let proved_depth .= optional_binding_77; self_.shared_goals.insert(key, max(proved_depth, depth)); return blot_error::Error.none;  } }
     if self_.shared_goals.count >= 65536 { return blot_error::Error.none; } self_.shared_goals.insert(key, depth); return blot_error::Error.none;
 }
 fn deinit(self_: Solver&) { self_.shared_authority.present = false; self_.shared_goals.deinit(); self_.rigid_type_overflow.deinit(); self_.rigid_rows.deinit(); self_.store.deinit(); }

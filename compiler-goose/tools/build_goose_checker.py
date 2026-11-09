@@ -50,6 +50,19 @@ STABLE_CLOSURES_SOURCES = {
     (True, True, True): "7c1501a2a77451b3f3d38d31b19daba4204baeefd91310f2e6235613623bdec6",
 }
 
+ARRAY_REACH_GATE_PATCH_SHA256 = "bddc93903b58489f47c1ddf41adfe141d1a68e795777f96554cd8b8207ef804a"
+# This layer requires stable-closures; keys are diagnostics/runtime/reachable.
+ARRAY_REACH_GATE_SOURCES = {
+    (False, False, False): "dcedc7d49da1643e469a5bfe34a55a93672a7a1d49d354a413ae42f52e62f91a",
+    (False, False, True): "260743c05ebfd13fb6d102c93dec3707b3d8923bbd6522ec44f9f2d880fb5cf0",
+    (False, True, False): "29bcb52979da4b80a14266b64d0f86e95e086975818518658bea217eccb9ddb3",
+    (False, True, True): "cd1fc3306a761a633a00c27d0b65eac8286126e24d56fd2ee08a36632cf5f680",
+    (True, False, False): "4616a9c32fc51a9f6ce9181ac1cccb29825d1d84aafafe722c3cfb828a793f22",
+    (True, False, True): "912ba1fc9e1111841a8379d7a0daade247e04251f470736bd7d5642d4eaf02ab",
+    (True, True, False): "9f5bf7ea2500c01a5cf3057712ed67bcea76b162797a2647499adde728893712",
+    (True, True, True): "dcd6ffbca3ac21a4fafe227525c08eeda2f0caff0c399ca29a29d4223a414d45",
+}
+
 LINK_INPUTS = (
     "CMakeFiles/goose.dir/src/process.cpp.o",
     "CMakeFiles/goose.dir/src/progress.cpp.o",
@@ -173,6 +186,8 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.array_reach_gate and not args.stable_closures:
+        raise RuntimeError("--array-reach-gate requires --stable-closures")
     goose_build = args.goose_build.resolve()
     cache = args.cache_dir.resolve()
     if cache.is_relative_to(goose_build):
@@ -211,6 +226,14 @@ def build(args):
             raise RuntimeError("stable-closures patch changed; review and update its pinned digest")
         identity["stable_closures_patch_sha256"] = STABLE_CLOSURES_PATCH_SHA256
         identity["stable_closures_source_sha256"] = STABLE_CLOSURES_SOURCES[
+            (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
+        ]
+    array_patch = Path(__file__).with_name("goose-array-reach-gate.patch")
+    if args.array_reach_gate:
+        if digest(array_patch) != ARRAY_REACH_GATE_PATCH_SHA256:
+            raise RuntimeError("array-reach-gate patch changed; review and update its pinned digest")
+        identity["array_reach_gate_patch_sha256"] = ARRAY_REACH_GATE_PATCH_SHA256
+        identity["array_reach_gate_source_sha256"] = ARRAY_REACH_GATE_SOURCES[
             (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
         ]
     key = json_digest(identity)
@@ -268,6 +291,14 @@ def build(args):
                 patched_source_sha256 = checked_source(
                     work / "source", identity["stable_closures_source_sha256"]
                 )
+            if args.array_reach_gate:
+                stages.append(run_stage("array-reach-gate-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(array_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(
+                    work / "source", identity["array_reach_gate_source_sha256"]
+                )
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -290,6 +321,11 @@ def build(args):
             if args.stable_closures:
                 final_identity["stable_closures_patch_sha256"] = digest(stable_patch)
                 final_identity["stable_closures_source_sha256"] = STABLE_CLOSURES_SOURCES[
+                    (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
+                ]
+            if args.array_reach_gate:
+                final_identity["array_reach_gate_patch_sha256"] = digest(array_patch)
+                final_identity["array_reach_gate_source_sha256"] = ARRAY_REACH_GATE_SOURCES[
                     (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
                 ]
             if final_identity != identity:
@@ -335,6 +371,10 @@ def main():
     parser.add_argument(
         "--stable-closures", action="store_true",
         help="publish complete stable graph closures; include optional query profile counters",
+    )
+    parser.add_argument(
+        "--array-reach-gate", action="store_true",
+        help="qualify ArrayElems cache by actual reachability; requires --stable-closures",
     )
     args = parser.parse_args()
     try:

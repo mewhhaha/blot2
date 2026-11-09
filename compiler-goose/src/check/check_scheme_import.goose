@@ -50,11 +50,11 @@ fn copyVersion(self_: Copier&, node: blot_check_types::Node) -> Id, Error {
     return self_.destination.instanceVersion(Identity { self_.private_unit, declaration , ..}, node.c);
 }
 fn copyScope(self_: Copier&, source: u32) -> u32, Error {
-    if self_.private_namespace == 0 || source == 0 { return 0, blot_error::Error.type_limit; } { let optional_binding_59 .= self_.private_scopes.get(source); if optional_binding_59 { let known .= optional_binding_59; return known, blot_error::Error.none;  } }
+    if self_.private_namespace == 0 || source == 0 { return 0, blot_error::Error.type_limit; } { let scalar_lookup_1 .= self_.private_scopes.get(source); if scalar_lookup_1 {let optional_binding_59:u32=scalar_lookup_1; let known .= optional_binding_59; return known, blot_error::Error.none;  } }
     let fresh, error = self_.destination.rigidScope(); if error != blot_error::Error.none { return 0, error; } self_.private_scopes.insert(source, fresh); return fresh, blot_error::Error.none;
 }
 fn rowVariable(self_: Copier&, source: u32) -> blot_check_effects::Id, Error {
-    { let optional_binding_58 .= self_.row_variables.get(source); if optional_binding_58 { let known .= optional_binding_58; return known, blot_error::Error.none;  } } let fresh, error = self_.destination.freshEffects(); if error != blot_error::Error.none { return 0, error; } self_.row_variables.insert(source, fresh); return fresh, blot_error::Error.none;
+    { let scalar_lookup_2 .= self_.row_variables.get(source); if scalar_lookup_2 {let optional_binding_58:u32=scalar_lookup_2; let known .= optional_binding_58; return known, blot_error::Error.none;  } } let fresh, error = self_.destination.freshEffects(); if error != blot_error::Error.none { return 0, error; } self_.row_variables.insert(source, fresh); return fresh, blot_error::Error.none;
 }
 fn variableOf(self_: Copier&, row: blot_check_effects::Id) -> u32, Error { match self_.destination.effects.node(row).tail { variable match_payload_26 => { let value = match_payload_26.value;  return value, blot_error::Error.none; }, _ => { return 0, blot_error::Error.type_limit; }, } }
 recursive fn relocatedRows(self_:Copier&,source:const u32[:])->List,Error {
@@ -80,7 +80,7 @@ recursive fn copyGenerativeBody(self_:Copier&,source:List,roots:IdBuffer&)->List
  let error=copyIds(self_,self_.source.list(source),0,roots);if error!=blot_error::Error.none {return List{..},error;}return self_.destination.saveList(roots.items);
 }
 recursive fn copyLabel(self_:Copier&,label:blot_check_effects::Label,depth:i64)->blot_check_effects::Label,Error {
-    if depth >= 1024 || label == 0 || label >= self_.source.operationCount() { return 0, blot_error::Error.type_limit; } { let optional_binding_57 .= self_.labels.get(label); if optional_binding_57 { let known .= optional_binding_57; return known, blot_error::Error.none;  } }
+    if depth >= 1024 || label == 0 || label >= self_.source.operationCount() { return 0, blot_error::Error.type_limit; } { let scalar_lookup_3 .= self_.labels.get(label); if scalar_lookup_3 {let optional_binding_57:u32=scalar_lookup_3; let known .= optional_binding_57; return known, blot_error::Error.none;  } }
     if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
     let operation=self_.source.operation(label);var args=IdBuffer{..};
  let result,error=copyLabelBody(self_,label,operation,depth,args);deinit(args);return result,error;
@@ -93,7 +93,7 @@ recursive fn copyLabelBody(self_:Copier&,label:blot_check_effects::Label,operati
     let result, error = self_.destination.internScopedOperation(identity, instance, args.items); if error != blot_error::Error.none { return 0, error; } self_.labels.insert(label, result); return result, blot_error::Error.none;
 }
 recursive fn copyRow(self_:Copier&,source_row:blot_check_effects::Id,depth:i64)->blot_check_effects::Id,Error {
-    if depth >= 1024 { return 0, blot_error::Error.type_limit; } if source_row == 0 { return 0, blot_error::Error.none; } { let optional_binding_54 .= self_.rows.get(source_row); if optional_binding_54 { let known .= optional_binding_54; return known, blot_error::Error.none;  } }
+    if depth >= 1024 { return 0, blot_error::Error.type_limit; } if source_row == 0 { return 0, blot_error::Error.none; } { let scalar_lookup_4 .= self_.rows.get(source_row); if scalar_lookup_4 {let optional_binding_54:u32=scalar_lookup_4; let known .= optional_binding_54; return known, blot_error::Error.none;  } }
     if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
     let row=self_.source.row(source_row);var labels=IdBuffer{..};
  let result,error=copyRowBody(self_,source_row,row,depth,labels);deinit(labels);return result,error;
@@ -106,7 +106,7 @@ recursive fn copyRowBody(self_:Copier&,source_row:blot_check_effects::Id,row:blo
         parameter match_payload_23 => { let value = match_payload_23.value;  tail = blot_check_effects::Tail.parameter { value , ..}; },
         formal match_payload_24 => { let value = match_payload_24.value;  let copied, error = copy(self_, value, depth + 1); if error != blot_error::Error.none { return 0, error; } tail = blot_check_effects::Tail.formal { copied , ..}; },
         variable match_payload_25 => { let value = match_payload_25.value;
-            var mapped = blot_support::none<u32>(); { let optional_binding_53 .= self_.row_variables.get(value); if optional_binding_53 { let known .= optional_binding_53; mapped = blot_support::some<u32>(known);  } }
+            var mapped = blot_support::none<u32>(); { let scalar_lookup_5 .= self_.row_variables.get(value); if scalar_lookup_5 {let optional_binding_53:u32=scalar_lookup_5; let known .= optional_binding_53; mapped = blot_support::some<u32>(known);  } }
             if !mapped.present && self_.fresh_rows { let fresh, error = self_.destination.freshEffects(); if error != blot_error::Error.none { return 0, error; } self_.row_variables.insert(value, fresh); mapped = blot_support::some(fresh); }
             if !mapped.present { return 0, blot_error::Error.type_limit; } let replacement = self_.destination.effects.node(mapped.value);
             for label in self_.destination.effects.list(replacement.labels) {
@@ -122,7 +122,7 @@ recursive fn quantifier(self_:Copier&,node:blot_check_types::Node,depth:i64,id:I
 }
 recursive fn quantifierBody(self_:Copier&,node:blot_check_types::Node,depth:i64,id:Id,binders:IdBuffer&)->Id,Error {
     for original in self_.source.list(List { node.b, node.c , ..}) { let leaf = self_.source.node(original); if leaf.tag != blot_check_types::Tag.bound { return 0, blot_error::Error.type_limit; }
-        var binder: Id = 0; { let optional_binding_52 .= self_.mapping.get(original); if optional_binding_52 { let known .= optional_binding_52; binder = known;  } else { let fresh, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } binder = fresh; } } self_.mapping.insert(original, binder); let error=push(binders,binder);if error!=blot_error::Error.none {return 0,error;}
+        var binder: Id = 0; { let scalar_lookup_6 .= self_.mapping.get(original); if scalar_lookup_6 {let optional_binding_52:u32=scalar_lookup_6; let known .= optional_binding_52; binder = known;  } else { let fresh, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } binder = fresh; } } self_.mapping.insert(original, binder); let error=push(binders,binder);if error!=blot_error::Error.none {return 0,error;}
     }
     let body, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let original=self_.source.quantifierGoals(id);let goals=import_goals.alloc_slice(original.len);for goal,index in original {goals[index]=goal;}
  let result,error=quantifierGoalsBody(self_,node,depth,body,binders.items,goals);import_goals.free_slice(goals);return result,error;
@@ -154,7 +154,7 @@ recursive fn copy(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
     let result, error = copyDepth(self_, source_id, depth); if depth == 0 { saturatingAdd(self_.destination.normalization.import_nodes_added,(self_.destination.nodes.len - before) as u64); } return result, error;
 }
 recursive fn copyDepth(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
-    if depth >= 1024 { return 0, blot_error::Error.type_limit; } let id = self_.source.head(source_id, 0); { let optional_binding_43 .= self_.mapping.get(id); if optional_binding_43 { let known .= optional_binding_43; return known, blot_error::Error.none;  } }
+    if depth >= 1024 { return 0, blot_error::Error.type_limit; } let id = self_.source.head(source_id, 0); { let scalar_lookup_7 .= self_.mapping.get(id); if scalar_lookup_7 {let optional_binding_43:u32=scalar_lookup_7; let known .= optional_binding_43; return known, blot_error::Error.none;  } }
     if self_.associated { let error = self_.destination.chargeProjection(); if error != blot_error::Error.none { return 0, error; } }
     let node = self_.source.node(id); var result: Id = 0; var failure = blot_error::Error.none;
     match node.tag {

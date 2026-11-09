@@ -145,12 +145,12 @@ recursive fn expression<E>(self_: SourceWalker<E>&, id: blot_parse_ast::Id, dept
         blot_parse_ast::tag_group, blot_parse_ast::tag_return_stmt, blot_parse_ast::tag_function_return_stmt => { return expression(self_, node.a, depth + 1); },
         blot_parse_ast::tag_field => { return expression(self_, node.b, depth + 1); },
         blot_parse_ast::tag_product, blot_parse_ast::tag_record, blot_parse_ast::tag_array, blot_parse_ast::tag_block => {
-            if node.tag == blot_parse_ast::tag_block && node.c != 0 { return blot_error::Error.unsafe_cleanup; } for child in self_.engine.tree.children(id) { let error = expression(self_, child, depth + 1); if error != blot_error::Error.none { return error; } }
+            if node.tag == blot_parse_ast::tag_block && node.c != 0 { return blot_error::Error.unsafe_cleanup; } let ast_walk_1_source=id;let ast_walk_1_count=self_.engine.tree.children(ast_walk_1_source).len;for ast_walk_1_index in 0..ast_walk_1_count {let child=self_.engine.tree.children(ast_walk_1_source)[ast_walk_1_index]; let error = expression(self_, child, depth + 1); if error != blot_error::Error.none { return error; } }
         },
         blot_parse_ast::tag_let_stmt => { let binding = self_.engine.tree.binding(id); if binding.fallback != 0 { return blot_error::Error.unsafe_cleanup; } return expression(self_, binding.value, depth + 1); },
         blot_parse_ast::tag_if_expr, blot_parse_ast::tag_if_stmt => { let error = expression(self_, node.a, depth + 1); if error != blot_error::Error.none { return error; } let error = expression(self_, node.b, depth + 1); if error != blot_error::Error.none { return error; } return expression(self_, node.c, depth + 1); },
         blot_parse_ast::tag_range_stmt => { return range(self_, node.a, node.b, node.c, depth + 1); },
-        blot_parse_ast::tag_for_stmt => { let details = self_.engine.tree.extra.items[node.c..node.c + 3]; if details[0] == 0 { return blot_error::Error.unsafe_cleanup; } return range(self_, node.b, details[0], details[1], depth + 1); },
+        blot_parse_ast::tag_for_stmt => { let ast_details_start=(node.c) as i64;let ast_details_count=self_.engine.tree.extra.items[ast_details_start..node.c + 3].len;let details=blot_parse_ast::List{start:ast_details_start as u32,len:ast_details_count as u32,..}; if self_.engine.tree.list(details)[0] == 0 { return blot_error::Error.unsafe_cleanup; } return range(self_, node.b, self_.engine.tree.list(details)[0], self_.engine.tree.list(details)[1], depth + 1); },
         _ => { return blot_error::Error.unsafe_cleanup; },
     } return blot_error::Error.none;
 }

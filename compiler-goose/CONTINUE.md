@@ -1,30 +1,41 @@
-# Write the complete Goose port before verification
+# Finish the Goose compiler experiment
 
-The user requests a 1:1 experimental port in idiomatic Goose, keeping Zig as
-the oracle. **Do not compile, execute, test, lint or format-check the port until
-all production code is written.** Source inspection and writing are the current
-phase. Never count file presence as algorithm completion or claim parity.
+The writing-first phase is over. Current work is to fix production lifetime
+failures in coherent families, produce the complete native compiler, then
+qualify CLI/project-server behavior and recoverable request OOM against Zig.
+Run bounded batch checks at family boundaries rather than per-edit fixtures.
+Never count source presence or a selected-root check as whole-port completion.
 
-`oracle.json` pins Zig commit `156f84b4810f630dff7e5efb7014b2194e3160f7`,
-all native sources and the installed compiler. An executable copy and its
-identity are in ignored `build/goose-port/oracle/`. Leave `compiler/`, its
-installed binaries and the sibling checkouts intact.
+Keep `compiler/` and its installed binaries as the oracle. `oracle.json` pins
+Zig commit `156f84b4810f630dff7e5efb7014b2194e3160f7`; the executable copy and
+identity are in ignored `build/goose-port/oracle/`. New-language comparisons
+must use the corresponding newer Zig candidate and pinned source inputs.
+Preserve sibling checkouts and installed Goose toolchains.
 
-The source is about 183k production lines. The root module will be
-`src/main.goose`. Each source module retains its Zig filename and uses a flat
-namespace `blot_<area>_<filename>`. Use Goose's `namespace::name`, dotted
-package-root imports (`import check.types;`) and file-relative peer imports
-(`import .effects;`). Imports create no namespace or alias.
+Use the tracked private checker recipe. The newer selfhost Goose snapshot is
+not a qualified replacement for this port's packages, reusable pools and native
+host APIs. Selected-root diagnostics are partial. Normal whole builds emit C
+and a host header, then compile and link the real Goose CLI with native OS
+adapters. Stages remain capped at 120s and whole attempts at 300s.
 
-Current writing ownership:
+The current lifetime repair replaces recursive predicate scratch borrows with
+scalar pool ranges. Reusable storage remains owned until the calling frame
+finishes; each recursive step reads a predicate by value. Importer callback
+contexts pass their fixed borrowed fields by value. No lifetime acceptance rule
+is weakened. The proof/resolver, scalar metadata, sort and diagnostic transfer
+families are repaired. The source/global-reference validator batch adds 21 AST
+cursors and removes 14 span aliases. Combined selected checking hit120.301s
+with no error and is incomplete; split engine checking is pending.
+Six isolated production engine families execute. Current results and the next frontier belong in root CONTINUE.md
+and pinned qualification receipts.
 
-- `goose_syntax_port`: parse/eval first passes; now archive codecs and optimized bodies.
-- `goose_language_mapping`: check first passes complete; now artifact fragment and constant replay.
-- `goose_backend_port`: all 125 backend modules.
-- Root: all reuse/runtime modules, support primitives, driver and packaging.
-
-Progress and exact constructor/API decisions belong in the agents' port notes.
-The writing phase is unfinished; no verification has run.
+Native request rollback and runtime observation components are tested; their
+whole compiler integration remains unqualified. A
+committed worker forks a candidate before reading each request; only a complete
+staged reply can adopt it. Explicit allocation failures discard the candidate
+and retain the committed heap. Generic panics and signals are not OOM. Coverage
+must distinguish observed pool operations, reserved capacity and RSS; unavailable
+live/scratch counts must stay explicitly unavailable.
 
 Retained contexts now use canonical typed metadata and fixed pooled buffers.
 Lexical contexts may borrow caller-owned tables. Arrays cannot
@@ -45,8 +56,3 @@ encoded references, recoverable allocation and source-package imports. Preserve
 the requested source contracts and record gaps; choose and qualify the Goose
 toolchain after writing. Do not work around gaps by weakening Blot checks,
 forwarding compilation to Zig, or inserting placeholder successes.
-
-Source-only writing checkpoint: see source-correspondence.json and port-notes/
-for explicit completed writing passes, WIP and required unwritten modules. The
-whole port remains unwritten and verification_started remains false. All normal
-Zig compiler files and binaries remain the oracle and default.

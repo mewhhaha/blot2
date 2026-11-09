@@ -8,6 +8,7 @@ Each C++ suite compiles once. Upstream Goose fixtures are checked by content has
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import time
@@ -45,10 +46,10 @@ def source_root(path):
     return path
 
 
-def command(args, name, values, timeout):
+def command(args, name, values, timeout, env=None):
     started = time.monotonic()
     result = subprocess.run([str(value) for value in values], capture_output=True,
-                            text=True, timeout=timeout)
+                            text=True, timeout=timeout, env=env)
     (args.output / (name + ".stdout")).write_text(result.stdout)
     (args.output / (name + ".stderr")).write_text(result.stderr)
     if result.returncode:
@@ -72,7 +73,7 @@ def stability(args):
     prefix += '#include "' + str(TESTS / "stability_laws.h") + '"\n'
     (args.output / "probe-prefix.h").write_text(prefix)
     gates = (candidate / "type_queries.h").read_text()
-    for name in ("StableTypeGraph", "StableCanContainGraph", "StableReachesGraph", "StableQueryProfile"):
+    for name in ("StableTypeGraph", "StableCanContainGraph", "StableReachesGraph", "StableQueryProfile", "ArrayGateProfile"):
         gates = gates.replace(name, "Candidate" + name)
     (args.output / "candidate-gates.h").write_text(gates)
     binary = args.output / "stability"
@@ -109,6 +110,74 @@ def visited(args):
             "scope": "source-extracted TypeEq/ordered traversal; controlled lazy/array-size leaves"}
 
 
+def array_gate(args):
+    source = args.source / "src"
+    old_source = args.baseline_source / "src"
+    prefix = "#include <iostream>\n"
+    for name in ("includes.h", "utils.h", "direct_input_trace.h", "small_vector.h",
+                 "flat_map.h", "lexer_cache.h", "lexer.h", "ast.h", "type_queries.h"):
+        prefix += '#include "' + str(source / name) + '"\n'
+    prefix += 'using namespace goose;\nstatic int passed;\n'
+    prefix += 'static void law(const char *, const function<void()> &test) { test(); passed++; }\n'
+    prefix += '#include "' + str(TESTS / "stability_laws.h") + '"\n'
+    (args.output / "array-prefix.h").write_text(prefix)
+    header = (source / "typecheck.h").read_text()
+    types = (source / "typecheck_types.h").read_text()
+    methods = ""
+    for head in ("    static bool SameIndex(", "    bool TypeEq(", "    bool TypeArgsEq("):
+        methods += block(header, head) + "\n"
+    methods += block(types, "inline TypeExpr *TypeCheck::LoadType(").replace("TypeCheck::", "") + "\n"
+    methods += block(header, "    struct ArrayReachVisited {") + ";\n"
+    walk = block(types, "inline void TypeCheck::ArrayElemsReached(").replace("TypeCheck::", "")
+    methods += walk.replace("{", "{\n    array_walks++;", 1) + "\n"
+    methods += block(types, "inline void TypeCheck::AppendArrayElemsReached(").replace("TypeCheck::", "") + "\n"
+    old = block((old_source / "typecheck_types.h").read_text(), "inline void TypeCheck::AppendArrayElemsReached(")
+    methods += old.replace("TypeCheck::AppendArrayElemsReached", "BaselineAppend") + "\n"
+    (args.output / "array-methods.h").write_text(methods)
+    binary = args.output / "array-gate"
+    built = command(args, "compile-array-gate", [args.cxx, "-std=gnu++20", "-O2", "-Wall",
+                    "-Wextra", "-Wno-unused-parameter", "-I" + str(args.output),
+                    TESTS / "array_gate.cpp", "-o", binary], 30)
+    tested = command(args, "array-gate", [binary], 30)
+    if '"laws":7' not in tested["stdout"]:
+        raise RuntimeError("array-gate law inventory changed")
+    fixture = TESTS / "array_gate.goose"
+    for label, goose in (("baseline", args.baseline), ("candidate", args.goose)):
+        result = command(args, "array-gate-" + label, [goose, "run", fixture,
+                         "--stdlib", args.stdlib], 30)
+        if result["stdout"] != "array gate passed\n":
+            raise RuntimeError("array-gate runtime output changed")
+    env = dict(os.environ)
+    env.pop("GOOSE_DIAGNOSTIC_ROOTS", None)
+    env.pop("GOOSE_CHECKER_PROFILE", None)
+    cfile = args.output / "array-gate-same-path.c"
+    hashes = []
+    for label, goose, profile in (("baseline", args.baseline, False),
+                                  ("candidate", args.goose, False),
+                                  ("profile", args.goose, True)):
+        selected = dict(env)
+        if profile:
+            selected["GOOSE_CHECKER_PROFILE"] = "1"
+        emitted = command(args, "array-gate-emit-" + label,
+                          [goose, "--standalone", fixture, "--stdlib", args.stdlib,
+                           "-o", cfile], 30, selected)
+        hashes.append(digest(cfile))
+    if len(set(hashes)) != 1:
+        raise RuntimeError("array-gate baseline/candidate/profile C output differs")
+    rows = [line for line in emitted["stderr"].splitlines()
+            if line.startswith("GOOSE_CHECKER_PROFILE array_gate ")]
+    counters = {key: int(value) for key, value in
+                (item.split("=", 1) for item in rows[-1].split()[2:])}
+    if not counters["full_rejected"] or not counters["reach_accepted"]:
+        raise RuntimeError("phantom fixture did not exercise the narrower graph")
+    if counters["full_accepted_reach_rejected"]:
+        raise RuntimeError("phantom fixture unexpectedly rejected a full-ready graph")
+    return {"compile": built, "run": tested, "binary_sha256": digest(binary), "laws": 7,
+            "same_path_C_sha256": hashes[0], "profile_cross_counts": counters,
+            "methods_sha256": digest(args.output / "array-methods.h"),
+            "scope": "actual gates/equality/ordered array methods; controlled lazy/size leaves"}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--goose", type=Path, required=True, help="candidate private compiler")
@@ -120,7 +189,7 @@ def main():
     parser.add_argument("--stdlib", type=Path, help="override selected stdlib tree")
     parser.add_argument("--cc", type=Path, default=Path("/usr/bin/clang"))
     parser.add_argument("--cxx", type=Path, default=Path("/usr/bin/clang++"))
-    parser.add_argument("--checks", nargs="+", choices=("semantic", "stability", "visited"),
+    parser.add_argument("--checks", nargs="+", choices=("semantic", "stability", "visited", "array-gate"),
                         default=["semantic", "stability", "visited"])
     parser.add_argument("--output", type=Path, default=ROOT / "build/goose-port/checker-tools")
     args = parser.parse_args()
@@ -152,6 +221,8 @@ def main():
         report["checks"]["stability"] = stability(args)
     if "visited" in args.checks:
         report["checks"]["visited"] = visited(args)
+    if "array-gate" in args.checks:
+        report["checks"]["array-gate"] = array_gate(args)
     path = args.output / "receipt.json"
     path.write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps({"receipt": str(path), "checks": list(report["checks"]),

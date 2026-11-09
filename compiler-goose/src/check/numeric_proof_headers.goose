@@ -63,7 +63,7 @@ recursive fn contains(self_: Builder&, id: blot_parse_ast::Id, depth: i64) -> bo
         blot_parse_ast::tag_group => { return contains(self_, node.a, depth + 1); },
         blot_parse_ast::tag_type_binder, blot_parse_ast::tag_type_field => { return contains(self_, node.b, depth + 1); },
         blot_parse_ast::tag_type_array, blot_parse_ast::tag_type_product, blot_parse_ast::tag_type_record, blot_parse_ast::tag_effect_row => {
-            for child in self_.tree.children(id) { let found, error = contains(self_, child, depth + 1); if error != blot_error::Error.none || found { return found, error; } }
+            let ast_walk_1_source=id;let ast_walk_1_count=self_.tree.children(ast_walk_1_source).len;for ast_walk_1_index in 0..ast_walk_1_count {let child=self_.tree.children(ast_walk_1_source)[ast_walk_1_index]; let found, error = contains(self_, child, depth + 1); if error != blot_error::Error.none || found { return found, error; } }
         }, _ => {},
     }
     return false, blot_error::Error.none;

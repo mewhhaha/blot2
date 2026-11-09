@@ -1,12 +1,17 @@
-# Continue the owned-storage rewrite
+# Continue the Goose compiler completion
 
 ## Current frontier
 
-Implement [RFC #46](https://github.com/mewhhaha/blot2/issues/46) in Zig first,
-then mirror checked behavior in Goose. The remaining stages are in
-[the migration index](docs/language/NEXT_MIGRATION.md). Immutable collections,
-automatic admitted copies, overloads, parameterized namespaces and staged scopes
-remain pending; named-owner writes still describe the current memory model.
+Current user priority: repair Goose lifetimes in coherent families, build the
+actual native compiler, then qualify recoverable OOM/retention and differential
+behavior against Zig. Verify at family boundaries, keeping stage/whole limits
+at 120/300s. Source-only progress and native component tests are not executable
+or whole-runtime qualification. Keep the Zig oracle and sibling state intact.
+
+The remaining language [RFC #46](https://github.com/mewhhaha/blot2/issues/46)
+stages remain in [the migration index](docs/language/NEXT_MIGRATION.md).
+Immutable collections, automatic admitted copies, overloads, parameterized
+namespaces and staged scopes are pending; named-owner writes remain current.
 
 The named-function source migration is complete across **782 Blot files**:
 **353 std / 3,506 Ink / 5,105 Gdev module functions** now use named declarations.
@@ -43,32 +48,69 @@ candidate; use the explicitly identified development compiler for these checks.
 Full original-export, release and Main/frame qualification remain pending.
 See [the exact batch evidence and compressed raw reports](benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
 
-Goose mirrors the new parser/checker rules. Its parser engine passes in 2.30s
-and the full import graph parses, but no whole compiler executable or semantic
-qualification exists. Preserve the original pinned Zig oracle for old-language
-comparisons. The previous whole-port frontier remains `LegacyProof.resolve`'s
-`withImporter` callback lifetime. Its four production entry-path checks qualify
-34f7a396, not the current mirrored checker. Expose `StoreEvent.at` at
-`ApplyCalleeStores` before more callback rewrites; keep the call location primary.
-Use coherent bounded families, not per-edit synthetic fixtures. Astra is for a
-specific snag; never Terra. Local named-function hoisting remains pending and
-has not been cut from the RFC.
+Goose mirrors the new parser/checker rules. Its parser engine passes, but no
+whole compiler executable or semantic qualification exists. Preserve the
+original pinned Zig oracle for old-language comparisons. The current repair
+removes mixed-root importer callbacks, separates resolver/context/counter inputs,
+and uses scalar owner/lease/generation keys for recursive proof storage. Both
+store acquisitions retain all 9/21 header-identity guards. Error-only work records
+keep borrowed inputs separate. A review audits 210 affected calls and 46 bodies.
+The actual checker path has cleared the proof/resolver, sort-context and
+diagnostic-transfer failures. Its latest selected-root diagnostic is the
+source-validator AST traversal at `parse/source_operators.goose:448`; that
+immutable traversal family is now repaired. The combined five-root check hit
+its 120.301s cap with no emitted error; that is incomplete. Separate check/lower/
+independent roots are being checked concurrently to expose distinct failures. All 12 sort helpers and 11 comparator/swap contexts
+now take fixed views by value, preserving charged comparison/swap order. The current source batch also
+converts 100 immutable AST loops, removes 32 retained AST span aliases and copies
+111 scalar metadata lookups rather than retaining optional map-entry references.
+Readonly leased views pass by value; owning mutation/deinit references remain.
+The adjacent source/global-reference family replaces another 21 AST loops
+and 14 span aliases, preserving forward/reverse and prefix traversal order.
+Six isolated production law families execute, including borrowed sort payloads
+and shared counters, repeated store release/reuse, owner/generation rejection
+and direct reified-view reads. Diagnostic transfer now canonicalizes owned
+payloads and validates pool membership before deriving scalar run indices. These source
+repairs remain under validation, not a completed checker or compiler pass.
 
-The normal private checker is `0c235f03...`: exported roots first, nominal
-identity/reference reachability, lazy overload diagnostics, visited-type buckets,
-raw identity skipping and historical live-event indexing. Its tracked recipe
-reconstructs 108 source files. Preserve current-key/order/classread checks;
-index membership is no lifetime authority. Dense all-relevant synthetic replay
-costs 2.15x; no completed compiler performance gain is claimed. The subsequent
-reference-prefix experiment remains unselected (one confounded failing-prefix
-pair: 108.859 to 104.512s). Installed Goose remains unchanged.
+The actual whole C/header build compiles all seven runtime/native objects in
+about one second, then reaches its **120.323s emission cap without an error**.
+No C program, header or executable was produced. Normal Goose checks unreached
+nongeneric functions across the universal generated-adapter import closure;
+separate worker entry files alone would not isolate that work. Measure the
+checker before raising limits or making a broad process split. Private profiling identifies the real exported entry, rather than parsing or
+global initialization, as the current cost. A 30-second stack sample observes
+array reachability, TypeEq/reference root queries and branch flow snapshots.
+The optional stable-closure candidate is `fdc59ab9...`; an array-specific gate
+is qualified on controls, with no macro compilation win yet. Installed Goose
+remains unchanged.
+Current static source fixes still need whole executable qualification.
 
-Current batch evidence is
-[batched validation](benchmarks/evidence/qualification/2026-11-08-goose-batched-validation.json).
-Prior repairs, qualified controls and rejected experiments remain in
-[the pinned handoff](https://github.com/mewhhaha/blot2/blob/22003c1b937c63e8dfdea723c6807e834060b1f7/CONTINUE.md)
-and its linked receipts. Whole stage/overall caps remain 120/300s. Full builds
-stop 3s after the first error; partial batches collect independent diagnostics.
+The native request transaction components pass normal and sanitizer batches:
+forked candidates preserve the previous heap on explicit marked OOM, stage
+bounded immutable replies, validate before adoption, detach inherited workers,
+and wait for post-adoption cache publication. Cache staging mutates no external
+files; publication runs through an allocation-free native hook after adoption.
+The production server loop and C entry now integrate these APIs, but no compiler
+runtime has executed them yet. Stage-worker physical OOM propagation remains
+unqualified. Scoped runtime observations report actual pool operation totals
+and virtual region reservations; active payload, retained capacity and scratch
+remain unavailable. Never substitute operation balance or RSS for liveness.
+See [observer evidence](benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json),
+[supervisor/transport evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-supervisor.json)
+and [cache evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-cache.json).
+
+Whole builds cache native/runtime objects first, retain stage logs/timings,
+stop three seconds after the first emission diagnostic, and share a 300s cap.
+Do not repeat whole builds per small edit. Partial entry checks are diagnostic
+coverage only. Astra is for a specific snag; never Terra.
+
+Prior qualified controls, source repairs and rejected checker experiments remain
+in [batched validation](benchmarks/evidence/qualification/2026-11-08-goose-batched-validation.json)
+and [the pinned handoff](https://github.com/mewhhaha/blot2/blob/22003c1b937c63e8dfdea723c6807e834060b1f7/CONTINUE.md).
+Those receipts qualify their exact earlier source/tool identities.
+Current source repair scope and pending runtime work are pinned in
+[the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 Main shrinks **10,038,987 → 9,203,613B** (8.3%). Three fresh paired compilations
 measure **5.768 → 5.523s**; paired deltas are **-1277ms, +38ms, +94ms**. There

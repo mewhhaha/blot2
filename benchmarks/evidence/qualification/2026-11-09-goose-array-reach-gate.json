@@ -1,0 +1,180 @@
+{
+  "date": "2026-11-09",
+  "scope": "Optional query-specific ArrayElemsReached cache readiness guard; no TypeEq, TY_FN, checking, traversal, cache-key, merge-order or debug-recompute change",
+  "candidate": {
+    "binary": "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+    "sha256": "a7f79fff83b5b348170c7317a01443f8d3d4e2928cd22c105f8c57e1adf9ee29",
+    "source108_sha256": "dcd6ffbca3ac21a4fafe227525c08eeda2f0caff0c399ca29a29d4223a414d45",
+    "mode": "reachable-program + diagnostic-roots + runtime-observer + stable-closures + array-reach-gate"
+  },
+  "baseline": {
+    "binary": "build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/goose",
+    "sha256": "fdc59ab96ebc33de194de180f7d222798bf1891e5b9b971d04f7db56c0081434",
+    "source108_sha256": "7c1501a2a77451b3f3d38d31b19daba4204baeefd91310f2e6235613623bdec6",
+    "mode": "same modes without array-reach-gate"
+  },
+  "reproduce_build": [
+    "python3",
+    "compiler-goose/tools/build_goose_checker.py",
+    "--array-reach-gate",
+    "--stable-closures",
+    "--reachable-program",
+    "--diagnostic-roots",
+    "--runtime-observer",
+    "--expansion-node-limit",
+    "1000000"
+  ],
+  "reproduce_controls": [
+    "python3",
+    "compiler-goose/tools/test_checker_tools.py",
+    "--goose",
+    "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+    "--baseline",
+    "build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/goose",
+    "--source",
+    "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/source",
+    "--baseline-source",
+    "build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/source",
+    "--checks",
+    "semantic",
+    "stability",
+    "visited",
+    "array-gate",
+    "--output",
+    "build/goose-port/array-reach-gate/controls"
+  ],
+  "reproduce_observer": [
+    "python3",
+    "compiler-goose/tools/test_runtime_observer.py",
+    "--goose",
+    "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+    "--output",
+    "build/goose-port/array-reach-gate/runtime-observer-controls"
+  ],
+  "build": {
+    "stages": [
+      {
+        "stage": "patch",
+        "exit": 0,
+        "seconds": 0.032
+      },
+      {
+        "stage": "diagnostic-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "runtime-observer-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "reachable-program-patch",
+        "exit": 0,
+        "seconds": 0.004
+      },
+      {
+        "stage": "stable-closures-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "array-reach-gate-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "compile",
+        "exit": 0,
+        "seconds": 56.509
+      },
+      {
+        "stage": "link",
+        "exit": 0,
+        "seconds": 0.264
+      }
+    ],
+    "receipt_sha256": "73512c8799bc6a3ad9230a55a1aaaf63f6bd4c3296525c9178912a71ad917599",
+    "compiler": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "patch_sha256": "bddc93903b58489f47c1ddf41adfe141d1a68e795777f96554cd8b8207ef804a",
+    "all_eight_optional_layer_source_pins": true,
+    "per_stage_cap_seconds": 120,
+    "private_builds": 1,
+    "cached_support_objects": true
+  },
+  "proof": [
+    "ArrayElemsReached reads TypeEq identity, actual nominal fields, and referent/slice/array element closures; StableReachesGraph proves these exact dependencies.",
+    "An unused nominal generic argument needs stable identity, not instantiated field closure. Unattached argument remains unattached during readiness and original traversal.",
+    "LoadType uses canonical varint i64, shallow plain const copies, or a plain reference to the same proven referent. It introduces no incomplete actual fields.",
+    "typesbuilding always falls back. Pending array/index/pool identity and unfinished/failed actual instances still fall back to the original walk and diagnostics.",
+    "Full readiness is queried only for GOOSE_CHECKER_PROFILE comparison and never controls acceptance."
+  ],
+  "controls": {
+    "semantic": 24,
+    "actual_AST_stability": 166,
+    "visited": 300,
+    "query_specific_gate_laws": 7,
+    "gate_law_names": [
+      "phantom identity versus actual-field closure, ordered/merged lists",
+      "unfinished instances and function/generic/pool/array negatives",
+      "failed instances and cycle ancestor failure",
+      "typesbuilding and lazy actual completion",
+      "reference/slice/const and nominal argument order",
+      "pending array identity preserves first size failure",
+      "LoadType normalization"
+    ],
+    "same_path_byte_exact_C": 7,
+    "phantom_profile_on_off_C_identical": true,
+    "observer_injected_refusals": 24,
+    "allocator_refusal": {
+      "mechanism": "RLIMIT_AS",
+      "physicalRAMExhaustionTested": false
+    },
+    "generic_failures_never_OOM": [
+      "panic",
+      "invalid-size",
+      "SIGSEGV",
+      "SIGKILL"
+    ],
+    "result": "pass"
+  },
+  "profile": {
+    "phantom_cross_counts": {
+      "checked": 2,
+      "full_rejected": 2,
+      "reach_accepted": 2,
+      "reach_rejected": 0,
+      "full_accepted_reach_rejected": 0
+    },
+    "counter_semantics": "reach_accepted/reach_rejected partition full_rejected; checked excludes typesbuilding; full_accepted_reach_rejected counts the reverse difference",
+    "frequency": "every 16384 nonbuilding queries and destruction",
+    "cost": "profile-only old Full proof adds observation work; no per-query clocks"
+  },
+  "provenance": {
+    "gate_laws_adapted_from": "build/goose-port/array-reachability-gate-build/gate-laws.cpp",
+    "prior_gate_laws_sha256": "f923a37d2525d25e55570035c0b6a882388c954100d0ac3b045b37de28f7c0bf",
+    "adaptation": "Five prior actual-AST laws rebound to current extracted methods; added pending-size diagnostic and LoadType laws. Controlled AnyField and ArraySize leaves remain explicit. New tracked Goose fixture exercises real typechecker and execution.",
+    "method_binding": "Current AST, equality, LoadType, visited context, ordered walk, candidate Append and baseline Append extracted at run time; extracted method hash retained in detailed receipt.",
+    "prior_experiment": "Earlier unselected gate-only candidate had a startup-inclusive synthetic regression around four percent; no whole-port result. This receipt makes no performance win claim."
+  },
+  "limitations": [
+    "No completed whole-port compile or macro performance measurement for this candidate.",
+    "Current semantic controls compare two reachable-program variants; previous eager/default qualification remains separate.",
+    "Query-law fixture uses controlled lazy-field and array-size leaves; real Goose fixture and live invalid semantic controls complement it.",
+    "Physical RAM exhaustion and whole-runtime fault coverage remain unavailable."
+  ],
+  "tracked_sources": {
+    "compiler-goose/tools/build_goose_checker.py": "66607f8a117c0e5ead278c1b2e997a25964a407308e7f1c5336cea2612eab6d1",
+    "compiler-goose/tools/goose-array-reach-gate.patch": "bddc93903b58489f47c1ddf41adfe141d1a68e795777f96554cd8b8207ef804a",
+    "compiler-goose/tools/test_checker_tools.py": "82e86f537bebe14d7ba061ae223617b0e389bbb670248b259130d7cc26e80632",
+    "compiler-goose/tests/checker_tools/array_gate.cpp": "733a5bc757234866edc3677ed2ec94997b0d6da99c2e3c5d40682469ca1539c1",
+    "compiler-goose/tests/checker_tools/array_gate.goose": "7b47fd2f7024b6d4186c258f10c2248add8555c2d0df0b9a7a5e24988f388749"
+  },
+  "detailed_evidence": {
+    "build/goose-port/array-reach-gate/controls/receipt.json": "788bc48b2d49e1bfeb7325dafcefd0d0c2ff37ce75626c5a0c98615a95320e39",
+    "build/goose-port/array-reach-gate/runtime-observer-controls/result.json": "221ab4d138ea31e86adf7c6ac381b0e8e5ebb7bf23012a294a53b5bfd3f3d053",
+    "build/goose-port/array-reach-gate/C-parity.json": "2f7b7e36701d4aa93f487d41ac54119af66402cc36bcebc117a4abcd64e4e3ed",
+    "build/goose-port/array-reach-gate/phantom-profile.log": "4a575135dabc091f7bd7ece212fb4fa76784a220eef6e5feca9f580792151ff5"
+  },
+  "whole_compiler_qualified": false
+}

@@ -2,6 +2,7 @@
 // process-global packet buffer and are released before the next read.
 namespace blot_reuse_zig_project_server;
 import .zig_project_server;
+import support.process_pool;
 var request_bytes:u8[>..]=[];
 struct Hello {kind:const u8[:]="hello",protocol:const u8[:]="blot-zig-project",version:u32=protocol_version,compilerIdentity:const u8[:],capabilities:const TextSlice[:],maxFrameBytes:i64=blot_reuse_zig_project_frames::max_frame_bytes}
 struct OpenReply {kind:const u8[:]="open",id:u32,epoch:const u8[:]=epoch,revision:u64=0}
@@ -33,7 +34,39 @@ fn dispatch<E>(executor:E&,reader:blot_io::Reader,writer:blot_io::Writer,compile
  {releaseSources(assets);} {releaseSources(sources);} }
 fn runWithPolicy<E>(executor:E&,reader:blot_io::Reader,writer:blot_io::Writer,compiler:Digest,cache_root:Text,policy:blot_execution_policy::Policy)->Error {
     var identity:u8[64]=[0;64];let digits="0123456789abcdef";for byte,index in compiler {identity[index*2]=digits[byte>>4];identity[index*2+1]=digits[byte&15];}let capabilities=["project-build","utf8_bytes","abort-disposes-process","source-overlays","backend-checkpoints","native-assets-v1","editor-completion-v1","allocation-explanations-v1"];let error=reply(writer,Hello{compilerIdentity:identity[..],capabilities:capabilities[..],..},[]);if error!=blot_error::Error.none {return error;}
+    // Fork before reading each request; the supervisor publishes only complete
+    // replies after candidate cleanup and adoption. The previous heap stays idle.
     var opened=blot_support::none<OpenProject>();var last_id:u32=0;
-    loop {let frame,present,error=blot_reuse_zig_project_frames::readRequestFrame(reader,request_bytes);if error!=blot_error::Error.none {let __cleanup_result_6_0: Error = error; {if opened.present {opened.value.deinit();}} return __cleanup_result_6_0;}if !present {let __cleanup_result_7_0: Error = blot_error::Error.none; {if opened.present {opened.value.deinit();}} return __cleanup_result_7_0;}var parsed,error=parseRequest(frame.metadata());if error!=blot_error::Error.none {let __cleanup_result_8_0: Error = error; {if opened.present {opened.value.deinit();}} return __cleanup_result_8_0;}let request=parsed.value;if request.id==0 || request.id<=last_id {let __cleanup_result_9_0: Error = blot_error::Error.request_order; {parsed.deinit();} {if opened.present {opened.value.deinit();}} return __cleanup_result_9_0;}last_id=request.id;let done,error=dispatch(executor,reader,writer,compiler,cache_root,policy,opened,request,frame);if error!=blot_error::Error.none {let __cleanup_result_10_0: Error = error; {parsed.deinit();} {if opened.present {opened.value.deinit();}} return __cleanup_result_10_0;}if done {let __cleanup_result_11_0: Error = blot_error::Error.none; {parsed.deinit();} {if opened.present {opened.value.deinit();}} return __cleanup_result_11_0;} {parsed.deinit();} }
- {if opened.present {opened.value.deinit();}} }
+    let role=blot_native::request_start(blot_reuse_zig_project_frames::max_frame_bytes as u64,blot_reuse_zig_project_frames::max_frame_bytes as u64,120000);
+    if role<0 {return blot_error::Error.io;}
+    if role==0 {
+        if blot_native::request_transport_run(reader.fd,writer.fd)<0 {return blot_error::Error.io;}
+        return blot_error::Error.none;
+    }
+    loop {
+        if blot_native::request_begin()<0 {return blot_error::Error.io;}
+        blot_process_pool::detachInherited();
+        let token=blot_native::request_token();
+        let output=blot_native::request_reply_open();if output<0 {failRequest(token,blot_error::Error.io);}
+        let input=blot_io::Reader{blot_native::request_input_fd()};let staged=blot_io::Writer{output};
+        let frame,present,error=blot_reuse_zig_project_frames::readRequestFrame(input,request_bytes);
+        if error!=blot_error::Error.none {failRequest(token,error);}
+        if !present {failRequest(token,blot_error::Error.truncated_frame);}
+        var parsed,error=parseRequest(frame.metadata());if error!=blot_error::Error.none {failRequest(token,error);}
+        let request=parsed.value;
+        if request.id==0 || request.id<=last_id {parsed.deinit();failRequest(token,blot_error::Error.request_order);}
+        last_id=request.id;
+        let done,error=dispatch(executor,input,staged,compiler,cache_root,policy,opened,request,frame);
+        parsed.deinit();
+        if error!=blot_error::Error.none {failRequest(token,error);}
+        if done && opened.present {opened.value.deinit();opened=blot_support::none<OpenProject>();}
+        if blot_native::request_finish(token)<0 {return blot_error::Error.io;}
+        if done {return blot_error::Error.none;}
+    }
+}
+fn failRequest(token:u64,error:Error) {
+    if error==blot_error::Error.out_of_memory {blot_native::request_fail_oom(token);}
+    blot_native::request_fail(token);abort("request failure returned");
+}
+
 fn run<E>(executor:E&,reader:blot_io::Reader,writer:blot_io::Writer,compiler:Digest,cache_root:Text)->Error {return runWithPolicy(executor,reader,writer,compiler,cache_root,blot_execution_policy::Policy{..});}

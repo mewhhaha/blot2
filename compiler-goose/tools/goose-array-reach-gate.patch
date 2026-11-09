@@ -1,0 +1,48 @@
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -32,2 +32,27 @@
+ 
++// Profile-only comparison of the old full graph with ArrayElemsReached's
++// identity/actual-field/referent graph. Neither proof constructs a type.
++struct ArrayGateProfile {
++    bool enabled = [] { auto value = getenv("GOOSE_CHECKER_PROFILE"); return value && *value; }();
++    uint64_t checked = 0, full_rejected = 0, reach_accepted = 0, reach_rejected = 0;
++    uint64_t full_accepted_reach_rejected = 0;
++    void Report() const {
++        if (!enabled) return;
++        fprintf(stderr, "GOOSE_CHECKER_PROFILE array_gate checked=%llu full_rejected=%llu reach_accepted=%llu reach_rejected=%llu full_accepted_reach_rejected=%llu\n",
++                (unsigned long long)checked, (unsigned long long)full_rejected,
++                (unsigned long long)reach_accepted, (unsigned long long)reach_rejected,
++                (unsigned long long)full_accepted_reach_rejected);
++    }
++    void Observe(bool full, bool reach) {
++        ++checked;
++        if (!full) {
++            ++full_rejected;
++            if (reach) ++reach_accepted;
++            else ++reach_rejected;
++        } else if (!reach) ++full_accepted_reach_rejected;
++        if ((checked & ((UINT64_C(1) << 14) - 1)) == 0) Report();
++    }
++    ~ArrayGateProfile() { Report(); }
++};
++
+ // The checker owns this for one compilation. Construction/qualification of
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -108,2 +108,3 @@
+     StableQueryProfile arrayprofile { "array.elements" };
++    ArrayGateProfile arraygateprofile;
+     // CanContain's and ReachesThroughRefs' answers for complete type graphs:
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1605,3 +1605,8 @@
+ inline void TypeCheck::AppendArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out) {
+-    if (typesbuilding || !stabletypes.Ready(t)) {
++    auto ready = false;
++    if (!typesbuilding) {
++        ready = stablereaches.Ready(t, stablecontainment);
++        if (arraygateprofile.enabled) arraygateprofile.Observe(stabletypes.Ready(t), ready);
++    }
++    if (!ready) {
+         arrayprofile.Slow(typesbuilding != 0);
