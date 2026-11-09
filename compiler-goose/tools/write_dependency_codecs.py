@@ -384,7 +384,7 @@ for d in ORDER:
   else:lines.append('for index in 0..count as i64 '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]'))
   lines.append('return result,Error.none;')
  elif kind=='optional':
-  child=d['children'][0];option_type=t[len('blot_support::Option<'):-1];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return blot_support::none<'+option_type+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return blot_support::some<'+option_type+'>(value),Error.none;')
+  child=d['children'][0];option_type=t[len('blot_support::Option<'):-1];lines.append('let flag,error=reader.integer(1);if error!=Error.none {'+error_return(d)+'}if flag==0 {return blot_support::none<'+option_type+'>(),Error.none;}if flag!=1 {'+error_return(d,'Error.invalid_artifact')+'}let value,error=read_'+proc(child)+'(reader,level+1);if error!=Error.none {'+error_return(d)+'}return blot_support::Option<'+option_type+'>{true,value},Error.none;')
  elif kind=='union':
   lines.append('let error=reader.depth(level+1);if error!=Error.none {'+error_return(d)+'}let tag,error=reader.varint();if error!=Error.none {'+error_return(d)+'}')
   for field,ordinal,target,child,fs in d['variants']:

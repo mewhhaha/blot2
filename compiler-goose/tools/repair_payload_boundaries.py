@@ -107,7 +107,17 @@ def repair_codec_const_options(source):
             return match[1]+'(hasher,default<'+wanted+'>())'
         return match[0]
     source=re.sub(r'\b(describe_\w+)\(hasher,default<([^;{}]+)>\(\)\)',sample,source)
-    return source,count
+    # Keep the decoded value's owned field roots across an invariant Option.
+    # The wire flag, native child schema and rollback order are unchanged.
+    typed = []
+    for line in source.splitlines(keepends=True):
+        result = re.match(r'fn read_\w+<O>\(reader:Decoder<O>&,level:i64\)->(blot_support::Option<.+>),Error \{', line)
+        if result:
+            line, changed = re.subn(r'return blot_support::some(?:<[^;\n]+>)?\(value\),blot_error::Error.none;',
+                                   lambda match: 'return ' + result[1] + '{true,value},blot_error::Error.none;', line)
+            count += changed
+        typed.append(line)
+    return ''.join(typed),count
 
 
 def main():

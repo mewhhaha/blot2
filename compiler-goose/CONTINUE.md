@@ -4,11 +4,12 @@ Fix production ownership in coherent families, build the complete native compile
 then qualify CLI/project-server behavior, recoverable request OOM and retention
 against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-All **24 executed production helper laws pass together in 159.22s**, including
+All **25 executed production helper laws pass together in 183.89s**, including
 actual frame cleanup, nonempty session tables, ordinary and packet-decoded Checked
-worker publication, Prepared Option lifetime and real receipt admission. Checked
-observers retain existing aliases and typed journal ownership; no graph copies or
-new registry. Exact hashes and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+worker publication, Prepared lifetime, real receipt admission and optimizer
+archive publication. Exact input identities and the complete C/link/runtime
+receipt are [pinned here](../benchmarks/evidence/qualification/2026-11-10-goose-complete25.json.gz).
+This is helper qualification; **no whole C/header/executable exists yet**.
 
 Seed now owns a scalar registered Snapshot key. Session initialization validates
 and adopts once; invalid input remains caller-owned. Four real admission and
@@ -31,11 +32,11 @@ The newer backend/query family uses scalar type cursors and unit IDs, concrete
 query-record stores and checked registered module/Core views. Timing labels retain
 owned storage and capacity reuse. Affected laws cover nested cursor restoration,
 query-table growth and publication after producer cleanup across real Frame.
-The attempted complete25 run stopped after21 passes at the receipt emission cap;
-its independent projection control now passes in the smaller footprint law.
-Optimizer archive round-trip is the current affected-family frontier.
-Selected108 passes executor/metadata and reaches PlainLayouts method lookup plus
-optimizer-header publication. **No whole C/header/executable exists.**
+The previous complete25 attempt stopped after21 passes at the receipt cap;
+the final serial run passes. Optimizer decoding uses typed optional carriers,
+concrete owned record stores and fresh region headers. Whole109–111 emit no artifacts. A nullable parent call is fixed; the current
+frontier is the SessionCatalog escape into a retained session. The shared/units
+factory split is in progress.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

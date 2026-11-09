@@ -487,140 +487,11 @@
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
+    "raw_receipt": "2026-11-10-goose-complete25.json.gz",
     "passed": true,
-    "goose": {
-      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/678bb76efbff1b1b6a33143b802f1a807d005cfa7e81a149a9ef905f85e45294/goose",
-      "sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
-    },
-    "cc": {
-      "path": "/usr/bin/clang-23",
-      "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d"
-    },
-    "tests": {
-      "coalesce": {
-        "seconds": 0.23560436500702053,
-        "program_sha256": "893d85a4617ef14216f8e77890525f22406decaab6df9ea0cf997c281e6392ff",
-        "binary_sha256": "4bfc2ca37d891349839f7804d0de11bc28a93c9aeff533b145cfa766b0880de9"
-      },
-      "expectation": {
-        "seconds": 0.1863953970023431,
-        "program_sha256": "db3c037efd8d25e53380bc371ef964513fa06b3dd3edcf64845206fc738abe0c",
-        "binary_sha256": "1838e7cf82e7b6fe126abee04bcb74487984073b5b236759af15c84fe01c548d"
-      },
-      "package_owner_frames": {
-        "seconds": 0.13381240700255148,
-        "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
-        "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
-      },
-      "parser": {
-        "seconds": 1.700815051997779,
-        "program_sha256": "a7361862b3896df0db617d691fb68521260a1c1f97f14c30b0f1f9d0fd1d3df8",
-        "binary_sha256": "f473f51f2a3f626330378bb92a21d78689683be70eea4523847dda25e6c22575"
-      },
-      "proof_leases": {
-        "seconds": 3.7272033649787772,
-        "program_sha256": "c49c96e964422dc5c4e68e8c31a3bdf0e1d22d99d4f207970ab8cb5c3c742cad",
-        "binary_sha256": "6b4b220d39d3344c7867f96c955154619b6cfd04ae17a50d0a3ce3c74e89d21f"
-      },
-      "source_sort": {
-        "seconds": 0.14901111699873582,
-        "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
-        "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
-      },
-      "diagnostic_ownership": {
-        "seconds": 6.282236019993434,
-        "program_sha256": "442f30dc91770623ff4f821592c9ffd023d0e2f4cacadd7c666baaddee3f8046",
-        "binary_sha256": "3206a97b3ff5ab99e2fafbe4d98ce327f4b2dc1deb6f698354cd640cd38c2793"
-      },
-      "body_freeze": {
-        "seconds": 7.164810243993998,
-        "program_sha256": "98074b25e6fc1b85cf749068acc314a446e083779f84acbe941104eb79af5c08",
-        "binary_sha256": "3bc28a469d5d6b25ce0e4f1b671b20cd371c4c8d8a14873198ca44981d9115ae"
-      },
-      "immutable_readers": {
-        "seconds": 3.9483386460051406,
-        "program_sha256": "d89214d19176c178a39a244b2792030f9ed0b069ff20631eced05791dfa7f6ca",
-        "binary_sha256": "9dcb68356bc886ada83de850567ac7bdf1c738545a8822b9dc28dcbd327f324e"
-      },
-      "import_arena": {
-        "seconds": 3.5954880740027875,
-        "program_sha256": "00a84d9b05c5f5ebb72860737f8e565d59ab6cb26bd862dac75a64a19186b93f",
-        "binary_sha256": "c7e3c601ad924022ffe05f12a6c1632df4c537950eef3863fd54f87f7432a12d"
-      },
-      "source_validation_ownership": {
-        "seconds": 4.14457905801828,
-        "program_sha256": "5a4166ebeffeaeaccb8d0d73a65ef968d648ac3d5f80902a22cb9b373ba2f7b7",
-        "binary_sha256": "cdf4271483f7a16acc717f159c737c22c9e2afe28f88dec1ecbbf904313e3f3b"
-      },
-      "editor_budget": {
-        "seconds": 6.060079985007178,
-        "program_sha256": "2b42e3b8aea0f3b1c5053b599238bb05989d01400c97297f06faf63d8da30219",
-        "binary_sha256": "a18ed774924c58a5b6b46d92cda1f15767e59e8512465878e4d34b5aa831720b"
-      },
-      "cache_root_frames": {
-        "seconds": 3.2533362150134053,
-        "program_sha256": "970fa4933cbf7c856351a8ef4a2266d05577e7bd3b79468331a6345e5652f149",
-        "binary_sha256": "0bf822600ea27a9f222079737031e8c7b2002f7bfa539468da5888792bdc6886"
-      },
-      "native_asset_metadata": {
-        "seconds": 4.5007625370053574,
-        "program_sha256": "c424cac888f7ebdc06c37ec296a6d399022610bedfee37b153e60fecf8176fa7",
-        "binary_sha256": "87edea8b80439a63cd4a64227d4ab6d7fbb6d1de6c44377becc0af1814926474"
-      },
-      "completion_probe": {
-        "seconds": 3.474402255989844,
-        "program_sha256": "49f2df1a6249bafc2222306862b0cf8f8d68399936d203c706e78e2d0c86d19b",
-        "binary_sha256": "5ca4de419f06417b75069a958ecaabc1dccf36df5ceab4a45b7d52de07bdbbec"
-      },
-      "completion_project_load": {
-        "seconds": 8.609287433006102,
-        "program_sha256": "ef3cf974125a6bcc2f81676b29021e9cf2577285e50faeb7edf2e342c6733f21",
-        "binary_sha256": "2e78e84f2561fb59f36699dbe0ba2a5ea0dfe45ab1528424d17c37ecc71eed8c"
-      },
-      "dependency_ownership": {
-        "seconds": 5.330299093999201,
-        "program_sha256": "ce19cb221f4aec4cf54fe181393b56c3a99ab25419c1c8d5bef14e57cdfd389e",
-        "binary_sha256": "f6b623ef231cdd0ae90f22fd9ac4f5aefbbf0b1e3cc7335ca3574305f332d1e6"
-      },
-      "empty_session": {
-        "seconds": 13.881664551008726,
-        "program_sha256": "3d255d882e7e2573ff3d60fe9abb9af61e1453617db97a98b13faeac4959091d",
-        "binary_sha256": "24010fb273831a3c4f3985b3f5f60e298c4ae1566d4f978f1d18dba953cf7b85"
-      },
-      "archive_capture": {
-        "seconds": 3.854828139010351,
-        "program_sha256": "c2a10f7386662cf5460d704962e81cd05d33c61136e5437a0a13cb2f35ebd431",
-        "binary_sha256": "8f57133441f1f7d9097effc0033b122530f8885c04a6ae64c9178efea0c55083"
-      },
-      "resolved_body": {
-        "seconds": 3.5829560910060536,
-        "program_sha256": "375b7428daf498a05a9d86815cad5297b66cbb8f54b9d82a0582a7dfef62baa7",
-        "binary_sha256": "c35714afbb10ebd49183c0f505d97949edae726f7e7b46e79d8906feada41323"
-      },
-      "wasm_scope_outline": {
-        "seconds": 4.139718079997692,
-        "program_sha256": "43f0a0a22915390b510e2b617c7e1b7674fc37b9c786c051f2bd3258b0fc3030",
-        "binary_sha256": "a839b1bdb8b0446e2ed2214bb0ddfd706f223fb4502e70c3361a98633168cf08"
-      },
-      "core_validation_borrow": {
-        "seconds": 29.764180701982696,
-        "program_sha256": "6d4251a0e7d3dd9cb01b94f79cdccaf37543fe1da78f70601644a02cd44902d8",
-        "binary_sha256": "6d58c273448dcaebce76151bd0161f3fe2d200bcf46a5318b1f13d233839d0bb"
-      },
-      "retained_seed": {
-        "seconds": 30.707987136003794,
-        "program_sha256": "1c7f7f498fd37d2a8b4d3a82118dbb149dcc10360d6ab868c8e03ea1c79b027c",
-        "binary_sha256": "6f40160c91cf3932f94c4750832a656721b93645cbda4716afead4f07c849611"
-      },
-      "executor_frame": {
-        "seconds": 10.79641687500407,
-        "program_sha256": "f1eaf576bb6b4bbf9e7874e2efbf5e77f99015f97c43b98d5cfc8eae4ce15d09",
-        "binary_sha256": "04c8696177e94447c91ec554de0c596361025ee97771ecd5bb5e9c224d72a5d8"
-      }
-    },
-    "scope": "All24 C/link/execute pass in159.224s. Scalar revision-input/overlay handles, owned outcomes, completion/load/editor and actual scoped Executor empty/rejected batch\u2192Frame coverage. Whole compiler unqualified.",
-    "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_receipt_sha256": "033cf5af3f81f700cd2902259ab75bd4abc3241570c335e6e00e496b7bcec178"
+    "count": 25,
+    "seconds": 183.89,
+    "scope": "Complete production helper inventory; C emission/link/runtime on qualified678; not whole compiler/runtime qualification"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -892,7 +763,19 @@
     "executed_engine_families": 6,
     "whole_compile_speedup_ratio": null,
     "comparison": "baseline cap120.262s; candidate reaches source error95.491s; baseline censored",
-    "receipt": "benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json"
+    "receipt": "benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json",
+    "argcopy": {
+      "status": "Optional tracked private recipe; installed Goose and qualified678 untouched",
+      "binary_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632",
+      "source_sha256": "0535d5041072eb36209db614634b974386e9bf1889fdcdcfc7b3b88e310a8628",
+      "scope": "Distinct copied incoming argument contents proof; exact storage identity unchanged; recursive/reference traversal cases conservative",
+      "focused_controls": 21,
+      "existing_semantic_runtime_controls": 24,
+      "global_empty_parity_controls": 24,
+      "whole_build_111": "Failed37.249s at same SessionCatalog escape; no artifacts",
+      "independent_review": "No concrete blocker; creation/weakening/join/store/return/global-reach and recursive conservatism audited",
+      "raw_receipt": "2026-11-10-goose-copied-argument-contents.json.gz"
+    }
   },
   "oracle_qualification_runner": {
     "path": "compiler-goose/tools/qualify_compiler.ts",
@@ -2444,13 +2327,17 @@
   "backend_query_family": {
     "raw_receipt": "2026-11-10-goose-backend-query-family.json.gz",
     "scope": "Affected laws only; exact per-case import closures are pinned in the raw receipt",
-    "full25": "Incomplete:21passes then30s receipt emission cap under concurrent selected-server load",
+    "full25": "All25pass together in183.890s on frozen source after optimizer repair; previous21pass/caprun remains incomplete",
     "receipt_projection_split": {
       "core_validation_borrow_emit_seconds": 26.661,
       "footprint_owner_emit_seconds": 4.772,
       "passed": true
     },
-    "optimizer_archive_roundtrip": "In progress; not qualified",
+    "optimizer_archive_roundtrip": {
+      "passed": true,
+      "whole_batch_seconds": 7.817,
+      "scope": "Nonempty signature/import encode, producer release, decode, wire release, registered optimizer publication, real Frame and readback/cleanup"
+    },
     "checkpointed_sources": {
       "compiler-goose/src/backend/result_owner.goose": "8d6d047550083e48d8d6ca9d7c1e7e4cf64cb01f84166cc64ecd87ba751d43aa",
       "compiler-goose/src/backend/scoped_backend.goose": "212c756111b8513472f20b30aa15cf2177feee89352ba13d958419194ffe9a10",
@@ -2487,5 +2374,97 @@
       "same specialization with different actual owners"
     ],
     "constraints": "Keep exact=false; proof joins by intersection and is cleared on reference traversal/weakening; no retained callee-local RootAlt.from"
+  },
+  "whole_build_109": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/private-checker/678bb76efbff1b1b6a33143b802f1a807d005cfa7e81a149a9ef905f85e45294/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 18.465,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "diagnostic": "core_eval:3522 nullable catalog.parent is not narrowed by field truthiness; fixed with local parent binding"
+  },
+  "whole_build_110": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/private-checker/678bb76efbff1b1b6a33143b802f1a807d005cfa7e81a149a9ef905f85e45294/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 33.944,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "diagnostic": "core_eval:3537 SessionCatalog-rooted reference escapes through live_sessions.alloc_index(value)"
+  },
+  "whole_build_111": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 37.249,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "diagnostic": "Same SessionCatalog escape as110; copied-contents proof deliberately does not preserve authority across field extraction"
+  },
+  "optimizer_publication_family": {
+    "source_sha256": {
+      "compiler-goose/src/backend/backend_checkpoint.goose": "7b4bd8e1049df3f708c1b16a4809b6f7ca5b7ccfe6e926170701aa5c02d7281d",
+      "compiler-goose/src/backend/optimized_bodies.goose": "8936f9840563278b9fa9dbb54509c362056c9b18a19b0ec1c49d19a01f643a53",
+      "compiler-goose/src/backend/runtime_ir.goose": "ba441dcc43d4e5887bb60ba4ac77f7da70ea6b55b4c2bdb400da8b5557fb250f",
+      "compiler-goose/src/reuse/dependency_format_codecs.goose": "acaea2d227c894dc818095f9aa756f149fa0e6073c3ca59c1dce66f6e5a53be3",
+      "compiler-goose/src/reuse/optimized_archive.goose": "9e38b74a7130516441e7db99fa1615f23170821a7901e055d0ace4ca9b7aa96e",
+      "compiler-goose/tests/archive_capture.goose": "76c609c00c870365b1c044dfdc2df21fed70099bec5a85839935108c32c429d7",
+      "compiler-goose/tools/repair_payload_boundaries.py": "682155522d20d0062f2f004b20d92822d28818eb0698846d1ac0ba4a762e5ab1",
+      "compiler-goose/tools/write_dependency_codecs.py": "b3691e83e6eececae624e6f60b7ac760d8cf32809954b4c97e49d60e6f584fbd"
+    },
+    "complete25_receipt": "2026-11-10-goose-complete25.json.gz",
+    "codec_authoring": "Ten typed Optional returns emitted by raw generator and existing repair helper; helper idempotence10to0 passes",
+    "full_repair_replay": "Not qualified: existing proof-header guard stops full repair script before codec step; invoked codec author function directly",
+    "whole_builds_receipt": "2026-11-10-goose-whole109-111.json.gz",
+    "whole_compiler_executable": false
   }
 }
