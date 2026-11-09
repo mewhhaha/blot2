@@ -135,6 +135,28 @@
       "batch": 28,
       "qualification": "source error; no artifact",
       "frozen_capture": "build/goose-port/completion-batch-28/capture.json"
+    },
+    {
+      "stage": "emit program",
+      "command": [
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+        "-o",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.c",
+        "--header",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.h",
+        "-O0",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "/home/jacobt/src/blot2/compiler-goose/src/main.goose"
+      ],
+      "seconds": 96.747,
+      "exit": 1,
+      "stop": "completed",
+      "log": "/home/jacobt/src/blot2/compiler-goose/build/stages/emit-program.log",
+      "log_sha256": "d4102981869e0a7133eb233ad89ccce59a757affdd092123f6887f3349dd0714",
+      "batch": 35,
+      "qualification": "source error; no artifact",
+      "frozen_capture": "build/goose-port/completion-batch-35/capture.json"
     }
   ],
   "isolated_engines": {
@@ -189,29 +211,18 @@
       "initialized": 9,
       "unchanged": 57,
       "generated_codecs": "unchanged"
-    }
+    },
+    "body_freeze_holders": "five related holders use fixed pooled scratch; final owner publication under repair",
+    "body_freeze_registered_runs": 7
   },
   "latest_selected_frontier": {
-    "batch": 32,
-    "partial": true,
-    "engines": [
-      "check"
-    ],
-    "exit": 1,
-    "seconds": 55.613,
-    "stop": "completed",
-    "errors": [
-      {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/body_check_freeze.goose",
-        "line": 15,
-        "message": "error: storing a reference into bodies, which holds a grow-shrink array: such a reference lives in a variable, is passed down or returned, and is never stored (\u00a75.2)"
-      }
-    ],
-    "full_qualification": false,
-    "source_sha256": "bd8bd7e351ba9c237b13571fc7de31352bd9b592be11c763d8d7cbb5d6a3a22d",
-    "source_unchanged": true,
-    "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
-    "status": "annotationOption conversion clears; body-cache freeze auxiliary context family in repair"
+    "batch": 35,
+    "seconds": 96.747,
+    "scope": "normal whole emission",
+    "file": "compiler-goose/src/check/check_factory.goose",
+    "line": 193,
+    "error": "outer immutable imports input may alias callee shrink",
+    "status": "allinnerbodyfreeze/publication clears; immutable input boundary under review"
   },
   "latest_executed_laws": {
     "passed": true,
@@ -225,44 +236,48 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.23391615401487797,
+        "seconds": 0.28763460100162774,
         "program_sha256": "fc15d284596c5bc06135e29f9be492638bcc9ec210e47c224b6f5884ee4ab3ae",
-        "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0",
-        "input_manifest_sha256": "a42a503939ac6a566f594a378a7678d2d3a357f6b7128fe7934758123a4d7a11"
+        "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0"
       },
       "expectation": {
-        "seconds": 0.15485922497464344,
+        "seconds": 0.15466328299953602,
         "program_sha256": "1a49692e57820540ca50fbf9d5e84e28d1d5229adaf9a081c4abe66c8335f230",
-        "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b",
-        "input_manifest_sha256": "a44846a4909d879493b266fb505e7aa0b425520c13c7007bbb6b52b62198d4f4"
+        "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b"
       },
       "package_owner_frames": {
-        "seconds": 0.13403118500718847,
+        "seconds": 0.13312272599432617,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
-        "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211",
-        "input_manifest_sha256": "bd621cb6c3897f6cfcfc23ff882300bef881d02d08f5e1b51f420daa0fbe2059"
+        "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.652895253006136,
+        "seconds": 1.5984820520097855,
         "program_sha256": "7cce6851bd8320f33cde196572a6ea0a5c47d30a448c4fa55227e823ce7516c9",
-        "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82",
-        "input_manifest_sha256": "25993844419b87e8ebe298562026cf0e80911aa8ceb585769160ed5b818340f7"
+        "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82"
       },
       "proof_leases": {
-        "seconds": 3.608476416004123,
-        "program_sha256": "3c962d5baf896694788ffb4c78138ce29570bb0e0c62576cf96d9e16d2d71b9a",
-        "binary_sha256": "0bdb55ad29991159cd73720248360f6574aee6ad3bcc3a94ffc713ed6a283b1c",
-        "input_manifest_sha256": "432e0eda22711a5309463fdd32fbea6ee52748cf505b1ad5104be68a6dad5741"
+        "seconds": 3.492019725003047,
+        "program_sha256": "9b1205f808b7b1b562871ac02a4b9e5c7be64c76ba633cf0df8b43bbb706103d",
+        "binary_sha256": "bf65fcfd1659245130c7422e71c31acd88a2d2e572548b7d5c41a103d6bef385"
       },
       "source_sort": {
-        "seconds": 0.13470738401520066,
+        "seconds": 0.1330332149809692,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
-        "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0",
-        "input_manifest_sha256": "1f88af3e291bdf5add3cb1d56c57ebc3f8c5794abd5577a00c2ff442ee2c35cd"
+        "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
+      },
+      "diagnostic_ownership": {
+        "seconds": 3.4147080139955506,
+        "program_sha256": "f12cbdcfadd004e2a6c2eea1f89f1eb718df8585c18b1c48972b0b1ea8158cc5",
+        "binary_sha256": "438fbbc189df8120012b522adbc034fe8eb35f39d69827620b63bd8fbcad87ff"
+      },
+      "body_freeze": {
+        "seconds": 5.345474174013361,
+        "program_sha256": "1a5c6c7533e2944935978fb0cd0c73b87bba2a2496d91cb03d875440b7709700",
+        "binary_sha256": "8ce8f462062a5f084ff40ee0e0edb5873d63bd5fdf8add305c2487e782e3b289"
       }
     },
     "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_sha256": "4e6d8603687690288220532f8f6dbad626aa6bb8da5d3755d8b391f42c4c6dcb"
+    "raw_sha256": "6148afb1a4ce8561c7bd8b690b4e8abb7af45cbedd66e46840d7f563936a6636"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "10c5d247befb922878052723979acdb87924721f259e691172727dd130484672",
@@ -495,5 +510,17 @@
       }
     ],
     "full_qualification": false
+  },
+  "body_freeze_law": {
+    "passed": true,
+    "seconds": 5.296332825004356,
+    "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-body-freeze.json.gz",
+    "sha256": "e8a5135648b8d82058231904d7f4e00fc251b115b75a647dba3f20d59a5f9856",
+    "checks": [
+      "real initialized source stores",
+      "empty and owned Body graph publication",
+      "source teardown before cache read",
+      "clone/retain/release/cleanup"
+    ]
   }
 }

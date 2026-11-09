@@ -1,6 +1,6 @@
 // Generated from actual Goose/host/build inputs by build.py.
 // Regenerated before every build; no Zig oracle digest is reused.
 namespace blot_source_identity;
-let digest:u8[32]=[33,181,138,17,138,167,102,194,210,3,67,117,237,18,249,3,40,129,64,45,206,47,213,233,72,56,72,113,217,47,116,166];
+let digest:u8[32]=[55,249,56,50,208,199,246,11,134,136,60,21,2,130,225,13,245,199,175,153,67,129,19,133,29,205,168,13,7,250,18,39];
 let inference_budget:u64=1000000;
 let artifact_replay:bool=false;

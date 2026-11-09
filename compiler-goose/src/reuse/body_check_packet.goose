@@ -40,6 +40,7 @@ let operations,error=value.graph_owner.copy(source.graph.operations);if error!=b
 value.graph.row_variable_count=source.graph.row_variable_count;
 let quantifier_goals,error=value.graph_owner.copy(source.graph.quantifier_goals);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.quantifier_goals=quantifier_goals;
 let quantifier_obligations,error=value.graph_owner.copy(source.graph.quantifier_obligations);if error!=blot_error::Error.none {value.release();return null,error;}value.graph.quantifier_obligations=quantifier_obligations;
+value.graph=canonicalFrozenGraph(value.graph_owner,value.graph);
 value.nominals=cloneIdentityReads(source.nominals);
 value.field_names=cloneNames(source.field_names);
 value.qualifications=copyOwned(source.qualifications);value.body_bytes=source.body_bytes;value.type_work=source.type_work;

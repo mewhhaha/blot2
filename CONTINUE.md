@@ -62,7 +62,7 @@ scratch separately through 189 calls. Core resolver lowering uses scalar
 statement cursors through ten calls. Behavior, charged work, allocation/error
 and cleanup order are preserved by static family audits; the final checker
 boundary remains pending. All three pattern-coverage recursion boundaries use
-checked pool views; local work remains owned until recursion returns. Seven
+checked pool views; local work remains owned until recursion returns. Eight
 isolated production engine families have executed, including the new owned
 diagnostic clone/move/cleanup law in 3.372s. Hole and dispatch payload transfers
 now validate owned names; nine fixed-array initializers repair clear capacity
@@ -70,7 +70,7 @@ reads and whole-value copies, leaving 57 scratch/output buffers unchanged.
 
 Whole C/header emission with the baseline private checker hits 120.262s without
 an artifact. The combined optional reference-closure cache/trace candidate
-`01b0b74e...` reaches an actionable source error in 95.491s on identical
+`01b0b74e...` reaches actionable source errors in about 95–97s on identical
 production inputs except generated identity metadata. The baseline is censored;
 no whole compilation ratio is claimed. The closure cache preserves stable
 readiness, ordered traversal and every live-root/provenance check, is bounded,
@@ -80,8 +80,12 @@ is unchanged. See [the cache/trace receipt](benchmarks/evidence/qualification/20
 
 Split runtime/semantic/lower/independent roots pass. Source validation,
 coverage, diagnostics and usage checking now clear their prior failures. The
-current check-root frontier is a forbidden stored growable-array reference in
-`reuse/body_check_freeze.goose:15`; its auxiliary context family is in repair. Actual CLI, server and OOM execution
+body-freeze family now uses fixed scratch headers and validates all seven
+frozen runs through the live owner journal before publication. Its direct law
+passes in 5.345s and checks source teardown, cache clone/retain/release. The
+current whole-build frontier is `check_factory.goose:193`: immutable imported
+descriptors expose mutable transitive references at the outer checker boundary.
+The entry descriptor/aliasing contract is under review. Actual CLI, server and OOM execution
 remain pending until a complete executable exists. The new qualification runner
 has eight oracle baseline passes and a strict unsupported ABI 8 recursion
 witness; no ABI 2 fallback or unavailable memory counters are accepted as proof.

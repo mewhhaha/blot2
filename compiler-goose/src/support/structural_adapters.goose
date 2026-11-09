@@ -4929,6 +4929,18 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::
 fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::Fact,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FieldProjection)->bool {return equalFields(left,right);}
 fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FieldProjection,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeBodies)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeBodies,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeConstructors)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeConstructors,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeIdentities)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeIdentities,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeQualifications)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeQualifications,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeSchemes)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeSchemes,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeScopes)->bool {return equalFields(left,right);}
+fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeScopes,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::FreezeWork)->bool {return equalFields(left,right);}
 fn blot_reuse_body_check_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_body_check_cache::FreezeWork,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_check_cache::IdentityRead)->bool {return equalFields(left,right);}

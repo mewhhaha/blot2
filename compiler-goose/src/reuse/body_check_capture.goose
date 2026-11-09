@@ -26,6 +26,7 @@ struct Scratch_u8___ {storage:u8[:][:]=default<u8[:][:]>(),items:u8[:][:]=defaul
 fn push(self_:Scratch_u8___&,value:u8[:])->Error {return blot_support_pooled_buffer::push(self_,value,owned_u8___);}
 fn append(self_:Scratch_u8___&,values:const (u8[:])[:])->Error {return blot_support_pooled_buffer::append(self_,values,owned_u8___);}
 fn deinit(self_:Scratch_u8___&) {blot_support_pooled_buffer::deinit(self_,owned_u8___);}
+fn clear(self_:Scratch_u8___&) {blot_support_pooled_buffer::clear(self_);}
 struct Scratch_Projection {storage:Projection[:]=default<Projection[:]>(),items:Projection[:]=default<Projection[:]>()}
 fn push(self_:Scratch_Projection&,value:Projection)->Error {return blot_support_pooled_buffer::push(self_,value,owned_Projection);}
 fn append(self_:Scratch_Projection&,values:const Projection[:])->Error {return blot_support_pooled_buffer::append(self_,values,owned_Projection);}
