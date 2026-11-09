@@ -10,6 +10,8 @@ import reuse.completion_fit;
 import reuse.revision_inputs;
 import reuse.source_overlays;
 import support.error;
+import support.native;
+import driver.compile_workspace;
 fn accounting() {
     var budget=blot_reuse_completion_fit::Budget{remaining:10};
     let editor=blot_reuse_project_check::Editor.query{blot_reuse_project_check::EditorQuery{unit:1,marker:blot_check_check::EditorMarker{prefix:"hel",..},budget:budget}};
@@ -41,7 +43,19 @@ fn lifecycle(source:blot_reuse_project::Project&) {
     // Discarding an unstarted borrowed query does not touch the caller's budget.
     let ignored=editor;assert(budget.remaining==5 && budget.exhausted);
 }
+fn sourceDiagnostics() {
+ let sources=[blot_reuse_source_overlays::Source{path:"/tmp/source-diagnostic-frame.blot",contents:blot_support::some<const u8[:]>("const value = (\n")}];
+ var snapshot,error=blot_reuse_revision_inputs::initWithSources(blot_reuse_project::Options{..},sources[..]);assert(error==blot_error::Error.none);
+ var provider=snapshot.provider();var source,error=blot_reuse_project::loadWithInputs("/tmp/source-diagnostic-frame.blot",snapshot.options(),provider);assert(error==blot_error::Error.none && source.diagnostics.len!=0);
+ var engine,error=blot_reuse_project_check::initEngine(source,blot_check_check::PrivateExecution{},blot_reuse_project_check::Editor.none,false);assert(error==blot_error::Error.none);
+ assert(engine.appendSourceDiagnostics()==blot_error::Error.none && engine.diagnostics.items.len==source.diagnostics.len);
+ let diagnostics=blot_reuse_project_check::copyDiagnostics(engine.diagnostics);engine.diagnostics.items=engine.diagnostics.storage[..0];engine.deinit();
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+ assert(diagnostics[0].source.present && diagnostics[0].source.value.unit!=0);
+ for &diagnostic in diagnostics {diagnostic.deinit();}blot_reuse_project_check::releaseOwned(diagnostics);source.deinit();snapshot.deinit();
+}
 fn main() {
+    sourceDiagnostics();
     for cycle in 0..3 {
         accounting();let sources=[blot_reuse_source_overlays::Source{path:"/tmp/editor-budget.blot",contents:blot_support::some<const u8[:]>("const value = 1\n")}];
         var snapshot,error=blot_reuse_revision_inputs::initWithSources(blot_reuse_project::Options{..},sources[..]);assert(error==blot_error::Error.none);

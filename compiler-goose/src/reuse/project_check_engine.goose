@@ -32,9 +32,9 @@ reusable[] var offer_slots:dictionary_slot<u32,BodyOffer>[>..]=[];
 reusable[] var source_module_runs:blot_support::Option<SourceModule>[>..]=[];
 reusable[] var compiled_catalog_runs:CompiledCatalog[>..]=[];
 reusable[] var source_declaration_runs:blot_check_check::SourceDeclaration[>..]=[];
-fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {return blot_support_pooled_buffer::push(self_,canonicalOwnedDiagnostic(value),owned_Diagnostic);}
+fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {let length=self_.items.len;let error=blot_support_pooled_buffer::ensure(self_,length+1,owned_Diagnostic);if error!=blot_error::Error.none {return error;}let storage=owned_Diagnostic.realloc_slice(self_.storage,self_.storage.len);assert(blot_support::same_slice_identity(storage,self_.storage));storage[length]=canonicalOwnedDiagnostic(value);self_.items=storage[..length+1];return blot_error::Error.none;}
 fn appendSourceDiagnostics(self_:Engine&)->Error {
- let count=self_.source.diagnostics.len;for index in 0..count {let diagnostic=blot_reuse_project::diagnosticAt(self_.source,index);let error=self_.diagnostics.push(Diagnostic{unit:diagnostic.unit,span:diagnostic.span,code:Code.source_validation,source:blot_support::some(diagnostic),..});if error!=blot_error::Error.none {return error;}}
+ let count=self_.source.diagnostics.len;for index in 0..count {let diagnostic=blot_reuse_project::diagnosticAt(self_.source,index);let error=self_.diagnostics.push(Diagnostic{unit:diagnostic.unit,span:diagnostic.span,code:Code.source_validation,source:blot_support::Option<blot_reuse_project::Diagnostic>{true,diagnostic},..});if error!=blot_error::Error.none {return error;}}
  return blot_error::Error.none;
 }
 fn initEngine(source:Project,execution:blot_check_check::PrivateExecution,editor:Editor,retain_bodies:bool)->Engine,Error {

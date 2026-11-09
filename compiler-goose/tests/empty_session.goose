@@ -129,7 +129,16 @@ fn preparedOfferValue()->Preparation {
 fn preparedOffer()->blot_support::Option<Preparation> {let value=preparedOfferValue();return blot_support::Option<Preparation>{true,value};}
 fn preparationPublication() {
     var offer=preparedOffer();assert(offer.present);
-    match offer.value {ready bound=>{var ready=blot_reuse_partial_dependency::publishPrepared(bound.value);offer.value=blot_reuse_partial_dependency::Preparation.inactive;workspaceLifecycle();assert(ready.units.len==1 && ready.entry==1 && ready.source_completion && ready.seed_pin.owners().len==1);ready.deinit();},_=>{abort("ready preparation expected");}}
+    match offer.value {ready bound=>{
+        var ready=blot_reuse_partial_dependency::publishPrepared(bound.value);offer.value=blot_reuse_partial_dependency::Preparation.inactive;
+        var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);
+        let catalog=ready.catalog_owner;let unit_owner=ready.unit_owners[0];
+        let unpinned,error=blot_backend_result_publication::inputUnits(blot_backend_result_publication::Owner{},ready.units);assert(error==blot_error::Error.invalid_artifact && unpinned.len==0);
+        {let workspace=frame.borrow();assert(workspace);assert(blot_backend_core_backend::pinWorkspaceInputs(workspace,ready.units,ready.catalog_owner,ready.unit_owners,ready.seed_pin.owners())==blot_error::Error.none);
+         let held=workspace.compiled_units;assert(held.len==1 && held[0].unit==1 && ready.source_completion && ready.seed_pin.owners().len==1);
+         ready.deinit();assert(catalog.valid() && unit_owner.valid() && held[0].unit==1);}
+        assert(frame.release()==blot_error::Error.none && !catalog.valid() && !unit_owner.valid());
+    },_=>{abort("ready preparation expected");}}
     offer.value.deinit();
 }
 fn seedPublication() {

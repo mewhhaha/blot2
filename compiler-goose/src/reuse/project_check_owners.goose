@@ -28,7 +28,7 @@ fn releaseOwned(values:const Export[:]) {if values.len==0 {return;}owned_Export.
 reusable[] var owned_Diagnostic:Diagnostic[>..]=[];
 fn copyDiagnostics(buffer:DiagnosticBuffer)->Diagnostic[:] {
  if buffer.items.len==0 {return default<Diagnostic[:]>();}let source=owned_Diagnostic.realloc_slice(buffer.storage,buffer.storage.len);assert(blot_support::same_slice_identity(source,buffer.storage));
- let run=owned_Diagnostic.alloc_slice(buffer.items.len);for index in 0..buffer.items.len {run[index]=source[index];}return run;
+ let run=owned_Diagnostic.alloc_slice(buffer.items.len);for index in 0..buffer.items.len {run[index]=canonicalOwnedDiagnostic(source[index]);}return run;
 }
 fn releaseOwned(values:const Diagnostic[:]) {if values.len==0 {return;}owned_Diagnostic.free_slice(values);}
 reusable[] var owned_blot_reuse_body_check_cache__Cache:blot_reuse_body_check_cache::Cache[>..]=[];

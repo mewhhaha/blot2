@@ -485,25 +485,25 @@
       "server"
     ],
     "exit": 1,
-    "seconds": 94.473,
+    "seconds": 103.029,
     "stop": "completed",
     "errors": [
       {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose",
-        "line": 2453,
-        "message": "error: storing a reference rooted at units, which does not outlive the destination (\u00a79.2)"
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose",
+        "line": 34,
+        "message": "error: storing a reference rooted at key, which does not outlive the destination (\u00a79.2)"
       },
       {
         "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
         "line": 60,
-        "message": "error: cannot assign payloads: global owned_Diagnostic may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:35 (\u00a75.1)"
+        "message": "error: cannot assign payloads: global owned_blot_support__Option_BindingMap_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/entry_frontend_cutoff.goose:134 (\u00a75.1)"
       }
     ],
     "full_qualification": false,
-    "source_sha256": "eadbf7b8808603d73e89d8ce6dfde28ff85e4ce000e351cf9ef5b0da8a2f6de5",
+    "source_sha256": "6d820f6b8e2254819bc8ec1f446d62a276249135cf8ccb4f74f63ef88fd713bf",
     "source_unchanged": true,
     "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
-    "batch": 101
+    "batch": 102
   },
   "latest_executed_laws": {
     "passed": true,
@@ -672,7 +672,7 @@
     "compiler-goose/src/reuse/hole_diagnostics.goose": "e94e56d1cb5a9807ec54cb99c25e5537f12ccd1d59f54aafb6fbef0bba43a867",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "88d649bb129cbe432932a81225248cc667063c05afa6ee03fb1232263563a80e",
     "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
-    "compiler-goose/src/backend/core_backend.goose": "1a9b45b2a43bc29f0ab9441929722f4e9be9a02413ad6ed0048026b50d78e5af",
+    "compiler-goose/src/backend/core_backend.goose": "50c901c2c75d46402989ceba9d0ba853bd987c264e11d883f7174b7b61c27cdc",
     "compiler-goose/src/backend/scoped_backend.goose": "b8a7acc2d3b6db4aa52929be8da8ca91a8d92858030c505caca724a419df4d31",
     "compiler-goose/src/check/frozen_types.goose": "da4542a805c716156f6d7043a2c174a34c49edc646a764cc0bda3bd62b3e42b9",
     "compiler-goose/src/check/parameter_patterns.goose": "80e54c0df28a360299311ec14bc356770537f6b86a9b374971d3d23e7c16b754",
@@ -693,7 +693,7 @@
     "compiler-goose/src/check/check_owners.goose": "6d705c938d74129a9a1885c3e8a034e0cf863310c88e7cbcb3919f125191f830",
     "compiler-goose/src/reuse/dependency_consumer.goose": "ac8d97effe8394dc8f26167eaac8b69c632a945a9b1aa799bdb7caade19c4330",
     "compiler-goose/src/reuse/dependency_project_consumer.goose": "f0a0b9fc851d7a0f125cd9957799a3c7c481facc8b8e6d109c74bfbc3d502d55",
-    "compiler-goose/src/reuse/project_check_engine.goose": "cf188813853b0989e9d18e409030e41c63880baebc949c1cceeb3cc1eee630ee",
+    "compiler-goose/src/reuse/project_check_engine.goose": "095a453acf18ae2d0c0a16b527b53aa66b62dd3b063cac48959a7633d6523be4",
     "compiler-goose/src/source_identity.goose": "db93030e6c1acfbaefafe0f4648cc129eaf0b5c9c2feaf63cd09be3007f38441",
     "compiler-goose/src/_diagnostic_roots.goose": "2a82c829b3f19d6e7fae7ea780299c7cc10a65e01013dd492468ab76ccaeb01e",
     "compiler-goose/src/backend/native_assets.goose": "e75f4152f25627c177a03b91c44ca526b02885b92949859f39dc69344225f0ed",
@@ -728,9 +728,9 @@
     "compiler-goose/src/driver/project_executor.goose": "26fa186f5c820163bfb6ce00b24c92acfabeb0469a6cdba66766fb045442e6ff",
     "compiler-goose/src/reuse/editor_completion.goose": "4d7d39ab578f3196dfd9ce32daf387a5d401a8ea198e9d2e3586c75996aae411",
     "compiler-goose/src/reuse/partial_dependency.goose": "939653b628e63cab497fc5c3c883f84d5f7f767e9e40ca09b37bb6baf2f04d64",
-    "compiler-goose/src/reuse/project.goose": "3e4694c666325e3e0c42ec3d82bd24f5444e028e47ae75dd6e5df6de344efe21",
+    "compiler-goose/src/reuse/project.goose": "e07b04b085b7ea7615142d6559023482148c0ca86744ebbbea805ae1d5d88803",
     "compiler-goose/src/reuse/project_check_factory.goose": "10707c0e9bbb8cd9544e620c38ef1fd24e27ab7e3a186e2f55dd62802b4b5ae3",
-    "compiler-goose/src/reuse/project_check_owners.goose": "696d720410f69d797766952d924696b4a88828a5884f09845d278c801ed9ce7a",
+    "compiler-goose/src/reuse/project_check_owners.goose": "1ec7d58ff1425d93d6c566cfec1014093270e28f1742ced7717c473c0ca8abe6",
     "compiler-goose/src/reuse/project_check_parallel.goose": "3f4e84a5cc1151fb2ba36f4a96c47809a7008a5488b1962fbf79e8a46cadc5f1",
     "compiler-goose/src/reuse/purity_diagnostics.goose": "e18c0041100ebc2896a31787139c8ad8dcfde59fea205a92e0e49cf7625a9622",
     "compiler-goose/src/reuse/retained_revision_frontend.goose": "f4209f301317cbaf60e2c8f1901203a31539ebffe9e1563d0e3767d72304d102",
@@ -787,14 +787,15 @@
     "compiler-goose/tools/write_project_packet_contexts.py": "7959871f7f386240733ae85f1e5824b80260c3e290491435a649c8d7d9611af1",
     "compiler-goose/tests/dependency_ownership.goose": "0ec2097cf50ffac105e733aec8c4c5799bda1449010ae5c7005f5e9f1132710e",
     "compiler-goose/tools/write_checked_views.py": "745d24c73196b1a3580775e31911498ffeaa7f55149be40f302170fc52a3cbb4",
-    "compiler-goose/tests/empty_session.goose": "7a5b9e7dfce5299a72b018106fdb968087841d31e709e42a6e41cbb085946cc0",
+    "compiler-goose/tests/empty_session.goose": "24d7f21fd642133cbd7dd04f0000ab102c4d5ec7211399863e2d1e3220c11c50",
     "compiler-goose/tests/proof_leases.goose": "4ff7d5d23f6f35ae9bef6f0cc61f04f12bb3c5e3722bb834e0e4672807a7863a",
     "compiler-goose/tests/diagnostic_ownership.goose": "33c647d1d60d0062469f51adfcea8f7023e92b048a410b0538df8c389aa98292",
     "compiler-goose/tests/retained_seed.goose": "9122e4b5a159e136e774aa866010a379455b23c0d8ddf2c03f7fa1126e35388e",
-    "compiler-goose/tests/editor_budget.goose": "30995effc1722602a462319278aae6459ded3a04d0375afffdf7b41109d241aa",
+    "compiler-goose/tests/editor_budget.goose": "fc5f8347bace861864b3ec3601df426cee455ac40d25515f8ffce424e973c54e",
     "compiler-goose/tests/completion_project_load.goose": "717f244384db87f96191007fb8d8e62b2def37cb6647a84d3607314af163c70a",
     "compiler-goose/tests/executor_frame.goose": "123d487ec3f2074b61ba094e0ddc5b8b364c8b0095e87e40af4909d6c11cc31f",
-    "compiler-goose/src/reuse/zig_project_server_lifecycle.goose": "a318c1015d0bf96e212f6781ce14d8ab74c07ee6e920cd678c6ffe587a2d0e15"
+    "compiler-goose/src/reuse/zig_project_server_lifecycle.goose": "a318c1015d0bf96e212f6781ce14d8ab74c07ee6e920cd678c6ffe587a2d0e15",
+    "compiler-goose/src/backend/result_publication.goose": "046409c88b9cb052d8050428c22423bfd9eb400c1ec5a06a87ced68fe29d2a03"
   },
   "unqualified": [
     "whole compiler executable",
@@ -2019,5 +2020,73 @@
       }
     ],
     "full_qualification": false
+  },
+  "selected_batch102": {
+    "partial": true,
+    "seconds": 103.213,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 103.029,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose",
+            "line": 34,
+            "message": "error: storing a reference rooted at key, which does not outlive the destination (\u00a79.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global owned_blot_support__Option_BindingMap_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/entry_frontend_cutoff.goose:134 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "6d820f6b8e2254819bc8ec1f446d62a276249135cf8ccb4f74f63ef88fd713bf",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 6.16,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "6d820f6b8e2254819bc8ec1f446d62a276249135cf8ccb4f74f63ef88fd713bf",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.458,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "6d820f6b8e2254819bc8ec1f446d62a276249135cf8ccb4f74f63ef88fd713bf",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "publication_diagnostic_family": {
+    "scope": "Subsequent checked family after complete24 baseline; four affected C/link/runtime laws pass and final strict pinned observer law passes13.528s. Not fresh whole24 or compiler qualification.",
+    "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-publication-family.json.gz",
+    "raw_receipt_sha256": "f3dab34045c8bc5ae446bb001e2302af29367ef783ee5a50d46ac814aed65286",
+    "repairs": "Concrete DiagnosticBuffer/copy and Project UnitBuffer stores; typed source Diagnostic Option. Registered input-unit observer resolves exact named module run; canonical pin stores only staged owner data. Input-unit reader rejects unowned fallback; general compiledUnits reader retains sameUnits validation.",
+    "law": "Stage real catalog/per-Core journals; destroy producing Prepared; pinned Core remains readable; Frame teardown invalidates both owners. Unstaged input rejects. Source diagnostics transfer out of Engine then survive Frame and producer cleanup.",
+    "frontier": "102 clears backendunits and ownedDiagnostic errors; reaches scoped global footprint borrowed-name key and BindingMap optional publication."
   }
 }

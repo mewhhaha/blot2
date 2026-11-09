@@ -19,10 +19,19 @@ Input success/error text is owned symmetrically; complete record stores retain
 exact named pools. Source tables reserve their known final size once. The new
 executor law covers rejection, empty batch and pooled cleanup through Frame.
 
-Selected batch 101 passes executor/metadata and clears input Snapshot/candidate
-run errors. It reaches backend input-unit publication and DiagnosticBuffer push.
-**No whole C/header/executable exists.** Runtime integration remains pending;
-do not forward compilation to Zig or insert placeholder success.
+The subsequent publication family passes four affected C/link/runtime laws and
+the final pinned-unit observer law in 13.53s. It transfers diagnostics through
+concrete owning stores and reads staged module headers through their registered
+owner. A real nonempty pin test destroys Prepared, reads retained Core, then
+releases Frame and verifies both journals are dead. Unstaged inputs decline.
+The prior complete24 receipt remains its exact baseline; this is affected-family
+qualification of the newer source.
+
+Selected batch 102 passes executor/metadata and clears the input-unit escape and
+DiagnosticBuffer errors. It reaches scoped global-footprint borrowed-name keys
+and optional BindingMap publication. **No whole C/header/executable exists.**
+CLI/server, recoverable request OOM/retry and differential integration remain
+pending; no compiler forwarding or placeholder success.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

@@ -2450,7 +2450,7 @@ fn bindPublicationOwner(workspace: CompileWorkspace&,driver_owner: u64) -> blot_
 // Pin before assigning units to evaluator, generator, metadata or replay contexts.
 fn pinWorkspaceInputs(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],catalog_owner: blot_reuse_dependency_payload::Owner,unit_owners: const blot_reuse_dependency_payload::Owner[:],seed_owners: const blot_reuse_dependency_payload::Owner[:]) -> blot_error::Error {
     let error = blot_backend_result_publication::stageInputs(workspace.publication_owner,units,catalog_owner,unit_owners,seed_owners); if error != blot_error::Error.none { return error; }
-    let held,held_error = blot_backend_result_publication::inputUnits(workspace.publication_owner,units); assert(held_error == blot_error::Error.none); workspace.compiled_units = held; return blot_error::Error.none;
+    let held,held_error = blot_backend_result_publication::registeredInputUnits(workspace.publication_owner); assert(held_error == blot_error::Error.none); workspace.compiled_units = held; return blot_error::Error.none;
 }
 fn publicationCanReclaim(workspace: const CompileWorkspace&) -> bool { return blot_backend_result_publication::canReclaim(workspace.publication_owner); }
 fn pinResult(result: Result&,catalog_owner: blot_reuse_dependency_payload::Owner,unit_owners: const blot_reuse_dependency_payload::Owner[:],seed_owners: const blot_reuse_dependency_payload::Owner[:]) -> blot_error::Error {

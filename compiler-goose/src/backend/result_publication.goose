@@ -56,8 +56,13 @@ fn stageInputs(owner: Owner,units: const blot_check_core::Module[:],catalog: Inp
     }
     let error = retainInputs(); if error != blot_error::Error.none { pins.deinit(); return error; } assert(next == count); state.pins = pins; state.inputs_staged = true; return blot_error::Error.none;
 }
+fn registeredInputUnits(owner:Owner)->const blot_check_core::Module[:],Error {
+    if !valid(owner) || !states[owner.slot-1].inputs_staged {return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact;}
+    let registered=states[owner.slot-1].pins.units;if registered.len==0 {return default<const blot_check_core::Module[:]>(),blot_error::Error.none;}
+    let owned=module_runs.realloc_slice(registered,registered.len);assert(blot_support::same_slice_identity(owned,registered));let start=module_runs.index_of(owned[0]);return module_runs[start..start+owned.len],blot_error::Error.none;
+}
 fn inputUnits(owner: Owner,source: const blot_check_core::Module[:]) -> const blot_check_core::Module[:],Error {
-    if owner.slot == 0 { return source,blot_error::Error.none; } if !valid(owner) || !states[owner.slot - 1].inputs_staged || !sameUnits(states[owner.slot - 1].pins.units,source) { return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact; } return states[owner.slot - 1].pins.units,blot_error::Error.none;
+    let held,error=registeredInputUnits(owner);if error!=blot_error::Error.none || !sameUnits(held,source) {return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact;}return held,blot_error::Error.none;
 }
 fn prepare(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:],module_pins: const blot_reuse_code_artifacts::ModulePin[:]) -> Pins,Error {
     if !valid(owner) || !resultValid(owner,epoch,false) { return Pins {..},blot_error::Error.invalid_artifact; } let state = states[owner.slot - 1];
@@ -69,7 +74,7 @@ fn prepare(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catal
 fn commit(owner: Owner,epoch: u64,pins: Pins&) {
     assert(valid(owner) && resultValid(owner,epoch,false)); let state: State& = states[owner.slot - 1]; assert(state.inputs_staged && !state.published && state.pins.headers.len == 0 && pins.journals.len == 0 && pins.units.len == 0); state.pins.headers = module_runs.realloc_slice(pins.headers,pins.headers.len); pins.headers = default<blot_check_core::Module[:]>(); state.published = true; state.leased = true;
 }
-fn units(owner: Owner,epoch: u64) -> const blot_check_core::Module[:] { assert(resultValid(owner,epoch,true)); return states[owner.slot - 1].pins.units; }
+fn units(owner: Owner,epoch: u64) -> const blot_check_core::Module[:] { assert(resultValid(owner,epoch,true));let held,error=registeredInputUnits(owner);assert(error==blot_error::Error.none);return held; }
 fn releaseResult(owner: Owner,epoch: u64,pinned: bool) {
     if owner.slot == 0 { assert(epoch == 0 && !pinned); return; } assert(resultValid(owner,epoch,pinned)); let state: State& = states[owner.slot - 1]; state.result_live = false; state.leased = false;
     // Input journals and header copies remain alive during workspace teardown.
