@@ -31,9 +31,10 @@ fn words(length:i64,initial:u32)->u32[:] {let result=owned_words.alloc_slice(len
 fn release(values:u32[:]) {if values.len!=0 {owned_words.free_slice(values);}}
 struct Map {bindings:u32[:]=default<u32[:]>(),nominals:u32[:]=default<u32[:]>(),constructors:u32[:]=default<u32[:]>(),contracts:u32[:]=default<u32[:]>(),implementations:u32[:]=default<u32[:]>(),qualifications:Qualification[:]=default<Qualification[:]>()}
 // Reattach only runs allocated by compare; no source/method borrow is published.
-fn canonicalOwned(self_:Map)->Map {
- return Map{bindings:owned_words.realloc_slice(self_.bindings,self_.bindings.len),nominals:owned_words.realloc_slice(self_.nominals,self_.nominals.len),constructors:owned_words.realloc_slice(self_.constructors,self_.constructors.len),contracts:owned_words.realloc_slice(self_.contracts,self_.contracts.len),implementations:owned_words.realloc_slice(self_.implementations,self_.implementations.len),qualifications:owned_qualifications.realloc_slice(self_.qualifications,self_.qualifications.len)};
-}
+fn ownedWords(values:u32[:])->u32[:] {if values.len==0 {return default<u32[:]>();}let owned=owned_words.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_words.index_of(owned[0]);assert(start>=0 && values.len<=owned_words.len-start);return owned_words[start..start+values.len];}
+fn ownedQualifications(values:Qualification[:])->Qualification[:] {if values.len==0 {return default<Qualification[:]>();}let owned=owned_qualifications.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_qualifications.index_of(owned[0]);assert(start>=0 && values.len<=owned_qualifications.len-start);return owned_qualifications[start..start+values.len];}
+fn canonicalOwned(self_:Map)->Map {return Map{bindings:ownedWords(self_.bindings),nominals:ownedWords(self_.nominals),constructors:ownedWords(self_.constructors),contracts:ownedWords(self_.contracts),implementations:ownedWords(self_.implementations),qualifications:ownedQualifications(self_.qualifications)};}
+
 fn deinit(self_:Map&) {release(self_.bindings);release(self_.nominals);release(self_.constructors);release(self_.contracts);release(self_.implementations);if self_.qualifications.len!=0 {owned_qualifications.free_slice(self_.qualifications);}self_=Map {..};}
 fn binding(self_:Map,old:u32)->blot_support::Option<u32> {if old==0||old>=self_.bindings.len||self_.bindings[old]==0 {return blot_support::none<u32>();}return blot_support::some(self_.bindings[old]);}
 fn qualification(self_:Map,old:Span)->Span {
@@ -95,7 +96,7 @@ fn compare(left:const Interface&,right:const Interface&,targets:Targets)->blot_s
  if !eligible(left,right) {return blot_support::none<Map>(),blot_error::Error.none;}var map=Map {bindings:words(left.bindings.len,0), ..};var comparisons:i64=65536;
  let error=buildMap(left,right,targets,map,comparisons);if reported {reported=comparisons;}
  if error!=blot_error::Error.none {map.deinit();if error==blot_error::Error.out_of_memory {return blot_support::none<Map>(),error;}return blot_support::none<Map>(),blot_error::Error.none;}
- return blot_support::some(map),blot_error::Error.none;
+ return blot_support::Option<Map>{true,canonicalOwned(map)},blot_error::Error.none;
 }
 fn stage(targets:Targets,value:Stage) {let progress=targets.progress;if progress {progress.stage=value;}}
 fn budget(remaining:i64&)->Error {if remaining==0 {return blot_error::Error.declined;}remaining--;return blot_error::Error.none;}

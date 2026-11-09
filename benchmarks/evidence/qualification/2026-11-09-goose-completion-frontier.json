@@ -485,25 +485,25 @@
       "server"
     ],
     "exit": 1,
-    "seconds": 103.029,
+    "seconds": 94.888,
     "stop": "completed",
     "errors": [
       {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/support/pooled_map.goose",
-        "line": 34,
-        "message": "error: storing a reference rooted at key, which does not outlive the destination (\u00a79.2)"
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+        "line": 788,
+        "message": "error: storing a reference rooted at self_, which does not outlive the destination: it is reached through a reference that may point into Roots_runs (\u00a79.2)"
       },
       {
         "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
         "line": 60,
-        "message": "error: cannot assign payloads: global owned_blot_support__Option_BindingMap_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/entry_frontend_cutoff.goose:134 (\u00a75.1)"
+        "message": "error: cannot assign payloads: global owned_blot_support__Option_FrozenModule_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:74 (\u00a75.1)"
       }
     ],
     "full_qualification": false,
-    "source_sha256": "6d820f6b8e2254819bc8ec1f446d62a276249135cf8ccb4f74f63ef88fd713bf",
+    "source_sha256": "df1948c7121b55e412e9fb0590e60fcab82708adc15e0dd2a864f6d1694ffe67",
     "source_unchanged": true,
     "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
-    "batch": 102
+    "batch": 103
   },
   "latest_executed_laws": {
     "passed": true,
@@ -718,7 +718,7 @@
     "compiler-goose/src/backend/startup_occurrence_plan.goose": "6d113c8bffcd5d28cf9171713af23f8dc9c81cc157f9155452f9659adec557b3",
     "compiler-goose/src/backend/storage_calls.goose": "36aa3bbcddf51cc247c71c154edf285aeee9ed27d10c0afde18335aa8fd9a776",
     "compiler-goose/src/backend/storage_deferred_join.goose": "1d1d895714b9142920e29a71380eb54244a658ab0b2abd62d1bc52e8088a3c51",
-    "compiler-goose/src/backend/storage_global_footprint.goose": "1926a0d15f42a45fc101e35ad6543779a93037d08a8f2b7e4ad05edd15cf7a25",
+    "compiler-goose/src/backend/storage_global_footprint.goose": "e467f96695cdb23182cf88b3461fe2189978a0f0ee5f176f4f62a11a3a7df074",
     "compiler-goose/src/backend/unit_index.goose": "c887940e3a3c9b2736de030a41fb243f4730a904adf2230dd2a470a0284ec5c0",
     "compiler-goose/src/backend/wasm.goose": "a30b81d8b8612c425f82a5011efa4558cf693aba0a32999e794c60a5e3d001a7",
     "compiler-goose/src/check/core.goose": "83cf5fde517cdefd020914439e4b4fb7eca29330f0213869cfaa24d858765fbc",
@@ -778,7 +778,7 @@
     "compiler-goose/src/check/check_packet_owner.goose": "599425927dc3ab0af5a1647bda2d8283ba3d8f228503711bd8c20de0daa47521",
     "compiler-goose/src/support/project_packet_owners.goose": "60ea3f9683da4d5d11bbc9bddf52af89147eeefcd60a44c9f971b998de8cbfa8",
     "compiler-goose/tests/core_validation_borrow.goose": "3f6f89ccbf3804ebc3168b7781bfc43d0b8a430a7fa87a4f374a9004f7347a77",
-    "compiler-goose/tools/test_engines.py": "d07bf94b73f852bcba69422132bb7693f5693ce776820ddedf451193aed47c76",
+    "compiler-goose/tools/test_engines.py": "eee44da8815e76c403173ed382b8e67fb046d21029279ebb56d9e1d2065d8ba2",
     "compiler-goose/src/reuse/body_check_cache.goose": "1bc2ed6fb5665c2f9aa0e862297a817146256952d325db91d0b95e0c124b4580",
     "compiler-goose/src/reuse/body_check_packet.goose": "b6eda0b216be27b66e57d70adc26d3c9bb13e8abf4567f5b10f0885385782a1c",
     "compiler-goose/src/support/project_packet_contexts.goose": "309e3a262d65e85651f0169bb46fe2593844503f9ab0498f37c86391a936d680",
@@ -793,9 +793,12 @@
     "compiler-goose/tests/retained_seed.goose": "9122e4b5a159e136e774aa866010a379455b23c0d8ddf2c03f7fa1126e35388e",
     "compiler-goose/tests/editor_budget.goose": "fc5f8347bace861864b3ec3601df426cee455ac40d25515f8ffce424e973c54e",
     "compiler-goose/tests/completion_project_load.goose": "717f244384db87f96191007fb8d8e62b2def37cb6647a84d3607314af163c70a",
-    "compiler-goose/tests/executor_frame.goose": "123d487ec3f2074b61ba094e0ddc5b8b364c8b0095e87e40af4909d6c11cc31f",
+    "compiler-goose/tests/executor_frame.goose": "3fb2a8ea6db823672b362e733e59f4b43fba5a65f953f816c16a927cf8c12e06",
     "compiler-goose/src/reuse/zig_project_server_lifecycle.goose": "a318c1015d0bf96e212f6781ce14d8ab74c07ee6e920cd678c6ffe587a2d0e15",
-    "compiler-goose/src/backend/result_publication.goose": "046409c88b9cb052d8050428c22423bfd9eb400c1ec5a06a87ced68fe29d2a03"
+    "compiler-goose/src/backend/result_publication.goose": "046409c88b9cb052d8050428c22423bfd9eb400c1ec5a06a87ced68fe29d2a03",
+    "compiler-goose/src/reuse/entry_frontend_cutoff.goose": "881e428eacad210c13f84ac25945d6e0236d29485f258da67eac6e2cadfc9ee0",
+    "compiler-goose/src/reuse/frontend_binding_relocation.goose": "e088dc3691ab772957cf1db96cea6eb56c67db2f8a105274db777222870c2c6f",
+    "compiler-goose/tests/footprint_owner.goose": "45c33822da78f4bc2112e1dad5eca89daad0e5f6cb504908917dd3f08355a85a"
   },
   "unqualified": [
     "whole compiler executable",
@@ -2088,5 +2091,73 @@
     "repairs": "Concrete DiagnosticBuffer/copy and Project UnitBuffer stores; typed source Diagnostic Option. Registered input-unit observer resolves exact named module run; canonical pin stores only staged owner data. Input-unit reader rejects unowned fallback; general compiledUnits reader retains sameUnits validation.",
     "law": "Stage real catalog/per-Core journals; destroy producing Prepared; pinned Core remains readable; Frame teardown invalidates both owners. Unstaged input rejects. Source diagnostics transfer out of Engine then survive Frame and producer cleanup.",
     "frontier": "102 clears backendunits and ownedDiagnostic errors; reaches scoped global footprint borrowed-name key and BindingMap optional publication."
+  },
+  "selected_batch103": {
+    "partial": true,
+    "seconds": 94.998,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 94.888,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 788,
+            "message": "error: storing a reference rooted at self_, which does not outlive the destination: it is reached through a reference that may point into Roots_runs (\u00a79.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global owned_blot_support__Option_FrozenModule_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:74 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "df1948c7121b55e412e9fb0590e60fcab82708adc15e0dd2a864f6d1694ffe67",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.557,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "df1948c7121b55e412e9fb0590e60fcab82708adc15e0dd2a864f6d1694ffe67",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.243,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "df1948c7121b55e412e9fb0590e60fcab82708adc15e0dd2a864f6d1694ffe67",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "footprint_relocation_family": {
+    "scope": "Two newer affected C/link/runtime laws pass on frozen source: footprint_owner6.289s and executor_frame10.660s; prior complete24 remains exact baseline. Not whole compiler.",
+    "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-footprint-relocation.json.gz",
+    "raw_receipt_sha256": "b2872b38348fb46538f17d8c22c0ecf6f491dd0c3f2b85d9d3da3aa9cd055c73",
+    "repairs": "Global-footprint Index owns/releases cached dispatch-name bytes; explicit Operator hash preserves dictionary semantics. BindingMap publication uses typed Options and exact guarded named spans.",
+    "coverage": "Four cycles of 12same-name associated targets exercise owned key identity, target-buffer growth, Frame and cleanup; actual6-run relocation publication verifies5word maps andqualification afterFrame.",
+    "frontier": "103 clears borrowed map key and BindingMap; reaches scoped Root writeback through Generator and relocated FrozenModule publication."
   }
 }

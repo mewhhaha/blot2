@@ -27,11 +27,11 @@ releases Frame and verifies both journals are dead. Unstaged inputs decline.
 The prior complete24 receipt remains its exact baseline; this is affected-family
 qualification of the newer source.
 
-Selected batch 102 passes executor/metadata and clears the input-unit escape and
-DiagnosticBuffer errors. It reaches scoped global-footprint borrowed-name keys
-and optional BindingMap publication. **No whole C/header/executable exists.**
-CLI/server, recoverable request OOM/retry and differential integration remain
-pending; no compiler forwarding or placeholder success.
+The latest footprint/relocation family passes affected C/link/runtime laws in
+6.29s and10.66s; cached spelling bytes are owned and all6relocation runs survive
+Frame publication/cleanup. Selected103 reaches scoped Root writeback through
+Generator and relocated FrozenModule publication; executor/metadata pass.
+**No whole C/header/executable exists.** Integrated qualification remains pending.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

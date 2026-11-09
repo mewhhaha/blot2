@@ -12,6 +12,7 @@ import support.option;
 type Error = blot_error::Error;
 type Module = blot_check_core::Module;
 type Ref = blot_check_core::BindingRef;
+fn blot_check_types::hash(value:blot_check_types::Operator)->u64 {return ::hash(blot_check_types::operatorCode(value));}
 let limit: i64 = 100000;
 struct Node {unit: u32,root: u32,start: u32 = 0,len: u32 = 0}
 struct Edges {nodes: const Node[:] = default<const Node[:]>(),slots: const i64[:] = default<const i64[:]>(),all: bool = false}
@@ -31,6 +32,8 @@ reusable[] var node_run_pool: NodeRun[>..] = [];
 reusable[] var unit_map_pool: dictionary_slot<u32,i64>[>..] = [];
 reusable[] var global_map_pool: dictionary_slot<Ref,i64>[>..] = [];
 reusable[] var name_map_pool: dictionary_slot<const u8[:],Targets>[>..] = [];
+reusable[] var name_text_pool:u8[>..]=[];
+fn ownName(name:const u8[:])->const u8[:] {if name.len==0 {return default<const u8[:]>();}let owned=name_text_pool.alloc_slice(name.len);for byte,index in name {owned[index]=byte;}return owned;}
 reusable[] var operator_map_pool: dictionary_slot<blot_check_types::Operator,Targets>[>..] = [];
 reusable[] var direct_map_pool: dictionary_slot<Node,Edges>[>..] = [];
 reusable[] var completed_map_pool: dictionary_slot<Node,const i64[:]>[>..] = [];
@@ -40,7 +43,7 @@ struct Index {
 fn ownSlots(self_: Index&,values: const i64[:]) -> const i64[:],Error {if values.len == 0 {return default<const i64[:]>(),blot_error::Error.none;}let owned = slots_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.slot_runs,SlotRun {items: owned},slot_run_pool);if error != blot_error::Error.none {slots_pool.free_slice(owned);return default<const i64[:]>(),error;}return owned,blot_error::Error.none;}
 fn ownNodes(self_: Index&,values: const Node[:]) -> const Node[:],Error {if values.len == 0 {return default<const Node[:]>(),blot_error::Error.none;}let owned = nodes_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.node_runs,NodeRun {items: owned},node_run_pool);if error != blot_error::Error.none {nodes_pool.free_slice(owned);return default<const Node[:]>(),error;}return owned,blot_error::Error.none;}
 fn deinit(self_: Index&) {
-    for slot in self_.names.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();}}for slot in self_.operators.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();}}
+    for slot in self_.names.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();if slot.key.len!=0 {name_text_pool.free_slice(slot.key);}}}for slot in self_.operators.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();}}
     blot_support_pooled_map::deinit(self_.unit_indices,unit_map_pool);blot_support_pooled_map::deinit(self_.globals,global_map_pool);blot_support_pooled_map::deinit(self_.names,name_map_pool);blot_support_pooled_map::deinit(self_.operators,operator_map_pool);blot_support_pooled_map::deinit(self_.direct,direct_map_pool);blot_support_pooled_map::deinit(self_.completed,completed_map_pool);
     for run in self_.slot_runs.items {slots_pool.free_slice(run.items);}for run in self_.node_runs.items {nodes_pool.free_slice(run.items);}blot_support_pooled_buffer::deinit(self_.slot_runs,slot_run_pool);blot_support_pooled_buffer::deinit(self_.node_runs,node_run_pool);self_.units=default<const Module[:]>();self_.all=default<const i64[:]>();
 }
@@ -51,7 +54,7 @@ fn init(units: const Module[:],globals: const Ref[:]) -> Index,Error {
         for owner,index in units {blot_support_pooled_map::insert(self_.unit_indices,owner.unit,index,unit_map_pool);
             for candidate in owner.associated {
                 var target = candidate.target;if target.unit == 0 {target.unit = owner.unit;}
-                if candidate.member != 0 {let name = owner.fieldSpelling(candidate.member);if name.present {if !blot_support_pooled_map::contains(self_.names,name.value) {blot_support_pooled_map::insert(self_.names,name.value,Targets {..},name_map_pool);}let targets .= blot_support_pooled_map::get(self_.names,name.value);assert(targets);let error = targets.push(target);if error != blot_error::Error.none {return error;}}else {self_.unknown_names = true;}}
+                if candidate.member != 0 {let name = owner.fieldSpelling(candidate.member);if name.present {if !blot_support_pooled_map::contains(self_.names,name.value) {blot_support_pooled_map::insert(self_.names,ownName(name.value),Targets {..},name_map_pool);}let targets .= blot_support_pooled_map::get(self_.names,name.value);assert(targets);let error = targets.push(target);if error != blot_error::Error.none {return error;}}else {self_.unknown_names = true;}}
                 if candidate.operator != blot_check_types::Operator.none {if !blot_support_pooled_map::contains(self_.operators,candidate.operator) {blot_support_pooled_map::insert(self_.operators,candidate.operator,Targets {..},operator_map_pool);}let targets .= blot_support_pooled_map::get(self_.operators,candidate.operator);assert(targets);let error = targets.push(target);if error != blot_error::Error.none {return error;}}
             }
         }return blot_error::Error.none;

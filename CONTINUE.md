@@ -48,84 +48,30 @@ candidate; use the explicitly identified development compiler for these checks.
 Full original-export, release and Main/frame qualification remain pending.
 See [the exact batch evidence and compressed raw reports](benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
 
-Goose mirrors the new parser/checker rules, but **no whole compiler executable
-exists yet**. Keep the original Zig oracle for old-language comparisons.
-The current user scope is lifetime repair, actual native compilation, then
-CLI/server, retained state and recoverable request OOM qualification. Use
-coherent source batches and bounded checks; source presence is not completion.
+Goose mirrors the parser/checker rules, but **no whole C/header/executable exists**.
+Current scope: repair ownership in coherent families, build the actual native
+compiler, then qualify CLI/server, retained revisions, request OOM/retry and
+differential behavior against Zig. No forwarding to Zig or placeholder success.
 
-Twenty-four executed production helper laws pass together in 159.22s. They cover
-real Frame create/release, nonempty session tables, ordinary and packet-decoded
-Checked publication through worker slots, Prepared lifetime, receipt admission,
-diagnostics, readers, imports, snapshots and editor budgets. Packet observers
-validate the existing retained typed journal; no graph copies or owner registry
-are added. These helpers do not qualify a whole compiler executable.
+The last complete **24 production helper laws pass in 159.22s**. Subsequent
+publication/diagnostic and footprint/relocation families pass their affected
+C/link/runtime laws. They exercise real Frame lifecycle, nonempty registered
+input pins surviving producer teardown, scalar lease/generation owners, ordinary
+and packet-decoded worker publication, source observations, diagnostics, maps
+and actual retained-session admission/cleanup. Exact source hashes distinguish
+these receipts; they are not whole-compiler qualification.
 
-Project checker engines and worker headers are now invocation-local. Synchronous
-callback contexts borrow the local engine, so caller-owned compiled modules,
-reuse masks, execution observers and editor budgets need no global retention.
-The engine registry and temporary editor-prefix copy/writeback machinery are
-removed. Worker requests own their engine value and clean it before source and
-packet ownership. Nonempty compiled/mask views and callback/worker lifetimes
-have executed controls; the full entry remains pending.
+Current owners use existing registered pools and journals. Inputs, source overlays,
+Pattern stores and retained seeds carry checked scalar keys. Source retains49
+alias guards. Publication observes exact owning runs; global-footprint indexes
+own cached spelling bytes. Copied host workers remain; language tasks are retired.
+Preserve ABI8, session2 and the Zig oracle/sibling sources.
 
-Live Source keeps its lease/generation checks and all 49 alias guards. Patterns
-now carries scalar lease/generation authority and observes registered buffers
-through checked accessors; its inactive owner and two borrowed fields are removed. Frozen readers carry fixed descriptors and value proof headers without
-copying graphs. Import dictionaries hold scalar indices into an invocation-owned
-arena; append-only caller tables use grow-only storage. SourceValidation publishes
-19 registered views without extra allocation. Loader and scheduling scratch use
-fixed pooled headers; diagnostic/item moves use checked whole-run observations.
-NativeAssets sorts scalar indices and owns generated error codes after producer
-cleanup. Its final Source ownership scan can still be quadratic; optimization
-requires a measured workload.
-
-Source and semantic diagnostics publish through checked owning views. Checked
-results and Prepared headers transfer their exact owned runs out of local scopes.
-Parallel lowering owns a fixed result-slot run; fixed-mode preparation payloads
-are reconstructed after mutation. Snapshot append/adopt factories observe their
-existing owner journals; sharing and pin lifetimes have executed controls. The
-receipt helpers return their receipt directly and observe the owning graph runs.
-Checked observers preserve Source alias guards and validate scalar Pattern keys.
-Prepared publication preserves checked Entry and seed-pin authority, and the
-consumer moves the original enum inactive before owning its fresh checked value.
-Fresh Core headers resolve through their per-unit owner before publication. CoreValidationBorrow now carries scalar receipt authority,
-validates both graph identities and declines stale receipts; shared owners remain
-valid. Its own executed law replaces a superseded expensive graph warmup, reducing
-the dependency ownership law from about 36s to 5s. Typed optional records preserve
-nested editor/diagnostic/Prepared ownership without cloning.
-
-Seed ownership now uses a scalar registered Snapshot key. Session initialization
-validates and adopts once, removing the raw-owned/shared alternatives and lazy
-transition. Invalid seeds decline earlier at initialization while retaining caller
-ownership. Four actual session admission/cleanup cycles execute successfully;
-Astra reviewed consumption, allocation-failure ordering and moved-key resets.
-Diagnostic record publication and concrete owned pushes retain exact text pools;
-a rich cloned diagnostic survives producer teardown and real Frame cleanup.
-
-Live/frozen revision inputs and source overlays now carry scalar checked keys;
-their existing registries own all buffers and text. This removes inactive defaults,
-12 borrowed input fields and four unused duplicate record types. Source overlays
-reserve their known final table capacity once. Complete canonical observation
-stores own both success bytes and failure causes. Native asset/editor/server
-callers preserve their data and wire behavior. Five typed executor record Options
-clear the measured project_jobs alias path. The new executed executor law covers
-invalid-size rejection, an empty valid batch, pooled cleanup and Frame lifecycle;
-actual worker packet integration remains pending.
-
-The subsequent publication family passes four affected C/link/runtime laws and
-the final pinned-unit observer law in 13.53s. It transfers diagnostics through
-concrete owning stores and reads staged module headers through their registered
-owner. A real nonempty pin test destroys Prepared, reads retained Core, then
-releases Frame and verifies both journals are dead. Unstaged inputs decline.
-The prior complete24 receipt remains its exact baseline; this is affected-family
-qualification of the newer source.
-
-Selected batch 102 passes executor/metadata and clears the input-unit escape and
-DiagnosticBuffer errors. It reaches scoped global-footprint borrowed-name keys
-and optional BindingMap publication. **No whole C/header/executable exists.**
-CLI/server, recoverable request OOM/retry and differential integration remain
-pending; no compiler forwarding or placeholder success.
+Selected batch103 passes executor/metadata and clears earlier input publication,
+diagnostic and relocation errors. It reaches scoped-backend Root writeback through
+Generator and relocated FrozenModule publication. General nonempty evaluator
+borrowing, whole native emission and integrated runtime/OOM remain pending.
+See [the current frontier and raw receipts](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 The optional private direct-global empty-holder precision extension passes 24 new
 controls and the existing 24 semantic controls with diagnostic/runtime/C parity.
