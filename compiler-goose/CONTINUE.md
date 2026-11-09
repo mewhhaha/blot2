@@ -4,17 +4,18 @@ Fix production ownership in coherent families, build the complete native compile
 then qualify CLI/project-server behavior, recoverable request OOM and retention
 against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-All **22 executed production helper laws pass together in 113.92s**, including
+All **22 executed production helper laws pass together in 114.45s**, including
 actual frame cleanup, nonempty session tables, ordinary and packet-decoded Checked
 worker publication, Prepared Option lifetime and real receipt admission. Checked
 observers retain existing aliases and typed journal ownership; no graph copies or
 new registry. Exact hashes and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-Selected batch 92 passes executor/metadata but retains two server errors: local
-ready payload ownership across Frame.create and parameter-pattern inactive
-publication at the frontend boundary. **No whole C/header/executable exists.**
-General nonempty Session/catalog borrowing and integrated runtime qualification
-remain pending. Do not forward compilation to Zig or insert placeholder success.
+Selected batch 96 passes executor/metadata and clears prior preparation and
+Pattern-sentinel errors. It reaches candidate_seed ownership across Frame.create
+and dispatch diagnostic candidate_runs publication. **No whole C/header/executable
+exists.** General nonempty Session/catalog borrowing and integrated runtime
+qualification remain pending. Do not forward compilation to Zig or insert
+placeholder success.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new
@@ -30,8 +31,8 @@ binaries as oracle; oracle.json pins the older language candidate, so new-langua
 comparisons need the matching newer Zig identity. Preserve sibling source/assets.
 
 Project engines and shallow workers are invocation-local; callbacks borrow local
-state, workers destroy their Engine before source/packet ownership. Source/Patterns
-retain 49/2 alias guards. Frozen proof headers are values, imports use scalar arena
+state, workers destroy their Engine before source/packet ownership. Source retains
+49 alias guards; Patterns uses scalar lease/generation and checked buffer access. Frozen proof headers are values, imports use scalar arena
 indices and SourceValidation owns 19 registered views. No project graphs are cloned.
 
 Owning headers use exact registered runs and existing journals. Thirty restores

@@ -6,6 +6,7 @@ import reuse.project;
 import reuse.project_check;
 import reuse.partial_dependency;
 import reuse.dependency_closure;
+import reuse.dependency_owned_headers;
 import reuse.retained_dependency;
 import reuse.frozen_dependency;
 import reuse.completed_core_validation;
@@ -39,6 +40,10 @@ struct EntryState {
 }
 reusable var entries:EntryState[>..]=[];
 fn valid(self_:const Entry&)->bool {return self_.slot!=0 && self_.slot-1<entries.len && entries[self_.slot-1].live && entries[self_.slot-1].generation==self_.generation;}
+fn canonicalEntry(source:Entry?)->Entry? {
+ if !source {return null;}assert(source.valid());
+ let owned:Entry& =entries[source.slot-1].canonical;assert(source .== owned);return owned;
+}
 fn deinit(self_:Entry&) {if self_.slot==0 {return;}assert(valid(self_));let at=self_.slot-1;entries[at].names.deinit();entries[at]=EntryState{..};entries.free(at);}
 fn matches(self_:const Entry&,units:const Core[:],entry:u32,names:Identity)->bool {
  if !valid(self_) {return false;}let state:const EntryState& =entries[self_.slot-1];if units.len==0 || entry!=units.len || state.prefix.prefix(units,entry,names)!=units.len-1 {return false;}
@@ -71,6 +76,7 @@ fn prepareEntry<E,P>(executor:E&,entry_path:const u8[:],output_identity:blot_sup
  let error=payload.value.attachSeedPin(pin);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {pin.deinit();prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
  let error=payload.value.rebindFrozenPrefix(owner.value);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
  if !previous.present {let error=mintEntry(payload.value,owner);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}}
+ prepared=blot_reuse_partial_dependency::Preparation.ready{blot_reuse_partial_dependency::publishPrepared(payload.value)};
  },_=>{}}
  return prepared,blot_error::Error.none;
 }
@@ -79,5 +85,6 @@ fn mintEntry(value:blot_reuse_partial_dependency::Prepared&,owner:const blot_reu
  if value.source_mode || value.units.len!=owner.value.modules.len+1 || value.entry!=value.units.len || value.cached!=owner.value.modules.len {return blot_error::Error.none;}
  if prefix.prefix(value.units,value.entry,value.identity.view())!=owner.value.modules.len {return blot_error::Error.none;}
  if entries.len>=0xffffffff {return blot_error::Error.out_of_memory;}let names,error=blot_backend_runtime_identity::copy(value.identity.view());if error!=blot_error::Error.none {return error;}
- let modules=value.catalog_owner.mutable(value.units);let module=modules[value.entry-1];let generation=blot_native::fresh_owner_id();let at=entries.alloc_index(EntryState{prefix:prefix,module:module,names:names,generation:generation,live:true, ..});entries[at].canonical=Entry{(at+1) as u32,generation, ..};value.source_completion .= entries[at].canonical;return blot_error::Error.none;
+ assert(value.unit_owners.len==value.units.len && !value.isBorrowed(value.entry-1));
+ let modules=value.catalog_owner.mutable(value.units);let module=blot_reuse_dependency_owned_headers::canonical(value.unit_owners[value.entry-1],modules[value.entry-1]);let generation=blot_native::fresh_owner_id();let at=entries.alloc_index(EntryState{prefix:prefix,module:module,names:names,generation:generation,live:true, ..});entries[at].canonical=Entry{(at+1) as u32,generation, ..};value.source_completion .= entries[at].canonical;return blot_error::Error.none;
 }

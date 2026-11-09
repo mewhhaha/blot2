@@ -54,7 +54,7 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Twenty-two executed production helper laws pass together in 113.92s. They cover
+Twenty-two executed production helper laws pass together in 114.45s. They cover
 real Frame create/release, nonempty session tables, ordinary and packet-decoded
 Checked publication through worker slots, Prepared lifetime, receipt admission,
 diagnostics, readers, imports, snapshots and editor budgets. Packet observers
@@ -69,8 +69,9 @@ removed. Worker requests own their engine value and clean it before source and
 packet ownership. Nonempty compiled/mask views and callback/worker lifetimes
 have executed controls; the full entry remains pending.
 
-Live Source/Patterns keep existing lease/generation checks and all 49/2 alias
-guards. Frozen readers carry fixed descriptors and value proof headers without
+Live Source keeps its lease/generation checks and all 49 alias guards. Patterns
+now carries scalar lease/generation authority and observes registered buffers
+through checked accessors; its inactive owner and two borrowed fields are removed. Frozen readers carry fixed descriptors and value proof headers without
 copying graphs. Import dictionaries hold scalar indices into an invocation-owned
 arena; append-only caller tables use grow-only storage. SourceValidation publishes
 19 registered views without extra allocation. Loader and scheduling scratch use
@@ -85,17 +86,21 @@ Parallel lowering owns a fixed result-slot run; fixed-mode preparation payloads
 are reconstructed after mutation. Snapshot append/adopt factories observe their
 existing owner journals; sharing and pin lifetimes have executed controls. The
 receipt helpers return their receipt directly and observe the owning graph runs.
-Checked observers preserve all 49/2 Source/Patterns alias guards and reify exact
-registered runs. CoreValidationBorrow now carries scalar receipt authority,
+Checked observers preserve Source alias guards and validate scalar Pattern keys.
+Prepared publication preserves checked Entry and seed-pin authority, and the
+consumer moves the original enum inactive before owning its fresh checked value.
+Fresh Core headers resolve through their per-unit owner before publication. CoreValidationBorrow now carries scalar receipt authority,
 validates both graph identities and declines stale receipts; shared owners remain
 valid. Its own executed law replaces a superseded expensive graph warmup, reducing
 the dependency ownership law from about 36s to 5s. Typed optional records preserve
 nested editor/diagnostic/Prepared ownership without cloning.
 
-Selected batch 92 passes executor/metadata but still reports two server errors:
-local ready payload ownership across Frame.create and parameter-pattern inactive
-publication at the frontend boundary. General nonempty evaluator borrowing and
-whole compiler integration remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz).
+Selected batch 96 passes executor/metadata and clears the prior preparation and
+Pattern-sentinel errors. It reaches candidate_seed ownership across Frame.create
+and dispatch diagnostic candidate_runs publication. The expanded Frame law covers
+real seed pin/rebind/Entry minting, enum moves, zero-key packet roundtrips and
+cleanup. General nonempty evaluator borrowing and whole compiler integration
+remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz).
 There is still no whole C program, header or executable. Actual CLI/server,
 request OOM/retry and differential qualification remain pending.
 

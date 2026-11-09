@@ -3,6 +3,7 @@ import bootstrap_globals;
 import driver.cli;
 import driver.cli_workers;
 import std;
+import check.parameter_patterns;
 import eval.type_evidence;
 import eval.implementation_evidence;
 import support.error;
@@ -73,7 +74,23 @@ fn implementationLeases() {
         replacement.deinit();
     }
 }
+fn patternLeases() {
+    assert(!blot_check_parameter_patterns::valid(blot_check_parameter_patterns::Store{}));
+    for iteration in 0..32 {
+        var store,error=blot_check_parameter_patterns::initPooled();assert(error==blot_error::Error.none);
+        let view=blot_check_parameter_patterns::checkedView(store);
+        var wrong=view;wrong.generation++;assert(!blot_check_parameter_patterns::valid(wrong));
+        wrong=view;wrong.lease=0;assert(!blot_check_parameter_patterns::valid(wrong));
+        let id,error=store.add(blot_check_parameter_patterns::Node{blot_check_parameter_patterns::Kind.binding,17});assert(error==blot_error::Error.none);
+        let span,error=store.saveList([id]);assert(error==blot_error::Error.none);
+        assert(view.node(id).a==17 && view.list(span)[0]==id);
+        assert(view.nodes() .== store.nodes() && view.extra() .== store.extra());
+        store.deinit();assert(!blot_check_parameter_patterns::valid(view));
+        var next,error=blot_check_parameter_patterns::initPooled();assert(error==blot_error::Error.none);
+        assert(next.lease==view.lease && next.generation!=view.generation && !blot_check_parameter_patterns::valid(view));next.deinit();
+    }
+}
 fn main() {
-    evidenceLeases();implementationLeases();
+    evidenceLeases();implementationLeases();patternLeases();
     print("proof leases passed: shared headers, owner/generation rejection, release/reuse");
 }

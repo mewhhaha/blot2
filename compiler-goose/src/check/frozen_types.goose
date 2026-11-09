@@ -68,7 +68,7 @@ fn node(self_: Patterns, id: blot_check_parameter_patterns::Id) -> blot_check_pa
     match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { let view=blot_check_parameter_patterns::canonical(s.lease,s.generation);return view.node(id); }, frozen s => { return s.value.nodes[id]; }, }
 }
 fn list(self_: Patterns, span: blot_check_parameter_patterns::List) -> const blot_check_parameter_patterns::Id[:] {
-    match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { let view=blot_check_parameter_patterns::canonical(s.lease,s.generation);return view.extra.items[span.start..span.start + span.len]; }, frozen s => { return s.value.extra[span.start..span.start + span.len]; }, }
+    match self_ { inactive => { abort("inactive frozen source descriptor"); }, store s => { let view=blot_check_parameter_patterns::canonical(s.lease,s.generation);return view.extra().items[span.start..span.start + span.len]; }, frozen s => { return s.value.extra[span.start..span.start + span.len]; }, }
 }
 fn field(self_: Patterns, value: blot_check_parameter_patterns::Node, index: i64) -> blot_check_parameter_patterns::Field {
     match self_ { inactive => { abort("inactive frozen source descriptor"); },

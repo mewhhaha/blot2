@@ -305,7 +305,7 @@ let parameters=checked_header_parameters.alloc_slice(contract.parameters.len);fo
 state.headers[index]=lease;contracts[index]=ProofContract{binding:contract.binding,header:blot_check_numeric_proof_headers::Owned{arity:contract.header.arity,value_slots:value_slots,proof_slots:proof_slots,values:values,operands:operands,requirements:requirements,result:contract.header.result,..},parameters:parameters,..};}}
 // Publication recovers only the exact arrays registered by this Checked owner.
 fn ownedSourceDeclarations(owner:CheckedOwner)->SourceDeclaration[:] {let state .= checkedOwnerState(owner);let values=checked_declarations.realloc_slice(state.declarations,state.declarations.len);assert(blot_support::same_slice_identity(values,state.declarations));return values;}
-fn sourceValidationPatterns(store:blot_check_parameter_patterns::Store)->blot_check_parameter_patterns::Store {if store.lease==0 {assert(store.generation==0 && store.nodes .== blot_check_parameter_patterns::inactive.nodes && store.extra .== blot_check_parameter_patterns::inactive.extra);return blot_check_parameter_patterns::Store{..};}return blot_check_parameter_patterns::checkedView(store);}
+fn sourceValidationPatterns(store:blot_check_parameter_patterns::Store)->blot_check_parameter_patterns::Store {if store.lease==0 {assert(store.generation==0);return blot_check_parameter_patterns::Store{..};}return blot_check_parameter_patterns::checkedView(store);}
 fn ownedSourceValidation(checked:const Checked&,declarations:const SourceDeclaration[:])->SourceValidation {
  let owner=checked.owner;let state .= checkedOwnerState(owner);
  assert(blot_support::same_slice_identity(state.declarations,declarations));

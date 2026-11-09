@@ -10,11 +10,11 @@ enum CatalogOwner {inactive,typed{value:const Checked&},source{value:const blot_
 struct CatalogModule {owner:CatalogOwner=CatalogOwner.inactive,exports:const Export[:]=default<const Export[:]>(),valid:bool=false}
 fn catalog(self_:CatalogModule)->blot_check_check::DeclarationCatalog {match self_.owner {
  typed payload=>{return blot_check_check::declarationCatalog(payload.value);},source payload=>{return blot_check_check::declarationCatalog(payload.value);},
- frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(payload.value)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.catalog();},inactive=>{abort("inactive project declaration catalog");},
+ frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.catalog();},inactive=>{abort("inactive project declaration catalog");},
 }}
 fn declaration(self_:CatalogModule,binding:u32)->blot_check_check::SourceDeclaration {match self_.owner {
  typed payload=>{return blot_check_check::sourceDeclaration(payload.value.bindings[binding]);},source payload=>{return payload.value.declarations[binding];},
- frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(payload.value)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.declaration(binding);},inactive=>{abort("inactive project declaration catalog");},
+ frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.declaration(binding);},inactive=>{abort("inactive project declaration catalog");},
 }}
 fn resolved(self_:CatalogModule,node:u32)->u32 {match self_.owner {typed payload=>{return payload.value.resolved[node];},source payload=>{return payload.value.resolved[node];},_=>{abort("source resolution requires a live source catalog");}}}
 enum Editor {none,query{value:EditorQuery}}
@@ -57,7 +57,7 @@ fn catalogModule(self_:const Engine&,unit:u32)->blot_support::Option<CatalogModu
 }
 fn valueImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::ImportedBinding {
  assert(!self_.source_validation);let compiled .= self_.result.compiledModule(self_.source,target.unit);var interface=default<blot_check_check::SchemeInterface>();
- if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(compiled.interface)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {interface=self_.result.interface(target);}return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. };
+ if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(compiled.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {interface=self_.result.interface(target);}return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. };
 }
 fn headerImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::SourceHeader {
  assert(self_.source_validation);let module=self_.catalogModule(target.unit);assert(module.present);let declaration=module.value.declaration(target.binding);return blot_check_check::SourceHeader{ capability_flow:declaration.capability_flow, capability_parameters:declaration.capability_parameters, target:target, named_function:declaration.named_function, origin:origin, .. };
@@ -65,7 +65,7 @@ fn headerImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_chec
 fn initCompiledCatalogs(self_:Engine&)->Error {
  self_.compiled_catalogs=compiled_catalog_runs.alloc_slice(self_.source.compiled_modules.len);for &value in self_.compiled_catalogs {value=CompiledCatalog{..};}
  for module,index in self_.source.compiled_modules {if self_.result.compiledModule(self_.source,index+1)==null {continue;}let exports=owned_Export.alloc_slice(module.exports.len);for old,at in module.exports {exports[at]=Export{old.name,old.target,old.kind,old.catalog, ..};}self_.compiled_catalogs[index].exports=exports;
- if self_.source_validation {let declarations=source_declaration_runs.alloc_slice(module.interface.bindings.len);self_.compiled_catalogs[index].declarations=declarations;let view=blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(module.interface)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..};for at in declarations.len {declarations[at]=view.declaration(at as u32);}}}return blot_error::Error.none;
+ if self_.source_validation {let declarations=source_declaration_runs.alloc_slice(module.interface.bindings.len);self_.compiled_catalogs[index].declarations=declarations;let view=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(module.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..};for at in declarations.len {declarations[at]=view.declaration(at as u32);}}}return blot_error::Error.none;
 }
 fn recoverModule(self_:Engine&,unit:u32)->bool,Error {
  let previous:const FrozenModule& =self_.source.compiled_modules[unit-1];let targets=blot_reuse_frontend_binding_relocation::Targets{units:self_.result.binding_maps, ..};var relocated=default<blot_reuse_dependency_payload::Owned<FrozenModule>>();

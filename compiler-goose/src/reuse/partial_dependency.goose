@@ -70,14 +70,16 @@ struct Prepared {
  identity:blot_backend_runtime_identity::Metadata=blot_backend_runtime_identity::Metadata{},unit_order:u32[:]=default<u32[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),cached:i64=0,borrowed:bool[:]=default<bool[:]>(),entry_imports:Import[:]=default<Import[:]>(),entry_implicit_prelude:bool=false,
  entry:u32=0,prelude:u32=0,source_mode:bool=false,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:Owner[:]=default<Owner[:]>(),seed_pin:blot_reuse_retained_dependency::InputPin=blot_reuse_retained_dependency::InputPin{},
 }
-// Initial publication precedes receipt/pin attachment; all metadata views name owned runs.
+// Re-publish after attaching receipts/pins or rebinding borrowed Core headers.
 fn publishPrepared(value:Prepared)->Prepared {
- assert(value.catalog_owner.unique() && value.source_completion==null && value.seed_pin.len==0);
+ assert(value.catalog_owner.unique());
+ let completion=blot_reuse_source_completion::canonicalEntry(value.source_completion);
+ let pin=blot_reuse_retained_dependency::InputPin{start:value.seed_pin.start,len:value.seed_pin.owners().len};
  let digests=value.catalog_owner.mutable(value.source_digests);let caches=blot_reuse_project_check::owned_blot_reuse_body_check_cache__Cache.realloc_slice(value.body_caches,value.body_caches.len);assert(blot_support::same_slice_identity(caches,value.body_caches));
  let units=value.catalog_owner.mutable(value.units);let bytes=value.catalog_owner.mutable(value.identity.bytes);let symbols=value.catalog_owner.mutable(value.identity.symbols);let owners=value.catalog_owner.mutable(value.identity.owners);
  let order=value.catalog_owner.mutable(value.unit_order);let paths=value.catalog_owner.mutable(value.paths);let borrowed=value.catalog_owner.mutable(value.borrowed);let imports=value.catalog_owner.mutable(value.entry_imports);
  let unit_owners=core_owners.realloc_slice(value.unit_owners,value.unit_owners.len);assert(blot_support::same_slice_identity(unit_owners,value.unit_owners));
- return Prepared{source_digests:digests,body_caches:caches,units:units,identity:blot_backend_runtime_identity::Metadata{bytes:bytes,symbols:symbols,owners:owners},unit_order:order,paths:paths,cached:value.cached,borrowed:borrowed,entry_imports:imports,entry_implicit_prelude:value.entry_implicit_prelude,entry:value.entry,prelude:value.prelude,source_mode:value.source_mode,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,..};
+ return Prepared{source_completion:completion,source_digests:digests,body_caches:caches,units:units,identity:blot_backend_runtime_identity::Metadata{bytes:bytes,symbols:symbols,owners:owners},unit_order:order,paths:paths,cached:value.cached,borrowed:borrowed,entry_imports:imports,entry_implicit_prelude:value.entry_implicit_prelude,entry:value.entry,prelude:value.prelude,source_mode:value.source_mode,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,seed_pin:pin};
 }
 fn initPaths(self_:Prepared&,count:i64)->Error {
  let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(self_.catalog_owner,count);if error!=blot_error::Error.none {return error;}
@@ -113,7 +115,8 @@ fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&)->Error {
  var copies:OwnedCore[>..<]=[];
  if self_.seed_pin.owners().len==0 {for module in seed.modules {let copy,error=blot_reuse_dependency_payload::clone(module.core);if error!=blot_error::Error.none {let __cleanup_result_1_0: Error = error; {for &copy in copies {copy.deinit();}} return __cleanup_result_1_0;}copies.push(copy);}}
  let receipt .= self_.source_completion;if receipt {receipt.deinit();}self_.source_completion .=null;
- for module,index in seed.modules {self_.unit_owners[index].release();if self_.seed_pin.owners().len!=0 {self_.units[index]=module.core;}else {self_.units[index]=copies[index].value;self_.unit_owners[index]=copies[index].owner;copies[index].owner=Owner{};}if self_.borrowed.len!=0 {self_.borrowed[index]=true;}}
+ let units=self_.catalog_owner.mutable(self_.units);
+ for module,index in seed.modules {self_.unit_owners[index].release();if self_.seed_pin.owners().len!=0 {units[index]=module.core;}else {units[index]=blot_reuse_dependency_owned_headers::canonical(copies[index].owner,copies[index].value);self_.unit_owners[index]=copies[index].owner;copies[index].owner=Owner{};}if self_.borrowed.len!=0 {self_.borrowed[index]=true;}}
  self_.cached=seed.modules.len;let __cleanup_result_2_0: Error = blot_error::Error.none; {for &copy in copies {copy.deinit();}} return __cleanup_result_2_0;
  {for &copy in copies {copy.deinit();}} }
 fn emit(self_:const Prepared&,workspace:Workspace&)->Result,Error {return self_.emitWithOptions(workspace,CompileOptions{..});}
@@ -232,7 +235,7 @@ fn prepareProjectMode<E>(executor:E&,source:Project&,entry_path:const u8[:],outp
    else {let copied,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(source));if error!=blot_error::Error.none {let __cleanup_result_33_0: Preparation = Preparation.inactive; let __cleanup_result_33_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_33_0, __cleanup_result_33_1;}ir=copied;}
    ir.value.unit=id;ready.stats.body_lowerings+=ir.value.body_lowerings;
   }
-  ready.units[index]=ir.value;ready.unit_owners[index]=ir.owner;
+  ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index]=ir.owner;
   if source.compiledModule(id)==null {ready.stats.syntax_nodes+=unit.tree.nodes.len-1;}
   if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {let __cleanup_result_34_0: Preparation = Preparation.inactive; let __cleanup_result_34_1: Error = error; {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_34_0, __cleanup_result_34_1;}let __cleanup_result_35_0, __cleanup_result_35_1 = reject(source,entry_path,diagnostic); {if lowered.present {lowered.value.deinit();}} {if !transferred {ready.deinit();}} {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_35_0, __cleanup_result_35_1;}
  }

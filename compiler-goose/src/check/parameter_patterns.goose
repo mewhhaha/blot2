@@ -13,21 +13,21 @@ type List = blot_check_types::List;
 enum Kind { binding, tuple, array, record }
 struct Node { kind: Kind, a: u32, b: u32 = 0 }
 struct Field { name: u32, pattern: Id }
-struct Store {lease:u32=0,generation:u64=0,nodes:Nodes& =inactive.nodes,extra:Words& =inactive.extra}
+struct Store {lease:u32=0,generation:u64=0}
 
 
-fn node(self_: const Store&, id: Id) -> Node { return self_.nodes.items[id]; }
-fn list(self_: const Store&, span: List) -> const Id[:] { return self_.extra.items[span.start..span.start + span.len]; }
+fn node(self_: Store, id: Id) -> Node { return self_.nodes().items[id]; }
+fn list(self_: Store, span: List) -> const Id[:] { return self_.extra().items[span.start..span.start + span.len]; }
 fn saveList(self_: Store&, values: const Id[:]) -> List, blot_error::Error {
-    if values.len > 0xffffffff - self_.extra.len { return List {..}, blot_error::Error.type_limit; }
-    let start = self_.extra.len as u32;
-    self_.extra.append(values);if self_.extra.failure!=blot_error::Error.none {return List{..},self_.extra.failure;}
+    if values.len > 0xffffffff - self_.extra().len { return List {..}, blot_error::Error.type_limit; }
+    let start = self_.extra().len as u32;
+    self_.extra().append(values);if self_.extra().failure!=blot_error::Error.none {return List{..},self_.extra().failure;}
     return List { start, values.len as u32 , ..}, blot_error::Error.none;
 }
 fn add(self_: Store&, value: Node) -> Id, blot_error::Error {
-    if self_.nodes.len == 0xffffffff { return 0, blot_error::Error.type_limit; }
-    let id = self_.nodes.len as u32;
-    self_.nodes.push(value);if self_.nodes.failure!=blot_error::Error.none {return 0,self_.nodes.failure;}
+    if self_.nodes().len == 0xffffffff { return 0, blot_error::Error.type_limit; }
+    let id = self_.nodes().len as u32;
+    self_.nodes().push(value);if self_.nodes().failure!=blot_error::Error.none {return 0,self_.nodes().failure;}
     return id, blot_error::Error.none;
 }
 fn sequence(self_: Store&, kind: Kind, children: const Id[:]) -> Id, blot_error::Error {
@@ -37,14 +37,14 @@ fn sequence(self_: Store&, kind: Kind, children: const Id[:]) -> Id, blot_error:
     return add(self_, Node { kind, span.start, span.len , ..});
 }
 fn record(self_: Store&, fields: const Field[:]) -> Id, blot_error::Error {
-    if fields.len > (0xffffffff - self_.extra.len) / 2 { return 0, blot_error::Error.type_limit; }
-    let start = self_.extra.len as u32;
-    for item in fields {self_.extra.push(item.name);self_.extra.push(item.pattern);if self_.extra.failure!=blot_error::Error.none {return 0,self_.extra.failure;}}
+    if fields.len > (0xffffffff - self_.extra().len) / 2 { return 0, blot_error::Error.type_limit; }
+    let start = self_.extra().len as u32;
+    for item in fields {self_.extra().push(item.name);self_.extra().push(item.pattern);if self_.extra().failure!=blot_error::Error.none {return 0,self_.extra().failure;}}
     return add(self_, Node { Kind.record, start, fields.len as u32 , ..});
 }
-fn field(self_: const Store&, value: Node, index: i64) -> Field {
+fn field(self_: Store, value: Node, index: i64) -> Field {
     assert(value.kind == Kind.record && index < value.b);
-    return Field { self_.extra.items[value.a + index * 2], self_.extra.items[value.a + index * 2 + 1] , ..};
+    return Field { self_.extra().items[value.a + index * 2], self_.extra().items[value.a + index * 2 + 1] , ..};
 }
 
 fn kindCode(value: Kind) -> u32 {
@@ -100,11 +100,12 @@ fn restore(self_:Words&,values:const u32[:])->Error {self_.clear();self_.append(
 
 struct OwnerState {nodes:Nodes=Nodes{..},extra:Words=Words{..},generation:u64=0,live:bool=false}
 reusable var owners:OwnerState[>..]=[];
-var inactive=OwnerState{..};
 fn validLease(lease:u32,generation:u64)->bool {return lease!=0 && lease-1<owners.len && owners[lease-1].live && owners[lease-1].generation==generation;}
-fn valid(self_:const Store&)->bool {return validLease(self_.lease,self_.generation);}
-fn canonical(lease:u32,generation:u64)->Store {assert(validLease(lease,generation));let state:OwnerState& =owners[lease-1];return Store{lease:lease,generation:generation,nodes:state.nodes,extra:state.extra};}
-fn checkedView(store:Store)->Store {let canonical=blot_check_parameter_patterns::canonical(store.lease,store.generation);assert(store.nodes .== canonical.nodes && store.extra .== canonical.extra);return Store{lease:store.lease,generation:store.generation,nodes:owners[store.lease-1].nodes,extra:owners[store.lease-1].extra};}
-fn initPooled()->Store,Error {if owners.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=owners.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owners[index];return Store{lease:(index+1) as u32,generation:generation,nodes:state.nodes,extra:state.extra, ..},blot_error::Error.none;}
+fn valid(self_:Store)->bool {return validLease(self_.lease,self_.generation);}
+fn nodes(self_:Store)->Nodes& {assert(valid(self_));return owners[self_.lease-1].nodes;}
+fn extra(self_:Store)->Words& {assert(valid(self_));return owners[self_.lease-1].extra;}
+fn canonical(lease:u32,generation:u64)->Store {assert(validLease(lease,generation));return Store{lease:lease,generation:generation};}
+fn checkedView(store:Store)->Store {return canonical(store.lease,store.generation);}
+fn initPooled()->Store,Error {if owners.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=owners.alloc_index(OwnerState{generation:generation,live:true, ..});return Store{lease:(index+1) as u32,generation:generation},blot_error::Error.none;}
 fn init()->Store,Error {return initPooled();}
-fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes.deinit();self_.extra.deinit();let index=self_.lease-1;owners[index].live=false;owners.free(index);self_=Store{..};}
+fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes().deinit();self_.extra().deinit();let index=self_.lease-1;owners[index].live=false;owners.free(index);self_=Store{..};}

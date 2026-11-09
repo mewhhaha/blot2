@@ -86,6 +86,17 @@ fn packetPublication() {
     assert(checked.editor.present && checked.editor.value.names[0].name==7 && checked.editor.value.context.present && checked.editor.value.context.value.nodes[0].kind==blot_reuse_hole_diagnostics::Kind.unsigned32);
     result.deinit();jobs[0].deinit();blot_reuse_project_check::project_jobs.free_slice(jobs);
 }
+fn emptyPatternsPacket() {
+    var bytes:u8[>..<]=[];
+    {var writer=blot_project_packet::Writer{bytes};blot_project_packet::put(writer,blot_check_parameter_patterns::Store{});assert(writer.failure==blot_error::Error.none);}
+    var packet,error=blot_project_packet::initOwner();assert(error==blot_error::Error.none);
+    var input,error=blot_project_packet::initOwner();assert(error==blot_error::Error.none);
+    let encoded,error=blot_project_packet::allocate(input,bytes.len,0 as u8);assert(error==blot_error::Error.none);for byte,index in bytes {encoded[index]=byte;}
+    var store=blot_check_parameter_patterns::Store{};
+    {var reader=blot_project_packet::Reader{bytes:encoded,owner:packet};blot_project_packet::get(reader,store);assert(reader.failure==blot_error::Error.none && reader.at==bytes.len);}
+    assert(store.valid() && store.nodes().len==0 && store.extra().len==0);
+    store.deinit();packet.deinit();input.deinit();bytes.clear();
+}
 type Prepared=blot_reuse_partial_dependency::Prepared;
 type Preparation=blot_reuse_partial_dependency::Preparation;
 fn preparedOfferValue()->Preparation {
@@ -97,13 +108,28 @@ fn preparedOfferValue()->Preparation {
  let paths,error=blot_reuse_dependency_payload::alloc<blot_reuse_dependency_payload::HeaderPath>(owner,1);assert(error==blot_error::Error.none);paths[0]=bytes;
  let symbols,error=blot_reuse_dependency_payload::alloc<blot_backend_runtime_identity::Name>(owner,1);assert(error==blot_error::Error.none);symbols[0]=blot_backend_runtime_identity::Name{};
  let names,error=blot_reuse_dependency_payload::alloc<blot_backend_runtime_identity::Name>(owner,1);assert(error==blot_error::Error.none);names[0]=blot_backend_runtime_identity::Name{0,bytes.len as u32};
- let value=Prepared{units:units,identity:blot_backend_runtime_identity::Metadata{bytes,symbols,names},unit_order:order,paths:paths,borrowed:borrowed,entry:1,catalog_owner:owner,..};
- return Preparation.ready{blot_reuse_partial_dependency::publishPrepared(value)};
+ let unit_owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let unit_owners=blot_reuse_partial_dependency::core_owners.alloc_slice(1);unit_owners[0]=unit_owner;
+ var value=blot_reuse_partial_dependency::publishPrepared(Prepared{units:units,identity:blot_backend_runtime_identity::Metadata{bytes,symbols,names},unit_order:order,paths:paths,borrowed:borrowed,entry:1,catalog_owner:owner,unit_owners:unit_owners,..});
+ var seed_owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let seed_symbols,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Symbol>(seed_owner,1);assert(error==blot_error::Error.none);seed_symbols[0]=blot_reuse_frozen_dependency::Symbol{text:default<u8[:]>()};
+ let seed,error=blot_reuse_retained_dependency::create(seed_symbols,0,seed_owner);assert(error==blot_error::Error.none && seed);
+ let generation=blot_native::fresh_owner_id();let at=blot_reuse_source_completion::prefixes.alloc_index(blot_reuse_source_completion::PrefixState{graph:seed.value,generation:generation,live:true,..});
+ blot_reuse_source_completion::prefixes[at].canonical=blot_reuse_source_completion::Prefix{(at+1) as u32,generation};seed.source_completion .= blot_reuse_source_completion::prefixes[at].canonical;
+ var pin,error=seed.pinInputs();assert(error==blot_error::Error.none && pin.owners().len==1);
+ assert(value.attachSeedPin(pin)==blot_error::Error.none && pin.len==0);
+ assert(value.rebindFrozenPrefix(seed.value)==blot_error::Error.none);
+ assert(blot_reuse_source_completion::mintEntry(value,seed)==blot_error::Error.none && value.source_completion);
+ let completion=value.source_completion;let pin_start=value.seed_pin.start;
+ value=blot_reuse_partial_dependency::publishPrepared(value);
+ assert(value.source_completion .== completion && value.seed_pin.len==1 && value.seed_pin.start==pin_start);
+ seed.deinit();assert(value.seed_pin.owners()[0].valid());
+ return Preparation.ready{value};
 }
 fn preparedOffer()->blot_support::Option<Preparation> {let value=preparedOfferValue();return blot_support::Option<Preparation>{true,value};}
 fn preparationPublication() {
     var offer=preparedOffer();assert(offer.present);
-    match offer.value {ready bound=>{let payload=bound;workspaceLifecycle();assert(payload.value.units.len==1 && payload.value.entry==1);},_=>{abort("ready preparation expected");}}
+    match offer.value {ready bound=>{var ready=blot_reuse_partial_dependency::publishPrepared(bound.value);offer.value=blot_reuse_partial_dependency::Preparation.inactive;workspaceLifecycle();assert(ready.units.len==1 && ready.entry==1 && ready.source_completion && ready.seed_pin.owners().len==1);ready.deinit();},_=>{abort("ready preparation expected");}}
     offer.value.deinit();
 }
 fn main() {
@@ -112,6 +138,7 @@ fn main() {
         tableViews();
         modulePublication();
         packetPublication();
+        emptyPatternsPacket();
         preparationPublication();
         let allocation_owner=blot_native::fresh_owner_id();
         let session,error=blot_eval_core_eval::initOwnedEmptySession(allocation_owner);

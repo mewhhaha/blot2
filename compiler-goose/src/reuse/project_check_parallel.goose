@@ -7,7 +7,11 @@ struct ParallelJob {
  module:blot_support::Option<Module> =blot_support::none<Module>(),cache:blot_reuse_body_check_cache::Cache=blot_reuse_body_check_cache::Cache{..},
 }
 reusable[] var project_jobs:ParallelJob[>..]=[];
-fn deinit(self_:ParallelJob&) {for &diagnostic in self_.diagnostics {diagnostic.deinit();}releaseOwned(self_.diagnostics);if self_.module.present {self_.module.value.deinit();}self_.cache.deinit();self_=ParallelJob{..};}
+fn deinit(self_:ParallelJob&) {
+ let diagnostics=self_.diagnostics;for index in 0..diagnostics.len {var diagnostic=canonicalOwnedDiagnostic(diagnostics[index]);diagnostic.deinit();}releaseOwned(diagnostics);
+ if self_.module.present {var module=canonicalModule(self_.module.value);module.deinit();}
+ var cache=self_.cache;cache.deinit();self_=ParallelJob{..};
+}
 fn parallelReady(source:Project,unit:u32,done:const bool[:])->bool {for imported in source.unitImports(unit) {if !done[imported.target-1] && source.compiledModule(imported.target)==null {return false;}}if source.unit(unit).implicit_prelude && source.prelude_unit!=0 && source.prelude_unit!=unit {let prelude=source.prelude_unit;if !done[prelude-1] && source.compiledModule(prelude)==null {return false;}}return true;}
 struct WorkOrder {source:Project,units:u32[:]}
 fn lessThan(self_:WorkOrder,left:i64,right:i64)->bool {let l=self_.units[left];let r=self_.units[right];let a=self_.source.unit(l).tree.nodes.len;let b=self_.source.unit(r).tree.nodes.len;if a!=b {return a>b;}return l<r;}

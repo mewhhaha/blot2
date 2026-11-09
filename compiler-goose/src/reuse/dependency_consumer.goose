@@ -200,11 +200,11 @@ fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u
   if node.tag==blot_parse_ast::tag_data_decl {let count=tree.children(node.b).len;for index in count {let name=tree.node(tree.children(node.b)[index]).a;occupied.insert(name,true);}}
  }
  var imports:blot_check_check::ImportedBinding[>..]=[];var catalogs:blot_check_check::ImportedCatalog[>..]=[];var fixities:blot_check_check::ImportedFixity[>..]=[];
- catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(dependency.interface)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
+ catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(dependency.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
  for exported in dependency.exports {
   if occupied.contains(exported.name) {continue;}
   if exported.kind==blot_reuse_frozen_dependency::ExportKind.value {    let __field_order_560_name: blot_parse_symbols::Symbol = exported.name; let __field_order_561_target: blot_check_check::ExternalTarget = exported.target; let __field_order_562_origin: blot_parse_ast::Id = 0; let __field_order_563_interface: blot_check_check::SchemeInterface = scheme(dependency,exported.target.binding); imports.push(blot_check_check::ImportedBinding{ name: __field_order_560_name, target: __field_order_561_target, interface: __field_order_563_interface, origin: __field_order_562_origin });}
-  else {catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::some(blot_check_check::frozenProducer(dependency.interface)),name:exported.name,kind:exportKind(exported.kind),index:exported.catalog,origin:0});}
+  else {catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(dependency.interface)},name:exported.name,kind:exportKind(exported.kind),index:exported.catalog,origin:0});}
  }
  for fixity in dependency.fixities {
   if !fixity.named {    let __field_order_564_expose: bool = false; let __field_order_565_target: blot_check_check::ExternalTarget = fixity.producer; let __field_order_566_origin: blot_parse_ast::Id = 0; let __field_order_567_interface: blot_check_check::SchemeInterface = scheme(dependency,fixity.producer.binding); imports.push(blot_check_check::ImportedBinding{ target: __field_order_565_target, interface: __field_order_567_interface, origin: __field_order_566_origin, expose: __field_order_564_expose });}
