@@ -8,6 +8,8 @@ import reuse.dependency_payload;
 import reuse.frozen_dependency;
 import backend.runtime_identity;
 import support.error;
+import driver.compile_workspace;
+import support.native;
 type FrozenModule=blot_reuse_frozen_dependency::Module;
 fn receiptBorrow() {
     var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
@@ -24,6 +26,8 @@ fn receiptBorrow() {
     let admitted=receipt.borrow(graph);assert(admitted.receipt.slot==receipt.slot && admitted.receipt.generation==receipt.generation);
     let symbol_graph=blot_reuse_frozen_dependency::FrozenDependency{alternate_symbols,modules};let wrong_symbols=receipt.borrow(symbol_graph);assert(wrong_symbols.receipt.slot==0);
     let module_graph=blot_reuse_frozen_dependency::FrozenDependency{symbols,alternate_modules};let wrong_modules=receipt.borrow(module_graph);assert(wrong_modules.receipt.slot==0);
+    var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+    assert(blot_reuse_dependency_closure::validReceipt(admitted.receipt) && receipt.borrow(graph).receipt.slot==receipt.slot);
     let stale=admitted.receipt;receipt.deinit();
     assert(!blot_reuse_dependency_closure::validReceipt(stale));
     assert(stale.borrow(graph).receipt.slot==0);

@@ -72,7 +72,8 @@ fn replay<S>(session: S&,entry: const Entry&,input: const Inputs&) -> u32,bool,E
  for old in entry.value.fixed { let current=mapped(anchors,proof,before,old); session.storage.specialized_closures.insert(blot_eval_core_eval::ViewKey {value:current,evidence:session.valueEvidence(current)},current); } if next.present { session.retained.specialization_receipts.push(next.value); next=blot_support::none<Proof>(); } for read in proof.call_reads { if read.present { session.proofs.proof_reused++; } } let __cleanup_result_497_0: u32 = selected; let __cleanup_result_497_1: bool = true; let __cleanup_result_497_2: Error = blot_error::Error.none; { if next.present { next.value.deinit(); } } return __cleanup_result_497_0, __cleanup_result_497_1, __cleanup_result_497_2;
  { if next.present { next.value.deinit(); } } }
 
-fn canonicalRecords(self_:Adapter,source:const Entry[:])->Entry[:] {return record_pool.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:Adapter,source:const Entry[:])->Entry[:] {if source.len==0 {return default<Entry[:]>();}let owned=record_pool.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=record_pool.index_of(owned[0]);assert(start>=0 && source.len<=record_pool.len-start);return record_pool[start..start+source.len];}
+fn storeRecord(self_:Adapter,backing:Entry[:],position:i64,value:Entry) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:Adapter,source:Entry)->Entry {
  return Entry{Key{source.key.mode,blot_eval_lexical_capture_inputs::canonicalOwned(source.key.input),source.key.fingerprint_,source.key.expected,source.key.options,source.key.depth},
   blot_reuse_specialization_receipt::canonicalOwned(source.dependencies),Replay{source.value.selected,

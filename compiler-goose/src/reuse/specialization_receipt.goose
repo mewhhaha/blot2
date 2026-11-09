@@ -126,46 +126,54 @@ fn deinit(self_: Record&) {
     releaseOwned(self_.call_publications); releaseOwned(self_.views); releaseOwned(self_.plain_facts);
     self_ = default<Record>();
 }
+fn ownedClosures(values:const u32[:])->u32[:] {if values.len==0 {return default<u32[:]>();}let owned=owned_closures.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_closures.index_of(owned[0]);assert(start>=0 && values.len<=owned_closures.len-start);return owned_closures[start..start+values.len];}
+fn ownedSources(values:const blot_check_core::BindingRef[:])->blot_check_core::BindingRef[:] {if values.len==0 {return default<blot_check_core::BindingRef[:]>();}let owned=owned_sources.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_sources.index_of(owned[0]);assert(start>=0 && values.len<=owned_sources.len-start);return owned_sources[start..start+values.len];}
+fn ownedScalars(values:const ScalarRead[:])->ScalarRead[:] {if values.len==0 {return default<ScalarRead[:]>();}let owned=owned_scalars.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_scalars.index_of(owned[0]);assert(start>=0 && values.len<=owned_scalars.len-start);return owned_scalars[start..start+values.len];}
+fn ownedCalls(values:const CallRead[:])->CallRead[:] {if values.len==0 {return default<CallRead[:]>();}let owned=owned_calls.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_calls.index_of(owned[0]);assert(start>=0 && values.len<=owned_calls.len-start);return owned_calls[start..start+values.len];}
+fn ownedViews(values:const ViewEffect[:])->ViewEffect[:] {if values.len==0 {return default<ViewEffect[:]>();}let owned=owned_views.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_views.index_of(owned[0]);assert(start>=0 && values.len<=owned_views.len-start);return owned_views[start..start+values.len];}
+fn ownedPlains(values:const PlainFact[:])->PlainFact[:] {if values.len==0 {return default<PlainFact[:]>();}let owned=owned_plains.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_plains.index_of(owned[0]);assert(start>=0 && values.len<=owned_plains.len-start);return owned_plains[start..start+values.len];}
+fn ownedReady(values:const ReadyRead[:])->ReadyRead[:] {if values.len==0 {return default<ReadyRead[:]>();}let owned=owned_ready.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_ready.index_of(owned[0]);assert(start>=0 && values.len<=owned_ready.len-start);return owned_ready[start..start+values.len];}
+fn ownedPrincipals(values:const PrincipalRead[:])->PrincipalRead[:] {if values.len==0 {return default<PrincipalRead[:]>();}let owned=owned_principals.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=owned_principals.index_of(owned[0]);assert(start>=0 && values.len<=owned_principals.len-start);return owned_principals[start..start+values.len];}
 fn canonicalOwned(source: Member) -> Member {
     return Member {
-        ready: owned_ready.realloc_slice(source.ready, source.ready.len),
-        principals: owned_principals.realloc_slice(source.principals, source.principals.len),
+        ready: ownedReady(source.ready),
+        principals: ownedPrincipals(source.principals),
         principal_graphs: source.principal_graphs, target: source.target, function: source.function,
         query_budgets: source.query_budgets, principal_nodes: source.principal_nodes, principal_edges: source.principal_edges,
         summary_work: source.summary_work, transitions: source.transitions, exhausted: source.exhausted,
     };
 }
 fn canonicalMember(source: blot_support::Option<Member>) -> blot_support::Option<Member> {
-    if source.present { return blot_support::some(canonicalOwned(source.value)); }
+    if source.present { return blot_support::Option<Member>{true,canonicalOwned(source.value)}; }
     return blot_support::none<Member>();
 }
 // Rebuild borrowed headers from their owning pools; every run keeps its size.
 fn canonicalOwned(source: Record) -> Record {
     return Record {
         member: canonicalMember(source.member),
-        completed_closures: owned_closures.realloc_slice(source.completed_closures, source.completed_closures.len),
+        completed_closures: ownedClosures(source.completed_closures),
         input: source.input, expected: source.expected, selected: source.selected, options: source.options,
         depth: source.depth, values_before: source.values_before, children_before: source.children_before,
         values_added: source.values_added, children_added: source.children_added, steps: source.steps,
         collected: source.collected, source_scopes: source.source_scopes, solver_nodes: source.solver_nodes,
-        complete: source.complete, sources: owned_sources.realloc_slice(source.sources, source.sources.len),
-        scalar_reads: owned_scalars.realloc_slice(source.scalar_reads, source.scalar_reads.len),
-        call_reads: owned_calls.realloc_slice(source.call_reads, source.call_reads.len),
-        call_publications: owned_calls.realloc_slice(source.call_publications, source.call_publications.len),
-        views: owned_views.realloc_slice(source.views, source.views.len),
-        plain_facts: owned_plains.realloc_slice(source.plain_facts, source.plain_facts.len),
+        complete: source.complete, sources: ownedSources(source.sources),
+        scalar_reads: ownedScalars(source.scalar_reads),
+        call_reads: ownedCalls(source.call_reads),
+        call_publications: ownedCalls(source.call_publications),
+        views: ownedViews(source.views),
+        plain_facts: ownedPlains(source.plain_facts),
     };
 }
 fn clone(self_: Record) -> Record, Error {
     var result = self_;
     if self_.member.present {
         var member = self_.member.value; member.principals = copyOwned(member.principals); member.ready = copyOwned(member.ready);
-        result.member = blot_support::some(member);
+        result.member = blot_support::Option<Member>{true,canonicalOwned(member)};
     }
     result.sources = copyOwned(self_.sources); result.scalar_reads = copyOwned(self_.scalar_reads);
     result.call_reads = copyOwned(self_.call_reads); result.call_publications = copyOwned(self_.call_publications);
     result.views = copyOwned(self_.views); result.plain_facts = copyOwned(self_.plain_facts);
-    result.completed_closures = copyOwned(self_.completed_closures); return result, blot_error::Error.none;
+    result.completed_closures = copyOwned(self_.completed_closures); return canonicalOwned(result), blot_error::Error.none;
 }
 fn addBytes(total: i64&, amount: i64) {
     if amount > 9223372036854775807 - total { total = 9223372036854775807; } else { total += amount; }

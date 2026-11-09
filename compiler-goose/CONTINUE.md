@@ -27,11 +27,15 @@ releases Frame and verifies both journals are dead. Unstaged inputs decline.
 The prior complete24 receipt remains its exact baseline; this is affected-family
 qualification of the newer source.
 
-The latest footprint/relocation family passes affected C/link/runtime laws in
-6.29s and10.66s; cached spelling bytes are owned and all6relocation runs survive
-Frame publication/cleanup. Selected103 reaches scoped Root writeback through
-Generator and relocated FrozenModule publication; executor/metadata pass.
-**No whole C/header/executable exists.** Integrated qualification remains pending.
+The newer backend/query family uses scalar type cursors and unit IDs, concrete
+query-record stores and checked registered module/Core views. Timing labels retain
+owned storage and capacity reuse. Affected laws cover nested cursor restoration,
+query-table growth and publication after producer cleanup across real Frame.
+The attempted complete25 run stopped after21 passes at the receipt emission cap;
+its independent projection control now passes in the smaller footprint law.
+Optimizer archive round-trip is the current affected-family frontier.
+Selected108 passes executor/metadata and reaches PlainLayouts method lookup plus
+optimizer-header publication. **No whole C/header/executable exists.**
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

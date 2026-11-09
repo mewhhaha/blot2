@@ -27,6 +27,13 @@ struct Stack {
 }
 fn init(owner:Owner&)->Stack {let id=owner.next_id;assert(id!=0);owner.next_id++;return Stack{owner:owner,id:id,..};}
 fn emptyFrom(source:const Stack&)->Stack {let owner .= source.owner;if owner {return init(owner);}return Stack{..};}
+// Temporary type queries share one journal owner and exchange only scalar cursors.
+struct Cursor {id:u64=0,len:i64=0,first:i64=absent,last:i64=absent,active_count:i64=0,first_active:i64=absent,last_active:i64=absent,touched:bool=false,snapshot:blot_support::Option<Range>,stats:Stats}
+fn cursor(stack:const Stack&)->Cursor {return Cursor{id:stack.id,len:stack.len,first:stack.first,last:stack.last,active_count:stack.active_count,first_active:stack.first_active,last_active:stack.last_active,touched:stack.touched,snapshot:stack.snapshot,stats:stack.stats};}
+fn setCursor(stack:Stack&,value:Cursor) {stack.id=value.id;stack.len=value.len;stack.first=value.first;stack.last=value.last;stack.active_count=value.active_count;stack.first_active=value.first_active;stack.last_active=value.last_active;stack.touched=value.touched;stack.snapshot=value.snapshot;stack.stats=value.stats;}
+fn isolate(stack:Stack&)->Cursor {let saved=cursor(stack);let owner .=stack.owner;var id:u64=0;if owner {id=owner.next_id;assert(id!=0);owner.next_id++;}setCursor(stack,Cursor{id:id,..});return saved;}
+fn restore(stack:Stack&,saved:Cursor) {deinit(stack);setCursor(stack,saved);}
+
 fn key(stack:const Stack&,unit:u32,parameter:u32)->Key {return Key{stack.id,(unit as u64<<32)|parameter};}
 fn increase(value:u64&) {if value!=18446744073709551615 {value++;}}
 fn at(stack:const Stack&,index:i64)->TypeArgument {let owner .= stack.owner;assert(owner);return owner.journal.entries[index].argument;}

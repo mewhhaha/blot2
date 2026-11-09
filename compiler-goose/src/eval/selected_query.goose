@@ -44,5 +44,6 @@ fn remember(table: Table&,closure: blot_eval_eval_values::ClosureValue,owned: bl
  let prepared,error=table.prepare(candidate.value); if error!=blot_error::Error.none { candidate.value.abort(); return 0,false,error; } if !prepared.present { candidate.value.abort(); return 0,false,blot_error::Error.none; } let position=table.publish(prepared.value,candidate.value).position; candidate.value.abort(); return position,true,blot_error::Error.none;
 }
 
-fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {return records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {if source.len==0 {return default<Record[:]>();}let owned=records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=records.index_of(owned[0]);assert(start>=0 && source.len<=records.len-start);return records[start..start+source.len];}
+fn storeRecord(self_:Adapter,backing:Record[:],position:i64,value:Record) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:Adapter,source:Record)->Record {return Record{source.key,blot_reuse_specialization_receipt::canonicalOwned(source.dependencies),source.value};}

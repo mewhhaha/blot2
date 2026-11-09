@@ -181,7 +181,8 @@ fn selectedImportChildren(self_:const Import&,node:blot_eval_type_evidence::Node
  if node.c!=0 {return default<const u32[:]>(),blot_error::Error.invalid_evidence;}var width:i64=1;if node.tag==blot_eval_type_evidence::Tag.record {width=2;}if node.b as u64>0x7fffffffffffffff/(width as u64) {return default<const u32[:]>(),blot_error::Error.invalid_evidence;}return span(self_.source.extra,node.a,node.b as i64*width);
 }
 
-fn canonicalRecords(self_:PortableAdapter,source:const PortableRecord[:])->PortableRecord[:] {return query_records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:PortableAdapter,source:const PortableRecord[:])->PortableRecord[:] {if source.len==0 {return default<PortableRecord[:]>();}let owned=query_records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=query_records.index_of(owned[0]);assert(start>=0 && source.len<=query_records.len-start);return query_records[start..start+source.len];}
+fn storeRecord(self_:PortableAdapter,backing:PortableRecord[:],position:i64,value:PortableRecord) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:PortableAdapter,source:PortableRecord)->PortableRecord {
  return PortableRecord{source.key,blot_reuse_principal_inputs::canonicalOwned(source.dependencies),source.value};
 }

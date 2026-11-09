@@ -6,6 +6,8 @@ import std;
 import reuse.retained_dependency;
 import reuse.dependency_owned_headers;
 import support.error;
+import driver.compile_workspace;
+import support.native;
 type Owner=blot_reuse_dependency_payload::Owner;
 type FrozenModule=blot_reuse_frozen_dependency::Module;
 fn module(seed:u32)->blot_reuse_dependency_payload::Owned<FrozenModule> {
@@ -53,4 +55,10 @@ fn adopted() {
     var frozen=blot_reuse_dependency_payload::Owned<blot_reuse_frozen_dependency::FrozenDependency>{blot_reuse_frozen_dependency::FrozenDependency{symbols,modules},root};
     let source,error=blot_reuse_retained_dependency::adopt(frozen);assert(error==blot_error::Error.none && source!=null && frozen.owner.lease==0);inspect(source.value.modules[0]);shareAndRelease(source);
 }
-fn main() {for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}
+fn relocatedPublication() {
+ var result,error=blot_reuse_project_check::initResult();assert(error==blot_error::Error.none);assert(result.allocateReuse(1)==blot_error::Error.none);
+ var owned=module(1);let child=owned.owner;blot_reuse_project_check::publishRelocatedModule(result,1,owned);assert(owned.owner.lease==0 && child.valid());
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+ assert(result.relocated_modules[0].present);inspect(result.relocated_modules[0].value);result.deinit();assert(!child.valid());
+}
+fn main() {relocatedPublication();for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}

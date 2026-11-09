@@ -71,7 +71,7 @@ fn recoverModule(self_:Engine&,unit:u32)->bool,Error {
  let previous:const FrozenModule& =self_.source.compiled_modules[unit-1];let targets=blot_reuse_frontend_binding_relocation::Targets{units:self_.result.binding_maps, ..};var relocated=default<blot_reuse_dependency_payload::Owned<FrozenModule>>();
  if targets.changes() {let changed=blot_reuse_frontend_reference_relocation::changes(previous,targets);if !changed.present {return false,blot_error::Error.none;}if changed.value {let value,error=blot_reuse_dependency_payload::clone(previous);if error!=blot_error::Error.none {return false,error;}relocated=value;let error=blot_reuse_frontend_reference_relocation::rewrite(relocated.owner,relocated.value,targets);if error!=blot_error::Error.none {relocated.deinit();return false,blot_error::Error.none;}}}
  var selected=previous;if relocated.owner.lease!=0 {selected=relocated.value;}let exports=owned_Export.alloc_slice(selected.exports.len);for old,index in selected.exports {exports[index]=Export{old.name,old.target,old.kind,old.catalog, ..};}
- self_.compiled_catalogs[unit-1].exports=exports;if relocated.owner.lease!=0 {self_.result.relocated_modules[unit-1]=blot_support::some(relocated.value);result_states[self_.result.owner.slot-1].relocated[unit-1]=relocated.owner;}
+ self_.compiled_catalogs[unit-1].exports=exports;if relocated.owner.lease!=0 {publishRelocatedModule(self_.result,unit,relocated);}
  self_.result.reused_modules[unit-1]=true;self_.result.module_cutoff.reused+=1;return true,blot_error::Error.none;
 }
 fn offerBodies(self_:Engine&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->Error {

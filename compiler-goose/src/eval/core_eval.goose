@@ -1611,7 +1611,7 @@ fn put(self_: PrincipalQueries&,key: PrincipalGraphKey,value: PrincipalGraph?,se
  if session.member_trace { requireReference(session.member_trace).complete=false; } if self_.owner!=0 { if self_.owner!=session.owner_id||self_.units!=unitsIdentity(session)||self_.unit_count!=session.units.len { return false,blot_error::Error.none; } } else { self_.owner=session.owner_id; self_.units=unitsIdentity(session); self_.unit_count=session.units.len; }
  if value==null { if self_.claim!=PrincipalClaim.source_description||self_.declines.count>=self_.table.limits.records { return false,blot_error::Error.none; } self_.declines.insert(key,true); return true,blot_error::Error.none; }
  let sources=principal_dependency_sources.alloc_slice(value.dependencies.len); for source,index in value.dependencies { sources[index]=source; } let plain=principal_dependency_plain.alloc_slice(value.plain_reads.len); var writes=false; for fact,index in value.plain_reads { plain[index]=fact; writes=writes||!fact.read; }
- var candidate=blot_reuse_semantic_query_table::Candidate<PrincipalQueryKey,PrincipalDependencies,PrincipalGraphResult,PrincipalAdapter> {owner:blot_native::fresh_owner_id(),record:blot_support::some(PrincipalRecord {key:PrincipalQueryKey {key,self_.claim,self_.force_collision},dependencies:PrincipalDependencies {sources,plain,writes},value:PrincipalGraphResult {value}}),adapter:PrincipalAdapter {self_.claim}};
+ var candidate=blot_reuse_semantic_query_table::Candidate<PrincipalQueryKey,PrincipalDependencies,PrincipalGraphResult,PrincipalAdapter> {owner:blot_native::fresh_owner_id(),record:blot_support::Option<PrincipalRecord>{true,PrincipalRecord {key:PrincipalQueryKey {key,self_.claim,self_.force_collision},dependencies:PrincipalDependencies {sources,plain,writes},value:PrincipalGraphResult {value}}},adapter:PrincipalAdapter {self_.claim}};
  let prepared,error=self_.table.prepare(candidate); if error!=blot_error::Error.none||!prepared.present { principal_dependency_sources.free_slice(sources); principal_dependency_plain.free_slice(plain); candidate.record=blot_support::none<PrincipalRecord>(); return false,error; } self_.table.publish(prepared.value,candidate); return true,blot_error::Error.none;
 }
 struct RetainedPrincipalGraphs { queries: PrincipalQueries,declines_slot: u32=0 }
@@ -4524,7 +4524,8 @@ fn canonicalReadPrincipalGraph(source:const PrincipalGraph?)->const PrincipalGra
  if !source {return null;}let at=source.pool_index;assert(at>=0 && at<principal_graph_pool.len);
  let graph:const PrincipalGraph& =principal_graph_pool[at];assert(graph .== source && graph.leases!=0);return graph;
 }
-fn canonicalRecords(self_:PrincipalAdapter,source:const PrincipalRecord[:])->PrincipalRecord[:] {return principal_query_records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:PrincipalAdapter,source:const PrincipalRecord[:])->PrincipalRecord[:] {if source.len==0 {return default<PrincipalRecord[:]>();}let owned=principal_query_records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=principal_query_records.index_of(owned[0]);assert(start>=0 && source.len<=principal_query_records.len-start);return principal_query_records[start..start+source.len];}
+fn storeRecord(self_:PrincipalAdapter,backing:PrincipalRecord[:],position:i64,value:PrincipalRecord) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:PrincipalAdapter,source:PrincipalRecord)->PrincipalRecord {
  return PrincipalRecord{source.key,PrincipalDependencies{
   principal_dependency_sources.realloc_slice(source.dependencies.sources,source.dependencies.sources.len),

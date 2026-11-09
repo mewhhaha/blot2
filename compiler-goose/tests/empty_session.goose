@@ -136,7 +136,7 @@ fn preparationPublication() {
         let unpinned,error=blot_backend_result_publication::inputUnits(blot_backend_result_publication::Owner{},ready.units);assert(error==blot_error::Error.invalid_artifact && unpinned.len==0);
         {let workspace=frame.borrow();assert(workspace);assert(blot_backend_core_backend::pinWorkspaceInputs(workspace,ready.units,ready.catalog_owner,ready.unit_owners,ready.seed_pin.owners())==blot_error::Error.none);
          let held=workspace.compiled_units;assert(held.len==1 && held[0].unit==1 && ready.source_completion && ready.seed_pin.owners().len==1);
-         ready.deinit();assert(catalog.valid() && unit_owner.valid() && held[0].unit==1);}
+         ready.deinit();let registered,error=blot_backend_scoped_backend::registeredModule(held,1);assert(error==blot_error::Error.none && registered && registered.unit==1);assert(catalog.valid() && unit_owner.valid() && held[0].unit==1);}
         assert(frame.release()==blot_error::Error.none && !catalog.valid() && !unit_owner.valid());
     },_=>{abort("ready preparation expected");}}
     offer.value.deinit();

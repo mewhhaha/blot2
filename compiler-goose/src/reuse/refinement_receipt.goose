@@ -430,7 +430,8 @@ fn initObservationOwner() -> ObservationOwner,Error { if next_observation_owner_
 fn borrow(self_: ObservationOwner) -> Observation? { if self_.lease==0||self_.lease-1>=observation_owner_slots.len { return null; } let slot: ObservationOwnerState& =observation_owner_slots[self_.lease-1]; if !slot.live||slot.generation!=self_.generation { return null; } return slot.value; }
 fn deinit(self_: ObservationOwner&) { if self_.lease==0 { return; } let at=self_.lease-1; assert(at<observation_owner_slots.len&&observation_owner_slots[at].live&&observation_owner_slots[at].generation==self_.generation); let slot: ObservationOwnerState& =observation_owner_slots[at]; slot.value=Observation {..}; slot.live=false; observation_owner_slots.free(at); self_=ObservationOwner {..}; }
 
-fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {return owned_records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {if source.len==0 {return default<Record[:]>();}let owned=owned_records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=owned_records.index_of(owned[0]);assert(start>=0 && source.len<=owned_records.len-start);return owned_records[start..start+source.len];}
+fn storeRecord(self_:Adapter,backing:Record[:],position:i64,value:Record) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:Adapter,source:Record)->Record {
  return Record{Key{source.key.root,source.key.expected,
   key_seeds.realloc_slice(source.key.seeds,source.key.seeds.len),

@@ -107,8 +107,8 @@ fn deinit<K,D,V,A>(self_: OwnedRecord<K,D,V,A>&) { self_.key.deinit(); self_.dep
 struct Builder<K,D,V,A> {
     key: blot_support::Option<K>, dependencies: blot_support::Option<D>, value: blot_support::Option<V>, adapter: A,
 }
-fn read<K,D,V,A>(self_: Builder<K,D,V,A>&, dependencies: D) { assert(!self_.dependencies.present); self_.dependencies = blot_support::some(dependencies); }
-fn stage<K,D,V,A>(self_: Builder<K,D,V,A>&, value: V) { assert(!self_.value.present); self_.value = blot_support::some(value); }
+fn read<K,D,V,A>(self_: Builder<K,D,V,A>&, dependencies: D) { assert(!self_.dependencies.present); self_.dependencies = blot_support::Option<D>{true,dependencies}; }
+fn stage<K,D,V,A>(self_: Builder<K,D,V,A>&, value: V) { assert(!self_.value.present); self_.value = blot_support::Option<V>{true,value}; }
 fn abort<K,D,V,A>(self_: Builder<K,D,V,A>&) {
     if self_.key.present { self_.key.value.deinit(); self_.key.present = false; }
     if self_.dependencies.present { self_.dependencies.value.deinit(); self_.dependencies.present = false; }
@@ -124,7 +124,7 @@ fn complete<K,D,V,A>(self_: Builder<K,D,V,A>&) -> blot_support::Option<Candidate
     let record = OwnedRecord<K,D,V,A> { self_.key.value, self_.dependencies.value, self_.value.value , ..};
     if !self_.adapter.complete(record) { return blot_support::none<Candidate<K,D,V,A>>(); }
     self_.key.present = false; self_.dependencies.present = false; self_.value.present = false;
-    return blot_support::some(Candidate<K,D,V,A> { blot_native::fresh_owner_id(), blot_support::some(record), self_.adapter , ..});
+    return blot_support::Option<Candidate<K,D,V,A>>{true,Candidate<K,D,V,A> { blot_native::fresh_owner_id(), blot_support::Option<OwnedRecord<K,D,V,A>>{true,record}, self_.adapter , ..}};
 }
 fn abort<K,D,V,A>(self_: Candidate<K,D,V,A>&) {
     if self_.record.present { self_.record.value.deinit(); self_.record.present = false; }
@@ -149,7 +149,7 @@ fn deinit<K,D,V,A>(self_: Table<K,D,V,A>&) {
     self_.owner = 0;
 }
 fn begin<K,D,V,A>(self_: const Table<K,D,V,A>&, owned_key: K) -> Builder<K,D,V,A> {
-    return Builder<K,D,V,A> { key: blot_support::some(owned_key), adapter: self_.adapter , ..};
+    return Builder<K,D,V,A> { key: blot_support::Option<K>{true,owned_key}, adapter: self_.adapter , ..};
 }
 fn canAdmit<K,D,V,A>(self_: const Table<K,D,V,A>&, minimum_bytes: i64) -> bool {
     return self_.records.len < self_.limits.records && self_.records.len < 4294967295 &&
@@ -177,7 +177,7 @@ fn prepare<K,D,V,A>(self_: Table<K,D,V,A>&, candidate: const Candidate<K,D,V,A>&
     if capacity != self_.backing.len {
         let out, error = self_.adapter.allocateRecords(capacity);
         if error != blot_error::Error.none { return blot_support::none<Prepared>(), error; }
-        for record, index in self_.adapter.canonicalRecords(self_.backing)[..self_.records.len] { out[index] = record; }
+        for index in self_.records.len {let record=self_.adapter.canonicalRecords(self_.backing)[index];self_.adapter.storeRecord(out,index,record);}
         self_.adapter.releaseRecords(self_.backing); self_.backing = out;
         self_.records = out[..self_.index.count];
     }
@@ -194,8 +194,8 @@ fn validPrepared<K,D,V,A>(self_: const Table<K,D,V,A>&, prepared: Prepared, cand
 }
 fn publish<K,D,V,A>(self_: Table<K,D,V,A>&, prepared: Prepared, candidate: Candidate<K,D,V,A>&) -> Handle<A> {
     assert(self_.validPrepared(prepared, candidate)); assert(self_.records.len == self_.index.count);
-    self_.backing[self_.records.len] = self_.adapter.canonicalRecord(candidate.record.value); candidate.record.present = false;
-    self_.records = self_.backing[..self_.records.len + 1]; self_.index.publish(prepared.fingerprint);
+    self_.adapter.storeRecord(self_.backing,self_.records.len,candidate.record.value); candidate.record.present = false;
+    self_.records = self_.adapter.canonicalRecords(self_.backing)[..self_.records.len + 1]; self_.index.publish(prepared.fingerprint);
     self_.owned_bytes += prepared.bytes;
     return Handle<A> { prepared.position as u32, self_.owner , ..};
 }

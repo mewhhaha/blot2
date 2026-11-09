@@ -53,24 +53,21 @@ Current scope: repair ownership in coherent families, build the actual native
 compiler, then qualify CLI/server, retained revisions, request OOM/retry and
 differential behavior against Zig. No forwarding to Zig or placeholder success.
 
-The last complete **24 production helper laws pass in 159.22s**. Subsequent
-publication/diagnostic and footprint/relocation families pass their affected
-C/link/runtime laws. They exercise real Frame lifecycle, nonempty registered
-input pins surviving producer teardown, scalar lease/generation owners, ordinary
-and packet-decoded worker publication, source observations, diagnostics, maps
-and actual retained-session admission/cleanup. Exact source hashes distinguish
-these receipts; they are not whole-compiler qualification.
+The last complete **24 production helper laws pass in 159.22s** on their pinned
+baseline. The newer backend/query family uses scalar type cursors and unit IDs,
+concrete query-record stores, owned timing names and checked registered views.
+Affected laws exercise nonempty storage growth, receipt admission, retained
+inputs and publication across real Frame cleanup. Optimizer archive round-trip
+qualification is in progress; the latest attempted complete25 run stopped at a
+30s receipt-emission cap after21 passes and is **incomplete**.
 
 Current owners use existing registered pools and journals. Inputs, source overlays,
 Pattern stores and retained seeds carry checked scalar keys. Source retains49
 alias guards. Publication observes exact owning runs; global-footprint indexes
 own cached spelling bytes. Copied host workers remain; language tasks are retired.
-Preserve ABI8, session2 and the Zig oracle/sibling sources.
-
-Selected batch103 passes executor/metadata and clears earlier input publication,
-diagnostic and relocation errors. It reaches scoped-backend Root writeback through
-Generator and relocated FrozenModule publication. General nonempty evaluator
-borrowing, whole native emission and integrated runtime/OOM remain pending.
+Preserve ABI8, session2 and the Zig oracle/sibling sources. Selected108 passes
+executor/metadata; server reaches PlainLayouts method lookup and optimizer-header
+publication. The next selected check and whole native build remain pending.
 See [the current frontier and raw receipts](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 The optional private direct-global empty-holder precision extension passes 24 new

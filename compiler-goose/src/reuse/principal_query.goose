@@ -54,11 +54,12 @@ fn init(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_semantic_qu
     return blot_reuse_semantic_query_table::init<Key,Dependencies,Value,Adapter>(Adapter {..}, limits);
 }
 
-fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {return records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:Adapter,source:const Record[:])->Record[:] {if source.len==0 {return default<Record[:]>();}let owned=records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=records.index_of(owned[0]);assert(start>=0 && source.len<=records.len-start);return records[start..start+source.len];}
+fn storeRecord(self_:Adapter,backing:Record[:],position:i64,value:Record) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:Adapter,source:Record)->Record {
  let value=blot_eval_core_eval::canonicalSolvedEvidence(source.value);
  if source.dependencies.inputs.present {
-  return Record{source.key,Dependencies{blot_support::some<blot_reuse_principal_inputs::Key>(blot_reuse_principal_inputs::canonicalOwned(source.dependencies.inputs.value))},value};
+  return Record{source.key,Dependencies{blot_support::Option<blot_reuse_principal_inputs::Key>{true,blot_reuse_principal_inputs::canonicalOwned(source.dependencies.inputs.value)}},value};
  }
  return Record{source.key,Dependencies{blot_support::none<blot_reuse_principal_inputs::Key>()},value};
 }

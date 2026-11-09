@@ -1369,6 +1369,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::OptionalLocals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::OptionalValues)->bool {return equalFields(left,right);}
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::OptionalValues,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::PlainLayouts)->bool {return equalFields(left,right);}
+fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::PlainLayouts,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::PlanConstruction)->bool {return equalFields(left,right);}
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::PlanConstruction,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::PlanInstructions)->bool {return equalFields(left,right);}
@@ -1697,6 +1699,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transpor
 fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::Position,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::Query)->bool {return equalFields(left,right);}
 fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::Query,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Cursor)->bool {return equalFields(left,right);}
+fn blot_backend_storage_type_arguments::blotStructuralHash<StructuralSink>(value:blot_backend_storage_type_arguments::Cursor,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Entry)->bool {return equalFields(left,right);}
 fn blot_backend_storage_type_arguments::blotStructuralHash<StructuralSink>(value:blot_backend_storage_type_arguments::Entry,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_type_arguments::Heads)->bool {return equalFields(left,right);}

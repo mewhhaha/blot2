@@ -1,6 +1,7 @@
 // Retained project outputs own every checker, cache, remap and diagnostic run.
 namespace blot_reuse_project_check;
 import .project_check;
+import reuse.dependency_owned_headers;
 struct ResultOwner {slot:u32=0,generation:u64=0}
 struct ResultState {relocated:blot_reuse_dependency_payload::Owner[:]=default<blot_reuse_dependency_payload::Owner[:]>(),generation:u64=0,live:bool=false}
 reusable var result_states:ResultState[>..]=[];
@@ -52,6 +53,12 @@ fn copyOwned(values:const blot_support::Option<BindingMap>[:])->blot_support::Op
 fn releaseOwned(values:const blot_support::Option<BindingMap>[:]) {if values.len==0 {return;}owned_blot_support__Option_BindingMap_.free_slice(values);}
 reusable[] var owned_blot_support__Option_FrozenModule_:blot_support::Option<FrozenModule>[>..]=[];
 fn copyOwned(values:const blot_support::Option<FrozenModule>[:])->blot_support::Option<FrozenModule>[:] {if values.len==0 {return default<blot_support::Option<FrozenModule>[:]>();}let run=owned_blot_support__Option_FrozenModule_.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
+fn publishRelocatedModule(self_:CheckedProject,unit:u32,value:blot_reuse_dependency_payload::Owned<FrozenModule>&) {
+ assert(self_.owner.valid() && unit!=0 && unit<=self_.relocated_modules.len);assert(value.owner.unique());
+ let length=self_.relocated_modules.len;let owned=owned_blot_support__Option_FrozenModule_.realloc_slice(self_.relocated_modules,length);assert(blot_support::same_slice_identity(owned,self_.relocated_modules));let start=owned_blot_support__Option_FrozenModule_.index_of(owned[0]);assert(start>=0 && length<=owned_blot_support__Option_FrozenModule_.len-start);
+ let slots=owned_blot_support__Option_FrozenModule_[start..start+length];slots[unit-1]=blot_support::Option<FrozenModule>{true,blot_reuse_dependency_owned_headers::canonical(value.owner,value.value)};
+ let owners=result_states[self_.owner.slot-1].relocated;assert(unit<=owners.len && owners[unit-1].lease==0);owners[unit-1]=value.owner;value.owner=blot_reuse_dependency_payload::Owner{};
+}
 fn releaseOwned(values:const blot_support::Option<FrozenModule>[:]) {if values.len==0 {return;}owned_blot_support__Option_FrozenModule_.free_slice(values);}
 reusable[] var owned_blot_reuse_dependency_payload__Owner:blot_reuse_dependency_payload::Owner[>..]=[];
 fn copyOwned(values:const blot_reuse_dependency_payload::Owner[:])->blot_reuse_dependency_payload::Owner[:] {if values.len==0 {return default<blot_reuse_dependency_payload::Owner[:]>();}let run=owned_blot_reuse_dependency_payload__Owner.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}

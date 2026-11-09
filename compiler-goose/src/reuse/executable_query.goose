@@ -107,14 +107,16 @@ fn initOptimizer(limits: blot_reuse_semantic_query_table::Limits = blot_reuse_se
     return blot_reuse_semantic_query_table::init<OptimizerKey,OptimizerDependencies,OptimizerResult,OptimizerAdapter>(OptimizerAdapter {..}, limits);
 }
 
-fn canonicalRecords(self_:FragmentAdapter,source:const FragmentRecord[:])->FragmentRecord[:] {return fragment_records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:FragmentAdapter,source:const FragmentRecord[:])->FragmentRecord[:] {if source.len==0 {return default<FragmentRecord[:]>();}let owned=fragment_records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=fragment_records.index_of(owned[0]);assert(start>=0 && source.len<=fragment_records.len-start);return fragment_records[start..start+source.len];}
+fn storeRecord(self_:FragmentAdapter,backing:FragmentRecord[:],position:i64,value:FragmentRecord) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:FragmentAdapter,source:FragmentRecord)->FragmentRecord {
  return FragmentRecord{source.key,FragmentDependencies{
   body_reads.realloc_slice(source.dependencies.inline_bodies,source.dependencies.inline_bodies.len),
   static_reads.realloc_slice(source.dependencies.static_reads,source.dependencies.static_reads.len),
   source.dependencies.replay_job,source.dependencies.reusable_},source.value};
 }
-fn canonicalRecords(self_:OptimizerAdapter,source:const OptimizerRecord[:])->OptimizerRecord[:] {return optimizer_records.realloc_slice(source,source.len);}
+fn canonicalRecords(self_:OptimizerAdapter,source:const OptimizerRecord[:])->OptimizerRecord[:] {if source.len==0 {return default<OptimizerRecord[:]>();}let owned=optimizer_records.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=optimizer_records.index_of(owned[0]);assert(start>=0 && source.len<=optimizer_records.len-start);return optimizer_records[start..start+source.len];}
+fn storeRecord(self_:OptimizerAdapter,backing:OptimizerRecord[:],position:i64,value:OptimizerRecord) {let destination=self_.canonicalRecords(backing);assert(position>=0 && position<destination.len);destination[position]=self_.canonicalRecord(value);}
 fn canonicalRecord(self_:OptimizerAdapter,source:OptimizerRecord)->OptimizerRecord {
  return OptimizerRecord{source.key,OptimizerDependencies{
   callees.realloc_slice(source.dependencies.callees,source.dependencies.callees.len),

@@ -480,30 +480,11 @@
     }
   },
   "latest_selected_frontier": {
+    "batch": 108,
     "partial": true,
-    "engines": [
-      "server"
-    ],
-    "exit": 1,
-    "seconds": 94.888,
-    "stop": "completed",
-    "errors": [
-      {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
-        "line": 788,
-        "message": "error: storing a reference rooted at self_, which does not outlive the destination: it is reached through a reference that may point into Roots_runs (\u00a79.2)"
-      },
-      {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
-        "line": 60,
-        "message": "error: cannot assign payloads: global owned_blot_support__Option_FrozenModule_ may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:74 (\u00a75.1)"
-      }
-    ],
-    "full_qualification": false,
-    "source_sha256": "df1948c7121b55e412e9fb0590e60fcab82708adc15e0dd2a864f6d1694ffe67",
-    "source_unchanged": true,
-    "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
-    "batch": 103
+    "server": "PlainLayouts method lookup and optimizer header publication; executor and metadata pass",
+    "seconds": 114.66,
+    "whole_compiler_executable": false
   },
   "latest_executed_laws": {
     "passed": true,
@@ -2159,5 +2140,352 @@
     "repairs": "Global-footprint Index owns/releases cached dispatch-name bytes; explicit Operator hash preserves dictionary semantics. BindingMap publication uses typed Options and exact guarded named spans.",
     "coverage": "Four cycles of 12same-name associated targets exercise owned key identity, target-buffer growth, Frame and cleanup; actual6-run relocation publication verifies5word maps andqualification afterFrame.",
     "frontier": "103 clears borrowed map key and BindingMap; reaches scoped Root writeback through Generator and relocated FrozenModule publication."
+  },
+  "selected_batch104": {
+    "partial": true,
+    "seconds": 95.189,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 95.059,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 511,
+            "message": "error: storing a reference rooted at caller, which does not outlive the destination (\u00a79.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global entries may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/backend/result_owner.goose:42 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "c25ad129deb07c43d37a39cafbd7b26c99c91328993490f5b07fcc6a9c7645c3",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.457,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "c25ad129deb07c43d37a39cafbd7b26c99c91328993490f5b07fcc6a9c7645c3",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.253,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "c25ad129deb07c43d37a39cafbd7b26c99c91328993490f5b07fcc6a9c7645c3",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch105": {
+    "partial": true,
+    "seconds": 97.249,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 97.098,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 531,
+            "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8): the recursive call at /home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose:531 passes module rooted differently from the cycle's entry call"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global completed_modules may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/dependency_closure.goose:165 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "c8275c85857ec35b0412c8e2e18e7a8089b3481189f5abad0ff531ecdd6c1fd7",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.557,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "c8275c85857ec35b0412c8e2e18e7a8089b3481189f5abad0ff531ecdd6c1fd7",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.253,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "c8275c85857ec35b0412c8e2e18e7a8089b3481189f5abad0ff531ecdd6c1fd7",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch106": {
+    "partial": true,
+    "seconds": 94.653,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 94.539,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 537,
+            "message": "error: cannot rebind let source"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global records may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/semantic_query_table.goose:197 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "5750f5a3941bae9a9b6ed0ced3dafe47bbd253d62d6b1f5be34ce8d8a6787db9",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.432,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "5750f5a3941bae9a9b6ed0ced3dafe47bbd253d62d6b1f5be34ce8d8a6787db9",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.252,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "5750f5a3941bae9a9b6ed0ced3dafe47bbd253d62d6b1f5be34ce8d8a6787db9",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch107": {
+    "partial": true,
+    "seconds": 103.851,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 103.523,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 497,
+            "message": "error: cannot call mapTypesUnder, which may shrink self_ while to (bound at /home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose:497) is still used: it may refer into self_ (\u00a75.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global records may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/eval/selected_query.goose:48 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "13ba2d080cbb0cc1a51914b90c8f46f032f9920665015ab321c8f9ad0722e0de",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.861,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "13ba2d080cbb0cc1a51914b90c8f46f032f9920665015ab321c8f9ad0722e0de",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.354,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "13ba2d080cbb0cc1a51914b90c8f46f032f9920665015ab321c8f9ad0722e0de",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch108": {
+    "partial": true,
+    "seconds": 114.66,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 114.505,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/scoped_backend.goose",
+            "line": 521,
+            "message": "error: no matching overload for call to insert"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global optimizer_headers may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/backend/backend_checkpoint.goose:47 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "ff0e12d70a841b7c95f0768d7e8e61de2344c469880a5d4aabef59f124565131",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.735,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "ff0e12d70a841b7c95f0768d7e8e61de2344c469880a5d4aabef59f124565131",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.253,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "ff0e12d70a841b7c95f0768d7e8e61de2344c469880a5d4aabef59f124565131",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "backend_query_family": {
+    "raw_receipt": "2026-11-10-goose-backend-query-family.json.gz",
+    "scope": "Affected laws only; exact per-case import closures are pinned in the raw receipt",
+    "full25": "Incomplete:21passes then30s receipt emission cap under concurrent selected-server load",
+    "receipt_projection_split": {
+      "core_validation_borrow_emit_seconds": 26.661,
+      "footprint_owner_emit_seconds": 4.772,
+      "passed": true
+    },
+    "optimizer_archive_roundtrip": "In progress; not qualified",
+    "checkpointed_sources": {
+      "compiler-goose/src/backend/result_owner.goose": "8d6d047550083e48d8d6ca9d7c1e7e4cf64cb01f84166cc64ecd87ba751d43aa",
+      "compiler-goose/src/backend/scoped_backend.goose": "212c756111b8513472f20b30aa15cf2177feee89352ba13d958419194ffe9a10",
+      "compiler-goose/src/backend/storage_type_arguments.goose": "e84fcc5c4d923324e834ead108e9c5807b926979db6b821a9ed16a157af2b849",
+      "compiler-goose/src/eval/canonical_specialization.goose": "330711067ec7326bbd5cbd39709b2de23e05f38d763b7cd459dd1b476f50cd08",
+      "compiler-goose/src/eval/core_eval.goose": "dba107432360e5901fbacca22fadf4cf68b5abf232af703b62e0f9774a9b015c",
+      "compiler-goose/src/eval/selected_query.goose": "f73a0ef0c60cee6bd776937dba7c8b240a16faf5477369dfd9239a9104f08cda",
+      "compiler-goose/src/reuse/dependency_closure.goose": "34632d52ee7536118d4e5a67feea8696fd649b7e1a4e4cb046af10f24429d470",
+      "compiler-goose/src/reuse/executable_query.goose": "ec51b28d1ed06ab89c531dd7e3fb07e2628a17edfdc44ad84653a688187f3405",
+      "compiler-goose/src/reuse/principal_archive.goose": "d396236093eaa432f6db05f6bc9365651d050faabda24f26c12c078de9edfcd3",
+      "compiler-goose/src/reuse/principal_query.goose": "0904c89569cefdbc985391edb7242d286b0af3a9ea7d6f33ec7230475763de7e",
+      "compiler-goose/src/reuse/project_check_engine.goose": "d0f9477451380077e49d560b13d7411e8554fd4339a7a29a2ca5745a6a2e8cb1",
+      "compiler-goose/src/reuse/project_check_owners.goose": "a30bb29297ea334a9bed48b8b4d5aebabebe086d6b01a8fc311470ab5497d444",
+      "compiler-goose/src/reuse/refinement_receipt.goose": "3573f7d7869da0652a47ecfe15be3a7ff04136cb74b74cff5404a9ee20981366",
+      "compiler-goose/src/reuse/semantic_query_table.goose": "bd643c63aca5dbc77b1e63a86fabafb1f4682f5c08a84d111f0f6fddb5d29140",
+      "compiler-goose/src/reuse/specialization_receipt.goose": "833a46ab629d2662ecf2406392d2459944acf49179ed1225e99c7d554f10235a",
+      "compiler-goose/tests/core_validation_borrow.goose": "f8419ddc2bf21809d4d132b0607fd191b1352c7a04564302ee542698592ee752",
+      "compiler-goose/tests/dependency_ownership.goose": "7ef0444b8610cd2d80dbbd28a2450d62939b6c97c2aa623cc1c5bf2730ed5b98",
+      "compiler-goose/tests/empty_session.goose": "25e5b3ac0a3fa3c03cbeb6f4b580bad175d7252e0ba969dff4aa5c8507fd6947",
+      "compiler-goose/tests/executor_frame.goose": "82ebf749d1a1af58656834123f332d5988f2a3575b4d45652be0682a4d96a451",
+      "compiler-goose/tests/footprint_owner.goose": "acad168e114840b45be3321c17560e055760db9af877910d5b70f0218cb7aeea"
+    }
+  },
+  "unimplemented_checker_precision_proposal": {
+    "status": "Isolated prototype requested; not promoted",
+    "intent": "Preserve complete incoming argument contents across nonrecursive whole-record copies using a distinct proof bit, without changing exact storage identity",
+    "required_controls": [
+      "unrelated owner clear permitted",
+      "either real owner clear rejected",
+      "local escape",
+      "alias mutation",
+      "deep reference traversal",
+      "recursive owner-changing backedge",
+      "same specialization with different actual owners"
+    ],
+    "constraints": "Keep exact=false; proof joins by intersection and is cleared on reference traversal/weakening; no retained callee-local RootAlt.from"
   }
 }
