@@ -1189,7 +1189,7 @@ recursive fn primitiveFunction(generator: Generator&, key: blot_reuse_code_artif
 
     block { let existing = generator.planning.primitive_functions.get(key); if existing { if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { return 0, hit; } } return existing, blot_error::Error.none; } }
     let metadata = unit(generator, key.unit).primitives[key.catalog]; if metadata.arity == 0 || metadata.arity > 3 || key.applied >= metadata.arity { return 0, fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.unsupported); }
-    var parameters: u32[3]; var current: blot_backend_layout::Node; var ty = key.ty;
+    var parameters: u32[3] = default<u32[3]>(); var current: blot_backend_layout::Node; var ty = key.ty;
     for index in 0..metadata.arity { let arrow = generator.representations.store.node(ty); if arrow.tag != blot_backend_layout::Tag.function { return 0, fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.unresolved_type); } parameters[index] = arrow.a; if index == key.applied { current = arrow; } ty = arrow.b; }
     if generator.planning.primitive_functions.count >= 65536 { return 0, fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.complexity); }
     let inputs: blot_backend_runtime_ir::ValueType[3] = [blot_backend_runtime_ir::VT_i32, generator.representations.store.machine(current.a), blot_backend_runtime_ir::VT_i32]; let function_id, added = generator.module.addTypedFunction(inputs, generator.representations.store.machine(current.b), layoutRole(generator, current.b)); if added != blot_error::Error.none { return 0, added; }

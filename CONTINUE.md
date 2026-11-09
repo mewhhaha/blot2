@@ -62,8 +62,11 @@ scratch separately through 189 calls. Core resolver lowering uses scalar
 statement cursors through ten calls. Behavior, charged work, allocation/error
 and cleanup order are preserved by static family audits; the final checker
 boundary remains pending. All three pattern-coverage recursion boundaries use
-checked pool views; local work remains owned until recursion returns. Six
-isolated production engine families execute.
+checked pool views; local work remains owned until recursion returns. Seven
+isolated production engine families have executed, including the new owned
+diagnostic clone/move/cleanup law in 3.372s. Hole and dispatch payload transfers
+now validate owned names; nine fixed-array initializers repair clear capacity
+reads and whole-value copies, leaving 57 scratch/output buffers unchanged.
 
 Whole C/header emission with the baseline private checker hits 120.262s without
 an artifact. The combined optional reference-closure cache/trace candidate
@@ -75,8 +78,10 @@ and falls back to the original walk. 24 semantic controls, 20 debug/release law
 executions, 6 exact C comparisons and trace-on/off parity pass. Installed Goose
 is unchanged. See [the cache/trace receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json).
 
-Split runtime/semantic/lower/independent roots pass; the current check-root
-boundary follows the validator flattening. Actual CLI, server and OOM execution
+Split runtime/semantic/lower/independent roots pass. Source validation,
+coverage, diagnostics and usage checking now clear their prior failures. The
+current check-root frontier is a forbidden stored growable-array reference in
+`reuse/body_check_freeze.goose:15`; its auxiliary context family is in repair. Actual CLI, server and OOM execution
 remain pending until a complete executable exists. The new qualification runner
 has eight oracle baseline passes and a strict unsupported ABI 8 recursion
 witness; no ABI 2 fallback or unavailable memory counters are accepted as proof.
@@ -87,11 +92,13 @@ bounded immutable replies, validate before adoption, detach inherited workers,
 and wait for post-adoption cache publication. Cache staging mutates no external
 files; publication runs through an allocation-free native hook after adoption.
 The production server loop and C entry now integrate these APIs, but no compiler
-runtime has executed them yet. A dedicated capability now carries token-bound allocation-failure markers
+runtime has executed them yet. A dedicated capability now carries token-bound
+allocation-failure markers
 from copied stage processes. Native/sanitizer controls cover initialization,
 execution and post-reply cleanup refusal, malformed markers, ordinary failures,
 retained state/cache and retry in 7.5s. These tests use the real Goose allocator
-with a fake C compiler entry; whole compiler integration remains unqualified. Scoped runtime observations report actual pool operation totals
+with a fake C compiler entry; whole compiler integration remains unqualified. Scoped runtime observations
+report actual pool operation totals
 and virtual region reservations; active payload, retained capacity and scratch
 remain unavailable. Never substitute operation balance or RSS for liveness.
 See [observer evidence](benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json),

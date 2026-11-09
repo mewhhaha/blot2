@@ -256,7 +256,7 @@ recursive fn inspectRead<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Out
 }
 recursive fn taskReadWrite<E>(self_: Walker<E>&, source: AstId, depth: i64) -> bool, Outcome, Error {
     if !self_.task_views || self_.engine.tree.node(source).tag != blot_parse_ast::tag_apply { return false, Outcome.live, blot_error::Error.none; }
-    var head = source; var arguments: AstId[3]; var count: i64 = 0;
+    var head = source; var arguments: AstId[3] = default<AstId[3]>(); var count: i64 = 0;
     while self_.engine.tree.node(head).tag == blot_parse_ast::tag_apply && count < arguments.len { arguments[count] = self_.engine.tree.node(head).b; count += 1; head = self_.engine.tree.node(head).a; }
     if self_.engine.tree.node(head).tag == blot_parse_ast::tag_intrinsic { let operation = blot_check_task_types::lookup(self_.engine.pool.get(self_.engine.tree.node(head).a));
         if operation.present && (operation.value == blot_check_task_types::Op.read || operation.value == blot_check_task_types::Op.write) && count == blot_check_task_types::arity(operation.value) {

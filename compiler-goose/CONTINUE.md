@@ -23,8 +23,10 @@ explicit row importers, copied scalar metadata and immutable AST cursors.
 Validator now holds only scalar state; 23 helpers pass tree, symbols, context and
 scratch independently through 189 calls. Recursive Core resolver statement
 helpers use scalar cursors. Static audits preserve traversal, charged work,
-allocation/error and cleanup order. Six production engine families execute;
-the final checker boundary and whole artifact remain pending.
+allocation/error and cleanup order. Seven production engine families have
+executed, including an owned diagnostic transfer law. Source validation,
+coverage, diagnostics and usage now clear. The checker frontier is the stored
+growable-array reference in body_check_freeze:15; whole artifact remains pending.
 
 The optional bounded reference-closure cache/trace checker reaches a concrete
 whole-build source error in 95.491s where the baseline caps at 120.262s on the

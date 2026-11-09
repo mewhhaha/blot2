@@ -4,6 +4,7 @@ from pathlib import Path
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import json
+import hashlib
 import os
 import re
 import signal
@@ -12,6 +13,15 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINES = ['runtime', 'semantic', 'check', 'lower', 'independent']
+
+def source_inputs(source, stdlib):
+    entries = []
+    for label, root in [('compiler', source.parent), ('stdlib', stdlib)]:
+        for path in sorted(root.rglob('*.goose')):
+            entries.append({'root': label, 'path': str(path.resolve()),
+                            'sha256': hashlib.sha256(path.read_bytes()).hexdigest()})
+    digest = hashlib.sha256(json.dumps(entries, sort_keys=True).encode()).hexdigest()
+    return entries, digest
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -61,6 +71,9 @@ def main():
         return 0
     args.output.mkdir(parents=True, exist_ok=True)
     log_path = args.output / 'diagnostics.log'
+    stdlib = ROOT.parent / 'goose-to-wasm/build/source/stdlib'
+    entries, source_digest = source_inputs(args.source, stdlib)
+    (args.output / 'inputs.json').write_text(json.dumps(entries, indent=2) + '\n')
     command = [str(args.goose.resolve()), 'check', str(args.source.resolve()),
                '--stdlib', str(ROOT.parent / 'goose-to-wasm/build/source/stdlib')]
     environment = dict(os.environ)
@@ -95,12 +108,19 @@ def main():
         item = {'file': match[1], 'line': int(match[2]), 'message': match[3]}
         if item not in errors:
             errors.append(item)
+    _, final_digest = source_inputs(args.source, stdlib)
+    unchanged = source_digest == final_digest
     report = {'partial': True, 'engines': args.engines, 'exit': child.returncode,
               'seconds': round(time.monotonic() - started, 3), 'stop': reason,
-              'errors': errors, 'full_qualification': False}
+              'errors': errors, 'full_qualification': False,
+              'source_sha256': source_digest, 'source_unchanged': unchanged,
+              'goose_sha256': hashlib.sha256(args.goose.read_bytes()).hexdigest()}
+    if not unchanged:
+        report['exit'] = 1
+        report['stop'] = 'source changed during check'
     (args.output / 'result.json').write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps(report, indent=2))
-    if child.returncode:
+    if report['exit']:
         return 1
     return 0
 
