@@ -9,11 +9,11 @@ fn copyOwned(values:const u8[:])->u8[:] {if values.len==0 {return default<u8[:]>
 fn releaseOwned(values:const u8[:]) {if values.len==0 {return;}owned_u8.free_slice(values);}
 fn canonicalDiagnosticText(value:const u8[:])->const u8[:] {let text=owned_u8.realloc_slice(value,value.len);assert(blot_support::same_slice_identity(text,value));return text;}
 fn canonicalOwnedDiagnostic(value:Diagnostic)->Diagnostic {
- var purity=blot_support::none<blot_check_check::PurityWitness>();if value.purity.present {let old=value.purity.value;var name=blot_support::none<const u8[:]>();if old.operation_name.present {name=blot_support::some<const u8[:]>(canonicalDiagnosticText(old.operation_name.value));}purity=blot_support::some(blot_check_check::PurityWitness{identity:old.identity,family:old.family,member:old.member,compound:old.compound,foreign:old.foreign,specialized:old.specialized,origin_unavailable:old.origin_unavailable,operation_name:name});}
+ var purity=blot_support::none<blot_check_check::PurityWitness>();if value.purity.present {let old=value.purity.value;var name=blot_support::none<const u8[:]>();if old.operation_name.present {name=blot_support::some<const u8[:]>(canonicalDiagnosticText(old.operation_name.value));}purity=blot_support::Option<blot_check_check::PurityWitness>{true,blot_check_check::PurityWitness{identity:old.identity,family:old.family,member:old.member,compound:old.compound,foreign:old.foreign,specialized:old.specialized,origin_unavailable:old.origin_unavailable,operation_name:name}};}
  var detail=blot_support::none<const u8[:]>();if value.detail.present {detail=blot_support::some<const u8[:]>(canonicalDiagnosticText(value.detail.value));}
- var hole=blot_support::none<blot_reuse_hole_diagnostics::Snapshot>();if value.hole.present {hole=blot_support::some(blot_reuse_hole_diagnostics::canonicalOwned(value.hole.value));}
- var explanation=blot_support::none<blot_reuse_dispatch_explanation::Explanation>();if value.explanation.present {explanation=blot_support::some(blot_reuse_dispatch_explanation::canonicalOwned(value.explanation.value));}
- var source=blot_support::none<blot_reuse_project::Diagnostic>();if value.source.present {source=blot_support::some(blot_reuse_project::canonicalOwnedDiagnostic(value.source.value));}
+ var hole=blot_support::none<blot_reuse_hole_diagnostics::Snapshot>();if value.hole.present {hole=blot_support::Option<blot_reuse_hole_diagnostics::Snapshot>{true,blot_reuse_hole_diagnostics::canonicalOwned(value.hole.value)};}
+ var explanation=blot_support::none<blot_reuse_dispatch_explanation::Explanation>();if value.explanation.present {explanation=blot_support::Option<blot_reuse_dispatch_explanation::Explanation>{true,blot_reuse_dispatch_explanation::canonicalOwned(value.explanation.value)};}
+ var source=blot_support::none<blot_reuse_project::Diagnostic>();if value.source.present {source=blot_support::Option<blot_reuse_project::Diagnostic>{true,blot_reuse_project::canonicalOwnedDiagnostic(value.source.value)};}
  return Diagnostic{unit:value.unit,span:value.span,code:value.code,semantic:value.semantic,type_application:value.type_application,symbol:value.symbol,implicit_type_witness:value.implicit_type_witness,source_terminator:value.source_terminator,numeric_literal:value.numeric_literal,purity:purity,detail:detail,hole:hole,explanation:explanation,contexts:value.contexts,context_len:value.context_len,source:source};
 }
 reusable[] var owned_u32:u32[>..]=[];
@@ -36,6 +36,13 @@ fn copyOwned(values:const blot_reuse_body_check_cache::Cache[:])->blot_reuse_bod
 fn releaseOwned(values:const blot_reuse_body_check_cache::Cache[:]) {if values.len==0 {return;}owned_blot_reuse_body_check_cache__Cache.free_slice(values);}
 reusable[] var owned_blot_support__Option_Module_:blot_support::Option<Module>[>..]=[];
 fn copyOwned(values:const blot_support::Option<Module>[:])->blot_support::Option<Module>[:] {if values.len==0 {return default<blot_support::Option<Module>[:]>();}let run=owned_blot_support__Option_Module_.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
+fn moduleSlots(self_:CheckedProject)->blot_support::Option<Module>[:] {
+ assert(self_.owner.valid());let length=self_.modules.len;if length==0 {return default<blot_support::Option<Module>[:]>();}
+ let owned=owned_blot_support__Option_Module_.realloc_slice(self_.modules,length);assert(blot_support::same_slice_identity(owned,self_.modules));
+ let start=owned_blot_support__Option_Module_.index_of(owned[0]);return owned_blot_support__Option_Module_[start..start+length];
+}
+fn canonicalModule(value:Module)->Module {let checked=blot_check_check::canonicalOwnedChecked(value.checked);let length=value.exports.len;if length==0 {return Module{checked:checked,exports:default<Export[:]>(),valid:value.valid};}let owned=owned_Export.realloc_slice(value.exports,length);assert(blot_support::same_slice_identity(owned,value.exports));let start=owned_Export.index_of(owned[0]);return Module{checked:checked,exports:owned_Export[start..start+length],valid:value.valid};}
+fn publishModule(self_:CheckedProject,unit:u32,value:Module) {let modules=moduleSlots(self_);modules[unit-1]=blot_support::Option<Module>{true,canonicalModule(value)};}
 fn releaseOwned(values:const blot_support::Option<Module>[:]) {if values.len==0 {return;}owned_blot_support__Option_Module_.free_slice(values);}
 reusable[] var owned_blot_reuse_entry_frontend_cutoff__Color:blot_reuse_entry_frontend_cutoff::Color[>..]=[];
 fn copyOwned(values:const blot_reuse_entry_frontend_cutoff::Color[:])->blot_reuse_entry_frontend_cutoff::Color[:] {if values.len==0 {return default<blot_reuse_entry_frontend_cutoff::Color[:]>();}let run=owned_blot_reuse_entry_frontend_cutoff__Color.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}

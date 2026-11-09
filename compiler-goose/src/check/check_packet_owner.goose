@@ -17,3 +17,5 @@ fn attachCheckedPacket(owner:CheckedOwner,packet:blot_project_packet::Owner)->bl
 fn releaseCheckedPacket(owner:CheckedOwner) {let key=CheckedPacketKey{owner.lease,owner.generation};let found .= blot_support_pooled_map::get(checked_packets,key);if !found {return;}var held=found;blot_support_pooled_map::remove(checked_packets,key);held.deinit();}
 
 fn hash(key:CheckedPacketKey)->u64 {return ::hash_combine(::hash(key.lease),::hash(key.generation));}
+
+fn checkedPacket(owner:CheckedOwner)->blot_project_packet::Owner {assert(owner.valid());let key=CheckedPacketKey{owner.lease,owner.generation};let found .= blot_support_pooled_map::get(checked_packets,key);if !found {return blot_project_packet::Owner{};}let packet:blot_project_packet::Owner=found;assert(packet.valid());return packet;}

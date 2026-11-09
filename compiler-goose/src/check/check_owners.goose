@@ -14,6 +14,7 @@ import support.native;
 import std;
 import .check;
 import .check_packet_owner;
+import .checked_views;
 struct CheckedOwner {lease:u32=0,generation:u64=0}
 struct CheckedHeaderLease {
 value_slots:u32[:]=default<u32[:]>(),

@@ -22,7 +22,7 @@ fn prepareWorkOrder(source:Project,ready:const u32[:],work:ParallelUnits&)->Erro
  let canonical=parallel_unit_runs.realloc_slice(work.storage,work.storage.len);assert(blot_support::same_slice_identity(canonical,work.storage));blot_check_source_sort::pdqContext(0,work.items.len,WorkOrder{source,canonical[..work.items.len], ..});return blot_error::Error.none;
 }
 fn discardParallel(self_:Engine&,resolution:i64,associated:i64) {
- for &slot in self_.result.modules {if slot.present {slot.value.deinit();slot=blot_support::none<Module>();}}
+ let modules=moduleSlots(self_.result);for &slot in modules {if slot.present {slot.value.deinit();slot=blot_support::none<Module>();}}
  for &cache in self_.result.body_caches {cache.deinit();cache=blot_reuse_body_check_cache::Cache{..};}
  self_.result.body_elaborations=0;self_.result.imported_schemes=0;self_.result.normalization=blot_work_counters::Normalization{..};self_.resolution_remaining=resolution;self_.associated_remaining=associated;blot_phase_profile::recordChecking(blot_work_counters::Frontend{parallel_retries:1, ..});
 }
@@ -42,7 +42,7 @@ fn prepareParallelNames(parent:Engine&,units:const u32[:])->bool,Error {
 fn executeProjectJob(parent:Engine&,unit:u32,job:ParallelJob&)->Error {
  var worker=borrowWorker(parent);worker.source.symbols.read_only=true;worker.source.symbols.missing_name=false;let capture=blot_phase_profile::captureChecking(job.work);job.failure=worker.checkModule(unit);capture.restore(job.work);
  job.missing_name=worker.source.symbols.missing_name;job.resolution_used=parent.resolution_remaining-worker.resolution_remaining;job.associated_used=parent.associated_remaining-worker.associated_remaining;job.work.parallel_jobs+=1;
- job.module=worker.result.modules[unit-1];worker.result.modules[unit-1]=blot_support::none<Module>();if worker.result.body_caches.len!=0 {job.cache=worker.result.body_caches[unit-1];worker.result.body_caches[unit-1]=blot_reuse_body_check_cache::Cache{..};}
+ let modules=moduleSlots(worker.result);let produced=modules[unit-1];if produced.present {job.module=blot_support::Option<Module>{true,canonicalModule(produced.value)};}else {job.module=blot_support::none<Module>();}modules[unit-1]=blot_support::none<Module>();if worker.result.body_caches.len!=0 {job.cache=worker.result.body_caches[unit-1];worker.result.body_caches[unit-1]=blot_reuse_body_check_cache::Cache{..};}
  job.diagnostics=copyDiagnostics(worker.diagnostics);worker.diagnostics.items=worker.diagnostics.storage[..0];discardWorker(worker);return blot_error::Error.none;
 }
 fn checkParallel<E>(self_:Engine&,executor:E&,deferrable:bool)->bool,Error {
@@ -66,7 +66,7 @@ fn parallelBatches<E>(self_:Engine&,executor:E&,deferrable:bool,remaining:i64,re
  blot_phase_profile::recordChecking(counts);blot_phase_profile::recordChecking(blot_work_counters::Frontend{parallel_batches:1, ..});var retry=false;var out_of_memory=false;
  for unit in ready.items {let job:ParallelJob& =jobs[unit-1];blot_phase_profile::recordChecking(job.work);if job.failure!=blot_error::Error.none {out_of_memory=out_of_memory || job.failure==blot_error::Error.out_of_memory;retry=true;}
  retry=retry || job.missing_name || job.diagnostics.len!=0 || !job.module.present;if job.resolution_used>self_.resolution_remaining || job.associated_used>self_.associated_remaining {retry=true;}else {self_.resolution_remaining-=job.resolution_used;self_.associated_remaining-=job.associated_used;}
- if job.module.present {self_.result.modules[unit-1]=job.module;job.module=blot_support::none<Module>();}if self_.result.body_caches.len!=0 {self_.result.body_caches[unit-1]=job.cache;job.cache=blot_reuse_body_check_cache::Cache{..};}
+ if job.module.present {publishModule(self_.result,unit,job.module.value);job.module=blot_support::none<Module>();}if self_.result.body_caches.len!=0 {self_.result.body_caches[unit-1]=job.cache;job.cache=blot_reuse_body_check_cache::Cache{..};}
  }
  if retry {self_.discardParallel(resolution,associated);if out_of_memory {return false,blot_error::Error.out_of_memory;}return false,blot_error::Error.none;}
  for unit in ready.items {let checked:const Checked& =self_.result.modules[unit-1].value.checked;self_.result.body_elaborations+=checked.body_elaborations;self_.result.imported_schemes+=checked.imported_schemes;self_.result.normalization.merge(checked.types.normalization);done[unit-1]=true;left-=1;}

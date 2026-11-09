@@ -63,7 +63,7 @@ fn clone(self_: Explanation) -> Explanation, Error {
         let out = candidate_runs.alloc_slice(self_.candidates.len);
         for old, index in self_.candidates {
             out[index] = canonicalCandidate(Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..});
-            if old.origin.present { out[index].origin = blot_support::some(canonicalOrigin(old.origin.value.clone())); }
+            if old.origin.present { out[index].origin = blot_support::Option<Origin>{true,canonicalOrigin(old.origin.value.clone())}; }
         }
         result.candidates = out;
     }
@@ -135,7 +135,7 @@ fn makeOrigin(self_: Builder&, name: const u8[:], path: Text, span: blot_support
 }
 fn addOrigin(self_: Builder&, operand: Text, outcome: Outcome, value: Origin) {
     if self_.len == max_candidates { freeText(operand); var origin = value; origin.deinit(); self_.truncated = true; return; }
-    self_.candidates[self_.len] = canonicalCandidate(Candidate { Side.implementation, blot_support::some(value), operand, outcome , ..}); self_.len++;
+    self_.candidates[self_.len] = canonicalCandidate(Candidate { Side.implementation, blot_support::Option<Origin>{true,value}, operand, outcome , ..}); self_.len++;
 }
 fn addStep(self_: Builder&, member: Text, ty: Text, outcome: Outcome) -> Error {
     var value = Step { ty: ty, outcome: outcome , ..};
@@ -156,7 +156,7 @@ fn finish(self_: Builder&, operation: Text, member: Text) -> Explanation, Error 
         for index in self_.len {
             let old = self_.candidates[index];
             out[index] = canonicalCandidate(Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..});
-            if old.origin.present { out[index].origin = blot_support::some(canonicalOrigin(old.origin.value.clone())); }
+            if old.origin.present { out[index].origin = blot_support::Option<Origin>{true,canonicalOrigin(old.origin.value.clone())}; }
         }
         result.candidates = out;
     }
@@ -232,7 +232,7 @@ fn canonicalText(value:Text)->Text {if !value.present {return blot_support::none
 fn canonicalOrigin(value:Origin)->Origin {return Origin{name:canonicalText(value.name),path:canonicalText(value.path),span:value.span,..};}
 fn canonicalStep(value:Step)->Step {return Step{member:canonicalText(value.member),ty:canonicalText(value.ty),outcome:value.outcome,..};}
 fn canonicalContext(value:Context)->Context {return Context{kind:value.kind,path:canonicalText(value.path),span:value.span,..};}
-fn canonicalCandidate(value:Candidate)->Candidate {var origin=blot_support::none<Origin>();if value.origin.present {origin=blot_support::some(canonicalOrigin(value.origin.value));}return Candidate{side:value.side,origin:origin,operand:canonicalText(value.operand),outcome:value.outcome,..};}
+fn canonicalCandidate(value:Candidate)->Candidate {var origin=blot_support::none<Origin>();if value.origin.present {origin=blot_support::Option<Origin>{true,canonicalOrigin(value.origin.value)};}return Candidate{side:value.side,origin:origin,operand:canonicalText(value.operand),outcome:value.outcome,..};}
 fn canonicalOwned(value:Explanation)->Explanation {
  let candidates=candidate_runs.realloc_slice(value.candidates,value.candidates.len);let steps=step_runs.realloc_slice(value.steps,value.steps.len);let contexts=context_runs.realloc_slice(value.contexts,value.contexts.len);
  if candidates.len!=0 {assert(blot_support::same_slice_identity(candidates,value.candidates));}if steps.len!=0 {assert(blot_support::same_slice_identity(steps,value.steps));}if contexts.len!=0 {assert(blot_support::same_slice_identity(contexts,value.contexts));}

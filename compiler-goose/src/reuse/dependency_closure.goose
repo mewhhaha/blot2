@@ -145,9 +145,18 @@ reusable[] var completed_modules: Core[>..]=[];
 reusable[] var completed_lengths: u32[>..]=[];
 var next_completed_generation: u64=1;
 struct CoreValidationReceipt { slot: u32=0,generation: u64=0,receipt_index: u32=0 }
-struct CoreValidationBorrow { receipt: CoreValidationReceipt,graph: Frozen }
-fn borrow(self_: const CoreValidationReceipt&,graph: const Frozen&) -> CoreValidationBorrow { return CoreValidationBorrow {self_,graph}; }
-fn prefix(self_: CoreValidationBorrow,units: const Core[:],entry: u32,identity: blot_backend_runtime_identity::View) -> i64 { return prefix(self_.receipt,self_.graph,units,entry,identity); }
+struct CoreValidationBorrow { receipt: CoreValidationReceipt=CoreValidationReceipt{..} }
+fn validReceipt(self_:CoreValidationReceipt)->bool {return self_.slot!=0 && self_.slot-1<completed_states.len && completed_states[self_.slot-1].live && completed_states[self_.slot-1].generation==self_.generation;}
+fn borrow(self_: const CoreValidationReceipt&,graph: const Frozen&) -> CoreValidationBorrow {
+ if !validReceipt(self_) {return CoreValidationBorrow{};}
+ let saved=completed_states[self_.slot-1].graph;
+ if !blot_support::same_slice_identity(graph.modules,saved.modules) || !blot_support::same_slice_identity(graph.symbols,saved.symbols) {return CoreValidationBorrow{};}
+ return CoreValidationBorrow{self_};
+}
+fn prefix(self_: CoreValidationBorrow,units: const Core[:],entry: u32,identity: blot_backend_runtime_identity::View) -> i64 {
+ if !validReceipt(self_.receipt) {return 0;}
+ return prefix(self_.receipt,completed_states[self_.receipt.slot-1].graph,units,entry,identity);
+}
 fn deinit(self_: CoreValidationReceipt&) { if self_.slot==0 { return; } let at=self_.slot-1; assert(at<completed_states.len&&completed_states[at].live&&completed_states[at].generation==self_.generation); let state: CompletedCoreState& =completed_states[at]; completed_modules.free_slice(state.modules); completed_lengths.free_slice(state.source_lengths); state.modules=default<Core[:]>(); state.source_lengths=default<u32[:]>(); state.graph=default<Frozen>(); state.live=false; completed_states.free(at); let receipt_index=self_.receipt_index; self_.slot=0; self_.generation=0; completed_receipts.free(receipt_index); }
 fn sameDescriptors(before: Core,after: Core) -> bool { return blot_check_core::stampView(before)==blot_check_core::stampView(after); }
 fn prefix(self_: CoreValidationReceipt,graph_owner: const Frozen&,units: const Core[:],entry: u32,identity: blot_backend_runtime_identity::View) -> i64 {

@@ -17,10 +17,10 @@ fn importExport(self_:Engine&,imports:blot_check_check::ImportedBinding[>..]&,he
 }
 fn appendDiagnostics(self_:Engine&,unit:u32,diagnostics:const blot_check_check::Diagnostic[:])->Error {
  for source in diagnostics {var origin=unit;if source.origin_unit!=0 {origin=source.origin_unit;}var item=Diagnostic{unit:origin,span:source.span,code:Code.semantic,semantic:blot_support::some(source.code),type_application:source.type_application,symbol:source.symbol,implicit_type_witness:source.implicit_type_witness,source_terminator:source.source_terminator,numeric_literal:source.numeric_literal,contexts:source.contexts,context_len:source.context_len, ..};
- if source.purity.present {var witness=source.purity.value;if witness.operation_name.present {witness.operation_name=blot_support::some<const u8[:]>(copyOwned(witness.operation_name.value));}item.purity=blot_support::some(witness);}
+ if source.purity.present {var witness=source.purity.value;if witness.operation_name.present {witness.operation_name=blot_support::some<const u8[:]>(copyOwned(witness.operation_name.value));}item.purity=blot_support::Option<blot_check_check::PurityWitness>{true,witness};}
  if source.detail.present {item.detail=blot_support::some<const u8[:]>(copyOwned(source.detail.value));}
- if source.hole.present {let hole,error=source.hole.value.clone();if error!=blot_error::Error.none {item.deinit();return error;}item.hole=blot_support::some(hole);}
- if source.explanation.present {let explanation,error=source.explanation.value.clone();if error!=blot_error::Error.none {item.deinit();return error;}item.explanation=blot_support::some(explanation);}
+ if source.hole.present {let hole,error=source.hole.value.clone();if error!=blot_error::Error.none {item.deinit();return error;}item.hole=blot_support::Option<blot_reuse_hole_diagnostics::Snapshot>{true,hole};}
+ if source.explanation.present {let explanation,error=source.explanation.value.clone();if error!=blot_error::Error.none {item.deinit();return error;}item.explanation=blot_support::Option<blot_reuse_dispatch_explanation::Explanation>{true,explanation};}
  let error=self_.diagnostics.push(item);if error!=blot_error::Error.none {item.deinit();return error;}
  }return blot_error::Error.none;
 }
@@ -70,7 +70,7 @@ fn checkModuleBody(self_:Engine&,unit:u32)->Error {
  accountEditorBudget(self_.editor,checked.counters.inference_steps as i64,checked.initializer_rejected,checked.diagnostics);
  if checked.initializer_rejected {let error=self_.appendDiagnostics(unit,checked.diagnostics);checked.deinit();return error;}
  let exports,error=self_.moduleExports(unit,blot_check_check::declarationCatalog(checked),checked.bindings,checked.diagnostics,forwarded[..]);if error!=blot_error::Error.none {checked.deinit();return error;}
- self_.result.modules[unit-1]=blot_support::some(Module{checked,exports,self_.diagnostics.items.len==before, ..});self_.result.body_elaborations+=checked.body_elaborations;self_.result.imported_schemes+=checked.imported_schemes;self_.result.normalization.merge(checked.types.normalization);return blot_error::Error.none;
+ publishModule(self_.result,unit,Module{checked,exports,self_.diagnostics.items.len==before, ..});self_.result.body_elaborations+=checked.body_elaborations;self_.result.imported_schemes+=checked.imported_schemes;self_.result.normalization.merge(checked.types.normalization);return blot_error::Error.none;
 }
 fn appendHiddenImport(self_:Engine&,target:ExternalTarget,imports:blot_check_check::ImportedBinding[>..]&,headers:blot_check_check::SourceHeader[>..]&) {if self_.source_validation {var imported=self_.headerImport(target,0);imported.expose=false;headers.push(imported);}else {var imported=self_.valueImport(target,0);imported.expose=false;imports.push(imported);}}
 

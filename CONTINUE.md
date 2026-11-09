@@ -54,11 +54,12 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Twenty-one executed production families pass together, including real compiler
-Frame.create/release and nonempty registered session-table spans. They cover diagnostic and
-body ownership, live/frozen readers, imports, SourceValidation, frames, native
-assets, completion snapshots, loader scheduling and editor budgets. These laws
-check real helpers in seconds; they do not qualify a whole compiler executable.
+Twenty-two executed production helper laws pass together in 113.92s. They cover
+real Frame create/release, nonempty session tables, ordinary and packet-decoded
+Checked publication through worker slots, Prepared lifetime, receipt admission,
+diagnostics, readers, imports, snapshots and editor budgets. Packet observers
+validate the existing retained typed journal; no graph copies or owner registry
+are added. These helpers do not qualify a whole compiler executable.
 
 Project checker engines and worker headers are now invocation-local. Synchronous
 callback contexts borrow the local engine, so caller-owned compiled modules,
@@ -84,18 +85,19 @@ Parallel lowering owns a fixed result-slot run; fixed-mode preparation payloads
 are reconstructed after mutation. Snapshot append/adopt factories observe their
 existing owner journals; sharing and pin lifetimes have executed controls. The
 receipt helpers return their receipt directly and observe the owning graph runs.
-A focused C/link/execution check passes in 35.99s, and seven worker entry roots
-pass in one frozen batch. The server entry now reaches pooled evaluator and
-archive/workspace reset lifetime errors. The inactive archive metadata sentinel is
-now removed, and persistent evaluator bootstrap takes no borrowed unit input.
-The full21-law batch passes, including real Frame/Plan/outline cleanup.
-Thirty map restores fill exact fresh runs before publishing headers; ModuleStamps
-uses fixed pooled buffers. SessionTables is a scalar checked lease, with executed
-nonempty offset/Slot view and reuse controls. The server entry now reaches two
-retained-revision Options/frontend-owner errors. General nonempty evaluator
-borrowing and whole compiler integration remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz). There is still no
-emitted whole C program, header or executable. Actual CLI/server, request OOM/retry and differential qualification
-remain pending.
+Checked observers preserve all 49/2 Source/Patterns alias guards and reify exact
+registered runs. CoreValidationBorrow now carries scalar receipt authority,
+validates both graph identities and declines stale receipts; shared owners remain
+valid. Its own executed law replaces a superseded expensive graph warmup, reducing
+the dependency ownership law from about 36s to 5s. Typed optional records preserve
+nested editor/diagnostic/Prepared ownership without cloning.
+
+Selected batch 92 passes executor/metadata but still reports two server errors:
+local ready payload ownership across Frame.create and parameter-pattern inactive
+publication at the frontend boundary. General nonempty evaluator borrowing and
+whole compiler integration remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz).
+There is still no whole C program, header or executable. Actual CLI/server,
+request OOM/retry and differential qualification remain pending.
 
 The optional private direct-global empty-holder precision extension passes 24 new
 controls and the existing 24 semantic controls with diagnostic/runtime/C parity.

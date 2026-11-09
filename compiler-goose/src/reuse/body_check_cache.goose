@@ -130,7 +130,7 @@ reusable[] var name_slots:NameSlot[>..]=[];
 fn valid(self_:const Cache&)->bool {return self_.lease!=0 && self_.lease-1<cache_states.len && cache_states[self_.lease-1].live && cache_states[self_.lease-1].generation==self_.generation;}
 fn initPooled()->Cache,Error {
  if cache_states.len>=0xffffffff {return Cache{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=cache_states.alloc_index(CacheState{generation:generation,live:true, ..});let state:CacheState& =cache_states[at];
- state.canonical=Cache{state.minimum_nodes,state.bodies,state.index,(at+1) as u32,generation, ..};return state.canonical,blot_error::Error.none;
+ let result=Cache{cache_states[at].minimum_nodes,cache_states[at].bodies,cache_states[at].index,(at+1) as u32,generation, ..};state.canonical=result;return result,blot_error::Error.none;
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let result,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_states[result.lease-1].canonical,blot_error::Error.none;}

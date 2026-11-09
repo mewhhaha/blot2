@@ -190,6 +190,16 @@ for t in sorted(SLICES):owner.append('reusable[] var pool_'+ident(t)+':'+t+'[>..
 owner+=['fn valid(self:Owner)->bool {return self.slot!=0&&self.slot-1<leases.len&&leases[self.slot-1].live&&leases[self.slot-1].generation==self.generation;}','fn initOwner()->Owner,Error {if leases.len>=0xffffffff {return Owner{..},Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=leases.alloc_index(Lease{generation:generation,live:true,..});return Owner{(at+1) as u32,generation},Error.none;}','fn retain(self:Owner)->Owner,Error {if !self.valid() {return Owner{..},Error.invalid_artifact;}let state:Lease&=leases[self.slot-1];if state.references==0xffffffffffffffff {return Owner{..},Error.dependency_limit;}state.references++;return self,Error.none;}']
 for t in sorted(SLICES):
  owner.append('fn allocate<PacketOwner>(self:PacketOwner&,length:i64,witness:'+t+')->'+t+'[:],Error {if !self.valid()||length<0||length>element_limit {return default<'+t+'[:]>(),Error.invalid_artifact;}if length==0 {return default<'+t+'[:]>(),Error.none;}if links.len>=0xfffffffe {return default<'+t+'[:]>(),Error.out_of_memory;}let run=pool_'+ident(t)+'.alloc_slice(length);let state:Lease& =leases[self.slot-1];let at=links.alloc_index(Link{Run.run_'+ident(t)+'{run},state.head});state.head=(at+1) as u32;return run,Error.none;}')
+# Only Checked's retained packet slices need public header observation.
+observe_types=set()
+for key in ['blot_check_check::Checked','blot_check_check::EditorCapture','blot_check_numeric_proof_bodies::Owned','blot_check_capability_contracts::Collection']:
+ for field,ty in D[key][2]:
+  ty=resolve(ty,D[key][3])
+  if ty.endswith('[:]'):observe_types.add(resolve(ty[:-3],D[key][3]))
+for t in sorted(observe_types):
+ if t not in SLICES:raise ValueError('Unknown Checked packet run '+t)
+ for method,qual in [('view',''),('readView','const ')]:
+  owner.append('fn '+method+'(self:Owner,values:'+qual+t+'[:])->'+qual+t+'[:] {assert(self.valid());if values.len==0 {return default<'+qual+t+'[:]>();}var next=leases[self.slot-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {Run.run_'+ident(t)+' run=>{if blot_support::same_slice_identity(values,run.values) {let owned=pool_'+ident(t)+'.realloc_slice(run.values,run.values.len);let start=pool_'+ident(t)+'.index_of(owned[0]);return pool_'+ident(t)+'[start..start+owned.len];}},_=>{}}}abort("packet view must name this owner\'s exact live typed run");}')
 owner.append('fn deinit(self:Owner&) {if self.slot==0 {return;}assert(self.valid());let state:Lease&=leases[self.slot-1];assert(state.references!=0);state.references--;if state.references==0 {var next=state.head;while next!=0 {let at=next-1;let link=links[at];next=link.next;match link.value {')
 for t in sorted(SLICES):owner.append('Run.run_'+ident(t)+' value=>{pool_'+ident(t)+'.free_slice(value.values);},')
 owner.append('}links.free(at);}state.live=false;leases.free(self.slot-1);}self=Owner{..};}')

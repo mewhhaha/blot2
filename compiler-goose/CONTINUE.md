@@ -4,26 +4,26 @@ Fix production ownership in coherent families, build the complete native compile
 then qualify CLI/project-server behavior, recoverable request OOM and retention
 against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-All **21 executed production helper laws pass**, including actual compiler frame
-create/release, Plan/outline/archive cleanup, nonempty session-table offset/Slot
-views, shared editor budgets and owned dependency snapshots. The extended Frame
-law passes four allocation/deinit/reuse cycles in6.115s. Exact source/tool hashes
-and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+All **22 executed production helper laws pass together in 113.92s**, including
+actual frame cleanup, nonempty session tables, ordinary and packet-decoded Checked
+worker publication, Prepared Option lifetime and real receipt admission. Checked
+observers retain existing aliases and typed journal ownership; no graph copies or
+new registry. Exact hashes and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-Selected batch89 passes executor/metadata and reaches two retained-revision
-errors in the server entry: local CompileOptions views across Frame.create, and
-frontend body-auxiliary owner publication. **No whole C/header/executable exists.**
+Selected batch 92 passes executor/metadata but retains two server errors: local
+ready payload ownership across Frame.create and parameter-pattern inactive
+publication at the frontend boundary. **No whole C/header/executable exists.**
 General nonempty Session/catalog borrowing and integrated runtime qualification
 remain pending. Do not forward compilation to Zig or insert placeholder success.
 
-Use the tracked private checker recipe and the existing qualified678 binary from
-the root frontier. Its optional direct-global empty-holder precision passes24 new
-and24 existing controls; bounded GlobalReach logging preserves on/off diagnostics.
+Use the tracked private checker recipe and the existing qualified 678 binary from
+the root frontier. Its optional direct-global empty-holder precision passes 24 new
+and 24 existing controls; bounded GlobalReach logging preserves on/off diagnostics.
 Installed Goose and siblings remain unchanged. Newer selfhost Goose snapshots are
 not qualified for this port's native/packages/pool interfaces.
 
-Repair stages cap at120s. After entry checks, final C emission may use180s within
-the shared300s whole-build cap. The actual builder regenerates source identity,
+Repair stages cap at 120s. After entry checks, final C emission may use 180s within
+the shared 300s whole-build cap. The actual builder regenerates source identity,
 emits C plus a host header and links the real Goose CLI/native OS adapters.
 Source-only identity metadata is unqualified. Keep compiler/ and installed Zig
 binaries as oracle; oracle.json pins the older language candidate, so new-language
@@ -31,8 +31,8 @@ comparisons need the matching newer Zig identity. Preserve sibling source/assets
 
 Project engines and shallow workers are invocation-local; callbacks borrow local
 state, workers destroy their Engine before source/packet ownership. Source/Patterns
-retain49/2 alias guards. Frozen proof headers are values, imports use scalar arena
-indices and SourceValidation owns19 registered views. No project graphs are cloned.
+retain 49/2 alias guards. Frozen proof headers are values, imports use scalar arena
+indices and SourceValidation owns 19 registered views. No project graphs are cloned.
 
 Owning headers use exact registered runs and existing journals. Thirty restores
 fill fresh allocations before publishing views; buffer writers name owned
