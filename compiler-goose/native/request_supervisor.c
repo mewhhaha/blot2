@@ -16,8 +16,8 @@
 #include <unistd.h>
 
 /* SOCK_SEQPACKET makes each control record atomic; ancillary FDs never carry
- * compiler data. Only immutable, size-checked memfds cross this boundary. */
-enum { BEGIN = 1, FORKED, GO, FINISH, OOM, FAILED, ADOPT, READY, COMMIT, QUIESCENT, KEEP, IDLE };
+ * compiler data. Transferred FDs are immutable spools or the dedicated OOM capability. */
+enum { BEGIN = 1, FORKED, GO, FINISH, OOM, FAILED, ADOPT, READY, COMMIT, QUIESCENT, KEEP, IDLE, STAGE_CAP };
 struct record {
     uint64_t magic, token, length;
     int32_t kind, pid;
@@ -25,6 +25,8 @@ struct record {
 _Static_assert(sizeof(struct record) == 32, "fixed control record");
 static const uint64_t magic = UINT64_C(0x424c4f5452583031);
 static int channel = -1, input = -1, reply = -1, worker = -1, role = -1;
+static int stage_sender = -1, stage_child;
+extern int32_t blot_worker_quiesce(void) __attribute__((weak));
 static uint64_t request_bound, reply_bound, active_token, input_length, reply_length;
 static uint32_t limit_ms;
 static pid_t supervisor_pid;
@@ -92,12 +94,77 @@ static int receive(int fd, struct record *r, int *received, int64_t deadline) {
                 else close(value);
             }
         }
+        if (!n && !count && !msg.msg_controllen && (p.revents & POLLHUP)) return -EPIPE;
         if (n != sizeof *r || (msg.msg_flags & (MSG_TRUNC | MSG_CTRUNC)) ||
             count > 1 || r->magic != magic) {
             close_fd(received); return -EPROTO;
         }
         return 0;
     }
+}
+/* Return 1 only for an authenticated explicit stage marker. Capability EOF
+ * has no failure meaning; malformed/truncated records are ordinary failures. */
+static int stage_record(int *cap, uint64_t token, int64_t deadline) {
+    struct record r; int fd;
+    int error = receive(*cap, &r, &fd, deadline);
+    if (error == -EPIPE) { close_fd(cap); return 0; }
+    int invalid_fd = fd >= 0;
+    close_fd(&fd);
+    if (error) return error;
+    if (invalid_fd || r.kind != OOM || r.token != token || r.length || r.pid)
+        return -EPROTO;
+    return 1;
+}
+static int receive_candidate(int fd, int *cap, uint64_t token,
+                             struct record *r, int *received, int64_t deadline) {
+    *received = -1;
+    while (*cap >= 0) {
+        int64_t remaining = deadline - milliseconds();
+        if (remaining <= 0) return -ETIMEDOUT;
+        int timeout = INT_MAX;
+        if (remaining < INT_MAX) timeout = (int)remaining;
+        struct pollfd ready[2] = { { .fd = *cap, .events = POLLIN },
+                                   { .fd = fd, .events = POLLIN } };
+        int count = poll(ready, 2, timeout);
+        if (count < 0 && errno == EINTR) continue;
+        if (count < 0) return -errno;
+        if (!count) return -ETIMEDOUT;
+        /* Marker precedes FINISH/FAILED when both endpoints are ready. */
+        if (ready[0].revents) {
+            int error = stage_record(cap, token, deadline);
+            if (error) return error;
+        }
+        if (ready[1].revents) return receive(fd, r, received, deadline);
+    }
+    return receive(fd, r, received, deadline);
+}
+static int parse_unsigned(const char *text, uint64_t *value) {
+    if (!text || !*text) return -EINVAL;
+    *value = 0;
+    for (; *text; ++text) {
+        if (*text < '0' || *text > '9') return -EINVAL;
+        unsigned digit = (unsigned)(*text - '0');
+        if (*value > (UINT64_MAX - digit) / 10) return -EINVAL;
+        *value = *value * 10 + digit;
+    }
+    return 0;
+}
+int32_t blot_request_stage_init(int *argc, char **argv) {
+    if (*argc < 3 || strcmp(argv[1], "--worker") ||
+        strcmp(argv[2], "--blot-request-oom")) return 0;
+    uint64_t fd, token;
+    if (*argc != 5 || parse_unsigned(argv[3], &fd) || fd <= 2 || fd > INT_MAX ||
+        parse_unsigned(argv[4], &token) || !token) return -EINVAL;
+    int type = 0; socklen_t size = sizeof type;
+    if (getsockopt((int)fd, SOL_SOCKET, SO_TYPE, &type, &size) || type != SOCK_SEQPACKET ||
+        fcntl((int)fd, F_SETFD, FD_CLOEXEC)) return -EINVAL;
+    stage_sender = (int)fd; stage_child = 1; active_token = token;
+    *argc = 2; argv[2] = NULL;
+    return 1;
+}
+int32_t blot_request_stage_capability(void) {
+    if (role != BLOT_REQUEST_WORKER || input < 0 || !active_token) return -1;
+    return stage_sender;
 }
 static int immutable(int fd, uint64_t length, uint64_t bound) {
     struct stat st;
@@ -182,12 +249,12 @@ uint64_t blot_request_reply_length(void) { return reply_length; }
 int32_t blot_request_input_fd(void) { return input; }
 uint64_t blot_request_input_length(void) { return input_length; }
 uint64_t blot_request_token(void) {
-    if (role != BLOT_REQUEST_WORKER) return 0;
+    if (role != BLOT_REQUEST_WORKER && !stage_child) return 0;
     return active_token;
 }
 void blot_request_stop(void) {
     if (role == BLOT_REQUEST_SUPERVISOR) { kill_group(worker); reap(worker); reap_group(worker); }
-    close_fd(&channel); close_fd(&input); close_fd(&reply);
+    close_fd(&channel); close_fd(&input); close_fd(&reply); close_fd(&stage_sender);
     worker = -1; role = -1;
 }
 int32_t blot_request_begin(void) {
@@ -214,6 +281,9 @@ int32_t blot_request_begin(void) {
             if (setpgid(0, 0) || prctl(PR_SET_PDEATHSIG, SIGKILL) ||
                 getppid() != baseline) _exit(120);
             active_token = r.token;
+            error = receive(channel, &r, &fd, 0);
+            if (error || r.kind != STAGE_CAP || r.token != active_token || fd < 0) _exit(120);
+            stage_sender = fd;
             if (fork_hook) fork_hook();
             error = receive(channel, &r, &fd, 0);
             if (error || r.kind != GO || r.token != active_token ||
@@ -232,7 +302,9 @@ int32_t blot_request_begin(void) {
     }
 }
 _Noreturn void blot_request_fail_oom(uint64_t token) {
-    send_record(channel, OOM, token, 0, 0, -1); _exit(121);
+    int fd = channel;
+    if (stage_child) fd = stage_sender;
+    send_record(fd, OOM, token, 0, 0, -1); _exit(121);
 }
 _Noreturn void blot_request_fail(uint64_t token) {
     send_record(channel, FAILED, token, 0, 0, -1); _exit(122);
@@ -240,6 +312,11 @@ _Noreturn void blot_request_fail(uint64_t token) {
 int32_t blot_request_finish(int32_t reply_fd, uint64_t length, uint64_t token) {
     if (role != BLOT_REQUEST_WORKER || input < 0 || token != active_token)
         blot_request_fail(token);
+    /* A copied worker writes its response before its final cleanup. Normal EOF
+     * and join make that cleanup, any marker, and capability closure precede
+     * FINISH. A hung worker remains subject to the supervisor request deadline. */
+    if (blot_worker_quiesce && blot_worker_quiesce()) blot_request_fail(token);
+    close_fd(&stage_sender);
     int staged = spool(reply_fd, length, reply_bound);
     close_fd(&input); input_length = 0;
     if (staged < 0) blot_request_fail(token);
@@ -268,26 +345,39 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
         return -EINVAL;
     int request = spool(request_fd, length, request_bound);
     if (request < 0) return request;
+    int stage[2];
+    if (socketpair(AF_UNIX, SOCK_SEQPACKET | SOCK_CLOEXEC, 0, stage)) {
+        int error = errno; close(request); return -error;
+    }
+    /* Empty seqpacket messages otherwise look like EOF, even after peer close.
+     * Kernel credentials distinguish a real packet; POLLHUP proves closure. */
+    int credentials = 1;
+    if (setsockopt(stage[0], SOL_SOCKET, SO_PASSCRED, &credentials, sizeof credentials)) {
+        int error = errno; close(stage[0]); close(stage[1]); close(request); return -error;
+    }
     close_fd(&reply); reply_length = 0; active_token = token;
     int64_t deadline = milliseconds() + limit_ms;
     int error = send_record(channel, BEGIN, token, 0, 0, -1);
     struct record r; int candidate_channel = -1, candidate = -1;
     if (!error) error = receive(channel, &r, &candidate_channel, deadline);
     if (!error && r.kind == FAILED && r.token == token && candidate_channel < 0) {
-        close(request); return BLOT_REQUEST_FAILED;
+        close(request); close(stage[0]); close(stage[1]); return BLOT_REQUEST_FAILED;
     }
     if (!error && (r.kind != FORKED || r.token != token || r.pid <= 0 || candidate_channel < 0))
         error = -EPROTO;
     if (error) {
-        close(request); close_fd(&candidate_channel);
+        close(request); close(stage[0]); close(stage[1]); close_fd(&candidate_channel);
         /* A lost baseline transport is terminal; it cannot promise rollback. */
         blot_request_stop(); return -EPIPE;
     }
     candidate = r.pid;
-    error = send_record(candidate_channel, GO, token, length, 0, request);
+    error = send_record(candidate_channel, STAGE_CAP, token, 0, 0, stage[1]);
+    close(stage[1]);
+    if (!error) error = send_record(candidate_channel, GO, token, length, 0, request);
     close(request);
     int result = BLOT_REQUEST_FAILED, returned = -1;
-    if (!error) error = receive(candidate_channel, &r, &returned, deadline);
+    if (!error) error = receive_candidate(candidate_channel, &stage[0], token, &r, &returned, deadline);
+    if (error == 1) result = BLOT_REQUEST_OOM;
     if (error == -ETIMEDOUT) result = BLOT_REQUEST_TIMEOUT;
     if (!error && r.token == token && r.kind == OOM && returned < 0 && !r.length)
         result = BLOT_REQUEST_OOM;
@@ -297,8 +387,14 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
         uint64_t complete_length = r.length;
         error = send_record(candidate_channel, ADOPT, token, 0, 0, -1);
         int extra = -1;
-        if (!error) error = receive(candidate_channel, &r, &extra, deadline);
+        if (!error) error = receive_candidate(candidate_channel, &stage[0], token, &r, &extra, deadline);
+        /* Even READY cannot retire the baseline while a descendant retains
+         * this request capability. Every marker must be drained through EOF. */
+        if (!error && r.kind == READY && r.token == token && extra < 0 && stage[0] >= 0)
+            error = stage_record(&stage[0], token, deadline);
+        if (error == 1) result = BLOT_REQUEST_OOM;
         if (!error && r.kind == READY && r.token == token && extra < 0) {
+            close_fd(&stage[0]);
             kill_group(worker); reap(worker); reap_group(worker);
             close_fd(&channel); channel = candidate_channel; worker = candidate;
             reply = returned; reply_length = complete_length;
@@ -314,7 +410,7 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
         close_fd(&extra);
         if (error == -ETIMEDOUT) result = BLOT_REQUEST_TIMEOUT;
     }
-    close_fd(&returned); close_fd(&candidate_channel);
+    close_fd(&returned); close_fd(&candidate_channel); close_fd(&stage[0]);
     kill_group(candidate);
     error = send_record(channel, KEEP, token, 0, 0, -1);
     int extra = -1;

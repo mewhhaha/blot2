@@ -57,10 +57,15 @@ store acquisitions retain all 9/21 header-identity guards. Error-only work recor
 keep borrowed inputs separate. A review audits 210 affected calls and 46 bodies.
 The actual checker path has cleared the proof/resolver, sort-context and
 diagnostic-transfer failures. Its latest selected-root diagnostic is the
-source-validator AST traversal at `parse/source_operators.goose:448`; that
-immutable traversal family is now repaired. The combined five-root check hit
-its 120.301s cap with no emitted error; that is incomplete. Separate check/lower/
-independent roots are being checked concurrently to expose distinct failures. All 12 sort helpers and 11 comparator/swap contexts
+source-validator AST traversal, then a scratch index at
+`parse/source_operators.goose:100`; that
+traversal/indexing family is now repaired. The combined five-root check hit
+its 120.301s cap with no emitted error; that is incomplete. Split runtime,
+semantic, lower and independent roots pass in 2.103/66.086/3.605/67.102s. The
+checker root then exposed a pre-existing scratch wrapper index; it is fixed
+and its family audited. A whole build, rather than another selected check,
+hit120.262s with warnings only and no C/header. Measure this whole-entry cost
+before repeating emission attempts. All 12 sort helpers and 11 comparator/swap contexts
 now take fixed views by value, preserving charged comparison/swap order. The current source batch also
 converts 100 immutable AST loops, removes 32 retained AST span aliases and copies
 111 scalar metadata lookups rather than retaining optional map-entry references.
@@ -92,13 +97,17 @@ bounded immutable replies, validate before adoption, detach inherited workers,
 and wait for post-adoption cache publication. Cache staging mutates no external
 files; publication runs through an allocation-free native hook after adoption.
 The production server loop and C entry now integrate these APIs, but no compiler
-runtime has executed them yet. Stage-worker physical OOM propagation remains
-unqualified. Scoped runtime observations report actual pool operation totals
+runtime has executed them yet. A dedicated capability now carries token-bound allocation-failure markers
+from copied stage processes. Native/sanitizer controls cover initialization,
+execution and post-reply cleanup refusal, malformed markers, ordinary failures,
+retained state/cache and retry in 7.5s. These tests use the real Goose allocator
+with a fake C compiler entry; whole compiler integration remains unqualified. Scoped runtime observations report actual pool operation totals
 and virtual region reservations; active payload, retained capacity and scratch
 remain unavailable. Never substitute operation balance or RSS for liveness.
 See [observer evidence](benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json),
 [supervisor/transport evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-supervisor.json)
-and [cache evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-cache.json).
+and [cache evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-cache.json) and
+[worker OOM evidence](benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json).
 
 Whole builds cache native/runtime objects first, retain stage logs/timings,
 stop three seconds after the first emission diagnostic, and share a 300s cap.

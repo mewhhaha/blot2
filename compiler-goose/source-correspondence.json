@@ -3688,7 +3688,7 @@
   "remaining_production_work": [
     "Produce and execute the complete Goose compiler; current whole C/header emission is capped and no executable exists.",
     "Qualify integrated request OOM rollback, cache publication, retained revision retry and differential behavior with the real compiler; native components alone are qualified.",
-    "Propagate explicitly authenticated physical OOM from copied stage workers; generic worker exits and signals remain failures.",
+    "Qualify the implemented token-bound stage-worker allocation refusal capability with the complete compiler; native/sanitizer controls pass, ordinary exits and signals remain failures.",
     "Measure typed-pool active payload, retained capacity and scratch bounds; current scoped runtime hooks provide operation totals and virtual reservations, not those quantities."
   ],
   "algorithm_first_pass_written": true,

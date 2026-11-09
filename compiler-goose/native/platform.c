@@ -260,6 +260,8 @@ int64_t blot_environment_copy(const uint8_t *name, uint8_t *out, uint64_t capaci
 struct blot_worker_process { pid_t pid; int input; int output; };
 static struct blot_worker_process blot_workers[16];
 extern char **environ;
+extern int32_t blot_request_stage_capability(void) __attribute__((weak));
+extern uint64_t blot_request_token(void) __attribute__((weak));
 int64_t blot_worker_spawn(uint32_t slot) {
     if (slot >= 16 || blot_workers[slot].pid) return -EINVAL;
     char executable[PATH_MAX];
@@ -278,6 +280,20 @@ int64_t blot_worker_spawn(uint32_t slot) {
             return -saved;
         }
     }
+    int capability = -1;
+    uint64_t token = 0;
+    if (blot_request_stage_capability && blot_request_token) {
+        int source = blot_request_stage_capability();
+        if (source >= 0) {
+            capability = fcntl(source, F_DUPFD_CLOEXEC, 3);
+            if (capability < 0) {
+                int saved = errno;
+                for (size_t i = 0; i < 4; ++i) close(all[i]);
+                return -saved;
+            }
+            token = blot_request_token();
+        }
+    }
     posix_spawn_file_actions_t actions;
     int error = posix_spawn_file_actions_init(&actions);
     if (!error) {
@@ -287,16 +303,31 @@ int64_t blot_worker_spawn(uint32_t slot) {
             if (all[i] != STDIN_FILENO && all[i] != STDOUT_FILENO)
                 error = posix_spawn_file_actions_addclose(&actions, all[i]);
         }
-        char *arguments[] = { executable, "--worker", NULL };
+        /* POSIX dup2 file actions clear CLOEXEC, including source == target.
+         * Child bootstrap immediately restores it before runtime initialization. */
+        if (!error && capability >= 0)
+            error = posix_spawn_file_actions_adddup2(&actions, capability, capability);
+        char fd_text[32], token_text[32];
+        snprintf(fd_text, sizeof fd_text, "%d", capability);
+        snprintf(token_text, sizeof token_text, "%llu", (unsigned long long)token);
+        char *arguments[] = { executable, "--worker", NULL, NULL, NULL, NULL };
+        if (capability >= 0) {
+            arguments[2] = "--blot-request-oom";
+            arguments[3] = fd_text;
+            arguments[4] = token_text;
+        }
         pid_t pid = 0;
         if (!error) error = posix_spawn(&pid, executable, &actions, NULL, arguments, environ);
         posix_spawn_file_actions_destroy(&actions);
+        if (capability >= 0) close(capability);
+        capability = -1;
         if (!error) {
             close(request[0]); close(response[1]);
             blot_workers[slot] = (struct blot_worker_process){ pid, request[1], response[0] };
             return pid;
         }
     }
+    if (capability >= 0) close(capability);
     for (size_t i = 0; i < 4; ++i) close(all[i]);
     return -error;
 }
@@ -326,6 +357,29 @@ int32_t blot_worker_stop(uint32_t slot) {
     do { waited = waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
     if (waited < 0 && errno != ECHILD) return -errno;
     return 0;
+}
+/* Finish only candidate-owned jobs through EOF and runtime cleanup, so a
+ * response cannot race adoption with a subsequent allocation refusal. All
+ * inputs close before any join; the outer supervisor bounds a stuck child. */
+int32_t blot_worker_quiesce(void) {
+    for (size_t slot = 0; slot < 16; ++slot) {
+        if (blot_workers[slot].pid) {
+            close(blot_workers[slot].input);
+            blot_workers[slot].input = -1;
+        }
+    }
+    int error = 0;
+    for (size_t slot = 0; slot < 16; ++slot) {
+        struct blot_worker_process worker = blot_workers[slot];
+        if (!worker.pid) continue;
+        blot_workers[slot] = (struct blot_worker_process){0};
+        int status = 0;
+        pid_t waited;
+        do { waited = waitpid(worker.pid, &status, 0); } while (waited < 0 && errno == EINTR);
+        if (waited < 0 || !WIFEXITED(status) || WEXITSTATUS(status)) error = -EPIPE;
+        close(worker.output);
+    }
+    return error;
 }
 
 int32_t blot_lock_open(const uint8_t *path) {

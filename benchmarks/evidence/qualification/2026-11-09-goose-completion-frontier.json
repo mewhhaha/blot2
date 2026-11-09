@@ -69,6 +69,28 @@
       "log_sha256": "6e45943c35391744ec278d931d6a583d403e77ee773fe8a44528f4bbef2a2c53",
       "batch": 9,
       "qualification": "incomplete"
+    },
+    {
+      "stage": "emit program",
+      "command": [
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+        "-o",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.c",
+        "--header",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.h",
+        "-O0",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "/home/jacobt/src/blot2/compiler-goose/src/main.goose"
+      ],
+      "seconds": 120.262,
+      "exit": -15,
+      "stop": "time limit",
+      "log": "/home/jacobt/src/blot2/compiler-goose/build/stages/emit-program.log",
+      "log_sha256": "e5e6372fcd041dcf74386036b2cdc96870f8aae85eddb994441661cbed841ac9",
+      "batch": 23,
+      "qualification": "incomplete",
+      "frozen_capture": "build/goose-port/completion-batch-23/capture.json"
     }
   ],
   "isolated_engines": {
@@ -109,25 +131,13 @@
     "removed_source_validator_span_aliases": 14
   },
   "latest_selected_frontier": {
-    "batch": 19,
-    "partial": true,
-    "engines": [
-      "check"
-    ],
-    "exit": 1,
-    "seconds": 64.974,
-    "stop": "completed",
-    "errors": [
-      {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/parse/source_operators.goose",
-        "line": 448,
-        "message": "error: cannot call source_binding_annotation, which may shrink context: the for loop at /home/jacobt/src/blot2/compiler-goose/src/parse/source_operators.goose:446 iterates tree.list(implementation.members), which may refer into context (\u00a75.2)"
-      }
-    ],
-    "full_qualification": false,
-    "diagnostic_log": "build/goose-port/completion-batch-19/check-engine/diagnostics.log",
-    "diagnostic_log_sha256": "09c603936cc73c80bf27306569bc210697cbe0773a57d364294f8defe46e8639",
-    "status": "source/global-reference immutable traversal family repaired; combined batch20 hit120.301s cap with zero diagnostics; split batch21 pending"
+    "batch": 21,
+    "seconds": 66.805,
+    "file": "compiler-goose/src/parse/source_operators.goose",
+    "line": 100,
+    "error": "cannot index Scratchi64Buffer directly",
+    "status": "scratch wrapper index fixed and audited; four other selected roots pass; whole emission batch23 cap120.262s with zero errors; no repeated selected check after one-line fix",
+    "qualification": "partial"
   },
   "latest_executed_laws": {
     "passed": true,
@@ -201,7 +211,7 @@
     "compiler-goose/src/eval/implementation_rows.goose": "d24522469d2707505e5b5a6b0e191b71736d8f2f1bbd37fac42a076a9a6d8376",
     "compiler-goose/src/eval/selected_implementation_admission.goose": "11c8eacdb50e76fd51f42dd3862d901ab1e215db49cd74c92116668cf594f729",
     "compiler-goose/src/eval/type_evidence.goose": "30cd6db84f49c63af2336b3196c28c8f2a588f9186ed55e7c80038d87e66e227",
-    "compiler-goose/src/parse/source_operators.goose": "773819af73cd15b6df555ed91b81db4f5ec256364e53bf260d796d2e7fe0eb77",
+    "compiler-goose/src/parse/source_operators.goose": "d77d81e727181e6a8eb93617ccc77bff791ba486328ed01be36ee60eca7b5381",
     "compiler-goose/src/reuse/global_references.goose": "7c8ee8e2d9ce053c52f5f7a95f7329ded761bd9f19fc2ef23133d60761556bc9",
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "0ebb997c72ea70d035356726a1ddaa5b5a6451b7afdda80f9915c901a2b49552",
@@ -214,8 +224,8 @@
     "all compiler paths",
     "public CLI/project server behavior",
     "integrated request OOM/retry/retention",
-    "stage-worker physical OOM",
-    "active payload/retained capacity/scratch observations"
+    "active payload/retained capacity/scratch observations",
+    "integrated stage-worker allocation refusal in whole Goose compiler"
   ],
   "latest_combined_check": {
     "partial": true,
@@ -234,5 +244,82 @@
     "raw_result_sha256": "6233825128e93e99b517080e9da13b3a9c7b8499e7333bd9e67fc72c35dee274",
     "source_state": "source/global-reference traversal family repaired",
     "qualification": "incomplete"
-  }
+  },
+  "split_selected_batch21": {
+    "partial": true,
+    "seconds": 67.189,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 66.805,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/parse/source_operators.goose",
+            "line": 100,
+            "message": "error: cannot index a value of type blot_parse_source_operators::Scratchi64Buffer"
+          }
+        ],
+        "full_qualification": false
+      },
+      {
+        "partial": true,
+        "engines": [
+          "lower"
+        ],
+        "exit": 0,
+        "seconds": 3.605,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false
+      },
+      {
+        "partial": true,
+        "engines": [
+          "independent"
+        ],
+        "exit": 0,
+        "seconds": 67.102,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false
+      }
+    ],
+    "full_qualification": false,
+    "raw_result_sha256": "c5be706b5361487eb6021eb88ccec28d5420d6cc204f28cf71eb8182677d4032"
+  },
+  "split_selected_batch22": {
+    "partial": true,
+    "seconds": 66.137,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "runtime"
+        ],
+        "exit": 0,
+        "seconds": 2.103,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false
+      },
+      {
+        "partial": true,
+        "engines": [
+          "semantic"
+        ],
+        "exit": 0,
+        "seconds": 66.086,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false
+      }
+    ],
+    "full_qualification": false
+  },
+  "worker_oom_native_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json"
 }

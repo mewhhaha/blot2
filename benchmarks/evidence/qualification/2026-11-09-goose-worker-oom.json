@@ -1,0 +1,171 @@
+{
+  "date": "2026-11-09",
+  "scope": "Production native main, copied stage process spawn, supervisor, cache and observer with a fake C compiler entry/counter; selected unmodified real Goose runtime, no whole compiler executable or Goose dispatcher qualification",
+  "predecessor": {
+    "path": "benchmarks/evidence/qualification/2026-11-09-goose-request-supervisor.json",
+    "historical_receipt_sha256_before_successor_link": "9b2b8d5d640621cbd05486501e279c34a07572f74f19920004ac5ee6e4e23f3c",
+    "linked_receipt_sha256": "dab87cc16bff7f7ab5fdd30570108afc88fc467a3c0281071d34b2f83ae75c11",
+    "policy": "Original source hashes, results and pending entries remain historical; this record supplies the successor native source pins and rerun."
+  },
+  "runtime": {
+    "path": "build/goose-port/array-reach-gate/runtime-observer-controls/runtime.c",
+    "sha256": "a23cc0eb0a668064a0102ec8ea5a73a9c90bdf3e7dd9a7a4a2864e34d5f2c98c",
+    "origin_goose_sha256": "a7f79fff83b5b348170c7317a01443f8d3d4e2928cd22c105f8c57e1adf9ee29",
+    "origin_mode": "runtime-observer; emitted runtime has no compiler source algorithm",
+    "modified": false
+  },
+  "tools": {
+    "cc": "/usr/bin/clang-23",
+    "cc_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "cc_version": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "runner": "compiler-goose/tools/test_worker_oom.py",
+    "runner_sha256": "3af19534111295ad0cb7c04c04dfd28c2e6bd32e5c2aee8e844f2de9e7cac8db"
+  },
+  "source_sha256": {
+    "compiler-goose/native/main.c": "102c7d8003ea8fbfa50689149945c9f26e3fab706312f531d0ef5f681f178730",
+    "compiler-goose/native/platform.c": "09b707185be163c3f2393fe81842d060e53b3767f2d0615eede618e20b390ba2",
+    "compiler-goose/native/request_supervisor.c": "21299dc8945f3db5ef42e027b58a2ec807ba0260e0e6ab48917f8432d22d0941",
+    "compiler-goose/native/request_supervisor.h": "c2be3a0dde00933d1cda900bd0d88d58767d1aa63ee4ed1e299f53b8c8fcf05e",
+    "compiler-goose/native/request_cache.c": "08cddd2c4584d1298e483b553ef80fd250989725772e30565afe9fd10a1e33e0",
+    "compiler-goose/native/request_cache.h": "9708d7f85d1f722ee98bf3cf443f9edc8ee4fdfa27423998548ee91ea8c51318",
+    "compiler-goose/native/allocation_observer.c": "805b0051636a3c0d6edd36e79b89d3291f1edc9e23882a8246d2abe59378bad1",
+    "compiler-goose/native/allocation_observer.h": "a275b63e70ec5fe00081be2723b1342e7ce2956841732cf5feef86c90d94c4b0",
+    "compiler-goose/native/tests/worker_oom_test.c": "338c9e19f9360f799d882d8f762c2014c02b59ae812492d7de026b5e0411e5f6",
+    "compiler-goose/native/tests/request_supervisor_test.c": "ffcc80fd42a40e79775fab1117ccfa88d69b0dd4fe789c74d3211c83b4c3d402",
+    "compiler-goose/native/tests/request_transport_test.c": "44a003c250857fec54e4e862e5b3777f3aeb1738a043d6cae240080b3c0d95df",
+    "compiler-goose/native/request_transport.c": "bf38543e76c2cda2be152d80a20bb386c3ff2a796236c0c3e54efb60eb659c88",
+    "compiler-goose/native/request_transport.h": "1a1076f1c32506ee28861048416f1b90b640180acc66daf2e9abc758d5ce3d20",
+    "compiler-goose/tools/test_worker_oom.py": "3af19534111295ad0cb7c04c04dfd28c2e6bd32e5c2aee8e844f2de9e7cac8db"
+  },
+  "reproduce": [
+    "python3",
+    "compiler-goose/tools/test_worker_oom.py",
+    "--runtime",
+    "build/goose-port/array-reach-gate/runtime-observer-controls/runtime.c",
+    "--output",
+    "build/goose-port/worker-oom-tests"
+  ],
+  "compile_flags": {
+    "both": [
+      "-std=gnu11",
+      "-O1",
+      "-g",
+      "-pthread"
+    ],
+    "production_entry": [
+      "-Wall",
+      "-Wextra",
+      "-Werror",
+      "-Dmain=blot_native_main"
+    ],
+    "sanitized_additions": [
+      "-fsanitize=address,undefined",
+      "-fno-omit-frame-pointer"
+    ],
+    "wrapper": "Includes selected runtime.c unchanged, then tracked native/tests/worker_oom_test.c to reach real internal registry calloc. Production main.c is compiled separately, with only its main symbol renamed."
+  },
+  "sanitizer_environment": {
+    "ASAN_OPTIONS": "detect_leaks=0:allocator_may_return_null=1",
+    "UBSAN_OPTIONS": "halt_on_error=1",
+    "leak_scope": "Forked/killed heaps are intentionally discarded; explicit parent FD counts and child reaping checked. LeakSanitizer heap accounting not claimed."
+  },
+  "protocol": {
+    "public_ABI": 8,
+    "session_protocol": 2,
+    "copied_packet_protocol": "BLOTJOB2, version2, unchanged Goose readFrame/writeFrame schema",
+    "capability": "Fresh SOCK_SEQPACKET endpoint per candidate, transferred over its authenticated control channel and passed only to its stage exec children; token alone grants no authority. Separate from worker stdout and adoption control.",
+    "marker": "Existing fixed32-byte token-bound OOM record; only an explicit allocation callback emits the valid test markers. Exit125 alone has no OOM meaning.",
+    "bootstrap": "Private native argv suffix is validated and consumed before goose_init; visible worker args remain exactly --worker. Capability immediately restored CLOEXEC.",
+    "completion_order": "Close all candidate-owned worker inputs, join normal EOF/cleanup, close candidate capability, seal reply, FINISH/READY, drain capability through EOF before baseline retirement. Optional cache publish still occurs only after COMMIT.",
+    "baseline": "Candidate detaches inherited baseline worker handles without signalling baseline workers; baseline stage children retain token0, never later request tokens.",
+    "seqpacket_edge": "Linux zero-length seqpacket messages can return0 just like EOF, including when sender closes later. SO_PASSCRED marks real messages; only credential-free zero bytes plus POLLHUP counts as EOF. Empty/short/wrong-token records are ordinary failure."
+  },
+  "checks": [
+    {
+      "test": "worker-oom",
+      "variant": "native",
+      "seconds": 0.541,
+      "binary_sha256": "ab4f5a02a7491444d36bda8e05560f84961cc52905388e763f22b00ba76e4d08",
+      "stdout": "worker OOM: real allocator refusal before/init/after reply, retained heap/cache, generic failures, token/capability closure, FD/stdout/zombie cleanup pass\n"
+    },
+    {
+      "test": "supervisor",
+      "variant": "native",
+      "seconds": 0.385,
+      "binary_sha256": "92bf3a7145b2737784bc5cbb5b8d336bcf4b78441e813c49c00b66363f336178",
+      "stdout": "request supervisor: retained heap, classified failures, immutable spools, stdout/FD/child cleanup pass\n"
+    },
+    {
+      "test": "transport",
+      "variant": "native",
+      "seconds": 0.081,
+      "binary_sha256": "fa8fe97cc1da8572223c7a5abe99f90b6947aa1fc4c117cc6d98b4bdfef71cf3",
+      "stdout": "request transport: framing/envelope validation, retained revision/OOM id, one Hello, no partial output pass\n"
+    },
+    {
+      "test": "worker-oom",
+      "variant": "sanitized",
+      "seconds": 0.77,
+      "binary_sha256": "7102a448e10327161f5c56b866e90fcf83893d14a1384d7c398ee25d01aad113",
+      "stdout": "worker OOM: real allocator refusal before/init/after reply, retained heap/cache, generic failures, token/capability closure, FD/stdout/zombie cleanup pass\n"
+    },
+    {
+      "test": "supervisor",
+      "variant": "sanitized",
+      "seconds": 0.87,
+      "binary_sha256": "8bbb93eb0189a82c3ce942e1e6145fc5b8678777ba7de6e4f62da337835e696a",
+      "stdout": "request supervisor: retained heap, classified failures, immutable spools, stdout/FD/child cleanup pass\n"
+    },
+    {
+      "test": "transport",
+      "variant": "sanitized",
+      "seconds": 0.132,
+      "binary_sha256": "a3a33b444bc8a0b31e10f726ecab935f34bf22e2ace8a29f62124f2ed6db5a52",
+      "stdout": "request transport: framing/envelope validation, retained revision/OOM id, one Hello, no partial output pass\n"
+    }
+  ],
+  "worker_cases": {
+    "real_observed_allocator_refusal": [
+      "before runtime init",
+      "during stage execution",
+      "after full worker reply, during final cleanup"
+    ],
+    "generic_not_OOM": [
+      "plain exit125 before reply",
+      "ordinary runtime panic",
+      "SIGKILL",
+      "truncated reply",
+      "wrong token",
+      "forged short capability record",
+      "zero-length capability record while sender live",
+      "zero-length capability record then normal exit after full reply",
+      "plain exit125 after full reply, during cleanup"
+    ],
+    "ownership": [
+      "normal exec descendant cannot retain capability (explicit EBADF check)",
+      "fork descendant retaining capability prevents adoption and causes timeout; subtree killed/reaped",
+      "baseline worker survives every rejected candidate",
+      "accepted candidate stage jobs joined before adoption",
+      "new higher-token request starts without prior capability authority"
+    ],
+    "transaction": [
+      "accepted counter/cache7 -> each failure mutates candidate999 -> retained counter/cache7 -> valid retry -> final accepted8",
+      "staged cache target/temporary files remain unchanged/absent on authenticated child OOM",
+      "no partial external stdout, stable parent FD count, no remaining child/zombie at test end"
+    ]
+  },
+  "result": "All six native and ASan/UBSan executables passed",
+  "batch_seconds": 7.5,
+  "per_subprocess_limit_seconds": 30,
+  "detailed_receipt": {
+    "path": "build/goose-port/worker-oom-tests/receipt.json",
+    "sha256": "0b62285fa2df467de140c50e007e87ed12d1ecdf46cbf69609d05a65c81ba280"
+  },
+  "limitations": [
+    "Allocator refusal is forced through real Goose registry calloc under RLIMIT_AS; physical RAM exhaustion is untested.",
+    "The fake compiler entry exercises actual native lifecycle and cache publication, not actual Goose project stage algorithms or protocol2 payload parsing.",
+    "Whole compiler build, actual project edit/OOM/retained-artifact session and full runtime allocation coverage remain pending.",
+    "Linux; single-threaded quiescent request fork; descendants must stay in inherited candidate process group."
+  ],
+  "whole_compiler_qualified": false
+}

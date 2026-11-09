@@ -25,7 +25,9 @@ contexts pass their fixed borrowed fields by value. No lifetime acceptance rule
 is weakened. The proof/resolver, scalar metadata, sort and diagnostic transfer
 families are repaired. The source/global-reference validator batch adds 21 AST
 cursors and removes 14 span aliases. Combined selected checking hit120.301s
-with no error and is incomplete; split engine checking is pending.
+with no error and is incomplete. Four split roots pass; the checker root
+exposed a scratch wrapper index, now fixed. Whole emission then hit120.262s
+without an error or C/header. Profile the whole entry before another retry.
 Six isolated production engine families execute. Current results and the next frontier belong in root CONTINUE.md
 and pinned qualification receipts.
 
@@ -33,7 +35,9 @@ Native request rollback and runtime observation components are tested; their
 whole compiler integration remains unqualified. A
 committed worker forks a candidate before reading each request; only a complete
 staged reply can adopt it. Explicit allocation failures discard the candidate
-and retain the committed heap. Generic panics and signals are not OOM. Coverage
+and retain the committed heap. Generic panics and signals are not OOM. A dedicated token-bound stage-worker
+capability now covers native initialization/execution/cleanup refusals; normal
+and sanitizer controls pass, while whole compiler integration remains pending. Coverage
 must distinguish observed pool operations, reserved capacity and RSS; unavailable
 live/scratch counts must stay explicitly unavailable.
 

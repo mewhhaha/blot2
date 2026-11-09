@@ -39,7 +39,15 @@ void blot_request_stop(void);
 int32_t blot_request_begin(void);
 int32_t blot_request_input_fd(void);
 uint64_t blot_request_input_length(void);
-/* Zero in the supervisor and outside candidate/adoption processing. */
+/* Internal exec-worker bootstrap: consumes only the private native argv suffix,
+ * restores public --worker arguments, and marks the capability close-on-exec.
+ * Call before goose_init. Returns 1 for a bound stage child, 0 normally, <0 invalid. */
+int32_t blot_request_stage_init(int *argc, char **argv);
+/* Borrowed OOM-only capability for a candidate's copied stage workers, or -1.
+ * It never carries request/reply or adoption messages. */
+int32_t blot_request_stage_capability(void);
+/* Zero in the supervisor and outside candidate/adoption processing. Exec stage
+ * children retain their original token until exit, never a later request token. */
 uint64_t blot_request_token(void);
 /* Worker: call after all request cleanup. Borrows reply FD, stages and seals an
  * exact bounded copy. Returns 0 after adoption; failed candidates never return.

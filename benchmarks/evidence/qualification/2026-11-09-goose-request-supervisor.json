@@ -144,5 +144,9 @@
     "bound": "Derived from existing 16MiB metadata cap and minimum two bracket bytes per container; no separate depth policy",
     "traversal": "Iterative, allocation-free, no recursive C calls",
     "schema_authority": "Goose typed request parser unchanged (depth 64, unknown fields rejected); native traversal checks JSON lexical shape only"
+  },
+  "successor_qualification": {
+    "path": "benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json",
+    "scope": "Native supervisor/transport rerun with authenticated exec stage-worker OOM and pre-adoption capability closure; this historical receipt retains its exact original source pins and pending scope."
   }
 }

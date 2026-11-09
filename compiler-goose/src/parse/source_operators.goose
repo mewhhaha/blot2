@@ -97,7 +97,7 @@ recursive fn pattern_result<C>(self_: Validator<C>&,id: Id,depth: i64) {
   var starts=Scratchi64Buffer {};  let ast_children_source=id;let ast_children_count=self_.tree.children(ast_children_source).len;
   let ast_visit_4_source=ast_children_source;let ast_visit_4_count=self_.tree.children(ast_visit_4_source).len;for ast_visit_4_index in 0..ast_visit_4_count {let child=self_.tree.children(ast_visit_4_source)[ast_visit_4_index]; starts.push(self_.locals.len); pattern_result(self_,child,depth+1); if stopped(self_) { starts.deinit(); return; } }
   starts.push(self_.locals.len); var index=ast_children_count;
-  while index!=0 { index--; unique_pattern(self_,self_.locals.items[starts.items[index]..starts[index+1]],self_.locals.items[starts.items[index+1]..],self_.tree.children(ast_children_source)[index]); if stopped(self_) { starts.deinit(); return; } }
+  while index!=0 { index--; unique_pattern(self_,self_.locals.items[starts.items[index]..starts.items[index+1]],self_.locals.items[starts.items[index+1]..],self_.tree.children(ast_children_source)[index]); if stopped(self_) { starts.deinit(); return; } }
   starts.deinit(); } else if n.tag==a_pattern_value { name(self_,n.a,id,self_.tree.span(id).start+1); }
 }
 fn request_input<C>(self_: Validator<C>&,id: Id) -> bool {

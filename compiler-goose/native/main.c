@@ -31,12 +31,16 @@ static uint64_t unsigned_environment(const char *name) {
     return result;
 }
 
-static void request_forked(void) {
-    blot_worker_detach();
+static void observe_request(void) {
     uint64_t token = blot_request_token();
     uint64_t selected = 0;
     if (token == failure_request) selected = failure_at;
     blot_allocation_observer_begin(token, selected, failure_kind);
+}
+
+static void request_forked(void) {
+    blot_worker_detach();
+    observe_request();
 }
 
 static void allocation_failed(int kind, uint64_t bytes) {
@@ -65,6 +69,8 @@ int main(int argc, char **argv) {
         }
     }
 #endif
+    int stage_child = blot_request_stage_init(&argc, argv);
+    if (stage_child < 0) _exit(124);
     blot_platform_entry_init(argc, argv);
     failure_request = unsigned_environment("BLOT_GOOSE_FAIL_REQUEST");
     failure_at = unsigned_environment("BLOT_GOOSE_FAIL_AT");
@@ -73,6 +79,7 @@ int main(int argc, char **argv) {
     blot_request_fork_hook(request_forked);
     blot_request_adopt_hook(blot_request_cache_publish);
     blot_allocation_observer_install(allocation_failed);
+    if (stage_child) observe_request();
     goose_init(argc, argv);
     return blot_goose_main();
 }
