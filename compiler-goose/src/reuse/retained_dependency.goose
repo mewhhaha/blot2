@@ -2,6 +2,7 @@
 namespace blot_reuse_retained_dependency;
 import reuse.frozen_dependency;
 import reuse.dependency_payload;
+import reuse.dependency_owned_headers;
 import reuse.completed_core_validation;
 import reuse.source_completion;
 import support.error;
@@ -58,14 +59,14 @@ fn adopt(value:OwnedFrozen&)->Snapshot?,Error {
  // Rebind the outer journal runs before partitioning their child ownership.
  let modules=value.owner.mutable(value.value.modules);let symbols=value.owner.mutable(value.value.symbols);
  for module,index in modules {
-  let destination:Module& =module_owners[self_.modules[index].slot-1];value.owner.partitionInto(destination.owner,module);destination.value=module;
+  let destination:Module& =module_owners[self_.modules[index].slot-1];value.owner.partitionInto(destination.owner,module);destination.value=blot_reuse_dependency_owned_headers::canonical(destination.owner,module);
  }
  self_.value=Frozen{symbols,modules};self_.owner=value.owner;self_.initialized=self_.modules.len;value=default<OwnedFrozen>();return self_,blot_error::Error.none;
 }
 fn append(self_:Snapshot&,handle:ModuleHandle) {assert(self_.valid()&&!self_.validated&&self_.initialized<self_.modules.len&&handle.valid());self_.modules[self_.initialized]=handle;self_.value.modules[self_.initialized]=module_owners[handle.slot-1].value;self_.initialized++;}
 fn appendOwned(self_:Snapshot&,value:OwnedModule&)->Error {
  let handle,error=allocateModule();if error!=blot_error::Error.none {value.deinit();return error;}
- let module:Module& =module_owners[handle.slot-1];module.value=value.value;module.owner=value.owner;value=default<OwnedModule>();self_.append(handle);return blot_error::Error.none;
+ let module:Module& =module_owners[handle.slot-1];module.value=blot_reuse_dependency_owned_headers::canonical(value.owner,value.value);module.owner=value.owner;value=default<OwnedModule>();self_.append(handle);return blot_error::Error.none;
 }
 fn appendShared(self_:Snapshot&,previous:const Snapshot&,index:i64)->Error {
  assert(previous.valid()&&index>=0&&index<previous.initialized);let handle=previous.modules[index];assert(handle.valid());let module:Module& =module_owners[handle.slot-1];if module.references==0xffffffffffffffff {return blot_error::Error.dependency_limit;}module.references++;self_.append(handle);return blot_error::Error.none;

@@ -66,11 +66,11 @@ fn checkAndFreezeDependencies<E>(executor:E&,source:blot_reuse_project::Project&
 }
 fn prepareEntry<E,P>(executor:E&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,options:blot_reuse_project::Options,owner:const blot_reuse_retained_dependency::Snapshot&,inputs:P&,previous:blot_support::Option<blot_reuse_partial_dependency::EntryPrevious>)->blot_reuse_partial_dependency::Preparation,Error {
  let value,error=blot_reuse_partial_dependency::prepareReadOnlyWithBodies(executor,entry_path,output_identity,options,owner.value,inputs,previous);if error!=blot_error::Error.none {return default<blot_reuse_partial_dependency::Preparation>(),error;}var prepared=value;
- match prepared {ready &payload=>{
+ match prepared {ready bound=>{var payload=bound;
  let value,error=owner.pinInputs();if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}var pin=value;
- let error=payload.value.attachSeedPin(pin);if error!=blot_error::Error.none {pin.deinit();prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
- let error=payload.value.rebindFrozenPrefix(owner.value);if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
- if !previous.present {let error=mintEntry(payload.value,owner);if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}}
+ let error=payload.value.attachSeedPin(pin);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {pin.deinit();prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
+ let error=payload.value.rebindFrozenPrefix(owner.value);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
+ if !previous.present {let error=mintEntry(payload.value,owner);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}}
  },_=>{}}
  return prepared,blot_error::Error.none;
 }
@@ -79,5 +79,5 @@ fn mintEntry(value:blot_reuse_partial_dependency::Prepared&,owner:const blot_reu
  if value.source_mode || value.units.len!=owner.value.modules.len+1 || value.entry!=value.units.len || value.cached!=owner.value.modules.len {return blot_error::Error.none;}
  if prefix.prefix(value.units,value.entry,value.identity.view())!=owner.value.modules.len {return blot_error::Error.none;}
  if entries.len>=0xffffffff {return blot_error::Error.out_of_memory;}let names,error=blot_backend_runtime_identity::copy(value.identity.view());if error!=blot_error::Error.none {return error;}
- let generation=blot_native::fresh_owner_id();let at=entries.alloc_index(EntryState{prefix:prefix,module:value.units[value.entry-1],names:names,generation:generation,live:true, ..});entries[at].canonical=Entry{(at+1) as u32,generation, ..};value.source_completion .= entries[at].canonical;return blot_error::Error.none;
+ let modules=value.catalog_owner.mutable(value.units);let module=modules[value.entry-1];let generation=blot_native::fresh_owner_id();let at=entries.alloc_index(EntryState{prefix:prefix,module:module,names:names,generation:generation,live:true, ..});entries[at].canonical=Entry{(at+1) as u32,generation, ..};value.source_completion .= entries[at].canonical;return blot_error::Error.none;
 }

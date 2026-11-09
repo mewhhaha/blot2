@@ -19,7 +19,7 @@ and a host header, then compile and link the real Goose CLI with native OS
 adapters. Repair stages cap at 120s; final emission may use 180s after engine checks.
 Whole attempts share a 300s limit.
 
-Sixteen executed production families pass together, including complete native
+Seventeen executed production families pass together, including complete native
 asset preparation/error ownership, completion snapshots, loader/parallel
 scheduling and editor lifetime controls. Their exact inputs and binary identities
 are pinned in the root completion evidence; none is whole-port qualification.
@@ -38,14 +38,15 @@ sorts scalar indices instead of aggregate metadata; generated error codes remain
 owned after generator cleanup. Final Sources publication still has a worst-case
 quadratic owner lookup, pending a measured optimization.
 
-Source/semantic diagnostic publication and worker clones now use checked owning
-views. CheckedProject publication validates seven typed outer runs before local
-engine cleanup. The current rejected-portable flag fix and all completed source
-families pass the coherent 16-law batch; the next combined entry check is pending.
+Source/semantic diagnostics and CheckedProject/Prepared headers publish exact
+owned views. Parallel lowering owns its fixed slot run; fixed-mode result payloads
+are reconstructed after mutation. Snapshot owned-header factories preserve
+existing owner journals and shared/pin lifetimes. All 17 executed families pass;
+the current combined entry check is pending after explicit generic annotations.
 No whole C/header/executable exists; CLI/server/OOM qualification remains pending.
-Keep checks at family boundaries. Repair stages cap at 120s; final emission may
-use 180s after entry checks, sharing the 300s whole-build limit. Private tooling
-has scoped semantic/C parity evidence; installed toolchains remain untouched.
+Repair stages cap at 120s; final emission may use 180s after entry checks, sharing
+the 300s whole-build limit. Source-only manifest metadata remains unqualified;
+the actual builder regenerates identity before emission.
 
 Native request rollback and runtime observation components are tested; their
 whole compiler integration remains unqualified. A

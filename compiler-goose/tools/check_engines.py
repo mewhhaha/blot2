@@ -32,11 +32,9 @@ def main():
     parser.add_argument('--source', type=Path, default=ROOT / 'compiler-goose/src/_diagnostic_roots.goose')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/goose-port/engine-checks')
     args = parser.parse_args()
-    if not args.goose.exists():
-        command = ['python3', str(Path(__file__).with_name('build_goose_checker.py')),
-                   '--diagnostic-roots', '--expansion-node-limit', '1000000']
-        built = subprocess.run(command, check=True, capture_output=True, text=True)
-        args.goose = Path(json.loads(built.stdout)['binary'])
+    if not args.goose.is_file():
+        parser.error('--goose must name an existing checker; build it explicitly '
+                     'with compiler-goose/tools/build_goose_checker.py')
     if b'PARTIAL selected-root diagnostics' not in args.goose.read_bytes():
         parser.error('--goose must be the diagnostic-roots build')
     if args.jobs > 1 and len(args.engines) > 1:

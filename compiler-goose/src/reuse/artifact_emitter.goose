@@ -157,7 +157,7 @@ fn instructionRun(self_: const Recorder&, span: Span) -> blot_support::Option<co
     var values: const SymbolicInstruction[:] = self_.pending_instructions.items;
     if self_.frozen_instructions { values = self_.instructions; }
     if span.start > values.len || span.len > values.len - span.start { return blot_support::none<const SymbolicInstruction[:]>(); }
-    return blot_support::some(values[span.start..span.start + span.len]);
+    return blot_support::some<const SymbolicInstruction[:]>(values[span.start..span.start + span.len]);
 }
 fn recordArena(self_: Recorder&, arena: blot_backend_wasm::Arena) -> Error {
     assert(!self_.arena.present); let error = self_.append(Event.arena); if error != blot_error::Error.none { return error; }

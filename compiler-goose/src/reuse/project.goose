@@ -449,12 +449,12 @@ fn loadCompiledReadOnly(entrypath:const u8[:],options:Options,dependency:const b
 }
 fn loadCompiledMixedReadOnly<P>(entrypath:const u8[:],options:Options,dependency:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&,reuse:const bool[:])->Project,Error {
     let valid=validateReuseMask(dependency,reuse);if valid!=blot_error::Error.none {return Project {..},valid;}
-    var context=LoadContext {entrypath:entrypath,dependency:dependency,reuse:blot_support::some(reuse),provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
+    var context=LoadContext {entrypath:entrypath,dependency:dependency,reuse:blot_support::some<const bool[:]>(reuse),provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,dependency.modules,reuse),blot_error::Error.none;
 }
 fn loadLibraryReadOnly<P>(entrypath:const u8[:],options:Options,library:const blot_reuse_frozen_dependency::FrozenDependency&,inputs:P&,reuse:const bool[:])->Project,Error {
     let valid=validateReuseMask(library,reuse);if valid!=blot_error::Error.none {return Project {..},valid;}
-    var context=LoadContext {entrypath:entrypath,dependency:library,reuse:blot_support::some(reuse),library:true,provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
+    var context=LoadContext {entrypath:entrypath,dependency:library,reuse:blot_support::some<const bool[:]>(reuse),library:true,provided:true, ..};let error=withLoader(options,inputs,context,loadCompiledMode);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,library.modules,reuse),blot_error::Error.none;
 }
 

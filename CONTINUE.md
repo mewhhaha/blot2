@@ -54,7 +54,7 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Sixteen executed production families pass together. They cover diagnostic and
+Seventeen executed production families pass together. They cover diagnostic and
 body ownership, live/frozen readers, imports, SourceValidation, frames, native
 assets, completion snapshots, loader scheduling and editor budgets. These laws
 check real helpers in seconds; they do not qualify a whole compiler executable.
@@ -77,13 +77,15 @@ NativeAssets sorts scalar indices and owns generated error codes after producer
 cleanup. Its final Source ownership scan can still be quadratic; optimization
 requires a measured workload.
 
-Source and semantic diagnostics now publish through checked owning views, and
-worker clones preserve their payload ownership. All seven CheckedProject outer
-runs escape the local engine through validated typed views. One tagged-union
-portable flag now mutates its owning payload; the next batched entry check is
-pending. Executor and metadata checks have passed their previous boundaries.
-There is still no emitted whole C program, header or executable. Actual
-CLI/server, request OOM/retry and differential qualification remain pending.
+Source and semantic diagnostics publish through checked owning views. Checked
+results and Prepared headers transfer their exact owned runs out of local scopes.
+Parallel lowering owns a fixed result-slot run; fixed-mode preparation payloads
+are reconstructed after mutation. Snapshot append/adopt factories observe their
+existing owner journals; sharing and pin lifetimes have executed controls. The
+current generic closure annotations pass all 17 families; the combined server
+entry check is pending. There is still no emitted whole C program, header or
+executable. Actual CLI/server, request OOM/retry and differential qualification
+remain pending.
 
 Private checker tooling is checkpointed separately. Its holder index reaches the
 same diagnostic in 82.445s versus 104.824s on identical inputs in one pair; this
