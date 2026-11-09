@@ -37,6 +37,8 @@ fn clone(self_: Owned, destination: OwnedTables) -> Owned, Error {
 fn deinit(self_: Owned&) { self_.value_slots = default<const u32[:]>(); self_.proof_slots = default<const u32[:]>(); self_.values = default<const blot_check_numeric_proof_headers::Kind[:]>(); self_.operands = default<const blot_check_numeric_proof_headers::Term[:]>(); self_.requirements = default<const blot_check_numeric_proof_headers::Requirement[:]>(); self_.result.present = false; }
 struct Named { binding: u32, header: Owned }
 fn find(values: const Named[:], binding: u32) -> const Owned? { for &value in values { if value.binding == binding { return value.header; } } return null; }
+// Retained metadata copies the fixed header and keeps only its owned readonly views.
+fn findValue(values:const Named[:],binding:u32)->blot_support::Option<Owned> {for value in values {if value.binding==binding {return blot_support::some(value.header);}}return blot_support::none<Owned>();}
 fn equal(left: Owned, right: Owned) -> bool { return blot_structural::equal(left, right); }
 struct Binding { name: blot_parse_symbols::Symbol, formal: blot_support::Option<u32> }
 struct Builder {

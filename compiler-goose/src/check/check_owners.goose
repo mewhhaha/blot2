@@ -276,7 +276,7 @@ fn ownChecked_loop_carries(owner:CheckedOwner,values:const LoopCarry[:])->LoopCa
 fn ownChecked_loop_ranges(owner:CheckedOwner,values:const blot_check_types::List[:])->blot_check_types::List[:] {let state .= checkedOwnerState(owner);assert(state.loop_ranges.len==0);let result=checked_loop_ranges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_ranges=result;return result;}
 fn ownChecked_loop_exits(owner:CheckedOwner,values:const LoopExit[:])->LoopExit[:] {let state .= checkedOwnerState(owner);assert(state.loop_exits.len==0);let result=checked_loop_exits.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_exits=result;return result;}
 fn ownChecked_statement_arms(owner:CheckedOwner,values:const StatementArm[:])->StatementArm[:] {let state .= checkedOwnerState(owner);assert(state.statement_arms.len==0);let result=checked_statement_arms.alloc_slice(values.len);for value,index in values {result[index]=value;}state.statement_arms=result;return result;}
-fn ownChecked_declarations(owner:CheckedOwner,values:const SourceDeclaration[:])->SourceDeclaration[:] {let state .= checkedOwnerState(owner);assert(state.declarations.len==0);let result=checked_declarations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.declarations=result;return result;}
+fn ownChecked_declarations(owner:CheckedOwner,values:const SourceDeclaration[:])->SourceDeclaration[:] {let state .= checkedOwnerState(owner);assert(state.declarations.len==0);let result=checked_declarations.alloc_slice(values.len);for value,index in values {result[index]=SourceDeclaration{capability_flow:value.capability_flow,capability_parameters:value.capability_parameters,private:value.private,name:value.name,declaration:value.declaration,kind:value.kind,named_function:value.named_function,external:value.external};}state.declarations=result;return ownedSourceDeclarations(owner);}
 fn ownChecked_cap_nodes(owner:CheckedOwner,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {let state .= checkedOwnerState(owner);assert(state.cap_nodes.len==0);let result=checked_cap_nodes.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_nodes=result;return result;}
 fn ownChecked_cap_words(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.cap_words.len==0);let result=checked_cap_words.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_words=result;return result;}
 fn ownChecked_cap_bindings(owner:CheckedOwner,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {let state .= checkedOwnerState(owner);assert(state.cap_bindings.len==0);let result=checked_cap_bindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_bindings=result;return result;}
@@ -302,6 +302,52 @@ let operands=checked_header_operands.alloc_slice(contract.header.operands.len);f
 let requirements=checked_header_requirements.alloc_slice(contract.header.requirements.len);for value,slot in contract.header.requirements {requirements[slot]=value;}lease.requirements=requirements;
 let parameters=checked_header_parameters.alloc_slice(contract.parameters.len);for value,slot in contract.parameters {parameters[slot]=value;}lease.parameters=parameters;
 state.headers[index]=lease;contracts[index]=ProofContract{binding:contract.binding,header:blot_check_numeric_proof_headers::Owned{arity:contract.header.arity,value_slots:value_slots,proof_slots:proof_slots,values:values,operands:operands,requirements:requirements,result:contract.header.result,..},parameters:parameters,..};}}
+// Publication recovers only the exact arrays registered by this Checked owner.
+fn ownedSourceDeclarations(owner:CheckedOwner)->SourceDeclaration[:] {let state .= checkedOwnerState(owner);let values=checked_declarations.realloc_slice(state.declarations,state.declarations.len);assert(blot_support::same_slice_identity(values,state.declarations));return values;}
+fn sourceValidationPatterns(store:blot_check_parameter_patterns::Store)->blot_check_parameter_patterns::Store {if store.lease==0 {assert(store.generation==0 && store.nodes .== blot_check_parameter_patterns::inactive.nodes && store.extra .== blot_check_parameter_patterns::inactive.extra);return blot_check_parameter_patterns::Store{..};}return blot_check_parameter_patterns::checkedView(store);}
+fn ownedSourceValidation(checked:const Checked&,declarations:const SourceDeclaration[:])->SourceValidation {
+ let owner=checked.owner;let state .= checkedOwnerState(owner);
+ assert(blot_support::same_slice_identity(state.declarations,declarations));
+ assert(blot_support::same_slice_identity(state.resolved,checked.resolved));
+ assert(blot_support::same_slice_identity(state.nominals,checked.nominals));
+ assert(blot_support::same_slice_identity(state.contracts,checked.contracts));
+ assert(blot_support::same_slice_identity(state.contract_predicates,checked.contract_predicates));
+ assert(blot_support::same_slice_identity(state.contract_members,checked.contract_members));
+ assert(blot_support::same_slice_identity(state.implementations,checked.implementations));
+ assert(blot_support::same_slice_identity(state.implementation_predicates,checked.implementation_predicates));
+ assert(blot_support::same_slice_identity(state.implementation_members,checked.implementation_members));
+ assert(blot_support::same_slice_identity(state.member_templates,checked.member_templates));
+ assert(blot_support::same_slice_identity(state.selected_proofs,checked.selected_proofs));
+ assert(blot_support::same_slice_identity(state.selected_members,checked.selected_members));
+ assert(blot_support::same_slice_identity(state.selected_edges,checked.selected_edges));
+ assert(blot_support::same_slice_identity(state.selected_uses,checked.selected_uses));
+ assert(blot_support::same_slice_identity(state.constructors,checked.constructors));
+ assert(blot_support::same_slice_identity(state.effect_families,checked.effect_families));
+ assert(blot_support::same_slice_identity(state.effect_templates,checked.effect_templates));
+ assert(blot_support::same_slice_identity(state.associated,checked.associated));
+ assert(blot_support::same_slice_identity(state.diagnostics,checked.diagnostics));
+ return SourceValidation{owner:CheckedOwner{lease:owner.lease,generation:owner.generation},types:blot_check_types::checkedView(checked.types),parameter_patterns:sourceValidationPatterns(checked.parameter_patterns),
+ declarations:checked_declarations.realloc_slice(state.declarations,state.declarations.len),
+ resolved:checked_resolved.realloc_slice(state.resolved,state.resolved.len),
+ nominals:checked_nominals.realloc_slice(state.nominals,state.nominals.len),
+ contracts:checked_contracts.realloc_slice(state.contracts,state.contracts.len),
+ contract_predicates:checked_contract_predicates.realloc_slice(state.contract_predicates,state.contract_predicates.len),
+ contract_members:checked_contract_members.realloc_slice(state.contract_members,state.contract_members.len),
+ implementations:checked_implementations.realloc_slice(state.implementations,state.implementations.len),
+ implementation_predicates:checked_implementation_predicates.realloc_slice(state.implementation_predicates,state.implementation_predicates.len),
+ implementation_members:checked_implementation_members.realloc_slice(state.implementation_members,state.implementation_members.len),
+ member_templates:checked_member_templates.realloc_slice(state.member_templates,state.member_templates.len),
+ selected_proofs:checked_selected_proofs.realloc_slice(state.selected_proofs,state.selected_proofs.len),
+ selected_members:checked_selected_members.realloc_slice(state.selected_members,state.selected_members.len),
+ selected_edges:checked_selected_edges.realloc_slice(state.selected_edges,state.selected_edges.len),
+ selected_uses:checked_selected_uses.realloc_slice(state.selected_uses,state.selected_uses.len),
+ constructors:checked_constructors.realloc_slice(state.constructors,state.constructors.len),
+ effect_families:checked_effect_families.realloc_slice(state.effect_families,state.effect_families.len),
+ effect_templates:checked_effect_templates.realloc_slice(state.effect_templates,state.effect_templates.len),
+ associated:checked_associated.realloc_slice(state.associated,state.associated.len),
+ diagnostics:checked_diagnostics.realloc_slice(state.diagnostics,state.diagnostics.len),
+ unit:checked.unit};
+}
 fn releaseCheckedBodies(owner:CheckedOwner) {let state .= checkedOwnerState(owner);
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
 if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=default<UsageLoan[:]>();}

@@ -187,7 +187,12 @@ def call(stage: str, command: list[str], timeout: float) -> None:
               "log": str(log), "log_sha256": digest_file(log)}
     log.with_suffix(".json").write_text(json.dumps(record, indent=2) + "\n")
     if process.returncode != 0 or reason is not None:
-        print(log.read_text(errors="replace")[:12000], file=sys.stderr)
+        lines = log.read_text(errors="replace").splitlines()
+        diagnostics = [line for line in lines if not line.startswith("GOOSE_CHECKER_")]
+        trace = [line for line in lines if line.startswith("GOOSE_CHECKER_")]
+        print("\n".join(diagnostics)[:12000], file=sys.stderr)
+        if trace:
+            print("\n".join(trace[-4:]), file=sys.stderr)
         raise RuntimeError(f"{stage} failed after {elapsed:.3f}s "
                            f"({reason or process.returncode}); log: {log}")
     print(f"build: {stage} finished in {elapsed:.3f}s", file=sys.stderr, flush=True)

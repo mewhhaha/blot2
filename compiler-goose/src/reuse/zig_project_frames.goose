@@ -28,7 +28,7 @@ fn readRequestFrame(reader: blot_io::Reader, bytes: u8[>..]&) -> RequestFrame, b
     let checked = checkLengths(metadata, payload);
     if checked != blot_error::Error.none { return RequestFrame { bytes[..0], 0 , ..}, false, checked; }
     // Retain the high-water allocation; only this frame prefix is live.
-    let length=metadata+payload;if bytes.len<length {bytes.resize(length,0);}
+    let length=metadata+payload;if bytes.len<length {let zeros:u8[4096]=[0;4096];while bytes.len<length {let count=min(length-bytes.len,zeros.len);bytes.append(zeros[..count]);}}
     let read = blot_io::read_all(reader, bytes[..length]);
     if read != blot_error::Error.none {
         if read == blot_error::Error.end_of_stream { return RequestFrame { bytes[..0], 0 , ..}, false, blot_error::Error.truncated_frame; }

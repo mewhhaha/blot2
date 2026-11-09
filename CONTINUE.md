@@ -4,8 +4,8 @@
 
 Current user priority: repair Goose lifetimes in coherent families, build the
 actual native compiler, then qualify recoverable OOM/retention and differential
-behavior against Zig. Verify at family boundaries, keeping stage/whole limits
-at 120/300s. Source-only progress and native component tests are not executable
+behavior against Zig. Verify at family boundaries, keeping repair stages at 120s and whole builds at 300s. Final emission may
+use a 180s stage after engine-family checks. Source-only progress and native component tests are not executable
 or whole-runtime qualification. Keep the Zig oracle and sibling state intact.
 
 The remaining language [RFC #46](https://github.com/mewhhaha/blot2/issues/46)
@@ -54,9 +54,9 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Ten isolated production engine families execute in one fresh batch, including
+Fourteen isolated production engine families execute in one fresh batch, including
 owned diagnostic transfers, body-cache publication, live immutable readers and
-import-arena growth. The new small laws expose failures in 1.6–6.8s rather than
+import-arena growth and SourceValidation publication. Small laws expose failures in 1.6–7.1s rather than
 repeated 60s checker cycles. The actual final checker boundary remains pending.
 
 Live Source/Patterns use existing validated lease/generation keys; narrow
@@ -67,9 +67,22 @@ Import metadata now lives once per distinct target in a separate stable arena;
 the growing dictionary stores only indices, preserving first-wins and synthetic
 catalog import order. This clears the traced dictionary-growth input alias.
 Checked publication reifies its two moved stores through those same guards.
-Latest boundary: SourceValidation declaration publication at check.goose:3051
-still inherits local scratch provenance; the owned helper/payload shape is under
-review. Checked return and explicit rejection text options now clear.
+SourceValidation publishes 19 registered array views without new allocation;
+its eight scalar declaration fields survive source teardown in the executed law.
+Frozen readers retain fixed descriptors and value proof headers. All five proof
+payloads keep their owned slice identities after publisher-local headers end.
+Append-only import/catalog inputs now use grow-only tables across three callers;
+none previously shrank. Editor budget accounting now extracts the existing
+Budget reference from its fixed enum payload; its executed law covers exhaustion
+and rejected initializers. All five worker entry paths pass one partial batch.
+The real server has a separate diagnostic root. NativeAssets sorts scalar indices
+instead of copying aggregate definition metadata. Typed publication validates
+owned text runs; generated reader error codes now survive generator cleanup.
+Its actual prepare/reuse/duplicate/error law passes. Current server frontier:
+completion_probe.capture input/scratch borrowing at completion_probe.goose:21.
+The final Sources ownership scan can be quadratic; optimization is pending. Request frames grow by append-only zero chunks, keeping
+the high-water prefix and avoiding a false shrink effect; a two-frame law passes.
+Checked return and explicit rejection text options clear.
 
 Body freezing owns fixed scratch headers and validates all seven frozen runs
 against the live owner journal before publication. Its direct law covers source
@@ -81,7 +94,13 @@ candidate reaches concrete source errors in 95–97s; this is no overall compile
 ratio because the baseline is censored. Its 24 semantic controls, 20 debug/release
 laws, 6 exact C comparisons and trace-on/off parity pass. Shrink-origin tooling
 pins the original dictionary.goose84 resize through replay, without changing
-semantic decisions. Installed Goose remains untouched. See the
+semantic decisions. An ordered holder-event index reaches the same error in
+82.445s versus 104.824s on identical inputs in one diagnostic pair. A further
+frame skip passes 147 debug/release laws, 24 semantic controls and six C parity
+cases. Full emission caps at 120.271s, then reaches CLI/server source errors in
+135.011/129.973s with a 180s final-candidate cap. No C artifact exists.
+Neither result establishes a complete compile-time gain. Installed Goose remains
+untouched. See the
 [cache receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json)
 and [origin evidence](benchmarks/evidence/qualification/2026-11-09-goose-shrink-origins.json).
 
@@ -97,8 +116,12 @@ virtual reservations are not liveness. See [worker OOM evidence](benchmarks/evid
 The production qualification runner has eight oracle baseline passes and a
 strict unsupported ABI 8 recursion witness. Actual Goose CLI/server/OOM runs
 are pending a complete binary; no ABI 2 fallback or fake zero memory counters.
-Whole builds retain stage evidence, stop 3s after a diagnostic, cap stages at 120s
-and share a 300s limit. Partial root checks pin source/compiler identity and fail
+Whole builds retain stage evidence, stop 3s after a diagnostic, and share a
+300s limit. Repair stages cap at 120s; final emission may use 180s after the
+entry checks pass. The required Zig gate passed smoke/harness and compiled the
+2,974 native laws without LLVM, but its LLVM release phase reached 120s and
+cancelled native execution after 94 laws/65 full sweeps. Full qualification
+remains pending; Zig lint reports zero findings. Partial root checks pin source/compiler identity and fail
 on source drift. Astra is for a specific snag; never Terra.
 
 Current identities, source repairs, raw qualification receipts and unqualified

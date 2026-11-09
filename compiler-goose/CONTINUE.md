@@ -16,20 +16,34 @@ Use the tracked private checker recipe. The newer selfhost Goose snapshot is
 not a qualified replacement for this port's packages, reusable pools and native
 host APIs. Selected-root diagnostics are partial. Normal whole builds emit C
 and a host header, then compile and link the real Goose CLI with native OS
-adapters. Stages remain capped at 120s and whole attempts at 300s.
+adapters. Repair stages cap at 120s; final emission may use 180s after engine checks.
+Whole attempts share a 300s limit.
 
-Ten isolated engine families pass together, including body-freeze ownership,
-immutable live readers and import-arena growth. Source/Patterns use existing
-lease keys with 49/2 validation guards. Cursors replace held type/AST spans.
-The import dictionary now holds scalar indices into a separately owned stable
-metadata arena; first-wins, synthetic imports and producer lifetimes remain.
-Checked publication moves two validated store views and registered owned runs.
-Checked return and text-option rejection fixes now clear. SourceValidation
-declaration publication at check.goose:3051 remains the checker frontier.
-No whole executable exists; complete CLI/server and OOM qualification is pending.
+Fourteen isolated engine families pass together, including body-freeze ownership,
+live/frozen readers, import-arena growth and SourceValidation publication.
+Source/Patterns use existing lease keys with 49/2 validation guards. Cursors
+replace held type/AST spans. The import dictionary holds scalar indices into a
+separate stable arena, preserving first-wins and synthetic import order.
+Frozen descriptors carry fixed metadata; proof headers use value Options and
+retain the same five owned readonly payloads. The production publisher law
+checks all payload identities after local producer headers end. Append-only
+import/catalog inputs use grow-only arrays across three callers.
+
+SourceValidation publishes 19 registered views without additional allocations.
+Editor budget accounting now uses the existing explicit Budget reference; its
+executed law covers exhaustion and rejected initializers. All five worker entry
+paths pass one partial batch. The server now has its own diagnostic root;
+NativeAssets aggregate metadata copying is removed in favor of scalar indices;
+checked text publication and actual prepare/error/reuse laws pass. The current
+server frontier is completion_probe.capture input/scratch borrowing (line21).
+Final Sources publication has a worst-case quadratic ownership scan; pending
+optimization requires a measured workload. The frame reader uses
+append-only high-water growth; its actual 4097-byte/1-byte law passes.
+The actual whole build caps at 120.271s without C or a diagnostic. No complete
+executable exists; CLI/server and OOM qualification remain pending.
 
 Keep mini laws for owned boundary families: body_freeze runs in about 5–7s,
-immutable_readers 3.6s and import_arena 3.4s. The frozen dictionary experiments
+immutable_readers 3.9s, import_arena 3.5s and source_validation_ownership 3.8s. The frozen dictionary experiments
 and shrink-origin witness show why metadata must stay outside the growing map.
 
 The optional bounded reference-closure cache/trace checker reaches a concrete
@@ -37,7 +51,11 @@ whole-build source error in 95.491s where the baseline caps at 120.262s on the
 same production source except generated identity metadata. This is a shorter
 diagnostic cycle, not a completed compile or overall speed ratio. Its pinned
 semantic, debug/release and C parity controls pass. Use the tracked recipe;
-installed toolchains remain untouched. Root CONTINUE.md links current evidence.
+installed toolchains remain untouched. The holder index reaches the identical
+source error in 82.445s versus 104.824s in one exact-input pair. The optional
+UsedAfter frame skip passes 147 laws per debug/release mode, 24 semantic controls
+and six C parity cases; macro impact remains unqualified. Root CONTINUE.md links
+current evidence.
 
 Native request rollback and runtime observation components are tested; their
 whole compiler integration remains unqualified. A

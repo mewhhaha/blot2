@@ -63,7 +63,7 @@ reusable[] var source_runs:Source[>..]=[];
 fn sourceViews(ranges:const SourceRange[:],payload:const u8[:])->Source[:],Error {return rangeViews(ranges,payload,0,true);}
 fn rangeViews(ranges:const SourceRange[:],payload:const u8[:],start:i64,require_utf8:bool)->Source[:],Error {
     if ranges.len>4096 {return default<Source[:]>(),blot_error::Error.source_limit;}if start<0 || start>payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}var end=start;for range in ranges {if !validPath(range.path) || range.start!=end || range.length>payload.len-end || (range.deleted && range.length!=0) {return default<Source[:]>(),blot_error::Error.invalid_sources;}end+=range.length;if require_utf8 && !utf8(payload[range.start..end]) {return default<Source[:]>(),blot_error::Error.invalid_sources;}}if end!=payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}
-    let result=source_runs.alloc_slice(ranges.len);for range,index in ranges {var contents=blot_support::none<const u8[:]>();if !range.deleted {contents=blot_support::some(payload[range.start..range.start+range.length]);}result[index]=Source{path:range.path,contents:contents};}return result,blot_error::Error.none;
+    let result=source_runs.alloc_slice(ranges.len);for range,index in ranges {var contents=blot_support::none<const u8[:]>();if !range.deleted {contents=blot_support::some<const u8[:]>(payload[range.start..range.start+range.length]);}result[index]=Source{path:range.path,contents:contents};}return result,blot_error::Error.none;
 }
 fn releaseSources(sources:Source[:]) {if sources.len!=0 {source_runs.free_slice(sources);}}
 fn validateOpen(request:Request)->Options,Error {

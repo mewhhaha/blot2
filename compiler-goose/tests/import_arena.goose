@@ -31,6 +31,7 @@ fn collect(holder:Holder&,imports:const ImportedBinding[:]) {
     }
 }
 fn collectContext(context:Context&,imports:const ImportedBinding[:]) {collect(context.holder,imports);}
+fn collectCatalogs(holder:Holder&,catalogs:const blot_check_check::ImportedCatalog[:]) {for catalog in catalogs {register(holder,ImportedBinding{target:ExternalTarget{unit:4,binding:0},interface:catalog.interface(0),origin:170,..});}}
 fn probe() {
     var store,error=blot_check_types::init();assert(error==blot_error::Error.none);
     var patterns,error=blot_check_parameter_patterns::init();assert(error==blot_error::Error.none);
@@ -39,13 +40,18 @@ fn probe() {
     var producer=blot_check_check::Checked{types:store,parameter_patterns:patterns,bindings:bindings[..],..};
     let reader=blot_check_check::liveCallees(producer);
     let interface=blot_check_check::SchemeInterface{types:reader.types,scheme:bindings[0].scheme,obligations:reader.obligations,callees:blot_check_check::Callees.live{reader},..};
-    let inputs=[ImportedBinding{target:ExternalTarget{unit:1,binding:0},interface:interface,origin:10,..},ImportedBinding{target:ExternalTarget{unit:1,binding:0},interface:interface,origin:20,..},ImportedBinding{target:ExternalTarget{unit:2,binding:0},interface:interface,origin:40,..}];
+    var inputs:ImportedBinding[>..]=[];
+    inputs.push(ImportedBinding{target:ExternalTarget{unit:1,binding:0},interface:interface,origin:10,..});
+    inputs.push(ImportedBinding{target:ExternalTarget{unit:1,binding:0},interface:interface,origin:20,..});
+    inputs.push(ImportedBinding{target:ExternalTarget{unit:2,binding:0},interface:interface,origin:40,..});
+    var catalogs:blot_check_check::ImportedCatalog[>..]=[];
+    catalogs.push(blot_check_check::ImportedCatalog{producer:blot_support::some(blot_check_check::liveProducer(producer)),kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
     var map=ImportedMap{};var arena=ImportArena{records:[]};{var holder=Holder{map:map,arena:arena};
     {
-        var context=Context{holder:holder};collectContext(context,inputs[..]);
+        var context=Context{holder:holder};collectContext(context,inputs[..]);collectCatalogs(holder,catalogs[..]);
         assert(inputs[0].interface.types.head(variable,0)==variable && inputs[1].origin==20);
     }
-    assert(map.count==66 && holder.arena.records.len==66);
+    assert(map.count==67 && holder.arena.records.len==67);
     {
         let found .= map.get(inputs[0].target);assert(found!=null);let index:u32=found;
         assert(holder.arena.records[index].origin==10);
@@ -62,4 +68,4 @@ fn probe() {
     arena.records.clear();map.clear();patterns.deinit();store.deinit();
 }
 
-fn main() {probe();print("import arena passed: first-wins, synthetic order, growth, readonly producer metadata");}
+fn main() {probe();print("import arena passed: first-wins, synthetic order, growth, grow-only input wrappers, readonly producer metadata");}
