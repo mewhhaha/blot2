@@ -462,6 +462,13 @@
       "callbacks": "21 callback/producer fixed-record Options now typed literals; no callbacks or borrow scopes changed.",
       "worker": "Local owning module/diagnostic cleanup and local packet Pattern Store construction before publishing headers.",
       "frontier": "Previous payload/preparation and Pattern inactive errors clear; selected96 reaches candidate_seed and dispatch_explanation::candidate_runs. Actual full C/header/native still absent."
+    },
+    "seed_diagnostic_family": {
+      "seed": "Scalar Snapshot slot/generation replaces raw owned Frozen vs Snapshot-pointer alternatives. Graph observations return registered const references. Session init validates and adopts once; removes lazy ensureSharedSeed transition. Invalid seeds now decline during init; caller ownership preserved.",
+      "admission_law": "Real session init/deinit: invalid graph declined with same owner untouched and unique; valid empty seed consumed into validated Snapshot; session teardown invalidates scalar key. Four cycles. Astra reviewed adoption allocation order and candidate move/reset cleanup.",
+      "diagnostics": "Complete canonical Candidate stores replace2nested Origin updates; named text spans and exact fresh hole destinations avoid wrapper provenance. Positive cheap trace isolates generic buffer push unknown roots, replaced by4concrete owned-record overloads at13hole stores preserving errors and growth.",
+      "coverage": "Rich cloned dispatch diagnostic survives producer teardown and real Frame create/release. Retained session test executes C/link/run as23rd helper.",
+      "frontier": "Selected99 clears candidate_seed complaint and now reaches live revision Inputs Snapshot acrossFrame; dispatch candidate_runs remains atfrontend40. Actual whole C/header/native still absent."
     }
   },
   "latest_selected_frontier": {
@@ -470,13 +477,13 @@
       "server"
     ],
     "exit": 1,
-    "seconds": 100.597,
+    "seconds": 97.974,
     "stop": "completed",
     "errors": [
       {
         "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose",
         "line": 36,
-        "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while candidate_seed is still used: a reference into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_frontend.goose:57 (\u00a75.1)"
+        "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while snapshot is still used: a reference into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose:25 (\u00a75.1)"
       },
       {
         "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
@@ -485,10 +492,10 @@
       }
     ],
     "full_qualification": false,
-    "source_sha256": "087d40f71c9da37c8b68c9e78a29507a19d1daa0c1731cb8bf6206753e76052e",
+    "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
     "source_unchanged": true,
     "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
-    "batch": 96
+    "batch": 99
   },
   "latest_executed_laws": {
     "passed": true,
@@ -502,119 +509,124 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.28607226599706337,
+        "seconds": 0.23878909400082193,
         "program_sha256": "893d85a4617ef14216f8e77890525f22406decaab6df9ea0cf997c281e6392ff",
         "binary_sha256": "4bfc2ca37d891349839f7804d0de11bc28a93c9aeff533b145cfa766b0880de9"
       },
       "expectation": {
-        "seconds": 0.18681352099520154,
+        "seconds": 0.185195190977538,
         "program_sha256": "db3c037efd8d25e53380bc371ef964513fa06b3dd3edcf64845206fc738abe0c",
         "binary_sha256": "1838e7cf82e7b6fe126abee04bcb74487984073b5b236759af15c84fe01c548d"
       },
       "package_owner_frames": {
-        "seconds": 0.1352531049924437,
+        "seconds": 0.13431655301246792,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.7011579899990465,
+        "seconds": 1.905644905025838,
         "program_sha256": "a7361862b3896df0db617d691fb68521260a1c1f97f14c30b0f1f9d0fd1d3df8",
         "binary_sha256": "f473f51f2a3f626330378bb92a21d78689683be70eea4523847dda25e6c22575"
       },
       "proof_leases": {
-        "seconds": 3.6680764890043065,
+        "seconds": 3.7494602669903543,
         "program_sha256": "88f7c56eada7b911b5b35926c19474bc67072a52f477eb7685e2bf1a84db546f",
         "binary_sha256": "1e0ac03b2f66123fed50a9bd9484e01dcdebfcbd9ef31b6635afdfa4f23fd783"
       },
       "source_sort": {
-        "seconds": 0.13407313398784027,
+        "seconds": 0.14113126299344003,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 3.576602843008004,
-        "program_sha256": "c942e1a23a619619db789f71fadd243d72d2c1dfc271dc00667bee1031f14516",
-        "binary_sha256": "d87c31fe939762f86396323222cdaf304e18a4a0c653b76348a5705563b23739"
+        "seconds": 6.5125585309870075,
+        "program_sha256": "34bfdae1807188155d4181908c6af9349dc5ef7f50f19a43c890e24d2ef400c9",
+        "binary_sha256": "df35f41de30ec79273a00ea5b99e73bce72ab13d385e34cbacf74062b9bfa348"
       },
       "body_freeze": {
-        "seconds": 7.305586645990843,
+        "seconds": 7.501870497973869,
         "program_sha256": "3eacb6b97b86d223d55798829a3d200d0959b216bb4ad413ec89d8c09f93cf0e",
         "binary_sha256": "b32188d9772c2c4bafce0db8345f2abaa1d51fb563c6e08ce748a5f2755313c7"
       },
       "immutable_readers": {
-        "seconds": 4.049743443989428,
+        "seconds": 5.115195221005706,
         "program_sha256": "27e972f6ce6614bbbd00f197c9637c29de96b4124a761c2431c64164a2a4051b",
         "binary_sha256": "f5a39ba96e51db79ea15ac57f8d33b75d309807023a926cb5c2a0794d9f4d4d8"
       },
       "import_arena": {
-        "seconds": 3.5964177410060074,
+        "seconds": 3.774269567016745,
         "program_sha256": "64f34f9a71b67a159046a816ae772f399690bad108d62e339733e9c4a487472f",
         "binary_sha256": "c0e0b014548f181f0643b740cabbd58f3f1ada84b401a9d5798e2cada9198f5b"
       },
       "source_validation_ownership": {
-        "seconds": 4.160893174004741,
+        "seconds": 4.273344012995949,
         "program_sha256": "d2eb55b3b5067abbe73d2085176e9560bdd7b90149a5a89c37e957ce73c4d22b",
         "binary_sha256": "9f8453fc386e6e9f545675c8609cb4c03a69c315d61b56fac91a2296513bd5ef"
       },
       "editor_budget": {
-        "seconds": 6.390907635999611,
+        "seconds": 6.419117507000919,
         "program_sha256": "7baee55cb6ed6e54ec1d85534963bb2603d285b895924640c49e47c4f08c96c3",
         "binary_sha256": "1228eaf22a07dbc82d59128909f8fd389272aaf5d62489b081af4832a1f4b392"
       },
       "cache_root_frames": {
-        "seconds": 3.3448869989952073,
+        "seconds": 3.3474668209964875,
         "program_sha256": "3d5965c94468ff8ffb3f26d08a4298ab27f715ac01e6ce33e00ec4ec5c72771c",
         "binary_sha256": "61fff731a1e588ac1dfebe9478d4c4bf7d24bd08a9643b62be142ffd6b08de72"
       },
       "native_asset_metadata": {
-        "seconds": 4.643289934989298,
+        "seconds": 4.622416703001363,
         "program_sha256": "e53441272e092ad2167f85831f8c18a40638dd2ef04c5b7a64a43a8cc897e268",
         "binary_sha256": "f1c036a730c0d98bd1f4904d29b79af574577caf974b8d5ea67eb6daa6b48764"
       },
       "completion_probe": {
-        "seconds": 3.50988967900048,
+        "seconds": 3.641501842997968,
         "program_sha256": "2daee724f2ccff897507afb8c52df3a8c6b5f3aa4a048838380444ef8c9fe969",
         "binary_sha256": "76f7c8bae324e9ce8f29c96b9df66cc7cd41fef9d643ee162753eb18cfdf0cf6"
       },
       "completion_project_load": {
-        "seconds": 8.59271585798706,
-        "program_sha256": "f86f515827b900607cd7a0a68574d97de21257d141d1a6bb8b17ad3882d81b1c",
-        "binary_sha256": "8c9ac29057c39176bd53412cb0339050150386f1c33d7a34de30b8513dd5386d"
+        "seconds": 8.930559091008035,
+        "program_sha256": "003d2d7587bf9abb6cb17b48974023e38af9540263910f92d143a74724d78d79",
+        "binary_sha256": "102fb48ad7d19a47df5b8328ba3969ae1a04378efcee2af01550a843bcb26a9e"
       },
       "dependency_ownership": {
-        "seconds": 5.371228058997076,
+        "seconds": 5.560007870022673,
         "program_sha256": "b65cda6aa73cf3fd2d489b2ae41fdb1d75b42a781763faad7fcf319893b0c252",
         "binary_sha256": "c9fc14afc772b94c4b61f40bdbcbcfbc9c73f4dad0789da2a8205a9e6c3ae1d2"
       },
       "empty_session": {
-        "seconds": 11.326802032999694,
-        "program_sha256": "c3578b49a4d7a873c826abe1f2471a321838c79697e97916448ea3eed09d6187",
-        "binary_sha256": "d2ca05c719de4323bd146747044e720fea73de969e7861a54067435c48396357"
+        "seconds": 13.88595536100911,
+        "program_sha256": "fb327547b41cbc9cc381a05ad7b12b0a57ee00f5ea850672caa058c230348666",
+        "binary_sha256": "abc65d4bad0666c3777f754c018cc6b5f16b01e68b894d6731f35e589d026714"
       },
       "archive_capture": {
-        "seconds": 3.8943806220195256,
+        "seconds": 4.224509396008216,
         "program_sha256": "cc9370de43c30f59a8323749e897a73515bd9c15add17aab05d69fe15cd6ccd4",
         "binary_sha256": "1d2630997f083c6fae56ea7ecf80066b0ecf2a79067951d22f84ad5c1d22d819"
       },
       "resolved_body": {
-        "seconds": 3.5986869579937775,
+        "seconds": 3.7658919359964784,
         "program_sha256": "21da2b82301e708b5981c7a2662ec9075c8f48ac3410f629aa942fa3884b5a3a",
         "binary_sha256": "c34f45a675310db1f13389cfcbf208d4719815f594ad053f724b5dcf469352d9"
       },
       "wasm_scope_outline": {
-        "seconds": 4.365045726008248,
+        "seconds": 4.311462856974686,
         "program_sha256": "831a0e2be90b77f57dc889775926ac7d47a2819b783367009106cc0e20535b63",
         "binary_sha256": "280c185e301185e0abe67c94fce37335ed980f9f754ef4996a24657b7f157682"
       },
       "core_validation_borrow": {
-        "seconds": 30.61449164900114,
+        "seconds": 30.344839138997486,
         "program_sha256": "87ce6b8f5fd1112472764da6e548fddd17c740265ef68ad0c5f6008331469e49",
         "binary_sha256": "7d35bce77c2c17722a0735f41d0dcb2c66a195ba11370c5fd2dd51cdd8b324c1"
+      },
+      "retained_seed": {
+        "seconds": 31.09255637699971,
+        "program_sha256": "96f3ab8a5941531ca6436b904243a80b29c53ff4efed4d7dce2b8ff4a4ade570",
+        "binary_sha256": "bc11518083b47a555241cdeffe37d512dc07b548241678678c4363f63644f4a7"
       }
     },
-    "scope": "All22 C/link/execute pass together in114.453s after scalar Pattern Store, checked Prepared move, actual Entry/pin/rebind and zero-key packet laws. Whole compiler unqualified.",
+    "scope": "All23 C/link/execute pass in153.678s. Includes real retained Session admission/rejection/cleanup, scalar Seed and diagnostic+Frame ownership. Whole compiler unqualified.",
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_receipt_sha256": "52e348bf5828904c24dd555cc8f1a4442c88fa9f26d5b9b4b2b6e69358f6a7e9"
+    "raw_receipt_sha256": "e788a3172e277b4a3729d924ff59076f46c8ff2d51a5694c4666132c5e23175b"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -644,8 +656,8 @@
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "c34e758464a39e92f4427b99c6a52ff5227e4db7f95437a01dee81b3104c1b8c",
     "compiler-goose/src/support/json_adapters.goose": "bb28dcb6e46b8692447ea428df14b61994b754312c6628f6b3eaa5fb520cac00",
     "compiler-goose/src/support/structural_adapters.goose": "63d164f1aadffabff3d3b4fd5b615746867613691a5cf48d4b13b0fba16e4d3c",
-    "compiler-goose/src/reuse/hole_diagnostics.goose": "0dbe397bc63bf0eea0870b886a4be44e6e734b1cfb15f326e707d804f1d413d6",
-    "compiler-goose/src/reuse/dispatch_explanation.goose": "0db2d2c1ebccd4b644373aeafdb7bff9e2a29d0630ba3177bfcf93d743c9bd42",
+    "compiler-goose/src/reuse/hole_diagnostics.goose": "e94e56d1cb5a9807ec54cb99c25e5537f12ccd1d59f54aafb6fbef0bba43a867",
+    "compiler-goose/src/reuse/dispatch_explanation.goose": "88d649bb129cbe432932a81225248cc667063c05afa6ee03fb1232263563a80e",
     "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
     "compiler-goose/src/backend/core_backend.goose": "1a9b45b2a43bc29f0ab9441929722f4e9be9a02413ad6ed0048026b50d78e5af",
     "compiler-goose/src/backend/scoped_backend.goose": "b8a7acc2d3b6db4aa52929be8da8ca91a8d92858030c505caca724a419df4d31",
@@ -708,8 +720,8 @@
     "compiler-goose/src/reuse/project_check_owners.goose": "696d720410f69d797766952d924696b4a88828a5884f09845d278c801ed9ce7a",
     "compiler-goose/src/reuse/project_check_parallel.goose": "3f4e84a5cc1151fb2ba36f4a96c47809a7008a5488b1962fbf79e8a46cadc5f1",
     "compiler-goose/src/reuse/purity_diagnostics.goose": "e18c0041100ebc2896a31787139c8ad8dcfde59fea205a92e0e49cf7625a9622",
-    "compiler-goose/src/reuse/retained_revision_frontend.goose": "33141579e9604146c3215e22c0e62a848c13e55f585c90e0107b5bcc464b120d",
-    "compiler-goose/src/reuse/retained_revision_prepare.goose": "238c4f3ee2dd2bc81448cfb4dbe5db983c96cfdca83d42eba47c2d049cf7a28c",
+    "compiler-goose/src/reuse/retained_revision_frontend.goose": "03c3da226861c896771e661f08599aa64abc82f9acde67bc32498b9ba4ca59d8",
+    "compiler-goose/src/reuse/retained_revision_prepare.goose": "8031759937d832e1374962e5869ab84574bf22c34e51baba8657c7d16dd8a3b1",
     "compiler-goose/src/reuse/revision_inputs.goose": "9fb68da50917eb0fc6cb4200c078582a3fda3d7610139887d45cd1bed7241a0a",
     "compiler-goose/src/reuse/source_overlays.goose": "48808f774477a75bfbcbf354aa8ff2b5eaa08b4f21367f1ff13f037bc560dbda",
     "compiler-goose/src/reuse/zig_project_server_completion.goose": "98c780c3555e75fef90ab4124250a4a6979e0db6b61b5399471bdb68f9234100",
@@ -717,7 +729,7 @@
     "compiler-goose/src/reuse/artifact_emitter.goose": "acac4a5a86272cbe622d7241dcaa76969c8cf85278bfeac00a29c2eb61260339",
     "compiler-goose/src/reuse/constant_receipt_reuse.goose": "68fa4ddfcfcb5b297cc42f19afbea4b156b1497bbce780a598859bacb9517964",
     "compiler-goose/src/reuse/dependency_closure.goose": "ad5d0f4ff825423612a6feee38f328a34e2ab6c7e6ebc98a7f500f43545242d0",
-    "compiler-goose/src/reuse/retained_dependency.goose": "9c7236bebaf5cbc4515d3939bd3d8db23d29bc10da0faffb597674e3e6cc13f3",
+    "compiler-goose/src/reuse/retained_dependency.goose": "c8c6a050a891ebee5b3ac7249e6ea510e2005f57fd4a9ffaf31791f6da6ea4b6",
     "compiler-goose/src/reuse/source_completion.goose": "c435bc681d1af3d3b11b9b0f98063109f13b09b666675439a998aa6514b907e7",
     "compiler-goose/src/reuse/dependency_owned_headers.goose": "b9a5af079fe717fe786a5989910a39c693baa807f15d1cce16034bb1d385b8e5",
     "compiler-goose/src/backend/backend_checkpoint.goose": "89309d02b4185a5b2b1f9c110389988c7112ff0b0177b42026eee301dde9d599",
@@ -753,17 +765,19 @@
     "compiler-goose/src/check/check_packet_owner.goose": "599425927dc3ab0af5a1647bda2d8283ba3d8f228503711bd8c20de0daa47521",
     "compiler-goose/src/support/project_packet_owners.goose": "60ea3f9683da4d5d11bbc9bddf52af89147eeefcd60a44c9f971b998de8cbfa8",
     "compiler-goose/tests/core_validation_borrow.goose": "3f6f89ccbf3804ebc3168b7781bfc43d0b8a430a7fa87a4f374a9004f7347a77",
-    "compiler-goose/tools/test_engines.py": "9b8d02ea91a818eb3f4f75768b9c279fed2f4393e01cbf2291ff32025215c363",
+    "compiler-goose/tools/test_engines.py": "2665dc4138e3d1082c2405d6940e58c3cb0ba8691d93c5aa786ba8adaa5729e7",
     "compiler-goose/src/reuse/body_check_cache.goose": "1bc2ed6fb5665c2f9aa0e862297a817146256952d325db91d0b95e0c124b4580",
     "compiler-goose/src/reuse/body_check_packet.goose": "b6eda0b216be27b66e57d70adc26d3c9bb13e8abf4567f5b10f0885385782a1c",
     "compiler-goose/src/support/project_packet_contexts.goose": "309e3a262d65e85651f0169bb46fe2593844503f9ab0498f37c86391a936d680",
     "compiler-goose/src/check/checked_views.goose": "a71e81df49e4d86b320af6cba4126f9ab830a6856d7d7cbfff6a21e21447e14d",
-    "compiler-goose/src/reuse/retained_revision.goose": "d55bc153b8bdde7ce1ca55df010b430aa94ca3a3e4bcd5d0162fc6a487b06f0c",
+    "compiler-goose/src/reuse/retained_revision.goose": "baafb1d5393755939c03377a75ec8e977294f47c7395b9bd47a2d13337d8fd6f",
     "compiler-goose/tools/write_project_packet_contexts.py": "7959871f7f386240733ae85f1e5824b80260c3e290491435a649c8d7d9611af1",
     "compiler-goose/tests/dependency_ownership.goose": "0ec2097cf50ffac105e733aec8c4c5799bda1449010ae5c7005f5e9f1132710e",
     "compiler-goose/tools/write_checked_views.py": "745d24c73196b1a3580775e31911498ffeaa7f55149be40f302170fc52a3cbb4",
-    "compiler-goose/tests/empty_session.goose": "dfd681756e3adf28a1d0d93189723d4e736aa2472d95b90401790d774e9db7a3",
-    "compiler-goose/tests/proof_leases.goose": "4ff7d5d23f6f35ae9bef6f0cc61f04f12bb3c5e3722bb834e0e4672807a7863a"
+    "compiler-goose/tests/empty_session.goose": "5c982d7e5f77e6c6bfb7245c75633bd1deb121973a75925a77d75e663f1460aa",
+    "compiler-goose/tests/proof_leases.goose": "4ff7d5d23f6f35ae9bef6f0cc61f04f12bb3c5e3722bb834e0e4672807a7863a",
+    "compiler-goose/tests/diagnostic_ownership.goose": "33c647d1d60d0062469f51adfcea8f7023e92b048a410b0538df8c389aa98292",
+    "compiler-goose/tests/retained_seed.goose": "9122e4b5a159e136e774aa866010a379455b23c0d8ddf2c03f7fa1126e35388e"
   },
   "unqualified": [
     "whole compiler executable",
@@ -1863,6 +1877,66 @@
         "errors": [],
         "full_qualification": false,
         "source_sha256": "087d40f71c9da37c8b68c9e78a29507a19d1daa0c1731cb8bf6206753e76052e",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch99": {
+    "partial": true,
+    "seconds": 98.084,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 97.974,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose",
+            "line": 36,
+            "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while snapshot is still used: a reference into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose:25 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global candidate_runs may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_frontend.goose:40 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.657,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.251,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
         "source_unchanged": true,
         "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
       }

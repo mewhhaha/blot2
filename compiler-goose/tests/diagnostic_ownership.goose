@@ -4,6 +4,8 @@ import driver.cli_workers;
 import std;
 import reuse.hole_diagnostics;
 import reuse.dispatch_explanation;
+import driver.compile_workspace;
+import support.native;
 import support.option;
 import support.error;
 import check.types;
@@ -31,9 +33,9 @@ fn holes(mode:i64) {
     assert(error==blot_error::Error.none && span.start==0 && span.len==1);
     var binding_name=blot_reuse_hole_diagnostics::copyText("");
     if mode==2 {binding_name=blot_reuse_hole_diagnostics::copyText("owned");}
-    let error=builder.scope.push(blot_reuse_hole_diagnostics::canonicalBinding(Binding{name:binding_name,ty:id,requirements:span}),blot_reuse_hole_diagnostics::binding_pool);
+    let error=blot_reuse_hole_diagnostics::pushOwned(builder.scope,blot_reuse_hole_diagnostics::canonicalBinding(Binding{name:binding_name,ty:id,requirements:span}));
     assert(error==blot_error::Error.none);
-    let error=builder.requirements.push(blot_reuse_hole_diagnostics::canonicalRequirement(Requirement{kind:blot_check_types::ObligationKind.field,name:name(mode),subject:id}),blot_reuse_hole_diagnostics::requirement_pool);
+    let error=blot_reuse_hole_diagnostics::pushOwned(builder.requirements,blot_reuse_hole_diagnostics::canonicalRequirement(Requirement{kind:blot_check_types::ObligationKind.field,name:name(mode),subject:id}));
     assert(error==blot_error::Error.none);
     var original=builder.finish(id,span);
     assert(!builder.nodes.items[0].name.present && !builder.edges.items[0].name.present);
@@ -58,6 +60,8 @@ fn dispatch() {
     var original,error=builder.finish(blot_support::some<const u8[:]>("+"),blot_support::none<const u8[:]>());assert(error==blot_error::Error.none);
     var moved=blot_reuse_dispatch_explanation::canonicalOwned(original);original=blot_reuse_dispatch_explanation::Explanation{operation:blot_support::none<const u8[:]>(),member:blot_support::none<const u8[:]>()};
     var copied,error=moved.clone();assert(error==blot_error::Error.none);moved.deinit();original.deinit();
+    var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.valid());
+    assert(frame.release()==blot_error::Error.none);
     assert(copied.operation.value=="+" && copied.candidates[0].origin.value.name.value=="name");
     assert(copied.candidates[0].origin.value.path.value=="path" && copied.candidates[0].operand.value=="operand");
     assert(copied.steps[0].member.value=="member" && copied.steps[0].ty.present && copied.steps[0].ty.value.len==0);

@@ -62,8 +62,9 @@ fn clone(self_: Explanation) -> Explanation, Error {
     if self_.candidates.len != 0 {
         let out = candidate_runs.alloc_slice(self_.candidates.len);
         for old, index in self_.candidates {
-            out[index] = canonicalCandidate(Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..});
-            if old.origin.present { out[index].origin = blot_support::Option<Origin>{true,canonicalOrigin(old.origin.value.clone())}; }
+            let operand=cloneText(old.operand);
+            var origin=blot_support::none<Origin>();if old.origin.present {origin=blot_support::Option<Origin>{true,old.origin.value.clone()};}
+            out[index] = canonicalCandidate(Candidate { side:old.side,origin:origin,operand:operand,outcome:old.outcome });
         }
         result.candidates = out;
     }
@@ -155,8 +156,9 @@ fn finish(self_: Builder&, operation: Text, member: Text) -> Explanation, Error 
         let out = candidate_runs.alloc_slice(self_.len);
         for index in self_.len {
             let old = self_.candidates[index];
-            out[index] = canonicalCandidate(Candidate { side: old.side, operand: cloneText(old.operand), outcome: old.outcome , ..});
-            if old.origin.present { out[index].origin = blot_support::Option<Origin>{true,canonicalOrigin(old.origin.value.clone())}; }
+            let operand=cloneText(old.operand);
+            var origin=blot_support::none<Origin>();if old.origin.present {origin=blot_support::Option<Origin>{true,old.origin.value.clone()};}
+            out[index] = canonicalCandidate(Candidate { side:old.side,origin:origin,operand:operand,outcome:old.outcome });
         }
         result.candidates = out;
     }
@@ -227,7 +229,7 @@ fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_exp
 fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_explanation::ContextKind,writer: blot_json::Writer&) -> blot_error::Error { return writer.enumValue(value); }
 
 // Reification validates existing owned text, and never accepts borrowed display text.
-fn canonicalBytes(value:const u8[:])->const u8[:] {if value.len==0 {return default<const u8[:]>();}let owned=text_runs.realloc_slice(value,value.len);assert(blot_support::same_slice_identity(owned,value));return owned;}
+fn canonicalBytes(value:const u8[:])->const u8[:] {if value.len==0 {return default<const u8[:]>();}let owned=text_runs.realloc_slice(value,value.len);assert(blot_support::same_slice_identity(owned,value));let start=text_runs.index_of(owned[0]);assert(start>=0 && value.len<=text_runs.len-start);return text_runs[start..start+value.len];}
 fn canonicalText(value:Text)->Text {if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(canonicalBytes(value.value));}
 fn canonicalOrigin(value:Origin)->Origin {return Origin{name:canonicalText(value.name),path:canonicalText(value.path),span:value.span,..};}
 fn canonicalStep(value:Step)->Step {return Step{member:canonicalText(value.member),ty:canonicalText(value.ty),outcome:value.outcome,..};}

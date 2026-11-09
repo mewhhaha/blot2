@@ -4,18 +4,21 @@ Fix production ownership in coherent families, build the complete native compile
 then qualify CLI/project-server behavior, recoverable request OOM and retention
 against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-All **22 executed production helper laws pass together in 114.45s**, including
+All **23 executed production helper laws pass together in 153.68s**, including
 actual frame cleanup, nonempty session tables, ordinary and packet-decoded Checked
 worker publication, Prepared Option lifetime and real receipt admission. Checked
 observers retain existing aliases and typed journal ownership; no graph copies or
 new registry. Exact hashes and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-Selected batch 96 passes executor/metadata and clears prior preparation and
-Pattern-sentinel errors. It reaches candidate_seed ownership across Frame.create
-and dispatch diagnostic candidate_runs publication. **No whole C/header/executable
-exists.** General nonempty Session/catalog borrowing and integrated runtime
-qualification remain pending. Do not forward compilation to Zig or insert
-placeholder success.
+Seed now owns a scalar registered Snapshot key. Session initialization validates
+and adopts once; invalid input remains caller-owned. Four real admission and
+teardown cycles pass. Rich diagnostic text survives producer cleanup and Frame.
+
+Selected batch 99 passes executor/metadata and clears candidate_seed ownership.
+It reaches live revision-input Snapshot ownership across Frame.create and dispatch
+candidate_runs publication. **No whole C/header/executable exists.** Integrated
+runtime qualification remains pending; do not forward compilation to Zig or
+insert placeholder success.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

@@ -77,5 +77,10 @@ fn deinit(self_:Snapshot&) {
  if !self_.live {return;}assert(self_.valid());let completion=self_.source_completion;if completion {completion.deinit();}let validation=self_.core_validation;if validation {validation.deinit();}
  for handle in self_.modules[..self_.initialized] {handle.release();}if self_.modules.len!=0 {handles.free_slice(self_.modules);}self_.owner.deinit();let at=self_.slot-1;self_.live=false;snapshots.free(at);
 }
-struct Seed {value:Frozen=default<Frozen>(),snapshot:Snapshot?=null,owner:Owner=Owner {..}}
-fn deinit(self_:Seed&) {let snapshot=self_.snapshot;if snapshot {snapshot.deinit();}else {self_.owner.deinit();}self_=Seed {..};}
+// A seed owns one registered snapshot; borrowed graph headers stay invocation-local.
+struct Seed {slot:u32=0,generation:u64=0}
+fn valid(self_:Seed)->bool {return self_.slot!=0 && self_.slot-1<snapshots.len && snapshots[self_.slot-1].live && snapshots[self_.slot-1].generation==self_.generation;}
+fn seed(value:Snapshot&)->Seed {assert(value.valid());let owned:Snapshot& =snapshots[value.slot-1];assert(value .== owned);return Seed{slot:value.slot,generation:value.generation};}
+fn snapshot(self_:Seed)->Snapshot? {if self_.slot==0 {assert(self_.generation==0);return null;}assert(self_.valid());return snapshots[self_.slot-1];}
+fn value(self_:Seed)->const Frozen& {let owner=self_.snapshot();assert(owner);return owner.value;}
+fn deinit(self_:Seed&) {let owner=self_.snapshot();if owner {owner.deinit();}self_=Seed{};}

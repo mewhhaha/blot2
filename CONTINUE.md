@@ -54,7 +54,7 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Twenty-two executed production helper laws pass together in 114.45s. They cover
+Twenty-three executed production helper laws pass together in 153.68s. They cover
 real Frame create/release, nonempty session tables, ordinary and packet-decoded
 Checked publication through worker slots, Prepared lifetime, receipt admission,
 diagnostics, readers, imports, snapshots and editor budgets. Packet observers
@@ -95,14 +95,20 @@ valid. Its own executed law replaces a superseded expensive graph warmup, reduci
 the dependency ownership law from about 36s to 5s. Typed optional records preserve
 nested editor/diagnostic/Prepared ownership without cloning.
 
-Selected batch 96 passes executor/metadata and clears the prior preparation and
-Pattern-sentinel errors. It reaches candidate_seed ownership across Frame.create
-and dispatch diagnostic candidate_runs publication. The expanded Frame law covers
-real seed pin/rebind/Entry minting, enum moves, zero-key packet roundtrips and
-cleanup. General nonempty evaluator borrowing and whole compiler integration
-remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz).
-There is still no whole C program, header or executable. Actual CLI/server,
-request OOM/retry and differential qualification remain pending.
+Seed ownership now uses a scalar registered Snapshot key. Session initialization
+validates and adopts once, removing the raw-owned/shared alternatives and lazy
+transition. Invalid seeds decline earlier at initialization while retaining caller
+ownership. Four actual session admission/cleanup cycles execute successfully;
+Astra reviewed consumption, allocation-failure ordering and moved-key resets.
+Diagnostic record publication and concrete owned pushes retain exact text pools;
+a rich cloned diagnostic survives producer teardown and real Frame cleanup.
+
+Selected batch 99 passes executor/metadata and clears candidate_seed ownership.
+It reaches live revision-input Snapshot ownership across Frame.create and the
+remaining dispatch candidate_runs publication path. Whole compiler integration
+remains unqualified: no whole C program, header or executable. Actual CLI/server,
+request OOM/retry and differential qualification remain pending. See [the exact
+frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 The optional private direct-global empty-holder precision extension passes 24 new
 controls and the existing 24 semantic controls with diagnostic/runtime/C parity.

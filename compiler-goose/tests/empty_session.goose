@@ -132,6 +132,15 @@ fn preparationPublication() {
     match offer.value {ready bound=>{var ready=blot_reuse_partial_dependency::publishPrepared(bound.value);offer.value=blot_reuse_partial_dependency::Preparation.inactive;workspaceLifecycle();assert(ready.units.len==1 && ready.entry==1 && ready.source_completion && ready.seed_pin.owners().len==1);ready.deinit();},_=>{abort("ready preparation expected");}}
     offer.value.deinit();
 }
+fn seedPublication() {
+    var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+    let symbols,error=blot_reuse_dependency_payload::alloc<blot_reuse_frozen_dependency::Symbol>(owner,1);assert(error==blot_error::Error.none);symbols[0]=blot_reuse_frozen_dependency::Symbol{text:default<u8[:]>()};
+    var owned=blot_reuse_dependency_payload::Owned<blot_reuse_frozen_dependency::FrozenDependency>{blot_reuse_frozen_dependency::FrozenDependency{symbols,default<blot_reuse_frozen_dependency::Module[:]>()},owner};
+    let snapshot,error=blot_reuse_retained_dependency::adopt(owned);assert(error==blot_error::Error.none && snapshot && owned.owner.lease==0);
+    var key=blot_reuse_retained_dependency::seed(snapshot);let stale=key;
+    assert(key.valid());workspaceLifecycle();assert(key.value().symbols.len==1 && key.snapshot() .== snapshot);
+    key.deinit();assert(!key.valid() && !stale.valid());
+}
 fn main() {
     var previous:u64=0;
     for cycle in 0..4 {
@@ -140,6 +149,7 @@ fn main() {
         packetPublication();
         emptyPatternsPacket();
         preparationPublication();
+        seedPublication();
         let allocation_owner=blot_native::fresh_owner_id();
         let session,error=blot_eval_core_eval::initOwnedEmptySession(allocation_owner);
         assert(error==blot_error::Error.none && session);
