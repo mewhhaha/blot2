@@ -1,0 +1,8 @@
+entry func record (value: U32) : U32 => return do:
+  let point = { y: 2, x: value }
+  break @u32.add point.x point.y
+entry func array (value: U32) : Array U32 => return #[value, 2, 3]
+entry func scoped (value: U32) : U32 => return do:
+  let rows: ResizeArray U32 = #[value, 2]
+  rows[0] := @u32.add rows[0] 1
+  break rows[0]

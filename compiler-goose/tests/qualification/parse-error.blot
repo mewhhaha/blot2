@@ -1,0 +1,1 @@
+entry func broken (value: U32) : U32 => return (

@@ -91,6 +91,28 @@
       "batch": 23,
       "qualification": "incomplete",
       "frozen_capture": "build/goose-port/completion-batch-23/capture.json"
+    },
+    {
+      "stage": "emit program",
+      "command": [
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+        "-o",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.c",
+        "--header",
+        "/home/jacobt/src/blot2/compiler-goose/build/blot_goose.h",
+        "-O0",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "/home/jacobt/src/blot2/compiler-goose/src/main.goose"
+      ],
+      "seconds": 95.491,
+      "exit": 1,
+      "stop": "completed",
+      "log": "/home/jacobt/src/blot2/compiler-goose/build/stages/emit-program.log",
+      "log_sha256": "efc13db24435d729ef8faa394c0be5490a1c528576455d3f6e04a5c57289b182",
+      "batch": 24,
+      "qualification": "source error; no artifact",
+      "frozen_capture": "build/goose-port/completion-batch-24/capture.json"
     }
   ],
   "isolated_engines": {
@@ -128,22 +150,42 @@
     "sort_contexts": 11,
     "diagnostic_transfer": "canonical owned payloads, scalar source-header run, checked same-size pool rebase",
     "source_validator_ast_loops": 21,
-    "removed_source_validator_span_aliases": 14
+    "removed_source_validator_span_aliases": 14,
+    "scalar_helper_interfaces": [
+      "source validation suite and pattern ranges",
+      "global-reference AST lists and children",
+      "Core resolver statement cursors,10 calls"
+    ],
+    "flattened_validator_helpers": 23,
+    "flattened_validator_calls": 189,
+    "core_resolver_statement_calls": 10,
+    "removed_validator_symbol_text_spans": 4,
+    "coverage_boundary_rebases": 3
   },
   "latest_selected_frontier": {
-    "batch": 21,
-    "seconds": 66.805,
-    "file": "compiler-goose/src/parse/source_operators.goose",
-    "line": 100,
-    "error": "cannot index Scratchi64Buffer directly",
-    "status": "scratch wrapper index fixed and audited; four other selected roots pass; whole emission batch23 cap120.262s with zero errors; no repeated selected check after one-line fix",
-    "qualification": "partial"
+    "batch": 27,
+    "partial": true,
+    "engines": [
+      "check"
+    ],
+    "exit": 1,
+    "seconds": 54.486,
+    "stop": "completed",
+    "errors": [
+      {
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+        "line": 2977,
+        "message": "error: call covered stores a reference rooted at work into what its parameter self_ leads to, which may be the caller's storage behind self_, which work does not outlive (\u00a79.2)"
+      }
+    ],
+    "full_qualification": false,
+    "status": "source validator clears; allthree pattern-coverage recursion boundaries rebased with identitychecks; normal whole batch28 running"
   },
   "latest_executed_laws": {
     "passed": true,
     "goose": {
-      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
-      "sha256": "a7f79fff83b5b348170c7317a01443f8d3d4e2928cd22c105f8c57e1adf9ee29"
+      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+      "sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0"
     },
     "cc": {
       "path": "/usr/bin/clang-23",
@@ -151,54 +193,54 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.23853667598450556,
+        "seconds": 0.23391615401487797,
         "program_sha256": "fc15d284596c5bc06135e29f9be492638bcc9ec210e47c224b6f5884ee4ab3ae",
         "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0",
         "input_manifest_sha256": "a42a503939ac6a566f594a378a7678d2d3a357f6b7128fe7934758123a4d7a11"
       },
       "expectation": {
-        "seconds": 0.15517218702007085,
+        "seconds": 0.15485922497464344,
         "program_sha256": "1a49692e57820540ca50fbf9d5e84e28d1d5229adaf9a081c4abe66c8335f230",
         "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b",
         "input_manifest_sha256": "a44846a4909d879493b266fb505e7aa0b425520c13c7007bbb6b52b62198d4f4"
       },
       "package_owner_frames": {
-        "seconds": 0.13539130901335739,
+        "seconds": 0.13403118500718847,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211",
         "input_manifest_sha256": "bd621cb6c3897f6cfcfc23ff882300bef881d02d08f5e1b51f420daa0fbe2059"
       },
       "parser": {
-        "seconds": 1.598554387979675,
+        "seconds": 1.652895253006136,
         "program_sha256": "7cce6851bd8320f33cde196572a6ea0a5c47d30a448c4fa55227e823ce7516c9",
         "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82",
         "input_manifest_sha256": "25993844419b87e8ebe298562026cf0e80911aa8ceb585769160ed5b818340f7"
       },
       "proof_leases": {
-        "seconds": 3.5721454810118303,
-        "program_sha256": "aac5326ec4532e189d1272dd4b8051db247848c2df09d6596f00b6a774827003",
-        "binary_sha256": "24e6a3c3e2488154a5834120a42e3b240f46765c93daa807fa712b2c9cf93973",
-        "input_manifest_sha256": "9a8927aa30ce23999518c21b6290e15be37440c2e966cd91199a3a3af7810e06"
+        "seconds": 3.608476416004123,
+        "program_sha256": "3c962d5baf896694788ffb4c78138ce29570bb0e0c62576cf96d9e16d2d71b9a",
+        "binary_sha256": "0bdb55ad29991159cd73720248360f6574aee6ad3bcc3a94ffc713ed6a283b1c",
+        "input_manifest_sha256": "432e0eda22711a5309463fdd32fbea6ee52748cf505b1ad5104be68a6dad5741"
       },
       "source_sort": {
-        "seconds": 0.13496282100095414,
+        "seconds": 0.13470738401520066,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0",
         "input_manifest_sha256": "1f88af3e291bdf5add3cb1d56c57ebc3f8c5794abd5577a00c2ff442ee2c35cd"
       }
     },
     "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_sha256": "5cef9a706dd1726f615479b6ff422501c5d86825f7172e3a8358e9f3ca7842dd"
+    "raw_sha256": "4e6d8603687690288220532f8f6dbad626aa6bb8da5d3755d8b391f42c4c6dcb"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "10c5d247befb922878052723979acdb87924721f259e691172727dd130484672",
     "compiler-goose/src/check/capability_contract_source.goose": "948f1f003e8c6e883157733ae835f246b65090a539208b1e52d4c6baf90319b9",
     "compiler-goose/src/check/capability_flow.goose": "daa1d2ef2db79d9fafe6ecfc6f85af62ea47cb08273c46a81156dc2028a2d708",
-    "compiler-goose/src/check/check.goose": "f2c1867bd23be3d650b8f5cd76ecfc87d3af88bfe4b2d62609642b76dac37932",
+    "compiler-goose/src/check/check.goose": "e3a71588117d6c94cda3df693f9ec7873d559e07031b02a6badcf93c630f7627",
     "compiler-goose/src/check/check_factory.goose": "920f90ad451ee3d10a2aa3d0c2bbe5fb1f41550801a4dbce7156b3b093c9b992",
     "compiler-goose/src/check/check_scheme_import.goose": "c22306f0bc0b0219be570fab120986cb753dd18ad89faf370d0780ea4035c000",
     "compiler-goose/src/check/cleanup_contracts.goose": "f75b13fb8e270ee87ce646a247543625a5412739da21b097f80c19fc7a6ab79e",
-    "compiler-goose/src/check/core_builder.goose": "ed6f519c47587d507ceaecfd29d1f05d9ce93f5019425774e692fd12c1e0d1fe",
+    "compiler-goose/src/check/core_builder.goose": "0a0758beaed16d0bc2f0e536ec260323c55138d9d90048a2bc2e7776a7a142e7",
     "compiler-goose/src/check/numeric_proof_headers.goose": "f8fa34c6f2f04048af24340e20c3e078e4e7588676cab4ab3e9e82b30c2367ad",
     "compiler-goose/src/check/package_core.goose": "9f62f14720aa6bbfde123d0c93eddca077fe77c320d30519eaeeffd0368a26d9",
     "compiler-goose/src/check/scheme_equations.goose": "cf29613245eca9bbce4a88f5d23c605ba2baf34e07970e927d5f035ac27f5ae7",
@@ -211,13 +253,13 @@
     "compiler-goose/src/eval/implementation_rows.goose": "d24522469d2707505e5b5a6b0e191b71736d8f2f1bbd37fac42a076a9a6d8376",
     "compiler-goose/src/eval/selected_implementation_admission.goose": "11c8eacdb50e76fd51f42dd3862d901ab1e215db49cd74c92116668cf594f729",
     "compiler-goose/src/eval/type_evidence.goose": "30cd6db84f49c63af2336b3196c28c8f2a588f9186ed55e7c80038d87e66e227",
-    "compiler-goose/src/parse/source_operators.goose": "d77d81e727181e6a8eb93617ccc77bff791ba486328ed01be36ee60eca7b5381",
-    "compiler-goose/src/reuse/global_references.goose": "7c8ee8e2d9ce053c52f5f7a95f7329ded761bd9f19fc2ef23133d60761556bc9",
+    "compiler-goose/src/parse/source_operators.goose": "ef5ccabd33ccb33e8b7b4b12be07f71285b44c6b705dad982dd959dcaeab5067",
+    "compiler-goose/src/reuse/global_references.goose": "c64b02088acca4aa3c19628b46ba5b9f70daf95aa0d724e74bfc06929c7b77d8",
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "0ebb997c72ea70d035356726a1ddaa5b5a6451b7afdda80f9915c901a2b49552",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "903313c7894be52bc5cc9138595a7b33114f99b73b96385b29b6c56b48f4a427",
-    "compiler-goose/src/support/json_adapters.goose": "8482caa9a6fd2e1bd8a0d5c85b10b3d1ac83a3665f5ceae40b68028a8aa0e0b9",
-    "compiler-goose/src/support/structural_adapters.goose": "06e3d8c0b7765763bdd4c117d62b41b35430545e427d69b140904d012faa41a6"
+    "compiler-goose/src/support/json_adapters.goose": "3cad072b3d86a8c8d279290876599f2255d1d8ec033282c88b252d011909050d",
+    "compiler-goose/src/support/structural_adapters.goose": "a473374f25f66014a12bb2a761221d461c3771ab563a71fc4dd5b129b12aeb53"
   },
   "unqualified": [
     "whole compiler executable",
@@ -321,5 +363,59 @@
     ],
     "full_qualification": false
   },
-  "worker_oom_native_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json"
+  "worker_oom_native_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json",
+  "experimental_checker_candidate": {
+    "path": "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
+    "semantic_controls": 24,
+    "closure_law_executions": 20,
+    "executed_engine_families": 6,
+    "whole_compile_speedup_ratio": null,
+    "comparison": "baseline cap120.262s; candidate reaches source error95.491s; baseline censored",
+    "receipt": "benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json"
+  },
+  "oracle_qualification_runner": {
+    "path": "compiler-goose/tools/qualify_compiler.ts",
+    "baseline": "benchmarks/evidence/qualification/2026-11-09-goose-oracle-baseline.json.gz",
+    "passes": 8,
+    "unsupported": [
+      "ABI8 recursive selected calls"
+    ],
+    "goose_runtime": "pending"
+  },
+  "split_selected_batch25": {
+    "partial": true,
+    "seconds": 53.919,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 53.866,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/parse/source_operators.goose",
+            "line": 452,
+            "message": "error: call walk stores a reference rooted at validator into what its parameter self_ leads to, which may be the caller's storage behind context, which validator does not outlive (\u00a79.2)"
+          }
+        ],
+        "full_qualification": false
+      },
+      {
+        "partial": true,
+        "engines": [
+          "lower"
+        ],
+        "exit": 0,
+        "seconds": 3.505,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false
+      }
+    ],
+    "full_qualification": false
+  }
 }

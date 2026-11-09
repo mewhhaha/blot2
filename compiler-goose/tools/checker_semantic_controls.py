@@ -120,7 +120,9 @@ static int64_t adapter_length(sl_f64 values) { return values.len; }
      if line.startswith('GOOSE_CHECKER_PROFILE cache='):
       fields=dict(item.split('=',1) for item in line.split()[1:])
       name=fields.pop('cache');cache_rows[name]={key:int(value) for key,value in fields.items()}
-    assert set(cache_rows)=={'stable.type','stable.contain','stable.identity','stable.reaches','array.elements'},cache_rows
+    expected_caches={'stable.type','stable.contain','stable.identity','stable.reaches','array.elements'}
+    if 'struct ReferenceClosures {' in (args.source/'src/typecheck.h').read_text():expected_caches.add('reach.closure')
+    assert set(cache_rows)==expected_caches,cache_rows
     assert sum(row['hits'] for row in cache_rows.values())>0,cache_rows
     assert cache_rows['array.elements']['rejected']==cache_rows['array.elements']['building']+cache_rows['array.elements']['unstable']
     (work/'cache-profile.json').write_text(json.dumps(cache_rows,indent=2)+'\n')

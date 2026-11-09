@@ -18,18 +18,20 @@ host APIs. Selected-root diagnostics are partial. Normal whole builds emit C
 and a host header, then compile and link the real Goose CLI with native OS
 adapters. Stages remain capped at 120s and whole attempts at 300s.
 
-The current lifetime repair replaces recursive predicate scratch borrows with
-scalar pool ranges. Reusable storage remains owned until the calling frame
-finishes; each recursive step reads a predicate by value. Importer callback
-contexts pass their fixed borrowed fields by value. No lifetime acceptance rule
-is weakened. The proof/resolver, scalar metadata, sort and diagnostic transfer
-families are repaired. The source/global-reference validator batch adds 21 AST
-cursors and removes 14 span aliases. Combined selected checking hit120.301s
-with no error and is incomplete. Four split roots pass; the checker root
-exposed a scratch wrapper index, now fixed. Whole emission then hit120.262s
-without an error or C/header. Profile the whole entry before another retry.
-Six isolated production engine families execute. Current results and the next frontier belong in root CONTINUE.md
-and pinned qualification receipts.
+The current source batch uses scalar proof runs and store lease handles,
+explicit row importers, copied scalar metadata and immutable AST cursors.
+Validator now holds only scalar state; 23 helpers pass tree, symbols, context and
+scratch independently through 189 calls. Recursive Core resolver statement
+helpers use scalar cursors. Static audits preserve traversal, charged work,
+allocation/error and cleanup order. Six production engine families execute;
+the final checker boundary and whole artifact remain pending.
+
+The optional bounded reference-closure cache/trace checker reaches a concrete
+whole-build source error in 95.491s where the baseline caps at 120.262s on the
+same production source except generated identity metadata. This is a shorter
+diagnostic cycle, not a completed compile or overall speed ratio. Its pinned
+semantic, debug/release and C parity controls pass. Use the tracked recipe;
+installed toolchains remain untouched. Root CONTINUE.md links current evidence.
 
 Native request rollback and runtime observation components are tested; their
 whole compiler integration remains unqualified. A

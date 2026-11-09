@@ -55,41 +55,31 @@ removes mixed-root importer callbacks, separates resolver/context/counter inputs
 and uses scalar owner/lease/generation keys for recursive proof storage. Both
 store acquisitions retain all 9/21 header-identity guards. Error-only work records
 keep borrowed inputs separate. A review audits 210 affected calls and 46 bodies.
-The actual checker path has cleared the proof/resolver, sort-context and
-diagnostic-transfer failures. Its latest selected-root diagnostic is the
-source-validator AST traversal, then a scratch index at
-`parse/source_operators.goose:100`; that
-traversal/indexing family is now repaired. The combined five-root check hit
-its 120.301s cap with no emitted error; that is incomplete. Split runtime,
-semantic, lower and independent roots pass in 2.103/66.086/3.605/67.102s. The
-checker root then exposed a pre-existing scratch wrapper index; it is fixed
-and its family audited. A whole build, rather than another selected check,
-hit120.262s with warnings only and no C/header. Measure this whole-entry cost
-before repeating emission attempts. All 12 sort helpers and 11 comparator/swap contexts
-now take fixed views by value, preserving charged comparison/swap order. The current source batch also
-converts 100 immutable AST loops, removes 32 retained AST span aliases and copies
-111 scalar metadata lookups rather than retaining optional map-entry references.
-Readonly leased views pass by value; owning mutation/deinit references remain.
-The adjacent source/global-reference family replaces another 21 AST loops
-and 14 span aliases, preserving forward/reverse and prefix traversal order.
-Six isolated production law families execute, including borrowed sort payloads
-and shared counters, repeated store release/reuse, owner/generation rejection
-and direct reified-view reads. Diagnostic transfer now canonicalizes owned
-payloads and validates pool membership before deriving scalar run indices. These source
-repairs remain under validation, not a completed checker or compiler pass.
+The checker has cleared the proof/resolver, scalar metadata, AST traversal,
+sort and diagnostic-transfer failures. Source validation now uses scalar AST
+cursors and a scalar-only Validator: 23 helpers take tree, symbols, context and
+scratch separately through 189 calls. Core resolver lowering uses scalar
+statement cursors through ten calls. Behavior, charged work, allocation/error
+and cleanup order are preserved by static family audits; the final checker
+boundary remains pending. All three pattern-coverage recursion boundaries use
+checked pool views; local work remains owned until recursion returns. Six
+isolated production engine families execute.
 
-The actual whole C/header build compiles all seven runtime/native objects in
-about one second, then reaches its **120.323s emission cap without an error**.
-No C program, header or executable was produced. Normal Goose checks unreached
-nongeneric functions across the universal generated-adapter import closure;
-separate worker entry files alone would not isolate that work. Measure the
-checker before raising limits or making a broad process split. Private profiling identifies the real exported entry, rather than parsing or
-global initialization, as the current cost. A 30-second stack sample observes
-array reachability, TypeEq/reference root queries and branch flow snapshots.
-The optional stable-closure candidate is `fdc59ab9...`; an array-specific gate
-is qualified on controls, with no macro compilation win yet. Installed Goose
-remains unchanged.
-Current static source fixes still need whole executable qualification.
+Whole C/header emission with the baseline private checker hits 120.262s without
+an artifact. The combined optional reference-closure cache/trace candidate
+`01b0b74e...` reaches an actionable source error in 95.491s on identical
+production inputs except generated identity metadata. The baseline is censored;
+no whole compilation ratio is claimed. The closure cache preserves stable
+readiness, ordered traversal and every live-root/provenance check, is bounded,
+and falls back to the original walk. 24 semantic controls, 20 debug/release law
+executions, 6 exact C comparisons and trace-on/off parity pass. Installed Goose
+is unchanged. See [the cache/trace receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json).
+
+Split runtime/semantic/lower/independent roots pass; the current check-root
+boundary follows the validator flattening. Actual CLI, server and OOM execution
+remain pending until a complete executable exists. The new qualification runner
+has eight oracle baseline passes and a strict unsupported ABI 8 recursion
+witness; no ABI 2 fallback or unavailable memory counters are accepted as proof.
 
 The native request transaction components pass normal and sanitizer batches:
 forked candidates preserve the previous heap on explicit marked OOM, stage
@@ -260,7 +250,7 @@ permits; no unchanged retry or cap growth.
 returning a scalar; branch casts, errors and recursive tail stay ordered. Both
 checkers pass 42 controls and two local-borrow escape negatives. The whole run
 caps at 120.281s with zero diagnostics and no C output; no qualification or
-completed speed claim. Measurement 410 (same 120s cap) reads five valid ABI2 snapshots and reaps in
+completed speed claim. Measurement 410 (same 120s cap) reads five valid ABI 2 snapshots and reaps in
 119.671s. At 115s, 1.302 billion raw visits are 99.98431% identity skips; positive
 ClassAt work is small, while 7.934 billion TypeEq calls remain. Both sampled
 stacks are waiting main-thread frames, so provide no hotspot attribution.

@@ -1,0 +1,2 @@
+// 雪: diagnostic offsets count UTF-8 bytes.
+entry func hole (value: U32) : U32 => return @hole

@@ -1,0 +1,8 @@
+import { increment as renamed } from "./library"
+import * as library from "./library"
+entry func answer (value: U32) : U32 => return @u32.add (renamed value) (library.increment value)
+
+entry func scoped (value: U32) : U32 => return do:
+  let rows: ResizeArray U32 = #[value, 2]
+  rows[0] := @u32.add rows[0] 1
+  break rows[0]

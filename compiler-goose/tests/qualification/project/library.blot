@@ -1,0 +1,2 @@
+private func hidden (value: U32) : U32 => return @u32.add value 2
+func increment (value: U32) : U32 => return hidden value

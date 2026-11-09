@@ -27,152 +27,155 @@ fn numeric_issue(tree: const Tree&,id: Id,point: u32) -> Issue {
  return Issue {code:code,node:id,point:point,has_numeric_literal:true,numeric_literal:fault};
 }
 fn named(pool: const Pool&,symbol: Symbol) -> bool {
- let text=pool.get(symbol); if text.len==0 { return false; } let c=text[0]; return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||c=='_';
+ if pool.get(symbol).len==0 { return false; } let c=pool.get(symbol)[0]; return (c>='a'&&c<='z')||(c>='A'&&c<='Z')||c=='_';
 }
-struct Validator<C> {
- tree: const Tree&, pool: const Pool&, context: C&, locals: ScratchIdBuffer&, issue: Issue=Issue {}, has_issue: bool=false,
+struct Validator {
+ issue: Issue=Issue {}, has_issue: bool=false,
  pattern_scope: i64=-1, record_constructor: Symbol=0, loops: i64=0, replies: bool=false,
  permitted_requests: Id=0, failure: Error=blot_error::Error.none
 }
-fn annotations_stopped<C>(self_: Validator<C>&) -> bool { return self_.failure!=blot_error::Error.none||self_.context.source_annotations_stopped(); }
-fn validate_controls<C>(self_: Validator<C>&) -> bool { return self_.context.source_control_validation(); }
-fn stopped<C>(self_: Validator<C>&) -> bool { return self_.has_issue||annotations_stopped(self_); }
-fn fail<C>(self_: Validator<C>&,code: Code,id: Id,point: u32,symbol: Symbol) {
- if !stopped(self_) { self_.issue=Issue {code:code,node:id,point:point,symbol:symbol}; self_.has_issue=true; }
+fn annotations_stopped<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return self_.failure!=blot_error::Error.none||context.source_annotations_stopped(); }
+fn validate_controls<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return context.source_control_validation(); }
+fn stopped<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&) -> bool { return self_.has_issue||annotations_stopped(self_,tree,pool,context,locals); }
+fn fail<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,code: Code,id: Id,point: u32,symbol: Symbol) {
+ if !stopped(self_,tree,pool,context,locals) { self_.issue=Issue {code:code,node:id,point:point,symbol:symbol}; self_.has_issue=true; }
 }
-fn numeric_failure<C>(self_: Validator<C>&,id: Id) { if stopped(self_) { return; } self_.issue=numeric_issue(self_.tree,id,self_.context.source_literal_point(id)); self_.has_issue=true; }
-fn local<C>(self_: Validator<C>&,symbol: Symbol) -> bool {
- var end=self_.locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
- for item in self_.locals.items[..end] { if item==symbol { return true; } }
- let text=self_.pool.get(symbol);
- for c,index in text { if c=='.' { let root,found=self_.pool.lookup(text[..index]); if found { for item in self_.locals.items[..end] { if item==root { return true; } } } break; } }
+fn numeric_failure<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) { if stopped(self_,tree,pool,context,locals) { return; } self_.issue=numeric_issue(tree,id,context.source_literal_point(id)); self_.has_issue=true; }
+fn local<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol) -> bool {
+ var end=locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
+ for item in locals.items[..end] { if item==symbol { return true; } }
+ let text_count=pool.get(symbol).len;
+ for index in 0..text_count {let c=pool.get(symbol)[index];if c=='.' { let root,found=pool.lookup(pool.get(symbol)[..index]); if found { for item in locals.items[..end] { if item==root { return true; } } } break; } }
  return false;
 }
-fn name<C>(self_: Validator<C>&,symbol: Symbol,id: Id,point: u32) {
- if stopped(self_)||self_.context.source_editor_probe(id) { return; }
- if !local(self_,symbol) { let exists,err=self_.context.source_value_exists(symbol); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,c_unknown_value,id,point,symbol); } }
+fn name<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,id: Id,point: u32) {
+ if stopped(self_,tree,pool,context,locals)||context.source_editor_probe(id) { return; }
+ if !local(self_,tree,pool,context,locals,symbol) { let exists,err=context.source_value_exists(symbol); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,point,symbol); } }
 }
-fn bind<C>(self_: Validator<C>&,symbol: Symbol) { if !stopped(self_)&&symbol!=0&&self_.pool.get(symbol)!="_" { self_.locals.push(symbol); } }
-fn record_target<C>(self_: Validator<C>&,id: Id,symbol: Symbol) -> bool {
- if stopped(self_) { return false; } let point=self_.tree.span(id).start+1;
- if self_.context.source_private_constructor(symbol) { fail(self_,c_private_access,id,point,symbol); return false; }
- var end=self_.locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
- for item in self_.locals.items[..end] { if item==symbol { fail(self_,c_record_constructor,id,point,0); return false; } }
- let target,err=self_.context.source_record_target(symbol); self_.failure=err; if err!=blot_error::Error.none { return false; }
- if target==record_target_record { return true; } if target==record_target_other { fail(self_,c_record_constructor,id,point,0); } else { fail(self_,c_unknown_constructor,id,point,symbol); } return false;
+fn bind<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol) { if !stopped(self_,tree,pool,context,locals)&&symbol!=0&&pool.get(symbol)!="_" { locals.push(symbol); } }
+fn record_target<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,symbol: Symbol) -> bool {
+ if stopped(self_,tree,pool,context,locals) { return false; } let point=tree.span(id).start+1;
+ if context.source_private_constructor(symbol) { fail(self_,tree,pool,context,locals,c_private_access,id,point,symbol); return false; }
+ var end=locals.len; if self_.pattern_scope>=0 { end=self_.pattern_scope; }
+ for item in locals.items[..end] { if item==symbol { fail(self_,tree,pool,context,locals,c_record_constructor,id,point,0); return false; } }
+ let target,err=context.source_record_target(symbol); self_.failure=err; if err!=blot_error::Error.none { return false; }
+ if target==record_target_record { return true; } if target==record_target_other { fail(self_,tree,pool,context,locals,c_record_constructor,id,point,0); } else { fail(self_,tree,pool,context,locals,c_unknown_constructor,id,point,symbol); } return false;
 }
-fn type_application<C>(self_: Validator<C>&,id: Id) -> bool {
+fn type_application<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) -> bool {
  var head=id;
- loop { let n=self_.tree.node(head); if n.tag==a_apply||n.tag==a_group { head=n.a; } else if n.tag==a_name { return !local(self_,n.a)&&self_.context.source_type_application(n.a); } else { return false; } }
+ loop { let n=tree.node(head); if n.tag==a_apply||n.tag==a_group { head=n.a; } else if n.tag==a_name { return !local(self_,tree,pool,context,locals,n.a)&&context.source_type_application(n.a); } else { return false; } }
 }
-fn pattern<C>(self_: Validator<C>&,id: Id,depth: i64) {
- let previous=self_.pattern_scope; if previous<0 { self_.pattern_scope=self_.locals.len; }
- pattern_result(self_,id,depth); self_.pattern_scope=previous;
+fn pattern<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
+ let previous=self_.pattern_scope; if previous<0 { self_.pattern_scope=locals.len; }
+ pattern_result(self_,tree,pool,context,locals,id,depth); self_.pattern_scope=previous;
 }
-fn pattern_names<C>(self_: Validator<C>&,id: Id,depth: i64) { let saved=self_.locals.len; pattern(self_,id,depth); self_.locals.resize(saved); }
-fn unique_pattern<C>(self_: Validator<C>&,first: const Symbol[:],second: const Symbol[:],id: Id) {
- for a in first { for b in second { if a==b { fail(self_,c_duplicate_pattern_binding,id,self_.tree.span(id).start,0); return; } } }
+fn pattern_names<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) { let saved=locals.len; pattern(self_,tree,pool,context,locals,id,depth); locals.resize(saved); }
+fn unique_pattern<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,first_start:i64,first_end:i64,second_start:i64,second_end:i64,id: Id) {
+ assert(first_start>=0 && first_start<=first_end && first_end<=locals.len);
+ assert(second_start>=0 && second_start<=second_end && second_end<=locals.len);
+ for first in first_start..first_end {let a=locals.items[first];for second in second_start..second_end {let b=locals.items[second];if a==b {fail(self_,tree,pool,context,locals,c_duplicate_pattern_binding,id,tree.span(id).start,0);return;}}}
 }
-recursive fn pattern_result<C>(self_: Validator<C>&,id: Id,depth: i64) {
- if id==0||stopped(self_) { return; } if depth>=1024 { fail(self_,c_nesting_limit,id,self_.tree.span(id).start,0); return; }
- let n=self_.tree.node(id);
- if n.tag==a_numeric_error { numeric_failure(self_,id); }
- else if n.tag==a_pattern_name { bind(self_,n.a); }
- else if n.tag==a_pattern_field { if n.b==0 { bind(self_,n.a); } else { pattern_result(self_,n.b,depth+1); } }
+recursive fn pattern_result<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
+ if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
+ let n=tree.node(id);
+ if n.tag==a_numeric_error { numeric_failure(self_,tree,pool,context,locals,id); }
+ else if n.tag==a_pattern_name { bind(self_,tree,pool,context,locals,n.a); }
+ else if n.tag==a_pattern_field { if n.b==0 { bind(self_,tree,pool,context,locals,n.a); } else { pattern_result(self_,tree,pool,context,locals,n.b,depth+1); } }
  else if n.tag==a_pattern_constructor {
-  if n.b!=0&&self_.tree.node(n.b).tag==a_pattern_record { if !record_target(self_,id,n.a) { return; } } else { name(self_,n.a,id,self_.tree.span(id).start+1); }
-  let previous=self_.record_constructor; self_.record_constructor=n.a; pattern_result(self_,n.b,depth+1); self_.record_constructor=previous;
+  if n.b!=0&&tree.node(n.b).tag==a_pattern_record { if !record_target(self_,tree,pool,context,locals,id,n.a) { return; } } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start+1); }
+  let previous=self_.record_constructor; self_.record_constructor=n.a; pattern_result(self_,tree,pool,context,locals,n.b,depth+1); self_.record_constructor=previous;
  } else if n.tag==a_pattern_product||n.tag==a_pattern_record {
-  let base=self_.locals.len; let ast_children_source=id;let ast_children_count=self_.tree.children(ast_children_source).len;
-  let ast_visit_2_source=ast_children_source;let ast_visit_2_count=self_.tree.children(ast_visit_2_source).len;for index in 0..ast_visit_2_count {let child=self_.tree.children(ast_visit_2_source)[index];
+  let base=locals.len; let ast_children_source=id;let ast_children_count=tree.children(ast_children_source).len;
+  let ast_visit_2_source=ast_children_source;let ast_visit_2_count=tree.children(ast_visit_2_source).len;for index in 0..ast_visit_2_count {let child=tree.children(ast_visit_2_source)[index];
    if n.tag==a_pattern_record {
-    let field=self_.tree.node(child).a; let known,has_known=self_.context.source_record_field_exists(self_.record_constructor,field);
-    if has_known&&!known { fail(self_,c_unknown_record_field,child,self_.tree.span(child).start,field); return; }
-    let ast_visit_3_source=ast_children_source;let ast_visit_3_start=0;let ast_visit_3_count=self_.tree.children(ast_visit_3_source)[ast_visit_3_start..index].len;for ast_visit_3_index in 0..ast_visit_3_count {let earlier=self_.tree.children(ast_visit_3_source)[ast_visit_3_start+ast_visit_3_index]; if self_.tree.node(earlier).a==field { fail(self_,c_duplicate_record_field,child,self_.tree.span(child).start,field); return; } }
+    let field=tree.node(child).a; let known,has_known=context.source_record_field_exists(self_.record_constructor,field);
+    if has_known&&!known { fail(self_,tree,pool,context,locals,c_unknown_record_field,child,tree.span(child).start,field); return; }
+    let ast_visit_3_source=ast_children_source;let ast_visit_3_start=0;let ast_visit_3_count=tree.children(ast_visit_3_source)[ast_visit_3_start..index].len;for ast_visit_3_index in 0..ast_visit_3_count {let earlier=tree.children(ast_visit_3_source)[ast_visit_3_start+ast_visit_3_index]; if tree.node(earlier).a==field { fail(self_,tree,pool,context,locals,c_duplicate_record_field,child,tree.span(child).start,field); return; } }
    }
-   let start=self_.locals.len; pattern_result(self_,child,depth+1); if stopped(self_) { return; }
-   unique_pattern(self_,self_.locals.items[base..start],self_.locals.items[start..],child); if stopped(self_) { return; }
+   let start=locals.len; pattern_result(self_,tree,pool,context,locals,child,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
+   unique_pattern(self_,tree,pool,context,locals,base,start,start,locals.len,child); if stopped(self_,tree,pool,context,locals) { return; }
   }
  } else if n.tag==a_pattern_row {
-  var starts=Scratchi64Buffer {};  let ast_children_source=id;let ast_children_count=self_.tree.children(ast_children_source).len;
-  let ast_visit_4_source=ast_children_source;let ast_visit_4_count=self_.tree.children(ast_visit_4_source).len;for ast_visit_4_index in 0..ast_visit_4_count {let child=self_.tree.children(ast_visit_4_source)[ast_visit_4_index]; starts.push(self_.locals.len); pattern_result(self_,child,depth+1); if stopped(self_) { starts.deinit(); return; } }
-  starts.push(self_.locals.len); var index=ast_children_count;
-  while index!=0 { index--; unique_pattern(self_,self_.locals.items[starts.items[index]..starts.items[index+1]],self_.locals.items[starts.items[index+1]..],self_.tree.children(ast_children_source)[index]); if stopped(self_) { starts.deinit(); return; } }
-  starts.deinit(); } else if n.tag==a_pattern_value { name(self_,n.a,id,self_.tree.span(id).start+1); }
+  var starts=Scratchi64Buffer {};  let ast_children_source=id;let ast_children_count=tree.children(ast_children_source).len;
+  let ast_visit_4_source=ast_children_source;let ast_visit_4_count=tree.children(ast_visit_4_source).len;for ast_visit_4_index in 0..ast_visit_4_count {let child=tree.children(ast_visit_4_source)[ast_visit_4_index]; starts.push(locals.len); pattern_result(self_,tree,pool,context,locals,child,depth+1); if stopped(self_,tree,pool,context,locals) { starts.deinit(); return; } }
+  starts.push(locals.len); var index=ast_children_count;
+  while index!=0 { index--; unique_pattern(self_,tree,pool,context,locals,starts.items[index],starts.items[index+1],starts.items[index+1],locals.len,tree.children(ast_children_source)[index]); if stopped(self_,tree,pool,context,locals) { starts.deinit(); return; } }
+  starts.deinit(); } else if n.tag==a_pattern_value { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start+1); }
 }
-fn request_input<C>(self_: Validator<C>&,id: Id) -> bool {
- var head=id; while self_.tree.node(head).tag==a_apply||self_.tree.node(head).tag==a_group { head=self_.tree.node(head).a; }
- return self_.tree.node(head).tag==a_intrinsic&&self_.pool.get(self_.tree.node(head).a)=="@requests";
+fn request_input<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) -> bool {
+ var head=id; while tree.node(head).tag==a_apply||tree.node(head).tag==a_group { head=tree.node(head).a; }
+ return tree.node(head).tag==a_intrinsic&&pool.get(tree.node(head).a)=="@requests";
 }
 struct Deferred { node: Id, locals: i64, handlers: bool=false }
-recursive fn suite<C>(self_: Validator<C>&,children: const Id[:],depth: i64) {
+recursive fn suite<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,source:Id,depth: i64) {
  var deferred=ScratchDeferredBuffer {};
- for child,index in children {
-  if stopped(self_) { deferred.deinit(); return; } let n=self_.tree.node(child); var terminator=terminator_none;
+ let count=tree.children(source).len;
+ for index in 0..count {let child=tree.children(source)[index];
+  if stopped(self_,tree,pool,context,locals) { deferred.deinit(); return; } let n=tree.node(child); var terminator=terminator_none;
   if n.tag==a_return_stmt||n.tag==a_function_return_stmt { terminator=terminator_return; }
   else if n.tag==a_break_stmt||n.tag==a_continue_stmt { terminator=terminator_break; }
   else if n.tag==a_yield_stmt { terminator=terminator_yield; }
-  if terminator!=terminator_none&&index+1<children.len { let following=children[index+1]; fail(self_,c_unreachable_statement,following,self_.tree.span(following).start,0); if self_.has_issue { self_.issue.terminator=terminator; } deferred.deinit(); return; }
-  if n.tag==a_for_stmt&&request_input(self_,n.b) { self_.failure=self_.context.source_request_header(child); if annotations_stopped(self_) { deferred.deinit(); return; } }
-  let dispatch,has_dispatch=request_dispatch(self_,child);
-  if n.tag==a_for_stmt&&request_input(self_,n.b)&&has_dispatch {
-   let saved_request=self_.permitted_requests; var head=n.b; while self_.tree.node(head).tag==a_apply||self_.tree.node(head).tag==a_group { head=self_.tree.node(head).a; }
-   self_.permitted_requests=head; walk(self_,n.b,depth+1); self_.permitted_requests=saved_request;
-   let saved=self_.locals.len; pattern(self_,n.a,depth+1); request_case(self_,dispatch,true,depth+1); self_.locals.resize(saved); deferred.push(Deferred {child,saved,true});
-  } else if n.tag==a_for_stmt&&!request_input(self_,n.b) {
-   let body=self_.tree.extra.items[n.c+1]; loop_scope(self_,n.a,body,depth+1); deferred.push(Deferred {child,self_.locals.len,false});
-  } else if n.tag==a_range_stmt { loop_scope(self_,0,n.c,depth+1); deferred.push(Deferred {child,self_.locals.len,false}); }
-  else { walk(self_,child,depth+1); }
-  if stopped(self_) { deferred.deinit(); return; }
+  if terminator!=terminator_none&&index+1<count { let following=tree.children(source)[index+1]; fail(self_,tree,pool,context,locals,c_unreachable_statement,following,tree.span(following).start,0); if self_.has_issue { self_.issue.terminator=terminator; } deferred.deinit(); return; }
+  if n.tag==a_for_stmt&&request_input(self_,tree,pool,context,locals,n.b) { self_.failure=context.source_request_header(child); if annotations_stopped(self_,tree,pool,context,locals) { deferred.deinit(); return; } }
+  let dispatch,has_dispatch=request_dispatch(self_,tree,pool,context,locals,child);
+  if n.tag==a_for_stmt&&request_input(self_,tree,pool,context,locals,n.b)&&has_dispatch {
+   let saved_request=self_.permitted_requests; var head=n.b; while tree.node(head).tag==a_apply||tree.node(head).tag==a_group { head=tree.node(head).a; }
+   self_.permitted_requests=head; walk(self_,tree,pool,context,locals,n.b,depth+1); self_.permitted_requests=saved_request;
+   let saved=locals.len; pattern(self_,tree,pool,context,locals,n.a,depth+1); request_case(self_,tree,pool,context,locals,dispatch,true,depth+1); locals.resize(saved); deferred.push(Deferred {child,saved,true});
+  } else if n.tag==a_for_stmt&&!request_input(self_,tree,pool,context,locals,n.b) {
+   let body=tree.extra.items[n.c+1]; loop_scope(self_,tree,pool,context,locals,n.a,body,depth+1); deferred.push(Deferred {child,locals.len,false});
+  } else if n.tag==a_range_stmt { loop_scope(self_,tree,pool,context,locals,0,n.c,depth+1); deferred.push(Deferred {child,locals.len,false}); }
+  else { walk(self_,tree,pool,context,locals,child,depth+1); }
+  if stopped(self_,tree,pool,context,locals) { deferred.deinit(); return; }
  }
  var index=deferred.len;
  while index!=0 {
-  index--; let item=deferred.items[index]; self_.locals.resize(item.locals); let n=self_.tree.node(item.node);
-  if item.handlers { pattern(self_,n.a,depth+1); let dispatch,found=request_dispatch(self_,item.node); request_case(self_,dispatch,false,depth+1); }
-  else if n.tag==a_for_stmt { walk(self_,n.b,depth+1); walk(self_,self_.tree.extra.items[n.c],depth+1); }
-  else { walk(self_,n.a,depth+1); walk(self_,n.b,depth+1); } if stopped(self_) { deferred.deinit(); return; }
+  index--; let item=deferred.items[index]; locals.resize(item.locals); let n=tree.node(item.node);
+  if item.handlers { pattern(self_,tree,pool,context,locals,n.a,depth+1); let dispatch,found=request_dispatch(self_,tree,pool,context,locals,item.node); request_case(self_,tree,pool,context,locals,dispatch,false,depth+1); }
+  else if n.tag==a_for_stmt { walk(self_,tree,pool,context,locals,n.b,depth+1); walk(self_,tree,pool,context,locals,tree.extra.items[n.c],depth+1); }
+  else { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); } if stopped(self_,tree,pool,context,locals) { deferred.deinit(); return; }
  }
  deferred.deinit(); }
-fn request_dispatch<C>(self_: Validator<C>&,id: Id) -> Id,bool {
- let n=self_.tree.node(id); if n.tag!=a_for_stmt { return 0,false; }
- let body=self_.tree.extra.items[n.c+1]; if self_.tree.node(body).tag!=a_block { return 0,false; }
- let ast_statements_source=body;let ast_statements_count=self_.tree.children(ast_statements_source).len; if ast_statements_count!=1||self_.tree.node(self_.tree.children(ast_statements_source)[0]).tag!=a_request_case { return 0,false; } return self_.tree.children(ast_statements_source)[0],true;
+fn request_dispatch<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id) -> Id,bool {
+ let n=tree.node(id); if n.tag!=a_for_stmt { return 0,false; }
+ let body=tree.extra.items[n.c+1]; if tree.node(body).tag!=a_block { return 0,false; }
+ let ast_statements_source=body;let ast_statements_count=tree.children(ast_statements_source).len; if ast_statements_count!=1||tree.node(tree.children(ast_statements_source)[0]).tag!=a_request_case { return 0,false; } return tree.children(ast_statements_source)[0],true;
 }
-recursive fn request_case<C>(self_: Validator<C>&,id: Id,completion: bool,depth: i64) {
- if stopped(self_) { return; } let saved_replies=self_.replies; let saved_loops=self_.loops; self_.replies=!completion; self_.loops++;
+recursive fn request_case<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,completion: bool,depth: i64) {
+ if stopped(self_,tree,pool,context,locals) { return; } let saved_replies=self_.replies; let saved_loops=self_.loops; self_.replies=!completion; self_.loops++;
 
- let n=self_.tree.node(id);
- if completion { let start=self_.tree.extra.items[n.a]; let len=self_.tree.extra.items[n.a+1]; let ast_visit_5_source=blot_parse_ast::List {start,len};let ast_visit_5_count=self_.tree.list(ast_visit_5_source).len;for ast_visit_5_index in 0..ast_visit_5_count {let child=self_.tree.list(ast_visit_5_source)[ast_visit_5_index]; walk(self_,child,depth+1); } }
- let ast_visit_6_source=blot_parse_ast::List {n.b,n.c};let ast_visit_6_count=self_.tree.list(ast_visit_6_source).len;for ast_visit_6_index in 0..ast_visit_6_count {let child=self_.tree.list(ast_visit_6_source)[ast_visit_6_index]; if (self_.tree.node(child).a==0)==completion { walk(self_,child,depth+1); } }
+ let n=tree.node(id);
+ if completion { let start=tree.extra.items[n.a]; let len=tree.extra.items[n.a+1]; let ast_visit_5_source=blot_parse_ast::List {start,len};let ast_visit_5_count=tree.list(ast_visit_5_source).len;for ast_visit_5_index in 0..ast_visit_5_count {let child=tree.list(ast_visit_5_source)[ast_visit_5_index]; walk(self_,tree,pool,context,locals,child,depth+1); } }
+ let ast_visit_6_source=blot_parse_ast::List {n.b,n.c};let ast_visit_6_count=tree.list(ast_visit_6_source).len;for ast_visit_6_index in 0..ast_visit_6_count {let child=tree.list(ast_visit_6_source)[ast_visit_6_index]; if (tree.node(child).a==0)==completion { walk(self_,tree,pool,context,locals,child,depth+1); } }
  { self_.replies=saved_replies; self_.loops=saved_loops; } }
-recursive fn scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { let saved=self_.locals.len; pattern(self_,pattern_id,depth); walk(self_,body,depth); self_.locals.resize(saved); }
-recursive fn loop_scope<C>(self_: Validator<C>&,pattern_id: Id,body: Id,depth: i64) { self_.loops++; scope(self_,pattern_id,body,depth); self_.loops--; }
-fn operator<C>(self_: Validator<C>&,symbol: Symbol,is_named: bool,id: Id) {
- let spelling=self_.pool.get(symbol); if spelling=="and"||spelling=="or" { return; } let point=origin(self_.tree,id);
- if is_named { name(self_,symbol,id,point); } else if !self_.context.source_symbolic_declared(symbol) { fail(self_,c_unknown_operator,id,point,symbol); }
+recursive fn scope<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,pattern_id: Id,body: Id,depth: i64) { let saved=locals.len; pattern(self_,tree,pool,context,locals,pattern_id,depth); walk(self_,tree,pool,context,locals,body,depth); locals.resize(saved); }
+recursive fn loop_scope<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,pattern_id: Id,body: Id,depth: i64) { self_.loops++; scope(self_,tree,pool,context,locals,pattern_id,body,depth); self_.loops--; }
+fn operator<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,symbol: Symbol,is_named: bool,id: Id) {
+ if pool.get(symbol)=="and"||pool.get(symbol)=="or" { return; } let point=origin(tree,id);
+ if is_named { name(self_,tree,pool,context,locals,symbol,id,point); } else if !context.source_symbolic_declared(symbol) { fail(self_,tree,pool,context,locals,c_unknown_operator,id,point,symbol); }
 }
-recursive fn primitive<C>(self_: Validator<C>&,id: Id,head: Id,argument_count: i64,depth: i64) {
- if stopped(self_) { return; } let symbol=self_.tree.node(head).a; let spelling=self_.pool.get(symbol);
- if validate_controls(self_)&&spelling=="@requests"&&head!=self_.permitted_requests { fail(self_,c_requests_scope,head,self_.tree.span(head).start,0); return; }
- if !self_.context.source_intrinsic_known(symbol) { fail(self_,c_unknown_intrinsic,head,self_.tree.span(head).start,symbol); return; }
- let arity,has_arity=self_.context.source_intrinsic_arity(symbol);
- if !has_arity { let application=self_.tree.node(id); if application.tag==a_apply { walk(self_,application.a,depth); walk(self_,application.b,depth); } return; }
- if argument_count!=arity||argument_count>4 { fail(self_,c_call_arity,head,self_.tree.span(head).start,0); return; }
+recursive fn primitive<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,head: Id,argument_count: i64,depth: i64) {
+ if stopped(self_,tree,pool,context,locals) { return; } let symbol=tree.node(head).a;
+ if validate_controls(self_,tree,pool,context,locals)&&pool.get(symbol)=="@requests"&&head!=self_.permitted_requests { fail(self_,tree,pool,context,locals,c_requests_scope,head,tree.span(head).start,0); return; }
+ if !context.source_intrinsic_known(symbol) { fail(self_,tree,pool,context,locals,c_unknown_intrinsic,head,tree.span(head).start,symbol); return; }
+ let arity,has_arity=context.source_intrinsic_arity(symbol);
+ if !has_arity { let application=tree.node(id); if application.tag==a_apply { walk(self_,tree,pool,context,locals,application.a,depth); walk(self_,tree,pool,context,locals,application.b,depth); } return; }
+ if argument_count!=arity||argument_count>4 { fail(self_,tree,pool,context,locals,c_call_arity,head,tree.span(head).start,0); return; }
  var arguments: Id[4]=[0,0,0,0]; var current=id; var index=argument_count;
- while self_.tree.node(current).tag==a_apply { index--; arguments[index]=self_.tree.node(current).b; current=self_.tree.node(current).a; }
- let descriptor=spelling=="@type.call"||spelling=="@type.result"||spelling=="@panic";
- if descriptor&&self_.tree.node(arguments[0]).tag!=a_string { fail(self_,c_literal_required,arguments[0],self_.tree.span(arguments[0]).start,0); return; }
- var selectors=0; if spelling=="@effect.state"||spelling=="@effect.run" { selectors=2; } else if spelling=="@effect.provider"||spelling=="@effect.reader"||spelling=="@effect.writer" { selectors=1; }
- for i in 0..selectors { let arg=arguments[i]; if self_.tree.node(arg).tag==a_name&&self_.pool.get(self_.tree.node(arg).a)=="Foreign" { fail(self_,c_sealed_effect,arg,self_.tree.span(arg).start,0); return; } }
+ while tree.node(current).tag==a_apply { index--; arguments[index]=tree.node(current).b; current=tree.node(current).a; }
+ let descriptor=pool.get(symbol)=="@type.call"||pool.get(symbol)=="@type.result"||pool.get(symbol)=="@panic";
+ if descriptor&&tree.node(arguments[0]).tag!=a_string { fail(self_,tree,pool,context,locals,c_literal_required,arguments[0],tree.span(arguments[0]).start,0); return; }
+ var selectors=0; if pool.get(symbol)=="@effect.state"||pool.get(symbol)=="@effect.run" { selectors=2; } else if pool.get(symbol)=="@effect.provider"||pool.get(symbol)=="@effect.reader"||pool.get(symbol)=="@effect.writer" { selectors=1; }
+ for i in 0..selectors { let arg=arguments[i]; if tree.node(arg).tag==a_name&&pool.get(tree.node(arg).a)=="Foreign" { fail(self_,tree,pool,context,locals,c_sealed_effect,arg,tree.span(arg).start,0); return; } }
  for i in 0..arity {
   let arg=arguments[i]; if i==0&&descriptor { continue; }
-  if spelling=="@product.get"&&i==1 {
-   if self_.tree.node(arg).tag==a_numeric_error&&self_.tree.numeric_fault(arg).code==blot_parse_ast::numericcode_integer_range { numeric_failure(self_,arg); }
-   else if self_.tree.node(arg).tag!=a_integer { fail(self_,c_product_index_literal,arg,self_.tree.span(arg).start,0); } return;
+  if pool.get(symbol)=="@product.get"&&i==1 {
+   if tree.node(arg).tag==a_numeric_error&&tree.numeric_fault(arg).code==blot_parse_ast::numericcode_integer_range { numeric_failure(self_,tree,pool,context,locals,arg); }
+   else if tree.node(arg).tag!=a_integer { fail(self_,tree,pool,context,locals,c_product_index_literal,arg,tree.span(arg).start,0); } return;
   }
-  let foreign_descriptor=(spelling=="@effect.descriptor"&&i==0)||(spelling=="@effect.has"&&i==1);
-  if foreign_descriptor&&self_.tree.node(arg).tag==a_name&&self_.pool.get(self_.tree.node(arg).a)=="Foreign" { continue; }
-  walk(self_,arg,depth); if stopped(self_) { return; }
+  let foreign_descriptor=(pool.get(symbol)=="@effect.descriptor"&&i==0)||(pool.get(symbol)=="@effect.has"&&i==1);
+  if foreign_descriptor&&tree.node(arg).tag==a_name&&pool.get(tree.node(arg).a)=="Foreign" { continue; }
+  walk(self_,tree,pool,context,locals,arg,depth); if stopped(self_,tree,pool,context,locals) { return; }
  }
 }
 let c_private_access: Code=0;
@@ -303,114 +306,114 @@ let a_package_unpack=blot_parse_ast::tag_package_unpack;
 let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
-recursive fn walk<C>(self_: Validator<C>&,id: Id,depth: i64) {
- if id!=0 { let tag=self_.tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&self_.context.source_editor_probe(id) { return; } }
- if id==0||stopped(self_) { return; } if depth>=1024 { fail(self_,c_nesting_limit,id,self_.tree.span(id).start,0); return; }
- let n=self_.tree.node(id);
- if n.tag==a_numeric_error { numeric_failure(self_,id); }
+recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
+ if id!=0 { let tag=tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&context.source_editor_probe(id) { return; } }
+ if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
+ let n=tree.node(id);
+ if n.tag==a_numeric_error { numeric_failure(self_,tree,pool,context,locals,id); }
  else if n.tag==a_string {}
  else if n.tag==a_name {
-  if validate_controls(self_)&&!local(self_,n.a)&&self_.context.source_non_callable_effect(n.a) { fail(self_,c_effect_member,id,self_.tree.span(id).start,0); }
-  else { name(self_,n.a,id,self_.tree.span(id).start); }
+  if validate_controls(self_,tree,pool,context,locals)&&!local(self_,tree,pool,context,locals,n.a)&&context.source_non_callable_effect(n.a) { fail(self_,tree,pool,context,locals,c_effect_member,id,tree.span(id).start,0); }
+  else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); }
  } else if n.tag==a_intrinsic {
-  if validate_controls(self_)&&self_.pool.get(n.a)=="@requests"&&id!=self_.permitted_requests { fail(self_,c_requests_scope,id,self_.tree.span(id).start,0); }
-  else if !self_.context.source_intrinsic_known(n.a) { fail(self_,c_unknown_intrinsic,id,self_.tree.span(id).start,n.a); }
-  else { let arity,found=self_.context.source_intrinsic_arity(n.a); if found&&arity!=0 { fail(self_,c_call_arity,id,self_.tree.span(id).start,0); } }
+  if validate_controls(self_,tree,pool,context,locals)&&pool.get(n.a)=="@requests"&&id!=self_.permitted_requests { fail(self_,tree,pool,context,locals,c_requests_scope,id,tree.span(id).start,0); }
+  else if !context.source_intrinsic_known(n.a) { fail(self_,tree,pool,context,locals,c_unknown_intrinsic,id,tree.span(id).start,n.a); }
+  else { let arity,found=context.source_intrinsic_arity(n.a); if found&&arity!=0 { fail(self_,tree,pool,context,locals,c_call_arity,id,tree.span(id).start,0); } }
  } else if n.tag==a_constructor_ref {
-  let exists,err=self_.context.source_operator_target_exists(n.a); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,c_unknown_value,id,self_.tree.span(id).start+1,n.a); }
+  let exists,err=context.source_operator_target_exists(n.a); self_.failure=err; if err==blot_error::Error.none&&!exists { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start+1,n.a); }
  } else if n.tag==a_type_witness {
-  walk(self_,n.a,depth+1); if stopped(self_) { return; } let constructor,found=self_.pool.lookup("Type"); var exists=false;
-  if found { let value,err=self_.context.source_operator_target_exists(constructor); self_.failure=err; exists=value; }
-  if self_.failure==blot_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:self_.tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
- } else if n.tag==a_group||n.tag==a_return_stmt||n.tag==a_function_return_stmt { walk(self_,n.a,depth+1); }
- else if n.tag==a_yield_stmt { if validate_controls(self_)&&!self_.replies { fail(self_,c_yield_scope,id,self_.tree.span(id).start,0); } else { walk(self_,n.a,depth+1); } }
- else if n.tag==a_break_stmt { if validate_controls(self_)&&self_.loops==0 { fail(self_,c_break_scope,id,self_.tree.span(id).start,0); } }
- else if n.tag==a_continue_stmt { if validate_controls(self_)&&self_.loops==0 { fail(self_,c_continue_scope,id,self_.tree.span(id).start,0); } }
- else if n.tag==a_forever_stmt { loop_scope(self_,0,n.a,depth+1); }
+  walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; } let constructor,found=pool.lookup("Type"); var exists=false;
+  if found { let value,err=context.source_operator_target_exists(constructor); self_.failure=err; exists=value; }
+  if self_.failure==blot_error::Error.none&&(!found||!exists) { self_.issue=Issue {code:c_unknown_value,node:id,point:tree.span(id).start,symbol:constructor,implicit_type_witness:!found}; self_.has_issue=true; }
+ } else if n.tag==a_group||n.tag==a_return_stmt||n.tag==a_function_return_stmt { walk(self_,tree,pool,context,locals,n.a,depth+1); }
+ else if n.tag==a_yield_stmt { if validate_controls(self_,tree,pool,context,locals)&&!self_.replies { fail(self_,tree,pool,context,locals,c_yield_scope,id,tree.span(id).start,0); } else { walk(self_,tree,pool,context,locals,n.a,depth+1); } }
+ else if n.tag==a_break_stmt { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_break_scope,id,tree.span(id).start,0); } }
+ else if n.tag==a_continue_stmt { if validate_controls(self_,tree,pool,context,locals)&&self_.loops==0 { fail(self_,tree,pool,context,locals,c_continue_scope,id,tree.span(id).start,0); } }
+ else if n.tag==a_forever_stmt { loop_scope(self_,tree,pool,context,locals,0,n.a,depth+1); }
  else if n.tag==a_field_access {
-  var base=n.a; while self_.tree.node(base).tag==a_group { base=self_.tree.node(base).a; } let source=self_.tree.node(base);
-  if source.tag==a_name&&!local(self_,source.a)&&self_.context.source_qualified_exists(source.a,n.b) { return; } walk(self_,n.a,depth+1);
- } else if n.tag==a_field { if n.b!=0 { walk(self_,n.b,depth+1); } else { name(self_,n.a,id,self_.tree.span(id).start); } }
- else if n.tag==a_unary { walk(self_,n.b,depth+1); if self_.pool.get(n.a)!="-" { fail(self_,c_unsupported_prefix,id,self_.tree.span(id).start,0); } }
+  var base=n.a; while tree.node(base).tag==a_group { base=tree.node(base).a; } let source=tree.node(base);
+  if source.tag==a_name&&!local(self_,tree,pool,context,locals,source.a)&&context.source_qualified_exists(source.a,n.b) { return; } walk(self_,tree,pool,context,locals,n.a,depth+1);
+ } else if n.tag==a_field { if n.b!=0 { walk(self_,tree,pool,context,locals,n.b,depth+1); } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start); } }
+ else if n.tag==a_unary { walk(self_,tree,pool,context,locals,n.b,depth+1); if pool.get(n.a)!="-" { fail(self_,tree,pool,context,locals,c_unsupported_prefix,id,tree.span(id).start,0); } }
  else if n.tag==a_binary {
-  walk(self_,n.b,depth+1); if stopped(self_) { return; } operator(self_,n.a,named(self_.pool,n.a),id); walk(self_,n.c,depth+1);
+  walk(self_,tree,pool,context,locals,n.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } operator(self_,tree,pool,context,locals,n.a,named(pool,n.a),id); walk(self_,tree,pool,context,locals,n.c,depth+1);
  } else if n.tag==a_infix_chain {
-  walk(self_,n.a,depth+1); let tails=blot_parse_ast::List {n.b,n.c};let ast_tails_count=self_.tree.list(tails).len;
-  let ast_visit_7_source=tails;let ast_visit_7_count=self_.tree.list(ast_visit_7_source).len;for ast_visit_7_index in 0..ast_visit_7_count {let tail=self_.tree.list(ast_visit_7_source)[ast_visit_7_index]; if stopped(self_) { return; } let op=self_.tree.node(tail); operator(self_,op.a,(op.c&1)!=0,tail); walk(self_,op.b,depth+1); }
-  if stopped(self_) { return; } var stack=ScratchIdBuffer {};
-  let ast_visit_8_source=tails;let ast_visit_8_count=self_.tree.list(ast_visit_8_source).len;for ast_visit_8_index in 0..ast_visit_8_count {let tail=self_.tree.list(ast_visit_8_source)[ast_visit_8_index];
-   let flags=self_.tree.node(tail).c; let power=flags>>4; let association=(flags>>2)&3;
+  walk(self_,tree,pool,context,locals,n.a,depth+1); let tails=blot_parse_ast::List {n.b,n.c};let ast_tails_count=tree.list(tails).len;
+  let ast_visit_7_source=tails;let ast_visit_7_count=tree.list(ast_visit_7_source).len;for ast_visit_7_index in 0..ast_visit_7_count {let tail=tree.list(ast_visit_7_source)[ast_visit_7_index]; if stopped(self_,tree,pool,context,locals) { return; } let op=tree.node(tail); operator(self_,tree,pool,context,locals,op.a,(op.c&1)!=0,tail); walk(self_,tree,pool,context,locals,op.b,depth+1); }
+  if stopped(self_,tree,pool,context,locals) { return; } var stack=ScratchIdBuffer {};
+  let ast_visit_8_source=tails;let ast_visit_8_count=tree.list(ast_visit_8_source).len;for ast_visit_8_index in 0..ast_visit_8_count {let tail=tree.list(ast_visit_8_source)[ast_visit_8_index];
+   let flags=tree.node(tail).c; let power=flags>>4; let association=(flags>>2)&3;
    while stack.len!=0 {
-    let previous=self_.tree.node(stack.items[stack.len-1]).c; if previous>>4<power { break; }
-    if previous>>4==power { if ((previous>>2)&3)!=association||association==2 { fail(self_,c_operator_associativity,tail,origin(self_.tree,tail),0); stack.deinit(); return; } if association==1 { break; } }
+    let previous=tree.node(stack.items[stack.len-1]).c; if previous>>4<power { break; }
+    if previous>>4==power { if ((previous>>2)&3)!=association||association==2 { fail(self_,tree,pool,context,locals,c_operator_associativity,tail,origin(tree,tail),0); stack.deinit(); return; } if association==1 { break; } }
     stack.resize(stack.len-1);
    }
    stack.push(tail);
   }
   stack.deinit(); } else if n.tag==a_apply {
   var head=id; var argument_count=0;
-  loop { let current=self_.tree.node(head); if current.tag==a_apply { argument_count++; head=current.a; } else { break; } }
-  let callee=self_.tree.node(head);
-  if validate_controls(self_)&&callee.tag==a_name&&self_.tree.node(n.b).tag==a_record&&self_.context.source_constructor_exists(callee.a)&&!local(self_,callee.a) { fail(self_,c_constructor_marker,id,self_.tree.span(id).start,0); return; }
-  if callee.tag==a_intrinsic { primitive(self_,id,head,argument_count,depth+1); return; }
-  walk(self_,n.a,depth+1); if stopped(self_) { return; }
-  var type_argument=type_application(self_,n.a);
-  if type_argument&&validate_controls(self_) { let is_type,err=self_.context.source_argument_is_type(n.a,n.b); self_.failure=err; type_argument=is_type; }
-  if !type_argument { walk(self_,n.b,depth+1); }
- } else if n.tag==a_index_access { walk(self_,n.a,depth+1); walk(self_,n.b,depth+1); }
+  loop { let current=tree.node(head); if current.tag==a_apply { argument_count++; head=current.a; } else { break; } }
+  let callee=tree.node(head);
+  if validate_controls(self_,tree,pool,context,locals)&&callee.tag==a_name&&tree.node(n.b).tag==a_record&&context.source_constructor_exists(callee.a)&&!local(self_,tree,pool,context,locals,callee.a) { fail(self_,tree,pool,context,locals,c_constructor_marker,id,tree.span(id).start,0); return; }
+  if callee.tag==a_intrinsic { primitive(self_,tree,pool,context,locals,id,head,argument_count,depth+1); return; }
+  walk(self_,tree,pool,context,locals,n.a,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
+  var type_argument=type_application(self_,tree,pool,context,locals,n.a);
+  if type_argument&&validate_controls(self_,tree,pool,context,locals) { let is_type,err=context.source_argument_is_type(n.a,n.b); self_.failure=err; type_argument=is_type; }
+  if !type_argument { walk(self_,tree,pool,context,locals,n.b,depth+1); }
+ } else if n.tag==a_index_access { walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); }
  else if n.tag==a_record {
-  if n.a!=0&&!record_target(self_,id,n.a) { return; } let ast_fields_source=id;let ast_fields_count=self_.tree.children(ast_fields_source).len;
-  let ast_visit_9_source=ast_fields_source;let ast_visit_9_count=self_.tree.children(ast_visit_9_source).len;for index in 0..ast_visit_9_count {let child=self_.tree.children(ast_visit_9_source)[index];
-   let field=self_.tree.node(child).a;
-   if n.a!=0 { let known,has_known=self_.context.source_record_field_exists(n.a,field); if has_known&&!known { fail(self_,c_unknown_record_field,child,self_.tree.span(child).start,field); return; } }
-   let ast_visit_10_source=ast_fields_source;let ast_visit_10_start=0;let ast_visit_10_count=self_.tree.children(ast_visit_10_source)[ast_visit_10_start..index].len;for ast_visit_10_index in 0..ast_visit_10_count {let earlier=self_.tree.children(ast_visit_10_source)[ast_visit_10_start+ast_visit_10_index]; if self_.tree.node(earlier).a==field { fail(self_,c_duplicate_record_field,child,self_.tree.span(child).start,field); return; } }
-   walk(self_,child,depth+1); if stopped(self_) { return; }
+  if n.a!=0&&!record_target(self_,tree,pool,context,locals,id,n.a) { return; } let ast_fields_source=id;let ast_fields_count=tree.children(ast_fields_source).len;
+  let ast_visit_9_source=ast_fields_source;let ast_visit_9_count=tree.children(ast_visit_9_source).len;for index in 0..ast_visit_9_count {let child=tree.children(ast_visit_9_source)[index];
+   let field=tree.node(child).a;
+   if n.a!=0 { let known,has_known=context.source_record_field_exists(n.a,field); if has_known&&!known { fail(self_,tree,pool,context,locals,c_unknown_record_field,child,tree.span(child).start,field); return; } }
+   let ast_visit_10_source=ast_fields_source;let ast_visit_10_start=0;let ast_visit_10_count=tree.children(ast_visit_10_source)[ast_visit_10_start..index].len;for ast_visit_10_index in 0..ast_visit_10_count {let earlier=tree.children(ast_visit_10_source)[ast_visit_10_start+ast_visit_10_index]; if tree.node(earlier).a==field { fail(self_,tree,pool,context,locals,c_duplicate_record_field,child,tree.span(child).start,field); return; } }
+   walk(self_,tree,pool,context,locals,child,depth+1); if stopped(self_,tree,pool,context,locals) { return; }
   }
-  if n.a!=0 { let field,missing=self_.context.source_missing_record_field(n.a,self_.tree.children(ast_fields_source)); if missing { fail(self_,c_missing_record_field,id,self_.tree.span(id).start+1,field); } }
- } else if n.tag==a_product||n.tag==a_array { let ast_visit_11_source=id;let ast_visit_11_count=self_.tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=self_.tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,child,depth+1); } }
+  if n.a!=0 { let field,missing=context.source_missing_record_field(n.a,tree.children(ast_fields_source)); if missing { fail(self_,tree,pool,context,locals,c_missing_record_field,id,tree.span(id).start+1,field); } }
+ } else if n.tag==a_product||n.tag==a_array { let ast_visit_11_source=id;let ast_visit_11_count=tree.children(ast_visit_11_source).len;for ast_visit_11_index in 0..ast_visit_11_count {let child=tree.children(ast_visit_11_source)[ast_visit_11_index]; walk(self_,tree,pool,context,locals,child,depth+1); } }
  else if n.tag==a_lambda {
-  self_.failure=self_.context.source_expression_annotations(id); if annotations_stopped(self_) { return; }
+  self_.failure=context.source_expression_annotations(id); if annotations_stopped(self_,tree,pool,context,locals) { return; }
   let saved_loops=self_.loops; let saved_replies=self_.replies; self_.loops=0; self_.replies=false;
-  let saved=self_.locals.len; bind(self_,self_.tree.parameter(n.a).name); walk(self_,n.b,depth+1);
-  self_.locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
+  let saved=locals.len; bind(self_,tree,pool,context,locals,tree.parameter(n.a).name); walk(self_,tree,pool,context,locals,n.b,depth+1);
+  locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
  } else if n.tag==a_block {
-  let saved=self_.locals.len; suite(self_,self_.tree.children(id),depth+1); self_.locals.resize(saved); walk(self_,n.c,depth+1);
+  let saved=locals.len; suite(self_,tree,pool,context,locals,id,depth+1); locals.resize(saved); walk(self_,tree,pool,context,locals,n.c,depth+1);
  } else if n.tag==a_let_stmt {
-  let binding=self_.tree.binding(id); let scope,err=self_.context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
+  let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
 
-  pattern_names(self_,binding.pattern,depth+1); if stopped(self_) { { self_.context.source_binding_end(scope); } return; }
-  self_.failure=self_.context.source_binding_annotation(id); if annotations_stopped(self_) { { self_.context.source_binding_end(scope); } return; }
-  walk(self_,binding.value,depth+1); if stopped(self_) { { self_.context.source_binding_end(scope); } return; }
-  self_.failure=self_.context.source_binding_finish(id); if annotations_stopped(self_) { { self_.context.source_binding_end(scope); } return; }
-  walk(self_,binding.fallback,depth+1); pattern(self_,binding.pattern,depth+1);
-  { self_.context.source_binding_end(scope); } } else if n.tag==a_use_stmt||n.tag==a_iterator_bind {
-  self_.failure=self_.context.source_expression_annotations(id); walk(self_,n.b,depth+1); bind(self_,n.a);
+  pattern_names(self_,tree,pool,context,locals,binding.pattern,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+  self_.failure=context.source_binding_annotation(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+  walk(self_,tree,pool,context,locals,binding.value,depth+1); if stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+  self_.failure=context.source_binding_finish(id); if annotations_stopped(self_,tree,pool,context,locals) { { context.source_binding_end(scope); } return; }
+  walk(self_,tree,pool,context,locals,binding.fallback,depth+1); pattern(self_,tree,pool,context,locals,binding.pattern,depth+1);
+  { context.source_binding_end(scope); } } else if n.tag==a_use_stmt||n.tag==a_iterator_bind {
+  self_.failure=context.source_expression_annotations(id); walk(self_,tree,pool,context,locals,n.b,depth+1); bind(self_,tree,pool,context,locals,n.a);
  } else if n.tag==a_rebind_stmt {
-  var root=n.a; while self_.tree.node(root).tag==a_field_access||self_.tree.node(root).tag==a_index_access { root=self_.tree.node(root).a; } let target=self_.tree.node(root);
-  if target.tag==a_name&&!local(self_,target.a) { fail(self_,c_unknown_rebinding,id,self_.tree.span(root).start,target.a); return; }
-  let saved=self_.locals.len; let symbol,found=self_.pool.lookup("self"); bind(self_,symbol); walk(self_,n.a,depth+1); walk(self_,n.b,depth+1); self_.locals.resize(saved);
- } else if n.tag==a_if_expr||n.tag==a_if_stmt||n.tag==a_range_stmt { walk(self_,n.a,depth+1); scope(self_,0,n.b,depth+1); scope(self_,0,n.c,depth+1); }
+  var root=n.a; while tree.node(root).tag==a_field_access||tree.node(root).tag==a_index_access { root=tree.node(root).a; } let target=tree.node(root);
+  if target.tag==a_name&&!local(self_,tree,pool,context,locals,target.a) { fail(self_,tree,pool,context,locals,c_unknown_rebinding,id,tree.span(root).start,target.a); return; }
+  let saved=locals.len; let symbol,found=pool.lookup("self"); bind(self_,tree,pool,context,locals,symbol); walk(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); locals.resize(saved);
+ } else if n.tag==a_if_expr||n.tag==a_if_stmt||n.tag==a_range_stmt { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,0,n.b,depth+1); scope(self_,tree,pool,context,locals,0,n.c,depth+1); }
  else if n.tag==a_if_let_stmt {
-  pattern_names(self_,n.a,depth+1); walk(self_,n.b,depth+1); let body=self_.tree.extra.items[n.c]; let fallback=self_.tree.extra.items[n.c+1]; scope(self_,n.a,body,depth+1); scope(self_,0,fallback,depth+1);
+  pattern_names(self_,tree,pool,context,locals,n.a,depth+1); walk(self_,tree,pool,context,locals,n.b,depth+1); let body=tree.extra.items[n.c]; let fallback=tree.extra.items[n.c+1]; scope(self_,tree,pool,context,locals,n.a,body,depth+1); scope(self_,tree,pool,context,locals,0,fallback,depth+1);
  } else if n.tag==a_for_stmt {
-  walk(self_,n.b,depth+1); let end=self_.tree.extra.items[n.c]; let body=self_.tree.extra.items[n.c+1]; walk(self_,end,depth+1); scope(self_,n.a,body,depth+1);
+  walk(self_,tree,pool,context,locals,n.b,depth+1); let end=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,end,depth+1); scope(self_,tree,pool,context,locals,n.a,body,depth+1);
  } else if n.tag==a_case_expr {
-  let input=blot_parse_ast::List {self_.tree.extra.items[n.a],self_.tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=self_.tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=self_.tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,child,depth+1); }
-  let ast_visit_13_source=blot_parse_ast::List {n.b,n.c};let ast_visit_13_count=self_.tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=self_.tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,child,depth+1); }
- } else if n.tag==a_request_case { request_case(self_,id,true,depth+1); request_case(self_,id,false,depth+1); }
+  let input=blot_parse_ast::List {tree.extra.items[n.a],tree.extra.items[n.a+1]}; let ast_visit_12_source=input;let ast_visit_12_count=tree.list(ast_visit_12_source).len;for ast_visit_12_index in 0..ast_visit_12_count {let child=tree.list(ast_visit_12_source)[ast_visit_12_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+  let ast_visit_13_source=blot_parse_ast::List {n.b,n.c};let ast_visit_13_count=tree.list(ast_visit_13_source).len;for ast_visit_13_index in 0..ast_visit_13_count {let child=tree.list(ast_visit_13_source)[ast_visit_13_index]; walk(self_,tree,pool,context,locals,child,depth+1); }
+ } else if n.tag==a_request_case { request_case(self_,tree,pool,context,locals,id,true,depth+1); request_case(self_,tree,pool,context,locals,id,false,depth+1); }
  else if n.tag==a_case_arm {
-  let saved=self_.locals.len;
-  let rows=blot_parse_ast::List {n.a,n.b};let ast_rows_count=self_.tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,self_.tree.list(rows)[0],depth+1); }
-  let canonical_end=self_.locals.len; var index=0; if ast_rows_count!=0 { index=1; }
+  let saved=locals.len;
+  let rows=blot_parse_ast::List {n.a,n.b};let ast_rows_count=tree.list(rows).len; if ast_rows_count!=0 { pattern(self_,tree,pool,context,locals,tree.list(rows)[0],depth+1); }
+  let canonical_end=locals.len; var index=0; if ast_rows_count!=0 { index=1; }
   while index<ast_rows_count {
-   let row=self_.tree.list(rows)[index]; let previous=self_.pattern_scope; self_.pattern_scope=saved; pattern(self_,row,depth+1); self_.pattern_scope=previous; if stopped(self_) { { self_.locals.resize(saved); } return; }
-   var same=canonical_end-saved==self_.locals.len-canonical_end;
-   for name in self_.locals.items[saved..canonical_end] { var found=false; for other in self_.locals.items[canonical_end..] { if name==other { found=true; break; } } same=same&&found; }
-   if !same { fail(self_,c_alternative_bindings,row,self_.tree.span(row).start,0); }
-   self_.locals.resize(canonical_end); if stopped(self_) { { self_.locals.resize(saved); } return; } index++;
+   let row=tree.list(rows)[index]; let previous=self_.pattern_scope; self_.pattern_scope=saved; pattern(self_,tree,pool,context,locals,row,depth+1); self_.pattern_scope=previous; if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; }
+   var same=canonical_end-saved==locals.len-canonical_end;
+   for name in locals.items[saved..canonical_end] { var found=false; for other in locals.items[canonical_end..] { if name==other { found=true; break; } } same=same&&found; }
+   if !same { fail(self_,tree,pool,context,locals,c_alternative_bindings,row,tree.span(row).start,0); }
+   locals.resize(canonical_end); if stopped(self_,tree,pool,context,locals) { { locals.resize(saved); } return; } index++;
   }
-  let guard_=self_.tree.extra.items[n.c]; let body=self_.tree.extra.items[n.c+1]; walk(self_,body,depth+1); walk(self_,guard_,depth+1);
-  { self_.locals.resize(saved); } } else if n.tag==a_request_arm { walk(self_,n.a,depth+1); scope(self_,n.b,n.c,depth+1); }
+  let guard_=tree.extra.items[n.c]; let body=tree.extra.items[n.c+1]; walk(self_,tree,pool,context,locals,body,depth+1); walk(self_,tree,pool,context,locals,guard_,depth+1);
+  { locals.resize(saved); } } else if n.tag==a_request_arm { walk(self_,tree,pool,context,locals,n.a,depth+1); scope(self_,tree,pool,context,locals,n.b,n.c,depth+1); }
 }
 fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Error {
  let duplicate,has_duplicate=context.source_duplicate_name(); var collected=tree.roots.len;
@@ -435,10 +438,10 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
   let exists,err=context.source_operator_target_exists(fixity.target); if err!=blot_error::Error.none { return Issue {},false,err; }
   if !exists { return Issue {code:c_unknown_value,node:id,point:origin(tree,id),symbol:fixity.target},true,blot_error::Error.none; }
  }
- let locals_index=validator_locals.alloc_index(ValidatorLocals {}); let locals: ScratchIdBuffer& =validator_locals[locals_index].values;  var validator=Validator<C> {tree:tree,pool:pool,context:context,locals:locals}; index=tree.roots.len;
+ let locals_index=validator_locals.alloc_index(ValidatorLocals {}); let locals: ScratchIdBuffer& =validator_locals[locals_index].values;  var validator=Validator {}; index=tree.roots.len;
  while index!=0 {
   index--; let id=tree.roots.items[index]; validator.failure=context.source_declaration_header(id);
-  if annotations_stopped(validator) { let __cleanup_result_87_0: Issue = Issue {}; let __cleanup_result_87_1: bool = false; let __cleanup_result_87_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_87_0, __cleanup_result_87_1, __cleanup_result_87_2; }
+  if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_87_0: Issue = Issue {}; let __cleanup_result_87_1: bool = false; let __cleanup_result_87_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_87_0, __cleanup_result_87_1, __cleanup_result_87_2; }
   if tree.node(id).tag==a_implementation_decl {
    let saved=locals.len; let implementation=tree.implementation(id);
    let ast_visit_19_source=implementation.members;let ast_visit_19_count=tree.list(ast_visit_19_source).len;for ast_visit_19_index in 0..ast_visit_19_count {let member=tree.list(ast_visit_19_source)[ast_visit_19_index]; if tree.node(member).tag==a_value_decl { locals.push(tree.node(member).a); } }
@@ -446,24 +449,24 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
    let ast_visit_20_source=implementation.members;let ast_visit_20_count=tree.list(ast_visit_20_source).len;for ast_visit_20_index in 0..ast_visit_20_count {let member=tree.list(ast_visit_20_source)[ast_visit_20_index];
     if tree.node(member).tag!=a_value_decl { continue; }
     validator.failure=context.source_binding_annotation(member);
-    if annotations_stopped(validator) { break; } walk(validator,tree.value_decl(member).body,0); if stopped(validator) { break; }
+    if annotations_stopped(validator,tree,pool,context,locals) { break; } walk(validator,tree,pool,context,locals,tree.value_decl(member).body,0); if stopped(validator,tree,pool,context,locals) { break; }
    }
    context.source_implementation_end(scope); locals.resize(saved);
    if validator.has_issue { let __cleanup_result_89_0: Issue = validator.issue; let __cleanup_result_89_1: bool = true; let __cleanup_result_89_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_89_0, __cleanup_result_89_1, __cleanup_result_89_2; }
-   if annotations_stopped(validator) { let __cleanup_result_90_0: Issue = Issue {}; let __cleanup_result_90_1: bool = false; let __cleanup_result_90_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_90_0, __cleanup_result_90_1, __cleanup_result_90_2; } continue;
+   if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_90_0: Issue = Issue {}; let __cleanup_result_90_1: bool = false; let __cleanup_result_90_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_90_0, __cleanup_result_90_1, __cleanup_result_90_2; } continue;
   }
   if tree.node(id).tag!=a_value_decl { continue; } let value=tree.value_decl(id);
   if value.modifier!=0&&pool.get(value.modifier)!="entry" { let __cleanup_result_91_0: Issue = Issue {code:c_unknown_modifier,node:id,point:tree.span(id).start}; let __cleanup_result_91_1: bool = true; let __cleanup_result_91_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_91_0, __cleanup_result_91_1, __cleanup_result_91_2; }
   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __cleanup_result_92_0: Issue = Issue {}; let __cleanup_result_92_1: bool = false; let __cleanup_result_92_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_92_0, __cleanup_result_92_1, __cleanup_result_92_2; }
   validator.failure=context.source_binding_annotation(id);
-  if !annotations_stopped(validator) {
-   walk(validator,value.body,0); let attributes=value.attributes;let ast_attributes_count=tree.list(attributes).len; var attribute_index=value.attributes.len;
-   while attribute_index!=0 { attribute_index--; walk(validator,tree.node(tree.list(attributes)[attribute_index]).a,0); }
-   if !validator.has_issue&&!annotations_stopped(validator) { validator.failure=context.source_binding_finish(id); }
+  if !annotations_stopped(validator,tree,pool,context,locals) {
+   walk(validator,tree,pool,context,locals,value.body,0); let attributes=value.attributes;let ast_attributes_count=tree.list(attributes).len; var attribute_index=value.attributes.len;
+   while attribute_index!=0 { attribute_index--; walk(validator,tree,pool,context,locals,tree.node(tree.list(attributes)[attribute_index]).a,0); }
+   if !validator.has_issue&&!annotations_stopped(validator,tree,pool,context,locals) { validator.failure=context.source_binding_finish(id); }
   }
   context.source_binding_end(scope);
   if validator.has_issue { let __cleanup_result_93_0: Issue = validator.issue; let __cleanup_result_93_1: bool = true; let __cleanup_result_93_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_93_0, __cleanup_result_93_1, __cleanup_result_93_2; }
-  if annotations_stopped(validator) { let __cleanup_result_94_0: Issue = Issue {}; let __cleanup_result_94_1: bool = false; let __cleanup_result_94_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_94_0, __cleanup_result_94_1, __cleanup_result_94_2; }
+  if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_94_0: Issue = Issue {}; let __cleanup_result_94_1: bool = false; let __cleanup_result_94_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_94_0, __cleanup_result_94_1, __cleanup_result_94_2; }
  }
  let __cleanup_result_95_0: Issue = Issue {}; let __cleanup_result_95_1: bool = false; let __cleanup_result_95_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_95_0, __cleanup_result_95_1, __cleanup_result_95_2;
  { locals.deinit(); validator_locals.free(locals_index); } }

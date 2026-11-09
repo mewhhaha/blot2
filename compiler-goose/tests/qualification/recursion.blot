@@ -1,0 +1,11 @@
+entry func forward (value: U32) : U32 => return later value
+func sum (value: U32) : U32 => return if @u32.eq value 0 then 0 else @u32.add value (sum (@u32.sub value 1))
+func even (value: U32) : Bool => return if @u32.eq value 0 then true else odd (@u32.sub value 1)
+func odd (value: U32) : Bool => return if @u32.eq value 0 then false else even (@u32.sub value 1)
+func later (value: U32) : U32 => return sum value
+entry func parity (value: U32) : Bool => return even value
+
+entry func scoped (value: U32) : U32 => return do:
+  let rows: ResizeArray U32 = #[value, 2]
+  rows[0] := @u32.add rows[0] 1
+  break rows[0]

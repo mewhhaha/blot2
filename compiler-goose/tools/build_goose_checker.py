@@ -63,6 +63,22 @@ ARRAY_REACH_GATE_SOURCES = {
     (True, True, True): "dcd6ffbca3ac21a4fafe227525c08eeda2f0caff0c399ca29a29d4223a414d45",
 }
 
+REFERENCE_CLOSURES_PATCH_SHA256 = '6bcd4657a3684ee02817111e54563e2cd8113ec63d54a5d110265dcdc1aad05e'
+REFERENCE_CLOSURES_SOURCES = {
+    (False, False): '24365b502dfbc04802ac50d5042c9b9ae00cb985a21b3c2b13376604b627a8c2',
+    (False, True): 'aecbb8f092eaa1f2b0b4663505a3a6af9d1ec11ba87513fd936098c5655b9441',
+    (True, False): '0c52f4c6fd2f27e02ddefaf8cf1c9ad76b16f8645e67bd0e15dcf71b613c7004',
+    (True, True): '187d05fd13f5c4a408253fc43e301b595d7d5e90e30a068bbaff39f45d6f4843',
+}
+
+CHECKER_TRACE_PATCH_SHA256 = '22195392edac5d004b3e59926fc15aba6a13d6ba12d2de6f730581531e75597e'
+CHECKER_TRACE_SOURCES = {
+    (False, False): '3e4de1500dac07070b59f87cce28bdfca96a37d11b57f8c1ed9d92769aa52651',
+    (False, True): 'bb21234c788d48cd1f66186c3c90a868e6e1db6c01d6ea2e5e6a1ac120daf0bc',
+    (True, False): '69fd930be7698e56595b8f8e25a4a6e0f2cf7f6a9da26e1122effa40cd65d604',
+    (True, True): '805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9',
+}
+
 LINK_INPUTS = (
     "CMakeFiles/goose.dir/src/process.cpp.o",
     "CMakeFiles/goose.dir/src/progress.cpp.o",
@@ -186,6 +202,10 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.reference_closures and not (args.array_reach_gate and args.reachable_program):
+        raise RuntimeError("--reference-closures requires --array-reach-gate and --reachable-program")
+    if args.checker_trace and not args.reference_closures:
+        raise RuntimeError("--checker-trace requires --reference-closures")
     if args.array_reach_gate and not args.stable_closures:
         raise RuntimeError("--array-reach-gate requires --stable-closures")
     goose_build = args.goose_build.resolve()
@@ -205,6 +225,8 @@ def build(args):
     ]
     if args.reachable_program:
         flags.append("-DGOOSE_REACHABLE_PROGRAM=1")
+    if args.checker_trace:
+        flags.append("-gline-tables-only")
     identity = fingerprints(goose_build, patch, cxx, flags)
     diagnostic_patch = Path(__file__).with_name("goose-diagnostic-roots.patch")
     if args.diagnostic_roots:
@@ -236,6 +258,18 @@ def build(args):
         identity["array_reach_gate_source_sha256"] = ARRAY_REACH_GATE_SOURCES[
             (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
         ]
+    reference_closures_patch = Path(__file__).with_name("goose-reference-closures.patch")
+    if args.reference_closures:
+        if digest(reference_closures_patch) != REFERENCE_CLOSURES_PATCH_SHA256:
+            raise RuntimeError("reference_closures patch changed; review and update its pinned digest")
+        identity["reference_closures_patch_sha256"] = REFERENCE_CLOSURES_PATCH_SHA256
+        identity["reference_closures_source_sha256"] = REFERENCE_CLOSURES_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+    checker_trace_patch = Path(__file__).with_name("goose-checker-trace.patch")
+    if args.checker_trace:
+        if digest(checker_trace_patch) != CHECKER_TRACE_PATCH_SHA256:
+            raise RuntimeError("checker_trace patch changed; review and update its pinned digest")
+        identity["checker_trace_patch_sha256"] = CHECKER_TRACE_PATCH_SHA256
+        identity["checker_trace_source_sha256"] = CHECKER_TRACE_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -299,6 +333,22 @@ def build(args):
                 patched_source_sha256 = checked_source(
                     work / "source", identity["array_reach_gate_source_sha256"]
                 )
+            if args.reference_closures:
+                stages.append(run_stage("reference_closures-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(reference_closures_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(
+                    work / "source", identity["reference_closures_source_sha256"]
+                )
+            if args.checker_trace:
+                stages.append(run_stage("checker_trace-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(checker_trace_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(
+                    work / "source", identity["checker_trace_source_sha256"]
+                )
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -328,6 +378,12 @@ def build(args):
                 final_identity["array_reach_gate_source_sha256"] = ARRAY_REACH_GATE_SOURCES[
                     (args.diagnostic_roots, args.runtime_observer, args.reachable_program)
                 ]
+            if args.reference_closures:
+                final_identity["reference_closures_patch_sha256"] = digest(reference_closures_patch)
+                final_identity["reference_closures_source_sha256"] = REFERENCE_CLOSURES_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+            if args.checker_trace:
+                final_identity["checker_trace_patch_sha256"] = digest(checker_trace_patch)
+                final_identity["checker_trace_source_sha256"] = CHECKER_TRACE_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -376,6 +432,10 @@ def main():
         "--array-reach-gate", action="store_true",
         help="qualify ArrayElems cache by actual reachability; requires --stable-closures",
     )
+    parser.add_argument("--reference-closures", action="store_true",
+                        help="bound fresh-empty reference closure reuse; requires current reachable/array variant")
+    parser.add_argument("--checker-trace", action="store_true",
+                        help="include optional GOOSE_CHECKER_TRACE progress; requires --reference-closures")
     args = parser.parse_args()
     try:
         print(json.dumps(build(args)))

@@ -2653,6 +2653,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core_builder::Reso
 fn blot_check_core_builder::blotStructuralHash<StructuralSink>(value:blot_check_core_builder::ResolverLoopBuffers,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core_builder::ResolverLoopFrame)->bool {return equalFields(left,right);}
 fn blot_check_core_builder::blotStructuralHash<StructuralSink>(value:blot_check_core_builder::ResolverLoopFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core_builder::ResolverStatements)->bool {return equalFields(left,right);}
+fn blot_check_core_builder::blotStructuralHash<StructuralSink>(value:blot_check_core_builder::ResolverStatements,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core_builder::Scratch)->bool {return equalFields(left,right);}
 fn blot_check_core_builder::blotStructuralHash<StructuralSink>(value:blot_check_core_builder::Scratch,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core_builder::Source)->bool {return equalFields(left,right);}
@@ -4657,8 +4659,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_source_operators::
 fn blot_parse_source_operators::blotStructuralHash<StructuralSink>(value:blot_parse_source_operators::ScratchIdBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_source_operators::Scratchi64Buffer)->bool {return equalFields(left,right);}
 fn blot_parse_source_operators::blotStructuralHash<StructuralSink>(value:blot_parse_source_operators::Scratchi64Buffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft,C>(left:StructuralLeft,right:blot_parse_source_operators::Validator<C>)->bool {return equalFields(left,right);}
-fn blot_parse_source_operators::blotStructuralHash<StructuralSink,C>(value:blot_parse_source_operators::Validator<C>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_source_operators::Validator)->bool {return equalFields(left,right);}
+fn blot_parse_source_operators::blotStructuralHash<StructuralSink>(value:blot_parse_source_operators::Validator,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_source_operators::ValidatorLocals)->bool {return equalFields(left,right);}
 fn blot_parse_source_operators::blotStructuralHash<StructuralSink>(value:blot_parse_source_operators::ValidatorLocals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_parse_symbols::Buckets)->bool {return equalFields(left,right);}

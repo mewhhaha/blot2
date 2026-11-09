@@ -1,0 +1,10 @@
+func add (left: U32) -> (right: U32) : U32 => return @u32.add left right
+const plus_two = add 2
+const identity = func value => return value
+entry func apply (value: U32) : U32 => return identity (plus_two value)
+entry func answer () : U32 => return add 20 22
+
+entry func scoped (value: U32) : U32 => return do:
+  let rows: ResizeArray U32 = #[value, 2]
+  rows[0] := @u32.add rows[0] 1
+  break rows[0]

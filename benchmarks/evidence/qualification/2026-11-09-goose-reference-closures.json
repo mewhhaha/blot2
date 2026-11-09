@@ -1,0 +1,177 @@
+{
+  "date": "2026-11-09",
+  "scope": "Optional bounded fresh-empty ReachesThroughRefs closure cache plus optional checker progress; no root/provenance or lifetime acceptance change",
+  "candidate": {
+    "binary": "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
+    "source108_sha256": "805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9",
+    "mode": "reachable-program + diagnostics + runtime-observer + stable-closures + array-reach-gate + reference-closures + checker-trace",
+    "trace_default": "off; enable only with nonempty GOOSE_CHECKER_TRACE"
+  },
+  "baseline": {
+    "binary": "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+    "sha256": "a7f79fff83b5b348170c7317a01443f8d3d4e2928cd22c105f8c57e1adf9ee29",
+    "source108_sha256": "dcd6ffbca3ac21a4fafe227525c08eeda2f0caff0c399ca29a29d4223a414d45",
+    "mode": "same underlying22d variant without closure reuse or trace"
+  },
+  "build": {
+    "compile_seconds": 62.02,
+    "link_seconds": 0.265,
+    "private_builds": 1,
+    "per_stage_cap_seconds": 120,
+    "cached_support_objects": true,
+    "receipt_sha256": "fec9cd2a7e01471a04860880c3a74408066cc791e942084130baf970b29f001f",
+    "compile_flags": [
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++20",
+      "-Wall",
+      "-Wextra",
+      "-Wno-missing-field-initializers",
+      "-DGOOSE_EXPANSION_NODE_LIMIT=1000000",
+      "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+      "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+      "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+      "-isystem",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+      "-DGOOSE_REACHABLE_PROGRAM=1",
+      "-gline-tables-only"
+    ],
+    "compiler": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "pins": {
+      "00-closure": "24365b502dfbc04802ac50d5042c9b9ae00cb985a21b3c2b13376604b627a8c2",
+      "00-trace": "3e4de1500dac07070b59f87cce28bdfca96a37d11b57f8c1ed9d92769aa52651",
+      "01-closure": "aecbb8f092eaa1f2b0b4663505a3a6af9d1ec11ba87513fd936098c5655b9441",
+      "01-trace": "bb21234c788d48cd1f66186c3c90a868e6e1db6c01d6ea2e5e6a1ac120daf0bc",
+      "10-closure": "0c52f4c6fd2f27e02ddefaf8cf1c9ad76b16f8645e67bd0e15dcf71b613c7004",
+      "10-trace": "69fd930be7698e56595b8f8e25a4a6e0f2cf7f6a9da26e1122effa40cd65d604",
+      "11-closure": "187d05fd13f5c4a408253fc43e301b595d7d5e90e30a068bbaff39f45d6f4843",
+      "11-trace": "805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9"
+    }
+  },
+  "reproduce_build": [
+    "python3",
+    "compiler-goose/tools/build_goose_checker.py",
+    "--array-reach-gate",
+    "--stable-closures",
+    "--reachable-program",
+    "--diagnostic-roots",
+    "--runtime-observer",
+    "--reference-closures",
+    "--checker-trace",
+    "--expansion-node-limit",
+    "1000000"
+  ],
+  "reproduce_queries": [
+    "python3",
+    "compiler-goose/tools/test_reference_closures.py",
+    "--goose",
+    "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "--baseline",
+    "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/goose",
+    "--source",
+    "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/source",
+    "--baseline-source",
+    "build/goose-port/private-checker/22d2d1c717d3251aef4af59f6194da3e7a886bfcbdac970a6ed421baaf068824/source"
+  ],
+  "cache_contract": {
+    "eligibility": "Existing Boolean pair hit stays first. EXACT original cold gate: typesbuilding || !stablereaches.Ready(t,stablecontainment) || !stablecontainment.Identity(of). Cold raw walk unchanged.",
+    "struct_key": "GetStructInst(t), under the validated graph gate. RefPointees(struct)->EachField->FieldRuns->RunsOf(GetStructInst(t)); attached Reused instance does not inspect or apply root cq/alias qualifiers.",
+    "other_keys": "Exact TypeExpr pointer for every non-struct, including refs and slices; no stripping outer views. A ref reaches its pointee itself, a struct its actual field graph.",
+    "publication": "Complete original ordered ReachedThroughRefs(t,empty), then unchanged CanContain scan; store after both succeed. No partial/negative closure entries. Cached Boolean answers retain original publication behavior.",
+    "ownership": "std::unordered_map nodes keep vector references stable across rehash; no eviction or mutation of cached vectors. No flat_map reference crosses a possible insertion.",
+    "bounds": {
+      "entries": 4096,
+      "retained_vector_capacity_pointers": 1048576,
+      "pointer_payload_bytes_on_64bit": 8388608,
+      "map_node_overhead": "additional but entry-bounded",
+      "fallback": "use full local uncached result when either bound rejects; never omit checks"
+    },
+    "debug": "Every closure hit recomputes the raw empty closure and TypeArgsEq checks its ordered sequence; original Boolean-hit raw recompute remains."
+  },
+  "trace": {
+    "root_progress": "Begin/end named global/main/thread/export-body/export-ABI boundaries; current CheckSpecBodyOnce name/spec pointer restored by scope. Only coarse root boundaries read clocks.",
+    "engines": [
+      "TypeEq",
+      "ReachedThroughRefs",
+      "ReachesThroughRefs",
+      "RootCandidates",
+      "ShrinkTargets",
+      "SaveFlow",
+      "ArrayElemsReached"
+    ],
+    "sample_intervals": {
+      "TypeEq": 1048576,
+      "RootCandidates_ShrinkTargets_SaveFlow": 4096,
+      "other_engines": 16384
+    },
+    "type_identity": "TypeExpr address as within-process ID, original kind, at most4 outer wrappers, at most128-byte nominal qname, definition/instance addresses, declaration/actual field counts and instance status. No recursive formatting, normalization or instantiation.",
+    "closure_stats": "With profile or trace enabled, every16384 closure hit/miss events logs counters and retained capacity; final destruction reports too. Trace alone avoids activating the array-gate profile-only Full proof.",
+    "cost": "Opt-in observations add counter/branch/report work; no timing ratio inferred from traced runs."
+  },
+  "controls": {
+    "semantic": 24,
+    "focused_laws": 10,
+    "focused_variants": [
+      "debug with original-walk cache assertions",
+      "release query methods with law assertions explicitly restored"
+    ],
+    "focused_executions": 20,
+    "same_path_byte_exact_C": 6,
+    "trace_on_off_C_identical": true,
+    "ordered_trace_formatter": "Actual TraceEngine sampled at2^20 in focused law; shallow nominal=probe::Engine verified in output.",
+    "executed_engine_laws": "Parent reports six current-source families pass on this candidate; parent owns their exact receipt.",
+    "result": "pass"
+  },
+  "unchanged_query_blocks": {
+    "inline void TypeCheck::BoundReach(": {
+      "baseline_sha256": "968e228fd9b7a0f3f94103c6f677078b8154007c980300c1c1ce9e35427c52b2",
+      "candidate_ignoring_observational_tick_same": true
+    },
+    "inline void TypeCheck::RefPointees(": {
+      "baseline_sha256": "2565aa9931f38eceab070e49b8b22c46e7670d49770125d699f15d2ffa5dadb0",
+      "candidate_ignoring_observational_tick_same": true
+    },
+    "inline void TypeCheck::ReachedThroughRefs(": {
+      "baseline_sha256": "eae3a05495fb565ef7a28002e5f0746c3e93e4d00a931d663b9089e206e1f521",
+      "candidate_ignoring_observational_tick_same": true
+    },
+    "    bool TypeEq(": {
+      "baseline_sha256": "83f4c776e4f16c5c8d92b83442e1a89d2df136dc38ca267f4b89b21dae04ae13",
+      "candidate_ignoring_observational_tick_same": true
+    }
+  },
+  "macro_observation": {
+    "candidate_batch": 24,
+    "candidate_seconds": 95.491,
+    "candidate_outcome": "Reached concrete source error source_operators.goose:377 within120s budget; no C emitted.",
+    "baseline_batch": 23,
+    "baseline_censored_seconds": 120.262,
+    "baseline_outcome": "Only warnings; stopped at emission cap before C.",
+    "claim": "Combined optional candidate reached an actionable error within budget; baseline was censored. No overall compilation speed ratio or completed compiler build.",
+    "candidate_stage_record_sha256": "48576c3e5f688cdd79beac3b7cf5b2df0387c60e44e1cacc1bb9f4019fbbed5d",
+    "candidate_source_archive_sha256": "afef18df2a79cec827e732841f615b9ee60d01cd29f8ea91b2439f37a843e6ac",
+    "baseline_source_archive_sha256": "cc0477ebff6a99fd49658f5a358aeb879596a2e0a521f11dea430b9f8249d75a",
+    "gdb_sample": "Not run: parent requested stopping additional profiling once concrete source frontier became actionable."
+  },
+  "tracked_sources": {
+    "compiler-goose/tools/build_goose_checker.py": "e50e3110a401397dbeeddb407553d113fd08bed8061795cf2d8724e4b63b56fd",
+    "compiler-goose/tools/goose-reference-closures.patch": "6bcd4657a3684ee02817111e54563e2cd8113ec63d54a5d110265dcdc1aad05e",
+    "compiler-goose/tools/goose-checker-trace.patch": "22195392edac5d004b3e59926fc15aba6a13d6ba12d2de6f730581531e75597e",
+    "compiler-goose/tools/test_reference_closures.py": "5f966c5abb7c501ca5133eae2c88862d10c5bc47d7636e85b1e149f047e5bcf7",
+    "compiler-goose/tools/checker_semantic_controls.py": "cb6ae3d56d4ae3b9487cf71ad6ce1a9dc81d8b45cd8b8cbbf2b0f49e99205d27",
+    "compiler-goose/tests/checker_tools/reference_closures.cpp": "917266b3676e9c38975f87cda8a96d7124eb37675588376051635b7b37e9ab35"
+  },
+  "detailed_evidence": {
+    "build/goose-port/reference-closures/controls/receipt.json": "196e9c31218414a9e839b3d9ef6c1a207106ab0f137aea89b2f44efc988ded18",
+    "build/goose-port/reference-closures/query-controls/receipt.json": "4d6fe88929709c7186954da19af15f6477317dcc99e0213ff8b91a92cc56edf7",
+    "build/goose-port/reference-closures/query-controls/emit-trace.stderr": "cc6115199c4e96d7c46b86e6cc6b87f9c0a2541e1e5185b36ac069c220135f01"
+  },
+  "limitations": [
+    "Whole compiler and actual project runtime remain unqualified.",
+    "Focused query fixture uses actual AST/gates/equality/loaded forms/reference traversal and cache methods, with reused controlled lazy-field/ArraySize/GetStructInst leaves; it does not qualify compiler algorithms through a fake tree.",
+    "No new166/300-law stability/visited rerun: readiness code is unchanged; focused current-method order/lifetime laws and24 real compiler controls qualify this query change.",
+    "Current semantic controls compare reachable-program variants; eager/default mode qualification remains historical."
+  ],
+  "whole_compiler_qualified": false
+}
