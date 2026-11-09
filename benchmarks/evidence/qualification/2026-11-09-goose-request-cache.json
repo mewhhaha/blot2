@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-09",
+  "scope": "Native request-cache staging/publication plus source adaptation; whole Goose compiler integration pending root batch",
+  "passed": true,
+  "whole_compiler_qualified": false,
+  "command": "clang -std=gnu11 -O2 -Wall -Wextra -Werror compiler-goose/native/request_cache.c compiler-goose/native/tests/request_cache_test.c -Wl,--wrap=malloc -Wl,--wrap=calloc -Wl,--wrap=realloc -o build/goose-port/request-cache-test && build/goose-port/request-cache-test",
+  "cc": {
+    "path": "/usr/bin/clang-23",
+    "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "version": "clang version 23.1.4"
+  },
+  "source_sha256": {
+    "compiler-goose/native/request_cache.c": "08cddd2c4584d1298e483b553ef80fd250989725772e30565afe9fd10a1e33e0",
+    "compiler-goose/native/request_cache.h": "9708d7f85d1f722ee98bf3cf443f9edc8ee4fdfa27423998548ee91ea8c51318",
+    "compiler-goose/native/tests/request_cache_test.c": "36633815e833141114eb9ba996fc2d9d67f11c0bc1bd3fe6f0ed6dc9474180e1",
+    "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d"
+  },
+  "binary_sha256": "98897b1be3b97982570a22a111892b3b0cf0cafa7b6325c9b1f2699927f015d3",
+  "seconds": 0.032,
+  "output": "request cache staging/discard/publish/retry/close: passed",
+  "qualified_native_laws": [
+    "staging changes no external artifact/lock/directory",
+    "failed child discards only candidate COW queue and memfds",
+    "payload and paths are owned copies",
+    "all three artifact writes and removals publish after adoption",
+    "replaced queue entry closes old memfd",
+    "explicit discard drains without publication",
+    "exclusive lock contention retries then joined publication finishes",
+    "optional filesystem failure drains and later staging/publishing succeeds",
+    "OS path/component limits and embedded NUL declined without truncation",
+    "inactive request staging declined",
+    "no descriptor leaks",
+    "direct malloc/calloc/realloc forbidden during publisher"
+  ],
+  "bounds": {
+    "parts": 3,
+    "keys_per_request": 1,
+    "bytes_per_part": 67108864,
+    "path": "Linux PATH_MAX and NAME_MAX; no truncation",
+    "publisher_userspace_retry_ms": 10000
+  },
+  "publication_contract": "Register blot_request_cache_publish as native post-adoption hook; supervisor waits QUIESCENT before protocol acceptance or joined close shutdown. Publisher performs fixed-storage syscall work, never Goose callbacks, and drains on optional failures.",
+  "rollback_contract": "Encoding and sealed-memfd staging happen before adoption. Rejected candidate exit drops only its COW queue; every adopted publication drains before the next request fork, leaving baseline queue empty.",
+  "request_source_contract": "persist/persistJoined bypass detached writers and file locks; publish/remove stage owned native records; save stages checkpoint; report-file mutations are omitted during requests. Ordinary nontransactional CLI persistence remains unchanged.",
+  "limitations": [
+    "single-threaded Linux request process",
+    "one cache key with three parts per request; another key safely declines optional staging",
+    "per-syscall kernel filesystem I/O scheduling is not bounded by the userspace retry deadline",
+    "optional post-adopt write failure does not revoke accepted heap/reply",
+    "cache report file is not updated for transactional requests"
+  ]
+}

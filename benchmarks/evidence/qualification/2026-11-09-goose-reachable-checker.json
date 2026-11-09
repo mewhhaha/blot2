@@ -1,0 +1,126 @@
+{
+  "scope": "Explicit private reachable-program compiler plus environment-gated observational phase timing; not selected-root/full-port qualification",
+  "binary": {
+    "binary": "/home/jacobt/src/blot2/build/goose-port/private-checker/7d33c84c0f0b6d55b390fb4dbb4e9071285dab218911b974ad72e33d17967ed2/goose",
+    "sha256": "c25e3bb5fd326b0ee657e9479d384f8fddf19df093998534830f6a9c57c70a6f",
+    "cached": false
+  },
+  "build_stages": [
+    {
+      "stage": "patch",
+      "exit": 0,
+      "seconds": 0.032
+    },
+    {
+      "stage": "diagnostic-patch",
+      "exit": 0,
+      "seconds": 0.016
+    },
+    {
+      "stage": "runtime-observer-patch",
+      "exit": 0,
+      "seconds": 0.007
+    },
+    {
+      "stage": "reachable-program-patch",
+      "exit": 0,
+      "seconds": 0.008
+    },
+    {
+      "stage": "compile",
+      "exit": 0,
+      "seconds": 56.705
+    },
+    {
+      "stage": "link",
+      "exit": 0,
+      "seconds": 0.214
+    }
+  ],
+  "source_files": 108,
+  "source_sha256": "b35482ed9f79d8ba68578b8c16c07c6576a80bd379f2246e0c5a59610d5c9c15",
+  "patch_sha256": "b85c2eb347e88d6d5a0ba203d95370da872737538303f3a1e07cd27581cabb09",
+  "recipe_sha256": "3a1b202c00497bd10cdf002a4bdfb4ba59159ca2a570ea5eed78a66ada06656b",
+  "flags": [
+    "-O3",
+    "-DNDEBUG",
+    "-std=gnu++20",
+    "-Wall",
+    "-Wextra",
+    "-Wno-missing-field-initializers",
+    "-DGOOSE_EXPANSION_NODE_LIMIT=1000000",
+    "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+    "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+    "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+    "-isystem",
+    "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+    "-DGOOSE_REACHABLE_PROGRAM=1"
+  ],
+  "variant_source_pins": {
+    "00": "580dacd788139adf330874699fb9dd107194dcd8cbc386d804b9f054aad47e38",
+    "10": "093b2a49921d7bcbe70fa772c442e1fe55e551bfda6f9bacf666f48510fe9d39",
+    "01": "289fe724f7f13022bf035c911de73b92de399151d432b7dbfe9da467b0d9eda3",
+    "11": "b35482ed9f79d8ba68578b8c16c07c6576a80bd379f2246e0c5a59610d5c9c15"
+  },
+  "default_containment_source_verified_unchanged": "652b36d0039864a5a2bc9f6220f86bf08da77624f53a650ff15fe61e6914eded",
+  "controls": {
+    "count": 24,
+    "seconds": 0.66,
+    "result": "/home/jacobt/src/blot2/build/goose-port/reachable-program/control-results.json",
+    "sha256": "4e3e725ab125ca2563762660dcd4e92aa5e09bf19609b42071d0e1cf93390036"
+  },
+  "runtime_observer": {
+    "result": "/home/jacobt/src/blot2/build/goose-port/reachable-program/runtime-observer-controls/result.json",
+    "sha256": "c2a82006c105556293b6738e8e6ba8e84bdbdbc847bec2d4d45de77be2820826",
+    "attempts": 24,
+    "injected_refusals": 24,
+    "allocator_refusal": {
+      "mechanism": "RLIMIT_AS",
+      "physicalRAMExhaustionTested": false
+    },
+    "generic_failures_never_OOM": [
+      "panic",
+      "invalid-size",
+      "SIGSEGV",
+      "SIGKILL"
+    ],
+    "seconds": 1.228
+  },
+  "intentional_changes": [
+    "Eager semantic checks of nonexport, nonextern dead concrete bodies are omitted only in the optional reachable-program build",
+    "Dead concrete signatures still reject; their diagnostics can omit the synthetic standalone-body instantiation chain"
+  ],
+  "preserved": [
+    "Global initializers, all exports, main, thread roots, reachable function values, extern specializations, type/name/signature validation and all existing final fixups",
+    "Default builder path retains the previous source pin and no reachable-program macro",
+    "Selected-root diagnostic mode remains explicitly partial and still returns before output",
+    "Runtime observer refusal classifications and unavailable coverage markers remain unchanged"
+  ],
+  "profiling": {
+    "switch": "GOOSE_CHECKER_PROFILE=1",
+    "phases": [
+      "parse",
+      "resolve",
+      "roots.globals",
+      "roots.declarations",
+      "roots.main",
+      "roots.threads",
+      "roots.export_bodies",
+      "roots.dead",
+      "roots.exports",
+      "roots.fixups",
+      "typecheck",
+      "optimize",
+      "bce"
+    ],
+    "same_path_C_unchanged": true,
+    "disabled": "No new clock reads, formatting or allocations; a cached environment check and stage branches remain",
+    "profile_log": "/home/jacobt/src/blot2/build/goose-port/reachable-program/profile.log"
+  },
+  "pending": [
+    "Full port emission/executable and end-to-end compiler correctness",
+    "Whole compiler performance measurements; small-control timings are not a performance-gain claim"
+  ],
+  "whole_blot_goose_compiler_qualified": false,
+  "contract": "All live roots, signatures, externs and lifetime fixups remain checked. Only standalone diagnostics of unused Goose function bodies are omitted in this explicit private build mode."
+}

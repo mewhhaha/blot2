@@ -1,0 +1,277 @@
+{
+  "upstream_files": {
+    "errors_tc/cycle_holder_growshrink_store.goose": "62a1676c111b611f7f8b7163d734d4868660a7e67f19d399682745145b0fdffb",
+    "errors_tc/callee_held_views_later_store.goose": "47a06c1bd5f8488a9b08a88b67847999c7bb73ff8b4a14e5d9f565b14b4aa600",
+    "errors_tc/cycle_merged_store_call.goose": "ebaa30676207d5ecd88b13a884815cb6a06e0e46ee10a3ecf8865518a8163ea3",
+    "errors_tc/cycle_store_before_join_merged.goose": "b4fb635368ce6f6c7fd5cfcee989d3f7f4b31648f1ce776395c792f9f8c4f79e",
+    "lifetimes/store_reached_types.goose": "83eb0a877a0587df5537f55b24093b28155125ef37d6498feb13606447646cdb",
+    "lifetimes/store_inexact_roots.goose": "b7b9e38cbccd3483f8e865dea658bd699833f4f420416cbe25e34053ea07427f",
+    "lifetimes/store_sources.goose": "21a8cf8b4a38cb6c7643b128b9484834705d52bbe1e4070ad3267c5c985b1f7f",
+    "lifetimes/slice_ref_stores.goose": "107185f7b5f61d67417b7b0ead1a693b9ff98a18fe928d43cd927fee84852066",
+    "errors_tc/global_before_init_call.goose": "2bb04039bab3cd8c28668081fa1141e3c13ebbb366965d88ad66d17a00f4aa8a",
+    "errors_tc/shrink_global_initializer.goose": "245d48f79a537f79dc15ecec9ba7d54252f1054bd1db9b49442c47c7d78c359f",
+    "errors_tc/branch_join_arrays_function_value.goose": "a2f35d30c060da49a76f9c32e6082ab7da98b411fa5430408d4bc360ac601675",
+    "errors_tc/thread_global.goose": "c000dd65f33bec7e87bd46bc93a0933784e2fc5867c1151afbeb27f377452be4",
+    "errors_tc/struct_contains_itself.goose": "4fabe69763e547b59c94cc49f0ac503fdcaecdf9e39aee336011461f877e2ecb",
+    "errors_tc/unreached_param_hazard.goose": "8e26809f739209743e2b5b248b1f7f1fcc8b3b3a3e6d47c4db127f55202ed086",
+    "typing/overloaded_function_values.goose": "1e1c9aee4c802f0596875a740f17305c9afb62091e050c1b0434bd0da3564157"
+  },
+  "store_controls": [
+    {
+      "id": "upstream/errors_tc/cycle_holder_growshrink_store",
+      "file": "cycle_holder_growshrink_store.goose",
+      "source_sha256": "62a1676c111b611f7f8b7163d734d4868660a7e67f19d399682745145b0fdffb",
+      "phase": "type-error",
+      "expect": null
+    },
+    {
+      "id": "upstream/errors_tc/callee_held_views_later_store",
+      "file": "callee_held_views_later_store.goose",
+      "source_sha256": "47a06c1bd5f8488a9b08a88b67847999c7bb73ff8b4a14e5d9f565b14b4aa600",
+      "phase": "type-error",
+      "expect": null
+    },
+    {
+      "id": "upstream/errors_tc/cycle_merged_store_call",
+      "file": "cycle_merged_store_call.goose",
+      "source_sha256": "ebaa30676207d5ecd88b13a884815cb6a06e0e46ee10a3ecf8865518a8163ea3",
+      "phase": "type-error",
+      "expect": null
+    },
+    {
+      "id": "upstream/errors_tc/cycle_store_before_join_merged",
+      "file": "cycle_store_before_join_merged.goose",
+      "source_sha256": "b4fb635368ce6f6c7fd5cfcee989d3f7f4b31648f1ce776395c792f9f8c4f79e",
+      "phase": "type-error",
+      "expect": null
+    },
+    {
+      "id": "upstream/lifetimes/store_reached_types",
+      "file": "store_reached_types.goose",
+      "source_sha256": "83eb0a877a0587df5537f55b24093b28155125ef37d6498feb13606447646cdb",
+      "phase": "run",
+      "expect": {
+        "stdout": "whole\nargument\nfirst\nargument\nlocal\nrun\nextra\nnested 1\nassigned\nlocal\nitem i1\ntables\n",
+        "exit": 0,
+        "normalize": "trailing-newlines"
+      }
+    },
+    {
+      "id": "upstream/lifetimes/store_inexact_roots",
+      "file": "store_inexact_roots.goose",
+      "source_sha256": "b7b9e38cbccd3483f8e865dea658bd699833f4f420416cbe25e34053ea07427f",
+      "phase": "run",
+      "expect": {
+        "stdout": "a1 -\nr2 2\nn 2\nb1 8\nb3 -\n0\n",
+        "exit": 0,
+        "normalize": "trailing-newlines"
+      }
+    },
+    {
+      "id": "upstream/lifetimes/store_sources",
+      "file": "store_sources.goose",
+      "source_sha256": "21a8cf8b4a38cb6c7643b128b9484834705d52bbe1e4070ad3267c5c985b1f7f",
+      "phase": "run",
+      "expect": {
+        "stdout": "a\nabc\nabc\n0\n",
+        "exit": 0,
+        "normalize": "trailing-newlines"
+      }
+    },
+    {
+      "id": "upstream/lifetimes/slice_ref_stores",
+      "file": "slice_ref_stores.goose",
+      "source_sha256": "107185f7b5f61d67417b7b0ead1a693b9ff98a18fe928d43cd927fee84852066",
+      "phase": "run",
+      "expect": {
+        "stdout": "world world\ngoose hello\ncal 11\nse\nel local\nlo 1\n",
+        "exit": 0,
+        "normalize": "trailing-newlines"
+      }
+    }
+  ],
+  "source_archive_sha256": "8b4d0f59a808aea60a7a40416c391795a4bdb05bc9de7d074eb7d4f858db7353",
+  "visited": {
+    "ast_sha256": "634070939bac352a7afa374d43cdcf0f55da403ea86f12fdc4a1b4886423fe4c",
+    "blocks": [
+      {
+        "file": "typecheck.h",
+        "head": "    static bool SameIndex(",
+        "sha256": "7f52f09c8c5254b750bc833fcc86946c3516356d19d66b38680ea252b03b29e6"
+      },
+      {
+        "file": "typecheck.h",
+        "head": "    bool TypeEq(",
+        "sha256": "83f4c776e4f16c5c8d92b83442e1a89d2df136dc38ca267f4b89b21dae04ae13"
+      },
+      {
+        "file": "typecheck.h",
+        "head": "    bool TypeArgsEq(",
+        "sha256": "d0f8bb4f8681bbabe03fca6d16792e718dc185b9143103f62c56f235abde3cbe"
+      },
+      {
+        "file": "typecheck.h",
+        "head": "    struct ArrayReachVisited {",
+        "sha256": "5e1f6d61c3370946c004467be5e1d3f0f07e4912067040346db7f035bde09b43"
+      },
+      {
+        "file": "typecheck_types.h",
+        "head": "inline TypeExpr *TypeCheck::LoadType(",
+        "sha256": "6e1e45dbd1fb956531ca1a2afd6c6b197074094c40e8a8f465492454eed99fd9"
+      },
+      {
+        "file": "typecheck_types.h",
+        "head": "inline void TypeCheck::ArrayElemsReached(",
+        "sha256": "39bbfcf558b5eaeb45913621c8f702988e39e9c3813d60df9d8d688d15e0def7"
+      }
+    ],
+    "fixture_sha256": "7093e9b496d73123e91aa3bd9d9b1c4b6d03b8a4234b8d88c45461a5f6cc2473",
+    "extraction": {
+      "parts": [
+        {
+          "head": "struct Line {",
+          "sha256": "365c8e74e380c6e08eeb79865c44dabb26f950ef51ca47d7beb8620a0cbb9172"
+        },
+        {
+          "head": "enum TypeKind {",
+          "sha256": "8c1c0e3eb3f9cb778527f04214d4ee419b1c7750c648177efcf09e54b194ecbc"
+        },
+        {
+          "head": "enum ArrayKind {",
+          "sha256": "e5d702c5a6794654dcd04046e6d8bec628a82668e021495d5158bb78187ebaae"
+        },
+        {
+          "head": "enum IntStorage {",
+          "sha256": "9e570a2b46045fb941b6404f5d7107ba98ef8cf066ae48a9fcb9fe0309eab4da"
+        },
+        {
+          "head": "enum FltStorage {",
+          "sha256": "b218f1b9a1c3b071fc74ff31ab25ee4af81b842266079c7f738d4e438591f07e"
+        },
+        {
+          "head": "struct TypeDetail {",
+          "sha256": "72e62390272d77f0d2472749e2778eacd93b09f18a739f9250cee9cac50eb2ed"
+        },
+        {
+          "head": "struct TypeStruct :",
+          "sha256": "1ec4144caae1392a2121e6f8def647083065c4ce637ed85ce2aa792e2a33a92c"
+        },
+        {
+          "head": "struct TypeEnum :",
+          "sha256": "fb9143fc459c59ba6b3598378cf74951d96f8c756c3795420f01358792139906"
+        },
+        {
+          "head": "struct TypeName :",
+          "sha256": "3266f8d59fac45d23009c0faa92c992f5a30da9cad17c21c7eff13a5174f2303"
+        },
+        {
+          "head": "struct TypeFn :",
+          "sha256": "78e04dae7a10cc1b69d89f9fbeaf5bd8c120b89adfc5392cee664b5bab402051"
+        },
+        {
+          "head": "struct TypeArray :",
+          "sha256": "3cc9e7a4a588994e4c5e1bd78bc09469d82d0ce69813f2ea6eb45b408016f793"
+        },
+        {
+          "head": "struct TypeRef :",
+          "sha256": "5f6911105074be5a0f04073e7225d4605da8b3cfecb7bf5fcb16079d8a1c2212"
+        },
+        {
+          "head": "struct TypeVariant :",
+          "sha256": "81ef3fae1b7e3df589c435abd6672bf8a901959e901729bc4737bcac70707ec9"
+        },
+        {
+          "head": "struct TypeIndex :",
+          "sha256": "70f5f039c8f78cc6705ef57fe9de7d36716eaafa036e8614aba4b1bed29b6054"
+        },
+        {
+          "head": "struct TypeExpr {",
+          "sha256": "a17beae3b4f745f4315200d638658a24ebffc077479f59966adb2e8e3575109e"
+        },
+        {
+          "head": "inline bool IsRefOrSlice(",
+          "sha256": "19a3c5a6876f2e6156adf9554cc6ab21539578e4a27f313705233ae2ba89f277"
+        },
+        {
+          "head": "inline bool IsRelRef(",
+          "sha256": "43a22ecc40a11f71263068902bc9fe5d2f77f213c6321b8ad13604adf91fcb15"
+        },
+        {
+          "head": "    TypeExpr *ConstOf(",
+          "sha256": "221195822f5d204c4ac2f0b911279d4f079d987aba28da707c6087c6b7f71875"
+        },
+        {
+          "head": "    TypeExpr *PlainOf(",
+          "sha256": "decb41cf05b01b7027c87897f1e952b95f05a353b72423ef21c6ae568fad0376"
+        },
+        {
+          "head": "    TypeExpr *RefTo(",
+          "sha256": "7805e561ba8747b118e097572ac4977360cbce6752f7c65b69c566bec4b607db"
+        },
+        {
+          "head": "    static bool SameIndex(",
+          "sha256": "7f52f09c8c5254b750bc833fcc86946c3516356d19d66b38680ea252b03b29e6"
+        },
+        {
+          "head": "    bool TypeEq(",
+          "sha256": "83f4c776e4f16c5c8d92b83442e1a89d2df136dc38ca267f4b89b21dae04ae13"
+        },
+        {
+          "head": "    bool TypeArgsEq(",
+          "sha256": "d0f8bb4f8681bbabe03fca6d16792e718dc185b9143103f62c56f235abde3cbe"
+        },
+        {
+          "head": "inline TypeExpr *TypeCheck::LoadType(",
+          "sha256": "6e1e45dbd1fb956531ca1a2afd6c6b197074094c40e8a8f465492454eed99fd9"
+        },
+        {
+          "head": "    struct ArrayReachVisited {",
+          "sha256": "5e1f6d61c3370946c004467be5e1d3f0f07e4912067040346db7f035bde09b43"
+        },
+        {
+          "head": "inline void TypeCheck::ArrayElemsReached(",
+          "sha256": "bf84df9ada90643876286682205682d39e32979c85970dcb00a40f282053cc99"
+        },
+        {
+          "head": "inline void TypeCheck::ArrayElemsReached(",
+          "sha256": "39bbfcf558b5eaeb45913621c8f702988e39e9c3813d60df9d8d688d15e0def7"
+        }
+      ],
+      "baseline_source108_sha256": "4aa9d45d1786590c5a6d9f54c39a05ab1db3cddf0df0c16d1024c8507e7dc533",
+      "candidate_source108_sha256": "ebc1625848bad00e8b3d3708c6a6df63603c2a884fc3841c4e0b64709178b3d1",
+      "actual": [
+        "All TypeExpr/detail schemas and enums",
+        "TypeEq, TypeArgsEq, SameIndex",
+        "LoadType, ConstOf, PlainOf, RefTo",
+        "Both complete ArrayElemsReached walks and candidate ArrayReachVisited"
+      ],
+      "instrumentation": [
+        "TypeEq and traversal entry counters only"
+      ],
+      "controlled_leaves": [
+        "EachField/lazy instance construction/failure",
+        "ArraySize expression evaluation/diagnostic",
+        "AST allocation/declaration payloads"
+      ],
+      "limits": "Projected graph model with exact query/equality bodies, not full semantic type-instantiation test. Host allocation/OOM parity not claimed."
+    }
+  },
+  "origins": {
+    "stability.cpp": {
+      "path": "build/goose-port/stable-closures/probe.cpp",
+      "sha256": "49d495f5f3a4dbc0cdf744821dac20a2774021d33f5755574b8bd1e15e0321e1"
+    },
+    "stability_laws.h": {
+      "path": "build/goose-port/query-identity-experiment/laws.h",
+      "sha256": "f60553d48dbe88af29705caaad3eabb363450086b3af2562c1d79698bbb07065"
+    },
+    "visited.cpp": {
+      "path": "build/goose-port/array-visited-buckets-laws/control.cpp",
+      "sha256": "7093e9b496d73123e91aa3bd9d9b1c4b6d03b8a4234b8d88c45461a5f6cc2473"
+    },
+    "semantic_runner": {
+      "path": "build/goose-port/stable-closures/controls.py",
+      "sha256": "152b0c60589e7145d16c5e97007bf156848258bea281d9fc385c984778764ca4"
+    }
+  }
+}

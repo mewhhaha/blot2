@@ -46,6 +46,7 @@ extern fn environment_copy(name:const u8&,out:u8&,capacity:u64)->i64="blot_envir
 extern fn worker_spawn(slot:u32)->i64="blot_worker_spawn";
 extern fn worker_descriptor(slot:u32,writing:bool)->i32="blot_worker_descriptor";
 extern fn worker_stop(slot:u32)->i32="blot_worker_stop";
+extern fn worker_detach()="blot_worker_detach";
 extern fn lock_open(path:const u8&)->i32="blot_lock_open";
 extern fn try_lock(fd:i32,exclusive:bool)->i32="blot_try_lock";
 extern fn unlock(fd:i32)->i32="blot_unlock";
@@ -62,3 +63,18 @@ extern fn directory_open(path:const u8&)->i64="blot_directory_open";
 extern fn directory_next(handle:i64,out:u8&,capacity:u64)->i64="blot_directory_next";
 extern fn directory_close(handle:i64)->i32="blot_directory_close";
 extern fn last_errno()->i32="blot_last_errno";
+
+// Field zero freezes the optional observer snapshot and returns its coverage.
+// Other fields read that snapshot; absent native observation returns zero.
+extern fn runtime_observation(field:u32)->u64="blot_runtime_observation";
+
+// Opaque request transaction transport; all parsing/compilation stays Goose.
+extern fn request_start(max_request:u64,max_reply:u64,timeout_ms:u32)->i32="blot_request_start";
+extern fn request_begin()->i32="blot_request_begin";
+extern fn request_input_fd()->i32="blot_request_input_fd";
+extern fn request_token()->u64="blot_request_token";
+extern fn request_reply_open()->i32="blot_request_transport_reply_open";
+extern fn request_finish(token:u64)->i32="blot_request_transport_finish";
+extern fn request_transport_run(reader:i32,writer:i32)->i32="blot_request_transport_run";
+extern fn request_fail_oom(token:u64)="blot_request_fail_oom";
+extern fn request_fail(token:u64)="blot_request_fail";

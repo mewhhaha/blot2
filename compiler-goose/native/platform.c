@@ -305,6 +305,15 @@ int32_t blot_worker_descriptor(uint32_t slot, _Bool writing) {
     if (writing) return blot_workers[slot].input;
     return blot_workers[slot].output;
 }
+/* A forked request candidate owns copied descriptors, never the baseline's
+ * worker processes. Detach without signalling or waiting for those workers. */
+void blot_worker_detach(void) {
+    for (size_t slot = 0; slot < 16; ++slot) {
+        struct blot_worker_process worker = blot_workers[slot];
+        blot_workers[slot] = (struct blot_worker_process){0};
+        if (worker.pid) { close(worker.input); close(worker.output); }
+    }
+}
 int32_t blot_worker_stop(uint32_t slot) {
     if (slot >= 16) return -EINVAL;
     struct blot_worker_process worker = blot_workers[slot];
@@ -418,3 +427,18 @@ int32_t blot_directory_close(int64_t handle) {
     return 0;
 }
 int32_t blot_last_errno(void) { return errno; }
+
+/* The observer is optional in ordinary engines. Field zero snapshots its
+ * covered counters and returns the coverage mask; other fields read that
+ * snapshot. No linked observer means zero coverage, never invented liveness. */
+#if defined(__GNUC__) || defined(__clang__)
+extern uint64_t blot_allocation_observer_value(uint32_t field) __attribute__((weak));
+#endif
+uint64_t blot_runtime_observation(uint32_t field) {
+#if defined(__GNUC__) || defined(__clang__)
+    if (blot_allocation_observer_value) return blot_allocation_observer_value(field);
+#else
+    (void)field;
+#endif
+    return 0;
+}

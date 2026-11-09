@@ -1,0 +1,223 @@
+{
+  "date": "2026-11-08",
+  "scope": "Private Goose generated runtime hooks and production Counts JSON observation fixture; not whole compiler qualification",
+  "qualified": {
+    "covered_fixture": true,
+    "whole_compiler": false,
+    "recoverable_oom_retention_parity": false
+  },
+  "commands": {
+    "build": "python3 compiler-goose/tools/build_goose_checker.py --runtime-observer --diagnostic-roots",
+    "fixture": "python3 compiler-goose/tools/test_runtime_observer.py --goose build/goose-port/private-checker/f116aaa69cb77524458c7a1d834414ac82cc671d095e4fbe93840ad993a8dd7c/goose"
+  },
+  "private_checker": {
+    "path": "build/goose-port/private-checker/f116aaa69cb77524458c7a1d834414ac82cc671d095e4fbe93840ad993a8dd7c/goose",
+    "sha256": "0b6a72c08fd63d4275c7bccff0fcb351adc596ed993ae20fdf06737fe2e2c9c4",
+    "build_identity": {
+      "recipe_sha256": "6582bbb139838d14753ed507b856a8edce8f15175c9a8ba6dfd2a2f08495a6eb",
+      "source_sha256": "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39",
+      "patch_sha256": "5168d0b9ad17328d8ada154c251c6bd3956ea801fdb61ff92f9427e38d4e4bfa",
+      "patched_source_sha256": "652b36d0039864a5a2bc9f6220f86bf08da77624f53a650ff15fe61e6914eded",
+      "patched_headers": {
+        "src/typecheck_calls.h": "3ca9bf3180d7793fa4e5cc7cc449f817bd1cb0ef6b44e6c07cf1ec33de15117c",
+        "src/typecheck_builtins.h": "1bfec9e12a67467f44935a2820b416e7f12ca6c7e4e1af4eaf3969b153ce75e1",
+        "src/clone.h": "f9e88692342c320da4290773ca0fdb159171e6ddb9211967a55dd7fa819bc79c",
+        "src/type_queries.h": "521a808993a7f286dfdd79aa9494979ab334731984305aefe82cf112c91a900c",
+        "src/typecheck.h": "5caf95d6677b44574d6bd167d4f9106107635947435ea8fcbfcac9e7c167e401",
+        "src/typecheck_types.h": "dc1413cca9c5a4d945f17f079145875e4b49993d6eaff399e7a74f8d20b4a8cd"
+      },
+      "cxx": "/usr/bin/clang++",
+      "cxx_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+      "cxx_version": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+      "compile_flags": [
+        "-O3",
+        "-DNDEBUG",
+        "-std=gnu++20",
+        "-Wall",
+        "-Wextra",
+        "-Wno-missing-field-initializers",
+        "-DGOOSE_EXPANSION_NODE_LIMIT=100000",
+        "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+        "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+        "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+        "-isystem",
+        "/home/jacobt/src/goose-to-wasm/build/native/tcc/api"
+      ],
+      "link_flags": [
+        "-ldl",
+        "-lm"
+      ],
+      "goose_build": "/home/jacobt/src/goose-to-wasm/build",
+      "inputs": {
+        "CMakeFiles/goose.dir/src/process.cpp.o": "165aacdf7efbc42d53bdc4a0730cc5fbe2934f88141f4604a35355f568a78eb9",
+        "CMakeFiles/goose.dir/src/progress.cpp.o": "17604e2ab092d3ed6ff1623848f662825a6602d7f55f6cb529cbf8430635d18f",
+        "libgoose_shaderc.a": "b92edef61cfa6822388552bac58347b2510c76d64ae6ca89f85028522989e259",
+        "libtcc.a": "25bf43b5098e259167e87d565ee1a77c170d8b26291b6e98ad260e2d94fe7d55",
+        "generated": "a763fa852d50aac0b9f61c4212b0d414c7706c78bad3ce9ccdc2059c74962fbc",
+        "tcc/api": "38afc187cc8dac9e35e009e15641e085d6d030bef353fe86e37a91165d3b8ef1",
+        "tcclib": "c931d9eda9761b15df83a335520193d77e4aee24b63b492f687e392e4738548e",
+        "subprocess": "ff4b0e1f740eeefe2c4f0b486468b19e3522f44de9e92fb5c5b2856596cf8a9a"
+      },
+      "diagnostic_roots_patch_sha256": "f9a26028daf90287ef01672c9878c3d09c4ae1ec0c25b5dd2eca2b46e6343f47",
+      "runtime_observer_patch_sha256": "a18ccad0b1c0c4a776eb794f138e33a33a9f6374fb724d14877458663c4f020b"
+    },
+    "final_private_source_sha256": "2b09acc5f47a50eaff0d31a9a950a682e253a2be71e45c6ea808efcaf37f9f34",
+    "stages": [
+      {
+        "stage": "patch",
+        "exit": 0,
+        "seconds": 0.032
+      },
+      {
+        "stage": "diagnostic-patch",
+        "exit": 0,
+        "seconds": 0.007
+      },
+      {
+        "stage": "runtime-observer-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "compile",
+        "exit": 0,
+        "seconds": 56.94
+      },
+      {
+        "stage": "link",
+        "exit": 0,
+        "seconds": 0.264
+      }
+    ],
+    "build_count": 1,
+    "installed_goose_modified": false
+  },
+  "fixture_tools": {
+    "cc": "/usr/bin/clang-23",
+    "sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "version": "clang version 23.1.4",
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O0",
+      "-pthread",
+      "-I/home/jacobt/src/blot2/compiler-goose/native"
+    ],
+    "per_stage_cap_seconds": 30
+  },
+  "source_closure": {
+    "files": 8,
+    "manifest_sha256": "fa3f8da50cd214d48c7ccba2a60ef5ae47049bcb5cc7c533396288656f7439c0",
+    "entry": "compiler-goose/tests/runtime_observer.goose",
+    "stdlib": "/home/jacobt/src/goose-to-wasm/build/source/stdlib"
+  },
+  "fixture": {
+    "attempts": 24,
+    "matchingAttempts": 24,
+    "poolAllocations": 6,
+    "poolReallocations": 2,
+    "poolFrees": 4,
+    "poolReuses": 2,
+    "poolPayloadAllocatedBytes": 112,
+    "poolPayloadFreedBytes": 96,
+    "poolCapacityGrowthBytes": 104,
+    "regionReservedBytesBeforeRelease": 8594128896,
+    "activePoolPayload": null,
+    "retainedPoolCapacity": null,
+    "scratch": null,
+    "rss": null,
+    "productionReport": {
+      "live_bytes": null,
+      "peak_bytes": null,
+      "allocated_bytes": null,
+      "allocations": null,
+      "coverage": "unavailable",
+      "runtime_observations": {
+        "coverage": "pool-operations-and-region-reservations",
+        "scope": "request-counters-and-process-region-reservations",
+        "request": 123,
+        "attempts": 24,
+        "refusals": 0,
+        "pool_allocations": 6,
+        "pool_reallocations": 2,
+        "pool_frees": 4,
+        "pool_reuses": 2,
+        "pool_payload_allocated_bytes": 112,
+        "pool_payload_freed_bytes": 96,
+        "pool_capacity_growth_bytes": 104,
+        "region_reservations": 4,
+        "region_releases": 0,
+        "region_reserved_bytes": 8594128896,
+        "region_reserved_peak_bytes": 8594128896,
+        "explicit_capacity_requests": 7,
+        "explicit_capacity_requested_bytes": 200,
+        "registry_allocated_bytes": 224,
+        "pool_operations": true,
+        "region_reservations_observed": true,
+        "explicit_capacity_requests_observed": true,
+        "registry_allocation_observed": true,
+        "whole_runtime_fault_coverage": false,
+        "active_pool_payload_bytes": null,
+        "retained_pool_capacity_bytes": null,
+        "scratch_bytes": null,
+        "rss_bytes": null
+      }
+    },
+    "optionalObserverAbsent": true,
+    "runtimeHooksAbsent": true,
+    "source_sha256": {
+      "tests/runtime_observer.goose": "1320db030ff2f63ed2d75613ecdeec2ebce5a8486ca6c823771e163b4c0bb675",
+      "src/runtime/memory.goose": "f2fe4fbcf1a7e9367b4f9464af3c78f301ce62efd1db35200cc74a859b5a48ad",
+      "src/support/native.goose": "e9e4b4cf087bd89e801fd9934409c91549fcb703a4f053a91a8394cbb0105b8d",
+      "native/platform.c": "53eec51fbc3a3e8b99a5f5beb38dad909f9873a5cd21dde1afa2d41659abfb4c",
+      "native/allocation_observer.c": "805b0051636a3c0d6edd36e79b89d3291f1edc9e23882a8246d2abe59378bad1",
+      "native/allocation_observer.h": "a275b63e70ec5fe00081be2723b1342e7ce2956841732cf5feef86c90d94c4b0",
+      "native/tests/allocation_observer_test.c": "e3dfaa02df2b05c58472dd4c9df2c41e39f88960bdaa1cbf2a6b8207f2bbd261",
+      "native/tests/runtime_observer_probe.c": "96618960919923dfef60380041015788bc57a894f89be0169fc4d905edfece8b",
+      "tools/test_runtime_observer.py": "abaecc1a53e033ae90e9e0d709d92e0cb5c0b81853bd3738427415b7c44d8a92"
+    },
+    "artifact_sha256": {
+      "runtime.c": "a23cc0eb0a668064a0102ec8ea5a73a9c90bdf3e7dd9a7a4a2864e34d5f2c98c",
+      "probe.c": "72b6030530d7349b57db0231bd22c52b8a885ee738ebc0943a1f77a0845e21bb",
+      "probe": "bfd0f0020c41f4afeba61dc8407c03e59d01d65520c5b3a569e39c2d72a986ae",
+      "native-test": "daff3c8bdd5f6ac8888666dd6fff5066cb339b869d631d1472f01becc176925a",
+      "absent": "9e543774d1e3f9f2cb59dcf80c7c94ec04c792e4fddb62e071f75183d3ff1e99",
+      "no-hooks": "9a59a22f5bdb4e519c6ebd1839f8406da48ea651c8130ff6c7d0830a3cf6802a"
+    },
+    "injectedRefusals": 24,
+    "allocatorRefusal": {
+      "mechanism": "RLIMIT_AS",
+      "physicalRAMExhaustionTested": false
+    },
+    "genericFailuresNeverOOM": [
+      "panic",
+      "invalid-size",
+      "SIGSEGV",
+      "SIGKILL"
+    ],
+    "seconds": 1.239
+  },
+  "coverage_contract": {
+    "pool_operations": "Successful scalar and slice alloc/free/realloc operation counts; positive realloc payload deltas count allocated bytes, negative deltas count freed bytes; reuse counts successful growth without pool span growth.",
+    "pool_capacity_growth": "Sum of successful observed pool element-span growth deltas. Initializers, scope rewinds and every pool lifetime are not observed, so this is not current retained capacity.",
+    "region_reservations": "Exact process-local live and peak virtual mapping sizes including guard gaps, not resident or committed physical memory. Preserved across begin; all other exposed counters reset per request.",
+    "capacity_requests": "Explicit gs_stack_require requests including native mmap stacks. Not all scratch construction, writes or page faults.",
+    "unavailable": [
+      "current active pool payload",
+      "current retained pool capacity",
+      "scratch liveness",
+      "RSS",
+      "whole-runtime allocation-fault coverage",
+      "physical RAM exhaustion qualification"
+    ],
+    "oom": "Only explicit registry calloc refusal, terminal region reservation refusal or selected synthetic pool/capacity failpoints invoke the allocation-free terminal callback. Generic panic, malformed size, SIGSEGV and SIGKILL do not.",
+    "rollback": "Pool freelists/lengths may have changed before a later capacity refusal. Failed candidates must exit; no in-process longjmp or continuation is safe. Root supervisor integration remains a separate qualification.",
+    "concurrency": "Single-threaded request candidates and separate copied worker processes only; no shared-thread observer synchronization."
+  },
+  "integration_api": {
+    "install": "blot_allocation_observer_install(oom_callback) before goose_init; callback must terminate via blot_request_fail_oom(blot_request_token()).",
+    "begin": "blot_allocation_observer_begin(request_token, fail_at, fail_kind) after candidate fork and before request parsing; fail_at=0 disables, fail_kind=0 selects every covered mutation/capacity attempt.",
+    "report": "Production Counts.jsonStringify captures runtime_observation(0) before output; subsequent scalar reads use that frozen snapshot. Optional module or runtime absence returns zero coverage and emits unavailable fields."
+  },
+  "test_layout_updated": "2026-11-09: test/probe sources moved under native/tests; production source glob contains no test mains; final bounded fixture passed."
+}

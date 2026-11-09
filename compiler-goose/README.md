@@ -11,8 +11,9 @@ the parser has executed qualification. The original oracle pin is unchanged.
 Every compiler-algorithm module has a first source pass. The complete import
 graph parses under upstream Goose; type and lifetime checking are being
 repaired. No successful full compiler executable or parity result exists yet.
-Recoverable allocation failure and runtime retention/observation also remain
-unfinished production requirements.
+Native request rollback, staged cache publication and scoped runtime observation
+now have component tests. Their complete compiler integration and retained
+workload qualification remain pending.
 
 The module map follows the Zig implementation. Goose contexts borrow typed
 tables owned by their callers; numeric identities survive growth. Errors travel
@@ -42,13 +43,17 @@ are keyed by their actual source text, C compiler and flags.
 The first build exposed source syntax failures. Those parser failures are
 repaired; full compilation remains in progress. The build entry is `python3 build.py --goose /path/to/goose --cc clang --stdlib /path/to/stdlib`.
 Development defaults to Goose `-O0` and C `-O0`; `--release` selects `-O2` for
-both. Each subprocess stage reports its elapsed time and has a 30-second limit,
-adjustable with `--stage-timeout SECONDS`. A timeout terminates the stage's
-process group; failed object/link stages leave existing cached objects and the
-previous executable intact.
+both. Each stage saves a log and timing receipt and has a 30-second default limit,
+adjustable with `--stage-timeout SECONDS`. `--total-timeout` caps the whole
+attempt at 300 seconds by default. Failed emission stops three seconds after
+its first diagnostic. Cancellation terminates the process group; failed stages
+preserve existing cached objects and the previous executable.
 `--identity-only` writes a source-only fingerprint without starting a compiler;
-that is not a qualified build identity. Allocation metrics stay null with
-`coverage: "unavailable"` until real runtime allocation observations exist.
+that is not a qualified build identity. Active payload, retained pool capacity and scratch metrics stay null with
+explicit unavailable coverage. The optional private `--runtime-observer` build
+reports pool operation totals and virtual region reservations separately.
+[The component receipt](../benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json)
+pins the hook coverage and tests; these counters are not current live memory.
 
 An optional private bootstrap-checker experiment is reproducible with
 `python3 compiler-goose/tools/build_goose_checker.py`. It requires the pinned
@@ -72,3 +77,10 @@ Run the checked engine laws with
 to C and execute them using cached runtime/platform objects.
 Commands, source hashes and timings are saved under
 `build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.
+
+Private build experiments are opt-in. `--reachable-program` skips standalone
+checking of unused Goose bodies while preserving signatures, externs, executable
+roots and final lifetime checks. `--stable-closures` reuses successful complete
+type-graph walks; cold synthetic queries regress 2.54x, while descendant reuse
+improves. No completed compiler speedup is claimed. `GOOSE_CHECKER_PROFILE=1`
+reports phase and cache work. These modes preserve installed/sibling tools.

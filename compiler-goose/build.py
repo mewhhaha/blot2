@@ -40,8 +40,8 @@ def frame(value: bytes) -> bytes:
 
 def source_inputs() -> list[Path]:
     paths = set((ROOT / "src").rglob("*.goose"))
-    paths.update((ROOT / "native").rglob("*.c"))
-    paths.update((ROOT / "native").rglob("*.h"))
+    paths.update((ROOT / "native").glob("*.c"))
+    paths.update((ROOT / "native").glob("*.h"))
     paths.add(Path(__file__).resolve())
     paths.discard(IDENTITY)
     return sorted(paths, key=lambda path: path.relative_to(ROOT).as_posix())
@@ -129,49 +129,77 @@ def write_identity(record: dict) -> None:
     MANIFEST.write_text(json.dumps(record, sort_keys=True, indent=2) + "\n")
 
 
+BUILD_DEADLINE: float | None = None
+
+
 def call(stage: str, command: list[str], timeout: float) -> None:
     started = time.monotonic()
-    print(f"build: {stage} started (limit {timeout:g}s)", file=sys.stderr,
-          flush=True)
-    try:
-        process = subprocess.Popen(command, cwd=ROOT / "src", start_new_session=True)
-    except OSError as failure:
-        elapsed = time.monotonic() - started
-        raise RuntimeError(f"{stage} could not start after {elapsed:.3f}s: {failure}") from failure
-    try:
-        status = process.wait(timeout=timeout)
-    except (subprocess.TimeoutExpired, KeyboardInterrupt) as failure:
-        # Terminate the whole stage, including compiler subprocesses. A failed
-        # iteration must not leave work running after the driver exits.
+    if BUILD_DEADLINE is not None:
+        timeout = min(timeout, BUILD_DEADLINE - started)
+    if timeout <= 0:
+        raise RuntimeError("whole build reached its time limit")
+    logs = ROOT / "build/stages"
+    logs.mkdir(parents=True, exist_ok=True)
+    log = logs / (stage.replace(" ", "-") + ".log")
+    print(f"build: {stage} started (limit {timeout:g}s)", file=sys.stderr, flush=True)
+    reason = None
+    first_error = None
+    with log.open("wb") as stream:
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
+            process = subprocess.Popen(command, cwd=ROOT / "src", stdout=stream,
+                                       stderr=subprocess.STDOUT, start_new_session=True)
+        except OSError as failure:
+            raise RuntimeError(f"{stage} could not start: {failure}") from failure
         try:
-            process.wait(timeout=0.5)
-        except subprocess.TimeoutExpired:
-            pass
-        # The leader may exit on TERM while descendants ignore it. Always
-        # finish the group, including when the direct child has already exited.
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        process.wait()
-        elapsed = time.monotonic() - started
-        if isinstance(failure, KeyboardInterrupt):
-            raise RuntimeError(f"{stage} interrupted after {elapsed:.3f}s") from failure
-        raise RuntimeError(f"{stage} timed out after {elapsed:.3f}s "
-                           f"(limit {timeout:g}s)") from failure
+            while process.poll() is None:
+                now = time.monotonic()
+                if now - started >= timeout:
+                    reason = "time limit"
+                    break
+                # Stop a failed emission after collecting its first diagnostic.
+                # Later diagnostics do not justify another minutes-long traversal.
+                if stage == "emit program":
+                    if b": error:" in log.read_bytes():
+                        if first_error is None:
+                            first_error = now
+                        if now - first_error >= 3:
+                            reason = "first diagnostic"
+                            break
+                time.sleep(0.1)
+        except KeyboardInterrupt:
+            reason = "interrupted"
+        finally:
+            if process.poll() is None:
+                for sig in (signal.SIGTERM, signal.SIGKILL):
+                    try:
+                        os.killpg(process.pid, sig)
+                    except ProcessLookupError:
+                        pass
+                    if sig == signal.SIGTERM:
+                        try:
+                            process.wait(timeout=0.5)
+                        except subprocess.TimeoutExpired:
+                            pass
+                process.wait()
     elapsed = time.monotonic() - started
-    if status != 0:
-        raise RuntimeError(f"{stage} failed with exit {status} after {elapsed:.3f}s")
+    record = {"stage": stage, "command": command, "seconds": round(elapsed, 3),
+              "exit": process.returncode, "stop": reason or "completed",
+              "log": str(log), "log_sha256": digest_file(log)}
+    log.with_suffix(".json").write_text(json.dumps(record, indent=2) + "\n")
+    if process.returncode != 0 or reason is not None:
+        print(log.read_text(errors="replace")[:12000], file=sys.stderr)
+        raise RuntimeError(f"{stage} failed after {elapsed:.3f}s "
+                           f"({reason or process.returncode}); log: {log}")
     print(f"build: {stage} finished in {elapsed:.3f}s", file=sys.stderr, flush=True)
 
 
 def cached_object(stage: str, source: Path, build: Path, compiler: list[str],
                   flags: list[str], cc_digest: str, timeout: float) -> Path:
-    key = hashlib.sha256(frame(source.read_bytes()) + frame(
+    headers = b""
+    if source.parent == ROOT / "native":
+        for header in sorted(source.parent.glob("*.h")):
+            headers += frame(header.name.encode()) + frame(header.read_bytes())
+    key = hashlib.sha256(frame(source.read_bytes()) + frame(headers) + frame(
         json.dumps({"cc": cc_digest, "flags": flags,
                     "host": sys.platform, "machine": os.uname().machine},
                    sort_keys=True).encode())).hexdigest()
@@ -189,6 +217,7 @@ def cached_object(stage: str, source: Path, build: Path, compiler: list[str],
 
 
 def main() -> None:
+    global BUILD_DEADLINE
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", "goose"))
     parser.add_argument("--cc", default=os.environ.get("CC", "clang"))
@@ -199,6 +228,8 @@ def main() -> None:
     parser.add_argument("--cflag", action="append", default=[])
     parser.add_argument("--stage-timeout", type=float, default=30,
                         help="maximum seconds per subprocess stage (default: 30)")
+    parser.add_argument("--total-timeout", type=float, default=300,
+                        help="maximum seconds for the complete build (default: 300)")
     parser.add_argument("--stdlib", type=Path,
                         default=os.environ.get("GOOSE_STDLIB"),
                         help="selected Goose standard library; required for actual builds")
@@ -221,6 +252,9 @@ def main() -> None:
         parser.error("inference budget must be 1..18446744073709551615")
     if not math.isfinite(args.stage_timeout) or args.stage_timeout <= 0:
         parser.error("stage timeout must be a positive finite number of seconds")
+    if not math.isfinite(args.total_timeout) or args.total_timeout <= 0:
+        parser.error("total timeout must be positive and finite")
+    BUILD_DEADLINE = time.monotonic() + args.total_timeout
     optimization = "-O0"
     if args.release:
         optimization = "-O2"
@@ -246,20 +280,22 @@ def main() -> None:
     write_identity(record)
     program = build / "blot_goose.c"
     header = build / "blot_goose.h"
-    call("emit program", [str(goose), "-o", str(program), "--header", str(header),
-          args.inline, "--stdlib", args.stdlib, str(ROOT / "src/main.goose")], args.stage_timeout)
     compiler = [str(cc)] + cc_words[1:]
     runtime_object = cached_object("compile runtime", runtime, build, compiler,
         args.cflag, record["configuration"]["cc_sha256"], args.stage_timeout)
-    platform_object = cached_object("compile platform", ROOT / "native/platform.c",
-        build, compiler, args.cflag, record["configuration"]["cc_sha256"],
-        args.stage_timeout)
+    native_objects = []
+    for source in sorted((ROOT / "native").glob("*.c")):
+        native_objects.append(cached_object("compile " + source.stem, source,
+            build, compiler, args.cflag, record["configuration"]["cc_sha256"],
+            args.stage_timeout))
+    call("emit program", [str(goose), "-o", str(program), "--header", str(header),
+          args.inline, "--stdlib", args.stdlib, str(ROOT / "src/main.goose")], args.stage_timeout)
     args.output = args.output.resolve()
     args.output.parent.mkdir(parents=True, exist_ok=True)
     pending_output = args.output.with_name(f"{args.output.name}.{os.getpid()}.tmp")
     try:
         call("compile and link program", compiler + args.cflag + [str(program),
-             str(ROOT / "native/main.c"), str(platform_object),
+             *[str(path) for path in native_objects],
              str(runtime_object), "-lm", "-o", str(pending_output)],
              args.stage_timeout)
         pending_output.replace(args.output)

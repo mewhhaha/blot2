@@ -1,0 +1,148 @@
+{
+  "date": "2026-11-09",
+  "scope": "Native production request transaction supervisor and protocol-1 transport; fake retained counter semantics in native boundary tests only",
+  "compiler": "clang version 23.1.4",
+  "source_sha256": {
+    "compiler-goose/native/request_supervisor.c": "98e5c8753f6313b9ecfcab66721aa013fe72b32033147c4bf9fdb1d2e1b5d8bb",
+    "compiler-goose/native/request_supervisor.h": "56b07f8eb58ec36045f2b40bab4f4afd64cfb1e9d0c44a0bea6257ffbe97b2da",
+    "compiler-goose/native/request_transport.c": "bf38543e76c2cda2be152d80a20bb386c3ff2a796236c0c3e54efb60eb659c88",
+    "compiler-goose/native/request_transport.h": "1a1076f1c32506ee28861048416f1b90b640180acc66daf2e9abc758d5ce3d20",
+    "compiler-goose/native/platform.c": "53eec51fbc3a3e8b99a5f5beb38dad909f9873a5cd21dde1afa2d41659abfb4c",
+    "compiler-goose/native/tests/request_supervisor_test.c": "ffcc80fd42a40e79775fab1117ccfa88d69b0dd4fe789c74d3211c83b4c3d402",
+    "compiler-goose/native/tests/request_transport_test.c": "44a003c250857fec54e4e862e5b3777f3aeb1738a043d6cae240080b3c0d95df"
+  },
+  "results": [
+    {
+      "test": "supervisor",
+      "flavor": "native",
+      "command": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "compiler-goose/native/request_supervisor.c",
+        "compiler-goose/native/platform.c",
+        "compiler-goose/native/tests/request_supervisor_test.c",
+        "-pthread",
+        "-lm",
+        "-o",
+        "/home/jacobt/src/blot2/build/goose-port/request-supervisor/supervisor-native"
+      ],
+      "binary_sha256": "4ed0ca8dfba08471aac3e797982bfe8fb9d38735174ba4949ea3be4b634d73f4",
+      "compile_seconds": 0.278,
+      "run_seconds": 0.379,
+      "exit": 0,
+      "stdout": "request supervisor: retained heap, classified failures, immutable spools, stdout/FD/child cleanup pass",
+      "stderr": ""
+    },
+    {
+      "test": "transport",
+      "flavor": "native",
+      "command": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O2",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "compiler-goose/native/request_supervisor.c",
+        "compiler-goose/native/request_transport.c",
+        "compiler-goose/native/tests/request_transport_test.c",
+        "-o",
+        "/home/jacobt/src/blot2/build/goose-port/request-supervisor/transport-native"
+      ],
+      "binary_sha256": "f0ccc90ee3b7411333ecc9ea4d71cb7a9d71d0efda5039b4c7dff57c24508973",
+      "compile_seconds": 0.313,
+      "run_seconds": 0.066,
+      "exit": 0,
+      "stdout": "request transport: framing/envelope validation, retained revision/OOM id, one Hello, no partial output pass",
+      "stderr": ""
+    },
+    {
+      "test": "supervisor",
+      "flavor": "asan-ubsan",
+      "command": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O1",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "compiler-goose/native/request_supervisor.c",
+        "compiler-goose/native/platform.c",
+        "compiler-goose/native/tests/request_supervisor_test.c",
+        "-pthread",
+        "-lm",
+        "-o",
+        "/home/jacobt/src/blot2/build/goose-port/request-supervisor/supervisor-asan-ubsan"
+      ],
+      "binary_sha256": "651d4c3b08faebdd64d78b4bc1309d6882cd33e04cfa048fd51842f73705dc39",
+      "compile_seconds": 0.445,
+      "run_seconds": 0.969,
+      "exit": 0,
+      "stdout": "request supervisor: retained heap, classified failures, immutable spools, stdout/FD/child cleanup pass",
+      "stderr": ""
+    },
+    {
+      "test": "transport",
+      "flavor": "asan-ubsan",
+      "command": [
+        "/usr/bin/clang",
+        "-std=c11",
+        "-O1",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "compiler-goose/native/request_supervisor.c",
+        "compiler-goose/native/request_transport.c",
+        "compiler-goose/native/tests/request_transport_test.c",
+        "-o",
+        "/home/jacobt/src/blot2/build/goose-port/request-supervisor/transport-asan-ubsan"
+      ],
+      "binary_sha256": "b20c9a1334982edbe11b2f01a13bf4c2876537470a72362631c722d0c6a308ed",
+      "compile_seconds": 0.529,
+      "run_seconds": 0.124,
+      "exit": 0,
+      "stdout": "request transport: framing/envelope validation, retained revision/OOM id, one Hello, no partial output pass",
+      "stderr": ""
+    }
+  ],
+  "qualified": [
+    "Fork before exposing request bytes; immutable exact-size request/reply spools and kernel-capped sequential reply output",
+    "Accepted edit then marked OOM preserves prior heap value/revision; valid higher-id retry succeeds; failed ids stay consumed",
+    "Structured token-matched OOM marker only; ordinary exit, abort, signal, wrong token, timeout and malformed reply are not OOM",
+    "Reply frame, id, epoch, revision and JSON lexical envelope validated before candidate adoption",
+    "READY/COMMIT/post-publication QUIESCENT handshake; publication hook runs only after adoption and before external reply",
+    "Actual platform worker descriptors detach in candidate without signalling baseline workers; copied Goose registry reset API added",
+    "100 consecutive adoptions; no parent FD/stdout/child leaks; candidate subtree cleanup; supervisor-kill-before-GO parent-death coverage",
+    "Protocol frame limits, UTF-8/escape validation, duplicate envelope ids, metadata buffer refill, metadata-bounded iterative nesting and truncated input rejection",
+    "Opaque reply details at depths 65 and 4096 accepted; deep mixed-bracket mismatch and nested key/colon/comma errors rejected before adoption"
+  ],
+  "pending": [
+    "Whole Goose compiler build and actual project edit/OOM/retained-artifact session",
+    "Compiled Goose process_pool.detachInherited and server-loop integration",
+    "Real pool refusal callback through supervisor; native tests directly invoke authenticated OOM marker",
+    "Authenticated OOM propagation from copied-packet stage workers; process exit codes are deliberately not OOM authority",
+    "Cache staging/publication integration and actual filesystem failure family"
+  ],
+  "allocation_observation": "unavailable in this native boundary receipt; no allocation count or compiler performance claim",
+  "constraints": [
+    "Linux; single-threaded quiescent worker fork; descendant processes remain in request process group",
+    "Detached cache writers must be disabled/staged in transaction mode",
+    "Post-adoption control/publication failure is terminal EPIPE; prior baseline is already retired and no rollback is claimed",
+    "Diagnostic filename becomes empty only if encoded entry cannot fit the bounded OOM metadata envelope"
+  ],
+  "iterative_json": {
+    "container_stack_bytes": 1048576,
+    "container_bits": 8388608,
+    "bound": "Derived from existing 16MiB metadata cap and minimum two bracket bytes per container; no separate depth policy",
+    "traversal": "Iterative, allocation-free, no recursive C calls",
+    "schema_authority": "Goose typed request parser unchanged (depth 64, unknown fields rejected); native traversal checks JSON lexical shape only"
+  }
+}

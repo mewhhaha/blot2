@@ -1,0 +1,127 @@
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -4,2 +4,29 @@
+ namespace goose {
++
++// Optional per-compilation observations. Count-based samples survive a bounded
++// failing prefix without adding per-query clock reads or retaining AST facts.
++struct StableQueryProfile {
++    const char *name;
++    bool enabled = [] { auto value = getenv("GOOSE_CHECKER_PROFILE"); return value && *value; }();
++    uint64_t hits = 0, misses = 0, rejected = 0, building = 0, unstable = 0, events = 0;
++    void Report() const {
++        if (!enabled) return;
++        fprintf(stderr, "GOOSE_CHECKER_PROFILE cache=%s hits=%llu misses=%llu rejected=%llu building=%llu unstable=%llu\n",
++                name, (unsigned long long)hits, (unsigned long long)misses,
++                (unsigned long long)rejected, (unsigned long long)building,
++                (unsigned long long)unstable);
++    }
++    void Tick() { if ((++events & ((UINT64_C(1) << 20) - 1)) == 0) Report(); }
++    void Hit() { if (enabled) { ++hits; Tick(); } }
++    void Miss() { if (enabled) { ++misses; Tick(); } }
++    void Reject() { if (enabled) { ++rejected; Tick(); } }
++    void Slow(bool typesbuilding) {
++        if (!enabled) return;
++        ++rejected;
++        if (typesbuilding) ++building;
++        else ++unstable;
++        Tick();
++    }
++    ~StableQueryProfile() { Report(); }
++};
+ 
+@@ -10,2 +37,3 @@
+ struct StableTypeGraph {
++    StableQueryProfile profile { "stable.type" };
+     unordered_set<TypeExpr *> known;
+@@ -13,8 +41,10 @@
+     bool Ready(TypeExpr *t) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
+-        vector<TypeExpr *> seen;
+-        if (!Visit(t, seen)) return false;
+-        // Cache only the root after the WHOLE graph succeeded. A descendant
+-        // in a cycle may have depended on an ancestor that later fails.
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
++        vector<TypeExpr *> seen;
++        if (!Visit(t, seen)) { profile.Reject(); return false; }
++        // Every visited node is stable only after the WHOLE closure succeeds.
++        // A cycle may depend on an ancestor whose later field rejects it.
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+@@ -62,10 +92,14 @@
+ struct StableCanContainGraph {
++    StableQueryProfile profile { "stable.contain" };
+     unordered_set<TypeExpr *> known;
+     unordered_set<TypeExpr *> identities;
++    StableQueryProfile identityprofile { "stable.identity" };
+ 
+     bool Identity(TypeExpr *t) {
+-        if (!t) return false;
+-        if (identities.count(t)) return true;
+-        vector<TypeExpr *> seen;
+-        if (!IdentityVisit(t, seen)) return false;
++        if (!t) { identityprofile.Miss(); identityprofile.Reject(); return false; }
++        if (identities.count(t)) { identityprofile.Hit(); return true; }
++        identityprofile.Miss();
++        vector<TypeExpr *> seen;
++        if (!IdentityVisit(t, seen)) { identityprofile.Reject(); return false; }
++        identities.insert(seen.begin(), seen.end());
+         identities.insert(t);
+@@ -75,6 +109,8 @@
+     bool Ready(TypeExpr *t) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
+-        vector<TypeExpr *> seen;
+-        if (!Visit(t, seen)) return false;
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
++        vector<TypeExpr *> seen;
++        if (!Visit(t, seen)) { profile.Reject(); return false; }
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+@@ -155,2 +191,3 @@
+ struct StableReachesGraph {
++    StableQueryProfile profile { "stable.reaches" };
+     unordered_set<TypeExpr *> known;
+@@ -158,8 +195,10 @@
+     bool Ready(TypeExpr *t, StableCanContainGraph &identity) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
+-        vector<TypeExpr *> seen;
+-        if (!Visit(t, seen, identity)) return false;
+-        // A cycle can depend on an ancestor that fails later. Publish only
+-        // the root after the entire reachable closure succeeds.
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
++        vector<TypeExpr *> seen;
++        if (!Visit(t, seen, identity)) { profile.Reject(); return false; }
++        // Publish the closure only after every ancestor and later field
++        // succeeded; a failed cyclic walk must publish no partial proof.
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -107,2 +107,3 @@
+     unordered_map<const void *, vector<TypeExpr *>> arrayelements;
++    StableQueryProfile arrayprofile { "array.elements" };
+     // CanContain's and ReachesThroughRefs' answers for complete type graphs:
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1606,2 +1606,3 @@
+     if (typesbuilding || !stabletypes.Ready(t)) {
++        arrayprofile.Slow(typesbuilding != 0);
+         ArrayReachVisited open;
+@@ -1619,2 +1620,3 @@
+     if (it == arrayelements.end()) {
++        arrayprofile.Miss();
+         vector<TypeExpr *> elems;
+@@ -1623,3 +1625,3 @@
+         it = arrayelements.emplace(key, std::move(elems)).first;
+-    }
++    } else arrayprofile.Hit();
+ #ifndef NDEBUG

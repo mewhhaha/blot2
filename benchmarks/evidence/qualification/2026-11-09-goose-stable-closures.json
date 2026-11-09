@@ -1,0 +1,141 @@
+{
+  "scope": "Optional private stable-closure publication experiment; no whole-port run or compiler performance gain claimed",
+  "binary": {
+    "binary": "/home/jacobt/src/blot2/build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/goose",
+    "sha256": "fdc59ab96ebc33de194de180f7d222798bf1891e5b9b971d04f7db56c0081434",
+    "cached": false
+  },
+  "source_files": 108,
+  "source_sha256": "7c1501a2a77451b3f3d38d31b19daba4204baeefd91310f2e6235613623bdec6",
+  "compile_link_stages": [
+    {
+      "stage": "patch",
+      "exit": 0,
+      "seconds": 0.032
+    },
+    {
+      "stage": "diagnostic-patch",
+      "exit": 0,
+      "seconds": 0.008
+    },
+    {
+      "stage": "runtime-observer-patch",
+      "exit": 0,
+      "seconds": 0.004
+    },
+    {
+      "stage": "reachable-program-patch",
+      "exit": 0,
+      "seconds": 0.008
+    },
+    {
+      "stage": "stable-closures-patch",
+      "exit": 0,
+      "seconds": 0.008
+    },
+    {
+      "stage": "compile",
+      "exit": 0,
+      "seconds": 56.554
+    },
+    {
+      "stage": "link",
+      "exit": 0,
+      "seconds": 0.264
+    }
+  ],
+  "patch_sha256": "9e39a1011fbd9ceeb27caa0ea05584e476e33066f99cbac1bc105d91958aa91f",
+  "recipe_sha256": "690cf09db554107f6efabd4af363a6066062f0c0649c449c2ee9bef9e8c33529",
+  "reproduce": [
+    "python3",
+    "compiler-goose/tools/build_goose_checker.py",
+    "--stable-closures",
+    "--reachable-program",
+    "--diagnostic-roots",
+    "--runtime-observer",
+    "--expansion-node-limit",
+    "1000000"
+  ],
+  "variant_pins": {
+    "000": "861fcfc6c786a0d768dfb2d4b2d27dfc584b56ad2d6138bf5e13052d461e09c9",
+    "001": "d42241b5f0e4ed9fa276bdcbd38c4f3acaaa49012f3859a2f24d6a24e01ef6f8",
+    "010": "b898170cd638f5f185aa6f5ecb46590426397f717ac489fd4a60896926fb826d",
+    "011": "6e7af3b6b5ba0e44eebb1c125d0d5ad9c105ddf335ec611d0e2845dae046dbad",
+    "100": "d3772ffcc2231c76db17d241d0ad3305b36c3196d4410175069612c4b124367e",
+    "101": "f77020969723688160b6a4f469717a62691b8089d386256072ffc1e734ec92e9",
+    "110": "62e4bbc04b7dcb2c5770e3185a24de6068a6627fcd087b9d17334a8d66847ef1",
+    "111": "7c1501a2a77451b3f3d38d31b19daba4204baeefd91310f2e6235613623bdec6"
+  },
+  "proof": "Only publish each predicate own seen vector after its whole top-level Visit/IdentityVisit succeeds, then retain root insertion. Every local guard and dependency is proven; cycle backedges cannot cause publication before ancestor/later-field success. Failed own proofs publish nothing; independent identity proofs may survive a later containment/reach failure.",
+  "unchanged": [
+    "All mutability/readiness guards and typesbuilding bypass",
+    "Traversal vectors/order, TypeEq, ordered array element outputs and live lifetime constraints",
+    "Default private checker recipe source path unless new optional mode is selected"
+  ],
+  "controls": {
+    "semantic": 24,
+    "same_path_byte_exact_C": 6,
+    "actual_AST_laws": {
+      "laws": 166,
+      "gates": 4,
+      "fresh_member_audit_through": 64,
+      "large_member_local_discharge": 256
+    },
+    "visited_order_laws": 300,
+    "visited_note": "Existing extracted binary rerun; relevant actual AST, TypeEq, visited context and array walk are byte-identical to the selected current source; stability gates separately rebuilt and audited",
+    "runtime_observer_injected_refusals": 24,
+    "allocator_refusal": {
+      "mechanism": "RLIMIT_AS",
+      "physicalRAMExhaustionTested": false
+    }
+  },
+  "profile": {
+    "switch": "GOOSE_CHECKER_PROFILE=1",
+    "counters": [
+      "hits",
+      "misses",
+      "rejected graphs",
+      "ArrayReach typesbuilding slow paths",
+      "ArrayReach unstable-graph slow paths"
+    ],
+    "sampling": "Cumulative snapshot every2^20 counter events plus destruction, no per-query clocks; small scopes may emit only final snapshot",
+    "periodic_probe": "One million cache hits confirms mid-run and final exact counters",
+    "enabled_does_not_change_C": true
+  },
+  "micro": {
+    "scope": "actual AST/gates only; timings exclude fixture construction and do not predict whole compiler",
+    "timing_trials": 3,
+    "cold_single_root_ratio": 2.5434091572643034,
+    "ascending_reuse_ratio": 0.7483887811103582,
+    "descending_reuse_ratio": 0.0786989447945876,
+    "tradeoff": "Cold graphs pay additional cache entries/allocations; reuse ordering controls amortization. Gate microtimings do not predict full compiler cost."
+  },
+  "not_selected": "Traversal-local pointer-set replacement; retain vectors/order and avoid another unmeasured allocation tradeoff",
+  "prior_rejected_scope": {
+    "decision": "build/goose-port/query-bulk-experiment/decision.json",
+    "sha256": "a01bc1beb90f84e4c90f0a58199a8536a281e6c68d6bc412d01a07cfb205f58f",
+    "scope": "Older StableCanContainGraph-only trial; first failing-prefix diagnostic pair84.273 to83.872s,0.48 percent improvement; rejected against20 percent target; not completed compiler timing"
+  },
+  "pending": [
+    "Whole current port emission/executable and full runtime correctness",
+    "Whole compiler source/toolchain-pinned performance measurement",
+    "Host compiler allocation/OOM schedule effects of additional cached pointer entries"
+  ],
+  "evidence_sha256": {
+    "control-results.json": "5dba8ba6a945401a2be831584b832ff79ea952a61dc4e1f780bf0f1d5278eef0",
+    "C-parity.json": "09b63e362f72d3bc15c2eaf5b87799d7945acbf157dc4d76b7ab897650c4c613",
+    "probe.cpp": "49d495f5f3a4dbc0cdf744821dac20a2774021d33f5755574b8bd1e15e0321e1",
+    "probe-prefix.h": "2d3f2e1f397ae09ad2f0a7d94236664ec7f003bff2079fc49099c64ce746ba17",
+    "candidate-gates.h": "2399716a146fe8b1e0cb13614f3d0032ba93d4e9b8d34f4e9b960e20edcc9a53",
+    "probe": "1c912762e3b6133f6fbd70beb896b5ef4c200e0de7ed3a5242239ec9de865e49",
+    "probe-results.jsonl": "8a2d6b680cc3e1c0a8a1613d920f2cfd7634e79d6be8c8c7490fc70fdf8e3769",
+    "micro-summary.json": "4521d4ddc24c006732faad0eb49b2b68eac9d3828fe4bf4c8a7b510c5a074901",
+    "visited-300.log": "e4fb8ac79359274797db922dc430129c5ec5ddda1b18fd1b237969710de409a1",
+    "visited-source-equivalence.json": "45fb83d82be4e7ac2ba7a49fa6ae7c87f5fee9e6abbba1fd773847a6b123c773",
+    "counter-test.stdout": "4e4e738dc369123987ccd14c85c5362fe0eb4b450e039ea00463c2416a87ce54",
+    "counter-test.stderr": "06c6d6b0f30785edaafe7aa580bbeea888b6f50f92af48e8daacdb0eeb6e9db9",
+    "cache-profile.json": "3fdbaf6e9c1cd0fb9c2bd39cce92391a7a53a0b7764e08cc0a63f948be8b4b01",
+    "runtime-observer-controls/result.json": "cadd8690a1ff11c79d83a3cdffea0e3159dff4dbfd7a5e211a048a782a4618e3"
+  },
+  "whole_blot_goose_compiler_qualified": false
+}

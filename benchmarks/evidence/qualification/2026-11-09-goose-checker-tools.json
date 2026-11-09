@@ -1,0 +1,97 @@
+{
+  "date": "2026-11-09",
+  "scope": "Tracked reproduction of checker-tool controls; no whole-port qualification or compiler performance win",
+  "candidate": {
+    "sha256": "fdc59ab96ebc33de194de180f7d222798bf1891e5b9b971d04f7db56c0081434",
+    "source108_sha256": "7c1501a2a77451b3f3d38d31b19daba4204baeefd91310f2e6235613623bdec6",
+    "mode": "reachable-program + diagnostic-roots + runtime-observer + stable-closures"
+  },
+  "baseline": {
+    "sha256": "c25e3bb5fd326b0ee657e9479d384f8fddf19df093998534830f6a9c57c70a6f",
+    "source108_sha256": "b35482ed9f79d8ba68578b8c16c07c6576a80bd379f2246e0c5a59610d5c9c15",
+    "mode": "same modes without stable-closures"
+  },
+  "reproduce": [
+    "python3",
+    "compiler-goose/tools/test_checker_tools.py",
+    "--goose",
+    "build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/goose",
+    "--baseline",
+    "build/goose-port/private-checker/7d33c84c0f0b6d55b390fb4dbb4e9071285dab218911b974ad72e33d17967ed2/goose",
+    "--source",
+    "build/goose-port/private-checker/8954d59baed5c0f5336b3cd9bed2df667cae2dc4215e61e9e25645226e4888c6/source",
+    "--baseline-source",
+    "build/goose-port/private-checker/7d33c84c0f0b6d55b390fb4dbb4e9071285dab218911b974ad72e33d17967ed2/source",
+    "--upstream",
+    "../goose-to-wasm/build/source",
+    "--output",
+    "build/goose-port/checker-tools"
+  ],
+  "inventory": {
+    "semantic": 24,
+    "stability": 166,
+    "visited": 300,
+    "Cxx_compilations": "one per suite, no compilation per case",
+    "upstream_fixtures": 15
+  },
+  "tracked_sources": {
+    "compiler-goose/tools/test_checker_tools.py": "22d6866d0baabc1de78199de337f76ce7ef5ac6bc20745da1bfb50c0cde89d5a",
+    "compiler-goose/tools/checker_semantic_controls.py": "0cda189b995d711a78bdb3e4d76760d4505a6882474bc51ddfea7ea07ce6d443",
+    "compiler-goose/tests/checker_tools/fixtures.json": "c5e7207023637d97b4ffe78172f4a91fccfd6602c15988cee7a72ca400741943",
+    "compiler-goose/tests/checker_tools/stability.cpp": "49d495f5f3a4dbc0cdf744821dac20a2774021d33f5755574b8bd1e15e0321e1",
+    "compiler-goose/tests/checker_tools/stability_laws.h": "f60553d48dbe88af29705caaad3eabb363450086b3af2562c1d79698bbb07065",
+    "compiler-goose/tests/checker_tools/visited.cpp": "7093e9b496d73123e91aa3bd9d9b1c4b6d03b8a4234b8d88c45461a5f6cc2473"
+  },
+  "provenance": {
+    "Cpp_fixtures": "Exact copies of the already-qualified probe, inherited laws and source-extracted visited fixture; original paths/hashes and extraction manifest retained in fixtures.json",
+    "semantic_fixtures": "Existing generated Goose/C literal values checked byte-exact; upstream cases referenced by verified path/hash rather than copied",
+    "visited_binding": "Runner refuses changed current AST, TypeEq, TypeArgsEq, SameIndex, LoadType, visited context or ordered array walk"
+  },
+  "packaging_validation": {
+    "python_syntax": "passed",
+    "help_command": "passed",
+    "Cpp_source_copies_byte_exact": true,
+    "semantic_fixture_literals_byte_exact": true,
+    "upstream_fixture_pins_verified": 15,
+    "relocated_smoke": {
+      "checks": [
+        "stability"
+      ],
+      "laws": 166,
+      "compile_seconds": 2.567,
+      "run_seconds": 27.073,
+      "receipt_sha256": "457d7ffdcb91931dab202d4947baf75385e942144d690e71d1c4ff46b55b6ce3"
+    },
+    "unchanged_semantic_and_visited_rerun": false,
+    "stability_run_cap_seconds": 120,
+    "cap_note": "Relocated smoke took27.073s under the original30s cap; packaged runner uses120s to tolerate host load without altering fixture scale or assertions.",
+    "semantic_runner_whitespace": "Blank source lines normalized with identical Python AST and decoded fixture bytes."
+  },
+  "previous_current_candidate_qualification": {
+    "semantic": 24,
+    "exact_same_path_C": 6,
+    "stability": 166,
+    "visited": 300,
+    "observer_refusals": 24,
+    "evidence_sha256": "36e4def53dee05d39ae2ea756b0873013eeaf42fbb74936fbf2f37a3b41c20a2",
+    "control_report_sha256": "5dba8ba6a945401a2be831584b832ff79ea952a61dc4e1f780bf0f1d5278eef0",
+    "stability_rows_sha256": "8a2d6b680cc3e1c0a8a1613d920f2cfd7634e79d6be8c8c7490fc70fdf8e3769",
+    "visited_run_sha256": "e4fb8ac79359274797db922dc430129c5ec5ddda1b18fd1b237969710de409a1"
+  },
+  "micro_tradeoff": {
+    "scope": "Actual AST/gate synthetic workloads only, fixture construction excluded; not whole compiler timing",
+    "rotated_trials": 3,
+    "median_candidate_over_baseline": {
+      "cold_single_root": 2.5434091572643034,
+      "ascending_descendant_reuse": 0.7483887811103582,
+      "descending_descendant_reuse": 0.0786989447945876
+    },
+    "interpretation": "Additional cached pointer entries/allocations regress cold roots; reuse order controls amortization. Optional experiment, no universal performance claim.",
+    "original_rows_sha256": "8a2d6b680cc3e1c0a8a1613d920f2cfd7634e79d6be8c8c7490fc70fdf8e3769"
+  },
+  "limits": [
+    "Stability probe uses actual AST/gates but models query leaves; larger cached-member audit uses other proved members as assumptions",
+    "Visited probe contains exact extracted equality/traversal code with controlled lazy-instantiation and array-size leaves",
+    "Host allocation/OOM schedules and whole current compiler/runtime remain unqualified"
+  ]
+}

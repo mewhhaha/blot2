@@ -55,3 +55,25 @@
          auto mainsf = ast.MainFunction();
          if (!mainsf && !library && !(nomain && !ast.DeclaresMain()))
              throw CompileError { "program needs exactly one global fn main()" };
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1929,13 +1929,17 @@
+             for (auto &a : r.alts) {
+                 if (widen && Depth(a.root) > Depth(t.root)) {
+                     auto rname = a.root ? a.root->name : string_view("static data");
+-                    Error(at, cat("call ", spec->sf->name, " stores a reference rooted at ",
++                    auto chain = Chain(at->expansiontrace.empty() ? ActiveExpansionTrace() : at->expansiontrace);
++                    chain.insert(chain.begin(), { LocOf(e.at),
++                                                  cat("reference stored at ", Where(e.at)) });
++                    ErrorIn(LocOf(at), cat("call ", spec->sf->name, " stores a reference rooted at ",
+                                   rname,
+                                   e.bound ? cat(" into what its parameter ", pname,
+                                                 " leads to, which may be ")
+                                           : cat(" through its parameter ", pname,
+                                                 ", whose argument may point into "),
+-                                  TargetStr(t), ", which ", rname, " does not outlive (§9.2)"));
++                                  TargetStr(t), ", which ", rname, " does not outlive (§9.2)"),
++                            std::move(chain));
+                 }
+                 if (once(t.root, a.root))
+                     push(t.root, a, e.pointee, src, classread, e.byteview, e.reached, t.bound,

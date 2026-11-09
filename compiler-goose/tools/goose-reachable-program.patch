@@ -1,0 +1,109 @@
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -4,2 +4,29 @@
+ namespace goose {
++
++// Explicit private observation: no clock reads, formatting or allocations when
++// the environment switch is absent. Driver boundaries reuse existing clocks.
++inline bool CheckerProfileEnabled() {
++    static const bool enabled = [] {
++        auto value = getenv("GOOSE_CHECKER_PROFILE");
++        return value && *value;
++    }();
++    return enabled;
++}
++inline void CheckerPhase(const char *name, chrono::steady_clock::time_point from,
++                         chrono::steady_clock::time_point to) {
++    if (!CheckerProfileEnabled()) return;
++    auto ns = chrono::duration_cast<chrono::nanoseconds>(to - from).count();
++    fprintf(stderr, "GOOSE_CHECKER_PROFILE phase=%s ns=%lld\n", name, (long long)ns);
++}
++struct CheckerRootProfile {
++    bool enabled = CheckerProfileEnabled();
++    chrono::steady_clock::time_point from;
++    CheckerRootProfile() { if (enabled) from = chrono::steady_clock::now(); }
++    void Mark(const char *name) {
++        if (!enabled) return;
++        auto to = chrono::steady_clock::now();
++        CheckerPhase(name, from, to);
++        from = to;
++    }
++};
+ 
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -1346,2 +1346,3 @@
+         auto parse_finished = chrono::steady_clock::now();
++        CheckerPhase("parse", compile_started, parse_finished);
+         // The parser reported what it recovered from as it went; nothing
+@@ -1375,2 +1376,3 @@
+         auto resolve_finished = chrono::steady_clock::now();
++        CheckerPhase("resolve", parse_finished, resolve_finished);
+         // As after the parse, which an unknown type name is part of.
+@@ -1391,2 +1393,3 @@
+         auto check_finished = chrono::steady_clock::now();
++        CheckerPhase("typecheck", resolve_finished, check_finished);
+         // The checker reported the errors it went on past, root by root.
+@@ -1395,2 +1398,3 @@
+         auto optimize_finished = chrono::steady_clock::now();
++        CheckerPhase("optimize", check_finished, optimize_finished);
+         if (specs) {
+@@ -1420,2 +1424,3 @@
+         auto bce_finished = chrono::steady_clock::now();
++        CheckerPhase("bce", optimize_finished, bce_finished);
+         // Per-line outcomes, for comparing two builds of the pass.
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -3040,2 +3040,3 @@
+     void CheckRoots() {
++        CheckerRootProfile profile;
+         for (auto g : ast.globals) {
+@@ -3048,2 +3049,3 @@
+         globalinitializersdone = true;
++        profile.Mark("roots.globals");
+         // Concrete ones only; a pointee still spelled with a type parameter
+@@ -3055,2 +3057,3 @@
+         auto mainsf = ast.MainFunction();
++        profile.Mark("roots.declarations");
+         if (!mainsf && !library && !(nomain && !ast.DeclaresMain()))
+@@ -3068,2 +3071,3 @@
+         }
++        profile.Mark("roots.main");
+         // Thread entry points compile as separate programs (§11.2); check any
+@@ -3079,2 +3083,3 @@
+                 CheckRoot([&] { CheckThreadGlobals(sf->specs[0]); });
++        profile.Mark("roots.threads");
+         // NOTE: in this compilation model, code no call reaches would never be
+@@ -3094,6 +3099,22 @@
+         }
++        profile.Mark("roots.export_bodies");
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+             auto sf = ast.functions[i];
+-            if (!sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
+-        }
++            if (sf->isexport) continue;
++#if GOOSE_REACHABLE_PROGRAM
++            // Omit only eager dead-body diagnostics. Concrete dead signatures
++            // still validate, while extern specs remain available to C adapters.
++            if (!sf->isextern) {
++                if (!sf->specs.empty() || sf->isthread || sf->isnested || sf->brokensig ||
++                    sf->IsGeneric()) continue;
++                CheckRoot([&] {
++                    for (auto &p : sf->params) ValidateType(Subst(p.type), sf->line, VT_PARAM);
++                    for (auto t : sf->rets) ValidateType(Subst(t), sf->line, VT_RET);
++                });
++                continue;
++            }
++#endif
++            CheckRoot([&] { CheckUnreached(sf); });
++        }
++        profile.Mark("roots.dead");
+         auto exportcount = 0;
+@@ -3106,2 +3127,3 @@
+             throw CompileError { "--header requires at least one export fn" };
++        profile.Mark("roots.exports");
+         CheckRoot([&] { CheckGlobalShrinks(); });
+@@ -3112,2 +3134,3 @@
+         if (ast.exemplars) CheckExemplars();
++        profile.Mark("roots.fixups");
+     }
