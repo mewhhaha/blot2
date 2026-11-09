@@ -1,0 +1,193 @@
+{
+  "date": "2026-11-09",
+  "scope": "Optional bounded historical per-container event index for only HolderMayPointInto second scan; no lifetime/provenance/root rule change intended. This focused qualification is not a general semantic proof or whole compiler/runtime qualification.",
+  "candidate": {
+    "binary": "build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/goose",
+    "sha256": "02b71afe3c350da220d71e30269c60989fab35981a449f52e57d24ad6cd3d446",
+    "source108_sha256": "1d99eee32fbdaa20ac9c4c2b55df0fc58c7893b967ed5e5b22a689b4381deeb2",
+    "private_build_receipt_sha256": "057af1efed2609c58d42be16e529a9b420e56f3b3012ca53143809db520a790a",
+    "optional_mode": "--holder-event-index requires --checker-trace; absent flag retains prior implementation. Index enabled in this explicit variant; trace/profile output disabled unless corresponding env nonempty."
+  },
+  "baseline": {
+    "binary": "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
+    "source108_sha256": "805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9"
+  },
+  "build": {
+    "private_builds": 1,
+    "compile_seconds": 62.261,
+    "link_seconds": 0.264,
+    "per_compile_cap_seconds": 120,
+    "cached_support_objects": true,
+    "toolchain": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "toolchain_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "compile_flags": [
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++20",
+      "-Wall",
+      "-Wextra",
+      "-Wno-missing-field-initializers",
+      "-DGOOSE_EXPANSION_NODE_LIMIT=1000000",
+      "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+      "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+      "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+      "-isystem",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+      "-DGOOSE_REACHABLE_PROGRAM=1",
+      "-gline-tables-only"
+    ],
+    "support_inputs": {
+      "CMakeFiles/goose.dir/src/process.cpp.o": "165aacdf7efbc42d53bdc4a0730cc5fbe2934f88141f4604a35355f568a78eb9",
+      "CMakeFiles/goose.dir/src/progress.cpp.o": "17604e2ab092d3ed6ff1623848f662825a6602d7f55f6cb529cbf8430635d18f",
+      "libgoose_shaderc.a": "b92edef61cfa6822388552bac58347b2510c76d64ae6ca89f85028522989e259",
+      "libtcc.a": "25bf43b5098e259167e87d565ee1a77c170d8b26291b6e98ad260e2d94fe7d55",
+      "generated": "a763fa852d50aac0b9f61c4212b0d414c7706c78bad3ce9ccdc2059c74962fbc",
+      "tcc/api": "38afc187cc8dac9e35e009e15641e085d6d030bef353fe86e37a91165d3b8ef1",
+      "tcclib": "c931d9eda9761b15df83a335520193d77e4aee24b63b492f687e392e4738548e",
+      "subprocess": "ff4b0e1f740eeefe2c4f0b486468b19e3522f44de9e92fb5c5b2856596cf8a9a"
+    }
+  },
+  "tracked_sources": {
+    "compiler-goose/tools/build_goose_checker.py": "200630531d8f081d3ea5afc568b00eead7486305ba9aae2e7b318f012c8ad094",
+    "compiler-goose/tools/goose-holder-event-index.patch": "be5eb18d11c82f693a179c75fe94ce22e9d2a53f32c295f3f299809d55b0a78d",
+    "compiler-goose/tools/test_holder_events.py": "56e77d245c12d2cf76db643a1ece7b4f47ea7b95b5c30394cab74c0d4bf68430",
+    "compiler-goose/tests/checker_tools/holder_events.cpp": "66ae49dae824c70d397c52652b75c56c70e0e2df90e73227fa0ca4a56d014c2b",
+    "compiler-goose/tools/test_checker_tools.py": "82e86f537bebe14d7ba061ae223617b0e389bbb670248b259130d7cc26e80632",
+    "compiler-goose/tools/checker_semantic_controls.py": "cb6ae3d56d4ae3b9487cf71ad6ce1a9dc81d8b45cd8b8cbbf2b0f49e99205d27",
+    "compiler-goose/tools/test_reference_closures.py": "5f966c5abb7c501ca5133eae2c88862d10c5bc47d7636e85b1e149f047e5bcf7"
+  },
+  "mutation_inventory": {
+    "source108_sha256": "805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9",
+    "membership_mutations": [
+      "AppendStoreEventLog pushes then IndexStoreEvent",
+      "ReplaceStoreEventLog assigns then IndexStoreEvent"
+    ],
+    "nonmembership_mutation": "typecheck_builtins.h direct classread update only; remains read live",
+    "absent_mutations": "Full source inventory found no event-list clear/resize/erase/pop/swap/reset/assignment outside centralized replacement. This contract must be revisited if writers change.",
+    "historical_ids": "IndexStoreEvent registers current container on append and replacement. Sorted unique absolute IDs retain old memberships; original current-container guard removes stale postings.",
+    "recursion": "Reviewed query path HolderMayPointInto/StoredSlotMayPointInto and their type/lazy construction leaves does not enter event-mutating checker calls. Borrowed posting iterators cross read-only recursive queries only."
+  },
+  "preserved": [
+    "First loop and preconditions byte-identical (runner assertion)",
+    "Second loop from lower_bound preserves absolute ascending event order",
+    "Original current-container/source/classread/StoredLater checks and recursive slot predicates",
+    "Original found/where/hitat/via behavior, including diagnostic location and first hit",
+    "Classread normalization read live; no classification cached"
+  ],
+  "bounds": {
+    "id_bits": 32,
+    "max_holders": 262144,
+    "max_retained_vector_capacity_ids": 33554432,
+    "max_id_payload_bytes": 134217728,
+    "map_overhead": "Additional bounded holder-map/vector headers/buckets; payload bound is not total RSS.",
+    "fallback": "On ID overflow, holder cap or retained-capacity exhaustion, permanently disable/free entire index and perform original raw second scan. No partial map may answer queries. Null container indexed too."
+  },
+  "controls": {
+    "actual_method_laws_per_mode": 1085,
+    "modes": [
+      "debug",
+      "NDEBUG"
+    ],
+    "actual_methods": "Actual AST + source-extracted append/replace/index, both HolderMayPointInto overloads, StoredSlotMayPointInto. Type/depth/liveness query leaves controlled; no full TypeCheck fixture.",
+    "laws": "Recursive slot paths, class/copy/global/cycle cases, first-hit and all output locations, exact StoredLater call order, from bounds, historical retarget/order/duplicate IDs, null container, append between queries, global capacity/holder/ID-range fallback, deterministic mixed-graph matrix. Debug production helper recomputes raw membership/order.",
+    "semantic_controls": 24,
+    "semantic_result": "PASS vs baseline54f, including actual invalid lifetime/global/export/thread/function-value/signature checks and valid run/export/unused extern compile+link.",
+    "ordered_reference_closure_laws_per_mode": 10,
+    "same_path_C_cases": 6,
+    "C_parity": [
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_reached_types.goose",
+        "source_sha256": "83eb0a877a0587df5537f55b24093b28155125ef37d6498feb13606447646cdb",
+        "C_sha256": "49355b8417034b62b7d355492ed33fa3ae0167e3d932a2ffc50e825ce27633f2"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_inexact_roots.goose",
+        "source_sha256": "b7b9e38cbccd3483f8e865dea658bd699833f4f420416cbe25e34053ea07427f",
+        "C_sha256": "52d292024b84baec213f10cd0b0bd39a88b6725e47e6982e5cad04ee00dc751e"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_sources.goose",
+        "source_sha256": "21a8cf8b4a38cb6c7643b128b9484834705d52bbe1e4070ad3267c5c985b1f7f",
+        "C_sha256": "e75efe09f3c26fffb36186929eff751c7ba6ce5f0adbf132d2924814bfad1ce4"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/slice_ref_stores.goose",
+        "source_sha256": "107185f7b5f61d67417b7b0ead1a693b9ff98a18fe928d43cd927fee84852066",
+        "C_sha256": "280cd879803712b7cedd4a51a2bd8e5fc957b388d125c204a0210d49cba49c40"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/typing/overloaded_function_values.goose",
+        "source_sha256": "1e1c9aee4c802f0596875a740f17305c9afb62091e050c1b0434bd0da3564157",
+        "C_sha256": "ee6c3402b967ea5de95b9ff92ffb00ae3ffdc741e8f6222a8983a60d0fc7edc5"
+      },
+      {
+        "source": "/home/jacobt/src/blot2/compiler-goose/tests/checker_tools/array_gate.goose",
+        "source_sha256": "7b47fd2f7024b6d4186c258f10c2248add8555c2d0df0b9a7a5e24988f388749",
+        "C_sha256": "1cb98b08750bef867e6c00f1831951518e81853a100930fe1c52af0c7bcb5cec"
+      }
+    ],
+    "trace_on_off_C_identical": true,
+    "trace_controls": "Small emitted-C fixtures allocated postings but did not enter second-scan queries (queries=0); actual-method fixture exercises index hits/misses/fallback. Macro activity/capacity must be measured on real workload; no speedup claimed here."
+  },
+  "evidence": {
+    "build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/receipt.json": "057af1efed2609c58d42be16e529a9b420e56f3b3012ca53143809db520a790a",
+    "build/goose-port/holder-event-index/laws/receipt.json": "1626f4126a8dea1054bf5a091771d30203a76652ed4dc10f69cb9a770d8f0c01",
+    "build/goose-port/holder-event-index/semantic-controls/receipt.json": "26a14f5203978513c5fcd3cf6e3aeba3f26ff05cb368bc0e158294b67a6f6818",
+    "build/goose-port/holder-event-index/parity/receipt.json": "5f7840ee18378eb6bd8243998a46653c437fcdef3ae8a4884694247d18e454b9",
+    "build/goose-port/holder-event-index/index-active.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/goose-port/holder-event-index/index-active.stderr": "dc887ac5f4bd09b7bac1ebe05a057d85094b882cad9a5e37e94389d301758f0e"
+  },
+  "reproduce_build": [
+    "python3",
+    "compiler-goose/tools/build_goose_checker.py",
+    "--diagnostic-roots",
+    "--runtime-observer",
+    "--reachable-program",
+    "--stable-closures",
+    "--array-reach-gate",
+    "--reference-closures",
+    "--checker-trace",
+    "--holder-event-index",
+    "--expansion-node-limit",
+    "1000000"
+  ],
+  "reproduce_methods": [
+    "python3",
+    "compiler-goose/tools/test_holder_events.py",
+    "--source",
+    "build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/source",
+    "--baseline-source",
+    "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/source",
+    "--output",
+    "build/goose-port/holder-event-index/laws"
+  ],
+  "whole_port_qualified": false,
+  "macro_performance_claim": "None; parent owns concurrent whole emission and executed engine-law batch.",
+  "bounded_macro_activity_probe": {
+    "receipt": "build/goose-port/index-trace-45/receipt.json",
+    "sha256": "4610c55215eb745d3f4313778b4358741fbc86b5be76f9d93e38952c913e6b9b",
+    "batch45_capture_sha256": "7072862a55798f57ac7f6d5b5ed55164cfb5c9a12d585193bff31a87f5b96d58",
+    "all453_inputs_unchanged": true,
+    "seconds": 30.164,
+    "stopped_at_cap": true,
+    "no_error_or_C": true,
+    "trace_only": true,
+    "gdb_or_build": false,
+    "latest_periodic_index": "GOOSE_CHECKER_PROFILE holder_events active=1 queries=23 hits=0 misses=23 visits=0 fallbacks=0 holders=3449 ids=3145728 capacity=4298003 inserted=3145728 reason=none max_holders=262144 max_capacity=33554432",
+    "latest_periodic_not_exact_at_kill": true,
+    "interpretation": "Index active without fallback in observed prefix; all23 recorded queries missed, so scanned posting IDs=0. Metadata allocated3,145,728 IDs and4,298,003 capacity slots (~16.40MiB uint32 payload). This30s prefix does not establish later activity, cap behavior, cost attribution or speedup.",
+    "last_observed_counts": {
+      "TypeEq": 165139422,
+      "ReachedThroughRefs": 34082,
+      "ReachesThroughRefs": 2221151,
+      "RootCandidates": 609082,
+      "ShrinkTargets": 704512,
+      "SaveFlow": 538830,
+      "ArrayElemsReached": 787676
+    },
+    "last_observed_root": "blot_main::mainEntry",
+    "last_observed_body": "blot_eval_core_eval::resultConstraint",
+    "cost_attribution": "Count samples only; no per-engine timing or UsedAfter samples. Concurrent parent check-root means this is not a clean timing benchmark."
+  }
+}

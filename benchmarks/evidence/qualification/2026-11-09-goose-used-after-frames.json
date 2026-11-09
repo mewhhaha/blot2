@@ -1,0 +1,196 @@
+{
+  "scope": "Optional one-line UsedAfter blockpos frame prune, no persistent memo; heavyweight private checker built once, no production root checks/builds from this task. This is focused qualification, not whole compiler/runtime qualification.",
+  "candidate": {
+    "binary": "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/goose",
+    "sha256": "54cfe71d2a9c80d8b6ef8a61586782707791cfcc76a259898961d6e32a9eb464",
+    "source108_sha256": "f03448eccc05cb554d55800b45bf085f2c338d1a67f568b0b770df538c4f749d",
+    "build_receipt": "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/receipt.json",
+    "build_receipt_sha256": "940054e1053a99982d344ce2d4d34161eae5ed7cf5efbbfec6c2fc785e22942b",
+    "build_stages": [
+      {
+        "stage": "patch",
+        "exit": 0,
+        "seconds": 0.032
+      },
+      {
+        "stage": "diagnostic-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "runtime-observer-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "reachable-program-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "stable-closures-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "array-reach-gate-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "reference_closures-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "checker_trace-patch",
+        "exit": 0,
+        "seconds": 0.016
+      },
+      {
+        "stage": "holder-event-index-patch",
+        "exit": 0,
+        "seconds": 0.008
+      },
+      {
+        "stage": "used-after-frame-skip-patch",
+        "exit": 0,
+        "seconds": 0.004
+      },
+      {
+        "stage": "compile",
+        "exit": 0,
+        "seconds": 64.074
+      },
+      {
+        "stage": "link",
+        "exit": 0,
+        "seconds": 0.264
+      }
+    ]
+  },
+  "baseline": {
+    "binary": "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/goose",
+    "sha256": "02b71afe3c350da220d71e30269c60989fab35981a449f52e57d24ad6cd3d446",
+    "source108_sha256": "1d99eee32fbdaa20ac9c4c2b55df0fc58c7893b967ed5e5b22a689b4381deeb2"
+  },
+  "tracked_source_hashes": {
+    "compiler-goose/tools/build_goose_checker.py": "b4215710f9ab4cabf467fca7645c7e423a82e588c62152b106113bdaa1babd63",
+    "compiler-goose/tools/goose-used-after-frame-skip.patch": "dc4b0c927d497e3102aea044112ed6ee6b46f11244487fb56755a5358ad73fee",
+    "compiler-goose/tools/test_used_after_frames.py": "0304af34679d8671c2f31229b43b46d218d0db8679247c46e5846b258ef2b041",
+    "compiler-goose/tests/checker_tools/used_after_frames.cpp": "5dbae144e8b9821e90094c9381f1f48c3933ededddac1b6009bf42160407f6e4"
+  },
+  "optional_flag": "--used-after-frame-skip; requires --checker-trace; absent flag leaves source unchanged; all16 diagnostic/runtime/origin/holder index compositions pinned",
+  "proof": "NamesFrame only walks lexical frame links. For a false NamesFrame(fi,vframe), every prior mentions(n,fi) immediately returned false before MentionsName/seen mutation. All other skipped per-block operations only read fields; exit/cut calculation and loop checks remain before this prune. Full UsedAfter source equality after removing exactly the added guard is asserted.",
+  "controls": {
+    "method_laws_per_mode": 147,
+    "method_modes": [
+      "debug",
+      "NDEBUG"
+    ],
+    "method_scope": "Actual AST/Children, UsedAfter, MentionsName, EscapingContinue, FrameOfScope, NamesFrame and FindBreakScope. Minimal projected frame/scope context; controlled Depth and LaterOperands inputs.",
+    "method_results_and_seen_trace_parity": true,
+    "synthetic_unrelated4096_statement_frame_checks": {
+      "before": 4096,
+      "after": 1,
+      "timing_claim": false
+    },
+    "semantic_controls": 24,
+    "semantic_result": "PASS: actual lifetime/global/fnvalue/thread/export/signature errors retained; valid runtime/extern/export links retained",
+    "same_path_C_cases": [
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_reached_types.goose",
+        "source_sha256": "83eb0a877a0587df5537f55b24093b28155125ef37d6498feb13606447646cdb",
+        "C_sha256": "49355b8417034b62b7d355492ed33fa3ae0167e3d932a2ffc50e825ce27633f2"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_inexact_roots.goose",
+        "source_sha256": "b7b9e38cbccd3483f8e865dea658bd699833f4f420416cbe25e34053ea07427f",
+        "C_sha256": "52d292024b84baec213f10cd0b0bd39a88b6725e47e6982e5cad04ee00dc751e"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/store_sources.goose",
+        "source_sha256": "21a8cf8b4a38cb6c7643b128b9484834705d52bbe1e4070ad3267c5c985b1f7f",
+        "C_sha256": "e75efe09f3c26fffb36186929eff751c7ba6ce5f0adbf132d2924814bfad1ce4"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/lifetimes/slice_ref_stores.goose",
+        "source_sha256": "107185f7b5f61d67417b7b0ead1a693b9ff98a18fe928d43cd927fee84852066",
+        "C_sha256": "280cd879803712b7cedd4a51a2bd8e5fc957b388d125c204a0210d49cba49c40"
+      },
+      {
+        "source": "/home/jacobt/src/goose-to-wasm/build/source/test/typing/overloaded_function_values.goose",
+        "source_sha256": "1e1c9aee4c802f0596875a740f17305c9afb62091e050c1b0434bd0da3564157",
+        "C_sha256": "ee6c3402b967ea5de95b9ff92ffb00ae3ffdc741e8f6222a8983a60d0fc7edc5"
+      },
+      {
+        "source": "/home/jacobt/src/blot2/compiler-goose/tests/checker_tools/array_gate.goose",
+        "source_sha256": "7b47fd2f7024b6d4186c258f10c2248add8555c2d0df0b9a7a5e24988f388749",
+        "C_sha256": "1cb98b08750bef867e6c00f1831951518e81853a100930fe1c52af0c7bcb5cec"
+      }
+    ],
+    "trace_on_off_C_identical": true,
+    "reference_closure_laws_per_mode": 10
+  },
+  "evidence": {
+    "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/actual-method-laws/receipt.json": "2a09f5978d55ae5b577d66a27e0c47bd0f378c0c5fe158cd08c4301363dbfbff",
+    "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/semantic-controls/receipt.json": "9a8a14c07f99ce34af4e9cfffa1bab3f36d17d8c131e7828f846942f6db8b50d",
+    "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/parity/receipt.json": "3d19203e258537ea84dbabb631e55951ae8bf3df6f3dedc8e4330b552aba2e89"
+  },
+  "runs": [
+    {
+      "command": [
+        "python3",
+        "compiler-goose/tools/test_checker_tools.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/goose",
+        "--baseline",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/goose",
+        "--source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/source",
+        "--baseline-source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/source",
+        "--checks",
+        "semantic",
+        "--output",
+        "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/semantic-controls"
+      ],
+      "seconds": 1.049,
+      "exit": 0
+    },
+    {
+      "command": [
+        "python3",
+        "compiler-goose/tools/test_reference_closures.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/goose",
+        "--baseline",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/goose",
+        "--source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/source",
+        "--baseline-source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/source",
+        "--output",
+        "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/parity"
+      ],
+      "seconds": 4.739,
+      "exit": 0
+    },
+    {
+      "command": [
+        "python3",
+        "compiler-goose/tools/test_used_after_frames.py",
+        "--source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/source",
+        "--baseline-source",
+        "/home/jacobt/src/blot2/build/goose-port/private-checker/b4936df1b2e36c6432fc96b9ee02aeb174addd94da819eb819e5dd2f2ab1b882/source",
+        "--output",
+        "/home/jacobt/src/blot2/build/goose-port/used-after-frame-skip/actual-method-laws"
+      ],
+      "seconds": 4.019,
+      "exit": 0
+    }
+  ],
+  "materiality": "Unmeasured on production workload. Removes all repeated false frame-name checks across unrelated block statements, but adds one NamesFrame guard to eligible blocks; no overall speedup claimed.",
+  "whole_compiler_qualified": false
+}

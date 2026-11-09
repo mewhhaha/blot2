@@ -1,0 +1,143 @@
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -6,4 +6,73 @@
+ // Optional per-compilation observations. Count-based samples survive a bounded
+ // failing prefix without adding per-query clock reads or retaining AST facts.
++// Historical container membership only. Event contents/classification remain live.
++// Append/replace are the only membership mutations; replaced IDs stay on old
++// postings too, with the query's original live-container guard removing them.
++struct HolderStoreIndex {
++    using Id = uint32_t;
++    unordered_map<const void *, vector<Id>> postings;
++    const vector<Id> empty;
++    size_t capacity = 0, count = 0;
++    size_t max_capacity = size_t(1) << 25, max_holders = size_t(1) << 18;
++    bool active = true;
++    const char *fallback_reason = "none";
++    bool profile = [] {
++        auto trace = getenv("GOOSE_CHECKER_TRACE"), full = getenv("GOOSE_CHECKER_PROFILE");
++        return (trace && *trace) || (full && *full);
++    }();
++    uint64_t queries = 0, hits = 0, misses = 0, visits = 0, fallbacks = 0, inserted = 0;
++    void Report() const {
++        if (!profile) return;
++        fprintf(stderr, "GOOSE_CHECKER_PROFILE holder_events active=%d queries=%llu hits=%llu misses=%llu visits=%llu fallbacks=%llu holders=%zu ids=%zu capacity=%zu inserted=%llu reason=%s max_holders=%zu max_capacity=%zu\n",
++                active, (unsigned long long)queries, (unsigned long long)hits,
++                (unsigned long long)misses, (unsigned long long)visits,
++                (unsigned long long)fallbacks, postings.size(), count, capacity,
++                (unsigned long long)inserted, fallback_reason, max_holders, max_capacity);
++    }
++    void Disable(const char *reason) {
++        active = false; fallback_reason = reason;
++        decltype(postings){}.swap(postings);
++        capacity = count = 0;
++        Report();
++    }
++    void Record(const void *holder, size_t id) {
++        if (!active) return;
++        if (id > UINT32_MAX) { Disable("id-range"); return; }
++        auto found = postings.find(holder);
++        if (found == postings.end()) {
++            if (postings.size() >= max_holders) { Disable("holders"); return; }
++            found = postings.try_emplace(holder).first;
++        }
++        auto &ids = found->second;
++        auto at = lower_bound(ids.begin(), ids.end(), (Id)id);
++        if (at != ids.end() && *at == id) return;
++        auto offset = (size_t)(at - ids.begin());
++        if (ids.size() == ids.capacity()) {
++            if (capacity >= max_capacity) { Disable("capacity"); return; }
++            auto old = ids.capacity();
++            auto wanted = std::max(size_t(1), old * 2);
++            wanted = std::min(wanted, old + max_capacity - capacity);
++            ids.reserve(wanted);
++            auto growth = ids.capacity() - old;
++            if (growth > max_capacity - capacity) { Disable("capacity"); return; }
++            capacity += growth;
++        }
++        ids.insert(ids.begin() + offset, (Id)id);
++        ++count; ++inserted;
++        if (profile && (inserted & ((UINT64_C(1) << 20) - 1)) == 0) Report();
++    }
++    const vector<Id> *Find(const void *holder) {
++        const vector<Id> *result = nullptr;
++        if (active) {
++            auto found = postings.find(holder);
++            if (found == postings.end()) { result = &empty; if (profile) ++misses; }
++            else { result = &found->second; if (profile) ++hits; }
++        } else if (profile) ++fallbacks;
++        if (profile && (++queries & ((UINT64_C(1) << 14) - 1)) == 0) Report();
++        return result;
++    }
++    ~HolderStoreIndex() { Report(); }
++};
++
+ struct StableQueryProfile {
+     const char *name;
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2541,4 +2541,5 @@
+     // its lexical function's containers while being checked in another frame.
+     vector<StoreEvent> storeevents;
++    HolderStoreIndex holderstoreindex;
+     // Historical postings keep absolute event IDs. Replays may rewrite an old
+     // ID, so insertion stays sorted; live keys are checked at every query.
+@@ -2554,4 +2555,5 @@
+     void IndexStoreEvent(size_t id) {
+         const auto &e = storeevents[id];
++        holderstoreindex.Record(e.container, id);
+         if (e.root) IndexStoreEventId(storeeventkeys[e.root], id);
+         if (e.src && e.src != e.root) IndexStoreEventId(storeeventkeys[e.src], id);
+@@ -2566,4 +2568,29 @@
+         storeevents[id] = e;
+         IndexStoreEvent(id);
++    }
++    // HolderMayPointInto and its recursive/lazy type queries cannot mutate
++    // events or postings. No borrowed iterator survives a mutating checker call.
++    template<typename F> bool AnyHolderStoreEvent(VarDef *holder, size_t from, F visit) {
++        if (auto ids = holderstoreindex.Find(holder)) {
++            auto begin = lower_bound(ids->begin(), ids->end(), from);
++#ifndef NDEBUG
++            vector<size_t> expected, actual;
++            for (auto i = from; i < storeevents.size(); ++i)
++                if (storeevents[i].container == holder) expected.push_back(i);
++            for (auto at = begin; at != ids->end(); ++at) {
++                assert(*at < storeevents.size());
++                if (storeevents[*at].container == holder) actual.push_back(*at);
++            }
++            assert(actual == expected);
++#endif
++            for (auto at = begin; at != ids->end(); ++at) {
++                if (holderstoreindex.profile) ++holderstoreindex.visits;
++                if (visit(*at)) return true;
++            }
++            return false;
++        }
++        for (auto i = from; i < storeevents.size(); ++i)
++            if (visit(i)) return true;
++        return false;
+     }
+     vector<size_t> StoreEventCandidates(size_t begin, size_t end,
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2278,9 +2278,9 @@
+     // for a slice's slot, which may be a slice variable, anything the class
+     // outlives.
+-    for (auto i = from; i < storeevents.size(); i++) {
++    return AnyHolderStoreEvent(holder, from, [&](size_t i) {
+         auto &e = storeevents[i];
+         if (e.container != holder || (e.src && (e.src->type || e.src->isglobal)) ||
+             StoredLater(i))
+-            continue;
++            return false;
+         auto through = e.src ? StoredSlotMayPointInto(holder, e.pointee, e.sliceref, e.src,
+                                                       e.classread, arr, arrtype, where, seen)
+@@ -2288,6 +2288,6 @@
+                                                       e.exact, arr, arrtype, where, seen);
+         if (through) return found(i, through);
+-    }
+-    return false;
++        return false;
++    });
+ }
+ 

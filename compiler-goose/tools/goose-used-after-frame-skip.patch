@@ -1,0 +1,10 @@
+--- a/src/typecheck_exprs.h
++++ b/src/typecheck_exprs.h
+@@ -3309,6 +3309,7 @@
+     for (auto &bp : blockpos) {
+         if (bp.scopeidx < Depth(v) - 1) continue;
+         auto fi = FrameOfScope(bp.scopeidx);
++        if (!NamesFrame(fi, vframe)) continue;
+         auto &fr = frames[fi];
+         // A function value's body, whole.
+         if (fr.isfunval && !fr.isdefault && bp.scopeidx == fr.scopebase &&

@@ -87,6 +87,29 @@ SHRINK_ORIGINS_SOURCES = {
     (True, True): '841afb35421cb58439694f5888ce6f62fefef03b5d74bf5cbdb19c83e72c8de6',
 }
 
+HOLDER_EVENT_INDEX_PATCH_SHA256 = 'be5eb18d11c82f693a179c75fe94ce22e9d2a53f32c295f3f299809d55b0a78d'
+HOLDER_EVENT_INDEX_SOURCES = {(False, False, False): 'e67cb9b1d028c15d4c71f9dfa559f70ea834d33df4c99c682ed850cd078f349c', (False, True, False): '3e8dd1156f3f60683f75de408329e5d24ef57369857a74f94ace4447be88c76d', (True, False, False): 'a0f902f974fb9f0f3e98f70498a211ed7826b73912d249bfde518c2a71440af8', (True, True, False): '1d99eee32fbdaa20ac9c4c2b55df0fc58c7893b967ed5e5b22a689b4381deeb2', (False, False, True): '1af03e5a606c7281399a1f8a33ea280ef5b1cb523bcdd11c764adb171d5641a2', (False, True, True): 'f1d5912ed5d5a8cf6d3c1bd2376a5bb71aa5434a15dac94b89d1b983ddc042dd', (True, False, True): '9be722b78dd26fe8de4cc79ba48b4710d483a5bc5c273b50ef5dbe9c8f176546', (True, True, True): '9ffb6c9108d7e26d06d0284fe21934132ef6d3954c5847dd5bd92c319fb83e00'}
+
+USED_AFTER_FRAME_SKIP_PATCH_SHA256 = 'dc4b0c927d497e3102aea044112ed6ee6b46f11244487fb56755a5358ad73fee'
+USED_AFTER_FRAME_SKIP_SOURCES = {
+    (False, False, False, False): 'db22e0646ee3ea573058ff6a0126a632221e489dfc280eafc6ed1a1bc8764c51',
+    (False, True, False, False): 'fcde3f5d0c28881e412b8ab4d1fb8970c9bf67cf6ecb2ce21895dc19d70db78d',
+    (True, False, False, False): 'efb5c08d1c83bb0af16fcc91a43eca3e6abe132f185259c816c7129705e6f019',
+    (True, True, False, False): '2e6e23c2855f10b84247c97138e894cd3546b355fa24a9b5e62d57c54c0241b6',
+    (False, False, True, False): 'e49eddb7d9be137dab626655c7c3f863fbee058bf4f4e2a8c67b83476212748f',
+    (False, True, True, False): '201f605df464c5b1ceed15f2833e3241462d04983a0a1576eee7743416bcec96',
+    (True, False, True, False): '872cec83248ba5c4d6c864ecaef11e2c408b4eda66f32a615bb63a4be3d41b76',
+    (True, True, True, False): 'c97fdb83080328ea8c099da3632e8f066ce2342331b6b9283dcc181799d6f472',
+    (False, False, False, True): '856072afff89dc980039fc216aa5ae2cf57af59da96582b1aef9f30210a7b0ea',
+    (False, True, False, True): '5ad2ceab6a8c7620ec828b8ed00a985cb51fa8b3e5990ab9e2ef284836db6111',
+    (True, False, False, True): 'e04f799c4a00a1914da96f28c1181136b6605d45d67b8e6762526b3bf325118f',
+    (True, True, False, True): 'f03448eccc05cb554d55800b45bf085f2c338d1a67f568b0b770df538c4f749d',
+    (False, False, True, True): '0f7d85e80a4f24acc66ea7e42416cfcdb55dacc2a23c7153c44698e6e56cf797',
+    (False, True, True, True): '403b2f6d14d0a87a403f218add5887a466d3979dc254110bd8d8ddea115be1c7',
+    (True, False, True, True): 'ccd1a0ee6af0c1e56e067e1550dcbc27bfc2fe8babf61b2544e8bfbba297526e',
+    (True, True, True, True): 'e6a201258b7fac191dde3adfd4e37617c785647ba8bf01c8c139e12250b0658e',
+}
+
 LINK_INPUTS = (
     "CMakeFiles/goose.dir/src/process.cpp.o",
     "CMakeFiles/goose.dir/src/progress.cpp.o",
@@ -210,6 +233,10 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.used_after_frame_skip and not args.checker_trace:
+        raise RuntimeError("--used-after-frame-skip requires --checker-trace")
+    if args.holder_event_index and not args.checker_trace:
+        raise RuntimeError("--holder-event-index requires --checker-trace")
     if args.shrink_origins and not args.checker_trace:
         raise RuntimeError("--shrink-origins requires --checker-trace")
     if args.reference_closures and not (args.array_reach_gate and args.reachable_program):
@@ -286,6 +313,18 @@ def build(args):
             raise RuntimeError("shrink-origins patch changed; review and update its pinned digest")
         identity["shrink_origins_patch_sha256"] = SHRINK_ORIGINS_PATCH_SHA256
         identity["shrink_origins_source_sha256"] = SHRINK_ORIGINS_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+    holder_event_index_patch = Path(__file__).with_name("goose-holder-event-index.patch")
+    if args.holder_event_index:
+        if digest(holder_event_index_patch) != HOLDER_EVENT_INDEX_PATCH_SHA256:
+            raise RuntimeError("holder-event-index patch changed; review and update its pinned digest")
+        identity["holder_event_index_patch_sha256"] = HOLDER_EVENT_INDEX_PATCH_SHA256
+        identity["holder_event_index_source_sha256"] = HOLDER_EVENT_INDEX_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins)]
+    used_after_frame_skip_patch = Path(__file__).with_name("goose-used-after-frame-skip.patch")
+    if args.used_after_frame_skip:
+        if digest(used_after_frame_skip_patch) != USED_AFTER_FRAME_SKIP_PATCH_SHA256:
+            raise RuntimeError("used-after-frame-skip patch changed; review and update its pinned digest")
+        identity["used_after_frame_skip_patch_sha256"] = USED_AFTER_FRAME_SKIP_PATCH_SHA256
+        identity["used_after_frame_skip_source_sha256"] = USED_AFTER_FRAME_SKIP_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins, args.holder_event_index)]
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -371,6 +410,18 @@ def build(args):
                     "-d", str(work / "source"), "-i", str(shrink_origins_patch),
                 ], work, 5))
                 patched_source_sha256 = checked_source(work / "source", identity["shrink_origins_source_sha256"])
+            if args.holder_event_index:
+                stages.append(run_stage("holder-event-index-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(holder_event_index_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", identity["holder_event_index_source_sha256"])
+            if args.used_after_frame_skip:
+                stages.append(run_stage("used-after-frame-skip-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(used_after_frame_skip_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", identity["used_after_frame_skip_source_sha256"])
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -409,6 +460,12 @@ def build(args):
             if args.shrink_origins:
                 final_identity["shrink_origins_patch_sha256"] = digest(shrink_origins_patch)
                 final_identity["shrink_origins_source_sha256"] = SHRINK_ORIGINS_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+            if args.holder_event_index:
+                final_identity["holder_event_index_patch_sha256"] = digest(holder_event_index_patch)
+                final_identity["holder_event_index_source_sha256"] = HOLDER_EVENT_INDEX_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins)]
+            if args.used_after_frame_skip:
+                final_identity["used_after_frame_skip_patch_sha256"] = digest(used_after_frame_skip_patch)
+                final_identity["used_after_frame_skip_source_sha256"] = USED_AFTER_FRAME_SKIP_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins, args.holder_event_index)]
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -463,6 +520,10 @@ def main():
                         help="include optional GOOSE_CHECKER_TRACE progress; requires --reference-closures")
     parser.add_argument("--shrink-origins", action="store_true",
                         help="include optional original shrink witnesses; requires --checker-trace")
+    parser.add_argument("--holder-event-index", action="store_true",
+                        help="bound historical container postings for holder event queries; requires --checker-trace")
+    parser.add_argument("--used-after-frame-skip", action="store_true",
+                        help="skip UsedAfter blocks from unnameable frames; requires --checker-trace")
     args = parser.parse_args()
     try:
         print(json.dumps(build(args)))
