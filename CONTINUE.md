@@ -92,6 +92,11 @@ and general nonempty evaluator borrowing remain unresolved. There is still no
 emitted whole C program, header or executable. Actual CLI/server, request OOM/retry and differential qualification
 remain pending.
 
+The optional private direct-global empty-holder precision extension passes 24 new
+controls and the existing 24 semantic controls with diagnostic/runtime/C parity.
+It invalidates facts across calls/stores and keeps alias/loop/recursive boundaries.
+Installed Goose is unchanged. See [the exact tooling evidence](benchmarks/evidence/qualification/2026-11-09-goose-global-empty-facts.json).
+
 Private checker tooling is checkpointed separately. Its holder index reaches the
 same diagnostic in 82.445s versus 104.824s on identical inputs in one pair; this
 is not a complete compilation ratio. The frame guard passes 147 laws in each

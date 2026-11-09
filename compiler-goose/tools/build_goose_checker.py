@@ -16,6 +16,9 @@ import time
 
 
 ROOT = Path(__file__).resolve().parents[2]
+# This precision extension is qualified only on the complete 9ee recipe.
+GLOBAL_EMPTY_FACTS_PATCH_SHA256 = "b9bb7c4887af567d14e2e8f358ab47b5cd145f4549883e8ed9a7cb5313c9aa12"
+GLOBAL_EMPTY_FACTS_SOURCE_SHA256 = "f16a05773da3abe6574e88fff285e0acbdaa9ba907a14fbb71de0065b393f4f1"
 SOURCE_SHA256 = "1c7388a6c15f4429fef83f9d8377524123c231a2df20ddad91542ea31ff4bd39"
 PATCH_SHA256 = "5168d0b9ad17328d8ada154c251c6bd3956ea801fdb61ff92f9427e38d4e4bfa"
 PATCHED_SOURCE_SHA256 = "652b36d0039864a5a2bc9f6220f86bf08da77624f53a650ff15fe61e6914eded"
@@ -233,6 +236,11 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.global_empty_facts and (args.shrink_origins or not all((
+            args.diagnostic_roots, args.runtime_observer, args.reachable_program,
+            args.stable_closures, args.array_reach_gate, args.reference_closures,
+            args.checker_trace, args.holder_event_index, args.used_after_frame_skip))):
+        raise RuntimeError("--global-empty-facts requires the complete frame-skip recipe without --shrink-origins")
     if args.used_after_frame_skip and not args.checker_trace:
         raise RuntimeError("--used-after-frame-skip requires --checker-trace")
     if args.holder_event_index and not args.checker_trace:
@@ -325,6 +333,12 @@ def build(args):
             raise RuntimeError("used-after-frame-skip patch changed; review and update its pinned digest")
         identity["used_after_frame_skip_patch_sha256"] = USED_AFTER_FRAME_SKIP_PATCH_SHA256
         identity["used_after_frame_skip_source_sha256"] = USED_AFTER_FRAME_SKIP_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins, args.holder_event_index)]
+    global_empty_facts_patch = Path(__file__).with_name("goose-global-empty-facts.patch")
+    if args.global_empty_facts:
+        if digest(global_empty_facts_patch) != GLOBAL_EMPTY_FACTS_PATCH_SHA256:
+            raise RuntimeError("global-empty-facts patch changed; review and update its pinned digest")
+        identity["global_empty_facts_patch_sha256"] = GLOBAL_EMPTY_FACTS_PATCH_SHA256
+        identity["global_empty_facts_source_sha256"] = GLOBAL_EMPTY_FACTS_SOURCE_SHA256
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -422,6 +436,12 @@ def build(args):
                     "-d", str(work / "source"), "-i", str(used_after_frame_skip_patch),
                 ], work, 5))
                 patched_source_sha256 = checked_source(work / "source", identity["used_after_frame_skip_source_sha256"])
+            if args.global_empty_facts:
+                stages.append(run_stage("global-empty-facts-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(global_empty_facts_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", identity["global_empty_facts_source_sha256"])
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -466,6 +486,9 @@ def build(args):
             if args.used_after_frame_skip:
                 final_identity["used_after_frame_skip_patch_sha256"] = digest(used_after_frame_skip_patch)
                 final_identity["used_after_frame_skip_source_sha256"] = USED_AFTER_FRAME_SKIP_SOURCES[(args.diagnostic_roots, args.runtime_observer, args.shrink_origins, args.holder_event_index)]
+            if args.global_empty_facts:
+                final_identity["global_empty_facts_patch_sha256"] = digest(global_empty_facts_patch)
+                final_identity["global_empty_facts_source_sha256"] = GLOBAL_EMPTY_FACTS_SOURCE_SHA256
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -489,6 +512,10 @@ def main():
     parser.add_argument(
         "--cache-dir", type=Path, default=ROOT / "build/goose-port/private-checker",
         help="private build cache (default: ignored build/goose-port/private-checker)",
+    )
+    parser.add_argument(
+        "--global-empty-facts", action="store_true",
+        help="private direct-global empty-holder precision extension; requires full frame-skip recipe",
     )
     parser.add_argument(
         "--expansion-node-limit", type=int, choices=(100000, 1000000), default=100000,

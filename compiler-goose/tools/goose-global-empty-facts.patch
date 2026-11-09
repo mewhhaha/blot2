@@ -1,0 +1,82 @@
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -2167,0 +2168,2 @@
++        // Exact whole-global empties, valid only while judging this ordered shrink.
++        vector<VarDef *> emptyglobals;
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2684,0 +2685 @@
++        vector<VarDef *> emptyglobals;
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1214 +1214 @@
+-    if (!container || container->isglobal || IsTemp(container)) return;
++    if (!container || IsTemp(container)) return;
+@@ -1217 +1217,7 @@
+-    if (!KillPath(lval, base, path)) return;
++    if (container->isglobal) {
++        // Optional precision for a direct whole-global assignment only.
++        // Keep KillPath and reference-parameter paths conservative for globals.
++        auto id = Is<Ident>(lval);
++        if (!id || id->vdef != container || IsRefOrSlice(container->type)) return;
++        base = container;
++    } else if (!KillPath(lval, base, path)) return;
+@@ -1586,0 +1593,4 @@
++    // A later reference-bearing store may alias any global whose empty
++    // contents we knew. Proven-empty stores do not repopulate those globals.
++    if (src || roots.Unknown() || !roots.None())
++        erase_if(cur.kills, [](const Kill &k) { return k.container->isglobal; });
+@@ -2059,3 +2069,16 @@
+-    for (auto &gs : globalshrinks)
+-        if (gs.arr == vd && !gs.bound == !bound && (!bound || TypeEq(gs.bound, bound))) return;
+-    globalshrinks.push_back({ vd, bound, at->line, prefix, Chain({}) });
++    GlobalShrink gs { vd, bound, at->line, prefix, Chain({}) };
++    if (!bound)
++        for (auto &k : cur.kills)
++            if (k.container->isglobal && k.base == k.container && k.path.empty())
++                gs.emptyglobals.push_back(k.container);
++    // The same proof set has the same deferred judgement against global
++    // history. Distinct sets stay separate: a safe shrink cannot hide an
++    // unsafe occurrence of the same array.
++    std::sort(gs.emptyglobals.begin(), gs.emptyglobals.end(), std::less<VarDef *>{});
++    gs.emptyglobals.erase(std::unique(gs.emptyglobals.begin(), gs.emptyglobals.end()),
++                          gs.emptyglobals.end());
++    for (auto &prior : globalshrinks)
++        if (prior.arr == vd && !prior.bound == !bound &&
++            (!bound || TypeEq(prior.bound, bound)) && prior.emptyglobals == gs.emptyglobals)
++            return;
++    globalshrinks.push_back(std::move(gs));
+@@ -2088,0 +2112,4 @@
++                    if (find(gs.emptyglobals.begin(), gs.emptyglobals.end(), gd) !=
++                        gs.emptyglobals.end()) continue;
++                    // Only this exact top-level holder is empty: GlobalReach
++                    // still follows other globals' historical copies of it.
+@@ -2553,0 +2581,4 @@
++        if (known && external && external->isglobal && !bound)
++            for (auto &k : cur.kills)
++                if (k.container->isglobal && k.base == k.container && k.path.empty())
++                    o.emptyglobals.push_back(k.container);
+@@ -2560,0 +2592,3 @@
++            });
++            erase_if(e.emptyglobals, [&](VarDef *g) {
++                return find(o.emptyglobals.begin(), o.emptyglobals.end(), g) == o.emptyglobals.end();
+@@ -3253 +3287,5 @@
+-    erase_if(cur.kills, [&](const Kill &k) { return CallMayWrite(spec, argvals, k); });
++    erase_if(cur.kills, [&](const Kill &k) {
++        // Globals are deliberately narrower than local holder precision:
++        // every call invalidates them, including a call with no arguments.
++        return k.container->isglobal || CallMayWrite(spec, argvals, k);
++    });
+@@ -3314,0 +3353,3 @@
++                if (h.root->isglobal && !h.bound)
++                    for (auto g : h.order->emptyglobals)
++                        cur.kills.push_back({ g, g, "", storesbase });
+@@ -3315,0 +3357,2 @@
++            // These facts judge only this already-ordered shrink. Restore
++            // removes them; the call does not promise any post-call emptiness.
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -521,0 +522,3 @@
++    // Phase-2 argument/default checking may recreate pre-call facts after
++    // ApplyCalleeShrinks. No direct-global empty fact outlives the call.
++    erase_if(cur.kills, [](const Kill &k) { return k.container->isglobal; });

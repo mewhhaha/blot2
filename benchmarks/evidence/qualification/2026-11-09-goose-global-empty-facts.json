@@ -1,0 +1,46 @@
+{
+  "scope": "Optional private precision extension for direct whole-global empty-holder assignments; extends conservative global-history analysis. Not whole Blot compiler qualification.",
+  "candidate": {
+    "path": "build/goose-port/private-checker/6d8b64b168f4865a633de75a86b30cac1534783cbe8fb6ba27f84a7595e0784f/goose",
+    "sha256": "6e1c9b284979cfe8617d420cb7caa5e1acf8fe66a4fd48062511882120bb3025",
+    "source_sha256": "f16a05773da3abe6574e88fff285e0acbdaa9ba907a14fbb71de0065b393f4f1"
+  },
+  "baseline": {
+    "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/9ee55fa992dc6f6e282fd74b04cee268378e9a00f5a19668f383545be757b0e5/goose",
+    "sha256": "54cfe71d2a9c80d8b6ef8a61586782707791cfcc76a259898961d6e32a9eb464"
+  },
+  "patch": {
+    "path": "compiler-goose/tools/goose-global-empty-facts.patch",
+    "sha256": "b9bb7c4887af567d14e2e8f358ab47b5cd145f4549883e8ed9a7cb5313c9aa12",
+    "format_replay": "Zero-context diff removes blank context whitespace; clean108-file replay identical to qualified candidate source. Build receipt retains original patch bytes and digest."
+  },
+  "build_seconds": [
+    {
+      "stage": "compile",
+      "exit": 0,
+      "seconds": 63.54
+    },
+    {
+      "stage": "link",
+      "exit": 0,
+      "seconds": 0.314
+    }
+  ],
+  "controls": {
+    "direct_global_matrix": 24,
+    "all_passed": true,
+    "existing_matrix": "24 semantic controls pass exact diagnostics/runtime/profile and generated C checks",
+    "unsupported": "Field paths, unordered recursive resets and post-call empty propagation retain conservative rejection."
+  },
+  "safety": [
+    "Exact direct non-reference globals only; RHS proven reference free",
+    "Every call and reference-bearing store invalidates facts; call completion invalidates rechecked argument/default facts",
+    "Existing branch/loop flow joins; separate exemption sets for distinct unsafe shrink contexts",
+    "Known ordered shrink records replay temporary facts only for that shrink, never post-call facts",
+    "Final global reach traversal unchanged; only exact emptied top-level holder exempted"
+  ],
+  "default_mode": "Flag off selects same compiler/build inputs as9ee except builder recipe hash; installed Goose unchanged.",
+  "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-global-empty-facts.json.gz",
+  "raw_receipt_sha256": "710b570e89b736f02fa5b6d2f814ce0dbbdc42798caff50dfa79fc96cd6dcd65",
+  "remaining": "Whole compiler C/header/executable and integrated CLI/server/OOM/retention qualification remain unavailable."
+}
