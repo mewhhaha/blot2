@@ -15,6 +15,7 @@ SCHEMAS = [
     ('reuse/principal_interface', 'Interface'),
     ('reuse/frozen_dependency', 'Identity'),
     ('reuse/frozen_dependency', 'Module'),
+    ('reuse/frozen_dependency', 'FrozenDependency'),
 ]
 NESTED = {
     ('check/core', 'Types'): 'blot_check_core::Types',

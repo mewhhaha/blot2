@@ -1772,7 +1772,7 @@ struct CompileOptions {
     completed_core_validation: blot_reuse_completed_core_validation::Borrow&? = null,source_completion: blot_reuse_source_completion::Borrow,
     storage: blot_support::Option<blot_backend_storage_plan::Config>,inline_named: bool = true,explain_allocations: bool = false,ragged_builders: bool = true,constant_receipts: bool = true,constant_limits: ConstantLimits,
     ragged_probe_limit: u32 = blot_backend_ragged_builder::probe_limit,checkpoint: const blot_backend_backend_checkpoint::Checkpoint&? = null,io: bool = false,profile_backend: bool = false,policy: blot_execution_policy::Policy,observe_startup: bool = false,
-    identity: blot_support::Option<blot_backend_runtime_identity::View>,diagnostic_source_digests: const u8[32][:] = [],compiler_identity: blot_support::Option<u8[32]>,evidence_noise: bool = false,unit_order: const u32[:] = default<const u32[:]>(),diagnostic_source_mode: bool = false,diagnostic_prelude_unit: u32 = 0,
+    identity: blot_support::Option<blot_backend_runtime_identity::View>,diagnostic_source_digests: const u8[32][:] = default<const u8[32][:]>(),compiler_identity: blot_support::Option<u8[32]>,evidence_noise: bool = false,unit_order: const u32[:] = default<const u32[:]>(),diagnostic_source_mode: bool = false,diagnostic_prelude_unit: u32 = 0,
     artifact_replay: bool = false,artifact_dump: bool = false,retain_artifacts: bool = false,previous: const blot_reuse_artifact_capture::Capture&? = null,principal_previous: const blot_reuse_artifact_capture::Capture&? = null,query_previous: const blot_reuse_artifact_capture::Capture&? = null,cached_units: i64 = 0,validate_pins: bool = false,
 }
 // Every mutable owner is placed by the driver before provider borrows bind.

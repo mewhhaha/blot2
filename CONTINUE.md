@@ -82,8 +82,10 @@ results and Prepared headers transfer their exact owned runs out of local scopes
 Parallel lowering owns a fixed result-slot run; fixed-mode preparation payloads
 are reconstructed after mutation. Snapshot append/adopt factories observe their
 existing owner journals; sharing and pin lifetimes have executed controls. The
-current generic closure annotations pass all 17 families; the combined server
-entry check is pending. There is still no emitted whole C program, header or
+receipt helpers return their receipt directly and observe the owning graph runs.
+A focused C/link/execution check passes in 35.99s, and seven worker entry roots
+pass in one frozen batch. The server entry now reaches pooled evaluator and
+archive/workspace reset lifetime errors. There is still no emitted whole C program, header or
 executable. Actual CLI/server, request OOM/retry and differential qualification
 remain pending.
 

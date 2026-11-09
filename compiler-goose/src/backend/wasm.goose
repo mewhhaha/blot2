@@ -973,7 +973,7 @@ fn setFunctionParameters(module: Module&,id: u32,parameters: const ValueType[:])
 
 struct AssembleOptions {
     require_collector_free: bool = false,collector_rejection: blot_backend_collector_contract::Certificate? = null,
-    memory_profile: blot_support::Option<const blot_backend_source_origins::Site[:]> = blot_support::none<const blot_backend_source_origins::Site[:]>(),compiler_identity: blot_support::Option<u8[32]>,source_digests: const u8[32][:] = [],source_names: blot_support::Option<blot_backend_runtime_identity::View>,
+    memory_profile: blot_support::Option<const blot_backend_source_origins::Site[:]> = blot_support::none<const blot_backend_source_origins::Site[:]>(),compiler_identity: blot_support::Option<u8[32]>,source_digests: const u8[32][:] = default<const u8[32][:]>(),source_names: blot_support::Option<blot_backend_runtime_identity::View>,
     rejection: OwnershipFailure? = null,io: bool = false,workers: u8 = 1,profile: bool = false,tier: blot_compilation_tier::Tier = blot_compilation_tier::Tier.optimized,share_machine_code: bool = false,
     import_function_table: blot_support::Option<u32>,export_function_table: bool = false,export_memory: bool = false,
     previous: const blot_backend_optimized_bodies::Capture? = null,current: blot_backend_optimized_bodies::Capture? = null,stats: blot_backend_optimized_bodies::Stats? = null,

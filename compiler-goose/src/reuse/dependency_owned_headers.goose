@@ -44,3 +44,7 @@ fn canonical(owner:const Owner&,value:blot_reuse_frozen_dependency::Module)->blo
  assert(owner.unique());
  return blot_reuse_frozen_dependency::Module{identity:canonical(owner,value.identity),imports:owner.mutable(value.imports),implicit_prelude:value.implicit_prelude,source_imports:owner.mutable(value.source_imports),core:canonical(owner,value.core),interface:canonical(owner,value.interface),exports:owner.mutable(value.exports),fixities:owner.mutable(value.fixities)};
 }
+fn canonical(owner:const Owner&,value:blot_reuse_frozen_dependency::FrozenDependency)->blot_reuse_frozen_dependency::FrozenDependency {
+ assert(owner.unique());
+ return blot_reuse_frozen_dependency::FrozenDependency{symbols:owner.mutable(value.symbols),modules:owner.mutable(value.modules)};
+}

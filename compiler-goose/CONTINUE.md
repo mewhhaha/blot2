@@ -77,3 +77,8 @@ encoded references, recoverable allocation and source-package imports. Preserve
 the requested source contracts and record gaps; choose and qualify the Goose
 toolchain after writing. Do not work around gaps by weakening Blot checks,
 forwarding compilation to Zig, or inserting placeholder successes.
+
+Receipt return and owned graph publication pass a focused C/link/execution law
+in 35.99s. Seven worker roots pass the frozen batch86; batch87 server reaches
+three pooled evaluator and archive/workspace reset lifetime errors. Two nested
+readonly slice defaults are typed. Whole C/header/executable remain unavailable.

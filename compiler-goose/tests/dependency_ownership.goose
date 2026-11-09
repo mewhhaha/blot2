@@ -53,4 +53,10 @@ fn adopted() {
     var frozen=blot_reuse_dependency_payload::Owned<blot_reuse_frozen_dependency::FrozenDependency>{blot_reuse_frozen_dependency::FrozenDependency{symbols,modules},root};
     let source,error=blot_reuse_retained_dependency::adopt(frozen);assert(error==blot_error::Error.none && source!=null && frozen.owner.lease==0);inspect(source.value.modules[0]);shareAndRelease(source);
 }
-fn main() {for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}
+fn receiptReturn() {
+    var executor=blot_project_executor::init();var source,error=blot_reuse_project::init();assert(error==blot_error::Error.none);
+    let checked=default<blot_reuse_project_check::CheckedProject>();
+    let value,receipt,error=blot_reuse_dependency_closure::freezeDeferred(executor,source,checked,true);
+    assert(error==blot_error::Error.invalid_artifact && value.owner.lease==0 && receipt==null);source.deinit();executor.deinit();
+}
+fn main() {for cycle in 0..3 {appended();adopted();receiptReturn();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}
