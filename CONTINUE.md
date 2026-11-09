@@ -65,10 +65,11 @@ Current owners use existing registered pools and journals. Inputs, source overla
 Pattern stores and retained seeds carry checked scalar keys. Source retains49
 alias guards. Publication observes exact owning runs; global-footprint indexes
 own cached spelling bytes. Copied host workers remain; language tasks are retired.
-Preserve ABI8, session2 and the Zig oracle/sibling sources. Selected108 passes
-executor/metadata; server reaches PlainLayouts method lookup and optimizer-header
-publication. Actual whole builds109–111 emit no artifacts; the current frontier is a
-SessionCatalog escape into retained Session storage.
+Preserve ABI8, session2 and the Zig oracle/sibling sources. The session family now uses checked scalar parent/table keys and explicit
+header/published/worker pool reborrows. Value spellings use ranges into the existing
+metadata arena; Value and Root are fully scalar, and two retention copies disappear.
+The affected session/metadata laws pass in12.71/8.66s. Whole113 emits no artifacts;
+its next errors are IndexSet method lookup and effect-evidence buffer publication.
 See [the current frontier and raw receipts](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 The optional private direct-global empty-holder precision extension passes 24 new

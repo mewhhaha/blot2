@@ -3687,6 +3687,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PartialA
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PartialArrayMember,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PlainNominalsMap)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PlainNominalsMap,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PooledSessionCatalog)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PooledSessionCatalog,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PooledValues)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PooledValues,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PrincipalAdapter)->bool {return equalFields(left,right);}
@@ -4047,8 +4049,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionB
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionBindingOffsetsBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionCapabilityScopesBuffer)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionCapabilityScopesBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionCatalog)->bool {return equalFields(left,right);}
-fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionCatalog,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionContextState)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionContextState,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionFieldMap)->bool {return equalFields(left,right);}
@@ -4071,6 +4071,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionT
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionTables,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionVisitedNodesBuffer)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionVisitedNodesBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SharedSessionCatalog)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SharedSessionCatalog,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::Slot)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::Slot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SnapshotRange)->bool {return equalFields(left,right);}

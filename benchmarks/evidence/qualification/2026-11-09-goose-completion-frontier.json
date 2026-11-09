@@ -480,10 +480,14 @@
     }
   },
   "latest_selected_frontier": {
-    "batch": 108,
-    "partial": true,
-    "server": "PlainLayouts method lookup and optimizer header publication; executor and metadata pass",
-    "seconds": 114.66,
+    "whole_batch": 113,
+    "partial": false,
+    "seconds": 144.86,
+    "errors": [
+      "IndexSet method lookup",
+      "effect evidence buffer publication"
+    ],
+    "artifacts": {},
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
@@ -2467,5 +2471,76 @@
     ],
     "constraints": "Keep exact=false; proof joins by intersection and is cleared on reference traversal/weakening; no retained callee-local RootAlt.from",
     "raw_receipt": "2026-11-10-goose-copied-argument-contents.json.gz"
+  },
+  "whole_build_112": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 156.227,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false
+  },
+  "whole_build_113": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 144.86,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false
+  },
+  "session_value_ranges_family": {
+    "raw_receipt": "2026-11-10-goose-session-value-ranges.json.gz",
+    "checker_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632",
+    "passed": true,
+    "laws": {
+      "empty_session": 12.706,
+      "footprint_owner": 8.657
+    },
+    "changes": [
+      "Removed combined nullable SessionCatalog; shared sessions use checked scalar owner keys",
+      "Inherited table authority uses original catalog SessionTables key",
+      "Header/published/worker Session sources reborrow exact existing module pools",
+      "Value.name is an arena Range; Value and Root carry no borrowed fields",
+      "Two same-arena retention name copies removed"
+    ],
+    "review": "Independent Sol review found no missed spelling consumer or cross-Metadata transfer; bytearena only clears at final deinit",
+    "whole_builds_receipt": "2026-11-10-goose-whole112-113.json.gz",
+    "whole113_frontier": [
+      "scoped IndexSet mapalias cannot resolve local insert",
+      "effect_evidence.commit buffer move widens state provenance"
+    ],
+    "whole_compiler_executable": false
   }
 }

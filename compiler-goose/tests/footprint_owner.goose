@@ -22,15 +22,26 @@ fn typeCursors() {
     blot_backend_storage_type_arguments::restore(stack,saved);assert(stack.id==before.id && stack.len==before.len && stack.stats.synchronized==before.stats.synchronized);
     let entry=blot_backend_storage_type_arguments::heads(stack,1,2);assert(entry.any.present && blot_backend_storage_type_arguments::at(stack,entry.any.value).argument==3);stack.deinit();
 }
+struct NameArena {bytes:u8[>..<]&}
+fn nameRanges() {
+ var bytes:u8[>..<]=[];var metadata=NameArena{bytes};var source:u8[>..]=[];source.append("zebra");
+ var z=default<blot_backend_scoped_backend::Value>();z.name=blot_backend_scoped_backend::publishName(metadata,source[..]);source=[];
+ var a=default<blot_backend_scoped_backend::Value>();a.name=blot_backend_scoped_backend::publishName(metadata,"alpha");
+ var same=default<blot_backend_scoped_backend::Value>();same.name=blot_backend_scoped_backend::publishName(metadata,"zebra");
+ for index in 0..4096 {bytes.push(0);}assert(z.name.start!=same.name.start && blot_backend_scoped_backend::valueName(metadata,z)==blot_backend_scoped_backend::valueName(metadata,same));
+ var values=[z,a];blot_backend_scoped_backend::orderFields(metadata,values[..]);assert(blot_backend_scoped_backend::valueName(metadata,values[0])=="alpha" && blot_backend_scoped_backend::valueName(metadata,values[1])=="zebra");
+ let copied=z;assert(copied.name.start==z.name.start && copied.name.len==z.name.len && bytes.len==4111);
+}
 fn rootRuns() {
+    var bytes:u8[>..<]=[];var arena=NameArena{bytes};let spelling=blot_backend_scoped_backend::publishName(arena,"element");
     var layouts=blot_backend_scoped_backend::PlainLayouts{};let shape=default<blot_backend_scoped_backend::Value>();
     assert(blot_backend_scoped_backend::insert(layouts,1 as u64,shape)==blot_error::Error.none);assert(blot_backend_scoped_backend::contains(layouts,1 as u64));layouts.deinit();
     var roots=blot_backend_scoped_backend::Roots{};
-    for ordinal in 0..24 {var root=default<blot_backend_scoped_backend::Root>();root.stack=ordinal as u32;root.element.name="element";assert(blot_backend_scoped_backend::push(roots,root)==blot_error::Error.none);}
+    for ordinal in 0..24 {var root=default<blot_backend_scoped_backend::Root>();root.stack=ordinal as u32;root.element.name=spelling;assert(blot_backend_scoped_backend::push(roots,root)==blot_error::Error.none);}
     let registered=blot_backend_scoped_backend::registeredRoots(roots);
     for ordinal in 0..registered.len {let word=blot_backend_runtime_code::Local{(ordinal+1) as u32};registered[ordinal].word=word;registered[ordinal].global_ready=blot_support::Option<blot_backend_runtime_code::Local>{true,word};}
     var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
-    assert(registered.len==24 && registered[23].stack==23 && registered[23].word.id==24 && registered[23].global_ready.present && registered[23].element.name=="element");
+    assert(registered.len==24 && registered[23].stack==23 && registered[23].word.id==24 && registered[23].global_ready.present && blot_backend_scoped_backend::valueName(arena,registered[23].element)=="element");
     roots.deinit();
 }
 // Exercise the owned header projection with nonempty Core payloads; semantic
@@ -46,6 +57,7 @@ fn nonemptyCompletedViews() {
  blot_reuse_dependency_closure::completed_modules.free_slice(modules);blot_reuse_dependency_closure::completed_lengths.free_slice(lengths);owner.deinit();
 }
 fn main() {
+    nameRanges();
     nonemptyCompletedViews();
     for cycle in 0..4 {
         rootRuns();

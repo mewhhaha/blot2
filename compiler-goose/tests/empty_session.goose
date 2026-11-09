@@ -4,6 +4,7 @@ import driver.cli;
 import driver.cli_workers;
 import std;
 import eval.core_eval;
+import eval.worker_packet;
 import driver.compile_workspace;
 import support.error;
 import support.native;
@@ -161,7 +162,29 @@ fn inputPublication() {
     workspaceLifecycle();let captured=frozen.capturedSource(path);assert(captured.present && captured.value==bytes);
     let old=frozen;frozen.deinit();assert(!frozen.valid() && !old.valid());
 }
+struct SessionCatalogProbe {calls:u32=0}
+fn inspectOwnedSession(context:SessionCatalogProbe&,session:blot_eval_core_eval::Session&)->blot_error::Error {
+ assert(blot_eval_core_eval::canonicalSession(session) .== session);assert(session.units.len==1 && session.units[0].unit==1 && session.units[0].names=="session-unit");context.calls++;return blot_error::Error.none;
+}
+fn sessionCatalogs() {
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);let names,error=owner.copy("session-unit");assert(error==blot_error::Error.none);
+ let units,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(owner,1);assert(error==blot_error::Error.none);units[0]=blot_reuse_dependency_owned_headers::canonical(owner,blot_check_core::Module{unit:1,names:names,..});
+ let inputs=owner.mutable(units);var context=SessionCatalogProbe{};assert(blot_eval_core_eval::withSession<SessionCatalogProbe>(inputs,blot_native::fresh_owner_id(),context,inspectOwnedSession)==blot_error::Error.none && context.calls==1);
+ let parent,error=blot_eval_core_eval::initOwnedSession(inputs,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && parent);parent.options.max_steps=37;
+ let key=blot_eval_core_eval::sharedSessionCatalog(parent);assert(key.valid());var wrong=key;wrong.generation++;assert(!wrong.valid());wrong=key;wrong.parent_slot=0;assert(!wrong.valid());
+ let child,error=blot_eval_core_eval::initOwnedSharedSession(parent,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && child && child.session_owner_slot!=parent.session_owner_slot && child.options.max_steps==blot_eval_core_eval::Options{}.max_steps);
+ assert(blot_support::same_slice_identity(child.units,parent.units));let grandchild,error=blot_eval_core_eval::initOwnedSharedSession(child,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && grandchild && grandchild.catalog_tables.lease==parent.catalog_tables.lease && blot_support::same_slice_identity(grandchild.units,parent.units));blot_eval_core_eval::deinitOwnedSession(grandchild);blot_eval_core_eval::deinitOwnedSession(child);
+ assert(blot_eval_core_eval::withSharedSession<SessionCatalogProbe>(parent,blot_native::fresh_owner_id(),context,inspectOwnedSession)==blot_error::Error.none && context.calls==2);
+ blot_eval_core_eval::deinitOwnedSession(parent);assert(!key.valid());
+ let published=blot_backend_result_publication::module_runs.alloc_slice(1);published[0]=blot_reuse_dependency_owned_headers::canonical(owner,units[0]);let session,error=blot_eval_core_eval::initOwnedPublishedSession(published,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && session && session.unit_source==blot_eval_core_eval::SessionUnitSource.published);let shared,error=blot_eval_core_eval::initOwnedSharedSession(session,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && shared && shared.unit_source==blot_eval_core_eval::SessionUnitSource.published && blot_support::same_slice_identity(shared.units,published));blot_eval_core_eval::deinitOwnedSession(shared);blot_eval_core_eval::deinitOwnedSession(session);blot_backend_result_publication::module_runs.free_slice(published);
+ let worker=blot_eval_worker_packet::core_modules.alloc_slice(1);worker[0]=blot_reuse_dependency_owned_headers::canonical(owner,units[0]);
+ assert(blot_eval_core_eval::withWorkerSession<SessionCatalogProbe>(worker,blot_native::fresh_owner_id(),context,inspectOwnedSession)==blot_error::Error.none && context.calls==3);
+ let worker_parent,error=blot_eval_core_eval::initOwnedWorkerSession(worker,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && worker_parent && worker_parent.unit_source==blot_eval_core_eval::SessionUnitSource.worker);
+ let worker_child,error=blot_eval_core_eval::initOwnedSharedSession(worker_parent,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && worker_child && worker_child.unit_source==blot_eval_core_eval::SessionUnitSource.worker && blot_support::same_slice_identity(worker_child.units,worker));
+ blot_eval_core_eval::deinitOwnedSession(worker_child);blot_eval_core_eval::deinitOwnedSession(worker_parent);blot_eval_worker_packet::core_modules.free_slice(worker);owner.deinit();
+}
 fn main() {
+    sessionCatalogs();
     var previous:u64=0;
     for cycle in 0..4 {
         tableViews();

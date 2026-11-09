@@ -32,11 +32,14 @@ The newer backend/query family uses scalar type cursors and unit IDs, concrete
 query-record stores and checked registered module/Core views. Timing labels retain
 owned storage and capacity reuse. Affected laws cover nested cursor restoration,
 query-table growth and publication after producer cleanup across real Frame.
-The previous complete25 attempt stopped after21 passes at the receipt cap;
-the final serial run passes. Optimizer decoding uses typed optional carriers,
-concrete owned record stores and fresh region headers. Whole109–111 emit no artifacts. A nullable parent call is fixed; the current
-frontier is the SessionCatalog escape into a retained session. The shared/units
-factory split is in progress.
+The session family passes its expanded C/link/runtime law in12.71s, including
+packet/published/worker headers, child/grandchild sharing, callbacks and stale keys.
+Shared sessions use original catalog table keys and exact existing module pools.
+Value spellings now use arena ranges, making Value and Root fully scalar. The
+metadata law passes in8.66s; independent review finds no cross-arena transfer or
+byte-arena rollback. Two redundant retention name copies are removed.
+Whole113 emits no artifacts; next are IndexSet lookup and effect-evidence moves.
+See [the exact affected receipt](../benchmarks/evidence/qualification/2026-11-10-goose-session-value-ranges.json.gz).
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new
