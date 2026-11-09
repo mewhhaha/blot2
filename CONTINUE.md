@@ -54,7 +54,7 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Seventeen executed production families pass together. They cover diagnostic and
+Nineteen executed production families pass together. They cover diagnostic and
 body ownership, live/frozen readers, imports, SourceValidation, frames, native
 assets, completion snapshots, loader scheduling and editor budgets. These laws
 check real helpers in seconds; they do not qualify a whole compiler executable.
@@ -85,8 +85,11 @@ existing owner journals; sharing and pin lifetimes have executed controls. The
 receipt helpers return their receipt directly and observe the owning graph runs.
 A focused C/link/execution check passes in 35.99s, and seven worker entry roots
 pass in one frozen batch. The server entry now reaches pooled evaluator and
-archive/workspace reset lifetime errors. There is still no emitted whole C program, header or
-executable. Actual CLI/server, request OOM/retry and differential qualification
+archive/workspace reset lifetime errors. The inactive archive metadata sentinel is
+now removed, and persistent evaluator bootstrap takes no borrowed unit input.
+The 19-law batch passes with both lifecycle controls; workspace payload cleanup
+and general nonempty evaluator borrowing remain unresolved. There is still no
+emitted whole C program, header or executable. Actual CLI/server, request OOM/retry and differential qualification
 remain pending.
 
 Private checker tooling is checkpointed separately. Its holder index reaches the

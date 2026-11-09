@@ -26,4 +26,3 @@ var blot_reuse_artifact_emitter::inactive_Recorder_SymbolicInstruction:blot_reus
 var blot_reuse_artifact_emitter::inactive_recorder:blot_reuse_artifact_emitter::Recorder=blot_reuse_artifact_emitter::Recorder{..};
 
 var blot_reuse_artifact_capture::inactive_queries:blot_reuse_executable_query::FragmentTable=default<blot_reuse_executable_query::FragmentTable>();
-var blot_reuse_artifact_capture::inactive_capture:blot_reuse_artifact_capture::Capture=blot_reuse_artifact_capture::Capture{..};

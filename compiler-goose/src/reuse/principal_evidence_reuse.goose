@@ -89,10 +89,10 @@ fn init(allocation_owner: u64, old: const blot_reuse_artifact_capture::Capture&,
     return result, error;
 }
 fn initInto(result: State&, old: const blot_reuse_artifact_capture::Capture&, units: const blot_check_core::Module[:], names: blot_support::Option<blot_backend_runtime_identity::View>, stamps: blot_reuse_code_artifacts::ModuleStamps?, allocation_owner: u64, admitted: blot_support::Option<Gate>) -> Error {
-    assert(old.metadata.pools.present);
+    assert(old.metadata().pools.present);
     var admission = admitted;
     if !admission.present {
-        let gate, error = blot_reuse_principal_reuse_gate::initWithStamps(allocation_owner, old.metadata.pools.value, units, names, stamps);
+        let gate, error = blot_reuse_principal_reuse_gate::initWithStamps(allocation_owner, old.metadata().pools.value, units, names, stamps);
         if error != blot_error::Error.none { return error; } admission = blot_support::some(gate);
     }
     result = State { allocation_owner: allocation_owner, old: old, gate: admission.value, names: names, stats: Stats {
@@ -111,11 +111,11 @@ fn deinit(self_: State&) {
 fn ensureGraphs(self_: State&) -> bool, Error {
     if self_.graphs.present { return self_.graphs.value.enabled, blot_error::Error.none; }
     if !self_.gate.enabled { return false, blot_error::Error.none; } let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
-    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, old.metadata.pools.value, self_.gate.units, self_.gate);
+    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, old.metadata().pools.value, self_.gate.units, self_.gate);
     if error != blot_error::Error.none { return false, error; }
     var graphs = prepared;
     if !graphs.present {
-        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, old.metadata.pools.value, self_.gate.units, self_.names, self_.gate.units.len);
+        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, old.metadata().pools.value, self_.gate.units, self_.names, self_.gate.units.len);
         if failure != blot_error::Error.none { return false, failure; } graphs = blot_support::some(fresh);
     }
     if !graphs.value.enabled { graphs.value.deinit(); return false, blot_error::Error.none; }
@@ -138,7 +138,7 @@ fn sourceU32(module: const blot_check_core::Module&) -> bool {
 fn primitiveEvidence<G>(self_: const State&, g: G&, owner: u32, types: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> PrimitiveResult, Error {
     if rows.len != 0 || types.len == 0 { return PrimitiveResult.fallback, blot_error::Error.none; }
     if !blot_support::same_slice_identity(g.evaluator.units, self_.gate.units) { return PrimitiveResult.declined, blot_error::Error.none; }
-    assert(self_.old); let pools .= requiredOld(self_.old).metadata.pools.value;
+    assert(self_.old); let pools .= requiredOld(self_.old).metadata().pools.value;
     if owner == 0 || owner > pools.modules.len || owner > self_.gate.units.len { return PrimitiveResult.declined, blot_error::Error.none; }
     let pin = pools.modules[owner - 1];
     if pin.unit != owner || !self_.gate.structural_units[owner - 1] { return PrimitiveResult.declined, blot_error::Error.none; }
@@ -161,7 +161,7 @@ fn inputImageEqual(self_: State&) -> bool {
     if self_.input_image_equal.present { return self_.input_image_equal.value; }
     self_.stats.input_image_checks++;let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
     for &current, index in self_.gate.units {
-        if !blot_reuse_principal_input_image::moduleEqual(old.metadata.pools.value.modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
+        if !blot_reuse_principal_input_image::moduleEqual(old.metadata().pools.value.modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
     }
     self_.input_image_equal = blot_support::some(true); return true;
 }
@@ -206,7 +206,7 @@ fn sourcesEqual(self_: State&, target: BindingRef, inputs: const Inputs&) -> boo
     if self_.gate.constant_types { return self_.sourceDeclined(SourceDecline { target: target, reason: SourceReason.constant_types , ..}), blot_error::Error.none; }
     if !inputs.source_complete { return self_.sourceDeclined(SourceDecline { target: target, reason: SourceReason.incomplete , ..}), blot_error::Error.none; }
     let old .= self_.old; assert(old);
-    let pools .= old.metadata.pools; assert(pools.present);
+    let pools .= old.metadata().pools; assert(pools.present);
     for unit in inputs.source_units {
         if unit == 0 || unit > self_.gate.units.len || !blot_reuse_principal_input_image::moduleEqual(pools.value.modules[unit - 1].module, self_.gate.units[unit - 1]) { return self_.sourceDeclined(SourceDecline { target: target, source: BindingRef { unit, 0 , ..}, reason: SourceReason.module_image , ..}), blot_error::Error.none; }
     }
@@ -286,7 +286,7 @@ fn lookup<G>(self_: State&, g: G&, target: BindingRef, options: blot_eval_core_e
     if target.unit > requiredOld(self_.old).cached_units { self_.stats.fresh_unit_requests++; }
     let exact = self_.gate.admitsPrincipal(target);
     if !exact && !self_.gate.enabled { self_.stats.changed_or_unsupported++; return no, blot_error::Error.none; }
-    let table .= requiredOld(self_.old).metadata.principal_queries;
+    let table .= requiredOld(self_.old).metadata().principal_queries;
     var cursor = table.candidates(blot_reuse_principal_query::fingerprint(target), blot_reuse_semantic_query_table::Order.oldest_first);
     loop {
         let position = cursor.next(); if !position.present { break; }

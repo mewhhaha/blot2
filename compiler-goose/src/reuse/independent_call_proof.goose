@@ -57,7 +57,7 @@ recursive fn acquire<S,G>(state: S&, g: G&, read: blot_reuse_specialization_rece
         if valid { for input in record.scalar_reads { if !scalarMatches(g, input) { valid = false; break; } } }
         if !valid { continue; } let cloned, error = record.clone(); if error != blot_error::Error.none { return blot_support::none<Record>(), error; } state.stats.independent_reused++; return blot_support::some(cloned), blot_error::Error.none;
     }
-    for record in recordsView(state.old.metadata.independent_calls) {
+    for record in recordsView(state.old.metadata().independent_calls) {
         if record.target != target || record.evidence != read.evidence || record.depth != g.evaluator.depth || !blot_structural::equal(record.options, g.evaluator.options) { continue; }
         var valid = true; for source in record.sources { if !state.gate.admits(source) { valid = false; break; } }
         if valid { for input in record.scalar_reads { if !state.gate.admits(input.target) || !scalarMatches(g, input) { valid = false; break; } } }
@@ -84,8 +84,8 @@ fn probeLayout<S,G>(context: ProbeContext<S,G>&, store: blot_backend_layout::Sto
     session.options = query.generator.evaluator.options; session.depth = query.generator.evaluator.depth;
     let seeded = session.seedScalarInputs(query.generator.evaluator);
     if seeded == blot_error::Error.out_of_memory { return seeded; } if seeded != blot_error::Error.none { setProofResult(query,reject(query.state,DeclineReason.inputs)); return blot_error::Error.none; }
-    assert(query.state.old.metadata.pools.present);
-    let prepared, error = blot_reuse_artifact_import::initIndependentQuery(query.state.gate.allocation_owner, query.state.old.metadata.pools.value, session.units, query.state.gate);
+    assert(query.state.old.metadata().pools.present);
+    let prepared, error = blot_reuse_artifact_import::initIndependentQuery(query.state.gate.allocation_owner, query.state.old.metadata().pools.value, session.units, query.state.gate);
     if error != blot_error::Error.none { return error; } if !prepared.present { setProofResult(query,reject(query.state,DeclineReason.imports)); return blot_error::Error.none; }
     var maps = prepared.value; var probe = makeIndependentProbe(session,store,session.owner_id);
     let expected, imported = maps.importEvidence(probe, query.read.evidence);

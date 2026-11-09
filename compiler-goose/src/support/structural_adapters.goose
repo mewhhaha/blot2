@@ -3575,6 +3575,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::Eligibil
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::EligibilityCandidate,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::EligibilityParent)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::EligibilityParent,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::EmptySessionCatalog)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::EmptySessionCatalog,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::EvaluateQuery)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::EvaluateQuery,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::EvidenceRequest)->bool {return equalFields(left,right);}
@@ -4043,6 +4045,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionB
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionBindingOffsetsBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionCapabilityScopesBuffer)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionCapabilityScopesBuffer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionCatalog)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionCatalog,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionContextState)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::SessionContextState,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::SessionFieldMap)->bool {return equalFields(left,right);}

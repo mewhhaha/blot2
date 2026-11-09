@@ -402,7 +402,23 @@
     "checked_project_result": "ResultOwner live/generation plus7typed owning-run rebases/identity checks before lexical Engine reset; no addedallocation/copy; scope-escape law passes.",
     "parallel_lowering": "Batch owns one fixed Slot run; executor is invocation-borrowed; caller grow Slot arrays removed; success/take/discard/3failure/idempotent cleanup laws pass.",
     "prepared_output": "11 owned outer views use existing catalogOwner/Cache/Core-owner exact observations before fresh Prepared publication; cache/Core take moves preserve owning-run identity.",
-    "snapshot_headers": "9 schema-derived canonical header overloads cover125fields/99slices using existing unique-owner journals; no new pools, allocations or graph copies. append/adopt/pin/shared/retirement law passes."
+    "snapshot_headers": "9 schema-derived canonical header overloads cover125fields/99slices using existing unique-owner journals; no new pools, allocations or graph copies. append/adopt/pin/shared/retirement law passes.",
+    "archive_and_empty_session": {
+      "status": "19 executed families pass on frozen source",
+      "changes": [
+        "Capture has nullable metadata Context with checked observer; inactive metadata sentinel removed",
+        "Direct canonical Capture headers preserved; metadata consumers and backing generator updated",
+        "Workspace empty-session constructor has no borrowed unit input; allocation/cleanup shared with existing Session path"
+      ],
+      "pending": [
+        "General nonempty Session unit borrowing",
+        "Resolved-body payload owner cleanup while global Store borrows it"
+      ],
+      "new_laws": {
+        "empty_session": 4.944325489981566,
+        "archive_capture": 3.775567606004188
+      }
+    }
   },
   "latest_selected_frontier": {
     "partial": true,
@@ -448,94 +464,104 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.28645313598099165,
+        "seconds": 0.2886719060188625,
         "program_sha256": "fc15d284596c5bc06135e29f9be492638bcc9ec210e47c224b6f5884ee4ab3ae",
         "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0"
       },
       "expectation": {
-        "seconds": 0.18535189700196497,
+        "seconds": 0.20691305099171586,
         "program_sha256": "1a49692e57820540ca50fbf9d5e84e28d1d5229adaf9a081c4abe66c8335f230",
         "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b"
       },
       "package_owner_frames": {
-        "seconds": 0.13340482098283246,
+        "seconds": 0.13434811600018293,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.6446726029971614,
+        "seconds": 1.7033118709805422,
         "program_sha256": "7cce6851bd8320f33cde196572a6ea0a5c47d30a448c4fa55227e823ce7516c9",
         "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82"
       },
       "proof_leases": {
-        "seconds": 3.5228876059991308,
-        "program_sha256": "39cc4bb5f2fe131a5cdaf97da94b9ee4c18436d98e7811fe5e95de5c2b9ac089",
-        "binary_sha256": "98e56a85f3ca67b8d1b35379e1a71ee60049277f9dd95646cd5ea44b0c64b8ca"
+        "seconds": 3.6594141600071453,
+        "program_sha256": "b147fd8c167ed04db89883f7bb730e52f8c169912b946d4c9d0c8614be891c25",
+        "binary_sha256": "ee47e68ee498567b928be37d08257b38fe315ab9cc6c5f7283be4f157fe68963"
       },
       "source_sort": {
-        "seconds": 0.1415470359788742,
+        "seconds": 0.13647795101860538,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 3.376845199003583,
-        "program_sha256": "38ae2a988a597eb8d8cefff8eecb12ca4c84ab23b61f463577fda1fd1da927b9",
-        "binary_sha256": "0d416edcaff1d317fa8e6e815856d5f64ae676144eb2eefd15970578e069c170"
+        "seconds": 3.514704173983773,
+        "program_sha256": "97cf2265a47961e9dd42650b10dbd6e868ebd592d959da0336ff59a99fb1321d",
+        "binary_sha256": "3252351c2e8d39c4480c10096a51ccc76d0c80f78ebbf7ecae6575255e8d4e68"
       },
       "body_freeze": {
-        "seconds": 7.14495411599637,
-        "program_sha256": "aab9645896edba249c2bbf89a6ed3813ecc802609a94231cf7fd8225bbbac9ca",
-        "binary_sha256": "840e63c792be8f642135918ad935470efcccf5a95570dfff25ee024897c564a4"
+        "seconds": 6.96426494300249,
+        "program_sha256": "13a4a0cfeed1c73df0e28962c98b3418ad2500c604926814d7453856dd620f69",
+        "binary_sha256": "ffb456a771396f1561be9310ee3ee8aa689e8c8298ae22fca1764b31bc1c9c33"
       },
       "immutable_readers": {
-        "seconds": 3.932389453984797,
-        "program_sha256": "cbe00cc0b7e483ea7d103fab6060473fc1bdfcbcd11a7f80a31c228441b77c25",
-        "binary_sha256": "70f4a45b29d63013f47232e5645c5badc21959549c43ddaf8b24208a7223473a"
+        "seconds": 3.992381969001144,
+        "program_sha256": "dda7d3b00fa5fa5d9f0ba3bef5b6433a3f6751b19b6215831bcc75d4230672e8",
+        "binary_sha256": "03c8542ca375d500e93ec676fbcbddf2e6083424e676aec775764c09c848a385"
       },
       "import_arena": {
-        "seconds": 3.6019189470098354,
-        "program_sha256": "ceedc24998f4fddf56d47d8159e58f057af7564f5cb5ca850d193712ebcda9c1",
-        "binary_sha256": "0e7a78936be9e825e363260070f80a9be2a8c801c320c5e954c710e9aa475169"
+        "seconds": 4.012636726023629,
+        "program_sha256": "27a95e855702863e2124ab4c0ebb09946ade3c1d8d16ea62b419d8cce3bcccb2",
+        "binary_sha256": "599c4a537b2da29a8617e1606900509da56d2b7d418a5e70d59caaffcf9ddb3e"
       },
       "source_validation_ownership": {
-        "seconds": 4.231521997018717,
-        "program_sha256": "9d8357f01034f2092251cf5ca9b34936cfd9f8c65918eff6f221dba164a77467",
-        "binary_sha256": "d68039c2ce091607e268ad6940977c3f740f61a89ea30b175983ad90431aa819"
+        "seconds": 4.07855264301179,
+        "program_sha256": "e8a074b626a9edbefc393f03ae49fef004e3c79b0944f1e30c66c5bdd374b2db",
+        "binary_sha256": "f23f079a5421020f1b27a0afbe10e53a6951cb580ed1f330b27c7148da6a70dc"
       },
       "editor_budget": {
-        "seconds": 6.172461622016272,
-        "program_sha256": "24122efbc495b150f523b412af96aa1976d8c098559fce0affcf5d5c53852277",
-        "binary_sha256": "4843d3a949f16bb7ec771c6bb7374d76d7bfe539c2c52863231c8d7b8d5c8548"
+        "seconds": 6.200203885993687,
+        "program_sha256": "0b3ca1d9b5acd3b7e7c6c85764ccec5e3712109e8a307a694235b50558d01f6c",
+        "binary_sha256": "d6834d97679cb70ea1489fef5d582dd10f6bfc6dd849bf9064bd2c812b1dea1b"
       },
       "cache_root_frames": {
-        "seconds": 3.2092347409925424,
-        "program_sha256": "85375d9fdbd1533a3afa577c83cb3407b56754baec003108a1969fdc04773008",
-        "binary_sha256": "d1277443dd324e4a49f70e73a7ba4744c335dfc482d4cacb4ac7c5b7fca68c82"
+        "seconds": 3.283309680991806,
+        "program_sha256": "126d9cefd69adf47bc064ada807311836a4b4ef3159b3447d141abb8fd79420f",
+        "binary_sha256": "53153039adf6b5c2b7c03059561119e96555ad556f7566d35dca6ab764b0f6c0"
       },
       "native_asset_metadata": {
-        "seconds": 4.554761037987191,
-        "program_sha256": "bb1e8d7481c2f4263f8806a5e8da7ee34f0464606094edb2e2fb02189a0d93ff",
-        "binary_sha256": "9aa5547f1a8eef5ebcd773e88ddb4b945e9b21d7fdc5b55f2209b25a67b5d06a"
+        "seconds": 4.5115298069722485,
+        "program_sha256": "15f126590d40693453ced620055b96b9d72fcd6a4e83b157420cda2cb4b1e018",
+        "binary_sha256": "1166577c87a88b979008ef83e9690427d62e14216abfd92f930245f88e765959"
       },
       "completion_probe": {
-        "seconds": 3.4526363300101366,
-        "program_sha256": "538aa8288d6832211a69fe6deae35b0131d460b06fb796304e23ace4024c136e",
-        "binary_sha256": "08730125b5089fa9c2d5a710edb00428e80a5ae0d0df1da813d5c4ccaa58e84f"
+        "seconds": 3.561230034014443,
+        "program_sha256": "686b4d63241ddb6eed3d28ceb61e5f603fbe3ab6c830fba7bcf2adc93bbdd6c4",
+        "binary_sha256": "3bfe06158516c16f2c0402eb1996140d449248bf6db6ebd983c07d3bbc92a129"
       },
       "completion_project_load": {
-        "seconds": 7.409334413998295,
-        "program_sha256": "f9d443263951fa6fb403ce7514e3d871b6215e51fed34abf21cb046938a7d0e5",
-        "binary_sha256": "71a92472c79193f85c10445cc65dfb4736eb90d049a45f36dce36fc7221adce7"
+        "seconds": 7.788656829012325,
+        "program_sha256": "3aa3773a62096bfd7ecc58106639e567e5919f57090a1db4d958ee9e2db29a44",
+        "binary_sha256": "43cb047b7cdd30fce697b98738951e51ce052d01cd8ceb3326d8843a33185558"
       },
       "dependency_ownership": {
-        "seconds": 5.55573949898826,
-        "program_sha256": "a76fdc34e74bf4ace57916ea9c9305ea4b69d438c453a71fd6a5ffbed72ac41c",
-        "binary_sha256": "bf4a13325495bb295bddcff3039b9c112ce4b6599c15e0fa9a5a18765ee03cd7"
+        "seconds": 37.92786843900103,
+        "program_sha256": "8b9f524cf8b85f62f936b447b81fadd0f2c267dcf885ad5d21e6ff2ee056ff5e",
+        "binary_sha256": "818317eba52c56dbbe777863dc2d0facb26fddd4af2b2fdf64917a7788a11cf5"
+      },
+      "empty_session": {
+        "seconds": 4.944325489981566,
+        "program_sha256": "68ad526c94c4655e335f35af336c04ce0f46657211f00986546bc947aedc0806",
+        "binary_sha256": "206067ec2276baffc4612d06a8489f128f1a8379967b05ac2e2f89ae11bd2218"
+      },
+      "archive_capture": {
+        "seconds": 3.775567606004188,
+        "program_sha256": "8166a07a7ff74061a0b6fd1b98ffb7a48ed0b2dbdf97f9b829a8371a0179d6f8",
+        "binary_sha256": "6df9a2d4b508c297848620f33a36e16b009e04d523928c50c325b7376a768e0f"
       }
     },
-    "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_sha256": "959566d4d10a8fba775315a5a5d46e3ad1d12c1ac76b7ce069789e0726769439",
-    "scope": "17 executed production families on exact frozen input closures; whole compiler/server qualification pending."
+    "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
+    "raw_receipt_sha256": "10c45a297aa6fc54b0043d0cbeba396205bbd687c94784092989787f4df24e8e",
+    "scope": "19 real production helper C/link/execution families. Archive capture law excludes blocked clearBacking; whole compiler unavailable."
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "10c5d247befb922878052723979acdb87924721f259e691172727dd130484672",
@@ -552,7 +578,7 @@
     "compiler-goose/src/check/source_sort.goose": "3963e8b9107f5b064539245e8e6b8ffbdbe62bc73c0a9cc1db3d0c00e6e30f23",
     "compiler-goose/src/check/usage_check.goose": "5cd6ff97d5af77cf39006219f3180dab64e3c1bb9e9d25c133168fee56e00c22",
     "compiler-goose/src/eval/closed_evidence_import.goose": "78bfe5001b57919e7d97cfffdb7c5c7b3db83d4e8e2ee6b7a0c1f23a39b544fa",
-    "compiler-goose/src/eval/core_eval.goose": "576465bca7ebd594ec11ae0955766a64b1b3b69d46bacffe7cdde92f999ead6f",
+    "compiler-goose/src/eval/core_eval.goose": "4104a687ed057a90e763f3d372b305b8274ab62498ae44774778d091aef03b22",
     "compiler-goose/src/eval/implementation_evidence.goose": "acbe81fd3c371e00d07ccc5da951c0c90fa080ac4204754664a5842c1abefa40",
     "compiler-goose/src/eval/implementation_predicates.goose": "0abae4a4261fbebe8dbb027f98519ad403189e702c01fb02d1b46cedcb5d89f3",
     "compiler-goose/src/eval/implementation_rows.goose": "2f445390115cb2a518ee7320f7f45df28cc940bb8d35714309ad6a5b3c83701a",
@@ -563,12 +589,12 @@
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "cc77ae7d4609f38ec2d3eb6ae29331467499602d7c1895183057f09689e98f2e",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "c34e758464a39e92f4427b99c6a52ff5227e4db7f95437a01dee81b3104c1b8c",
-    "compiler-goose/src/support/json_adapters.goose": "ec787150716ab64fd3297d94e66b63acc21b958d12169e3e977df16364e94a9f",
-    "compiler-goose/src/support/structural_adapters.goose": "3df8271bd642953d83df73e2215f8bc31debba8400bb93f3ba29500199fa0362",
+    "compiler-goose/src/support/json_adapters.goose": "2b7bae9b894ce42a9ca13c6a5e19a0d70cb2b36c6685e185c294664e9ebf8c73",
+    "compiler-goose/src/support/structural_adapters.goose": "b532ecf8ea40b9e7a51ddfd7d635f3dd0e4ac42996f43d33b60cb717b0a60b35",
     "compiler-goose/src/reuse/hole_diagnostics.goose": "0dbe397bc63bf0eea0870b886a4be44e6e734b1cfb15f326e707d804f1d413d6",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "76622aefcaf6466906e47f6deaeb583ea519665ced419b68b3303e876186bd02",
     "compiler-goose/src/backend/backend_emission.goose": "83a10e7c142c39e11cf27e7e97fb77d1f6093652bc33431e48e1b69fbe4c9632",
-    "compiler-goose/src/backend/core_backend.goose": "c8003f1e7f95e196701e65d55098fcfabdaf23a482ccc674272c68cf234a60d0",
+    "compiler-goose/src/backend/core_backend.goose": "441f4052d89e6f4cddd1f4f4c7cc72bbe25e735fa3f222eeebd4e68412637b52",
     "compiler-goose/src/backend/scoped_backend.goose": "b8a7acc2d3b6db4aa52929be8da8ca91a8d92858030c505caca724a419df4d31",
     "compiler-goose/src/check/frozen_types.goose": "7bdffb9fcdc6079f1990d4c5c2c09a4a8331995439e772356eaffc0609710c23",
     "compiler-goose/src/check/parameter_patterns.goose": "9757bfe19e48733b1cec1a5d02fcab2d17d06d677b0f779b11ec08f15cc1ef01",
@@ -619,8 +645,8 @@
     "compiler-goose/src/backend/wasm.goose": "a30b81d8b8612c425f82a5011efa4558cf693aba0a32999e794c60a5e3d001a7",
     "compiler-goose/src/check/core.goose": "83cf5fde517cdefd020914439e4b4fb7eca29330f0213869cfaa24d858765fbc",
     "compiler-goose/src/driver/cli_pipeline.goose": "9c02f342fecb67f6d990ab2f573a674d727aa06c91741a51fd5ba97115eda404",
-    "compiler-goose/src/driver/compile_workspace.goose": "f21eb7bdb6d599a927a4ca66be21c06389eec02e7f0ee7f55476f9869d00b62f",
-    "compiler-goose/src/driver/compile_workspace_backing.goose": "1ecc21a3c2a2e69af8fc8a73410bb669bc6bc39c4f379a1e1c18079af7e99c1f",
+    "compiler-goose/src/driver/compile_workspace.goose": "3081456edaecbf4cbdb4ebc07b633cf36a10581516cfef237f65fcd972f30e3d",
+    "compiler-goose/src/driver/compile_workspace_backing.goose": "f7054e7eeb646da07b113ddcf6708b80948bc5dfc0ca345e0a8c91562c86dcf1",
     "compiler-goose/src/driver/project_executor.goose": "1e51b26ba0cf013d842ec9486ad5ef0f47d2965246dc58b049c92cc670cabbe3",
     "compiler-goose/src/reuse/editor_completion.goose": "de3422692bea14c53df597ae27d32723a0db13b251ca2db87de3f60d14d1fe33",
     "compiler-goose/src/reuse/partial_dependency.goose": "c522b576b342c0e36b043d4ad5eff9cf062f267c03ff5e2ae62e7871b98fca6e",
@@ -640,7 +666,17 @@
     "compiler-goose/src/reuse/dependency_closure.goose": "6814be40ba1be2246227e3d0d04e3fe9883ad145c8dfa90d2be09ea8356100b0",
     "compiler-goose/src/reuse/retained_dependency.goose": "9c7236bebaf5cbc4515d3939bd3d8db23d29bc10da0faffb597674e3e6cc13f3",
     "compiler-goose/src/reuse/source_completion.goose": "a84822aabef611e61f622145b1b568c4e2cc0b9c3b978ed43ed0ee5abe68d84c",
-    "compiler-goose/src/reuse/dependency_owned_headers.goose": "b9a5af079fe717fe786a5989910a39c693baa807f15d1cce16034bb1d385b8e5"
+    "compiler-goose/src/reuse/dependency_owned_headers.goose": "b9a5af079fe717fe786a5989910a39c693baa807f15d1cce16034bb1d385b8e5",
+    "compiler-goose/src/backend/backend_checkpoint.goose": "89309d02b4185a5b2b1f9c110389988c7112ff0b0177b42026eee301dde9d599",
+    "compiler-goose/src/bootstrap_globals.goose": "6807800d97761721175a56d48f85b69e85e5a68fb6215ec305e30eaa53acd54a",
+    "compiler-goose/src/eval/completed_specialization_query.goose": "804b46fc1bcc1fa1455f1f95e080ae88c3a39edf261bd66a5c0f0c33e247ccc1",
+    "compiler-goose/src/reuse/artifact_capture.goose": "82afb2b25378b8be668e807dae60af0b3b8659a22ed9747cf7db5dc077119eec",
+    "compiler-goose/src/reuse/artifact_fragment.goose": "dcb7745ca10c95f60d0be65fbaaf48a80a3189ecfb57cae0a7d4b9be1dd0ac10",
+    "compiler-goose/src/reuse/independent_call_proof.goose": "699a07741791aee5689aee5eb6e37e6519a92922d5934edf36677702cf3aadda",
+    "compiler-goose/src/reuse/independent_worker.goose": "68753de61978ac70be5283b34eae5cfadd80b54ef5218a02121aa83936b01961",
+    "compiler-goose/src/reuse/principal_evidence_reuse.goose": "dbcb2e69d0c2c1a317e6a852ee86821380e089f89e9babd40474adedb159b3a2",
+    "compiler-goose/src/reuse/refinement_receipt.goose": "4db40691548778909c26606e67cbce5fecdc56b039162464972751017bd283cf",
+    "compiler-goose/src/reuse/semantic_archive.goose": "dcd579b258d7117b31748c3676b529541c77592d4ee3932b2f7e242e984a293b"
   },
   "unqualified": [
     "whole compiler executable",

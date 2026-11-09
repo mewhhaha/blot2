@@ -1,7 +1,6 @@
 // One active compiler attempt per process. Every growing owner is named here;
 // retained publication data and captures live in separate typed owner pools.
 namespace blot_compile_workspace;
-import backend.optimizer_buffers;
 import backend.allocation_emission;
 import backend.backend_emission;
 import backend.backend_plan;
@@ -9,12 +8,12 @@ import backend.backend_representations;
 import backend.backend_static_data;
 import backend.cohort_candidate;
 import backend.core_backend;
-import backend.discarded_bindings;
 import backend.function_facts;
 import backend.layout;
 import backend.layout_bridge;
 import backend.numeric_rows;
 import backend.optimized_bodies;
+import backend.optimizer_buffers;
 import backend.region_candidate;
 import backend.resolved_body;
 import backend.result_publication;
@@ -23,17 +22,14 @@ import backend.runtime_operations;
 import backend.simd_abi;
 import backend.source_origins;
 import backend.startup_emission_facts;
-import backend.unit_index;
 import backend.wasm;
 import check.core;
-import check.numeric_proof_core;
 import check.record_order;
 import check.types;
 import dictionary;
 import eval.completed_specialization_query;
 import eval.core_eval;
 import eval.instance_arguments;
-import eval.semantic_job_batch;
 import eval.semantic_parallel;
 import reuse.artifact_capture;
 import reuse.artifact_fragment;
@@ -54,7 +50,7 @@ var backing_query_state_completed_worker_proofs: blot_eval_semantic_parallel::Re
 var backing_query_state_parallel_requests: blot_eval_semantic_parallel::Requests = blot_eval_semantic_parallel::Requests{..};
 var backing_query_state_parallel_slots: blot_eval_semantic_parallel::Slots = blot_eval_semantic_parallel::Slots{..};
 var backing_query_state_parallel_outcomes: blot_eval_semantic_parallel::Outcomes = blot_eval_semantic_parallel::Outcomes{..};
-var backing_query_state: blot_eval_completed_specialization_query::State = blot_eval_completed_specialization_query::State{old:blot_reuse_artifact_capture::inactive_capture,independent_calls:backing_query_state_independent_calls,completed_worker_proofs:backing_query_state_completed_worker_proofs,parallel_requests:backing_query_state_parallel_requests,parallel_slots:backing_query_state_parallel_slots,parallel_outcomes:backing_query_state_parallel_outcomes,..};
+var backing_query_state: blot_eval_completed_specialization_query::State = blot_eval_completed_specialization_query::State{independent_calls:backing_query_state_independent_calls,completed_worker_proofs:backing_query_state_completed_worker_proofs,parallel_requests:backing_query_state_parallel_requests,parallel_slots:backing_query_state_parallel_slots,parallel_outcomes:backing_query_state_parallel_outcomes,..};
 var backing_constant_state: blot_reuse_constant_receipt_reuse::State = blot_reuse_constant_receipt_reuse::State{..};
 var backing_origins_code_module_types: blot_backend_wasm::ValueType[>..<] = [];
 var backing_origins_code_module_instructions: blot_backend_wasm::Instruction[>..<] = [];
@@ -273,14 +269,19 @@ var backing_generator_diagnostic_contexts_records: blot_backend_source_origins::
 var backing_generator_diagnostic_contexts_ids: dictionary<blot_backend_source_origins::Context,u32> = dictionary<blot_backend_source_origins::Context,u32>{..};
 var backing_generator_diagnostic_contexts: blot_backend_source_origins::ContextPool = blot_backend_source_origins::ContextPool{records:backing_generator_diagnostic_contexts_records,ids:backing_generator_diagnostic_contexts_ids,..};
 
-fn makeGenerator(allocation_owner:u64,session:blot_eval_core_eval::Session&)->blot_backend_core_backend::Generator {return blot_backend_core_backend::Generator{ allocation_owner:allocation_owner, units:default<const blot_check_core::Module[:]>(), module:backing_generator_module, planning:backing_generator_planning, evaluator:session, representations:backing_generator_representations, static_data:backing_generator_static_data, numeric_rows:backing_generator_numeric_rows, diagnostic_contexts:backing_generator_diagnostic_contexts, .. };}
-fn makeWorkspace(allocation_owner:u64,generator:blot_backend_core_backend::Generator&,tables:blot_eval_core_eval::SessionTables,capture:blot_reuse_artifact_capture::Capture&,optimized:blot_backend_optimized_bodies::Capture&)->blot_backend_core_backend::CompileWorkspace {return blot_backend_core_backend::CompileWorkspace{ publication_owner:blot_backend_result_publication::Owner{..}, allocation_owner:allocation_owner, generator:generator, session_tables:tables, module_stamps:backing_module_stamps, journal:capture.emission, metadata:capture.metadata, retained:backing_retained, principal_state:backing_principal_state, persisted_principals:backing_persisted_principals, query_state:backing_query_state, constant_state:backing_constant_state, origins:backing_origins, candidate:backing_candidate, vectors:backing_vectors, optimized:optimized, capture:capture, allocation_snapshot:backing_allocation_snapshot, startup_snapshot:backing_startup_snapshot, explanation:backing_explanation, bytes:backing_bytes, message:backing_message, replay_module:backing_replay_module, replay_origins:backing_replay_origins, replay_candidate:backing_replay_candidate, replay_vectors:backing_replay_vectors, replay_contexts:backing_replay_contexts, replay_bytes:backing_replay_bytes, .. };}
+fn makeGenerator(allocation_owner:u64,session:blot_eval_core_eval::Session&)->blot_backend_core_backend::Generator {return blot_backend_core_backend::Generator{allocation_owner:allocation_owner,units:default<const blot_check_core::Module[:]>(),evaluator:session,module:backing_generator_module,planning:backing_generator_planning,representations:backing_generator_representations,static_data:backing_generator_static_data,numeric_rows:backing_generator_numeric_rows,diagnostic_contexts:backing_generator_diagnostic_contexts,..};}
+fn makeWorkspace(allocation_owner:u64,generator:blot_backend_core_backend::Generator&,tables:blot_eval_core_eval::SessionTables,capture:blot_reuse_artifact_capture::Capture&,optimized:blot_backend_optimized_bodies::Capture&)->blot_backend_core_backend::CompileWorkspace {return blot_backend_core_backend::CompileWorkspace{publication_owner:blot_backend_result_publication::Owner{..},allocation_owner:allocation_owner,generator:generator,session_tables:tables,journal:capture.emission,metadata:capture.metadata(),capture:capture,optimized:optimized,module_stamps:backing_module_stamps,retained:backing_retained,principal_state:backing_principal_state,persisted_principals:backing_persisted_principals,query_state:backing_query_state,constant_state:backing_constant_state,origins:backing_origins,candidate:backing_candidate,vectors:backing_vectors,allocation_snapshot:backing_allocation_snapshot,startup_snapshot:backing_startup_snapshot,explanation:backing_explanation,bytes:backing_bytes,message:backing_message,replay_module:backing_replay_module,replay_origins:backing_replay_origins,replay_candidate:backing_replay_candidate,replay_vectors:backing_replay_vectors,replay_contexts:backing_replay_contexts,replay_bytes:backing_replay_bytes,..};}
 fn resetBackingDescriptors() {
  backing_module_stamps = blot_reuse_code_artifacts::ModuleStamps{..};
  backing_retained = blot_reuse_artifact_fragment::State{..};
  backing_principal_state = blot_reuse_principal_evidence_reuse::State{..};
  backing_persisted_principals = blot_reuse_principal_archive::Reader{..};
- backing_query_state = blot_eval_completed_specialization_query::State{old:blot_reuse_artifact_capture::inactive_capture,independent_calls:backing_query_state_independent_calls,completed_worker_proofs:backing_query_state_completed_worker_proofs,parallel_requests:backing_query_state_parallel_requests,parallel_slots:backing_query_state_parallel_slots,parallel_outcomes:backing_query_state_parallel_outcomes,..};
+ backing_query_state_independent_calls = blot_eval_semantic_parallel::Records{..};
+ backing_query_state_completed_worker_proofs = blot_eval_semantic_parallel::Records{..};
+ backing_query_state_parallel_requests = blot_eval_semantic_parallel::Requests{..};
+ backing_query_state_parallel_slots = blot_eval_semantic_parallel::Slots{..};
+ backing_query_state_parallel_outcomes = blot_eval_semantic_parallel::Outcomes{..};
+ backing_query_state = blot_eval_completed_specialization_query::State{independent_calls:backing_query_state_independent_calls,completed_worker_proofs:backing_query_state_completed_worker_proofs,parallel_requests:backing_query_state_parallel_requests,parallel_slots:backing_query_state_parallel_slots,parallel_outcomes:backing_query_state_parallel_outcomes,..};
  backing_constant_state = blot_reuse_constant_receipt_reuse::State{..};
  backing_origins_code_module = blot_backend_cohort_candidate::Module{types:backing_origins_code_module_types,instructions:backing_origins_code_module_instructions,names:backing_origins_code_module_names,functions:backing_origins_code_module_functions,signatures:backing_origins_code_module_signatures,imports:backing_origins_code_module_imports,globals:backing_origins_code_module_globals,exports:backing_origins_code_module_exports,data:backing_origins_code_module_data,static_fields:backing_origins_code_module_static_fields,table_functions:backing_origins_code_module_table_functions,table_origins:backing_origins_code_module_table_origins,semantic_sites:backing_origins_code_module_semantic_sites,..};
  backing_origins_code = blot_backend_cohort_candidate::Extension{module:backing_origins_code_module,..};
@@ -304,11 +305,36 @@ fn resetBackingDescriptors() {
  backing_replay_vectors = blot_backend_simd_abi::View{module:backing_replay_vectors_module,..};
  backing_generator_module = blot_backend_wasm::Module{types:backing_generator_module_types,instructions:backing_generator_module_instructions,names:backing_generator_module_names,functions:backing_generator_module_functions,signatures:backing_generator_module_signatures,imports:backing_generator_module_imports,globals:backing_generator_module_globals,exports:backing_generator_module_exports,data:backing_generator_module_data,static_fields:backing_generator_module_static_fields,table_functions:backing_generator_module_table_functions,table_origins:backing_generator_module_table_origins,semantic_sites:backing_generator_module_semantic_sites,..};
  backing_generator_planning_bodies = blot_backend_resolved_body::Store<blot_backend_backend_emission::Plan>{headers:backing_generator_planning_bodies_headers,slots:backing_generator_planning_bodies_slots,entries:backing_generator_planning_bodies_entries,sinks:backing_generator_planning_bodies_sinks,payloads:backing_generator_planning_bodies_payloads,..};
+ backing_generator_planning_instances = blot_backend_backend_plan::KeyCache{..};
+ backing_generator_planning_template_results = blot_backend_backend_plan::KeyCache{..};
+ backing_generator_planning_template_catalog = blot_backend_backend_plan::TemplateCatalog{..};
+ backing_generator_planning_template_instances = blot_backend_backend_plan::TemplateCache{..};
+ backing_generator_planning_closures = blot_backend_backend_plan::ClosureCache{..};
+ backing_generator_planning_closure_template_results = blot_backend_backend_plan::ClosureCache{..};
+ backing_generator_planning_callables = blot_backend_backend_plan::CallableCache{..};
+ backing_generator_planning_carrier_adapters = blot_backend_backend_plan::CarrierCache{..};
+ backing_generator_planning_constructor_functions = blot_backend_backend_plan::ConstructorCache{..};
+ backing_generator_planning_primitive_functions = blot_backend_backend_plan::PrimitiveCache{..};
+ backing_generator_planning_operation_functions = blot_backend_backend_plan::OperationCache{..};
+ backing_generator_planning_runtime_operations_key_bytes = blot_backend_optimizer_buffers::Bytes{..};
  backing_generator_planning_runtime_operations = blot_backend_runtime_operations::Store{entries:backing_generator_planning_runtime_operations_entries,key_bytes:backing_generator_planning_runtime_operations_key_bytes,keys:backing_generator_planning_runtime_operations_keys,relocations:backing_generator_planning_runtime_operations_relocations,..};
+ backing_generator_planning_host_functions = blot_backend_backend_plan::HostCache{..};
+ backing_generator_planning_runtime_globals = blot_backend_backend_plan::RuntimeCache{..};
  backing_generator_planning_startup_facts = blot_backend_startup_emission_facts::Store{headers:backing_generator_planning_startup_facts_headers,events:backing_generator_planning_startup_facts_events,..};
+ backing_generator_planning_runtime_order = blot_backend_optimizer_buffers::Words{..};
+ backing_generator_planning_array_proofs = blot_backend_backend_plan::ArrayProofCache{..};
+ backing_generator_planning_numeric_plans = blot_backend_backend_plan::NumericPlanCache{..};
  backing_generator_planning_facts = blot_backend_function_facts::Store{entries:backing_generator_planning_facts_entries,..};
+ backing_generator_planning_discard_proofs = blot_backend_backend_plan::DiscardCache{..};
+ backing_generator_planning_discard_flags = blot_backend_optimizer_buffers::Flags{..};
+ backing_generator_planning_quantified = blot_backend_backend_plan::QuantifiedCache{..};
+ backing_generator_planning_uses = blot_backend_backend_plan::UsesCache{..};
+ backing_generator_planning_task_movers = blot_backend_backend_plan::WordCache{..};
  backing_generator_planning = blot_backend_backend_plan::State{bodies:backing_generator_planning_bodies,instances:backing_generator_planning_instances,template_results:backing_generator_planning_template_results,template_catalog:backing_generator_planning_template_catalog,template_instances:backing_generator_planning_template_instances,closures:backing_generator_planning_closures,closure_template_results:backing_generator_planning_closure_template_results,callables:backing_generator_planning_callables,carrier_adapters:backing_generator_planning_carrier_adapters,constructor_functions:backing_generator_planning_constructor_functions,primitive_functions:backing_generator_planning_primitive_functions,operation_functions:backing_generator_planning_operation_functions,runtime_operations:backing_generator_planning_runtime_operations,host_functions:backing_generator_planning_host_functions,runtime_globals:backing_generator_planning_runtime_globals,startup_facts:backing_generator_planning_startup_facts,runtime_order:backing_generator_planning_runtime_order,array_proofs:backing_generator_planning_array_proofs,numeric_plans:backing_generator_planning_numeric_plans,facts:backing_generator_planning_facts,discard_proofs:backing_generator_planning_discard_proofs,discard_flags:backing_generator_planning_discard_flags,quantified:backing_generator_planning_quantified,uses:backing_generator_planning_uses,task_movers:backing_generator_planning_task_movers,..};
  backing_generator_representations_store = blot_backend_layout::Store{closed:blot_backend_layout::ClosedLayouts{kinds:backing_generator_representations_store_closed_kinds,kind_bytes:backing_generator_representations_store_closed_kind_bytes,layouts:backing_generator_representations_store_closed_layouts,..},record_names:blot_check_record_order::Names{map:backing_generator_representations_store_record_names_map,..},nodes:backing_generator_representations_store_nodes,extra:backing_generator_representations_store_extra,universal_dictionaries:backing_generator_representations_store_universal_dictionaries,next:backing_generator_representations_store_next,buckets:backing_generator_representations_store_buckets,solver_owners:backing_generator_representations_store_solver_owners,solver_binders:backing_generator_representations_store_solver_binders,type_owners:backing_generator_representations_store_type_owners,..};
+ backing_generator_representations_connection_partial_nodes = blot_reuse_code_expectation::Nodes{..};
+ backing_generator_representations_connection_partial_extra = blot_reuse_code_expectation::Ids{..};
+ backing_generator_representations_connection_partial_next = blot_reuse_code_expectation::Ids{..};
  backing_generator_representations_connection_partial = blot_reuse_code_expectation::Store{nodes:backing_generator_representations_connection_partial_nodes,extra:backing_generator_representations_connection_partial_extra,next:backing_generator_representations_connection_partial_next,buckets:backing_generator_representations_connection_partial_buckets,..};
  backing_generator_representations_connection = blot_backend_layout_bridge::Store{partial:backing_generator_representations_connection_partial,to:backing_generator_representations_connection_to,from:backing_generator_representations_connection_from,row_to:backing_generator_representations_connection_row_to,row_from:backing_generator_representations_connection_row_from,shapes:backing_generator_representations_connection_shapes,..};
  backing_generator_representations_row_keys = blot_reuse_substitution_keys::Store{entries:backing_generator_representations_row_keys_entries,spans:backing_generator_representations_row_keys_spans,next:backing_generator_representations_row_keys_next,buckets:backing_generator_representations_row_keys_buckets,..};
@@ -321,12 +347,6 @@ fn resetBackingDescriptors() {
  backing_generator_diagnostic_contexts = blot_backend_source_origins::ContextPool{records:backing_generator_diagnostic_contexts_records,ids:backing_generator_diagnostic_contexts_ids,..};
 }
 fn clearBacking() {
-
- backing_query_state_independent_calls.clear();
- backing_query_state_completed_worker_proofs.clear();
- backing_query_state_parallel_requests.clear();
- backing_query_state_parallel_slots.clear();
- backing_query_state_parallel_outcomes.clear();
  backing_origins_code_module_types.clear();
  backing_origins_code_module_instructions.clear();
  backing_origins_code_module_names.clear();
@@ -440,34 +460,12 @@ fn clearBacking() {
  backing_generator_planning_bodies_entries.clear();
  backing_generator_planning_bodies_sinks.clear();
  backing_generator_planning_bodies_payloads.clear();
- backing_generator_planning_instances.clear();
- backing_generator_planning_template_results.clear();
- backing_generator_planning_template_catalog.clear();
- backing_generator_planning_template_instances.clear();
- backing_generator_planning_closures.clear();
- backing_generator_planning_closure_template_results.clear();
- backing_generator_planning_callables.clear();
- backing_generator_planning_carrier_adapters.clear();
- backing_generator_planning_constructor_functions.clear();
- backing_generator_planning_primitive_functions.clear();
- backing_generator_planning_operation_functions.clear();
  backing_generator_planning_runtime_operations_entries.clear();
- backing_generator_planning_runtime_operations_key_bytes.clear();
  backing_generator_planning_runtime_operations_keys.clear();
  backing_generator_planning_runtime_operations_relocations.clear();
- backing_generator_planning_host_functions.clear();
- backing_generator_planning_runtime_globals.clear();
  backing_generator_planning_startup_facts_headers.clear();
  backing_generator_planning_startup_facts_events.clear();
- backing_generator_planning_runtime_order.clear();
- backing_generator_planning_array_proofs.clear();
- backing_generator_planning_numeric_plans.clear();
  backing_generator_planning_facts_entries.clear();
- backing_generator_planning_discard_proofs.clear();
- backing_generator_planning_discard_flags.clear();
- backing_generator_planning_quantified.clear();
- backing_generator_planning_uses.clear();
- backing_generator_planning_task_movers.clear();
  backing_generator_representations_store_closed_kinds.clear();
  backing_generator_representations_store_closed_kind_bytes.clear();
  backing_generator_representations_store_closed_layouts.clear();
@@ -480,9 +478,6 @@ fn clearBacking() {
  backing_generator_representations_store_solver_owners.clear();
  backing_generator_representations_store_solver_binders.clear();
  backing_generator_representations_store_type_owners.clear();
- backing_generator_representations_connection_partial_nodes.clear();
- backing_generator_representations_connection_partial_extra.clear();
- backing_generator_representations_connection_partial_next.clear();
  backing_generator_representations_connection_partial_buckets.clear();
  backing_generator_representations_connection_to.clear();
  backing_generator_representations_connection_from.clear();

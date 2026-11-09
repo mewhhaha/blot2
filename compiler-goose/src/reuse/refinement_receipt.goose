@@ -273,10 +273,10 @@ fn lookupOwned<G,S>(g: G&, state: S&, destination: Table&, root: Root, shape: bl
         !blot_support::same_slice_identity(gate.units, g.evaluator.units) || g.allocation_owner == 0 || state.allocation_owner != g.allocation_owner {
         decline(g, Reason.mode); return blot_support::none<Value>(), blot_error::Error.none;
     }
-    assert(state.old.metadata.pools.present); let pools = state.old.metadata.pools.value;
+    assert(state.old.metadata().pools.present); let pools = state.old.metadata().pools.value;
     if !pools.bridge.present { return blot_support::none<Value>(), blot_error::Error.none; }
     let bridge = pools.bridge.value; let before_shape = blot_reuse_code_expectation::View { bridge.nodes, bridge.extra , ..};
-    let table = state.old.metadata.refinement_queries;
+    let table = state.old.metadata().refinement_queries;
     var cursor = table.candidates(rootFingerprint(root), blot_reuse_semantic_query_table::Order.oldest_first);
     loop {
         let position = cursor.next(); if !position.present { break; }

@@ -42,9 +42,7 @@ def stripouter(t):
  t=t.strip()
  while t.startswith('(') and balanced(t,0,'(',')')==len(t)-1:t=t[1:-1].strip()
  return t
-special={
- 'blot_reuse_artifact_capture::Capture':'blot_reuse_artifact_capture::inactive_capture',
-}
+special={}
 def defaults_expr(t,name):
  t=stripouter(t);imp(t)
  if t in special:return special[t]
@@ -79,13 +77,13 @@ def owner(name,t):
  return name
 # Canonical dynamic handles are supplied only after every successful allocation.
 ws='blot_backend_core_backend::CompileWorkspace'
-wsargs={'publication_owner':'blot_backend_result_publication::Owner{..}','allocation_owner':'allocation_owner','generator':'generator','session_tables':'tables','journal':'capture.emission','metadata':'capture.metadata','capture':'capture','optimized':'optimized'}
+wsargs={'publication_owner':'blot_backend_result_publication::Owner{..}','allocation_owner':'allocation_owner','generator':'generator','session_tables':'tables','journal':'capture.emission','metadata':'capture.metadata()','capture':'capture','optimized':'optimized'}
 for f,t,hd in info(ws):
  if f in wsargs or hd:continue
  assert t.endswith('&'),(f,t)
  wsargs[f]=owner('backing_'+f,t[:-1])
 gen='blot_backend_core_backend::Generator'
-gargs={'allocation_owner':'allocation_owner','units':'[]','evaluator':'session'}
+gargs={'allocation_owner':'allocation_owner','units':'default<const blot_check_core::Module[:]>()','evaluator':'session'}
 for f,t,hd in info(gen):
  if f in gargs or hd:continue
  if t.endswith('&'):gargs[f]=owner('backing_generator_'+f,t[:-1])

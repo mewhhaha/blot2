@@ -16,20 +16,21 @@ import support.pooled_map;
 import dictionary;
 type Error = blot_error::Error;
 struct Capture {
-    metadata: blot_reuse_code_artifacts::Context& =blot_reuse_code_artifacts::inactive_context, emission: blot_reuse_artifact_emitter::Recorder& =blot_reuse_artifact_emitter::inactive_recorder,
+    context: blot_reuse_code_artifacts::Context?=null, emission: blot_reuse_artifact_emitter::Recorder& =blot_reuse_artifact_emitter::inactive_recorder,
     cached_units: i64 = 0, optimized: blot_backend_optimized_bodies::Capture&? = null,
     executable_queries: blot_reuse_executable_query::FragmentTable& =inactive_queries,
     executable_queries_complete: bool = false,
 }
+fn metadata(self_:Capture)->blot_reuse_code_artifacts::Context& {let context .=self_.context;assert(context!=null);return context;}
 fn init(metadata: blot_reuse_code_artifacts::Context&, emission: blot_reuse_artifact_emitter::Recorder&,
     queries: blot_reuse_executable_query::FragmentTable&, cached_units: i64 = 0) -> Capture {
-    return Capture { metadata: metadata, emission: emission, cached_units: cached_units, executable_queries: queries , ..};
+    return Capture { context: metadata, emission: emission, cached_units: cached_units, executable_queries: queries , ..};
 }
 
 fn sealExecutableQueries(self_: Capture&) -> Error {
     assert(self_.executable_queries.records.len == 0 && !self_.executable_queries_complete);
-    if !self_.metadata.pools.present { return blot_error::Error.none; }
-    let pools = self_.metadata.pools.value;
+    if !self_.metadata().pools.present { return blot_error::Error.none; }
+    let pools = self_.metadata().pools.value;
     for function in pools.functions {
         var supported = false;
         match function.request {
@@ -37,14 +38,14 @@ fn sealExecutableQueries(self_: Capture&) -> Error {
         }
         if !supported { continue; }
         let owner = self_.emission.functions[function.function].owner;
-        let job = self_.metadata.jobs.items[owner - 1];
+        let job = self_.metadata().jobs.items[owner - 1];
         assert(job.state == blot_reuse_code_artifacts::State.complete && job.function.present && job.function.value == function.function);
         if !job.reusable_ { continue; }
         let size = blot_reuse_executable_query::dependencyBytes<blot_check_core::BindingRef,blot_reuse_code_artifacts::StaticRead>(job.inline_bodies.len, job.static_reads.len);
         if !size.present || !self_.executable_queries.canAdmit(size.value) { self_.executable_queries.saturate(); return blot_error::Error.none; }
         var builder = self_.executable_queries.begin(blot_reuse_executable_query::FragmentKey { function.request , ..});
-        let bodies = self_.metadata.inline_bodies.items[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len];
-        let reads = self_.metadata.static_reads.items[job.static_reads.start..job.static_reads.start + job.static_reads.len];
+        let bodies = self_.metadata().inline_bodies.items[job.inline_bodies.start..job.inline_bodies.start + job.inline_bodies.len];
+        let reads = self_.metadata().static_reads.items[job.static_reads.start..job.static_reads.start + job.static_reads.len];
         builder.read(blot_reuse_executable_query::FragmentDependencies {
             blot_reuse_executable_query::copyBodyReads(bodies), blot_reuse_executable_query::copyStaticReads(reads), owner, job.reusable_,
          ..});
@@ -59,8 +60,8 @@ fn sealExecutableQueries(self_: Capture&) -> Error {
 }
 fn selectionStable(self_: const Capture&, units: const blot_check_core::Module[:],
     names: blot_support::Option<blot_backend_runtime_identity::View>, cached: i64) -> bool {
-    if !self_.metadata.pools.present { return false; }
-    let pools = self_.metadata.pools.value; if !pools.identity.present || !names.present { return false; }
+    if !self_.metadata().pools.present { return false; }
+    let pools = self_.metadata().pools.value; if !pools.identity.present || !names.present { return false; }
     let old_names = pools.identity.value.view(); let current_names = names.value;
     if cached != self_.cached_units || cached > units.len || units.len != pools.modules.len { return false; }
     for pin, index in pools.modules {
@@ -104,7 +105,7 @@ fn deinit(self_: Capture&) {
     self_.executable_queries.deinit();
     let optimized .= self_.optimized;
     if optimized { optimized.deinit(); self_.optimized .= null; }
-    self_.emission.deinit(); self_.metadata.deinit(); self_.executable_queries_complete = false;
+    self_.emission.deinit(); self_.metadata().deinit(); self_.executable_queries_complete = false;
 }
 
 // Archive/session captures have canonical headers. The numeric token belongs

@@ -69,7 +69,7 @@ fn construct(frame:Frame)->Error {
  assert(frame.valid()&&active==frame);let state:FrameState& =frames[frame.slot-1];
  // Empty catalogs are deliberate: no caller-owned input header is retained
  // before bindPublicationOwner and pinWorkspaceInputs establish real pins.
- let session,error=blot_eval_core_eval::initOwnedSession([],state.allocation_owner);if error!=blot_error::Error.none {return error;}assert(session);state.session .= session;
+ let session,error=blot_eval_core_eval::initOwnedEmptySession(state.allocation_owner);if error!=blot_error::Error.none {return error;}assert(session);state.session .= session;
  let capture,token,error=state.factory.createArchiveCapture();if error!=blot_error::Error.none {return error;}assert(capture);state.capture .= capture;state.capture_token=token;
  let generator_index=generators.alloc_index(makeGenerator(state.allocation_owner,session));state.generator_slot=(generator_index+1) as u32;state.generator .= generators[generator_index];
  let prepared=state.generator.representations.init([]);if prepared!=blot_error::Error.none {return prepared;}state.prepared=true;
@@ -136,7 +136,7 @@ fn retainJournal(state:CaptureState&,owner:InputOwner,index:i64&)->Error {
 }
 fn takeCapture(frame:Frame&,result:Result&,units:const Core[:],catalog:InputOwner,unit_owners:const InputOwner[:],seed_owners:const InputOwner[:])->CaptureLease,Error {
  if !frame.valid() {return CaptureLease{..},blot_error::Error.invalid_artifact;}let source:FrameState& =frames[frame.slot-1];if result.capture==null {return CaptureLease{..},blot_error::Error.none;}
- if source.workspace==null||source.capture==null||source.capture_token==0||!(result.capture .== source.capture)||!result.publication_pinned||!result.capture.metadata.pools.present||unit_owners.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
+ if source.workspace==null||source.capture==null||source.capture_token==0||!(result.capture .== source.capture)||!result.publication_pinned||!result.capture.metadata().pools.present||unit_owners.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
  if !blot_backend_result_publication::resultValid(result.publication_owner,result.publication_epoch,true)||result.publication_owner!=source.workspace.publication_owner||result.publication_units.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
  for module,index in units {let held=result.publication_units[index];if module.owner_id!=held.owner_id||module.unit!=held.unit||!(module.nodes .== held.nodes) {return CaptureLease{..},blot_error::Error.invalid_artifact;}}
  if retained_captures.len>=0xffffffff||retained_optimized.len>=0xffffffff {return CaptureLease{..},blot_error::Error.out_of_memory;}
@@ -145,7 +145,7 @@ fn takeCapture(frame:Frame&,result:Result&,units:const Core[:],catalog:InputOwne
  state.journals=retained_journals.alloc_slice(count);for &owner in state.journals {owner=InputOwner{..};}var next:i64=0;
  let copied=retainCaptureInputs(state,catalog,unit_owners,seed_owners,next);if copied!=blot_error::Error.none {lease.deinit();return CaptureLease{..},copied;}assert(next==count);
  state.units=retained_units.alloc_slice(units.len);for module,index in units {state.units[index]=module;}
- let rebound=blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata.pools.value,state.units);if rebound!=blot_error::Error.none {lease.deinit();return CaptureLease{..},rebound;}
+ let rebound=blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata().pools.value,state.units);if rebound!=blot_error::Error.none {lease.deinit();return CaptureLease{..},rebound;}
  // Everything fallible precedes the move. Optimizer payloads and their header
  // move together; no retained capture points back into active compiler backing.
  if result.capture.optimized {

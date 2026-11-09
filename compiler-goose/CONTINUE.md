@@ -82,3 +82,9 @@ Receipt return and owned graph publication pass a focused C/link/execution law
 in 35.99s. Seven worker roots pass the frozen batch86; batch87 server reaches
 three pooled evaluator and archive/workspace reset lifetime errors. Two nested
 readonly slice defaults are typed. Whole C/header/executable remain unavailable.
+
+The archive metadata sentinel and evaluator empty-bootstrap parameter are removed.
+All 19 executed laws pass, including repeated empty-session and archive-capture
+lifecycles. Archive law excludes clearBacking: resolved-body Store still borrows
+its grow-only payload owner permanently. General nonempty Session input ownership
+is also unresolved; no whole compiler executable exists.
