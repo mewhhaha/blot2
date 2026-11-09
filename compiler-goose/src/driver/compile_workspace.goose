@@ -99,7 +99,7 @@ fn destroyContexts(state:FrameState&) {
   state.generator.module.artifacts .= null;state.generator.artifacts .= null;state.generator.retained .= null;state.generator.principal_state .= null;state.generator.persisted_principals .= null;state.generator.query_state .= null;state.generator.constant_state .= null;state.generator.refinement_owner .= null;
   // Generator cleanup owns attempt tables; canonical Session ownership belongs
   // to this Frame and is released exactly once below.
-  state.generator.deinit();state.generator.units=[];state.generator.spawn_units=[];
+  state.generator.deinit();state.generator.units=default<const blot_check_core::Module[:]>();state.generator.spawn_units=default<const blot_check_core::Module[:]>();
  }
  if state.capture_token!=0 {assert(state.capture);state.factory.destroyArchiveCapture(state.capture_token);state.capture_token=0;state.capture .= null;}
  activeOptimized().deinit();

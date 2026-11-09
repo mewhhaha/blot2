@@ -31,7 +31,7 @@ fn push(sites: Sites&,site: Site) -> Error { blot_support_pooled_buffer::push(si
 fn deinit(sites: Sites&) { blot_support_pooled_buffer::deinit(sites,site_runs); }
 struct View { code: blot_backend_cohort_candidate::Extension&,sites: Site[:] = default<Site[:]>(),owned: Sites }
 fn init(code: blot_backend_cohort_candidate::Extension&) -> View { View { code } }
-fn deinit(view: View&) { view.owned.deinit(); view.sites = []; view.code.deinit(); }
+fn deinit(view: View&) { view.owned.deinit(); view.sites=default<Site[:]>(); view.code.deinit(); }
 fn spelling<T>(value: T) -> const u8[:] { match value { const for <N,V> in variants<T> { V payload=>{ return blot_json::sourceName(N); }, } } }
 fn filename(names: blot_support::Option<blot_backend_runtime_identity::View>,unit: u32) -> const u8[:] { if names.present { let path = names.value.owner(unit); if path.present { return path.value; } } return ""; }
 fn initInto(result: View&,source: const blot_backend_wasm::Module&,units: const blot_check_core::Module[:],names: blot_support::Option<blot_backend_runtime_identity::View>,source_digests: const u8[32][:],contexts: const Context[:]) -> Error {

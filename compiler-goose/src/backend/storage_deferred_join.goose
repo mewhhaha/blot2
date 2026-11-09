@@ -17,7 +17,7 @@ struct Lane { first: Local,carrier: blot_support::Option<Local> = blot_support::
 reusable[] var lane_runs: Lane[>..] = [];
 struct Join { entry_locals: i64,edges: i64 = 0,lanes: Lane[:] = default<Lane[:]>() }
 fn init<M>(code: blot_backend_runtime_code::Code<M>) -> Join { let module .= code.module; return Join { entry_locals: module.parameters(code.function).len + module.locals(code.function).len , ..}; }
-fn deinit(join: Join&) { for &lane in join.lanes { lane.holes.deinit(); } if join.lanes.len != 0 { lane_runs.free_slice(join.lanes); } join.lanes = []; join.edges = 0; }
+fn deinit(join: Join&) { for &lane in join.lanes { lane.holes.deinit(); } if join.lanes.len != 0 { lane_runs.free_slice(join.lanes); } join.lanes=default<Lane[:]>(); join.edges = 0; }
 fn materialize<M>(lane: Lane&,code: blot_backend_runtime_code::Code<M>&,context: blot_backend_wasm_scope_outline::Context&) -> Error {
     if lane.carrier.present { return blot_error::Error.none; } let carrier,error = code.temp(); if error != blot_error::Error.none { return error; }
     for index in lane.holes.items { let patched = context.patchCopy(code.function,index,lane.first.id,carrier.id); if patched != blot_error::Error.none { return patched; } }

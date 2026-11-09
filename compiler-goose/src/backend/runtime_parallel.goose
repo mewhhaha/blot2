@@ -73,4 +73,4 @@ fn run(optional_io: bool,session: blot_backend_runtime_pipeline::Session&,matche
 }
 fn take(self_: Batch&,id: i64) -> blot_support::Option<Body>,Error { assert(id >= 0 && id < self_.slots.len && self_.slots[id].needed); let body = self_.slots[id].output; self_.slots[id].output = blot_support::none<Body>(); return body,blot_error::Error.none; }
 fn unproven(self_: const Batch&,id: i64) -> blot_support::Option<bool> { if !self_.slots[id].rc { return blot_support::none<bool>(); } return blot_support::some(self_.slots[id].unproven); }
-fn deinit(self_: Batch&) { for &slot in self_.slots { if slot.output.present { slot.output.value.deinit(); } } if self_.slots.len != 0 { slot_runs.free_slice(self_.slots); } self_.slots = []; }
+fn deinit(self_: Batch&) { for &slot in self_.slots { if slot.output.present { slot.output.value.deinit(); } } if self_.slots.len != 0 { slot_runs.free_slice(self_.slots); } self_.slots=default<Slot[:]>(); }

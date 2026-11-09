@@ -121,8 +121,16 @@ fn emitWithOptions(self_:const Prepared&,workspace:Workspace&,options:CompileOpt
  {if !published {output.deinit();}} }
 enum Preparation {inactive,ready{value:Prepared},rejected{value:Result}}
 fn deinit(self_:Preparation&) {match self_ {inactive=>{},ready payload=>{var value=payload.value;value.deinit();},rejected payload=>{var value=payload.value;value.deinit();}}self_=Preparation.inactive;}
+fn diagnosticFilename(source:const Project&,entry:const u8[:],unit:u32)->const u8[:] {
+ if unit!=0 {return source.filename(unit);}
+ return entry;
+}
+fn diagnosticFilename(result:const Result&,entry:const u8[:])->const u8[:] {
+ if result.diagnostic_filename.present {return result.diagnostic_filename.value;}
+ return entry;
+}
 fn reject(source:const Project&,entry_path:const u8[:],diagnostic:ConsumerDiagnostic)->Preparation,Error {
- var path=entry_path;if diagnostic.unit!=0 {path=source.filename(diagnostic.unit);}let cached=min(source.units.len,source.compiledCount());
+ let path=diagnosticFilename(source,entry_path,diagnostic.unit);let cached=min(source.units.len,source.compiledCount());
  return Preparation.rejected{Result{result:ConsumerResult{compiled:default<blot_backend_core_backend::Result>(),stats:Stats{},diagnostic:blot_support::some(diagnostic)},diagnostic_filename:blot_support::some(copyResultBytes(path)),source_bytes:source.source_bytes,fresh_modules:source.units.len-cached,cached_modules:cached}},blot_error::Error.none;
 }
 struct OrderFrame {unit:u32,next:i64=0}
@@ -181,7 +189,7 @@ fn prepareProjectMode<E>(executor:E&,source:Project&,entry_path:const u8[:],outp
  var check_transferred=false;
  if checked.diagnostics.len!=0 {
   let portable,error=portableRejection(source,checked.diagnostics[0]);if error!=blot_error::Error.none {let __cleanup_result_20_0: Preparation = Preparation.inactive; let __cleanup_result_20_1: Error = error; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_20_0, __cleanup_result_20_1;}
-  let value,error=rejectChecked(source,entry_path,checked.diagnostics[0]);if error!=blot_error::Error.none {let __cleanup_result_21_0: Preparation = Preparation.inactive; let __cleanup_result_21_1: Error = error; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_21_0, __cleanup_result_21_1;}var rejection=value;match rejection {rejected payload=>{payload.value.portable=portable;},_=>{abort("rejection factory returned no diagnostic");}}let __cleanup_result_22_0: Preparation = rejection; let __cleanup_result_22_1: Error = blot_error::Error.none; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_22_0, __cleanup_result_22_1;
+  let value,error=rejectChecked(source,entry_path,checked.diagnostics[0]);if error!=blot_error::Error.none {let __cleanup_result_21_0: Preparation = Preparation.inactive; let __cleanup_result_21_1: Error = error; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_21_0, __cleanup_result_21_1;}var rejection=value;match rejection {rejected &payload=>{payload.value.portable=portable;},_=>{abort("rejection factory returned no diagnostic");}}let __cleanup_result_22_0: Preparation = rejection; let __cleanup_result_22_1: Error = blot_error::Error.none; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_22_0, __cleanup_result_22_1;
  }
  let owner,error=blot_reuse_dependency_payload::init();if error!=blot_error::Error.none {let __cleanup_result_23_0: Preparation = Preparation.inactive; let __cleanup_result_23_1: Error = error; {if !check_transferred {checked.deinit();}} {if owned_check.present {owned_check.value.deinit();}} return __cleanup_result_23_0, __cleanup_result_23_1;}
  var ready=Prepared{ cached:dependency.modules.len, entry:source.entry, prelude:source.prelude_unit, source_mode:source.input_mode==blot_reuse_project::InputMode.source, source_bytes:source.source_bytes, stats:Stats{body_elaborations:checked.body_elaborations,imported_schemes:checked.imported_schemes,normalization:checked.normalization}, catalog_owner:owner };

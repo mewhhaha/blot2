@@ -9,7 +9,7 @@ struct Name { start: u32 = 0, len: u32 = 0 }
 struct View { bytes: const u8[:], symbols: const Name[:], owners: const Name[:] }
 fn text(view: View, name: Name) -> blot_support::Option<const u8[:]> {
     if name.start > view.bytes.len || name.len > view.bytes.len - name.start { return blot_support::none<const u8[:]>(); }
-    return blot_support::some(view.bytes[name.start..name.start + name.len]);
+    return blot_support::some<const u8[:]>(view.bytes[name.start..name.start + name.len]);
 }
 fn symbol(view: View, id: u32) -> blot_support::Option<const u8[:]> {
     if id == 0 || id >= view.symbols.len { return blot_support::none<const u8[:]>(); }

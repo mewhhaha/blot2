@@ -34,7 +34,7 @@ fn freeText(value: Text) {
     if !value.present || value.value.len == 0 { return; }
     text_runs.free_slice(value.value);
 }
-fn cloneText(value: Text) -> Text { if value.present { return blot_support::some(copyText(value.value)); } return blot_support::none<const u8[:]>(); }
+fn cloneText(value: Text) -> Text { if value.present { return blot_support::some<const u8[:]>(copyText(value.value)); } return blot_support::none<const u8[:]>(); }
 fn deinit(self_: Origin&) { freeText(self_.name); freeText(self_.path); self_.name.present = false; self_.path.present = false; }
 fn clone(self_: Origin) -> Origin { return canonicalOrigin(Origin { cloneText(self_.name), cloneText(self_.path), self_.span , ..}); }
 fn deinit(self_: Step&) { freeText(self_.member); freeText(self_.ty); self_.member.present = false; self_.ty.present = false; }
@@ -127,9 +127,9 @@ fn ownText(self_: Builder&, value: const u8[:]) -> const u8[:], Error {
 }
 fn makeOrigin(self_: Builder&, name: const u8[:], path: Text, span: blot_support::Option<blot_parse_ast::Span>) -> Origin, Error {
     let owned, error = self_.ownText(name); if error != blot_error::Error.none { return Origin {..}, error; }
-    var result = Origin { name: blot_support::some(owned), span: span , ..};
+    var result = Origin { name: blot_support::some<const u8[:]>(owned), span: span , ..};
     if path.present {
-        let owned, error = self_.ownText(path.value); if error != blot_error::Error.none { result.deinit(); return Origin {..}, error; } result.path = blot_support::some(owned);
+        let owned, error = self_.ownText(path.value); if error != blot_error::Error.none { result.deinit(); return Origin {..}, error; } result.path = blot_support::some<const u8[:]>(owned);
     }
     return result, blot_error::Error.none;
 }
@@ -141,7 +141,7 @@ fn addStep(self_: Builder&, member: Text, ty: Text, outcome: Outcome) -> Error {
     var value = Step { ty: ty, outcome: outcome , ..};
     if self_.step_len == max_steps { value.deinit(); self_.truncated = true; return blot_error::Error.none; }
     if member.present {
-        let text, error = self_.ownText(member.value); if error != blot_error::Error.none { value.deinit(); return error; } value.member = blot_support::some(text);
+        let text, error = self_.ownText(member.value); if error != blot_error::Error.none { value.deinit(); return error; } value.member = blot_support::some<const u8[:]>(text);
     }
     self_.steps[self_.step_len] = canonicalStep(value); self_.step_len++; return blot_error::Error.none;
 }
@@ -165,8 +165,8 @@ fn finish(self_: Builder&, operation: Text, member: Text) -> Explanation, Error 
         for index in self_.step_len { let old = self_.steps[index]; out[index] = canonicalStep(Step { cloneText(old.member), cloneText(old.ty), old.outcome , ..}); }
         result.steps = out;
     }
-    if operation.present { result.operation = blot_support::some(copyText(operation.value[..boundary(operation.value, max_text)])); }
-    if member.present { if member.value.len > max_text { self_.truncated = true; } result.member = blot_support::some(copyText(member.value[..boundary(member.value, max_text)])); }
+    if operation.present { result.operation = blot_support::some<const u8[:]>(copyText(operation.value[..boundary(operation.value, max_text)])); }
+    if member.present { if member.value.len > max_text { self_.truncated = true; } result.member = blot_support::some<const u8[:]>(copyText(member.value[..boundary(member.value, max_text)])); }
     // Publication snapshots own their text; arguments may still name Builder text.
     self_.deinit();
     let error = result.fit(); if error != blot_error::Error.none { result.deinit(); return Explanation {..}, error; } return result, blot_error::Error.none;
@@ -228,7 +228,7 @@ fn blot_reuse_dispatch_explanation::blotJsonWrite(value: blot_reuse_dispatch_exp
 
 // Reification validates existing owned text, and never accepts borrowed display text.
 fn canonicalBytes(value:const u8[:])->const u8[:] {if value.len==0 {return default<const u8[:]>();}let owned=text_runs.realloc_slice(value,value.len);assert(blot_support::same_slice_identity(owned,value));return owned;}
-fn canonicalText(value:Text)->Text {if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some(canonicalBytes(value.value));}
+fn canonicalText(value:Text)->Text {if !value.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(canonicalBytes(value.value));}
 fn canonicalOrigin(value:Origin)->Origin {return Origin{name:canonicalText(value.name),path:canonicalText(value.path),span:value.span,..};}
 fn canonicalStep(value:Step)->Step {return Step{member:canonicalText(value.member),ty:canonicalText(value.ty),outcome:value.outcome,..};}
 fn canonicalContext(value:Context)->Context {return Context{kind:value.kind,path:canonicalText(value.path),span:value.span,..};}

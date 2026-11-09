@@ -65,6 +65,15 @@ fn rangeViews(ranges:const SourceRange[:],payload:const u8[:],start:i64,require_
     if ranges.len>4096 {return default<Source[:]>(),blot_error::Error.source_limit;}if start<0 || start>payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}var end=start;for range in ranges {if !validPath(range.path) || range.start!=end || range.length>payload.len-end || (range.deleted && range.length!=0) {return default<Source[:]>(),blot_error::Error.invalid_sources;}end+=range.length;if require_utf8 && !utf8(payload[range.start..end]) {return default<Source[:]>(),blot_error::Error.invalid_sources;}}if end!=payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}
     let result=source_runs.alloc_slice(ranges.len);for range,index in ranges {var contents=blot_support::none<const u8[:]>();if !range.deleted {contents=blot_support::some<const u8[:]>(payload[range.start..range.start+range.length]);}result[index]=Source{path:range.path,contents:contents};}return result,blot_error::Error.none;
 }
+// Composition borrows byte payloads; the revision snapshot performs the owned copy.
+fn composeSources(sources:const Source[:],assets:const blot_backend_native_assets::Candidate?,merged:Source[>..]&)->const Source[:] {
+    if assets {
+        merged.append(assets.sources.items);
+        merged.append(sources);
+        return merged[..];
+    }
+    return sources;
+}
 fn releaseSources(sources:Source[:]) {if sources.len!=0 {source_runs.free_slice(sources);}}
 fn validateOpen(request:Request)->Options,Error {
     if !request.version.present || request.version.value!=protocol_version {return Options{..},blot_error::Error.version_mismatch;}if request.codegenWorkers==0 || request.codegenWorkers>16 {return Options{..},blot_error::Error.invalid_open;}if request.storage.present && !request.storage.value.valid() {return Options{..},blot_error::Error.invalid_open;}if !request.entry.present || !validPath(request.entry.value) || request.epoch.present || request.revision.present {return Options{..},blot_error::Error.invalid_open;}

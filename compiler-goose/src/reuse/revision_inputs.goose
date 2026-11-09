@@ -36,16 +36,16 @@ reusable[] var index_pool:dictionary_slot<const u8[:],u32>[>..]=[];
 reusable[] var digest_pool:dictionary_slot<u32,Digest>[>..]=[];
 reusable[] var mask_pool:bool[>..]=[];
 fn own(bytes:const u8[:])->const u8[:] {let result=bytes_pool.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
-fn ownedText(bytes:const u8[:])->const u8[:] {return bytes_pool.realloc_slice(bytes,bytes.len);}
+fn ownedText(bytes:const u8[:])->const u8[:] {let canonical=bytes_pool.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(canonical,bytes));return canonical;}
 fn free(bytes:const u8[:]) {if bytes.len!=0 {bytes_pool.free_slice(bytes);}}
 fn deinit(result:Outcome) {match result {bytes payload=>{free(payload.value);},failure=>{},inactive=>{}}}
 fn deinit(entry:Entry) {free(entry.key);entry.result.deinit();}
 fn deinit(entry:Resolution) {free(entry.source);free(entry.request);entry.result.deinit();}
-fn value(result:Outcome)->const u8[:],Error {match result {bytes payload=>{return payload.value,blot_error::Error.none;},failure payload=>{return default<const u8[:]>(),payload.error;},inactive=>{abort("inactive source observation");}}}
-fn success(result:Outcome)->Text {match result {bytes payload=>{return blot_support::some(payload.value);},failure=>{return blot_support::none<const u8[:]>();},inactive=>{abort("inactive source observation");}}}
+fn value(result:Outcome)->const u8[:],Error {match result {bytes payload=>{return ownedText(payload.value),blot_error::Error.none;},failure payload=>{return default<const u8[:]>(),payload.error;},inactive=>{abort("inactive source observation");}}}
+fn success(result:Outcome)->Text {match result {bytes payload=>{return blot_support::some<const u8[:]>(ownedText(payload.value));},failure=>{return blot_support::none<const u8[:]>();},inactive=>{abort("inactive source observation");}}}
 fn get(entries:const Entry[:],key:const u8[:])->blot_support::Option<Outcome> {for entry in entries {if entry.key==key {return blot_support::some(entry.result);}}return blot_support::none<Outcome>();}
 fn capturedSource(self_:View,canonical_path:const u8[:])->Text {let result=get(self_.files,canonical_path);if !result.present {return blot_support::none<const u8[:]>();}return success(result.value);}
-fn copyText(text:Text)->Text {if text.present {return blot_support::some(own(text.value));}return blot_support::none<const u8[:]>();}
+fn copyText(text:Text)->Text {if text.present {return blot_support::some<const u8[:]>(own(text.value));}return blot_support::none<const u8[:]>();}
 fn copyOptions(options:Options)->Options {
  let prelude=copyText(options.prelude_path);let std_root=copyText(options.std_root);
  let aliases=aliases_pool.alloc_slice(options.aliases.len);for alias,index in options.aliases {aliases[index]=Alias{own(alias.prefix),own(alias.root)};}

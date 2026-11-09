@@ -26,7 +26,7 @@ fn deinit(buffer: Members&) { blot_support_pooled_buffer::deinit(buffer,member_r
 fn deinit(buffer: Scopes&) { blot_support_pooled_buffer::deinit(buffer,scope_runs); }
 struct Extension { view: blot_backend_cohort_candidate::Extension&,members: Member[:] = default<Member[:]>(),scopes: Scope[:] = default<Scope[:]>(),boundary: u32 = 0 }
 fn init(view: blot_backend_cohort_candidate::Extension&) -> Extension { Extension { view } }
-fn deinit(extension: Extension&) { extension.view.deinit(); if extension.members.len != 0 { member_runs.free_slice(extension.members); } if extension.scopes.len != 0 { scope_runs.free_slice(extension.scopes); } extension.members = []; extension.scopes = []; extension.boundary = 0; }
+fn deinit(extension: Extension&) { extension.view.deinit(); if extension.members.len != 0 { member_runs.free_slice(extension.members); } if extension.scopes.len != 0 { scope_runs.free_slice(extension.scopes); } extension.members=default<Member[:]>(); extension.scopes=default<Scope[:]>(); extension.boundary = 0; }
 fn prepareInto(result: Extension&,source: const Module&,model: blot_backend_activation_intersection::Model) -> bool,Error {
     if !blot_backend_cohort_candidate::possible(source) || source.regions.present { return false,blot_error::Error.none; }
     for body,id in source.functions {

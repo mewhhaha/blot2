@@ -44,7 +44,7 @@ struct Mapping {contexts:Context[:],members:u32[:],owner:u32}
 struct Intersection {runtime:Cohort,semantic:Report,mapping:Mapping}
 reusable[] var context_runs:Context[>..]=[];
 reusable[] var member_runs:u32[>..]=[];
-fn deinit(self_:Mapping&) {if self_.contexts.len!=0 {context_runs.free_slice(self_.contexts);}if self_.members.len!=0 {member_runs.free_slice(self_.members);}self_.contexts=[];self_.members=[];}
+fn deinit(self_:Mapping&) {if self_.contexts.len!=0 {context_runs.free_slice(self_.contexts);}if self_.members.len!=0 {member_runs.free_slice(self_.members);}self_.contexts=default<Context[:]>();self_.members=default<u32[:]>();}
 fn deinit(self_:Intersection&) {self_.runtime.deinit();self_.semantic.deinit();self_.mapping.deinit();}
 struct Scan {source:const Module&,model:Model,runtime:const Cohort&,semantic:const Report&,evidence:Evidence,contexts:Context[:],remaining:i64=262144,failure:Error=blot_error::Error.none}
 fn decline(self_:Scan&,error:Error=blot_error::Error.declined) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_error::Error.declined;if error==blot_error::Error.out_of_memory {self_.failure=error;}}

@@ -19,43 +19,33 @@ and a host header, then compile and link the real Goose CLI with native OS
 adapters. Repair stages cap at 120s; final emission may use 180s after engine checks.
 Whole attempts share a 300s limit.
 
-Fourteen isolated engine families pass together, including body-freeze ownership,
-live/frozen readers, import-arena growth and SourceValidation publication.
-Source/Patterns use existing lease keys with 49/2 validation guards. Cursors
-replace held type/AST spans. The import dictionary holds scalar indices into a
-separate stable arena, preserving first-wins and synthetic import order.
-Frozen descriptors carry fixed metadata; proof headers use value Options and
-retain the same five owned readonly payloads. The production publisher law
-checks all payload identities after local producer headers end. Append-only
-import/catalog inputs use grow-only arrays across three callers.
+Sixteen executed production families pass together, including complete native
+asset preparation/error ownership, completion snapshots, loader/parallel
+scheduling and editor lifetime controls. Their exact inputs and binary identities
+are pinned in the root completion evidence; none is whole-port qualification.
 
-SourceValidation publishes 19 registered views without additional allocations.
-Editor budget accounting now uses the existing explicit Budget reference; its
-executed law covers exhaustion and rejected initializers. All five worker entry
-paths pass one partial batch. The server now has its own diagnostic root;
-NativeAssets aggregate metadata copying is removed in favor of scalar indices;
-checked text publication and actual prepare/error/reuse laws pass. The current
-server frontier is completion_probe.capture input/scratch borrowing (line21).
-Final Sources publication has a worst-case quadratic ownership scan; pending
-optimization requires a measured workload. The frame reader uses
-append-only high-water growth; its actual 4097-byte/1-byte law passes.
-The actual whole build caps at 120.271s without C or a diagnostic. No complete
-executable exists; CLI/server and OOM qualification remain pending.
+Project checker engines and shallow workers are invocation-local values.
+Synchronous callback contexts borrow the local engine; caller-owned compiled
+module/mask views and execution observers remain borrowed. The old engine
+registry and editor-prefix copy/writeback machinery are removed. Worker requests
+own Option<Engine> and destroy it before source/packet ownership. No project
+graphs are cloned to solve invocation lifetimes.
 
-Keep mini laws for owned boundary families: body_freeze runs in about 5–7s,
-immutable_readers 3.9s, import_arena 3.5s and source_validation_ownership 3.8s. The frozen dictionary experiments
-and shrink-origin witness show why metadata must stay outside the growing map.
+Source/Patterns retain 49/2 alias guards, frozen proof headers are values, import
+maps hold scalar arena indices, and SourceValidation owns 19 registered views.
+Loader and scheduler scratch use existing fixed pooled headers. NativeAssets
+sorts scalar indices instead of aggregate metadata; generated error codes remain
+owned after generator cleanup. Final Sources publication still has a worst-case
+quadratic owner lookup, pending a measured optimization.
 
-The optional bounded reference-closure cache/trace checker reaches a concrete
-whole-build source error in 95.491s where the baseline caps at 120.262s on the
-same production source except generated identity metadata. This is a shorter
-diagnostic cycle, not a completed compile or overall speed ratio. Its pinned
-semantic, debug/release and C parity controls pass. Use the tracked recipe;
-installed toolchains remain untouched. The holder index reaches the identical
-source error in 82.445s versus 104.824s in one exact-input pair. The optional
-UsedAfter frame skip passes 147 laws per debug/release mode, 24 semantic controls
-and six C parity cases; macro impact remains unqualified. Root CONTINUE.md links
-current evidence.
+Source/semantic diagnostic publication and worker clones now use checked owning
+views. CheckedProject publication validates seven typed outer runs before local
+engine cleanup. The current rejected-portable flag fix and all completed source
+families pass the coherent 16-law batch; the next combined entry check is pending.
+No whole C/header/executable exists; CLI/server/OOM qualification remains pending.
+Keep checks at family boundaries. Repair stages cap at 120s; final emission may
+use 180s after entry checks, sharing the 300s whole-build limit. Private tooling
+has scoped semantic/C parity evidence; installed toolchains remain untouched.
 
 Native request rollback and runtime observation components are tested; their
 whole compiler integration remains unqualified. A

@@ -54,75 +54,61 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Fourteen isolated production engine families execute in one fresh batch, including
-owned diagnostic transfers, body-cache publication, live immutable readers and
-import-arena growth and SourceValidation publication. Small laws expose failures in 1.6–7.1s rather than
-repeated 60s checker cycles. The actual final checker boundary remains pending.
+Sixteen executed production families pass together. They cover diagnostic and
+body ownership, live/frozen readers, imports, SourceValidation, frames, native
+assets, completion snapshots, loader scheduling and editor budgets. These laws
+check real helpers in seconds; they do not qualify a whole compiler executable.
 
-Live Source/Patterns use existing validated lease/generation keys; narrow
-callee/catalog readers retain readonly metadata. All 49/2 alias guards and
-cursor/head/associated-equation semantics remain. Proof parameter writes are
-explicitly pool-checked. Source traversal uses scalar cursors across 39 loops.
-Import metadata now lives once per distinct target in a separate stable arena;
-the growing dictionary stores only indices, preserving first-wins and synthetic
-catalog import order. This clears the traced dictionary-growth input alias.
-Checked publication reifies its two moved stores through those same guards.
-SourceValidation publishes 19 registered array views without new allocation;
-its eight scalar declaration fields survive source teardown in the executed law.
-Frozen readers retain fixed descriptors and value proof headers. All five proof
-payloads keep their owned slice identities after publisher-local headers end.
-Append-only import/catalog inputs now use grow-only tables across three callers;
-none previously shrank. Editor budget accounting now extracts the existing
-Budget reference from its fixed enum payload; its executed law covers exhaustion
-and rejected initializers. All five worker entry paths pass one partial batch.
-The real server has a separate diagnostic root. NativeAssets sorts scalar indices
-instead of copying aggregate definition metadata. Typed publication validates
-owned text runs; generated reader error codes now survive generator cleanup.
-Its actual prepare/reuse/duplicate/error law passes. Current server frontier:
-completion_probe.capture input/scratch borrowing at completion_probe.goose:21.
-The final Sources ownership scan can be quadratic; optimization is pending. Request frames grow by append-only zero chunks, keeping
-the high-water prefix and avoiding a false shrink effect; a two-frame law passes.
-Checked return and explicit rejection text options clear.
+Project checker engines and worker headers are now invocation-local. Synchronous
+callback contexts borrow the local engine, so caller-owned compiled modules,
+reuse masks, execution observers and editor budgets need no global retention.
+The engine registry and temporary editor-prefix copy/writeback machinery are
+removed. Worker requests own their engine value and clean it before source and
+packet ownership. Nonempty compiled/mask views and callback/worker lifetimes
+have executed controls; the full entry remains pending.
 
-Body freezing owns fixed scratch headers and validates all seven frozen runs
-against the live owner journal before publication. Its direct law covers source
-teardown, cache clone/retain/release and cleanup. No producer graphs or headers
-are copied by the reader/index architecture.
+Live Source/Patterns keep existing lease/generation checks and all 49/2 alias
+guards. Frozen readers carry fixed descriptors and value proof headers without
+copying graphs. Import dictionaries hold scalar indices into an invocation-owned
+arena; append-only caller tables use grow-only storage. SourceValidation publishes
+19 registered views without extra allocation. Loader and scheduling scratch use
+fixed pooled headers; diagnostic/item moves use checked whole-run observations.
+NativeAssets sorts scalar indices and owns generated error codes after producer
+cleanup. Its final Source ownership scan can still be quadratic; optimization
+requires a measured workload.
 
-Whole emission with baseline tooling caps at 120.262s. The optional closure-cache
-candidate reaches concrete source errors in 95–97s; this is no overall compile
-ratio because the baseline is censored. Its 24 semantic controls, 20 debug/release
-laws, 6 exact C comparisons and trace-on/off parity pass. Shrink-origin tooling
-pins the original dictionary.goose84 resize through replay, without changing
-semantic decisions. An ordered holder-event index reaches the same error in
-82.445s versus 104.824s on identical inputs in one diagnostic pair. A further
-frame skip passes 147 debug/release laws, 24 semantic controls and six C parity
-cases. Full emission caps at 120.271s, then reaches CLI/server source errors in
-135.011/129.973s with a 180s final-candidate cap. No C artifact exists.
-Neither result establishes a complete compile-time gain. Installed Goose remains
-untouched. See the
-[cache receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json)
-and [origin evidence](benchmarks/evidence/qualification/2026-11-09-goose-shrink-origins.json).
+Source and semantic diagnostics now publish through checked owning views, and
+worker clones preserve their payload ownership. All seven CheckedProject outer
+runs escape the local engine through validated typed views. One tagged-union
+portable flag now mutates its owning payload; the next batched entry check is
+pending. Executor and metadata checks have passed their previous boundaries.
+There is still no emitted whole C program, header or executable. Actual
+CLI/server, request OOM/retry and differential qualification remain pending.
 
-The native request supervisor/transport/cache/observer components pass normal
-and sanitizer checks. Candidate heaps and external cache writes remain staged
-until a complete validated reply is adopted. A dedicated token-bound capability
-reports stage-worker allocation refusal, including post-reply cleanup; ordinary
-crashes/signals remain failures. Tests use the real runtime with a fake compiler
-entry, so complete compiler integration remains pending. Active payload,
+Private checker tooling is checkpointed separately. Its holder index reaches the
+same diagnostic in 82.445s versus 104.824s on identical inputs in one pair; this
+is not a complete compilation ratio. The frame guard passes 147 laws in each
+debug/release mode, 24 semantic controls and six C parity cases. Full emission
+reaches concrete CLI/server errors in 130–135s; installed Goose remains unchanged.
+See the [tool evidence](benchmarks/evidence/qualification/2026-11-09-goose-used-after-frames.json).
+
+Native request supervisor/transport/cache/observer components pass normal and
+sanitizer controls using the real runtime with a fake compiler entry. Candidate
+heaps and cache writes remain staged until reply adoption. A token-bound
+stage-worker capability covers allocation refusal during initialization,
+execution and cleanup. Integrated compiler coverage is pending. Active payload,
 retained capacity and scratch counts are unavailable; operation totals and
 virtual reservations are not liveness. See [worker OOM evidence](benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json).
 
-The production qualification runner has eight oracle baseline passes and a
-strict unsupported ABI 8 recursion witness. Actual Goose CLI/server/OOM runs
-are pending a complete binary; no ABI 2 fallback or fake zero memory counters.
-Whole builds retain stage evidence, stop 3s after a diagnostic, and share a
-300s limit. Repair stages cap at 120s; final emission may use 180s after the
-entry checks pass. The required Zig gate passed smoke/harness and compiled the
-2,974 native laws without LLVM, but its LLVM release phase reached 120s and
-cancelled native execution after 94 laws/65 full sweeps. Full qualification
-remains pending; Zig lint reports zero findings. Partial root checks pin source/compiler identity and fail
-on source drift. Astra is for a specific snag; never Terra.
+The qualification runner has eight oracle baseline passes plus an unsupported
+ABI 8 recursion witness. No ABI 2 fallback or invented zero memory counts.
+Repair checks cap at 120s; final emission may use 180s after entry checks, within
+a shared 300s build limit. Builds stop 3s after the first diagnostic. Selected
+roots pin input/compiler identities and reject source drift. The required Zig
+gate passed smoke/harness and compiled all 2,974 laws without LLVM; its LLVM
+phase hit 120s and cancelled execution after 94 laws/65 full sweeps. Full
+qualification remains incomplete. Zig lint has zero findings. Astra reviews
+specific architectural snags; never Terra.
 
 Current identities, source repairs, raw qualification receipts and unqualified
 scope are pinned in [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

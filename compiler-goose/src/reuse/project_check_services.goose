@@ -2,7 +2,7 @@
 namespace blot_reuse_project_check;
 import .project_check;
 import backend.opaque_storage;
-fn originalBindingName(self_:const Engine&,target:ExternalTarget)->blot_support::Option<const u8[:]> {let producer=self_.catalogModule(target.unit);if !producer.present {return blot_support::none<const u8[:]>();}return blot_support::some(self_.source.symbols.get(producer.value.declaration(target.binding).name));}
+fn originalBindingName(self_:const Engine&,target:ExternalTarget)->blot_support::Option<const u8[:]> {let producer=self_.catalogModule(target.unit);if !producer.present {return blot_support::none<const u8[:]>();}return blot_support::some<const u8[:]>(self_.source.symbols.get(producer.value.declaration(target.binding).name));}
 fn originalUnitOrigin(self_:const Engine&,unit:u32)->blot_support::Option<blot_reuse_body_check_cache::Digest> {if unit==0 || unit>self_.source.units.len {return blot_support::none<blot_reuse_body_check_cache::Digest>();}var hash=blot_support_blake3::init();hash.update("body original module");hash.update(self_.source.filename(unit));return blot_support::some(hash.final());}
 fn originalBindingClosedRows(self_:const Engine&,target:ExternalTarget)->blot_support::Option<blot_reuse_body_check_cache::Digest> {
  let module=self_.catalogModule(target.unit);if !module.present {return blot_support::none<blot_reuse_body_check_cache::Digest>();}match module.value.owner {

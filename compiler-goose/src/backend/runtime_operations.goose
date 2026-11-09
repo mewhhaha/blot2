@@ -211,6 +211,6 @@ fn finish(store: Store&, module: blot_backend_wasm::Module&) -> blot_error::Erro
     for relocation in store.relocations { let id = store.entries[relocation.operation - 1].runtime; let location = relocation.location; if location.word { blot_backend_wasm::writeDataWord(module, location.index, id); } else { module.instructions[module.functions[location.function].instructions.start + location.index].operand = id; } }
     store.finalized = true; return blot_error::Error.none;
 }
-fn projectKey(store: Store&, operation: Id) -> blot_support::Option<const u8[:]> { if !store.identity.present || operation == 0 || operation > store.entries.len { return blot_support::none<const u8[:]>(); } return blot_support::some(key(store, store.entries[operation - 1])); }
+fn projectKey(store: Store&, operation: Id) -> blot_support::Option<const u8[:]> { if !store.identity.present || operation == 0 || operation > store.entries.len { return blot_support::none<const u8[:]>(); } return blot_support::some<const u8[:]>(key(store, store.entries[operation - 1])); }
 fn runtimeId(store: Store&, operation: Id) -> blot_support::Option<u32> { if !store.finalized || operation == 0 || operation > store.entries.len { return blot_support::none<u32>(); } return blot_support::some(store.entries[operation - 1].runtime); }
 fn deinit(store: Store&) { store.entries.clear(); store.key_bytes.clear(); store.keys.clear(); store.relocations.clear(); store.finalized = false; }

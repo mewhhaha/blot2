@@ -582,7 +582,7 @@ fn fieldSpelling(self_: const Module&, symbol: u32) -> blot_support::Option<cons
     while low < high {
         let middle = low + (high - low) / 2; let value = self_.field_names[middle];
         if value.symbol < symbol { low = middle + 1; } else if value.symbol > symbol { high = middle; }
-        else { return blot_support::some(self_.name(value.spelling)); }
+        else { return blot_support::some<const u8[:]>(self_.name(value.spelling)); }
     }
     return blot_support::none<const u8[:]>();
 }

@@ -46,3 +46,16 @@ export "probe_server" fn server() {
  let error=blot_reuse_zig_project_server::runWithPolicy(executor,blot_io::Reader{0},blot_io::Writer{1},[0;32],cache_root,blot_execution_policy::Policy{..});
  executor.deinit();if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}
 }
+
+// Packet construction/serialization/reply checking only; this is not a runtime law.
+export "probe_executor" fn executor() {
+ var worker=blot_project_executor::init();let source=blot_reuse_project::Project{..};
+ var engine,error=blot_reuse_project_check::initEngine(source,blot_check_check::PrivateExecution{..},blot_reuse_project_check::Editor.none,false);if error!=blot_error::Error.none {worker.deinit();return;}
+ let order:u32[0]=default<u32[0]>();var jobs:blot_reuse_project_check::ParallelJob[0]=default<blot_reuse_project_check::ParallelJob[0]>();
+ let counts,error=worker.runProjectChecks(engine,order[..],1,jobs[..]);engine.deinit();worker.deinit();if error!=blot_error::Error.none {return;}
+}
+
+// Completion reply schema checking only; no query or runtime qualification.
+export "probe_metadata" fn metadata() {
+ var bytes:u8[>..]=[];let error=blot_reuse_zig_project_server::encodeMetadata(default<blot_reuse_zig_project_server::CompletionReply>(),bytes);if error!=blot_error::Error.none {return;}
+}

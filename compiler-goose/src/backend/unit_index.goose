@@ -17,7 +17,7 @@ fn contains(set: Set,key: u32) -> bool {
     if set.slots.len == 0 { return false; } let hash = ::hash(key); let tag = (hash as! u32) | 2147483648; let mask = set.slots.len - 1; var index = (hash & (mask as u64)) as i64;
     while true { let slot = set.slots[index]; if slot.tag == tag && slot.key == key { return true; } if slot.tag == 0 { return false; } index = (index + 1) & mask; }
 }
-fn deinit(set: Set&) { if set.slots.len != 0 { owned_sets.free_slice(set.slots); } set.slots = []; }
+fn deinit(set: Set&) { if set.slots.len != 0 { owned_sets.free_slice(set.slots); } set.slots=default<const SetSlot[:]>(); }
 fn deinit(quantified: Quantified&) { quantified.types.deinit(); quantified.rows.deinit(); }
 fn has(quantified: Quantified,variable: u32,row: bool) -> bool { if row { return quantified.rows.contains(variable); } return quantified.types.contains(variable); }
 fn addVariables<T>(set: dictionary<u32,bool>&,types: const T&,lists: const blot_check_types::List[:]) { for list in lists { for variable in types.list(list) { set.insert(variable,true); } } }
@@ -45,7 +45,7 @@ fn build<T,C,F>(keys: i64,context: C,item_pool: T[>..]&) -> Table<T>,Error {
 }
 fn deinit<T>(table: Table<T>&,item_pool: T[>..]&) {
     if table.offsets.len != 0 { owned_words.free_slice(table.offsets); }
-    if table.items.len != 0 { item_pool.free_slice(table.items); } table.offsets = []; table.items = [];
+    if table.items.len != 0 { item_pool.free_slice(table.items); } table.offsets=default<u32[:]>(); table.items=default<T[:]>();
 }
 fn deinit(table: Table<u32>&) { deinit(table,owned_words); }
 fn deinit(table: Table<Exit>&) { deinit(table,owned_exits); }

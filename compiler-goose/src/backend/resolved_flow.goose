@@ -20,4 +20,4 @@ struct Loop { node: u32,kind: blot_check_core::LoopKind,carries: const blot_chec
 reusable[] var owned_operations: u32[>..] = [];
 fn allocateOperations(count: i64) -> u32[:] { owned_operations.alloc_slice(count) }
 fn copyOperations(values: const u32[:]) -> const u32[:] { if values.len == 0 { return default<const u32[:]>(); } let out = owned_operations.alloc_slice(values.len); for value,index in values { out[index] = value; } return out; }
-fn deinit(request: RequestLoop&) { if request.operations.len != 0 { owned_operations.free_slice(request.operations); } request.operations = []; }
+fn deinit(request: RequestLoop&) { if request.operations.len != 0 { owned_operations.free_slice(request.operations); } request.operations=default<const u32[:]>(); }

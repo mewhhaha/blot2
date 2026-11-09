@@ -10,7 +10,7 @@ struct Result { used: bool[:],omitted: i64,loads: i64 }
 reusable[] var used_runs: bool[>..] = [];
 reusable[] var read_runs: u8[>..] = [];
 reusable[] var code_runs: blot_backend_runtime_ir::Instruction[>..] = [];
-fn deinit(result: Result&) { if result.used.len != 0 { used_runs.free_slice(result.used); } result.used = []; }
+fn deinit(result: Result&) { if result.used.len != 0 { used_runs.free_slice(result.used); } result.used=default<bool[:]>(); }
 fn wordOffset(word: i64) -> blot_support::Option<u32> { if word > 1073741823 { return blot_support::none<u32>(); } return blot_support::some((word * 4) as u32); }
 fn contains(bundle: Bundle,local: u32) -> bool { if local < bundle.first { return false; } return local - bundle.first < bundle.words; }
 fn materialize(module: blot_backend_wasm::Module&,function: u32,bundles: const Bundle[:]) -> blot_support::Option<Result>,Error {

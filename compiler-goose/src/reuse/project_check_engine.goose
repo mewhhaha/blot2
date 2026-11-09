@@ -18,23 +18,28 @@ fn declaration(self_:CatalogModule,binding:u32)->blot_check_check::SourceDeclara
 }}
 fn resolved(self_:CatalogModule,node:u32)->u32 {match self_.owner {typed payload=>{return payload.value.resolved[node];},source payload=>{return payload.value.resolved[node];},_=>{abort("source resolution requires a live source catalog");}}}
 enum Editor {none,query{value:EditorQuery}}
+
 // Offers retain identities, while the previous project retains cache ownership.
 struct BodyOffer {lease:u32=0,generation:u64=0}
 type BodyOffers=blot_support_pooled_map::Map<u32,BodyOffer>;
 struct DiagnosticBuffer {storage:Diagnostic[:]=default<Diagnostic[:]>(),items:Diagnostic[:]=default<Diagnostic[:]>()}
 struct Engine {
- slot:u32=0,generation:u64=0,live:bool=false,previous_bodies:BodyOffers=BodyOffers{..},retain_bodies:bool=false,source:Project=Project{..},result:CheckedProject=CheckedProject{..},diagnostics:DiagnosticBuffer=DiagnosticBuffer{..},
+ previous_bodies:BodyOffers=BodyOffers{..},retain_bodies:bool=false,source:Project=Project{..},result:CheckedProject=CheckedProject{..},diagnostics:DiagnosticBuffer=DiagnosticBuffer{..},
  source_validation:bool=false,prepare_names:bool=false,execution:blot_check_check::PrivateExecution=blot_check_check::PrivateExecution{..},resolution_remaining:i64=1000000,associated_remaining:i64=1000000,editor:Editor=Editor.none,
  source_modules:blot_support::Option<SourceModule>[:]=default<blot_support::Option<SourceModule>[:]>(),compiled_catalogs:CompiledCatalog[:]=default<CompiledCatalog[:]>(),
 }
-reusable var engines:Engine[>..]=[];
 reusable[] var offer_slots:dictionary_slot<u32,BodyOffer>[>..]=[];
 reusable[] var source_module_runs:blot_support::Option<SourceModule>[>..]=[];
 reusable[] var compiled_catalog_runs:CompiledCatalog[>..]=[];
 reusable[] var source_declaration_runs:blot_check_check::SourceDeclaration[>..]=[];
-fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {return blot_support_pooled_buffer::push(self_,value,owned_Diagnostic);}
-fn initEngine(source:Project,execution:blot_check_check::PrivateExecution,editor:Editor,retain_bodies:bool)->Engine?,Error {
- if engines.len>=0xffffffff {return null,blot_error::Error.out_of_memory;}let result,error=initResult();if error!=blot_error::Error.none {return null,error;}let generation=blot_native::fresh_owner_id();                let __field_order_533_generation: u64 = generation; let __field_order_534_live: bool = true; let __field_order_535_source: blot_reuse_project_check::Project = source; let __field_order_536_result: blot_reuse_project_check::CheckedProject = result; let __field_order_537_execution: blot_check_check::PrivateExecution = execution; let __field_order_538_editor: blot_reuse_project_check::Editor = editor; let __field_order_539_retain_bodies: bool = retain_bodies; let __field_order_540_associated_remaining: i64 = min(blot_inference_limits::configured(),9223372036854775807 as u64) as i64; let at=engines.alloc_index(Engine{ generation: __field_order_533_generation, live: __field_order_534_live, retain_bodies: __field_order_539_retain_bodies, source: __field_order_535_source, result: __field_order_536_result, execution: __field_order_537_execution, associated_remaining: __field_order_540_associated_remaining, editor: __field_order_538_editor, .. });engines[at].slot=(at+1) as u32;return engines[at],blot_error::Error.none;
+fn push(self_:DiagnosticBuffer&,value:Diagnostic)->Error {return blot_support_pooled_buffer::push(self_,canonicalOwnedDiagnostic(value),owned_Diagnostic);}
+fn appendSourceDiagnostics(self_:Engine&)->Error {
+ let count=self_.source.diagnostics.len;for index in 0..count {let diagnostic=blot_reuse_project::diagnosticAt(self_.source,index);let error=self_.diagnostics.push(Diagnostic{unit:diagnostic.unit,span:diagnostic.span,code:Code.source_validation,source:blot_support::some(diagnostic),..});if error!=blot_error::Error.none {return error;}}
+ return blot_error::Error.none;
+}
+fn initEngine(source:Project,execution:blot_check_check::PrivateExecution,editor:Editor,retain_bodies:bool)->Engine,Error {
+ let result,error=initResult();if error!=blot_error::Error.none {return Engine{..},error;}
+ return Engine{retain_bodies:retain_bodies,source:source,result:result,execution:execution,associated_remaining:min(blot_inference_limits::configured(),9223372036854775807 as u64) as i64,editor:editor,..},blot_error::Error.none;
 }
 fn deinitSourceModules(self_:Engine&) {
  for &item in self_.source_modules {if item.present {item.value.validation.deinit();releaseOwned(item.value.exports);}}
@@ -43,7 +48,7 @@ fn deinitSourceModules(self_:Engine&) {
  if self_.compiled_catalogs.len!=0 {compiled_catalog_runs.free_slice(self_.compiled_catalogs);}self_.compiled_catalogs=default<CompiledCatalog[:]>();
 }
 fn deinitDiagnostics(self_:Engine&) {for &item in self_.diagnostics.items {item.deinit();}blot_support_pooled_buffer::deinit(self_.diagnostics,owned_Diagnostic);}
-fn deinit(self_:Engine&) {assert(self_.live);self_.deinitDiagnostics();self_.deinitSourceModules();blot_support_pooled_map::deinit(self_.previous_bodies,offer_slots);self_.result.deinit();let at=self_.slot-1;self_=Engine{..};engines.free(at);}
+fn deinit(self_:Engine&) {self_.deinitDiagnostics();self_.deinitSourceModules();blot_support_pooled_map::deinit(self_.previous_bodies,offer_slots);self_.result.deinit();self_=Engine{..};}
 fn catalogModule(self_:const Engine&,unit:u32)->blot_support::Option<CatalogModule> {
  if unit==0 || unit>self_.source.units.len {return blot_support::none<CatalogModule>();}let compiled .= self_.result.compiledModule(self_.source,unit);if compiled {return blot_support::some(CatalogModule{CatalogOwner.frozen{compiled.interface},self_.compiled_catalogs[unit-1].exports,true, ..});}
  if self_.source_validation {if unit<=self_.source_modules.len && self_.source_modules[unit-1].present {let source:const SourceModule& =self_.source_modules[unit-1].value;return blot_support::some(CatalogModule{CatalogOwner.source{source.validation},source.exports,source.valid, ..});}}

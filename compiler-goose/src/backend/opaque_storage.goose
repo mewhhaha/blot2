@@ -24,7 +24,7 @@ fn infer<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], co
 }
 fn inferPayload<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, remaining: i64&) -> Storage {
     var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: parameters, ..};
-    return expression(source, nominals, constructors, payload, frames,0, 0, remaining, false, 0, Resolver { entries: [] , ..});
+    return expression(source, nominals, constructors, payload, frames,0, 0, remaining, false, 0, Resolver { entries:default<const AuthorityEntry[:]>() , ..});
 }
 fn inferPayloadAuthoritative<N, C>(source: blot_check_frozen_types::Source, nominals: const N[:], constructors: const C[:], payload: blot_check_types::Id, parameters: blot_check_types::List, local_unit: u32, resolver: Resolver, remaining: i64&) -> Storage {
     var frames: Frame[256] = [Frame {..};256]; frames[0] = Frame { parameters: parameters, ..};

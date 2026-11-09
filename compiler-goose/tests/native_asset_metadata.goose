@@ -7,6 +7,8 @@ import backend.native_assets;
 import backend.native_asset_readers;
 import support.error;
 import reuse.source_overlays;
+import reuse.zig_project_server;
+import reuse.revision_inputs;
 fn populated()->blot_backend_native_assets::Session {
     var module:u8[>..]=[];module.append("/tmp/a.blot");
     var path:u8[>..]=[];path.append("/tmp/a.bin");
@@ -17,6 +19,21 @@ fn populated()->blot_backend_native_assets::Session {
     let roots=["/tmp/assets-root"];
     let session,error=blot_backend_native_assets::init(blot_backend_native_assets::Options{imports:definitions[..],roots:roots[..]});assert(error==blot_error::Error.none);
     module.clear();path.clear();ty.clear();name.clear();media.clear();return session;
+}
+fn compositionSnapshot(assets:const blot_backend_native_assets::Candidate?)->blot_reuse_revision_inputs::Snapshot {
+    var bytes:u8[>..]=[];bytes.append("const edited = 2\n");
+    let sources=[blot_reuse_source_overlays::Source{path:"/tmp/composition-entry.blot",contents:blot_support::some<const u8[:]>(bytes[..])}];
+    var merged:blot_reuse_source_overlays::Source[>..]=[];
+    let selected=blot_reuse_zig_project_server::composeSources(sources[..],assets,merged);
+    if assets {assert(selected.len==assets.sources.items.len+1 && selected[0].path==assets.sources.items[0].path);assert(blot_support::same_slice_identity(selected[0].contents.value,assets.sources.items[0].contents.value));}
+    else {assert(merged.len==0 && blot_support::same_slice_identity(selected,sources[..]));}
+    assert(selected[selected.len-1].path=="/tmp/composition-entry.blot" && blot_support::same_slice_identity(selected[selected.len-1].contents.value,bytes[..]));
+    let snapshot,error=blot_reuse_revision_inputs::initWithSources(blot_reuse_project::Options{..},selected);assert(error==blot_error::Error.none);bytes.clear();return snapshot;
+}
+fn checkComposition(snapshot:blot_reuse_revision_inputs::Snapshot&,has_assets:bool) {
+    let path,error=snapshot.canonical("/tmp/composition-entry.blot");assert(error==blot_error::Error.none);
+    let source,error=snapshot.read(path);assert(error==blot_error::Error.none && source=="const edited = 2\n");
+    if has_assets {let path,error=snapshot.canonical("/tmp/a.blot");assert(error==blot_error::Error.none);let source,error=snapshot.read(path);assert(error==blot_error::Error.none && source=="type Asset is data = $Asset U32\nconst asset: Asset = ($Asset 1)\n");}
 }
 fn main() {
     let assets=[blot_reuse_source_overlays::Source{path:"/tmp/a.bin",contents:blot_support::some<const u8[:]>("payload")},blot_reuse_source_overlays::Source{path:"/tmp/b.json",contents:blot_support::some<const u8[:]>("{\"score\":3}")},blot_reuse_source_overlays::Source{path:"/tmp/assets-root/text.json",contents:blot_support::some<const u8[:]>("{\"hello\":\"world\"}")}];
@@ -30,6 +47,7 @@ fn main() {
         assert(!first.modules.items[2].definition.ty.present && first.modules.items[2].source.len!=0);
         assert(first.resources.items[0].id==1 && first.resources.items[0].bytes=="payload");
         assert(first.stats.parsed==3 && first.stats.reused==0);
+        var composed=compositionSnapshot(first);var ordinary=compositionSnapshot(null);
         session.commit(first);
         var malformed=assets;malformed[1].contents=blot_support::some<const u8[:]>("{");
         let rejected,error=session.prepare("/tmp/entry.blot",[],malformed[..]);assert(error==blot_error::Error.none && rejected!=null && rejected.issue.present);
@@ -39,6 +57,7 @@ fn main() {
         let second,error=session.prepare("/tmp/entry.blot",[],assets[..]);assert(error==blot_error::Error.none && second!=null && !second.issue.present);
         assert(second.stats.parsed==0 && second.stats.reused==3 && second.modules.items[0].definition.ty.value=="Asset");
         session.commit(second);session.deinit();assert(session.owned_definitions.len==0 && session.owned_roots.len==0 && session.texts.items.len==0);
+        checkComposition(composed,true);checkComposition(ordinary,false);composed.deinit();ordinary.deinit();
     }
     let definitions=[blot_backend_native_assets::Definition{module:"/tmp/duplicate.blot",path:"/tmp/b.json",kind:blot_backend_native_assets::Kind.json},blot_backend_native_assets::Definition{module:"/tmp/duplicate.blot",path:"/tmp/b.json",kind:blot_backend_native_assets::Kind.json}];
     var duplicate,error=blot_backend_native_assets::init(blot_backend_native_assets::Options{imports:definitions[..]});assert(error==blot_error::Error.none);

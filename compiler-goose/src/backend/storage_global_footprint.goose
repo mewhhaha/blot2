@@ -42,7 +42,7 @@ fn ownNodes(self_: Index&,values: const Node[:]) -> const Node[:],Error {if valu
 fn deinit(self_: Index&) {
     for slot in self_.names.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();}}for slot in self_.operators.slots {if slot.tag != 0 {var targets = slot.val;targets.deinit();}}
     blot_support_pooled_map::deinit(self_.unit_indices,unit_map_pool);blot_support_pooled_map::deinit(self_.globals,global_map_pool);blot_support_pooled_map::deinit(self_.names,name_map_pool);blot_support_pooled_map::deinit(self_.operators,operator_map_pool);blot_support_pooled_map::deinit(self_.direct,direct_map_pool);blot_support_pooled_map::deinit(self_.completed,completed_map_pool);
-    for run in self_.slot_runs.items {slots_pool.free_slice(run.items);}for run in self_.node_runs.items {nodes_pool.free_slice(run.items);}blot_support_pooled_buffer::deinit(self_.slot_runs,slot_run_pool);blot_support_pooled_buffer::deinit(self_.node_runs,node_run_pool);self_.units = [];self_.all = [];
+    for run in self_.slot_runs.items {slots_pool.free_slice(run.items);}for run in self_.node_runs.items {nodes_pool.free_slice(run.items);}blot_support_pooled_buffer::deinit(self_.slot_runs,slot_run_pool);blot_support_pooled_buffer::deinit(self_.node_runs,node_run_pool);self_.units=default<const Module[:]>();self_.all=default<const i64[:]>();
 }
 fn init(units: const Module[:],globals: const Ref[:]) -> Index,Error {
     var self_ = Index {units,..};if globals.len == 0 {return self_,blot_error::Error.none;}
