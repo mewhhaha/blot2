@@ -5875,16 +5875,12 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_retained_revision:
 fn blot_reuse_retained_revision::blotStructuralHash<StructuralSink>(value:blot_reuse_retained_revision::SessionState,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_retained_revision::Stats)->bool {return equalFields(left,right);}
 fn blot_reuse_retained_revision::blotStructuralHash<StructuralSink>(value:blot_reuse_retained_revision::Stats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Acquired)->bool {return equalFields(left,right);}
-fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Acquired,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Counts)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Counts,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Entry)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Entry,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Frozen)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Frozen,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Observations)->bool {return equalFields(left,right);}
-fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Observations,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Pair)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Pair,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Persisted)->bool {return equalFields(left,right);}
@@ -5893,12 +5889,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::P
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::PersistedImport,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Provider)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Provider,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Record)->bool {return equalFields(left,right);}
-fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Record,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Resolution)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Resolution,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Settings)->bool {return equalFields(left,right);}
-fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Settings,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::Snapshot)->bool {return equalFields(left,right);}
 fn blot_reuse_revision_inputs::blotStructuralHash<StructuralSink>(value:blot_reuse_revision_inputs::Snapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_revision_inputs::State)->bool {return equalFields(left,right);}

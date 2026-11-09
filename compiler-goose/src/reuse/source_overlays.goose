@@ -16,12 +16,23 @@ reusable[] var file_slots:dictionary_slot<const u8[:],blot_support::Option<const
 reusable[] var owned_bytes:u8[>..]=[];
 fn get(self_:const Files&,name:const u8[:])->blot_support::Option<const u8[:]>? {return blot_support_pooled_map::get(self_,name);}
 fn contains(self_:const Files&,name:const u8[:])->bool {return blot_support_pooled_map::contains(self_,name);}
-struct Set {slot:u32=0,generation:u64=0,files:Files& =inactive_files}
+struct Set {slot:u32=0,generation:u64=0}
 struct SetState {live:bool=false,generation:u64=0,files:Files=Files{}}
-var inactive_files:Files=Files{};
 reusable var sets:SetState[>..]=[];
 fn valid(self_:const Set&)->bool {return self_.slot!=0 && self_.slot-1<sets.len && sets[self_.slot-1].live && sets[self_.slot-1].generation==self_.generation;}
+fn files(self_:Set)->Files& {assert(self_.valid());return sets[self_.slot-1].files;}
 fn copyBytes(bytes:const u8[:])->const u8[:] {let result=owned_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
+fn ownedText(bytes:const u8[:])->const u8[:] {if bytes.len==0 {return default<const u8[:]>();}let owned=owned_bytes.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(owned,bytes));let start=owned_bytes.index_of(owned[0]);return owned_bytes[start..start+bytes.len];}
+fn allocateFiles(self_:Files&,count:i64) {
+ if count==0 {return;}var capacity:i64=8;while count*3>capacity*2 {capacity*=2;}
+ let slots=file_slots.alloc_slice(capacity);for index in 0..capacity {slots[index]=default<dictionary_slot<const u8[:],blot_support::Option<const u8[:]>>>();}self_.slots=slots;
+}
+fn insertFile(self_:Files&,key:const u8[:],value:blot_support::Option<const u8[:]>) {
+ let owned=file_slots.realloc_slice(self_.slots,self_.slots.len);assert(blot_support::same_slice_identity(owned,self_.slots));let start=file_slots.index_of(owned[0]);let slots=file_slots[start..start+owned.len];
+ let name=ownedText(key);var contents=blot_support::none<const u8[:]>();if value.present {contents=blot_support::Option<const u8[:]>{true,ownedText(value.value)};}
+ let hash=name.hash();let mask=slots.len-1;var index=(hash & (mask as u64)) as i64;while slots[index].tag!=0 {index=(index+1)&mask;}
+ slots[index]=dictionary_slot<const u8[:],blot_support::Option<const u8[:]>>{name,contents,(hash as! u32)|2147483648};self_.count++;
+}
 fn releaseBytes(bytes:const u8[:]) {if bytes.len!=0 {owned_bytes.free_slice(bytes);}}
 fn utf8_valid(text: const u8[:]) -> bool {
     var at: i64 = 0;
@@ -95,12 +106,12 @@ fn canonicalPath(raw: const u8[:], out: u8[>..<]&) -> Error {
     }
 }
 fn init<O>(sources:const Source[:],options:O)->Set,Error {
- if sets.len>=0xffffffff {return Set{},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=sets.alloc_index(SetState{live:true,generation:generation});var result=Set{(at+1) as u32,generation,sets[at].files};var published=false;
- if sources.len>options.max_files {let __cleanup_result_1_0: Set = Set{}; let __cleanup_result_1_1: Error = blot_error::Error.source_limit; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}var total:i64=0;
+ if sets.len>=0xffffffff {return Set{},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=sets.alloc_index(SetState{live:true,generation:generation});var result=Set{(at+1) as u32,generation};var published=false;
+ if sources.len>options.max_files {let __cleanup_result_1_0: Set = Set{}; let __cleanup_result_1_1: Error = blot_error::Error.source_limit; {if !published {result.deinit();}} return __cleanup_result_1_0, __cleanup_result_1_1;}result.files().allocateFiles(sources.len);var total:i64=0;
  for source in sources {
   if source.contents.present {let count=source.contents.value.len;let remaining=max(options.max_total_source_bytes-total,0);if count>options.max_source_bytes || count>remaining {let __cleanup_result_2_0: Set = Set{}; let __cleanup_result_2_1: Error = blot_error::Error.source_limit; {if !published {result.deinit();}} return __cleanup_result_2_0, __cleanup_result_2_1;}total+=count;}
-  var name:u8[>..<]=[];let error=canonicalPath(source.path,name);if error!=blot_error::Error.none {let __cleanup_result_3_0: Set = Set{}; let __cleanup_result_3_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_3_0, __cleanup_result_3_1;}if result.files.contains(name[..]) {let __cleanup_result_4_0: Set = Set{}; let __cleanup_result_4_1: Error = blot_error::Error.duplicate_source_path; {if !published {result.deinit();}} return __cleanup_result_4_0, __cleanup_result_4_1;}
-  let key=copyBytes(name[..]);var contents=blot_support::none<const u8[:]>();if source.contents.present {contents=blot_support::some<const u8[:]>(copyBytes(source.contents.value));}blot_support_pooled_map::insert(result.files,key,contents,file_slots);
+  var name:u8[>..<]=[];let error=canonicalPath(source.path,name);if error!=blot_error::Error.none {let __cleanup_result_3_0: Set = Set{}; let __cleanup_result_3_1: Error = error; {if !published {result.deinit();}} return __cleanup_result_3_0, __cleanup_result_3_1;}if result.files().contains(name[..]) {let __cleanup_result_4_0: Set = Set{}; let __cleanup_result_4_1: Error = blot_error::Error.duplicate_source_path; {if !published {result.deinit();}} return __cleanup_result_4_0, __cleanup_result_4_1;}
+  let key=copyBytes(name[..]);var contents=blot_support::none<const u8[:]>();if source.contents.present {contents=blot_support::some<const u8[:]>(copyBytes(source.contents.value));}result.files().insertFile(key,contents);
  }published=true;let __cleanup_result_5_0: Set = result; let __cleanup_result_5_1: Error = blot_error::Error.none; {if !published {result.deinit();}} return __cleanup_result_5_0, __cleanup_result_5_1;
  {if !published {result.deinit();}} }
-fn deinit(self_:Set&) {if self_.slot==0 {return;}assert(self_.valid());let at=self_.slot-1;for slot in self_.files.slots {if slot.tag==0 {continue;}releaseBytes(slot.key);if slot.val.present {releaseBytes(slot.val.value);}}blot_support_pooled_map::deinit(self_.files,file_slots);sets[at]=SetState{};sets.free(at);self_=Set{};}
+fn deinit(self_:Set&) {if self_.slot==0 {return;}assert(self_.valid());let at=self_.slot-1;for slot in self_.files().slots {if slot.tag==0 {continue;}releaseBytes(slot.key);if slot.val.present {releaseBytes(slot.val.value);}}blot_support_pooled_map::deinit(self_.files(),file_slots);sets[at]=SetState{};sets.free(at);self_=Set{};}

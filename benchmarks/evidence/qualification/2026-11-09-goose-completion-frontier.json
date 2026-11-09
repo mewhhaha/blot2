@@ -469,6 +469,14 @@
       "diagnostics": "Complete canonical Candidate stores replace2nested Origin updates; named text spans and exact fresh hole destinations avoid wrapper provenance. Positive cheap trace isolates generic buffer push unknown roots, replaced by4concrete owned-record overloads at13hole stores preserving errors and growth.",
       "coverage": "Rich cloned dispatch diagnostic survives producer teardown and real Frame create/release. Retained session test executes C/link/run as23rd helper.",
       "frontier": "Selected99 clears candidate_seed complaint and now reaches live revision Inputs Snapshot acrossFrame; dispatch candidate_runs remains atfrontend40. Actual whole C/header/native still absent."
+    },
+    "input_executor_family": {
+      "inputs": "Live and frozen revision-input owners are scalar slot/generation keys. Existing state owns options, observations/indexes/counters and source set; guarded accessors replace12borrowed fields/inactive defaults. Removes four unused duplicate observation record types.",
+      "overlays": "Source Set uses scalar checked key; known final file count pre-sizes one table, complete canonical key/content stores replace generic map insertion. Duplicate/limit/hide behavior retained by executed completion/load/asset laws.",
+      "outcomes": "Input observations own success bytes and failure cause strings symmetrically; canonical complete Entry/Resolution stores replace generic record pushes. Same cleanup/error order, no graph cloning or new pools.",
+      "executor": "Exact copied negative/positive control isolates5remaining generic record Options in project_executor; typed literals clear project_jobs unknown-root reach. New actual executor_frame covers invalid-size rejection, valid empty batch, pooled cleanup and Frame, not worker packet execution.",
+      "coverage": "All24laws together; Frame includes nonempty overlay/live+frozen observations, hidden file failure cause, invalidated handles and cleanup. Native asset/editor/server callers migrated.",
+      "frontier": "Selected101 clears input Snapshot and candidate_runs errors; reaches backend pinWorkspaceInputs units escape and owned_Diagnostic generic push. Whole C/header/native absent."
     }
   },
   "latest_selected_frontier": {
@@ -477,25 +485,25 @@
       "server"
     ],
     "exit": 1,
-    "seconds": 97.974,
+    "seconds": 94.473,
     "stop": "completed",
     "errors": [
       {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose",
-        "line": 36,
-        "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while snapshot is still used: a reference into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose:25 (\u00a75.1)"
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose",
+        "line": 2453,
+        "message": "error: storing a reference rooted at units, which does not outlive the destination (\u00a79.2)"
       },
       {
         "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
         "line": 60,
-        "message": "error: cannot assign payloads: global candidate_runs may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_frontend.goose:40 (\u00a75.1)"
+        "message": "error: cannot assign payloads: global owned_Diagnostic may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:35 (\u00a75.1)"
       }
     ],
     "full_qualification": false,
-    "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
+    "source_sha256": "eadbf7b8808603d73e89d8ce6dfde28ff85e4ce000e351cf9ef5b0da8a2f6de5",
     "source_unchanged": true,
     "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
-    "batch": 99
+    "batch": 101
   },
   "latest_executed_laws": {
     "passed": true,
@@ -509,124 +517,129 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.23878909400082193,
+        "seconds": 0.23560436500702053,
         "program_sha256": "893d85a4617ef14216f8e77890525f22406decaab6df9ea0cf997c281e6392ff",
         "binary_sha256": "4bfc2ca37d891349839f7804d0de11bc28a93c9aeff533b145cfa766b0880de9"
       },
       "expectation": {
-        "seconds": 0.185195190977538,
+        "seconds": 0.1863953970023431,
         "program_sha256": "db3c037efd8d25e53380bc371ef964513fa06b3dd3edcf64845206fc738abe0c",
         "binary_sha256": "1838e7cf82e7b6fe126abee04bcb74487984073b5b236759af15c84fe01c548d"
       },
       "package_owner_frames": {
-        "seconds": 0.13431655301246792,
+        "seconds": 0.13381240700255148,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.905644905025838,
+        "seconds": 1.700815051997779,
         "program_sha256": "a7361862b3896df0db617d691fb68521260a1c1f97f14c30b0f1f9d0fd1d3df8",
         "binary_sha256": "f473f51f2a3f626330378bb92a21d78689683be70eea4523847dda25e6c22575"
       },
       "proof_leases": {
-        "seconds": 3.7494602669903543,
-        "program_sha256": "88f7c56eada7b911b5b35926c19474bc67072a52f477eb7685e2bf1a84db546f",
-        "binary_sha256": "1e0ac03b2f66123fed50a9bd9484e01dcdebfcbd9ef31b6635afdfa4f23fd783"
+        "seconds": 3.7272033649787772,
+        "program_sha256": "c49c96e964422dc5c4e68e8c31a3bdf0e1d22d99d4f207970ab8cb5c3c742cad",
+        "binary_sha256": "6b4b220d39d3344c7867f96c955154619b6cfd04ae17a50d0a3ce3c74e89d21f"
       },
       "source_sort": {
-        "seconds": 0.14113126299344003,
+        "seconds": 0.14901111699873582,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 6.5125585309870075,
-        "program_sha256": "34bfdae1807188155d4181908c6af9349dc5ef7f50f19a43c890e24d2ef400c9",
-        "binary_sha256": "df35f41de30ec79273a00ea5b99e73bce72ab13d385e34cbacf74062b9bfa348"
+        "seconds": 6.282236019993434,
+        "program_sha256": "442f30dc91770623ff4f821592c9ffd023d0e2f4cacadd7c666baaddee3f8046",
+        "binary_sha256": "3206a97b3ff5ab99e2fafbe4d98ce327f4b2dc1deb6f698354cd640cd38c2793"
       },
       "body_freeze": {
-        "seconds": 7.501870497973869,
-        "program_sha256": "3eacb6b97b86d223d55798829a3d200d0959b216bb4ad413ec89d8c09f93cf0e",
-        "binary_sha256": "b32188d9772c2c4bafce0db8345f2abaa1d51fb563c6e08ce748a5f2755313c7"
+        "seconds": 7.164810243993998,
+        "program_sha256": "98074b25e6fc1b85cf749068acc314a446e083779f84acbe941104eb79af5c08",
+        "binary_sha256": "3bc28a469d5d6b25ce0e4f1b671b20cd371c4c8d8a14873198ca44981d9115ae"
       },
       "immutable_readers": {
-        "seconds": 5.115195221005706,
-        "program_sha256": "27e972f6ce6614bbbd00f197c9637c29de96b4124a761c2431c64164a2a4051b",
-        "binary_sha256": "f5a39ba96e51db79ea15ac57f8d33b75d309807023a926cb5c2a0794d9f4d4d8"
+        "seconds": 3.9483386460051406,
+        "program_sha256": "d89214d19176c178a39a244b2792030f9ed0b069ff20631eced05791dfa7f6ca",
+        "binary_sha256": "9dcb68356bc886ada83de850567ac7bdf1c738545a8822b9dc28dcbd327f324e"
       },
       "import_arena": {
-        "seconds": 3.774269567016745,
-        "program_sha256": "64f34f9a71b67a159046a816ae772f399690bad108d62e339733e9c4a487472f",
-        "binary_sha256": "c0e0b014548f181f0643b740cabbd58f3f1ada84b401a9d5798e2cada9198f5b"
+        "seconds": 3.5954880740027875,
+        "program_sha256": "00a84d9b05c5f5ebb72860737f8e565d59ab6cb26bd862dac75a64a19186b93f",
+        "binary_sha256": "c7e3c601ad924022ffe05f12a6c1632df4c537950eef3863fd54f87f7432a12d"
       },
       "source_validation_ownership": {
-        "seconds": 4.273344012995949,
-        "program_sha256": "d2eb55b3b5067abbe73d2085176e9560bdd7b90149a5a89c37e957ce73c4d22b",
-        "binary_sha256": "9f8453fc386e6e9f545675c8609cb4c03a69c315d61b56fac91a2296513bd5ef"
+        "seconds": 4.14457905801828,
+        "program_sha256": "5a4166ebeffeaeaccb8d0d73a65ef968d648ac3d5f80902a22cb9b373ba2f7b7",
+        "binary_sha256": "cdf4271483f7a16acc717f159c737c22c9e2afe28f88dec1ecbbf904313e3f3b"
       },
       "editor_budget": {
-        "seconds": 6.419117507000919,
-        "program_sha256": "7baee55cb6ed6e54ec1d85534963bb2603d285b895924640c49e47c4f08c96c3",
-        "binary_sha256": "1228eaf22a07dbc82d59128909f8fd389272aaf5d62489b081af4832a1f4b392"
+        "seconds": 6.060079985007178,
+        "program_sha256": "2b42e3b8aea0f3b1c5053b599238bb05989d01400c97297f06faf63d8da30219",
+        "binary_sha256": "a18ed774924c58a5b6b46d92cda1f15767e59e8512465878e4d34b5aa831720b"
       },
       "cache_root_frames": {
-        "seconds": 3.3474668209964875,
-        "program_sha256": "3d5965c94468ff8ffb3f26d08a4298ab27f715ac01e6ce33e00ec4ec5c72771c",
-        "binary_sha256": "61fff731a1e588ac1dfebe9478d4c4bf7d24bd08a9643b62be142ffd6b08de72"
+        "seconds": 3.2533362150134053,
+        "program_sha256": "970fa4933cbf7c856351a8ef4a2266d05577e7bd3b79468331a6345e5652f149",
+        "binary_sha256": "0bf822600ea27a9f222079737031e8c7b2002f7bfa539468da5888792bdc6886"
       },
       "native_asset_metadata": {
-        "seconds": 4.622416703001363,
-        "program_sha256": "e53441272e092ad2167f85831f8c18a40638dd2ef04c5b7a64a43a8cc897e268",
-        "binary_sha256": "f1c036a730c0d98bd1f4904d29b79af574577caf974b8d5ea67eb6daa6b48764"
+        "seconds": 4.5007625370053574,
+        "program_sha256": "c424cac888f7ebdc06c37ec296a6d399022610bedfee37b153e60fecf8176fa7",
+        "binary_sha256": "87edea8b80439a63cd4a64227d4ab6d7fbb6d1de6c44377becc0af1814926474"
       },
       "completion_probe": {
-        "seconds": 3.641501842997968,
-        "program_sha256": "2daee724f2ccff897507afb8c52df3a8c6b5f3aa4a048838380444ef8c9fe969",
-        "binary_sha256": "76f7c8bae324e9ce8f29c96b9df66cc7cd41fef9d643ee162753eb18cfdf0cf6"
+        "seconds": 3.474402255989844,
+        "program_sha256": "49f2df1a6249bafc2222306862b0cf8f8d68399936d203c706e78e2d0c86d19b",
+        "binary_sha256": "5ca4de419f06417b75069a958ecaabc1dccf36df5ceab4a45b7d52de07bdbbec"
       },
       "completion_project_load": {
-        "seconds": 8.930559091008035,
-        "program_sha256": "003d2d7587bf9abb6cb17b48974023e38af9540263910f92d143a74724d78d79",
-        "binary_sha256": "102fb48ad7d19a47df5b8328ba3969ae1a04378efcee2af01550a843bcb26a9e"
+        "seconds": 8.609287433006102,
+        "program_sha256": "ef3cf974125a6bcc2f81676b29021e9cf2577285e50faeb7edf2e342c6733f21",
+        "binary_sha256": "2e78e84f2561fb59f36699dbe0ba2a5ea0dfe45ab1528424d17c37ecc71eed8c"
       },
       "dependency_ownership": {
-        "seconds": 5.560007870022673,
-        "program_sha256": "b65cda6aa73cf3fd2d489b2ae41fdb1d75b42a781763faad7fcf319893b0c252",
-        "binary_sha256": "c9fc14afc772b94c4b61f40bdbcbcfbc9c73f4dad0789da2a8205a9e6c3ae1d2"
+        "seconds": 5.330299093999201,
+        "program_sha256": "ce19cb221f4aec4cf54fe181393b56c3a99ab25419c1c8d5bef14e57cdfd389e",
+        "binary_sha256": "f6b623ef231cdd0ae90f22fd9ac4f5aefbbf0b1e3cc7335ca3574305f332d1e6"
       },
       "empty_session": {
-        "seconds": 13.88595536100911,
-        "program_sha256": "fb327547b41cbc9cc381a05ad7b12b0a57ee00f5ea850672caa058c230348666",
-        "binary_sha256": "abc65d4bad0666c3777f754c018cc6b5f16b01e68b894d6731f35e589d026714"
+        "seconds": 13.881664551008726,
+        "program_sha256": "3d255d882e7e2573ff3d60fe9abb9af61e1453617db97a98b13faeac4959091d",
+        "binary_sha256": "24010fb273831a3c4f3985b3f5f60e298c4ae1566d4f978f1d18dba953cf7b85"
       },
       "archive_capture": {
-        "seconds": 4.224509396008216,
-        "program_sha256": "cc9370de43c30f59a8323749e897a73515bd9c15add17aab05d69fe15cd6ccd4",
-        "binary_sha256": "1d2630997f083c6fae56ea7ecf80066b0ecf2a79067951d22f84ad5c1d22d819"
+        "seconds": 3.854828139010351,
+        "program_sha256": "c2a10f7386662cf5460d704962e81cd05d33c61136e5437a0a13cb2f35ebd431",
+        "binary_sha256": "8f57133441f1f7d9097effc0033b122530f8885c04a6ae64c9178efea0c55083"
       },
       "resolved_body": {
-        "seconds": 3.7658919359964784,
-        "program_sha256": "21da2b82301e708b5981c7a2662ec9075c8f48ac3410f629aa942fa3884b5a3a",
-        "binary_sha256": "c34f45a675310db1f13389cfcbf208d4719815f594ad053f724b5dcf469352d9"
+        "seconds": 3.5829560910060536,
+        "program_sha256": "375b7428daf498a05a9d86815cad5297b66cbb8f54b9d82a0582a7dfef62baa7",
+        "binary_sha256": "c35714afbb10ebd49183c0f505d97949edae726f7e7b46e79d8906feada41323"
       },
       "wasm_scope_outline": {
-        "seconds": 4.311462856974686,
-        "program_sha256": "831a0e2be90b77f57dc889775926ac7d47a2819b783367009106cc0e20535b63",
-        "binary_sha256": "280c185e301185e0abe67c94fce37335ed980f9f754ef4996a24657b7f157682"
+        "seconds": 4.139718079997692,
+        "program_sha256": "43f0a0a22915390b510e2b617c7e1b7674fc37b9c786c051f2bd3258b0fc3030",
+        "binary_sha256": "a839b1bdb8b0446e2ed2214bb0ddfd706f223fb4502e70c3361a98633168cf08"
       },
       "core_validation_borrow": {
-        "seconds": 30.344839138997486,
-        "program_sha256": "87ce6b8f5fd1112472764da6e548fddd17c740265ef68ad0c5f6008331469e49",
-        "binary_sha256": "7d35bce77c2c17722a0735f41d0dcb2c66a195ba11370c5fd2dd51cdd8b324c1"
+        "seconds": 29.764180701982696,
+        "program_sha256": "6d4251a0e7d3dd9cb01b94f79cdccaf37543fe1da78f70601644a02cd44902d8",
+        "binary_sha256": "6d58c273448dcaebce76151bd0161f3fe2d200bcf46a5318b1f13d233839d0bb"
       },
       "retained_seed": {
-        "seconds": 31.09255637699971,
-        "program_sha256": "96f3ab8a5941531ca6436b904243a80b29c53ff4efed4d7dce2b8ff4a4ade570",
-        "binary_sha256": "bc11518083b47a555241cdeffe37d512dc07b548241678678c4363f63644f4a7"
+        "seconds": 30.707987136003794,
+        "program_sha256": "1c7f7f498fd37d2a8b4d3a82118dbb149dcc10360d6ab868c8e03ea1c79b027c",
+        "binary_sha256": "6f40160c91cf3932f94c4750832a656721b93645cbda4716afead4f07c849611"
+      },
+      "executor_frame": {
+        "seconds": 10.79641687500407,
+        "program_sha256": "f1eaf576bb6b4bbf9e7874e2efbf5e77f99015f97c43b98d5cfc8eae4ce15d09",
+        "binary_sha256": "04c8696177e94447c91ec554de0c596361025ee97771ecd5bb5e9c224d72a5d8"
       }
     },
-    "scope": "All23 C/link/execute pass in153.678s. Includes real retained Session admission/rejection/cleanup, scalar Seed and diagnostic+Frame ownership. Whole compiler unqualified.",
+    "scope": "All24 C/link/execute pass in159.224s. Scalar revision-input/overlay handles, owned outcomes, completion/load/editor and actual scoped Executor empty/rejected batch\u2192Frame coverage. Whole compiler unqualified.",
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_receipt_sha256": "e788a3172e277b4a3729d924ff59076f46c8ff2d51a5694c4666132c5e23175b"
+    "raw_receipt_sha256": "033cf5af3f81f700cd2902259ab75bd4abc3241570c335e6e00e496b7bcec178"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -654,8 +667,8 @@
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "cc77ae7d4609f38ec2d3eb6ae29331467499602d7c1895183057f09689e98f2e",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "c34e758464a39e92f4427b99c6a52ff5227e4db7f95437a01dee81b3104c1b8c",
-    "compiler-goose/src/support/json_adapters.goose": "bb28dcb6e46b8692447ea428df14b61994b754312c6628f6b3eaa5fb520cac00",
-    "compiler-goose/src/support/structural_adapters.goose": "63d164f1aadffabff3d3b4fd5b615746867613691a5cf48d4b13b0fba16e4d3c",
+    "compiler-goose/src/support/json_adapters.goose": "f8ca3030c7b094ca9d7a42d53fbcc150685ba8b1571919b9c911fc03d15f0b45",
+    "compiler-goose/src/support/structural_adapters.goose": "8922c3f5b044a0b0f1146c098a1485c370b6da09f6a34d6affd666c6b9e247ae",
     "compiler-goose/src/reuse/hole_diagnostics.goose": "e94e56d1cb5a9807ec54cb99c25e5537f12ccd1d59f54aafb6fbef0bba43a867",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "88d649bb129cbe432932a81225248cc667063c05afa6ee03fb1232263563a80e",
     "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
@@ -683,10 +696,10 @@
     "compiler-goose/src/reuse/project_check_engine.goose": "cf188813853b0989e9d18e409030e41c63880baebc949c1cceeb3cc1eee630ee",
     "compiler-goose/src/source_identity.goose": "db93030e6c1acfbaefafe0f4648cc129eaf0b5c9c2feaf63cd09be3007f38441",
     "compiler-goose/src/_diagnostic_roots.goose": "2a82c829b3f19d6e7fae7ea780299c7cc10a65e01013dd492468ab76ccaeb01e",
-    "compiler-goose/src/backend/native_assets.goose": "54a95cdc97c2e59c7e690cf311e1c8238d2c20a181350e672fcafa60873b7f36",
+    "compiler-goose/src/backend/native_assets.goose": "e75f4152f25627c177a03b91c44ca526b02885b92949859f39dc69344225f0ed",
     "compiler-goose/src/driver/cli.goose": "1d34a8c00031e4ca59963ec249b844d1ba937e1fb574b4790576fb786853f628",
     "compiler-goose/src/reuse/zig_project_frames.goose": "83b0da075bfe1a9a4330f396b490d11db0d0d4c8df47dab459708c1bdb203e15",
-    "compiler-goose/src/reuse/zig_project_server_build.goose": "e0c15866f82671ce0674d202c2046f49a9fccb27f66fbc6e87d66fa9d53bafc8",
+    "compiler-goose/src/reuse/zig_project_server_build.goose": "3a11ef9b0c2cd45afc14f47e4917279cecedfcf396b8740664bbc87256595697",
     "compiler-goose/src/backend/activation_intersection.goose": "7f2e4f6058892840bdd168ec93528028c7bb8ce77e9d99245156ced772bc9e6d",
     "compiler-goose/src/backend/activation_model.goose": "db99cb30edac04f1c8338345f6c2f42249996d2b8eaa1ff12e01ec6b68a67796",
     "compiler-goose/src/backend/addressed_input_demand.goose": "7e389078ac98a0d6055f6a94e0ca1a873006868c207e804a87b7ae50944eec65",
@@ -712,19 +725,19 @@
     "compiler-goose/src/driver/cli_pipeline.goose": "9c02f342fecb67f6d990ab2f573a674d727aa06c91741a51fd5ba97115eda404",
     "compiler-goose/src/driver/compile_workspace.goose": "71321c983df6474f98a8d0e6e2585a22957ef51f4243acaa28d4b68c4096ff1a",
     "compiler-goose/src/driver/compile_workspace_backing.goose": "3395ccd7f45c2605db3c9c046c8212e482b1d3f124e7235d0a03f12a8c0104d6",
-    "compiler-goose/src/driver/project_executor.goose": "db9041a411dea7a28a2df7eb457098ae949fbe9e57d280deb2bd21b59e54f785",
-    "compiler-goose/src/reuse/editor_completion.goose": "de3422692bea14c53df597ae27d32723a0db13b251ca2db87de3f60d14d1fe33",
+    "compiler-goose/src/driver/project_executor.goose": "26fa186f5c820163bfb6ce00b24c92acfabeb0469a6cdba66766fb045442e6ff",
+    "compiler-goose/src/reuse/editor_completion.goose": "4d7d39ab578f3196dfd9ce32daf387a5d401a8ea198e9d2e3586c75996aae411",
     "compiler-goose/src/reuse/partial_dependency.goose": "939653b628e63cab497fc5c3c883f84d5f7f767e9e40ca09b37bb6baf2f04d64",
     "compiler-goose/src/reuse/project.goose": "3e4694c666325e3e0c42ec3d82bd24f5444e028e47ae75dd6e5df6de344efe21",
     "compiler-goose/src/reuse/project_check_factory.goose": "10707c0e9bbb8cd9544e620c38ef1fd24e27ab7e3a186e2f55dd62802b4b5ae3",
     "compiler-goose/src/reuse/project_check_owners.goose": "696d720410f69d797766952d924696b4a88828a5884f09845d278c801ed9ce7a",
     "compiler-goose/src/reuse/project_check_parallel.goose": "3f4e84a5cc1151fb2ba36f4a96c47809a7008a5488b1962fbf79e8a46cadc5f1",
     "compiler-goose/src/reuse/purity_diagnostics.goose": "e18c0041100ebc2896a31787139c8ad8dcfde59fea205a92e0e49cf7625a9622",
-    "compiler-goose/src/reuse/retained_revision_frontend.goose": "03c3da226861c896771e661f08599aa64abc82f9acde67bc32498b9ba4ca59d8",
-    "compiler-goose/src/reuse/retained_revision_prepare.goose": "8031759937d832e1374962e5869ab84574bf22c34e51baba8657c7d16dd8a3b1",
-    "compiler-goose/src/reuse/revision_inputs.goose": "9fb68da50917eb0fc6cb4200c078582a3fda3d7610139887d45cd1bed7241a0a",
-    "compiler-goose/src/reuse/source_overlays.goose": "48808f774477a75bfbcbf354aa8ff2b5eaa08b4f21367f1ff13f037bc560dbda",
-    "compiler-goose/src/reuse/zig_project_server_completion.goose": "98c780c3555e75fef90ab4124250a4a6979e0db6b61b5399471bdb68f9234100",
+    "compiler-goose/src/reuse/retained_revision_frontend.goose": "f4209f301317cbaf60e2c8f1901203a31539ebffe9e1563d0e3767d72304d102",
+    "compiler-goose/src/reuse/retained_revision_prepare.goose": "766eb4a28df700ec998bb86a37d79ea5a63b16a15b99332deeb91ee10a776591",
+    "compiler-goose/src/reuse/revision_inputs.goose": "b9bef5f62441efc94f218ead86a4e298bc89386acf2c0d47f238edb4df75d293",
+    "compiler-goose/src/reuse/source_overlays.goose": "d5ee117ed670dda86f4888121a8dda7ff6f6472511bd67912c5377954b595be3",
+    "compiler-goose/src/reuse/zig_project_server_completion.goose": "a478523b399f17fedb79bbd2c0cdc6552eb414a007edf491f11727a3736ce3b6",
     "compiler-goose/src/check/parallel_lowering.goose": "b2b549ce5a544a270e4be9cb9479d0221099294c815e2b3333a03addb2031af0",
     "compiler-goose/src/reuse/artifact_emitter.goose": "acac4a5a86272cbe622d7241dcaa76969c8cf85278bfeac00a29c2eb61260339",
     "compiler-goose/src/reuse/constant_receipt_reuse.goose": "68fa4ddfcfcb5b297cc42f19afbea4b156b1497bbce780a598859bacb9517964",
@@ -765,7 +778,7 @@
     "compiler-goose/src/check/check_packet_owner.goose": "599425927dc3ab0af5a1647bda2d8283ba3d8f228503711bd8c20de0daa47521",
     "compiler-goose/src/support/project_packet_owners.goose": "60ea3f9683da4d5d11bbc9bddf52af89147eeefcd60a44c9f971b998de8cbfa8",
     "compiler-goose/tests/core_validation_borrow.goose": "3f6f89ccbf3804ebc3168b7781bfc43d0b8a430a7fa87a4f374a9004f7347a77",
-    "compiler-goose/tools/test_engines.py": "2665dc4138e3d1082c2405d6940e58c3cb0ba8691d93c5aa786ba8adaa5729e7",
+    "compiler-goose/tools/test_engines.py": "d07bf94b73f852bcba69422132bb7693f5693ce776820ddedf451193aed47c76",
     "compiler-goose/src/reuse/body_check_cache.goose": "1bc2ed6fb5665c2f9aa0e862297a817146256952d325db91d0b95e0c124b4580",
     "compiler-goose/src/reuse/body_check_packet.goose": "b6eda0b216be27b66e57d70adc26d3c9bb13e8abf4567f5b10f0885385782a1c",
     "compiler-goose/src/support/project_packet_contexts.goose": "309e3a262d65e85651f0169bb46fe2593844503f9ab0498f37c86391a936d680",
@@ -774,10 +787,14 @@
     "compiler-goose/tools/write_project_packet_contexts.py": "7959871f7f386240733ae85f1e5824b80260c3e290491435a649c8d7d9611af1",
     "compiler-goose/tests/dependency_ownership.goose": "0ec2097cf50ffac105e733aec8c4c5799bda1449010ae5c7005f5e9f1132710e",
     "compiler-goose/tools/write_checked_views.py": "745d24c73196b1a3580775e31911498ffeaa7f55149be40f302170fc52a3cbb4",
-    "compiler-goose/tests/empty_session.goose": "5c982d7e5f77e6c6bfb7245c75633bd1deb121973a75925a77d75e663f1460aa",
+    "compiler-goose/tests/empty_session.goose": "7a5b9e7dfce5299a72b018106fdb968087841d31e709e42a6e41cbb085946cc0",
     "compiler-goose/tests/proof_leases.goose": "4ff7d5d23f6f35ae9bef6f0cc61f04f12bb3c5e3722bb834e0e4672807a7863a",
     "compiler-goose/tests/diagnostic_ownership.goose": "33c647d1d60d0062469f51adfcea8f7023e92b048a410b0538df8c389aa98292",
-    "compiler-goose/tests/retained_seed.goose": "9122e4b5a159e136e774aa866010a379455b23c0d8ddf2c03f7fa1126e35388e"
+    "compiler-goose/tests/retained_seed.goose": "9122e4b5a159e136e774aa866010a379455b23c0d8ddf2c03f7fa1126e35388e",
+    "compiler-goose/tests/editor_budget.goose": "30995effc1722602a462319278aae6459ded3a04d0375afffdf7b41109d241aa",
+    "compiler-goose/tests/completion_project_load.goose": "717f244384db87f96191007fb8d8e62b2def37cb6647a84d3607314af163c70a",
+    "compiler-goose/tests/executor_frame.goose": "123d487ec3f2074b61ba094e0ddc5b8b364c8b0095e87e40af4909d6c11cc31f",
+    "compiler-goose/src/reuse/zig_project_server_lifecycle.goose": "a318c1015d0bf96e212f6781ce14d8ab74c07ee6e920cd678c6ffe587a2d0e15"
   },
   "unqualified": [
     "whole compiler executable",
@@ -1597,10 +1614,10 @@
   },
   "frame_frontier": {
     "status": "C/link/execution passed",
-    "seconds": 11.326802032999694,
-    "scope": "Four cycles: actual Frame; ordinary/decoded Checked worker publication; zero-key pattern packet roundtrip; real seed pin/rebind/minted Entry; move original Preparation inactive then Frame and cleanup",
+    "seconds": 13.881664551008726,
+    "scope": "Four real Frame cycles with ordinary/decoded modules, zero-key packets, Seed/Prepared ownership, nonempty input overlays, owned failure cause and live\u2192frozen inputs",
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz",
-    "raw_receipt_sha256": "571763a1b6a422416d9d8da4be488b8d85eaeaa176ddb404f2dcfdfd4b6c2281"
+    "raw_receipt_sha256": "2ae0aa11305da40450cfdc5d072a0ab2de52a37565af41aeeb09ab04fda720e6"
   },
   "selected_batch88": {
     "partial": true,
@@ -1937,6 +1954,66 @@
         "errors": [],
         "full_qualification": false,
         "source_sha256": "8e273fb63d1a67d3ef9e5f1e369d24770e7b0babc2a43598aaf78fd55717b83a",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch101": {
+    "partial": true,
+    "seconds": 94.605,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 94.473,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose",
+            "line": 2453,
+            "message": "error: storing a reference rooted at units, which does not outlive the destination (\u00a79.2)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global owned_Diagnostic may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/project_check_engine.goose:35 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "eadbf7b8808603d73e89d8ce6dfde28ff85e4ce000e351cf9ef5b0da8a2f6de5",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.555,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "eadbf7b8808603d73e89d8ce6dfde28ff85e4ce000e351cf9ef5b0da8a2f6de5",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.253,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "eadbf7b8808603d73e89d8ce6dfde28ff85e4ce000e351cf9ef5b0da8a2f6de5",
         "source_unchanged": true,
         "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
       }

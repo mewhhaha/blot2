@@ -4,7 +4,7 @@ Fix production ownership in coherent families, build the complete native compile
 then qualify CLI/project-server behavior, recoverable request OOM and retention
 against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-All **23 executed production helper laws pass together in 153.68s**, including
+All **24 executed production helper laws pass together in 159.22s**, including
 actual frame cleanup, nonempty session tables, ordinary and packet-decoded Checked
 worker publication, Prepared Option lifetime and real receipt admission. Checked
 observers retain existing aliases and typed journal ownership; no graph copies or
@@ -14,11 +14,15 @@ Seed now owns a scalar registered Snapshot key. Session initialization validates
 and adopts once; invalid input remains caller-owned. Four real admission and
 teardown cycles pass. Rich diagnostic text survives producer cleanup and Frame.
 
-Selected batch 99 passes executor/metadata and clears candidate_seed ownership.
-It reaches live revision-input Snapshot ownership across Frame.create and dispatch
-candidate_runs publication. **No whole C/header/executable exists.** Integrated
-runtime qualification remains pending; do not forward compilation to Zig or
-insert placeholder success.
+Live/frozen input snapshots and source overlays use scalar registered keys.
+Input success/error text is owned symmetrically; complete record stores retain
+exact named pools. Source tables reserve their known final size once. The new
+executor law covers rejection, empty batch and pooled cleanup through Frame.
+
+Selected batch 101 passes executor/metadata and clears input Snapshot/candidate
+run errors. It reaches backend input-unit publication and DiagnosticBuffer push.
+**No whole C/header/executable exists.** Runtime integration remains pending;
+do not forward compilation to Zig or insert placeholder success.
 
 Use the tracked private checker recipe and the existing qualified 678 binary from
 the root frontier. Its optional direct-global empty-holder precision passes 24 new

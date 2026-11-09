@@ -45,7 +45,7 @@ fn main() {
     for cycle in 0..3 {
         accounting();let sources=[blot_reuse_source_overlays::Source{path:"/tmp/editor-budget.blot",contents:blot_support::some<const u8[:]>("const value = 1\n")}];
         var snapshot,error=blot_reuse_revision_inputs::initWithSources(blot_reuse_project::Options{..},sources[..]);assert(error==blot_error::Error.none);
-        var provider=snapshot.provider();var source,error=blot_reuse_project::loadWithInputs("/tmp/editor-budget.blot",snapshot.options,provider);assert(error==blot_error::Error.none);
+        var provider=snapshot.provider();var source,error=blot_reuse_project::loadWithInputs("/tmp/editor-budget.blot",snapshot.options(),provider);assert(error==blot_error::Error.none);
         // Nonempty external metadata/mask owners remain local throughout the engine invocation.
         let modules=[default<blot_reuse_frozen_dependency::Module>()];let reuse=[true];source.compiled_modules=modules[..];source.compiled_reuse=reuse[..];
         lifecycle(source);source.deinit();snapshot.deinit();

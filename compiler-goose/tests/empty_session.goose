@@ -141,6 +141,17 @@ fn seedPublication() {
     assert(key.valid());workspaceLifecycle();assert(key.value().symbols.len==1 && key.snapshot() .== snapshot);
     key.deinit();assert(!key.valid() && !stale.valid());
 }
+fn inputPublication() {
+    let sources=[blot_reuse_source_overlays::Source{path:"/tmp/frame-input.blot",contents:blot_support::some<const u8[:]>("const value = 17\n")},blot_reuse_source_overlays::Source{path:"/tmp/frame-hidden.blot",contents:blot_support::none<const u8[:]>()}];
+    var snapshot,error=blot_reuse_revision_inputs::initWithSources(blot_reuse_project::Options{..},sources[..]);assert(error==blot_error::Error.none);
+    let stale=snapshot;let path,error=snapshot.canonical("/tmp/frame-input.blot");assert(error==blot_error::Error.none);
+    let bytes,error=snapshot.read(path);assert(error==blot_error::Error.none && bytes=="const value = 17\n");
+    let missing,error=snapshot.read("/tmp/frame-hidden.blot");assert(error==blot_error::Error.file_not_found && missing.len==0);var provider=snapshot.provider();assert(provider.cause(error)=="FileNotFound");
+    workspaceLifecycle();assert(snapshot.valid() && snapshot.counts().source_reads==2);
+    var frozen=snapshot.freeze();assert(!snapshot.valid() && !stale.valid() && frozen.valid());
+    workspaceLifecycle();let captured=frozen.capturedSource(path);assert(captured.present && captured.value==bytes);
+    let old=frozen;frozen.deinit();assert(!frozen.valid() && !old.valid());
+}
 fn main() {
     var previous:u64=0;
     for cycle in 0..4 {
@@ -150,6 +161,7 @@ fn main() {
         emptyPatternsPacket();
         preparationPublication();
         seedPublication();
+        inputPublication();
         let allocation_owner=blot_native::fresh_owner_id();
         let session,error=blot_eval_core_eval::initOwnedEmptySession(allocation_owner);
         assert(error==blot_error::Error.none && session);

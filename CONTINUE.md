@@ -54,7 +54,7 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Twenty-three executed production helper laws pass together in 153.68s. They cover
+Twenty-four executed production helper laws pass together in 159.22s. They cover
 real Frame create/release, nonempty session tables, ordinary and packet-decoded
 Checked publication through worker slots, Prepared lifetime, receipt admission,
 diagnostics, readers, imports, snapshots and editor budgets. Packet observers
@@ -103,12 +103,21 @@ Astra reviewed consumption, allocation-failure ordering and moved-key resets.
 Diagnostic record publication and concrete owned pushes retain exact text pools;
 a rich cloned diagnostic survives producer teardown and real Frame cleanup.
 
-Selected batch 99 passes executor/metadata and clears candidate_seed ownership.
-It reaches live revision-input Snapshot ownership across Frame.create and the
-remaining dispatch candidate_runs publication path. Whole compiler integration
-remains unqualified: no whole C program, header or executable. Actual CLI/server,
-request OOM/retry and differential qualification remain pending. See [the exact
-frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+Live/frozen revision inputs and source overlays now carry scalar checked keys;
+their existing registries own all buffers and text. This removes inactive defaults,
+12 borrowed input fields and four unused duplicate record types. Source overlays
+reserve their known final table capacity once. Complete canonical observation
+stores own both success bytes and failure causes. Native asset/editor/server
+callers preserve their data and wire behavior. Five typed executor record Options
+clear the measured project_jobs alias path. The new executed executor law covers
+invalid-size rejection, an empty valid batch, pooled cleanup and Frame lifecycle;
+actual worker packet integration remains pending.
+
+Selected batch 101 passes executor/metadata and clears input Snapshot/candidate
+run errors. It reaches backend pinWorkspaceInputs unit publication and a generic
+DiagnosticBuffer push. Whole compiler integration remains unqualified: no whole
+C program, header or executable. CLI/server, request OOM/retry and differential
+qualification remain pending. See [the exact frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 The optional private direct-global empty-holder precision extension passes 24 new
 controls and the existing 24 semantic controls with diagnostic/runtime/C parity.

@@ -58,7 +58,7 @@ fn growth() {
     let options=blot_reuse_project::Options{prelude_path:blot_support::some<const u8[:]>("/tmp/loader-prelude.blot"),..};
     var snapshot,error=blot_reuse_revision_inputs::initWithSources(options,sources[..]);assert(error==blot_error::Error.none);
     var provider=blot_reuse_editor_completion::Provider{ordinary:snapshot.provider(),filename:"/tmp/loader-chain0.blot"};
-    var loaded,error=blot_reuse_project::loadWithInputs("/tmp/loader-chain0.blot",snapshot.options,provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len==0);
+    var loaded,error=blot_reuse_project::loadWithInputs("/tmp/loader-chain0.blot",snapshot.options(),provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len==0);
     assert(loaded.units.items.len==17 && loaded.entry==2 && loaded.prelude_unit==1 && loaded.imports.items.len==15);loweringControl(loaded);
     assert(loaded.order.items.len==17 && loaded.order.items[0]==1 && loaded.order.items[1]==17 && loaded.order.items[16]==2);
     var done:bool[17]=[false;17];var ready=blot_reuse_project_check::ParallelUnits{};var work=blot_reuse_project_check::ParallelUnits{};
@@ -104,7 +104,7 @@ fn diagnosticSelection() {
     let original,error=snapshot.read(target);assert(error==blot_error::Error.none);
     let captured,error=blot_reuse_completion_probe::capture(original,17);assert(error==blot_error::Error.none && captured.present);var probe=captured.value;
     var provider=blot_reuse_editor_completion::Provider{ordinary:snapshot.provider(),filename:target,replacement:blot_support::some<const u8[:]>(probe.source)};
-    var loaded,error=blot_reuse_project::loadWithInputs(target,snapshot.options,provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len!=0);
+    var loaded,error=blot_reuse_project::loadWithInputs(target,snapshot.options(),provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len!=0);
     var retained_paths=ownedSourcePaths(loaded);    var escaped=escapedSourceDiagnostics(loaded);assert(escaped.owner.valid() && escaped.modules.len==loaded.units.len && escaped.body_caches.len==loaded.units.len && escaped.diagnostics.len==loaded.diagnostics.len);
     assert(escaped.reused_modules.len==loaded.units.len && escaped.interface_colors.len==loaded.units.len && escaped.binding_maps.len==loaded.units.len && escaped.relocated_modules.len==loaded.units.len);
     assert(!escaped.modules[0].present && !escaped.reused_modules[0] && !escaped.binding_maps[0].present && !escaped.relocated_modules[0].present && escaped.diagnostics[0].source.value.message().len!=0);
@@ -197,7 +197,7 @@ fn main() {
         var probe=captured.value;assert(probe.prefix=="hel" && probe.replace.start==14 && probe.replace.end==17);
         assert(probe.source=="const value = __blot_editor_probe\n" && probe.originalOffset(probe.marker.end)==17);
         var provider=blot_reuse_editor_completion::Provider{ordinary:snapshot.provider(),filename:path,replacement:blot_support::some<const u8[:]>(probe.source)};
-        var loaded,error=blot_reuse_project::loadWithInputs(path,snapshot.options,provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len==0);
+        var loaded,error=blot_reuse_project::loadWithInputs(path,snapshot.options(),provider);assert(error==blot_error::Error.none && loaded.diagnostics.items.len==0);
         assert(loaded.units.items.len==1 && loaded.entry==1 && loaded.filename(1)=="/tmp/completion-probe.blot" && loaded.unit(1).source==probe.source);
         loaded.deinit();probe.deinit();snapshot.deinit();
     }
