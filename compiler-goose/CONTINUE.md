@@ -1,97 +1,62 @@
 # Finish the Goose compiler experiment
 
-The writing-first phase is over. Current work is to fix production lifetime
-failures in coherent families, produce the complete native compiler, then
-qualify CLI/project-server behavior and recoverable request OOM against Zig.
-Run bounded batch checks at family boundaries rather than per-edit fixtures.
-Never count source presence or a selected-root check as whole-port completion.
+Fix production ownership in coherent families, build the complete native compiler,
+then qualify CLI/project-server behavior, recoverable request OOM and retention
+against Zig. Source presence and selected-root diagnostics are partial evidence.
 
-Keep `compiler/` and its installed binaries as the oracle. `oracle.json` pins
-Zig commit `156f84b4810f630dff7e5efb7014b2194e3160f7`; the executable copy and
-identity are in ignored `build/goose-port/oracle/`. New-language comparisons
-must use the corresponding newer Zig candidate and pinned source inputs.
-Preserve sibling checkouts and installed Goose toolchains.
+All **21 executed production helper laws pass**, including actual compiler frame
+create/release, Plan/outline/archive cleanup, nonempty session-table offset/Slot
+views, shared editor budgets and owned dependency snapshots. The extended Frame
+law passes four allocation/deinit/reuse cycles in6.115s. Exact source/tool hashes
+and raw receipts are in [the completion frontier](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-Use the tracked private checker recipe. The newer selfhost Goose snapshot is
-not a qualified replacement for this port's packages, reusable pools and native
-host APIs. Selected-root diagnostics are partial. Normal whole builds emit C
-and a host header, then compile and link the real Goose CLI with native OS
-adapters. Repair stages cap at 120s; final emission may use 180s after engine checks.
-Whole attempts share a 300s limit.
+Selected batch89 passes executor/metadata and reaches two retained-revision
+errors in the server entry: local CompileOptions views across Frame.create, and
+frontend body-auxiliary owner publication. **No whole C/header/executable exists.**
+General nonempty Session/catalog borrowing and integrated runtime qualification
+remain pending. Do not forward compilation to Zig or insert placeholder success.
 
-Seventeen executed production families pass together, including complete native
-asset preparation/error ownership, completion snapshots, loader/parallel
-scheduling and editor lifetime controls. Their exact inputs and binary identities
-are pinned in the root completion evidence; none is whole-port qualification.
+Use the tracked private checker recipe and the existing qualified678 binary from
+the root frontier. Its optional direct-global empty-holder precision passes24 new
+and24 existing controls; bounded GlobalReach logging preserves on/off diagnostics.
+Installed Goose and siblings remain unchanged. Newer selfhost Goose snapshots are
+not qualified for this port's native/packages/pool interfaces.
 
-Project checker engines and shallow workers are invocation-local values.
-Synchronous callback contexts borrow the local engine; caller-owned compiled
-module/mask views and execution observers remain borrowed. The old engine
-registry and editor-prefix copy/writeback machinery are removed. Worker requests
-own Option<Engine> and destroy it before source/packet ownership. No project
-graphs are cloned to solve invocation lifetimes.
+Repair stages cap at120s. After entry checks, final C emission may use180s within
+the shared300s whole-build cap. The actual builder regenerates source identity,
+emits C plus a host header and links the real Goose CLI/native OS adapters.
+Source-only identity metadata is unqualified. Keep compiler/ and installed Zig
+binaries as oracle; oracle.json pins the older language candidate, so new-language
+comparisons need the matching newer Zig identity. Preserve sibling source/assets.
 
-Source/Patterns retain 49/2 alias guards, frozen proof headers are values, import
-maps hold scalar arena indices, and SourceValidation owns 19 registered views.
-Loader and scheduler scratch use existing fixed pooled headers. NativeAssets
-sorts scalar indices instead of aggregate metadata; generated error codes remain
-owned after generator cleanup. Final Sources publication still has a worst-case
-quadratic owner lookup, pending a measured optimization.
+Project engines and shallow workers are invocation-local; callbacks borrow local
+state, workers destroy their Engine before source/packet ownership. Source/Patterns
+retain49/2 alias guards. Frozen proof headers are values, imports use scalar arena
+indices and SourceValidation owns19 registered views. No project graphs are cloned.
 
-Source/semantic diagnostics and CheckedProject/Prepared headers publish exact
-owned views. Parallel lowering owns its fixed slot run; fixed-mode result payloads
-are reconstructed after mutation. Snapshot owned-header factories preserve
-existing owner journals and shared/pin lifetimes. All 17 executed families pass;
-the current combined entry check is pending after explicit generic annotations.
-No whole C/header/executable exists; CLI/server/OOM qualification remains pending.
-Repair stages cap at 120s; final emission may use 180s after entry checks, sharing
-the 300s whole-build limit. Source-only manifest metadata remains unqualified;
-the actual builder regenerates identity before emission.
+Owning headers use exact registered runs and existing journals. Thirty restores
+fill fresh allocations before publishing views; buffer writers name owned
+destinations. Plan storage is concrete for the single active workspace. SessionTables
+uses scalar lease/generation; ModuleStamps uses fixed pooled buffers. Generic record
+forwarding must not erase owned-view provenance. NativeAssets sorts scalar indices;
+its final Source owner lookup remains potentially quadratic, pending measurement.
 
-Native request rollback and runtime observation components are tested; their
-whole compiler integration remains unqualified. A
-committed worker forks a candidate before reading each request; only a complete
-staged reply can adopt it. Explicit allocation failures discard the candidate
-and retain the committed heap. Generic panics and signals are not OOM. A dedicated token-bound stage-worker
-capability now covers native initialization/execution/cleanup refusals; normal
-and sanitizer controls pass, while whole compiler integration remains pending. Coverage
-must distinguish observed pool operations, reserved capacity and RSS; unavailable
-live/scratch counts must stay explicitly unavailable.
+Runtime supervisor/transport/cache/observer components pass normal and sanitizer
+controls using a fake compiler entry. Candidate heaps/cache writes stay staged
+until a complete validated reply is adopted. Token-bound allocation refusals cover
+worker initialization/execution/cleanup; generic panics/signals are not OOM.
+Actual compiler integration is pending. Pool operations, reservations and RSS do
+not establish unavailable live/scratch byte counts.
 
-Retained contexts now use canonical typed metadata and fixed pooled buffers.
-Lexical contexts may borrow caller-owned tables. Arrays cannot
-become multiple owning fields in one Goose record. Backend Function/Signature
-records use ranges into Module tables. Owner identities are fresh process-local
-u64 values, not pointer casts; zero declines optional cache authority. Marks,
-rollback, source checking and private proof ownership remain distinct.
+Retained contexts keep canonical typed metadata; lexical contexts may borrow local
+tables. One Goose array cannot become multiple owning fields. Backend function and
+signature records use Module-table ranges. Owners are fresh process-local u64
+identities, never pointer casts; zero declines optional authority. Marks, rollback,
+source checks and private proof ownership remain distinct. Error results retain
+original wire names; Option contains fixed optional values. Native adapters provide
+bits, byte I/O, clocks and atomics, never Blot compilation or interpretation.
 
-`support/error.goose` owns explicit trailing Error results and original wire
-error names. `support/option.goose` contains only fixed optional values. Native
-adapters supply scalar bit representations, OS byte I/O, clocks and atomics;
-they do not compile or interpret Blot or Zig.
-
-The local Goose specification is in
-`../goose-to-wasm/build/source/docs/goose_spec.md`; the live sibling is under
-independent development. Its current bootstrap has gaps around native threads,
-encoded references, recoverable allocation and source-package imports. Preserve
-the requested source contracts and record gaps; choose and qualify the Goose
-toolchain after writing. Do not work around gaps by weakening Blot checks,
-forwarding compilation to Zig, or inserting placeholder successes.
-
-Receipt return and owned graph publication pass a focused C/link/execution law
-in 35.99s. Seven worker roots pass the frozen batch86; batch87 server reaches
-three pooled evaluator and archive/workspace reset lifetime errors. Two nested
-readonly slice defaults are typed. Whole C/header/executable remain unavailable.
-
-The archive metadata sentinel and evaluator empty-bootstrap parameter are removed.
-All 19 executed laws pass, including repeated empty-session and archive-capture
-lifecycles. Archive law excludes clearBacking: resolved-body Store still borrows
-its grow-only payload owner permanently. General nonempty Session input ownership
-is also unresolved; no whole compiler executable exists.
-
-The current broad batch passes20 laws. The default21st law, empty_session, now
-includes real Frame.create/release and fails at the remaining Session context
-publication edge. Real Plan/outline/archive cleanup pass. Thirty restore functions
-fill fresh owner runs before publishing views; generic buffers preserve exact
-destinations, and ModuleStamps uses fixed pooled headers. Source remains an
-unqualified whole compiler; the targeted private GlobalReach trace is qualified separately and does not change acceptance.
+The local Goose specification is ../goose-to-wasm/build/source/docs/goose_spec.md.
+That sibling develops independently. Preserve requested contracts and explicitly
+qualify toolchain gaps; never weaken Blot checks to bypass them. Superseded
+checkpoint narratives remain in pinned Git history.

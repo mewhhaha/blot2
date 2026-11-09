@@ -54,8 +54,8 @@ The current user scope is lifetime repair, actual native compilation, then
 CLI/server, retained state and recoverable request OOM qualification. Use
 coherent source batches and bounded checks; source presence is not completion.
 
-Twenty executed production families pass together; the actual Frame lifecycle
-is the one failing law in the 21-law default inventory. They cover diagnostic and
+Twenty-one executed production families pass together, including real compiler
+Frame.create/release and nonempty registered session-table spans. They cover diagnostic and
 body ownership, live/frozen readers, imports, SourceValidation, frames, native
 assets, completion snapshots, loader scheduling and editor budgets. These laws
 check real helpers in seconds; they do not qualify a whole compiler executable.
@@ -88,11 +88,12 @@ A focused C/link/execution check passes in 35.99s, and seven worker entry roots
 pass in one frozen batch. The server entry now reaches pooled evaluator and
 archive/workspace reset lifetime errors. The inactive archive metadata sentinel is
 now removed, and persistent evaluator bootstrap takes no borrowed unit input.
-The broad20-law batch passes, including real Plan payload and outline cleanup.
-Thirty map restores fill exact fresh runs before publishing headers, and
-ModuleStamps uses fixed pooled buffers. The expanded Frame law remains blocked
-by one Session context-to-Plan ownership edge; general nonempty evaluator
-borrowing is also unqualified. See the [frozen Frame diagnostic](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz). There is still no
+The full21-law batch passes, including real Frame/Plan/outline cleanup.
+Thirty map restores fill exact fresh runs before publishing headers; ModuleStamps
+uses fixed pooled buffers. SessionTables is a scalar checked lease, with executed
+nonempty offset/Slot view and reuse controls. The server entry now reaches two
+retained-revision Options/frontend-owner errors. General nonempty evaluator
+borrowing and whole compiler integration remain unqualified. See [Frame evidence](benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz). There is still no
 emitted whole C program, header or executable. Actual CLI/server, request OOM/retry and differential qualification
 remain pending.
 

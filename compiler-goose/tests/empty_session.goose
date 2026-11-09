@@ -16,9 +16,25 @@ fn workspaceLifecycle() {
     var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.valid());
     inspectWorkspace(frame);assert(frame.release()==blot_error::Error.none && !frame.valid());
 }
+fn tableViews() {
+    var tables,error=blot_eval_core_eval::initSessionTables();assert(error==blot_error::Error.none);
+    let state:blot_eval_core_eval::SessionTableState& =blot_eval_core_eval::tableState(tables);
+    state.binding_offsets.push(17);state.binding_offsets.push(23);state.node_offsets.push(31);
+    state.slots.push(blot_eval_core_eval::Slot{state:blot_eval_core_eval::State.complete,value:41});
+    let bindings=blot_eval_core_eval::registeredOffsets(state.binding_offsets);
+    let nodes=blot_eval_core_eval::registeredOffsets(state.node_offsets);
+    let slots=blot_eval_core_eval::registeredSlots(state.slots);
+    assert(bindings.len==2 && bindings[0]==17 && bindings[1]==23 && nodes.len==1 && nodes[0]==31);
+    assert(slots.len==1 && slots[0].state==blot_eval_core_eval::State.complete && slots[0].value==41);
+    assert(blot_support::same_slice_identity(bindings,state.binding_offsets.items));
+    assert(blot_support::same_slice_identity(nodes,state.node_offsets.items));
+    assert(blot_support::same_slice_identity(slots,state.slots.items));
+    tables.deinit();assert(tables.lease==0);
+}
 fn main() {
     var previous:u64=0;
     for cycle in 0..4 {
+        tableViews();
         let allocation_owner=blot_native::fresh_owner_id();
         let session,error=blot_eval_core_eval::initOwnedEmptySession(allocation_owner);
         assert(error==blot_error::Error.none && session);

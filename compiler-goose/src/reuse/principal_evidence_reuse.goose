@@ -106,7 +106,7 @@ fn initInto(result: State&, old: const blot_reuse_artifact_capture::Capture&, un
 fn deinit(self_: State&) {
     if self_.imported_inputs.present { self_.imported_inputs.value.deinit(); self_.imported_inputs.present = false; }
     if self_.graphs.present { self_.graphs.value.deinit(); self_.graphs.present = false; }
-    self_.gate.deinit(); self_.last_inputs .= null; self_.old .= null;
+    if self_.gate.storage!=0 {self_.gate.deinit();} self_.last_inputs .= null; self_.old .= null;
 }
 fn ensureGraphs(self_: State&) -> bool, Error {
     if self_.graphs.present { return self_.graphs.value.enabled, blot_error::Error.none; }

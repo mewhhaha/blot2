@@ -122,7 +122,7 @@ fn valid(self_:const Cache&)->bool {return self_.lease!=0&&self_.lease-1<cache_s
 fn initPooled()->Cache,Error {
  if cache_slots.len>=0xffffffff {return Cache {},blot_error::Error.out_of_memory;}
  let generation=blot_native::fresh_owner_id();let at=cache_slots.alloc_index(CacheSlot {state:CacheState {live:true,generation:generation,owner_id:blot_native::fresh_owner_id()}});let slot:CacheSlot& =cache_slots[at];
- slot.handle=Cache {lease:(at+1) as u32,generation:generation,keys:slot.state.keys, inputs:slot.state.inputs, owner_id:slot.state.owner_id, requests:slot.state.requests, reused:slot.state.reused, retained_words:slot.state.retained_words, examined_words:slot.state.examined_words, interface_visits:slot.state.interface_visits};return copy(slot.handle),blot_error::Error.none;
+ let result=Cache {lease:(at+1) as u32,generation:generation,keys:cache_slots[at].state.keys, inputs:cache_slots[at].state.inputs, owner_id:cache_slots[at].state.owner_id, requests:cache_slots[at].state.requests, reused:cache_slots[at].state.reused, retained_words:cache_slots[at].state.retained_words, examined_words:cache_slots[at].state.examined_words, interface_visits:cache_slots[at].state.interface_visits};slot.handle=result;return result,blot_error::Error.none;
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}

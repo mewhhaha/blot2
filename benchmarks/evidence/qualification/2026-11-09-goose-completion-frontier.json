@@ -434,6 +434,17 @@
         "Concrete TextMap growth rewrite did not affect error",
         "Cache default/factory/context/bootstrap probes remain ignored copied-tree evidence; no production changes from them"
       ]
+    },
+    "session_table_publication": {
+      "status": "21 laws pass; selectedserver reaches2 retained-revision errors",
+      "changes": [
+        "Scalar SessionTables lease/generation replaces11 borrowed default fields and inactive table sentinel",
+        "Three cache factories publish fresh headers from exact registered state fields",
+        "Session offset/Slot spans reify complete typed owner storage then expose live prefix",
+        "Region constraint publishers preserve already-owned names through concrete owning destinations",
+        "Default principal/query cleanup guards preserve strict live gate validation"
+      ],
+      "coverage": "Frame lifecycle and nonempty offset/Slot observer branches execute across4 allocation/deinit/reuse cycles"
     }
   },
   "latest_selected_frontier": {
@@ -442,37 +453,31 @@
       "server"
     ],
     "exit": 1,
-    "seconds": 104.176,
+    "seconds": 97.091,
     "stop": "completed",
     "errors": [
       {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
-        "line": 3525,
-        "message": "error: storing a reference rooted at units, which does not outlive the destination (\u00a79.2)"
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose",
+        "line": 36,
+        "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while options is still used: a reference to what may hold a reference or slice into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose:35 (\u00a75.1)"
       },
       {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
-        "line": 442,
-        "message": "error: cannot clear backing_generator_planning_bodies_payloads: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/semantic_archive.goose:137 (\u00a75.1)"
-      },
-      {
-        "file": "/home/jacobt/src/blot2/compiler-goose/src/driver/compile_workspace_backing.goose",
-        "line": 279,
-        "message": "error: cannot assign backing_module_stamps: global inactive_context may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/semantic_archive.goose:137 (\u00a75.1)"
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+        "line": 60,
+        "message": "error: cannot assign payloads: global owners may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_frontend.goose:40 (\u00a75.1)"
       }
     ],
     "full_qualification": false,
-    "source_sha256": "9b09628cc2dc4317ddaac719779ebad5042963d55002cd06109ab22ece3554ef",
+    "source_sha256": "78c9f527e8b0f06d11ef8b3ced7ccd5cca9ec0b63da2955b69661759652a1de4",
     "source_unchanged": true,
-    "goose_sha256": "54cfe71d2a9c80d8b6ef8a61586782707791cfcc76a259898961d6e32a9eb464",
-    "batch": 87,
-    "status": "Receipt returns and graph-owner publication clear; pooled evaluator and archive/workspace reset lifetimes are current."
+    "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339",
+    "batch": 89
   },
   "latest_executed_laws": {
     "passed": true,
     "goose": {
-      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/6d8b64b168f4865a633de75a86b30cac1534783cbe8fb6ba27f84a7595e0784f/goose",
-      "sha256": "6e1c9b284979cfe8617d420cb7caa5e1acf8fe66a4fd48062511882120bb3025"
+      "path": "/home/jacobt/src/blot2/build/goose-port/private-checker/678bb76efbff1b1b6a33143b802f1a807d005cfa7e81a149a9ef905f85e45294/goose",
+      "sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
     },
     "cc": {
       "path": "/usr/bin/clang-23",
@@ -480,109 +485,114 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.48679053399246186,
+        "seconds": 0.23723911101114936,
         "program_sha256": "893d85a4617ef14216f8e77890525f22406decaab6df9ea0cf997c281e6392ff",
         "binary_sha256": "4bfc2ca37d891349839f7804d0de11bc28a93c9aeff533b145cfa766b0880de9"
       },
       "expectation": {
-        "seconds": 0.2068840790016111,
+        "seconds": 0.15412392999860458,
         "program_sha256": "db3c037efd8d25e53380bc371ef964513fa06b3dd3edcf64845206fc738abe0c",
         "binary_sha256": "1838e7cf82e7b6fe126abee04bcb74487984073b5b236759af15c84fe01c548d"
       },
       "package_owner_frames": {
-        "seconds": 0.13348433299688622,
+        "seconds": 0.13542604399845004,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.6992023029888514,
+        "seconds": 1.75622832699446,
         "program_sha256": "a7361862b3896df0db617d691fb68521260a1c1f97f14c30b0f1f9d0fd1d3df8",
         "binary_sha256": "f473f51f2a3f626330378bb92a21d78689683be70eea4523847dda25e6c22575"
       },
       "proof_leases": {
-        "seconds": 3.5034780070127454,
-        "program_sha256": "c81622366f24f4547622ab2f0f00418703b0f47e2703bf18d04539e35428c316",
-        "binary_sha256": "a04ae9221b7c2d1a239e96c99a7ad04ff170839afff19ae3532f291eddf46826"
+        "seconds": 3.639075093989959,
+        "program_sha256": "c02cfb32d51d21634e87ac2e37a595c3b497c6822e7ed1ec0ce814be71fedd7a",
+        "binary_sha256": "9f6ba2e89ffcc025a37cab7729fe1815db94de3c433922f4f5d2a517f31fe4d4"
       },
       "source_sort": {
-        "seconds": 0.140954595990479,
+        "seconds": 0.1341346999979578,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 3.448707560019102,
-        "program_sha256": "d4ffb65add8e10411a8b80ffdd8c8033843099e29c052bc5f3a167440f07886c",
-        "binary_sha256": "fc9b009dc4ddafa4bee787b3176653ea17fcaa743c197d9ad9d11ff7f5a36faa"
+        "seconds": 3.553673602989875,
+        "program_sha256": "fa6eebf77185eeab1cb6cded30553618a880f3110c48792370b69c224e4f1687",
+        "binary_sha256": "bf3e4f58f15bb0d9653c39c9aa4d49f4978a542e25dbd271c54f6185e5249ee8"
       },
       "body_freeze": {
-        "seconds": 7.150592065008823,
-        "program_sha256": "8fd122b16ad3d8b4cd314e6544a46d0031f5cb67ac320af9d60108970e14886e",
-        "binary_sha256": "8ec42e129d892ceefdf9aa223e91e5da001e61acb474e548a8ec6f2881d48add"
+        "seconds": 7.522162309993291,
+        "program_sha256": "3b8b3d9c00f7eb7b518f2849c671b4743a102d8288df7cecbbadff7862626b0a",
+        "binary_sha256": "c039f0d51386263d14ea4d597959ce478c09a5ab9d436e66e645621c21b5082a"
       },
       "immutable_readers": {
-        "seconds": 4.042760009004269,
-        "program_sha256": "12f3e296e14198ada8e14649012d762cf8ede7760e15e51824b00b0d07b72766",
-        "binary_sha256": "709e85530f7dd4bbc6d927a45d8ce9216f113a41da67b82fd7027e77b34db51a"
+        "seconds": 4.1712606879882514,
+        "program_sha256": "5de2d2306b3cacd7570cd5ab410df183cd39859bd0ba51e81283a1390e87cf5f",
+        "binary_sha256": "3433a05e6fbda12ac68ac87dc811be5703231b417728ff64b69f49ed2fb7c1e7"
       },
       "import_arena": {
-        "seconds": 3.545291457005078,
-        "program_sha256": "762acee71d9ee07a54068abe2fc5d1ef1a2efa46471d72372ae71e753ae97330",
-        "binary_sha256": "26834965fe0d9658b26365614b41b4b2b367d957ef22bde9f8bf0124702e8bae"
+        "seconds": 3.8691674529982265,
+        "program_sha256": "e5f81e7343941636155548b39741a79a44b763fce799dbe3fb771fdf3ad24c24",
+        "binary_sha256": "ebd1a9fcfee33a8a1f618904419da518d92a548095b688ee75f7c44d85dc1a31"
       },
       "source_validation_ownership": {
-        "seconds": 4.020642410003347,
-        "program_sha256": "eae932c16286702fd52126c1e3e84a53c1c025b48d3b812c1d15d73c26f0a9e2",
-        "binary_sha256": "019d36dfc8d7b26cc718d3a6f094bd2370485380553d0957e12b8e2da990b1c1"
+        "seconds": 4.674419498012867,
+        "program_sha256": "034da51a6d97a053d0dba319a2f03bac16d076dcb9a1b1422bca611c473c54b5",
+        "binary_sha256": "dbe7adde07a3a65a4bc18702871042748cd7a490b89bacbf29f10bdad30a3b67"
       },
       "editor_budget": {
-        "seconds": 6.101323012000648,
-        "program_sha256": "d270b490e3f46783841b150c62fd7984b0723190e446661eeb20db1d1b0a42d4",
-        "binary_sha256": "e990ab7268ff3f4248bcc9d1e804b782c701b757f18414150c51c7542b05d882"
+        "seconds": 7.328917865001131,
+        "program_sha256": "bd09ea5beb5635c561c5bf0fb8af049d56f1e74a56e21bf6835480056903fa07",
+        "binary_sha256": "ae8e1e8710f23564be4abf3b4012cb2dd74a35b06fae0afa5387b2fdba3880fd"
       },
       "cache_root_frames": {
-        "seconds": 3.2316769339959137,
-        "program_sha256": "be087da496a20319a766206415c8e5b22514b9cef0d8fb6f9fe16bafbbbf4d2e",
-        "binary_sha256": "04a5290e0de202e0a58f8e362dc9b06f821298f7cf251a00b7fd29fda6b03358"
+        "seconds": 3.373352505004732,
+        "program_sha256": "da865dafa673b342ad65d64305fc281178460eb5e614d05f63d9b2f377c9eaa3",
+        "binary_sha256": "d791b04dcdfe663635faa8c8736233aae44b4de28cc8baf6a7b6284d974ccc5f"
       },
       "native_asset_metadata": {
-        "seconds": 4.559507284982828,
-        "program_sha256": "141037f4613397a1014faacb85df8cb633f799229115a9ba45de5f13c03b56c6",
-        "binary_sha256": "870ae134b88c80474c27ea94ce77c100126adfc411951cb03df3fdd118b3e07f"
+        "seconds": 4.654870433994802,
+        "program_sha256": "e98c26eba88364bd343421228889d62d04af0901433a426efa932e8eeeaad9b9",
+        "binary_sha256": "2aa56cee0fdee20372f5922ea8f1e2dfbd27f190d4468484a54dea538aa5e343"
       },
       "completion_probe": {
-        "seconds": 3.4919546199962497,
-        "program_sha256": "1721aa1e12d72013e00b4941cdb4c252ec21094dc748d55673cc9c2e918aab6f",
-        "binary_sha256": "e3e383f067edd54c53b50509b15c33776b55263ac07a357df15a47138162cb4d"
+        "seconds": 3.6303270990028977,
+        "program_sha256": "41646994ea37c59773f14a827006621234b773417dd85a3e735e91b0b8b79432",
+        "binary_sha256": "effccae12da1baafdb962c2451bf81ed22f35736a1fc892e119ea9b43a232014"
       },
       "completion_project_load": {
-        "seconds": 7.787252067995723,
-        "program_sha256": "d91b7984b327b912e3a1e069a88d1858b2b327dfc71782cf9640919ec259c06e",
-        "binary_sha256": "5e0f4f7cb701d66a3f981f5f958d1fe56cc90012979928daa789a716a8011467"
+        "seconds": 7.845892746991012,
+        "program_sha256": "807c132a80cdbd77a69836e6d7d74f5706889bdc54685cbb536ef0b18acef2ef",
+        "binary_sha256": "3f13dfc9dc4024e91a153258252c39d40ead3ee250076dcc3352b3f6dfcafa01"
       },
       "dependency_ownership": {
-        "seconds": 37.800618427980226,
-        "program_sha256": "14a1e03a5621c7f2cecc57b649ff6d2054cfe5b24162fd4c859aa3f1576e633d",
-        "binary_sha256": "ac6c9d07e92dc207b6628c1aef2bd869f9b15be1296582797bbfd4fea443a33c"
+        "seconds": 37.18061385699548,
+        "program_sha256": "df3992151c7e52c200142c68099b4326e7a02009f2ae92b2685f4c22053493b8",
+        "binary_sha256": "edd785e8e1305e56c441600028b16b8bf7b7843a8ef452c6d8b2ecf62ffb4ffc"
+      },
+      "empty_session": {
+        "seconds": 6.450841090991162,
+        "program_sha256": "bd447fc2dc7a44e20a9db21ac1a894491d773eb8ab4ff0c2c92820e8f2fb4d1b",
+        "binary_sha256": "f202d7c0ef8c8391faa7a0e9242e0741919ff6c7a9c185b8cefc163fd10db873"
       },
       "archive_capture": {
-        "seconds": 3.8864911920099985,
-        "program_sha256": "3afad0c1434f25be00b4908be5930fd27e54dfe86820075cf2a31346cd0accdf",
-        "binary_sha256": "04f36fd17a4934f5582ef0b30bd879aed4cca67d9f271eb2ad232ce38fc61e30"
+        "seconds": 3.8455890330078546,
+        "program_sha256": "b83c743d058288339acbc833b9056e6f326a4c198fa5ee9dab4a9cc556bf777a",
+        "binary_sha256": "f751018cd82e58e0f52d2ffc7832bb76a9fe1c8218bbac9b3118bee7e732c8dc"
       },
       "resolved_body": {
-        "seconds": 3.357399285014253,
-        "program_sha256": "bc5fb3bc80c6a13cadbd55a58e2b1f23706c8fd596d0da9e700f3889aef6984c",
-        "binary_sha256": "538507dcd6901142e0f677ed74cdf24bd604e42d91f3033d9b1c1db8f57cc590"
+        "seconds": 3.366386373003479,
+        "program_sha256": "417342235bebeae10d2b2e28c4debab5c3f73cdc7f683ab9c61484d23437288c",
+        "binary_sha256": "a6cfd562b4e7b81ce1799e0320dd85c5d62f247fd262f226f8347982b04ce0c7"
       },
       "wasm_scope_outline": {
-        "seconds": 3.9271663629915565,
-        "program_sha256": "52b0bbccaaf7d734bc60497112ec74a1eae587eda82bcd5339528437ee6a4fac",
-        "binary_sha256": "13ec222705c7538704c54f3fd2ab080dab108a66164a4e1c30f00036d0041267"
+        "seconds": 4.120621261972701,
+        "program_sha256": "15be151420a2e2d014e0f60277ea0a8d440eb74e72cfa99adc322d47c8b10eeb",
+        "binary_sha256": "d3558c784687245438a6fd3927c6560187f8476576379badb6da8a0c01ea30d9"
       }
     },
+    "scope": "All21 production helper laws C/link/execute pass. Extended Frame law additionally checks nonempty table spans in6.115s on identical production source. Not whole compiler qualification.",
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_receipt_sha256": "85de574d8d9101d97b7cbbde026a1f955391a45f1438e9f3ee07454a6fee7698",
-    "scope": "20 executed laws pass; default21-law inventory remains incomplete because actual Frame lifecycle fails at one global Session context ownership edge."
+    "raw_receipt_sha256": "d644693960092611b7ecbe9fb1736aa68729993089c20a21326f1824d14c51b9"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -599,7 +609,7 @@
     "compiler-goose/src/check/source_sort.goose": "3963e8b9107f5b064539245e8e6b8ffbdbe62bc73c0a9cc1db3d0c00e6e30f23",
     "compiler-goose/src/check/usage_check.goose": "5cd6ff97d5af77cf39006219f3180dab64e3c1bb9e9d25c133168fee56e00c22",
     "compiler-goose/src/eval/closed_evidence_import.goose": "78bfe5001b57919e7d97cfffdb7c5c7b3db83d4e8e2ee6b7a0c1f23a39b544fa",
-    "compiler-goose/src/eval/core_eval.goose": "0b479b9621b4791752eca0695df02eaf64b12459009e4fbc53d20270ae80d089",
+    "compiler-goose/src/eval/core_eval.goose": "bef4f101d642bb09718dd39788b058a193252f47cdb6245b876044c322d330c4",
     "compiler-goose/src/eval/implementation_evidence.goose": "642ad0586347b8140dddfe69624dcc207600c4c712eb48a44d137a2707fb53df",
     "compiler-goose/src/eval/implementation_predicates.goose": "0abae4a4261fbebe8dbb027f98519ad403189e702c01fb02d1b46cedcb5d89f3",
     "compiler-goose/src/eval/implementation_rows.goose": "2f445390115cb2a518ee7320f7f45df28cc940bb8d35714309ad6a5b3c83701a",
@@ -690,12 +700,12 @@
     "compiler-goose/src/reuse/dependency_owned_headers.goose": "b9a5af079fe717fe786a5989910a39c693baa807f15d1cce16034bb1d385b8e5",
     "compiler-goose/src/backend/backend_checkpoint.goose": "89309d02b4185a5b2b1f9c110389988c7112ff0b0177b42026eee301dde9d599",
     "compiler-goose/src/bootstrap_globals.goose": "4abcc76fab35fdaa3efc082fe1c2997c7527aa390208237d6021d6212150b931",
-    "compiler-goose/src/eval/completed_specialization_query.goose": "6d9ed1da84e9c736dd637249e6ae5703f538a98079fdce57e8fbfdb618248846",
+    "compiler-goose/src/eval/completed_specialization_query.goose": "ed7f18f9cae130204e235a60d6a9b1c220aa1786c033280e2923dc11d7672d0e",
     "compiler-goose/src/reuse/artifact_capture.goose": "82afb2b25378b8be668e807dae60af0b3b8659a22ed9747cf7db5dc077119eec",
     "compiler-goose/src/reuse/artifact_fragment.goose": "dcb7745ca10c95f60d0be65fbaaf48a80a3189ecfb57cae0a7d4b9be1dd0ac10",
     "compiler-goose/src/reuse/independent_call_proof.goose": "699a07741791aee5689aee5eb6e37e6519a92922d5934edf36677702cf3aadda",
     "compiler-goose/src/reuse/independent_worker.goose": "68753de61978ac70be5283b34eae5cfadd80b54ef5218a02121aa83936b01961",
-    "compiler-goose/src/reuse/principal_evidence_reuse.goose": "dbcb2e69d0c2c1a317e6a852ee86821380e089f89e9babd40474adedb159b3a2",
+    "compiler-goose/src/reuse/principal_evidence_reuse.goose": "1bb245c3e25be723d60af30e97ad09b804c1908346628c046e889982545cce02",
     "compiler-goose/src/reuse/refinement_receipt.goose": "4db40691548778909c26606e67cbce5fecdc56b039162464972751017bd283cf",
     "compiler-goose/src/reuse/semantic_archive.goose": "dcd579b258d7117b31748c3676b529541c77592d4ee3932b2f7e242e984a293b",
     "compiler-goose/src/backend/backend_plan.goose": "833a45ac0dc596f5de7957933ffb27e577228cc707bf0449c1e1f59b51b19f0e",
@@ -713,7 +723,10 @@
     "compiler-goose/src/eval/specialization.goose": "cfe31afb9f93d75d5f57fc1c93db28ded750e1c9ff2a38bb39932f8dcc777235",
     "compiler-goose/src/reuse/code_artifacts.goose": "9814daca5d4f9afd1f7cebafa760af58e717d51315be6dcc856d9dfe4607ad99",
     "compiler-goose/src/reuse/projection_cache.goose": "d29911341c53c9f87160e942ec8bf23fcb86d319fe05c194513f007a3cbf6ca4",
-    "compiler-goose/src/support/pooled_buffer.goose": "f9eca274b22d366ee5c84b17644a05130b08e4f7169dcd416970052031fa576a"
+    "compiler-goose/src/support/pooled_buffer.goose": "f9eca274b22d366ee5c84b17644a05130b08e4f7169dcd416970052031fa576a",
+    "compiler-goose/src/eval/body_recipe.goose": "f1e05dc61f7c9d65482142fe7b77f83d33102a2b5f84865467b5f768c5e872b9",
+    "compiler-goose/src/eval/lexical_capture_inputs.goose": "60480fad834fe785eb31d7a00f5f27605594a28c8501eee5151009534239f132",
+    "compiler-goose/src/eval/source_owners.goose": "5ce87c5f101cdb034e9eab7f02aaee101e1a39b8f2e6c77feeeea0d38ea06229"
   },
   "unqualified": [
     "whole compiler executable",
@@ -1532,10 +1545,11 @@
     ]
   },
   "frame_frontier": {
-    "status": "compile failed; not executed",
+    "status": "C/link/execution passed",
+    "seconds": 6.114627458999166,
+    "scope": "Actual repeated Frame.create/release plus nonempty offsets/Slot registered-view identity and deinit/reuse laws.",
     "raw_receipt": "benchmarks/evidence/qualification/2026-11-09-goose-frame-frontier.json.gz",
-    "raw_receipt_sha256": "5c2fa2cc7a945d8d3c7d2a47a16fdaadac344e6940d8a4c12220ec1d3314896c",
-    "remaining": "Actual Frame.create/release extends the empty-session law; one global owned_session_contexts-to-Plan payload lifetime diagnostic remains."
+    "raw_receipt_sha256": "f346c2cf0d48e7fe0ad08ad2612991bb337940d925aa0bccaf49b07efd554ff0"
   },
   "selected_batch88": {
     "partial": true,
@@ -1628,6 +1642,66 @@
         "source_sha256": "11b2f7fd0da314ac979189305065b628e9ce0e9ccb90a55943cd955ee711d4de",
         "source_unchanged": true,
         "goose_sha256": "7ebe012b0c5637777a98dbb87e810e26e135cdacea058837703a53451d8ef910"
+      }
+    ],
+    "full_qualification": false
+  },
+  "selected_batch89": {
+    "partial": true,
+    "seconds": 97.216,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "server"
+        ],
+        "exit": 1,
+        "seconds": 97.091,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose",
+            "line": 36,
+            "message": "error: cannot call blot_compile_workspace::create, which shrinks payloads while options is still used: a reference to what may hold a reference or slice into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_prepare.goose:35 (\u00a75.1)"
+          },
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+            "line": 60,
+            "message": "error: cannot assign payloads: global owners may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/retained_revision_frontend.goose:40 (\u00a75.1)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "78c9f527e8b0f06d11ef8b3ced7ccd5cca9ec0b63da2955b69661759652a1de4",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "executor"
+        ],
+        "exit": 0,
+        "seconds": 4.257,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "78c9f527e8b0f06d11ef8b3ced7ccd5cca9ec0b63da2955b69661759652a1de4",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "metadata"
+        ],
+        "exit": 0,
+        "seconds": 1.252,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "78c9f527e8b0f06d11ef8b3ced7ccd5cca9ec0b63da2955b69661759652a1de4",
+        "source_unchanged": true,
+        "goose_sha256": "3744e22352314fe5ad9d44bb58c1ee4bd504f032a3dfb542f77d22ab95db1339"
       }
     ],
     "full_qualification": false

@@ -87,7 +87,7 @@ fn valid(self_:const Cache&)->bool {return self_.lease!=0&&self_.lease-1<cache_s
 fn initPooled()->Cache,Error {
  if cache_slots.len>=0xffffffff {return Cache {},blot_error::Error.out_of_memory;}
  let generation=blot_native::fresh_owner_id();let at=cache_slots.alloc_index(CacheSlot {state:CacheState {live:true,generation:generation,owner_id:blot_native::fresh_owner_id()}});let slot:CacheSlot& =cache_slots[at];
- slot.handle=Cache {lease:(at+1) as u32,generation:generation,recipes:slot.state.recipes, keys:slot.state.keys, declined_limits:slot.state.declined_limits, owner_id:slot.state.owner_id, requests:slot.state.requests, builds:slot.state.builds, planned_visits:slot.state.planned_visits, replayed_visits:slot.state.replayed_visits, declined_walks:slot.state.declined_walks, reused_declines:slot.state.reused_declines};return copy(slot.handle),blot_error::Error.none;
+ let result=Cache {lease:(at+1) as u32,generation:generation,recipes:cache_slots[at].state.recipes, keys:cache_slots[at].state.keys, declined_limits:cache_slots[at].state.declined_limits, owner_id:cache_slots[at].state.owner_id, requests:cache_slots[at].state.requests, builds:cache_slots[at].state.builds, planned_visits:cache_slots[at].state.planned_visits, replayed_visits:cache_slots[at].state.replayed_visits, declined_walks:cache_slots[at].state.declined_walks, reused_declines:cache_slots[at].state.reused_declines};slot.handle=result;return result,blot_error::Error.none;
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}

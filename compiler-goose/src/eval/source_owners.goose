@@ -54,7 +54,7 @@ fn valid(self_:const Cache&)->bool {return self_.lease!=0&&self_.lease-1<cache_s
 fn initPooled()->Cache,Error {
  if cache_slots.len>=0xffffffff {return Cache {},blot_error::Error.out_of_memory;}
  let generation=blot_native::fresh_owner_id();let at=cache_slots.alloc_index(CacheSlot {state:CacheState {live:true,generation:generation,owner_id:blot_native::fresh_owner_id()}});let slot:CacheSlot& =cache_slots[at];
- slot.handle=Cache {lease:(at+1) as u32,generation:generation,units:slot.state.units, owner_id:slot.state.owner_id};return copy(slot.handle),blot_error::Error.none;
+ let result=Cache {lease:(at+1) as u32,generation:generation,units:cache_slots[at].state.units, owner_id:cache_slots[at].state.owner_id};slot.handle=result;return result,blot_error::Error.none;
 }
 fn init()->Cache,Error {return initPooled();}
 fn initPooledRef()->Cache?,Error {let cache,error=initPooled();if error!=blot_error::Error.none {return null,error;}return cache_slots[cache.lease-1].handle,blot_error::Error.none;}
