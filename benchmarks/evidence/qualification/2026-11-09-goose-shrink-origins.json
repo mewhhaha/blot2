@@ -1,0 +1,160 @@
+{
+  "date": "2026-11-09",
+  "scope": "Optional private original-shrink diagnostic metadata. Evidence establishes a reported witness and preserved control behavior; it does not prove the source program valid or invalid.",
+  "candidate": {
+    "binary": "build/goose-port/private-checker/9dca98c5e55b103625f3aa9c5459c45965643752f7b14802100b44ea7f98c892/goose",
+    "sha256": "f177f7ed3fca19b81fab57633505bacb7af3266c072a75bed24da9d850eb3a12",
+    "source108_sha256": "841afb35421cb58439694f5888ce6f62fefef03b5d74bf5cbdb19c83e72c8de6",
+    "mode": "reachable-program + diagnostic-roots + runtime-observer + stable-closures + array-reach-gate + reference-closures + checker-trace + shrink-origins"
+  },
+  "baseline": {
+    "binary": "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
+    "source108_sha256": "805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9"
+  },
+  "toolchain": {
+    "compiler": "/usr/bin/clang++",
+    "compiler_sha256": "3e9abb628a5e7ecb195c7c85ae13c44f3059a7fff093915682ebde3b30d2036d",
+    "compiler_version": "clang version 23.1.4\nTarget: x86_64-pc-linux-gnu\nThread model: posix\nInstalledDir: /usr/bin",
+    "compile_flags": [
+      "-O3",
+      "-DNDEBUG",
+      "-std=gnu++20",
+      "-Wall",
+      "-Wextra",
+      "-Wno-missing-field-initializers",
+      "-DGOOSE_EXPANSION_NODE_LIMIT=1000000",
+      "-DGOOSE_TCC_LIB_PATH=\"/home/jacobt/src/goose-to-wasm/build/native/tcclib\"",
+      "-I/home/jacobt/src/goose-to-wasm/build/source/third_party/subprocess",
+      "-I/home/jacobt/src/goose-to-wasm/build/native/generated",
+      "-isystem",
+      "/home/jacobt/src/goose-to-wasm/build/native/tcc/api",
+      "-DGOOSE_REACHABLE_PROGRAM=1",
+      "-gline-tables-only"
+    ],
+    "patch_sha256": "3180e9bd106ec0b4b7e4d626926f55b0aa0c089c13739ecba450c74df5c3e1aa",
+    "cached_support_objects": true,
+    "private_builds": 1,
+    "compile_seconds": 61.813,
+    "link_seconds": 0.315,
+    "per_stage_cap_seconds": 120,
+    "build_receipt_sha256": "31bb4befb5de3310a1a583ce0f13585757c056bafeb6fdcf81186c88fdae4693"
+  },
+  "tracked_inputs": {
+    "compiler-goose/tools/build_goose_checker.py": "be4776233c155e9721e1f6da44d57c08566a5fcc51b13e0f35b90120a52bbaa8",
+    "compiler-goose/tools/goose-shrink-origins.patch": "3180e9bd106ec0b4b7e4d626926f55b0aa0c089c13739ecba450c74df5c3e1aa",
+    "compiler-goose/tools/test_shrink_origins.py": "4732534a49db98ea48d8a9fdaa9013ccb7af34040607f8121e7e467b2d844cb9",
+    "compiler-goose/tests/checker_tools/shrink_origins_invalid.goose": "dd33948d111bb8d449fb07ec8441fada243e53ef37746ec857a4c843d19990fe",
+    "compiler-goose/tests/checker_tools/shrink_origins_valid.goose": "31d0054512cf4c1f8afc47721bd5a5ea675c0f2ebf4168f6f6eea0a3fe05fddb"
+  },
+  "reproduce_build": [
+    "python3",
+    "compiler-goose/tools/build_goose_checker.py",
+    "--array-reach-gate",
+    "--stable-closures",
+    "--reachable-program",
+    "--diagnostic-roots",
+    "--runtime-observer",
+    "--reference-closures",
+    "--checker-trace",
+    "--shrink-origins",
+    "--expansion-node-limit",
+    "1000000"
+  ],
+  "reproduce_controls": [
+    "python3",
+    "compiler-goose/tools/test_shrink_origins.py",
+    "--goose",
+    "build/goose-port/private-checker/9dca98c5e55b103625f3aa9c5459c45965643752f7b14802100b44ea7f98c892/goose",
+    "--baseline",
+    "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/goose",
+    "--source",
+    "build/goose-port/private-checker/9dca98c5e55b103625f3aa9c5459c45965643752f7b14802100b44ea7f98c892/source",
+    "--baseline-source",
+    "build/goose-port/private-checker/54fddda478e6e1f1a32cc3d1e0787a97bc3dc1f9335cd6909c222ba07835a207/source"
+  ],
+  "metadata_contract": {
+    "leaf": "Original AST Node and FnSpec; propagated through ordinary parameter/external shrink maps, bound summaries and LiveShrink copies. Replayed unknown sites do not acquire a guessed leaf.",
+    "merge": "Retains one originating witness; replaces balanced witness when a newly unbalanced shrink supplies it. Not a complete list of all shrink sites.",
+    "semantics": "No new TypeEq calls or semantic summary keys. SameRecord source byte-identical, sha256 352bdccabd4faa64bb338dd42377198a717279174d109e38f8385044e3837087. Metadata maps/fields are ignored by fixed-point equality and effect order.",
+    "activation": "GOOSE_SHRINK_ORIGINS=<callee name or qualified name>; * reports any failing ApplyCalleeLiveShrinks. Unset preserves diagnostics exactly.",
+    "location_output": "Use --diagnostics json: related location contains exact source span. Plain text currently prints the leaf function label without its location.",
+    "coverage": "Focused failure hook is ApplyCalleeLiveShrinks. Earlier direct CheckShrinkHolders errors (including mini insert loop) do not add a note in this variant."
+  },
+  "controls": {
+    "result": "passed",
+    "replay_depth": 2,
+    "primary_call_line": 5,
+    "original_leaf_line": 2,
+    "original_leaf_function": "leaf",
+    "default_diagnostics_unchanged": true,
+    "invalid_primary_unchanged": true,
+    "mismatched_filter_unchanged": true,
+    "same_path_C_sha256": "6c80287e781964e47d6bb07fe10eb77cef9dbf9cec96e4b98cb25b67a6a2121d",
+    "valid_runtime_unchanged": true,
+    "SameRecord_byte_identical": true
+  },
+  "frozen_target": {
+    "source_import_digest": "150bf1b91b2f4815891a4232c860b52e4ce91bdc85dee486321d94f7c33ba814",
+    "source_unchanged_after_json": true,
+    "partial_engine": "check",
+    "primary": {
+      "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check_factory.goose",
+      "line": 193,
+      "message": "error: cannot call checkEngineBody: it may shrink imports while imports is still used, and imports may refer into imports (\u00a75.2)"
+    },
+    "primary_run_seconds": 59.932,
+    "structured_run_seconds": 59.933,
+    "structured_command": [
+      "/home/jacobt/src/blot2/build/goose-port/private-checker/9dca98c5e55b103625f3aa9c5459c45965643752f7b14802100b44ea7f98c892/goose",
+      "check",
+      "/home/jacobt/src/blot2/compiler-goose/src/_diagnostic_roots.goose",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--diagnostics",
+      "json"
+    ],
+    "environment": {
+      "GOOSE_DIAGNOSTIC_ROOTS": "blot_diagnostic_roots::check",
+      "GOOSE_SHRINK_ORIGINS": "checkEngineBody"
+    }
+  },
+  "origin": {
+    "related": {
+      "message": "original shrink witness in dict_grow",
+      "file": "/home/jacobt/src/goose-to-wasm/build/source/stdlib/dictionary.goose",
+      "line": 84,
+      "col": 5,
+      "endLine": 84,
+      "endCol": 81
+    },
+    "source_line": "d.slots.resize(cap, dictionary_slot<K, V> { default<K>(), default<V>(), 0 });",
+    "source_sha256": "fb39f896731faf3799e81727f7261849a62bdfbdc92d5fdbc36405a85830f322"
+  },
+  "interpretation": "The diagnostic names dict_grow slots.resize as one original shrink witness replayed to the imports error. This pins the reported operation; it is not a semantic proof of aliasing, lifetime validity, or the correctness of the diagnostic.",
+  "limitations": [
+    "Exact related source span is available in --diagnostics json; plain text prints only the leaf function label.",
+    "The focused note hook annotates ApplyCalleeLiveShrinks. Earlier direct CheckShrinkHolders errors, including the cheap import-shrink mini witness, receive no origin note.",
+    "Metadata retains one witness, not a complete set of contributing shrink sites.",
+    "Whole compiler, program acceptance semantics and actual project runtime remain unqualified."
+  ],
+  "full_evidence": {
+    "path": "build/goose-port/shrink-origins/evidence.json",
+    "sha256": "f4d3ab8758d64e9a15c1e43758dee53ab70edf35f462645e7105606481c9edce",
+    "supporting_files": {
+      "build/goose-port/shrink-origins/controls/receipt.json": "5801aa55f2cfdedff327dfce7d9786a233a4ee158ada1ebce9d0b132d408965d",
+      "build/goose-port/shrink-origins/check/diagnostics.log": "fe7ccdca6f4a42391a70380f1787c8c2180c680c101de475ebccde39a7233ec4",
+      "build/goose-port/shrink-origins/check/result.json": "801d2e0b85949ceb7a269561a09e33be54f19be8647bef01dac7bbe15f13e61e",
+      "build/goose-port/shrink-origins/check-json.stdout": "7cc266586541ebd38c266a3d97b72764854695ea925748b32c2131a61fca49f1",
+      "build/goose-port/shrink-origins/check-json-result.json": "c13b4d3356b3ec6933c76171c4f5a9ee977ddc27317b32016cd3b0c2f6d42700",
+      "build/goose-port/shrink-origins/mini.json": "41533fbe247704db1256992b44cae52f80c712c8f5d25e3835cba7d6ab0330ad"
+    }
+  },
+  "whole_compiler_qualified": false,
+  "tool_support_inputs": {
+    "compiler-goose/tools/test_checker_tools.py": "82e86f537bebe14d7ba061ae223617b0e389bbb670248b259130d7cc26e80632",
+    "compiler-goose/tools/checker_semantic_controls.py": "cb6ae3d56d4ae3b9487cf71ad6ce1a9dc81d8b45cd8b8cbbf2b0f49e99205d27",
+    "compiler-goose/tools/check_engines.py": "8b1a90453795d32cb4644c8bf622545dc9e590161c6194b9c9d925d281fb325d"
+  },
+  "tool_support_pin_scope": "Current unchanged shared helper and selected-root runner source hashes recorded while packaging existing evidence; no compiler or control rerun."
+}

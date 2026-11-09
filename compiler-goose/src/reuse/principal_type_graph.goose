@@ -192,7 +192,7 @@ recursive fn ty(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     assert(valid(self_));
     if self_.frozen {
         match self_.source {
-            store store => { assert(store.value.versions.len == 0 && store.value.effects.versions.len == 0); },
+            store store => { let view:const blot_check_types::Store& =blot_check_types::canonical(store.lease,store.generation);assert(view.versions.len == 0 && view.effects.versions.len == 0); },
             _ => {},
         }
     }
@@ -276,7 +276,7 @@ recursive fn row(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     recursive fn cleanup_continuation_6() -> Id, Error {
 
 let source = self_.source.row(original);
-    for operation in self_.source.rowLabels(source.labels) {
+    let source_visit_1_count=(self_.source.rowLabels(source.labels)).len;for source_visit_1_index in 0..source_visit_1_count {let operation=(self_.source.rowLabels(source.labels))[source_visit_1_index];
         let value, error = self_.label(operation, depth + 1); if error != blot_error::Error.none { return 0, error; } copied.push(value);if copied.failure!=blot_error::Error.none {return 0,copied.failure;}
     }
     if copied.failure!=blot_error::Error.none {return 0,copied.failure;}
@@ -313,7 +313,7 @@ recursive fn label(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     let operation = self_.source.operation(original); var arguments=Words {..};
     recursive fn cleanup_continuation_5() -> Id, Error {
 
-    for old in self_.source.list(operation.arguments) {
+    let source_visit_2_count=(self_.source.list(operation.arguments)).len;for source_visit_2_index in 0..source_visit_2_count {let old=(self_.source.list(operation.arguments))[source_visit_2_index];
         let value, error = self_.ty(old, depth + 1); if error != blot_error::Error.none { return 0, error; } arguments.push(value);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;}
     }
     if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;}
@@ -338,8 +338,8 @@ recursive fn copyQuantified(self_:Copier&,node:blot_check_types::Node,root:u32,d
 var goals=Goals {..};
     recursive fn cleanup_continuation_3() -> Id,Error {
 
-            let old = self_.source.list(blot_check_types::List { node.b, node.c , ..});
-            for binder_source in old {
+            let source_old_count_1=(self_.source.list(blot_check_types::List { node.b, node.c , ..})).len;
+            let source_alias_visit_1_count=((self_.source.list(blot_check_types::List { node.b, node.c , ..}))).len;for source_alias_visit_1_index in 0..source_alias_visit_1_count {let binder_source=((self_.source.list(blot_check_types::List { node.b, node.c , ..})))[source_alias_visit_1_index];
                 let leaf = self_.source.node(binder_source); if leaf.tag != blot_check_types::Tag.bound { return 0, blot_error::Error.type_limit; }
                 let binder, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; }
                 binders.push(binder);if binders.failure!=blot_error::Error.none {return 0,binders.failure;} self_.types.insert(binder_source, binder);
@@ -347,7 +347,7 @@ var goals=Goals {..};
             let body, error = self_.ty(node.a, depth + 1); if error != blot_error::Error.none { return 0, error; }
             
             if binders.failure!=blot_error::Error.none {return 0,binders.failure;}
-for old_goal in self_.source.quantifierGoals(root) {
+let source_visit_3_count=(self_.source.quantifierGoals(root)).len;for source_visit_3_index in 0..source_visit_3_count {let old_goal=(self_.source.quantifierGoals(root))[source_visit_3_index];
                 var goal = old_goal;
                 let ty, ty_error = self_.ty(goal.ty, depth + 1); if ty_error != blot_error::Error.none { return 0, ty_error; } goal.ty = ty;
                 let other, other_error = self_.ty(goal.other, depth + 1); if other_error != blot_error::Error.none { return 0, other_error; } goal.other = other;

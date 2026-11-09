@@ -79,6 +79,14 @@ CHECKER_TRACE_SOURCES = {
     (True, True): '805a3f0181524c371bce3fa3185608471cfe08ec83b38e45810145e5d5f7e8e9',
 }
 
+SHRINK_ORIGINS_PATCH_SHA256 = '3180e9bd106ec0b4b7e4d626926f55b0aa0c089c13739ecba450c74df5c3e1aa'
+SHRINK_ORIGINS_SOURCES = {
+    (False, False): 'bdf7431736acf52daa57ca5fe9835139e151651ffd107a3564a811922252e8c1',
+    (False, True): '4e8460001a72ddba227ad52b037ed516fda2f0a3fa6b63fe8954836f3caa9e2a',
+    (True, False): 'a21cb0746bee7a7dfce69d73a11e1fc0e2d1bb011dc56dd83b3e843f45c16e05',
+    (True, True): '841afb35421cb58439694f5888ce6f62fefef03b5d74bf5cbdb19c83e72c8de6',
+}
+
 LINK_INPUTS = (
     "CMakeFiles/goose.dir/src/process.cpp.o",
     "CMakeFiles/goose.dir/src/progress.cpp.o",
@@ -202,6 +210,8 @@ def run_stage(name, command, work, timeout):
 
 
 def build(args):
+    if args.shrink_origins and not args.checker_trace:
+        raise RuntimeError("--shrink-origins requires --checker-trace")
     if args.reference_closures and not (args.array_reach_gate and args.reachable_program):
         raise RuntimeError("--reference-closures requires --array-reach-gate and --reachable-program")
     if args.checker_trace and not args.reference_closures:
@@ -270,6 +280,12 @@ def build(args):
             raise RuntimeError("checker_trace patch changed; review and update its pinned digest")
         identity["checker_trace_patch_sha256"] = CHECKER_TRACE_PATCH_SHA256
         identity["checker_trace_source_sha256"] = CHECKER_TRACE_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+    shrink_origins_patch = Path(__file__).with_name("goose-shrink-origins.patch")
+    if args.shrink_origins:
+        if digest(shrink_origins_patch) != SHRINK_ORIGINS_PATCH_SHA256:
+            raise RuntimeError("shrink-origins patch changed; review and update its pinned digest")
+        identity["shrink_origins_patch_sha256"] = SHRINK_ORIGINS_PATCH_SHA256
+        identity["shrink_origins_source_sha256"] = SHRINK_ORIGINS_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
     key = json_digest(identity)
     cache.mkdir(parents=True, exist_ok=True)
     # Serialize publishers; a failed or interrupted build never replaces a binary.
@@ -349,6 +365,12 @@ def build(args):
                 patched_source_sha256 = checked_source(
                     work / "source", identity["checker_trace_source_sha256"]
                 )
+            if args.shrink_origins:
+                stages.append(run_stage("shrink-origins-patch", [
+                    "patch", "--batch", "--forward", "--fuzz=0", "--no-backup-if-mismatch", "-p1",
+                    "-d", str(work / "source"), "-i", str(shrink_origins_patch),
+                ], work, 5))
+                patched_source_sha256 = checked_source(work / "source", identity["shrink_origins_source_sha256"])
             stages.append(run_stage("compile", [
                 str(cxx), *flags, "-c", str(work / "source/src/main.cpp"),
                 "-o", str(work / "main.cpp.o"),
@@ -384,6 +406,9 @@ def build(args):
             if args.checker_trace:
                 final_identity["checker_trace_patch_sha256"] = digest(checker_trace_patch)
                 final_identity["checker_trace_source_sha256"] = CHECKER_TRACE_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
+            if args.shrink_origins:
+                final_identity["shrink_origins_patch_sha256"] = digest(shrink_origins_patch)
+                final_identity["shrink_origins_source_sha256"] = SHRINK_ORIGINS_SOURCES[(args.diagnostic_roots, args.runtime_observer)]
             if final_identity != identity:
                 raise RuntimeError("build inputs changed during compilation; refusing publication")
             receipt = {
@@ -436,6 +461,8 @@ def main():
                         help="bound fresh-empty reference closure reuse; requires current reachable/array variant")
     parser.add_argument("--checker-trace", action="store_true",
                         help="include optional GOOSE_CHECKER_TRACE progress; requires --reference-closures")
+    parser.add_argument("--shrink-origins", action="store_true",
+                        help="include optional original shrink witnesses; requires --checker-trace")
     args = parser.parse_args()
     try:
         print(json.dumps(build(args)))

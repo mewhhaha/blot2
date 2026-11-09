@@ -213,16 +213,56 @@
       "generated_codecs": "unchanged"
     },
     "body_freeze_holders": "five related holders use fixed pooled scratch; final owner publication under repair",
-    "body_freeze_registered_runs": 7
+    "body_freeze_registered_runs": 7,
+    "readonly_readers": {
+      "type_alias_guards": 49,
+      "pattern_alias_guards": 2,
+      "source_observers": 10,
+      "pattern_observers": 3,
+      "type_source_constructors": 16,
+      "pattern_constructors": 3,
+      "live_callee_constructors": 3,
+      "catalog_constructors": 1,
+      "checked_proof_parameter_writers": 2,
+      "graph_or_header_copies": 0,
+      "new_registries": 0,
+      "review": "No concrete authority or semantic issue found"
+    },
+    "type_source_cursor_loops": 39,
+    "removed_type_source_aliases": 7,
+    "import_storage": {
+      "map_value": "u32 arena index",
+      "metadata_owner": "separate factory-local grow-only ImportArena",
+      "new_target_records": 1,
+      "duplicate_rule": "first-wins",
+      "synthetic_before_original": true,
+      "lookups": 4,
+      "graph_copies": 0
+    },
+    "checked_return": "two moved stores reconstructed by existing checkedView 49/2 guards before original resets",
+    "text_option_lifts": 2
   },
   "latest_selected_frontier": {
-    "batch": 35,
-    "seconds": 96.747,
-    "scope": "normal whole emission",
-    "file": "compiler-goose/src/check/check_factory.goose",
-    "line": 193,
-    "error": "outer immutable imports input may alias callee shrink",
-    "status": "allinnerbodyfreeze/publication clears; immutable input boundary under review"
+    "batch": 42,
+    "partial": true,
+    "engines": [
+      "check"
+    ],
+    "exit": 1,
+    "seconds": 60.196,
+    "stop": "completed",
+    "errors": [
+      {
+        "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check.goose",
+        "line": 3051,
+        "message": "error: returning a reference rooted in declarations, which dies with this function (\u00a79.2)"
+      }
+    ],
+    "full_qualification": false,
+    "source_sha256": "1e2f103d0ec00705934b309072066526866eb7a8a428efe3587c587159d73d26",
+    "source_unchanged": true,
+    "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0",
+    "status": "budgettext andCheckedreturn clear; SourceValidation declaration publication ownership in repair"
   },
   "latest_executed_laws": {
     "passed": true,
@@ -236,55 +276,65 @@
     },
     "tests": {
       "coalesce": {
-        "seconds": 0.28763460100162774,
+        "seconds": 0.28590847802115604,
         "program_sha256": "fc15d284596c5bc06135e29f9be492638bcc9ec210e47c224b6f5884ee4ab3ae",
         "binary_sha256": "2c9409c32a457dde45c6961b8896de6a712b917aa65ade48a8bd3b4529f2b0b0"
       },
       "expectation": {
-        "seconds": 0.15466328299953602,
+        "seconds": 0.1567161160055548,
         "program_sha256": "1a49692e57820540ca50fbf9d5e84e28d1d5229adaf9a081c4abe66c8335f230",
         "binary_sha256": "d418fba94ede5197ca0651bd668426ee70953d3516e6f80aeaa2eac10c62473b"
       },
       "package_owner_frames": {
-        "seconds": 0.13312272599432617,
+        "seconds": 0.13369531300850213,
         "program_sha256": "86230bed6c335f14721e673d433ec2e3369087bfea182cd05f6e8811fea7e563",
         "binary_sha256": "97f9b75dd43bb8add6ec7104465ee318e878366c946af4ca9321d2bec7001211"
       },
       "parser": {
-        "seconds": 1.5984820520097855,
+        "seconds": 1.597529900027439,
         "program_sha256": "7cce6851bd8320f33cde196572a6ea0a5c47d30a448c4fa55227e823ce7516c9",
         "binary_sha256": "6efd996e47b8e98f7daef45cb6564b141a9ebe5cb8cd7dff1324c378e3bdfa82"
       },
       "proof_leases": {
-        "seconds": 3.492019725003047,
-        "program_sha256": "9b1205f808b7b1b562871ac02a4b9e5c7be64c76ba633cf0df8b43bbb706103d",
-        "binary_sha256": "bf65fcfd1659245130c7422e71c31acd88a2d2e572548b7d5c41a103d6bef385"
+        "seconds": 3.520690663019195,
+        "program_sha256": "b9f2745727ee4d3f525276f80c5d1de6ca199e234e1496142459b476ffd6ff9e",
+        "binary_sha256": "5dd7ecdbd90473bbe7cf242e0b3ac50e431d071cf161112b8e45e19a83adc4df"
       },
       "source_sort": {
-        "seconds": 0.1330332149809692,
+        "seconds": 0.1324078269826714,
         "program_sha256": "e11d8009b17fda5164472b10f3931ec092894a4facc25f8fa7f61a24314b9d45",
         "binary_sha256": "417dfdfe1c2fee3d99b2e7f7a663e195f3625bce7fec968ee4cae46529b637b0"
       },
       "diagnostic_ownership": {
-        "seconds": 3.4147080139955506,
-        "program_sha256": "f12cbdcfadd004e2a6c2eea1f89f1eb718df8585c18b1c48972b0b1ea8158cc5",
-        "binary_sha256": "438fbbc189df8120012b522adbc034fe8eb35f39d69827620b63bd8fbcad87ff"
+        "seconds": 3.3688174829876516,
+        "program_sha256": "f3a5d4304b78741f5b61e99ecb9c893eae4122370909415b06f7bf573703bd6a",
+        "binary_sha256": "6df87eb77c0999929f221bc6f3f6b155acdd93ae7693537aa8f07dd5000ea93c"
       },
       "body_freeze": {
-        "seconds": 5.345474174013361,
-        "program_sha256": "1a5c6c7533e2944935978fb0cd0c73b87bba2a2496d91cb03d875440b7709700",
-        "binary_sha256": "8ce8f462062a5f084ff40ee0e0edb5873d63bd5fdf8add305c2487e782e3b289"
+        "seconds": 6.794631699012825,
+        "program_sha256": "f2648d0bec611a6c7c025b927dbc40fd5d1a38818dfa8b7828ca2e507fc1cff5",
+        "binary_sha256": "93337e609042b8af655b111e972d2b24f01afc2283f049608191e4ff8e9d4d62"
+      },
+      "immutable_readers": {
+        "seconds": 3.6257508629933,
+        "program_sha256": "4d381a68771abd8fbe69db74bc83c7308f0884f34e8ef4cbcb61c1b703f0730e",
+        "binary_sha256": "24d1a595f460694f35da07af6439818b47adf412af8bacaab442e0cd06fd9cbf"
+      },
+      "import_arena": {
+        "seconds": 3.7213771759998053,
+        "program_sha256": "bb28cc836c9fcb6929201e8eb67443c1d26627f21f21ae5f9589246b048f185a",
+        "binary_sha256": "8a1dcb2cb6b69edb8cdc46fef106e85546f62c9e8cc41a2c6112816ce95021fd"
       }
     },
     "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-executed-engines.json.gz",
-    "raw_sha256": "6148afb1a4ce8561c7bd8b690b4e8abb7af45cbedd66e46840d7f563936a6636"
+    "raw_sha256": "b31ecd2612c841f87f7dc3c84259069c0df5d39f9c0397c7826238c6d0598a82"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "10c5d247befb922878052723979acdb87924721f259e691172727dd130484672",
     "compiler-goose/src/check/capability_contract_source.goose": "948f1f003e8c6e883157733ae835f246b65090a539208b1e52d4c6baf90319b9",
     "compiler-goose/src/check/capability_flow.goose": "daa1d2ef2db79d9fafe6ecfc6f85af62ea47cb08273c46a81156dc2028a2d708",
-    "compiler-goose/src/check/check.goose": "e3a71588117d6c94cda3df693f9ec7873d559e07031b02a6badcf93c630f7627",
-    "compiler-goose/src/check/check_factory.goose": "4e5cb7b33b339dce9c73a230f10ec415a5f8b9be2ce7ee3f240fe28edf84a77f",
+    "compiler-goose/src/check/check.goose": "884a472cac6fc7bc4e99afde9aadbe2ec9b9c22d1c86ad4385f0c315ba0828f6",
+    "compiler-goose/src/check/check_factory.goose": "19d3d67827ef91cbc9bf6f71b438ae9143523a8037a9dca2460c9a34adcf4497",
     "compiler-goose/src/check/check_scheme_import.goose": "c22306f0bc0b0219be570fab120986cb753dd18ad89faf370d0780ea4035c000",
     "compiler-goose/src/check/cleanup_contracts.goose": "f75b13fb8e270ee87ce646a247543625a5412739da21b097f80c19fc7a6ab79e",
     "compiler-goose/src/check/core_builder.goose": "0a0758beaed16d0bc2f0e536ec260323c55138d9d90048a2bc2e7776a7a142e7",
@@ -294,10 +344,10 @@
     "compiler-goose/src/check/source_sort.goose": "3963e8b9107f5b064539245e8e6b8ffbdbe62bc73c0a9cc1db3d0c00e6e30f23",
     "compiler-goose/src/check/usage_check.goose": "5cd6ff97d5af77cf39006219f3180dab64e3c1bb9e9d25c133168fee56e00c22",
     "compiler-goose/src/eval/closed_evidence_import.goose": "3eff87ab0e91c63896076fae1e8fbe77442447dadd9c2552a764e4de4228ec98",
-    "compiler-goose/src/eval/core_eval.goose": "a0cafda6b8d9832d7ee6b6a03ad1bdca2f412e5a37a7f0919f5a7d6b0d9ad89a",
+    "compiler-goose/src/eval/core_eval.goose": "696609afb4982d96fbc33a2e7aec308296e1dd28b55a0d35266f904c4e6448d9",
     "compiler-goose/src/eval/implementation_evidence.goose": "acbe81fd3c371e00d07ccc5da951c0c90fa080ac4204754664a5842c1abefa40",
     "compiler-goose/src/eval/implementation_predicates.goose": "0abae4a4261fbebe8dbb027f98519ad403189e702c01fb02d1b46cedcb5d89f3",
-    "compiler-goose/src/eval/implementation_rows.goose": "d24522469d2707505e5b5a6b0e191b71736d8f2f1bbd37fac42a076a9a6d8376",
+    "compiler-goose/src/eval/implementation_rows.goose": "2f445390115cb2a518ee7320f7f45df28cc940bb8d35714309ad6a5b3c83701a",
     "compiler-goose/src/eval/selected_implementation_admission.goose": "11c8eacdb50e76fd51f42dd3862d901ab1e215db49cd74c92116668cf594f729",
     "compiler-goose/src/eval/type_evidence.goose": "30cd6db84f49c63af2336b3196c28c8f2a588f9186ed55e7c80038d87e66e227",
     "compiler-goose/src/parse/source_operators.goose": "ef5ccabd33ccb33e8b7b4b12be07f71285b44c6b705dad982dd959dcaeab5067",
@@ -305,13 +355,29 @@
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "0ebb997c72ea70d035356726a1ddaa5b5a6451b7afdda80f9915c901a2b49552",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "903313c7894be52bc5cc9138595a7b33114f99b73b96385b29b6c56b48f4a427",
-    "compiler-goose/src/support/json_adapters.goose": "3cad072b3d86a8c8d279290876599f2255d1d8ec033282c88b252d011909050d",
-    "compiler-goose/src/support/structural_adapters.goose": "a473374f25f66014a12bb2a761221d461c3771ab563a71fc4dd5b129b12aeb53",
+    "compiler-goose/src/support/json_adapters.goose": "09c31c293dccb3d99d105456c46e3097777d5e879e48c1fdd61fc2f865a16204",
+    "compiler-goose/src/support/structural_adapters.goose": "a4e0ebafc2098fa663b7741ddee41a1e00235b85f1d405b08c82ddb22cd516f0",
     "compiler-goose/src/reuse/hole_diagnostics.goose": "8cb3a89f6ecb429a7d869cc8c0b3531956ad0f60fbff7e7ff386e86c753ef889",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "367602561ea06a23ff42e2ef717c3eed2499bf5f77304fbbe61b3ca22ec1a55b",
     "compiler-goose/src/backend/backend_emission.goose": "79055bb07775e4fba25ce200cf2cff96779a063971d3443ab1fc6abef844c0c8",
     "compiler-goose/src/backend/core_backend.goose": "cb05a31a3e25c5b4590c9fd5f39fd96c411e48fd4becf7b9eb223dd15bfac422",
-    "compiler-goose/src/backend/scoped_backend.goose": "a49aedc9a61b0edba971659655f17780a52d45613a5cad6baa7ec10b71ff4fc3"
+    "compiler-goose/src/backend/scoped_backend.goose": "a49aedc9a61b0edba971659655f17780a52d45613a5cad6baa7ec10b71ff4fc3",
+    "compiler-goose/src/check/frozen_types.goose": "7bdffb9fcdc6079f1990d4c5c2c09a4a8331995439e772356eaffc0609710c23",
+    "compiler-goose/src/check/parameter_patterns.goose": "9757bfe19e48733b1cec1a5d02fcab2d17d06d677b0f779b11ec08f15cc1ef01",
+    "compiler-goose/src/check/types.goose": "3a828b3a000ebad7866afadf254fcbef6e803031e8e4b27196ef2d3481297641",
+    "compiler-goose/src/reuse/body_check_capture.goose": "41cd912b973cef17a18f43d8bd60d817a5e1a0a7d7f3cc5076519c9ef7b97d17",
+    "compiler-goose/src/reuse/body_check_capture_helpers.goose": "ea7b63199128c5cb6ce9f937835e692cbc922a1c63ed5e99811e5fb0b12564a1",
+    "compiler-goose/src/reuse/body_check_digests.goose": "114bad470ca70fbd6ab4fffdd55061e83eefdc63188423275bad2fbd50011f43",
+    "compiler-goose/src/reuse/body_check_freeze.goose": "d395dca09fefb2f8cc283a8fe29ab438a0177b910762682bd879c1bd9a2c50fd",
+    "compiler-goose/src/reuse/body_check_reads.goose": "a983607b58aa4654b7e9ad3ae7955b7d91233862dc4bb235920025e97437551f",
+    "compiler-goose/src/reuse/completion_fit.goose": "c506a77f8036506970f52c1d26a15902e2b4e7ad10ecee13fcfff64cf4f165ba",
+    "compiler-goose/src/reuse/module_visibility.goose": "eb0e76e7b15a629b9eedaadaf67ae5501b75b1f45039f38e7f92a94c0ef9a8c7",
+    "compiler-goose/src/reuse/principal_type_graph.goose": "9a95794d442b4e31f7f194e8281d3c7ba7b6e53863c540145d1a434777c346b4",
+    "compiler-goose/src/reuse/project_check.goose": "e88bcf233eefde2be9c17391d5a71563cd95e61e7334d7af2e8ba491664d991a",
+    "compiler-goose/src/reuse/project_check_module.goose": "625a3955659b83cce492c648688c68fbe077a971340ad0d1ce3e6fd47c83cc20",
+    "compiler-goose/src/reuse/project_check_services.goose": "e79361e789ec47b2bead48f0d165df619647116a0bace457127bb726aa423e87",
+    "compiler-goose/src/reuse/type_display.goose": "4046691e9e49c3e50af68dc86f2deea624f7c546e6872acacd6dcd36fc642b01",
+    "compiler-goose/src/reuse/dependency_cli.goose": "2423143742ac78adb848f07cc5199e61fffdd776f5ad33332b4dbf4a3d78c339"
   },
   "unqualified": [
     "whole compiler executable",
@@ -521,6 +587,114 @@
       "empty and owned Body graph publication",
       "source teardown before cache read",
       "clone/retain/release/cleanup"
+    ]
+  },
+  "immutable_readers_law": {
+    "passed": true,
+    "seconds": 3.5668537319870666,
+    "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-immutable-readers.json.gz",
+    "sha256": "fac382c8a17395823d85c75a1471c93b2fd9500b89bfaa1de74b25ffeae8445a",
+    "checks": [
+      "live cursor/head/associated equations",
+      "three pattern observers",
+      "narrow live metadata",
+      "stale lease/generation rejection"
+    ],
+    "review": "No remaining concrete authority or semantic issue found"
+  },
+  "split_selected_batch36": {
+    "partial": true,
+    "seconds": 57.82,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 57.717,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/module_visibility.goose",
+            "line": 22,
+            "message": "error: cannot call visibilityBody: it may shrink an array scan leads to while self_.source.nominalArguments(node) is still used, and self_.source.nominalArguments(node) may refer into it (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "e76b3b235ea6df9ad44e5602ac5c10be1d0204dc623d5957abb4399f396c882d",
+        "source_unchanged": true,
+        "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "lower"
+        ],
+        "exit": 0,
+        "seconds": 3.458,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "e76b3b235ea6df9ad44e5602ac5c10be1d0204dc623d5957abb4399f396c882d",
+        "source_unchanged": true,
+        "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0"
+      }
+    ],
+    "full_qualification": false
+  },
+  "split_selected_batch37": {
+    "partial": true,
+    "seconds": 59.93,
+    "results": [
+      {
+        "partial": true,
+        "engines": [
+          "check"
+        ],
+        "exit": 1,
+        "seconds": 59.826,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/check/check_factory.goose",
+            "line": 193,
+            "message": "error: cannot call checkEngineBody: it may shrink imports while imports is still used, and imports may refer into imports (\u00a75.2)"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "150bf1b91b2f4815891a4232c860b52e4ce91bdc85dee486321d94f7c33ba814",
+        "source_unchanged": true,
+        "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0"
+      },
+      {
+        "partial": true,
+        "engines": [
+          "lower"
+        ],
+        "exit": 0,
+        "seconds": 3.533,
+        "stop": "completed",
+        "errors": [],
+        "full_qualification": false,
+        "source_sha256": "150bf1b91b2f4815891a4232c860b52e4ce91bdc85dee486321d94f7c33ba814",
+        "source_unchanged": true,
+        "goose_sha256": "01b0b74e4e9d9ba9f8de35474935f96248a3d560c5726030042ae12c469f64f0"
+      }
+    ],
+    "full_qualification": false
+  },
+  "import_arena_law": {
+    "passed": true,
+    "seconds": 3.4165920979867224,
+    "raw_evidence": "benchmarks/evidence/qualification/2026-11-09-goose-import-arena.json.gz",
+    "sha256": "f7cb0e76904d5aad64bcc39d62b8465f5c6bb5e68613757bff730ce420361fbd",
+    "checks": [
+      "first-wins duplicates",
+      "synthetic-before-original duplicate",
+      "64 dictionary growth inserts",
+      "metadata source observation",
+      "context can borrow owning holder"
     ]
   }
 }

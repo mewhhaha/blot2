@@ -101,7 +101,10 @@ fn restore(self_:Words&,values:const u32[:])->Error {self_.clear();self_.append(
 struct OwnerState {nodes:Nodes=Nodes{..},extra:Words=Words{..},generation:u64=0,live:bool=false}
 reusable var owners:OwnerState[>..]=[];
 var inactive=OwnerState{..};
-fn valid(self_:const Store&)->bool {return self_.lease!=0 && self_.lease-1<owners.len && owners[self_.lease-1].live && owners[self_.lease-1].generation==self_.generation;}
+fn validLease(lease:u32,generation:u64)->bool {return lease!=0 && lease-1<owners.len && owners[lease-1].live && owners[lease-1].generation==generation;}
+fn valid(self_:const Store&)->bool {return validLease(self_.lease,self_.generation);}
+fn canonical(lease:u32,generation:u64)->Store {assert(validLease(lease,generation));let state:OwnerState& =owners[lease-1];return Store{lease:lease,generation:generation,nodes:state.nodes,extra:state.extra};}
+fn checkedView(store:Store)->Store {let canonical=blot_check_parameter_patterns::canonical(store.lease,store.generation);assert(store.nodes .== canonical.nodes && store.extra .== canonical.extra);return canonical;}
 fn initPooled()->Store,Error {if owners.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=owners.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owners[index];return Store{lease:(index+1) as u32,generation:generation,nodes:state.nodes,extra:state.extra, ..},blot_error::Error.none;}
 fn init()->Store,Error {return initPooled();}
 fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes.deinit();self_.extra.deinit();let index=self_.lease-1;owners[index].live=false;owners.free(index);self_=Store{..};}

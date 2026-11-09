@@ -48,79 +48,64 @@ candidate; use the explicitly identified development compiler for these checks.
 Full original-export, release and Main/frame qualification remain pending.
 See [the exact batch evidence and compressed raw reports](benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
 
-Goose mirrors the new parser/checker rules. Its parser engine passes, but no
-whole compiler executable or semantic qualification exists. Preserve the
-original pinned Zig oracle for old-language comparisons. The current repair
-removes mixed-root importer callbacks, separates resolver/context/counter inputs,
-and uses scalar owner/lease/generation keys for recursive proof storage. Both
-store acquisitions retain all 9/21 header-identity guards. Error-only work records
-keep borrowed inputs separate. A review audits 210 affected calls and 46 bodies.
-The checker has cleared the proof/resolver, scalar metadata, AST traversal,
-sort and diagnostic-transfer failures. Source validation now uses scalar AST
-cursors and a scalar-only Validator: 23 helpers take tree, symbols, context and
-scratch separately through 189 calls. Core resolver lowering uses scalar
-statement cursors through ten calls. Behavior, charged work, allocation/error
-and cleanup order are preserved by static family audits; the final checker
-boundary remains pending. All three pattern-coverage recursion boundaries use
-checked pool views; local work remains owned until recursion returns. Eight
-isolated production engine families have executed, including the new owned
-diagnostic clone/move/cleanup law in 3.372s. Hole and dispatch payload transfers
-now validate owned names; nine fixed-array initializers repair clear capacity
-reads and whole-value copies, leaving 57 scratch/output buffers unchanged.
+Goose mirrors the new parser/checker rules, but **no whole compiler executable
+exists yet**. Keep the original Zig oracle for old-language comparisons.
+The current user scope is lifetime repair, actual native compilation, then
+CLI/server, retained state and recoverable request OOM qualification. Use
+coherent source batches and bounded checks; source presence is not completion.
 
-Whole C/header emission with the baseline private checker hits 120.262s without
-an artifact. The combined optional reference-closure cache/trace candidate
-`01b0b74e...` reaches actionable source errors in about 95–97s on identical
-production inputs except generated identity metadata. The baseline is censored;
-no whole compilation ratio is claimed. The closure cache preserves stable
-readiness, ordered traversal and every live-root/provenance check, is bounded,
-and falls back to the original walk. 24 semantic controls, 20 debug/release law
-executions, 6 exact C comparisons and trace-on/off parity pass. Installed Goose
-is unchanged. See [the cache/trace receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json).
+Ten isolated production engine families execute in one fresh batch, including
+owned diagnostic transfers, body-cache publication, live immutable readers and
+import-arena growth. The new small laws expose failures in 1.6–6.8s rather than
+repeated 60s checker cycles. The actual final checker boundary remains pending.
 
-Split runtime/semantic/lower/independent roots pass. Source validation,
-coverage, diagnostics and usage checking now clear their prior failures. The
-body-freeze family now uses fixed scratch headers and validates all seven
-frozen runs through the live owner journal before publication. Its direct law
-passes in 5.345s and checks source teardown, cache clone/retain/release. The
-current whole-build frontier is `check_factory.goose:193`: immutable imported
-descriptors expose mutable transitive references at the outer checker boundary.
-The entry descriptor/aliasing contract is under review. Actual CLI, server and OOM execution
-remain pending until a complete executable exists. The new qualification runner
-has eight oracle baseline passes and a strict unsupported ABI 8 recursion
-witness; no ABI 2 fallback or unavailable memory counters are accepted as proof.
+Live Source/Patterns use existing validated lease/generation keys; narrow
+callee/catalog readers retain readonly metadata. All 49/2 alias guards and
+cursor/head/associated-equation semantics remain. Proof parameter writes are
+explicitly pool-checked. Source traversal uses scalar cursors across 39 loops.
+Import metadata now lives once per distinct target in a separate stable arena;
+the growing dictionary stores only indices, preserving first-wins and synthetic
+catalog import order. This clears the traced dictionary-growth input alias.
+Checked publication reifies its two moved stores through those same guards.
+Latest boundary: SourceValidation declaration publication at check.goose:3051
+still inherits local scratch provenance; the owned helper/payload shape is under
+review. Checked return and explicit rejection text options now clear.
 
-The native request transaction components pass normal and sanitizer batches:
-forked candidates preserve the previous heap on explicit marked OOM, stage
-bounded immutable replies, validate before adoption, detach inherited workers,
-and wait for post-adoption cache publication. Cache staging mutates no external
-files; publication runs through an allocation-free native hook after adoption.
-The production server loop and C entry now integrate these APIs, but no compiler
-runtime has executed them yet. A dedicated capability now carries token-bound
-allocation-failure markers
-from copied stage processes. Native/sanitizer controls cover initialization,
-execution and post-reply cleanup refusal, malformed markers, ordinary failures,
-retained state/cache and retry in 7.5s. These tests use the real Goose allocator
-with a fake C compiler entry; whole compiler integration remains unqualified. Scoped runtime observations
-report actual pool operation totals
-and virtual region reservations; active payload, retained capacity and scratch
-remain unavailable. Never substitute operation balance or RSS for liveness.
-See [observer evidence](benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json),
-[supervisor/transport evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-supervisor.json)
-and [cache evidence](benchmarks/evidence/qualification/2026-11-09-goose-request-cache.json) and
-[worker OOM evidence](benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json).
+Body freezing owns fixed scratch headers and validates all seven frozen runs
+against the live owner journal before publication. Its direct law covers source
+teardown, cache clone/retain/release and cleanup. No producer graphs or headers
+are copied by the reader/index architecture.
 
-Whole builds cache native/runtime objects first, retain stage logs/timings,
-stop three seconds after the first emission diagnostic, and share a 300s cap.
-Do not repeat whole builds per small edit. Partial entry checks are diagnostic
-coverage only. Astra is for a specific snag; never Terra.
+Whole emission with baseline tooling caps at 120.262s. The optional closure-cache
+candidate reaches concrete source errors in 95–97s; this is no overall compile
+ratio because the baseline is censored. Its 24 semantic controls, 20 debug/release
+laws, 6 exact C comparisons and trace-on/off parity pass. Shrink-origin tooling
+pins the original dictionary.goose84 resize through replay, without changing
+semantic decisions. Installed Goose remains untouched. See the
+[cache receipt](benchmarks/evidence/qualification/2026-11-09-goose-reference-closures.json)
+and [origin evidence](benchmarks/evidence/qualification/2026-11-09-goose-shrink-origins.json).
 
-Prior qualified controls, source repairs and rejected checker experiments remain
-in [batched validation](benchmarks/evidence/qualification/2026-11-08-goose-batched-validation.json)
-and [the pinned handoff](https://github.com/mewhhaha/blot2/blob/22003c1b937c63e8dfdea723c6807e834060b1f7/CONTINUE.md).
-Those receipts qualify their exact earlier source/tool identities.
-Current source repair scope and pending runtime work are pinned in
-[the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+The native request supervisor/transport/cache/observer components pass normal
+and sanitizer checks. Candidate heaps and external cache writes remain staged
+until a complete validated reply is adopted. A dedicated token-bound capability
+reports stage-worker allocation refusal, including post-reply cleanup; ordinary
+crashes/signals remain failures. Tests use the real runtime with a fake compiler
+entry, so complete compiler integration remains pending. Active payload,
+retained capacity and scratch counts are unavailable; operation totals and
+virtual reservations are not liveness. See [worker OOM evidence](benchmarks/evidence/qualification/2026-11-09-goose-worker-oom.json).
+
+The production qualification runner has eight oracle baseline passes and a
+strict unsupported ABI 8 recursion witness. Actual Goose CLI/server/OOM runs
+are pending a complete binary; no ABI 2 fallback or fake zero memory counters.
+Whole builds retain stage evidence, stop 3s after a diagnostic, cap stages at 120s
+and share a 300s limit. Partial root checks pin source/compiler identity and fail
+on source drift. Astra is for a specific snag; never Terra.
+
+Current identities, source repairs, raw qualification receipts and unqualified
+scope are pinned in [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+Earlier exact-candidate evidence remains in
+[batched validation](benchmarks/evidence/qualification/2026-11-08-goose-batched-validation.json)
+and the [pinned handoff](https://github.com/mewhhaha/blot2/blob/22003c1b937c63e8dfdea723c6807e834060b1f7/CONTINUE.md).
 
 Main shrinks **10,038,987 → 9,203,613B** (8.3%). Three fresh paired compilations
 measure **5.768 → 5.523s**; paired deltas are **-1277ms, +38ms, +94ms**. There

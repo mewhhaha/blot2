@@ -18,16 +18,19 @@ host APIs. Selected-root diagnostics are partial. Normal whole builds emit C
 and a host header, then compile and link the real Goose CLI with native OS
 adapters. Stages remain capped at 120s and whole attempts at 300s.
 
-The current source batch uses scalar proof runs and store lease handles,
-explicit row importers, copied scalar metadata and immutable AST cursors.
-Validator now holds only scalar state; 23 helpers pass tree, symbols, context and
-scratch independently through 189 calls. Recursive Core resolver statement
-helpers use scalar cursors. Static audits preserve traversal, charged work,
-allocation/error and cleanup order. Eight production engine families have
-executed, including an owned diagnostic transfer law. Source validation,
-coverage, diagnostics and usage now clear. The checker frontier is the immutable imports alias contract at check_factory:193. Body freezing and
-registered graph publication pass their direct 5.345s law. Whole artifact remains
-pending.
+Ten isolated engine families pass together, including body-freeze ownership,
+immutable live readers and import-arena growth. Source/Patterns use existing
+lease keys with 49/2 validation guards. Cursors replace held type/AST spans.
+The import dictionary now holds scalar indices into a separately owned stable
+metadata arena; first-wins, synthetic imports and producer lifetimes remain.
+Checked publication moves two validated store views and registered owned runs.
+Checked return and text-option rejection fixes now clear. SourceValidation
+declaration publication at check.goose:3051 remains the checker frontier.
+No whole executable exists; complete CLI/server and OOM qualification is pending.
+
+Keep mini laws for owned boundary families: body_freeze runs in about 5–7s,
+immutable_readers 3.6s and import_arena 3.4s. The frozen dictionary experiments
+and shrink-origin witness show why metadata must stay outside the growing map.
 
 The optional bounded reference-closure cache/trace checker reaches a concrete
 whole-build source error in 95.491s where the baseline caps at 120.262s on the
