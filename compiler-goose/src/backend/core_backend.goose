@@ -355,7 +355,7 @@ fn captureTypeLayout<M,R>(generator: Generator&, owner: u32, ty: blot_check_type
     if initial == blot_error::Error.none { return concrete, initial; } if initial == blot_error::Error.out_of_memory { return 0, initial; }
     let actual = generator.evaluator.valueEvidence(value);
     if actual != 0 {
-        let selected, converted = generator.representations.fromEvidence(generator.evaluator.evidenceStore(), actual);
+        let selected, converted = generator.fromEvidence(actual);
         if converted == blot_error::Error.out_of_memory { return 0, converted; } if converted != blot_error::Error.none { return 0, decline(generator, owner, span, blot_check_diagnostic_code::Code.unresolved_type); }
         let error = mapTypeDepth(generator, owner, mappings, rows, ty, selected, span, 0); if error != blot_error::Error.none { return 0, error; }
     }
@@ -377,7 +377,7 @@ fn mappingEvidence(generator: Generator&, mappings: const Mapping[:]) -> u32, bl
     var words: u32[>..<] = [];
     for mapping in mappings {
         if mapping.instance.decl != 0 { continue; }
-        let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), mapping.layout);
+        let actual, error = generator.toEvidence(mapping.layout);
         if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, blot_check_diagnostic_code::Code.unresolved_type); }
         words.append([mapping.variable, actual]);
     }
@@ -388,7 +388,7 @@ fn rowMappingEvidence(generator: Generator&, rows: const RowMapping[:]) -> u32, 
     var entries: blot_reuse_substitution_keys::Entry[>..<] = [];
     for mapping in rows {
         if mapping.row == blot_backend_layout::unknown_row { continue; }
-        let actual, error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(), mapping.row);
+        let actual, error = generator.rowToEvidence(mapping.row);
         if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return 0, error; } if error != blot_error::Error.none { return 0, decline(generator, 1, blot_check_core::Span {..}, blot_check_diagnostic_code::Code.unresolved_type); }
         entries.push(blot_reuse_substitution_keys::Entry { variable: mapping.variable, value: actual , ..});
     }
@@ -405,7 +405,7 @@ fn appendRows(rows: RowMapping[>..<]&,value: RowMapping) -> blot_error::Error { 
 fn appendRows(rows: blot_backend_substitution_buffers::Rows&,value: RowMapping) -> blot_error::Error { return rows.push(value); }
 fn loadSemanticRows<R>(generator: Generator&, mappings: const blot_eval_type_evidence::RowMapping[:], rows: R&) -> blot_error::Error {
     for mapping in mappings {
-        let concrete, error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(), mapping.evidence);
+        let concrete, error = generator.rowFromEvidence(mapping.evidence);
         if error == blot_error::Error.out_of_memory { return error; } if error != blot_error::Error.none { return decline(generator, 1, blot_check_core::Span {..}, blot_check_diagnostic_code::Code.unresolved_type); }
         let appended = appendRows(rows,RowMapping { variable: mapping.variable,row: concrete , ..}); if appended != blot_error::Error.none { return appended; }
     }
@@ -461,7 +461,7 @@ fn entrySignature(generator: Generator&, target: blot_check_core::BindingRef, ty
         return Key {..}, evaluationFailure(generator);
     }
     if !inferred.present { return Key {..}, decline(generator, target.unit, span, blot_check_diagnostic_code::Code.entry_type); }
-    let concrete, converted = generator.representations.fromEvidence(generator.evaluator.evidenceStore(), generator.evaluator.valueEvidence(inferred.value));
+    let concrete, converted = generator.fromEvidence(generator.evaluator.valueEvidence(inferred.value));
     if converted == blot_error::Error.out_of_memory { return Key {..}, converted; } if converted != blot_error::Error.none { return Key {..}, decline(generator, target.unit, span, blot_check_diagnostic_code::Code.unresolved_type); }
     var mappings: Mapping[>..<] = []; var rows: RowMapping[>..<] = [];
     let mapped = mapTypeDepth(generator, target.unit, mappings, rows, ty, concrete, span, 0); if mapped != blot_error::Error.none { return Key {..}, mapped; }
@@ -524,6 +524,11 @@ fn unusedAggregate(generator: Generator&, unit_id: u32, binding: blot_check_core
     let proof,error = blot_backend_discarded_bindings::init(owned.planning.discard_flags, owned.unit(unit_id), unit_id);if error!=blot_error::Error.none {return false,error;}
     let admitted = proof.admits(binding); owned.planning.discard_proofs.insert(unit_id, proof); return admitted, blot_error::Error.none;
 }
+// Production conversions bind only the active Frame's canonical bridge.
+fn toEvidence(generator:Generator&,id:u32)->u32,blot_error::Error {let bridge,error .=blot_compile_workspace::bridgeForGenerator(generator);if error!=blot_error::Error.none {return 0,error;}return bridge.toEvidence(id);}
+fn fromEvidence(generator:Generator&,id:u32)->u32,blot_error::Error {let bridge,error .=blot_compile_workspace::bridgeForGenerator(generator);if error!=blot_error::Error.none {return 0,error;}return bridge.fromEvidence(id);}
+fn rowToEvidence(generator:Generator&,id:u32)->u32,blot_error::Error {let bridge,error .=blot_compile_workspace::bridgeForGenerator(generator);if error!=blot_error::Error.none {return 0,error;}return bridge.rowToEvidence(id);}
+fn rowFromEvidence(generator:Generator&,id:u32)->u32,blot_error::Error {let bridge,error .=blot_compile_workspace::bridgeForGenerator(generator);if error!=blot_error::Error.none {return 0,error;}return bridge.rowFromEvidence(id);}
 fn specializer(source: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
     let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
     let bridge, error .= blot_compile_workspace::bridgeForGenerator(generator);
@@ -812,7 +817,7 @@ recursive fn retainedCapture(generator: Generator&, binding: blot_check_core::Bi
             let child = capturedTemplate(generator, template.templates, captured);
             if child.present { let value, error = retainedCapture(generator, captured, child.value, depth + 1); if error != blot_error::Error.none { let __retained_capture_0_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_0_1: blot_error::Error = error; return finishRetainedCapture(children,published,__retained_capture_0_0,__retained_capture_0_1); } children.push(value); }
             else if index < generator.representations.store.children(template.captures).len {
-                let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), generator.representations.store.children(template.captures)[index]);
+                let actual, error = generator.toEvidence(generator.representations.store.children(template.captures)[index]);
                 if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { let __retained_capture_1_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_1_1: blot_error::Error = error; return finishRetainedCapture(children,published,__retained_capture_1_0,__retained_capture_1_1); } let __retained_capture_2_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_2_1: blot_error::Error = fail(generator, template.unit, template.node, blot_check_diagnostic_code::Code.unresolved_type); return finishRetainedCapture(children,published,__retained_capture_2_0,__retained_capture_2_1); }
                 values.push(blot_eval_core_eval::RetainedValue { captured, actual , ..});
             }
@@ -830,13 +835,13 @@ fn finishClosureHints(hints: blot_backend_substitution_buffers::Hints&,error: bl
 fn resolveClosureMappings<M,R>(generator: Generator&, key: blot_reuse_code_artifacts::ClosureKey, mappings: M&, rows: R&) -> blot_error::Error {
     let source .= unit(generator, key.unit); let metadata = source.closures[key.catalog]; let captures = source.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len]; let fn_type = generator.representations.store.node(key.ty);
     for entry in generator.representations.row_keys.get(key.rows) {
-        let concrete, error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(), entry.value); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return fail(generator, key.unit, metadata.body, blot_check_diagnostic_code::Code.unresolved_type); }
+        let concrete, error = generator.rowFromEvidence(entry.value); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return fail(generator, key.unit, metadata.body, blot_check_diagnostic_code::Code.unresolved_type); }
         let appended = appendRows(rows,RowMapping { entry.variable,concrete , ..}); if appended != blot_error::Error.none { return appended; }
     }
     if key.evidence != 0 {
         let words = generator.evaluator.storage.evidence.children(key.evidence); var index: i64 = 0;
         while index < words.len {
-            let concrete, error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(), words[index + 1]); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return fail(generator, key.unit, metadata.body, blot_check_diagnostic_code::Code.unresolved_type); }
+            let concrete, error = generator.fromEvidence(words[index + 1]); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return fail(generator, key.unit, metadata.body, blot_check_diagnostic_code::Code.unresolved_type); }
             let mapped = mapType(generator, key.unit, mappings, words[index], concrete, source.span(metadata.body)); if mapped != blot_error::Error.none { return mapped; } index += 2;
         }
     }
@@ -947,7 +952,7 @@ fn selectMemberTemplate(generator: Generator&, unit_id: u32, node: blot_check_co
     var declaration_unit = unit_id; if reference.unit != 0 { declaration_unit = reference.unit; } let declaration .= unit(generator, declaration_unit); var template = false;
     for member in declaration.member_templates { if member.binding == reference.binding { template = true; break; } } if !template { return reference, blot_error::Error.none; }
     var owner: i64 = -1; for source, index in generator.units { if source.unit == unit_id { owner = index; break; } } if owner < 0 { return reference, fail(generator, unit_id, node, blot_check_diagnostic_code::Code.unsupported); }
-    let actual, actual_error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), expected); if actual_error != blot_error::Error.none { if actual_error == blot_error::Error.out_of_memory { return reference, actual_error; } return reference, fail(generator, unit_id, node, blot_check_diagnostic_code::Code.unresolved_type); }
+    let actual, actual_error = generator.toEvidence(expected); if actual_error != blot_error::Error.none { if actual_error == blot_error::Error.out_of_memory { return reference, actual_error; } return reference, fail(generator, unit_id, node, blot_check_diagnostic_code::Code.unresolved_type); }
     let selected, error = generator.evaluator.selectTemplate(owner, node, reference, actual); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return reference, error; } return reference, evaluationFailure(generator); } return selected, blot_error::Error.none;
 }
 struct CallableEmission { key: blot_reuse_code_artifacts::CallableKey, direct: Key, current: blot_backend_layout::Node, provider_local: u32, count: i64 }
@@ -1227,7 +1232,7 @@ fn operationLabel(generator: Generator&, unit_id: u32, catalog: u32, mappings: c
     let operation = source.operation_values[catalog]; var arguments: u32[>..<] = [];
     for argument in source.types.list(operation.arguments) {
         let concrete, layout_error = codeLayoutWithRows(generator, unit_id, argument, mappings, rows, span); if layout_error != blot_error::Error.none { return 0, layout_error; }
-        let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), concrete); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual);
+        let actual, error = generator.toEvidence(concrete); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual);
     }
     let semantic, error = generator.evaluator.storage.evidence.effects.internOperationInstance(operation.identity, arguments, blot_backend_layout::mappedInstance(operation.instance, mappings));
     if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } return semantic, blot_error::Error.none;
@@ -1235,7 +1240,7 @@ fn operationLabel(generator: Generator&, unit_id: u32, catalog: u32, mappings: c
 fn operationLayoutLabel(generator: Generator&, operation_type: u32, unit_id: u32, span: blot_check_core::Span) -> u32, blot_error::Error {
     let operation = generator.representations.store.node(operation_type); if operation.tag != blot_backend_layout::Tag.nominal { return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); }
     var source_arguments: u32[>..<] = []; source_arguments.append(generator.representations.store.children(operation_type)); var arguments: u32[>..<] = [];
-    for argument in source_arguments { let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), argument); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual); }
+    for argument in source_arguments { let actual, error = generator.toEvidence(argument); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual); }
     let semantic, error = generator.evaluator.storage.evidence.effects.internOperation(blot_check_types::NominalIdentity { operation.a, operation.b , ..}, arguments);
     if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } return semantic, blot_error::Error.none;
 }
@@ -1243,7 +1248,7 @@ fn requestLabel(generator: Generator&, unit_id: u32, label: u32, mappings: const
     let source .= unit(generator, unit_id); let operation = source.types.operation(label); var arguments: u32[>..<] = [];
     for argument in source.types.list(operation.arguments) {
         let concrete, layout_error = codeLayoutWithRows(generator, unit_id, argument, mappings, rows, span); if layout_error != blot_error::Error.none { return 0, layout_error; }
-        let actual, error = generator.representations.toEvidence(generator.evaluator.evidenceStore(), concrete); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual);
+        let actual, error = generator.toEvidence(concrete); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } arguments.push(actual);
     }
     let semantic, error = generator.evaluator.storage.evidence.effects.internOperationInstance(operation.identity, arguments, operation.instance);
     if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0, error; } return 0, decline(generator, unit_id, span, blot_check_diagnostic_code::Code.unresolved_type); } return semantic, blot_error::Error.none;

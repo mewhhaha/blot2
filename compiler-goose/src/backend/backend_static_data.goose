@@ -50,7 +50,7 @@ type Mappings = blot_backend_substitution_buffers::Mappings;
 type Rows = blot_backend_substitution_buffers::Rows;
 fn staticFailure(g: Generator&,owner: u32,code: Code) -> Error { return g.decline(owner,blot_check_core::Span {..},code); }
 fn representation(g: Generator&,evidence: u32,owner: u32) -> u32,Error {
-    let result,error = g.representations.fromEvidence(g.evaluator.evidenceStore(),evidence);
+    let result,error = g.fromEvidence(evidence);
     if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return result,error; }
     return 0,staticFailure(g,owner,blot_check_diagnostic_code::Code.unresolved_type);
 }
@@ -296,7 +296,7 @@ recursive fn serializeProvider(self_: State&,g: Generator&,id: ValueId,ty: u32,d
 recursive fn serializeClosureValue(self_: State&,g: Generator&,id: ValueId,ty: u32,depth: i64,info: ValueInfo,key: SerializedKey) -> u32,Error {
     let shape = g.representations.store.node(ty);
     if shape.tag == blot_backend_layout::Tag.universal || (shape.tag == blot_backend_layout::Tag.function && g.representations.store.node(shape.a).tag == blot_backend_layout::Tag.universal) { return serializeClosure(self_,g,id,ty,depth); }
-    var selected = ty; let initially_expected,conversion_error = g.representations.toEvidence(g.evaluator.evidenceStore(),ty); var expected = initially_expected;
+    var selected = ty; let initially_expected,conversion_error = g.toEvidence(ty); var expected = initially_expected;
     if conversion_error != blot_error::Error.none {
         if conversion_error == blot_error::Error.out_of_memory { return 0,conversion_error; }
         if conversion_error != blot_error::Error.unresolved_type { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
@@ -308,7 +308,7 @@ recursive fn serializeClosureValue(self_: State&,g: Generator&,id: ValueId,ty: u
         }
         let actual,actual_error = representation(g,g.evaluator.valueEvidence(inferred),1); if actual_error != blot_error::Error.none { return 0,actual_error; }
         let completed,completed_error = g.completeRetainedRows(ty,actual,0); if completed_error != blot_error::Error.none { return 0,completed_error; } selected = completed;
-        let resolved,resolved_error = g.representations.toEvidence(g.evaluator.evidenceStore(),selected); if resolved_error != blot_error::Error.none { if resolved_error == blot_error::Error.out_of_memory { return 0,resolved_error; } return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } expected = resolved;
+        let resolved,resolved_error = g.toEvidence(selected); if resolved_error != blot_error::Error.none { if resolved_error == blot_error::Error.out_of_memory { return 0,resolved_error; } return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } expected = resolved;
     }
     let specialized,error = g.evaluator.specializeClosure(id,expected); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,g.evaluationFailure(); }
     let address,serialized = serializeClosure(self_,g,specialized,selected,depth); if serialized != blot_error::Error.none { return 0,serialized; } let cached = self_.cache.insert(key,address); return address,cached;
@@ -433,7 +433,7 @@ recursive fn serializeClosure(self_: State&,g: Generator&,id: ValueId,ty: u32,de
             anonymous => {
                 let closure = source.closures[metadata.identity];
                 for mapping in g.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] {
-                    let concrete,error = g.representations.fromEvidence(g.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,g.fail(metadata.unit,closure.body,blot_check_diagnostic_code::Code.unresolved_type); }
+                    let concrete,error = g.fromEvidence(mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,g.fail(metadata.unit,closure.body,blot_check_diagnostic_code::Code.unresolved_type); }
                     let mapped = g.mapType(metadata.unit,mappings,mapping.variable,concrete,source.span(closure.body)); if mapped != blot_error::Error.none { return 0,mapped; }
                 }
                 var implementation = ty; var dictionaries = false;
@@ -492,7 +492,7 @@ recursive fn serializeStagedClosure(self_: State&,g: Generator&,value: ValueId,t
     recursive fn build() -> u32,Error {
         let copied = captured.append(g.evaluator.valueChildren(value)); if copied != blot_error::Error.none { return 0,copied; } if bindings.len != captured.items.len { return 0,g.fail(header.unit,metadata.body,blot_check_diagnostic_code::Code.unsupported); }
         for mapping in g.evaluator.storage.type_mappings.items[header.mappings.start..header.mappings.start + header.mappings.len] {
-            let concrete,error = g.representations.fromEvidence(g.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,g.fail(header.unit,metadata.body,blot_check_diagnostic_code::Code.unresolved_type); }
+            let concrete,error = g.fromEvidence(mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,g.fail(header.unit,metadata.body,blot_check_diagnostic_code::Code.unresolved_type); }
             let mapped = g.mapType(header.unit,mappings,mapping.variable,concrete,source.span(metadata.body)); if mapped != blot_error::Error.none { return 0,mapped; }
         }
         let loaded = g.loadSemanticRows(g.evaluator.storage.row_mappings.items[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != blot_error::Error.none { return 0,loaded; }

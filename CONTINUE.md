@@ -12,21 +12,20 @@ whole 290, stopped at partial expectation interning in 163.377s with unchanged
 reproduce and advance the relevant frontier in about 75–78s. These are partial,
 check-only probes and never qualify the full compiler.
 
-Backend 295 clears shared-map interning, emission index borrows, infinite lookup,
-closed-local module/body references, nullable fields and recursive array borrowing.
-It stops after 77.441s, unchanged source, at `backend_representations.goose:38`:
-generic bridge binding stores a projected state reference into the global bridge.
-Migrate production callers to the existing checked `bridgeForGenerator` accessor;
-retain generic representations for lexical contexts.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-borrow-walk295.json.gz).
+Backend 296 clears the canonical bridge family: all 38 production conversion
+calls across three files use four Generator helpers and the existing checked
+`bridgeForGenerator` accessor. Generic representations remain for lexical callers.
+The extended real-Frame law passes in 6.322s: lazy binding, exact bridge/layout/
+evidence identity, product and nonempty effect-row roundtrips, four memo tables,
+owner reuse and release.
+[Bridge law](benchmarks/evidence/qualification/2026-11-10-goose-canonical-bridge-laws.json.gz).
 
-Array walkers now receive the original borrow engine as an invocation parameter
-instead of storing it in each recursive walker. No new pool/registry/cache copy.
-The actual captured-borrow law passes in 2.848s, including absent/present sinks,
-repeated reads and public captured-read updates. Three artifact hooks also narrow
-nullable references locally. Earlier shape/index/closed-local families have
-focused native receipts in the index; none qualifies whole runtime.
-[Borrow law](benchmarks/evidence/qualification/2026-11-10-goose-borrow-walk-laws.json.gz).
+The grouped backend stops in 81.077s, unchanged source, at `layout.goose:114`:
+`hasOwners` rebinds a slice from a local fixed array to caller-owned layout
+children. Replace that mixed-owner slice selector with scalar traversal while
+preserving ordering, record-name skipping and the 4096-node budget. Whole compiler
+and actual CLI/server/OOM/retry/retention still pending.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-canonical-bridge296.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion

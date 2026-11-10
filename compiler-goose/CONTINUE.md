@@ -4,18 +4,17 @@ Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
 No forwarding to compiler/ and no ABI fallback.
 
-Whole 290 is the latest complete build attempt: 163.377s, unchanged 461 inputs,
-no artifact. Grouped backend repairs take about 75–78s and remain partial,
-check-only. Backend 295 clears the array walker/nullable-field family, then stops
-at backend_representations38 projected-state bridge binding (77.441s, unchanged).
-Production callers should use existing compile_workspace.bridgeForGenerator;
-generic representations API remains for lexical contexts.
+Whole 290 is the latest complete attempt: 163.377s, unchanged 461 inputs, no
+artifact. Grouped backend probes remain partial/check-only. Backend 296 clears
+all 38 canonical bridge callsites, then stops in 81.077s at layout114 mixed-owner
+slice rebinding in hasOwners. Source unchanged. Replace selection with scalar
+traversal, preserving record skipping/order/4096 budget.
 
-Actual captured-borrow law passes in 2.848s: recursive invocation parameters carry
-the original borrow engine without storing it in local walkers; shared caches and
-captured-read updates pass. No new pools/registries. Three nullable artifact hooks
-also fixed. Shape/index/closed-local native receipts are in the root index.
-Whole build and actual CLI/server/OOM/retry/retention remain pending.
+Extended real-Frame bridge law passes in 6.322s: all four conversions, lazy binding,
+exact bridge/layout/evidence identity, nontrivial roundtrips, memos, owner reuse
+and release. Generic lexical API remains. Whole executable and actual CLI/server/
+OOM/retry/retention still pending. Earlier array/optional/source families and
+rejected experiments stay in the receipt index and Git history.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;

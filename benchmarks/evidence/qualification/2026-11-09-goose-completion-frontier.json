@@ -4267,5 +4267,48 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "canonical_production_bridges": {
+    "receipt": "2026-11-10-goose-canonical-bridge-laws.json.gz",
+    "production_calls": 38,
+    "files": 3,
+    "new_helpers": 4,
+    "existing_checked_accessor": "compile_workspace.bridgeForGenerator",
+    "lexical_generic_API_retained": true,
+    "native_passed": true,
+    "sum_stage_seconds": 6.322,
+    "coverage": [
+      "real Frame with pinned Core input",
+      "lazy first binding",
+      "exact connection/layout/evidence identities",
+      "nontrivial physical-semantic product roundtrip",
+      "nonempty effect row roundtrip",
+      "four memo publications",
+      "repeated bridge uses same partial owner"
+    ],
+    "whole_compiler_executable": false,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-canonical-bridge296.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 81.077,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/layout.goose",
+          "line": 114,
+          "message": "error: re-binding selected with a reference rooted at a different scope depth is not supported; declare a new variable (\u00a79.2): selected is bound to one rooted at direct, and this one is rooted at the caller's storage behind store (owner)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "0015c0be4fef0792f2531d03a53b1c5410c6772b8812b83bea827cb03414256c",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }
