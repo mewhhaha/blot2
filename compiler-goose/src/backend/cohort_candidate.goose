@@ -1,6 +1,7 @@
 // Detached late bodies for a freshly rederived closed activation.
 namespace blot_backend_cohort_candidate;
 import .wasm;
+import .region_candidate;
 import .runtime_ir;
 import .activation_graph;
 import .activation_intersection;
@@ -25,9 +26,9 @@ fn deinit(flags: Flags&) { blot_support_pooled_buffer::deinit(flags,flag_runs); 
 fn push(code: Code&,value: Instruction) -> Error { blot_support_pooled_buffer::push(code,value,code_runs) }
 fn append(code: Code&,values: const Instruction[:]) -> Error { blot_support_pooled_buffer::append(code,values,code_runs) }
 fn deinit(code: Code&) { blot_support_pooled_buffer::deinit(code,code_runs); }
-struct Extension { module: Module&,original_functions: i64 = 0,original_signatures: i64 = 0,owned: Flags,active: bool = false }
+struct Extension { module: Module&,original_functions: i64 = 0,original_signatures: i64 = 0,owned: Flags,active: bool = false,region_members:blot_runtime_region_runtime::Member[:]=default<blot_runtime_region_runtime::Member[:]>(),region_scopes:blot_runtime_region_runtime::Scope[:]=default<blot_runtime_region_runtime::Scope[:]>() }
 fn init(module: Module&) -> Extension { Extension { module } }
-fn deinit(view: Extension&) { if view.active { view.module.reset(); } view.owned.deinit(); view.original_functions = 0; view.original_signatures = 0; view.active = false; }
+fn deinit(view: Extension&) { if view.active { view.module.reset(); } view.owned.deinit();if view.region_members.len!=0 {blot_backend_region_candidate::member_runs.free_slice(view.region_members);}if view.region_scopes.len!=0 {blot_backend_region_candidate::scope_runs.free_slice(view.region_scopes);}view.region_members=default<blot_runtime_region_runtime::Member[:]>();view.region_scopes=default<blot_runtime_region_runtime::Scope[:]>(); view.original_functions = 0; view.original_signatures = 0; view.active = false; }
 fn possible(source: const Module&) -> bool { if !source.arena.present || source.semantic_sites.len == 0 || source.cohorts.present { return false; } for origin in source.table_origins { if origin.kind == blot_backend_runtime_ir::TABLE_callable { return true; } } return false; }
 fn own(view: Extension&,id: u32) -> Function?,Error {
     if !view.active || id >= view.module.functions.len { return null,blot_error::Error.invalid_function_reference; } if id < view.original_functions && !view.owned.items[id] { let error = view.module.materializeBody(id); if error != blot_error::Error.none { return null,error; } view.owned.items[id] = true; } return view.module.functions[id],blot_error::Error.none;
@@ -36,14 +37,34 @@ fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let b
 fn replaceBody(view: Extension&,id: u32,code: const Instruction[:]) -> Error { let body,error = own(view,id); if error != blot_error::Error.none { return error; } assert(body != null); return view.module.publishInstructions(id,code); }
 fn detachedInto(view: Extension&,source: const Module&) -> Error {
     assert(!(view.module .== source)); deinit(view); let destination .= view.module;
-    let types .= destination.types; let instructions .= destination.instructions; let names .= destination.names; let functions .= destination.functions; let signatures .= destination.signatures; let imports .= destination.imports; let globals .= destination.globals; let exports .= destination.exports; let data .= destination.data; let static_fields .= destination.static_fields; let table_functions .= destination.table_functions; let table_origins .= destination.table_origins; let semantic_sites .= destination.semantic_sites;
-    destination = source; destination.types .= types; destination.instructions .= instructions; destination.names .= names; destination.functions .= functions; destination.signatures .= signatures; destination.imports .= imports; destination.globals .= globals; destination.exports .= exports; destination.data .= data; destination.static_fields .= static_fields; destination.table_functions .= table_functions; destination.table_origins .= table_origins; destination.semantic_sites .= semantic_sites; destination.artifacts .= null;
-    view.active = true; view.original_functions = source.functions.len; view.original_signatures = source.signatures.len;
-    recursive fn cloneContainers() -> Error {
-        destination.types.append(source.types); destination.names.append(source.names); destination.signatures.append(source.signatures); destination.imports.append(source.imports); destination.globals.append(source.globals); destination.exports.append(source.exports); destination.data.append(source.data); destination.static_fields.append(source.static_fields); destination.table_functions.append(source.table_functions); destination.table_origins.append(source.table_origins); destination.semantic_sites.append(source.semantic_sites);
-        for original in source.functions { var function = original; function.borrowed_body = true; function.borrowed_locals = source.locals(original); function.borrowed_instructions = blot_backend_wasm::instructions(source,original); destination.functions.push(function); let flag = view.owned.push(false); if flag != blot_error::Error.none { return flag; } } return blot_error::Error.none;
+    destination=Module{
+        memory_model:source.memory_model,artifacts:null,
+        types:destination.types,instructions:destination.instructions,names:destination.names,
+        functions:destination.functions,signatures:destination.signatures,imports:destination.imports,globals:destination.globals,exports:destination.exports,data:destination.data,
+        fixed_memory_bytes:source.fixed_memory_bytes,array_transport:source.array_transport,arena:source.arena,
+        fixture_helpers_present:source.fixture_helpers_present,fixture_helpers:source.fixture_helpers,
+        lists:source.lists,cohorts:source.cohorts,regions:blot_support::none<blot_runtime_region_runtime::Prepared>(),host_references:source.host_references,public_arena:source.public_arena,
+        cleanup_data:source.cleanup_data,defer_cycles:source.defer_cycles,mutable_static:source.mutable_static,
+        static_fields:destination.static_fields,table_functions:destination.table_functions,table_origins:destination.table_origins,semantic_sites:destination.semantic_sites,
+        indirect:source.indirect,start:source.start
+    };
+    view.active=true;view.original_functions=source.functions.len;view.original_signatures=source.signatures.len;
+    if source.regions.present {
+        let region=source.regions.value;let members=blot_backend_region_candidate::member_runs.alloc_slice(region.plan.members.len);let scopes=blot_backend_region_candidate::scope_runs.alloc_slice(region.scopes.len);
+        for member,index in region.plan.members {members[index]=member;}for scope,index in region.scopes {scopes[index]=scope;}
+        view.region_members=members;view.region_scopes=scopes;
+        destination.regions=blot_support::some(blot_runtime_region_runtime::Prepared{runtime:region.runtime,plan:blot_runtime_region_runtime::Plan{frame_bytes:region.plan.frame_bytes,bytes:region.plan.bytes,mask:region.plan.mask,members:members},scopes:scopes});
     }
-    let error = cloneContainers(); if error != blot_error::Error.none { view.deinit(); } return error;
+    destination.types.append(source.types);destination.instructions.append(source.instructions);destination.names.append(source.names);destination.signatures.append(source.signatures);destination.imports.append(source.imports);destination.globals.append(source.globals);destination.exports.append(source.exports);destination.data.append(source.data);destination.static_fields.append(source.static_fields);destination.table_functions.append(source.table_functions);destination.table_origins.append(source.table_origins);destination.semantic_sites.append(source.semantic_sites);
+    // Bodies use destination ranges, never slices into a growable source owner.
+    // Ordinary ranges remain unchanged; a pre-detached body is copied once.
+    for id in view.original_functions {
+        let original=source.functions[id];var locals=original.locals;var instructions=original.instructions;
+        if original.borrowed_body {let body=blot_backend_wasm::publishBody(destination,original.borrowed_locals,original.borrowed_instructions);locals=body.locals;instructions=body.instructions;}
+        destination.functions.push(Function{parameters:original.parameters,result:original.result,result_role:original.result_role,entry:original.entry,provider_parameter:original.provider_parameter,callable_layout:original.callable_layout,signature:original.signature,parameter_roles:original.parameter_roles,annotations:original.annotations,locals:locals,instructions:instructions,..});
+        let flag=view.owned.push(true);if flag!=blot_error::Error.none {view.deinit();return flag;}
+    }
+    return blot_error::Error.none;
 }
 fn namedFunction(model: blot_backend_activation_intersection::Model,id: i64) -> bool { for entry in model.functions { if entry.function != id { continue; } match entry.request { named=>{ return true; },_=>{}, } } return false; }
 fn prepareInto(view: Extension&,source: const Module&,model: blot_backend_activation_intersection::Model) -> bool,Error {

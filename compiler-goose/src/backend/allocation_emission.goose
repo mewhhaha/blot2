@@ -16,6 +16,11 @@ struct Site {
 struct Snapshot { sites: Site[:] = default<Site[:]>(),omitted: i64 = 0 }
 reusable[] var owned_sites: Site[>..] = [];
 fn clone(source: const Snapshot&) -> Snapshot,blot_error::Error { let sites = owned_sites.alloc_slice(source.sites.len); for value,index in source.sites { sites[index] = value; } return Snapshot { sites: sites,omitted: source.omitted,..},blot_error::Error.none; }
+fn canonicalOwned(value:Snapshot)->Snapshot {
+ if value.sites.len==0 {return Snapshot{omitted:value.omitted,..};}
+ let owned=owned_sites.realloc_slice(value.sites,value.sites.len);assert(blot_support::same_slice_identity(owned,value.sites));let start=owned_sites.index_of(owned[0]);assert(start>=0 && value.sites.len<=owned_sites.len-start);
+ return Snapshot{sites:owned_sites[start..start+value.sites.len],omitted:value.omitted};
+}
 fn deinit(snapshot: Snapshot&) { if snapshot.sites.len != 0 { owned_sites.free_slice(snapshot.sites); } snapshot = Snapshot {..}; }
 fn category(tag: blot_check_core::Tag) -> Kind {
     if tag == blot_check_core::Tag.closure { return Kind.closure_storage; }

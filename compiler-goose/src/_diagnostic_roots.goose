@@ -13,6 +13,10 @@ import reuse.zig_project_server;
 import execution_policy;
 import support.io;
 import support.option;
+import backend.core_backend;
+import backend.result_publication;
+import check.core;
+import reuse.code_artifacts;
 
 export "probe_runtime" fn runtime() {
  var output:u8[>..<]=[];
@@ -75,8 +79,83 @@ export "probe_scoped" fn scoped() {
 export "probe_prepare" fn prepare() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var stamp_memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},module_stamps:stamp_memo,..};
- let error=blot_backend_core_backend::prepare(run,false);run.deinit();
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ let error=blot_backend_core_backend::prepare(run);
+ if error==blot_error::Error.none {
+  var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+  let bound=memo.bindValidatedSources(run.stamp_sources);if bound==blot_error::Error.none {memo.compare_contents=true;memo.validate=run.options.validate_pins;let prepared=blot_backend_core_backend::finishPreparation(run,false,memo);}
+  memo.deinit();
+ }
+ run.deinit();
  let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+// Full backend routing without a source project. Unstaged Core: never execute.
+export "probe_compile" fn compile() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);let units=blot_backend_result_publication::module_runs.alloc_slice(1);units[0]=blot_check_core::Module{unit:1,..};
+ let result,error=blot_backend_core_backend::compileWithOptions(workspace,units,1,blot_backend_core_backend::CompileOptions{..});if error==blot_error::Error.none {var owned=result;owned.deinit();}
+ let released=frame.release();assert(released==blot_error::Error.none);blot_backend_result_publication::module_runs.free_slice(units);
+}
+
+// Diagnostic rendering traversal on deliberately uninitialized evidence; never execute.
+export "probe_entry_display" fn entry_display() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);var text:u8[>..<]=[];var display=blot_backend_core_backend::EntryDisplay{workspace.generator,text};
+ let printed,error=blot_backend_core_backend::ty(display,0,64);
+ let body=default<blot_check_core::Body>();let header=default<blot_eval_core_eval::SourceInterface>();
+ let declined=blot_backend_core_backend::declineEntryInterface(workspace.generator,1,body,header);
+ let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+
+// Check-only diagnostic probes. These intentionally invalid, unstaged fixtures
+// type-check later backend phases. Never execute these roots.
+export "probe_assemble" fn assemble() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ let compiled,error=blot_backend_core_backend::assemble(run);
+ run.deinit();var result=compiled;result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+export "probe_record_artifact" fn record_artifact() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var result=blot_backend_core_backend::emptyResult(workspace);
+ var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
+ var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+ let error=blot_backend_core_backend::recordArtifact(run,result,memo);
+ memo.deinit();run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+export "probe_publish" fn publish() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var result=blot_backend_core_backend::emptyResult(workspace);
+ var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
+ var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+ let error=blot_backend_core_backend::publish(run,result,memo);
+ memo.deinit();run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+export "probe_detach_result" fn detach_result() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);var result=blot_backend_core_backend::emptyResult(workspace);
+ let error=blot_backend_core_backend::detachResult(result);
+ result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+export "probe_emit" fn emit() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ let emitted,error=blot_backend_core_backend::emit(run);run.deinit();match emitted {diagnostic failure=>{var result=failure.value;result.deinit();},complete=>{}}
+let released=frame.release();assert(released==blot_error::Error.none);
+}
+export "probe_observe" fn observe() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};var result=blot_backend_core_backend::emptyResult(workspace);
+ let error=blot_backend_core_backend::observe(run,result);run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }

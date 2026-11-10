@@ -3287,5 +3287,99 @@
       "Shared Gate law reuses existing resolved-body construction after added Capture fixture exceeded30s emission cap."
     ],
     "next": "Separate preparation reset from lexical memo lifetime; then actual C/header/native and CLI/server/OOM/retry qualification."
+  },
+  "lexical_phase_result_and_canonical_pool_family": {
+    "whole212": "2026-11-10-goose-whole212.json.gz",
+    "partial_preparation211": "2026-11-10-goose-lexical-preparation211.json.gz",
+    "receipts": [
+      "2026-11-10-goose-outer-compile-boundary.json.gz",
+      "2026-11-10-goose-phase-owner-family.json.gz",
+      "2026-11-10-goose-result-diagnostic-laws.json.gz",
+      "2026-11-10-goose-cohort-owned-laws.json.gz",
+      "2026-11-10-goose-retained-range-laws.json.gz",
+      "2026-11-10-goose-lease-timing-owner-boundary.json.gz"
+    ],
+    "focused_native_seconds": {
+      "result_diagnostic": 6.635,
+      "wasm_pipeline_scope": 9.254,
+      "proof_leases": 6.921
+    },
+    "inventory": 36,
+    "complete_inventory_current_source": true,
+    "latest_phase232": {
+      "partial": true,
+      "engines": [
+        "entry_display",
+        "emit",
+        "assemble",
+        "observe",
+        "record_artifact",
+        "publish",
+        "detach_result"
+      ],
+      "exit": 1,
+      "seconds": 112.759,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/code_artifacts.goose",
+          "line": 1208,
+          "message": "error: expected a value of type u64, got i64 (narrowing and sign changes require an explicit `as`)"
+        },
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/specialization.goose",
+          "line": 325,
+          "message": "error: cannot call codeLayoutWithRows, which may shrink self_: the for loop at /home/jacobt/src/blot2/compiler-goose/src/eval/specialization.goose:297 iterates source.rowLabels(source_row), which may refer into self_ (\u00a75.2)"
+        },
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+          "line": 60,
+          "message": "error: cannot assign payloads: global inactive_Context_u32 may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/backend/substitution_buffers.goose:112 (\u00a75.1)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "e1745e6a5ffcb343097378b646eb03134a4f260ba7de4f92dc1b85ff1bfb1581",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "latest_ownership233": {
+      "partial": true,
+      "engines": [
+        "record_artifact",
+        "observe",
+        "publish",
+        "detach_result"
+      ],
+      "exit": 1,
+      "seconds": 3.776,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/code_artifacts.goose",
+          "line": 1213,
+          "message": "error: cannot iterate a value of type blot_eval_core_eval::ConstantRecordsBuffer"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "e123e7d1d0fa21db89f2f7746a6ef233838684f241cb918fefc83f384a2ccfa5",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "limits": [
+      "Whole compiler C/header/native executable still absent.",
+      "Phase probes are deliberately unstaged and may never execute.",
+      "Snapshot instruction/region/substitution/identity copying costs not benchmarked.",
+      "ABI8/session2 actual compiler CLI/server/OOM/retry qualification pending.",
+      "Complete36 component coverage never qualifies actual complete compiler execution."
+    ],
+    "complete36": {
+      "receipt": "2026-11-10-goose-complete36-owner-laws.json.gz",
+      "passed": true,
+      "tests": 36,
+      "seconds": 310.317,
+      "source_frozen": true,
+      "each_stage_cap_seconds": 30,
+      "outer_cap_seconds": 600
+    }
   }
 }

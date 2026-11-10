@@ -34,6 +34,37 @@ struct RegionCost {
     solver_bytes: u64 = 0, scratch_bytes: u64 = 0, solver_allocations: u64 = 0, scratch_allocations: u64 = 0,
 }
 struct RegionCensus { entries: RegionCost[32] = [RegionCost {..}; 32], overflow: RegionCost = RegionCost { caller: RegionCaller { function: "overflow" , ..}, stage: blot_support::Option<blot_work_counters::InferenceStage> { present: false , ..} , ..} }
+// Evaluator region labels come from fixed call sites, including resumed regions.
+// Rebuild their descriptors with static text before storing or publishing a census.
+fn canonicalRegionCaller(value:RegionCaller)->RegionCaller {
+ if value.function=="" {return RegionCaller{function:"",line:value.line};}
+ if value.function=="solveEvidenceOwnedCodeInner" {return RegionCaller{function:"solveEvidenceOwnedCodeInner",line:value.line};}
+ if value.function=="closureEvidenceQuery" {return RegionCaller{function:"closureEvidenceQuery",line:value.line};}
+ if value.function=="sourceRegionInterface" {return RegionCaller{function:"sourceRegionInterface",line:value.line};}
+ if value.function=="sourceInterfaceInner" {return RegionCaller{function:"sourceInterfaceInner",line:value.line};}
+ if value.function=="matchCovariantTypeInner" {return RegionCaller{function:"matchCovariantTypeInner",line:value.line};}
+ if value.function=="validateSchemeInner" {return RegionCaller{function:"validateSchemeInner",line:value.line};}
+ if value.function=="describePrincipalTape" {return RegionCaller{function:"describePrincipalTape",line:value.line};}
+ if value.function=="drainSummaries" {return RegionCaller{function:"drainSummaries",line:value.line};}
+ if value.function=="retainedQueryTape" {return RegionCaller{function:"retainedQueryTape",line:value.line};}
+ if value.function=="partialArrayMemberTape" {return RegionCaller{function:"partialArrayMemberTape",line:value.line};}
+ if value.function=="startupDependencies" {return RegionCaller{function:"startupDependencies",line:value.line};}
+ if value.function=="principalEvidenceRecorder" {return RegionCaller{function:"principalEvidenceRecorder",line:value.line};}
+ if value.function=="principalEvidenceRegionInner" {return RegionCaller{function:"principalEvidenceRegionInner",line:value.line};}
+ if value.function=="recheckCallProof" {return RegionCaller{function:"recheckCallProof",line:value.line};}
+ assert(false);return RegionCaller{};
+}
+fn canonicalRegionCost(value: RegionCost) -> RegionCost {
+    var caller = RegionCaller { function: "overflow", line: value.caller.line };
+    if value.caller.function != "overflow" { caller = canonicalRegionCaller(value.caller); }
+    return RegionCost { caller: caller, stage: value.stage, regions: value.regions, inclusive_us: value.inclusive_us, scopes: value.scopes, nodes: value.nodes, solver_bytes: value.solver_bytes, scratch_bytes: value.scratch_bytes, solver_allocations: value.solver_allocations, scratch_allocations: value.scratch_allocations };
+}
+fn canonicalRegionCensus(value: RegionCensus) -> RegionCensus {
+    var result = RegionCensus {..};
+    for entry, index in value.entries { result.entries[index] = canonicalRegionCost(entry); }
+    result.overflow = canonicalRegionCost(value.overflow);
+    return result;
+}
 fn sameBytes(left: const u8[:], right: const u8[:]) -> bool { if left.len != right.len { return false; } for byte, index in left { if byte != right[index] { return false; } } return true; }
 fn addCost(target: RegionCost&, cost: RegionCost) {
     target.regions = saturatingAdd(target.regions, cost.regions); target.inclusive_us = saturatingAdd(target.inclusive_us, cost.inclusive_us); target.scopes = saturatingAdd(target.scopes, cost.scopes); target.nodes = saturatingAdd(target.nodes, cost.nodes);
@@ -100,7 +131,7 @@ fn region(work: Work&, input: Region, name: const u8[:]) {
     if input.us <= work.regions[smallest].us { return; } work.regions[smallest] = input; work.regions[smallest].file_truncated = copyUtf8Prefix(work.regions[smallest].file_utf8, name);
 }
 fn snapshot(work: Work&) -> WorkStats {
-    var result = WorkStats { regions: work.regions, region_callers: work.region_callers, refinements: work.refinements, semantic_job_sum_us: work.semantic_job_nanos / 1000 , ..};
+    var result = WorkStats { regions: work.regions, region_callers: canonicalRegionCensus(work.region_callers), refinements: work.refinements, semantic_job_sum_us: work.semantic_job_nanos / 1000 , ..};
     if work.cpu_clock.enabled { var cpu = ThreadCpu {..}; for nanos, index in work.cpu_nanos { cpu.values[index] = nanos / 1000; } result.thread_cpu_us = blot_support::some(cpu); }
     result.lookup_us = work.nanos[1] / 1000;
     result.query_prepare_us = work.nanos[2] / 1000;

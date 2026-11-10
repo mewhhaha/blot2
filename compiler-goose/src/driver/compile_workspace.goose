@@ -42,6 +42,17 @@ fn canonicalWorkspace(source:Workspace&)->Workspace& {
  let owned:Workspace& =workspaces[state.workspace_slot-1];
  assert(source .==owned && registered .==owned);return owned;
 }
+// Results carry only the publication key; the active Frame owns message backing.
+fn resultMessage(owner:blot_backend_result_publication::Owner,epoch:u64,pinned:bool)->const u8[:] {
+ assert(blot_backend_result_publication::resultValid(owner,epoch,pinned));
+ if owner.slot==0 {return default<const u8[:]>();}
+ assert(active.valid());let state:const FrameState& =frames[active.slot-1];
+ assert(state.workspace_slot!=0 && state.workspace_slot-1<workspaces.len);
+ let workspace:const Workspace& =workspaces[state.workspace_slot-1];let registered .=state.workspace;
+ assert(registered && registered .== workspace && workspace.publication_owner==owner);
+ assert(blot_backend_result_publication::driver(owner)==state.generation && blot_backend_result_publication::allocation(owner)==state.allocation_owner);
+ return backing_message[..];
+}
 fn canonicalGenerator(source:Generator&)->Generator& {
  assert(active.valid());let state:FrameState& =frames[active.slot-1];
  assert(state.generator_slot!=0 && state.generator_slot-1<generators.len);

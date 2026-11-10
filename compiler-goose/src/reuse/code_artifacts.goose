@@ -185,7 +185,10 @@ fn deinit(self_:Context_blot_reuse_substitution_keys__Entry&) {blot_support_pool
 struct Context_blot_reuse_independent_call_proof__Record {storage:blot_reuse_independent_call_proof::Record[:]=default<blot_reuse_independent_call_proof::Record[:]>(),items:blot_reuse_independent_call_proof::Record[:]=default<blot_reuse_independent_call_proof::Record[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Context_blot_reuse_independent_call_proof__Record:blot_reuse_independent_call_proof::Record[>..]=[];
 fn ensure(self_:Context_blot_reuse_independent_call_proof__Record&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Context_blot_reuse_independent_call_proof__Record);return self_.failure;}
-fn push(self_:Context_blot_reuse_independent_call_proof__Record&,value:blot_reuse_independent_call_proof::Record) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Context_blot_reuse_independent_call_proof__Record);self_.len=self_.items.len;}
+fn push(self_:Context_blot_reuse_independent_call_proof__Record&,value:blot_reuse_independent_call_proof::Record) {
+ if self_.failure!=blot_error::Error.none {return;}let length=self_.items.len;if self_.ensure(length+1)!=blot_error::Error.none {return;}
+ let destination=pool_Context_blot_reuse_independent_call_proof__Record.realloc_slice(self_.storage,self_.storage.len);destination[length]=blot_reuse_independent_call_proof::canonicalOwned(value);self_.items=destination[..length+1];self_.len=length+1;
+}
 fn append(self_:Context_blot_reuse_independent_call_proof__Record&,values:const blot_reuse_independent_call_proof::Record[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Context_blot_reuse_independent_call_proof__Record);self_.len=self_.items.len;}
 fn resize(self_:Context_blot_reuse_independent_call_proof__Record&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
 fn resize(self_:Context_blot_reuse_independent_call_proof__Record&,length:i64,value:blot_reuse_independent_call_proof::Record) {if length<=self_.len {self_.resize(length);return;}if self_.ensure(length)!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
@@ -460,17 +463,30 @@ fn previousStampPools(lease:u32,generation:u64)->const Pools? {
  assert(lease-1<context_owners.len&&context_owners[lease-1].live&&context_owners[lease-1].generation==generation);
  let context:const Context& =context_owners[lease-1].canonical;assert(context.pools.present);return context.pools.value;
 }
-fn bindSources(self_:ModuleStamps&,owner:blot_backend_result_publication::Owner,current:const blot_check_core::Module[:],previous:const Context?)->Error {
- if self_.bound||self_.storage.len!=0 {return blot_error::Error.invalid_artifact;}
- let held,error=blot_backend_result_publication::registeredInputUnits(owner);if error!=blot_error::Error.none {return error;}
- if !blot_support::same_slice_identity(held,current) {return blot_error::Error.invalid_artifact;}
+struct StampSources {current_owner:blot_backend_result_publication::Owner=blot_backend_result_publication::Owner{},previous_context:u32=0,previous_generation:u64=0}
+// Validate before planning reset, without constructing a reference-bearing memo.
+fn validateStampSources(owner:blot_backend_result_publication::Owner,current:const blot_check_core::Module[:],previous:const Context?)->StampSources,Error {
+ let held,error=blot_backend_result_publication::registeredInputUnits(owner);if error!=blot_error::Error.none {return StampSources{},error;}
+ if !blot_support::same_slice_identity(held,current) {return StampSources{},blot_error::Error.invalid_artifact;}
  var lease:u32=0;var generation:u64=0;
- if previous {if !previous.validContext() {return blot_error::Error.invalid_artifact;}
+ if previous {if !previous.validContext() {return StampSources{},blot_error::Error.invalid_artifact;}
   let canonical:const Context& =context_owners[previous.context_lease-1].canonical;
-  if !(previous .== canonical)||!canonical.pools.present {return blot_error::Error.invalid_artifact;}
+  if !(previous .== canonical)||!canonical.pools.present {return StampSources{},blot_error::Error.invalid_artifact;}
   lease=previous.context_lease;generation=previous.context_generation;
  }
- self_.current_owner=owner;self_.previous_context=lease;self_.previous_generation=generation;self_.bound=true;return blot_error::Error.none;
+ return StampSources{current_owner:owner,previous_context:lease,previous_generation:generation},blot_error::Error.none;
+}
+fn bindValidatedSources(self_:ModuleStamps&,sources:StampSources)->Error {
+ if self_.bound||self_.storage.len!=0 {return blot_error::Error.invalid_artifact;}
+ let held,error=blot_backend_result_publication::registeredInputUnits(sources.current_owner);if error!=blot_error::Error.none {return error;}
+ if sources.previous_context!=0 {let at=sources.previous_context-1;if at>=context_owners.len||!context_owners[at].live||context_owners[at].generation!=sources.previous_generation||!context_owners[at].canonical.pools.present {return blot_error::Error.invalid_artifact;}}
+ else if sources.previous_generation!=0 {return blot_error::Error.invalid_artifact;}
+ self_.current_owner=sources.current_owner;self_.previous_context=sources.previous_context;self_.previous_generation=sources.previous_generation;self_.bound=true;return blot_error::Error.none;
+}
+fn bindSources(self_:ModuleStamps&,owner:blot_backend_result_publication::Owner,current:const blot_check_core::Module[:],previous:const Context?)->Error {
+ if self_.bound||self_.storage.len!=0 {return blot_error::Error.invalid_artifact;}
+ let sources,error=validateStampSources(owner,current,previous);if error!=blot_error::Error.none {return error;}
+ return bindValidatedSources(self_,sources);
 }
 fn currentStampUnits(self_:const ModuleStamps&)->const blot_check_core::Module[:] {
  if self_.current_owner.slot==0 {assert(self_.current_owner.generation==0);return default<const blot_check_core::Module[:]>();}
@@ -1120,10 +1136,10 @@ fn deinit(self_: Pools&) {
 
 fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
     var previous: const Pools? = null;
-    { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous .= previousStampPools(cache);  } }
+    { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous .=previousStampPools(cache.previous_context,cache.previous_generation);  } }
     var candidate = default<Pools>();
     var copying = CaptureState { shared: blot_eval_pool_leases::Builder {..} , ..};
-    { let optional_source_11 .= previous; if optional_source_11 { let old .= optional_source_11; copying.shared.previous = old.leases;  } }
+    { let optional_source_11 .= previous; if optional_source_11 { let old .= optional_source_11; copying.shared.previous .= old.leases;  } }
     candidate.project_identity = identity.present;
     if identity.present {
         var old = default<IdentityMetadata>();
@@ -1166,20 +1182,20 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.layouts.effects.owner_id = blot_native::fresh_owner_id();
     let before_evaluator = copying.shared.stats;
     let session .= generator.evaluator;
-    candidate.evaluator.code_origins = copying.capture_code_origins(session.storage.code_origins, old_evaluator.code_origins);
-    candidate.evaluator.values = copying.capture_values(session.storage.values, old_evaluator.values);
-    candidate.evaluator.children = copying.capture_children(session.storage.children, old_evaluator.children);
-    candidate.evaluator.closures = copying.capture_closures(session.storage.closures, old_evaluator.closures);
-    candidate.evaluator.value_evidence = copying.capture_value_evidence(session.storage.value_evidence, old_evaluator.value_evidence);
-    candidate.evaluator.type_mappings = copying.capture_type_mappings(session.storage.type_mappings, old_evaluator.type_mappings);
-    candidate.evaluator.row_mappings = copying.capture_row_mappings(session.storage.row_mappings, old_evaluator.row_mappings);
-    candidate.evaluator.value_records = copying.capture_value_records(session.storage.value_records, old_evaluator.value_records);
-    candidate.evaluator.record_layouts = copying.capture_record_layouts(session.storage.record_layouts, old_evaluator.record_layouts);
-    candidate.evaluator.field_names = copying.capture_field_names(session.storage.field_names, old_evaluator.field_names);
-    candidate.evaluator.implementation_proofs.proofs = copying.capture_implementation_proofs(session.implementation_proofs.proofs, old_evaluator.implementation_proofs.proofs);
-    candidate.evaluator.implementation_proofs.arguments = copying.capture_implementation_arguments(session.implementation_proofs.arguments, old_evaluator.implementation_proofs.arguments);
-    candidate.evaluator.implementation_proofs.members = copying.capture_implementation_members(session.implementation_proofs.members, old_evaluator.implementation_proofs.members);
-    candidate.evaluator.implementation_proofs.edges = copying.capture_implementation_edges(session.implementation_proofs.edges, old_evaluator.implementation_proofs.edges);
+    candidate.evaluator.code_origins = copying.capture_code_origins(session.storage.code_origins.items, old_evaluator.code_origins);
+    candidate.evaluator.values = copying.capture_values(session.storage.values.items, old_evaluator.values);
+    candidate.evaluator.children = copying.capture_children(session.storage.children.items, old_evaluator.children);
+    candidate.evaluator.closures = copying.capture_closures(session.storage.closures.items, old_evaluator.closures);
+    candidate.evaluator.value_evidence = copying.capture_value_evidence(session.storage.value_evidence.items, old_evaluator.value_evidence);
+    candidate.evaluator.type_mappings = copying.capture_type_mappings(session.storage.type_mappings.items, old_evaluator.type_mappings);
+    candidate.evaluator.row_mappings = copying.capture_row_mappings(session.storage.row_mappings.items, old_evaluator.row_mappings);
+    candidate.evaluator.value_records = copying.capture_value_records(session.storage.value_records.items, old_evaluator.value_records);
+    candidate.evaluator.record_layouts = copying.capture_record_layouts(session.storage.record_layouts.items, old_evaluator.record_layouts);
+    candidate.evaluator.field_names = copying.capture_field_names(session.storage.field_names.items, old_evaluator.field_names);
+    candidate.evaluator.implementation_proofs.proofs = copying.capture_implementation_proofs(session.implementation_proofs.proofs.items, old_evaluator.implementation_proofs.proofs);
+    candidate.evaluator.implementation_proofs.arguments = copying.capture_implementation_arguments(session.implementation_proofs.arguments.items, old_evaluator.implementation_proofs.arguments);
+    candidate.evaluator.implementation_proofs.members = copying.capture_implementation_members(session.implementation_proofs.members.items, old_evaluator.implementation_proofs.members);
+    candidate.evaluator.implementation_proofs.edges = copying.capture_implementation_edges(session.implementation_proofs.edges.items, old_evaluator.implementation_proofs.edges);
     candidate.evaluator.evidence.nodes = copying.capture_evidence_nodes(session.storage.evidence.nodes.items, old_evaluator.evidence.nodes);
     candidate.evaluator.evidence.extra = copying.capture_evidence_extra(session.storage.evidence.extra.items, old_evaluator.evidence.extra);
     candidate.evaluator.evidence.quantifier_goals = copying.capture_evidence_quantifier_goals(session.storage.evidence.quantifier_goals.items, old_evaluator.evidence.quantifier_goals);
@@ -1189,11 +1205,12 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     candidate.evaluator.evidence.effects.rows = copying.capture_evidence_rows(session.storage.evidence.effects.rows.items, old_evaluator.evidence.effects.rows);
     candidate.evaluator.evidence.effects.labels = copying.capture_evidence_labels(session.storage.evidence.effects.labels.items, old_evaluator.evidence.effects.labels);
     candidate.evaluator.evidence.effects.owner_id = blot_native::fresh_owner_id();
-    session.counters.snapshot_copy_bytes += copying.shared.stats.copied_bytes - before_evaluator.copied_bytes;
-    session.counters.snapshot_copy_allocations += copying.shared.stats.copied_fields - before_evaluator.copied_fields;
+    let copied_bytes=copying.shared.stats.copied_bytes-before_evaluator.copied_bytes;let copied_fields=copying.shared.stats.copied_fields-before_evaluator.copied_fields;assert(copied_bytes>=0 && copied_fields>=0);
+    session.counters.snapshot_copy_bytes +=copied_bytes as u64;
+    session.counters.snapshot_copy_allocations +=copied_fields as u64;
     // Every nested receipt is cloned before its record array is published.
     var constants: blot_reuse_constant_receipt::Record[>..<] = [];
-    for record in session.retained.constant_records {
+    for record in session.retained.constant_records.items {
         let owned, error = record.clone();
         if error != blot_error::Error.none {
             for &prior in constants { prior.deinit(); }
@@ -1210,7 +1227,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         values: copyOwned(generator.representations.instance_arguments.values),
         spans: copyOwned(generator.representations.instance_arguments.spans),
      ..};
-    candidate.captures = copying.capture_captures(generator.planning.template_catalog, old.captures);
+    candidate.captures = copying.capture_captures(generator.planning.template_catalog.items, old.captures);
     { let optional_source_7 .= generator.representations.connection; if optional_source_7 { let connection .= optional_source_7; candidate.bridge = blot_support::some(captureBridge(connection));  } }
     var locations: FieldLocation[>..<] = [];
     for slot in session.field_locations.slots {

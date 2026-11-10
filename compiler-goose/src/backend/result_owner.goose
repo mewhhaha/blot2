@@ -11,6 +11,14 @@ type Error = blot_error::Error;
 struct ByteBuffer { storage: u8[:] = default<u8[:]>(),items: u8[:] = default<u8[:]>(),len: i64 = 0 }
 reusable[] var byte_runs: u8[>..] = [];
 fn append(self_: ByteBuffer&,bytes: const u8[:]) -> Error { let error = blot_support_pooled_buffer::append(self_,bytes,byte_runs); self_.len = self_.items.len; return error; }
+// Reborrow the initialized prefix of an exact existing byte allocation.
+fn registeredBytes(value:ByteBuffer)->const u8[:] {
+ assert(value.len==value.items.len && value.len>=0 && value.len<=value.storage.len);
+ if value.len==0 {return default<const u8[:]>();}
+ let owned=byte_runs.realloc_slice(value.storage,value.storage.len);assert(blot_support::same_slice_identity(owned,value.storage));
+ let start=byte_runs.index_of(owned[0]);assert(start>=0 && value.storage.len<=byte_runs.len-start);
+ let items=byte_runs[start..start+value.len];assert(blot_support::same_slice_identity(items,value.items));return items;
+}
 fn clear(self_: ByteBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len = 0; }
 fn deinit(self_: ByteBuffer&) { blot_support_pooled_buffer::deinit(self_,byte_runs); self_.len = 0; }
 var inactive_bytes = ByteBuffer {..};

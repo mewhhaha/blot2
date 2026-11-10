@@ -3,6 +3,7 @@ namespace blot_backend_startup_emission_facts;
 import .wasm;
 import .runtime_ir;
 import support.error;
+import support.option;
 let none: u32 = 4294967295;
 enum Kind { named,anonymous,runtime_initializer }
 type Origin = Kind;
@@ -14,6 +15,13 @@ struct Store { enabled: bool = false,active: u32 = none,headers: Header[>..<]&,e
 reusable[] var header_runs: Header[>..] = [];
 reusable[] var event_runs: Event[>..] = [];
 fn init(headers: Header[>..<]&,events: Event[>..<]&) -> Store { Store { headers: headers,events: events } }
+fn canonicalOwned(value:Snapshot)->Snapshot {return Snapshot{headers:registeredHeaders(value.headers),events:registeredEvents(value.events)};}
+fn registeredHeaders(values:Header[:])->Header[:] {
+ if values.len==0 {return default<Header[:]>();}let owned=header_runs.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=header_runs.index_of(owned[0]);assert(start>=0 && values.len<=header_runs.len-start);return header_runs[start..start+values.len];
+}
+fn registeredEvents(values:Event[:])->Event[:] {
+ if values.len==0 {return default<Event[:]>();}let owned=event_runs.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));let start=event_runs.index_of(owned[0]);assert(start>=0 && values.len<=event_runs.len-start);return event_runs[start..start+values.len];
+}
 fn deinit(snapshot: Snapshot&) { if snapshot.headers.len != 0 { header_runs.free_slice(snapshot.headers); } if snapshot.events.len != 0 { event_runs.free_slice(snapshot.events); } snapshot.headers = default<Header[:]>(); snapshot.events = default<Event[:]>(); }
 fn deinit(store: Store&) { store.headers.clear(); store.events.clear(); store.enabled = false; store.active = none; }
 fn event(store: Store&,value: Event) -> blot_error::Error { if store.enabled { store.events.push(value); } return blot_error::Error.none; }

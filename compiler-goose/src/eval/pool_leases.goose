@@ -11,6 +11,7 @@ import eval.implementation_evidence;
 import eval.type_evidence;
 import reuse.code_artifacts;
 import support.error;
+import support.option;
 import support.structural_adapters;
 
 import support.structural;
@@ -160,7 +161,10 @@ fn shareable_identity_bytes(self_: const Builder&,old: const u8[:]) -> bool {
 }
 fn retained_identity_bytes(self_: Builder&,old: const u8[:]) -> const u8[:],Error {
  let previous .=self_.previous;if !previous {return default<const u8[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[0]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u8[:]>(),error; }
- self_.leases.values[0]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.identity_bytes && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_identity_bytes.len && meta.len<=pool_identity_bytes.len-meta.start);
+ let items=pool_identity_bytes[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[0]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_identity_bytes(self_: Builder&,source: const u8[:],previous: const u8[:]) -> const u8[:],Error {
  if shareable_identity_bytes(self_,previous)&&blot_structural::equal(source,previous) { return retained_identity_bytes(self_,previous); }
@@ -193,7 +197,10 @@ fn shareable_identity_symbols(self_: const Builder&,old: const blot_backend_runt
 }
 fn retained_identity_symbols(self_: Builder&,old: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_runtime_identity::Name[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[1]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_runtime_identity::Name[:]>(),error; }
- self_.leases.values[1]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.identity_symbols && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_identity_symbols.len && meta.len<=pool_identity_symbols.len-meta.start);
+ let items=pool_identity_symbols[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[1]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_identity_symbols(self_: Builder&,source: const blot_backend_runtime_identity::Name[:],previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:],Error {
  if shareable_identity_symbols(self_,previous)&&blot_structural::equal(source,previous) { return retained_identity_symbols(self_,previous); }
@@ -226,7 +233,10 @@ fn shareable_identity_owners(self_: const Builder&,old: const blot_backend_runti
 }
 fn retained_identity_owners(self_: Builder&,old: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_runtime_identity::Name[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[2]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_runtime_identity::Name[:]>(),error; }
- self_.leases.values[2]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.identity_owners && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_identity_owners.len && meta.len<=pool_identity_owners.len-meta.start);
+ let items=pool_identity_owners[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[2]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_identity_owners(self_: Builder&,source: const blot_backend_runtime_identity::Name[:],previous: const blot_backend_runtime_identity::Name[:]) -> const blot_backend_runtime_identity::Name[:],Error {
  if shareable_identity_owners(self_,previous)&&blot_structural::equal(source,previous) { return retained_identity_owners(self_,previous); }
@@ -259,7 +269,10 @@ fn shareable_layout_nodes(self_: const Builder&,old: const blot_backend_layout::
 }
 fn retained_layout_nodes(self_: Builder&,old: const blot_backend_layout::Node[:]) -> const blot_backend_layout::Node[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_layout::Node[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[3]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_layout::Node[:]>(),error; }
- self_.leases.values[3]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_nodes && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_nodes.len && meta.len<=pool_layout_nodes.len-meta.start);
+ let items=pool_layout_nodes[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[3]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_nodes(self_: Builder&,source: const blot_backend_layout::Node[:],previous: const blot_backend_layout::Node[:]) -> const blot_backend_layout::Node[:],Error {
  if shareable_layout_nodes(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_nodes(self_,previous); }
@@ -292,7 +305,10 @@ fn shareable_layout_extra(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_layout_extra(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[4]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[4]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_extra && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_extra.len && meta.len<=pool_layout_extra.len-meta.start);
+ let items=pool_layout_extra[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[4]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_extra(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_layout_extra(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_extra(self_,previous); }
@@ -325,7 +341,10 @@ fn shareable_layout_universal_dictionaries(self_: const Builder&,old: const blot
 }
 fn retained_layout_universal_dictionaries(self_: Builder&,old: const blot_backend_layout::UniversalDictionaries[:]) -> const blot_backend_layout::UniversalDictionaries[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_layout::UniversalDictionaries[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[5]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_layout::UniversalDictionaries[:]>(),error; }
- self_.leases.values[5]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_universal_dictionaries && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_universal_dictionaries.len && meta.len<=pool_layout_universal_dictionaries.len-meta.start);
+ let items=pool_layout_universal_dictionaries[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[5]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_universal_dictionaries(self_: Builder&,source: const blot_backend_layout::UniversalDictionaries[:],previous: const blot_backend_layout::UniversalDictionaries[:]) -> const blot_backend_layout::UniversalDictionaries[:],Error {
  if shareable_layout_universal_dictionaries(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_universal_dictionaries(self_,previous); }
@@ -358,7 +377,10 @@ fn shareable_layout_operations(self_: const Builder&,old: const blot_check_effec
 }
 fn retained_layout_operations(self_: Builder&,old: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_effect_evidence::Operation[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[6]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_effect_evidence::Operation[:]>(),error; }
- self_.leases.values[6]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_operations && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_operations.len && meta.len<=pool_layout_operations.len-meta.start);
+ let items=pool_layout_operations[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[6]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_operations(self_: Builder&,source: const blot_check_effect_evidence::Operation[:],previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:],Error {
  if shareable_layout_operations(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_operations(self_,previous); }
@@ -391,7 +413,10 @@ fn shareable_layout_arguments(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_layout_arguments(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[7]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[7]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_arguments && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_arguments.len && meta.len<=pool_layout_arguments.len-meta.start);
+ let items=pool_layout_arguments[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[7]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_arguments(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_layout_arguments(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_arguments(self_,previous); }
@@ -424,7 +449,10 @@ fn shareable_layout_rows(self_: const Builder&,old: const blot_check_effect_evid
 }
 fn retained_layout_rows(self_: Builder&,old: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_effect_evidence::Row[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[8]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_effect_evidence::Row[:]>(),error; }
- self_.leases.values[8]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_rows && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_rows.len && meta.len<=pool_layout_rows.len-meta.start);
+ let items=pool_layout_rows[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[8]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_rows(self_: Builder&,source: const blot_check_effect_evidence::Row[:],previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:],Error {
  if shareable_layout_rows(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_rows(self_,previous); }
@@ -457,7 +485,10 @@ fn shareable_layout_labels(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_layout_labels(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[9]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[9]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.layout_labels && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_layout_labels.len && meta.len<=pool_layout_labels.len-meta.start);
+ let items=pool_layout_labels[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[9]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_layout_labels(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_layout_labels(self_,previous)&&blot_structural::equal(source,previous) { return retained_layout_labels(self_,previous); }
@@ -490,7 +521,10 @@ fn shareable_values(self_: const Builder&,old: const blot_eval_eval_values::Valu
 }
 fn retained_values(self_: Builder&,old: const blot_eval_eval_values::ValueInfo[:]) -> const blot_eval_eval_values::ValueInfo[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_eval_values::ValueInfo[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[10]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_eval_values::ValueInfo[:]>(),error; }
- self_.leases.values[10]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.values && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_values.len && meta.len<=pool_values.len-meta.start);
+ let items=pool_values[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[10]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_values(self_: Builder&,source: const blot_eval_eval_values::ValueInfo[:],previous: const blot_eval_eval_values::ValueInfo[:]) -> const blot_eval_eval_values::ValueInfo[:],Error {
  if shareable_values(self_,previous)&&blot_structural::equal(source,previous) { return retained_values(self_,previous); }
@@ -523,7 +557,10 @@ fn shareable_children(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_children(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[11]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[11]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.children && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_children.len && meta.len<=pool_children.len-meta.start);
+ let items=pool_children[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[11]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_children(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_children(self_,previous)&&blot_structural::equal(source,previous) { return retained_children(self_,previous); }
@@ -556,7 +593,10 @@ fn shareable_closures(self_: const Builder&,old: const blot_eval_eval_values::Cl
 }
 fn retained_closures(self_: Builder&,old: const blot_eval_eval_values::ClosureValue[:]) -> const blot_eval_eval_values::ClosureValue[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_eval_values::ClosureValue[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[12]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_eval_values::ClosureValue[:]>(),error; }
- self_.leases.values[12]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.closures && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_closures.len && meta.len<=pool_closures.len-meta.start);
+ let items=pool_closures[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[12]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_closures(self_: Builder&,source: const blot_eval_eval_values::ClosureValue[:],previous: const blot_eval_eval_values::ClosureValue[:]) -> const blot_eval_eval_values::ClosureValue[:],Error {
  if shareable_closures(self_,previous)&&blot_structural::equal(source,previous) { return retained_closures(self_,previous); }
@@ -589,7 +629,10 @@ fn shareable_value_evidence(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_value_evidence(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[13]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[13]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.value_evidence && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_value_evidence.len && meta.len<=pool_value_evidence.len-meta.start);
+ let items=pool_value_evidence[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[13]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_value_evidence(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_value_evidence(self_,previous)&&blot_structural::equal(source,previous) { return retained_value_evidence(self_,previous); }
@@ -622,7 +665,10 @@ fn shareable_type_mappings(self_: const Builder&,old: const blot_eval_type_evide
 }
 fn retained_type_mappings(self_: Builder&,old: const blot_eval_type_evidence::Mapping[:]) -> const blot_eval_type_evidence::Mapping[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_type_evidence::Mapping[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[14]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_type_evidence::Mapping[:]>(),error; }
- self_.leases.values[14]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.type_mappings && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_type_mappings.len && meta.len<=pool_type_mappings.len-meta.start);
+ let items=pool_type_mappings[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[14]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_type_mappings(self_: Builder&,source: const blot_eval_type_evidence::Mapping[:],previous: const blot_eval_type_evidence::Mapping[:]) -> const blot_eval_type_evidence::Mapping[:],Error {
  if shareable_type_mappings(self_,previous)&&blot_structural::equal(source,previous) { return retained_type_mappings(self_,previous); }
@@ -655,7 +701,10 @@ fn shareable_row_mappings(self_: const Builder&,old: const blot_eval_type_eviden
 }
 fn retained_row_mappings(self_: Builder&,old: const blot_eval_type_evidence::RowMapping[:]) -> const blot_eval_type_evidence::RowMapping[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_type_evidence::RowMapping[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[15]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_type_evidence::RowMapping[:]>(),error; }
- self_.leases.values[15]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.row_mappings && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_row_mappings.len && meta.len<=pool_row_mappings.len-meta.start);
+ let items=pool_row_mappings[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[15]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_row_mappings(self_: Builder&,source: const blot_eval_type_evidence::RowMapping[:],previous: const blot_eval_type_evidence::RowMapping[:]) -> const blot_eval_type_evidence::RowMapping[:],Error {
  if shareable_row_mappings(self_,previous)&&blot_structural::equal(source,previous) { return retained_row_mappings(self_,previous); }
@@ -688,7 +737,10 @@ fn shareable_evidence_nodes(self_: const Builder&,old: const blot_eval_type_evid
 }
 fn retained_evidence_nodes(self_: Builder&,old: const blot_eval_type_evidence::Node[:]) -> const blot_eval_type_evidence::Node[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_type_evidence::Node[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[16]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_type_evidence::Node[:]>(),error; }
- self_.leases.values[16]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_nodes && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_nodes.len && meta.len<=pool_evidence_nodes.len-meta.start);
+ let items=pool_evidence_nodes[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[16]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_nodes(self_: Builder&,source: const blot_eval_type_evidence::Node[:],previous: const blot_eval_type_evidence::Node[:]) -> const blot_eval_type_evidence::Node[:],Error {
  if shareable_evidence_nodes(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_nodes(self_,previous); }
@@ -721,7 +773,10 @@ fn shareable_evidence_extra(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_evidence_extra(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[17]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[17]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_extra && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_extra.len && meta.len<=pool_evidence_extra.len-meta.start);
+ let items=pool_evidence_extra[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[17]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_extra(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_evidence_extra(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_extra(self_,previous); }
@@ -754,7 +809,10 @@ fn shareable_evidence_quantifier_goals(self_: const Builder&,old: const blot_eva
 }
 fn retained_evidence_quantifier_goals(self_: Builder&,old: const blot_eval_type_evidence::QuantifierGoals[:]) -> const blot_eval_type_evidence::QuantifierGoals[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_type_evidence::QuantifierGoals[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[18]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_type_evidence::QuantifierGoals[:]>(),error; }
- self_.leases.values[18]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_quantifier_goals && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_quantifier_goals.len && meta.len<=pool_evidence_quantifier_goals.len-meta.start);
+ let items=pool_evidence_quantifier_goals[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[18]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_quantifier_goals(self_: Builder&,source: const blot_eval_type_evidence::QuantifierGoals[:],previous: const blot_eval_type_evidence::QuantifierGoals[:]) -> const blot_eval_type_evidence::QuantifierGoals[:],Error {
  if shareable_evidence_quantifier_goals(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_quantifier_goals(self_,previous); }
@@ -787,7 +845,10 @@ fn shareable_evidence_quantifier_obligations(self_: const Builder&,old: const bl
 }
 fn retained_evidence_quantifier_obligations(self_: Builder&,old: const blot_eval_type_evidence::Goal[:]) -> const blot_eval_type_evidence::Goal[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_type_evidence::Goal[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[19]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_type_evidence::Goal[:]>(),error; }
- self_.leases.values[19]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_quantifier_obligations && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_quantifier_obligations.len && meta.len<=pool_evidence_quantifier_obligations.len-meta.start);
+ let items=pool_evidence_quantifier_obligations[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[19]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_quantifier_obligations(self_: Builder&,source: const blot_eval_type_evidence::Goal[:],previous: const blot_eval_type_evidence::Goal[:]) -> const blot_eval_type_evidence::Goal[:],Error {
  if shareable_evidence_quantifier_obligations(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_quantifier_obligations(self_,previous); }
@@ -820,7 +881,10 @@ fn shareable_evidence_operations(self_: const Builder&,old: const blot_check_eff
 }
 fn retained_evidence_operations(self_: Builder&,old: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_effect_evidence::Operation[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[20]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_effect_evidence::Operation[:]>(),error; }
- self_.leases.values[20]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_operations && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_operations.len && meta.len<=pool_evidence_operations.len-meta.start);
+ let items=pool_evidence_operations[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[20]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_operations(self_: Builder&,source: const blot_check_effect_evidence::Operation[:],previous: const blot_check_effect_evidence::Operation[:]) -> const blot_check_effect_evidence::Operation[:],Error {
  if shareable_evidence_operations(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_operations(self_,previous); }
@@ -853,7 +917,10 @@ fn shareable_evidence_arguments(self_: const Builder&,old: const u32[:]) -> bool
 }
 fn retained_evidence_arguments(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[21]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[21]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_arguments && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_arguments.len && meta.len<=pool_evidence_arguments.len-meta.start);
+ let items=pool_evidence_arguments[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[21]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_arguments(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_evidence_arguments(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_arguments(self_,previous); }
@@ -886,7 +953,10 @@ fn shareable_evidence_rows(self_: const Builder&,old: const blot_check_effect_ev
 }
 fn retained_evidence_rows(self_: Builder&,old: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_effect_evidence::Row[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[22]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_effect_evidence::Row[:]>(),error; }
- self_.leases.values[22]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_rows && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_rows.len && meta.len<=pool_evidence_rows.len-meta.start);
+ let items=pool_evidence_rows[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[22]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_rows(self_: Builder&,source: const blot_check_effect_evidence::Row[:],previous: const blot_check_effect_evidence::Row[:]) -> const blot_check_effect_evidence::Row[:],Error {
  if shareable_evidence_rows(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_rows(self_,previous); }
@@ -919,7 +989,10 @@ fn shareable_evidence_labels(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_evidence_labels(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[23]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[23]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.evidence_labels && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_evidence_labels.len && meta.len<=pool_evidence_labels.len-meta.start);
+ let items=pool_evidence_labels[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[23]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_evidence_labels(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_evidence_labels(self_,previous)&&blot_structural::equal(source,previous) { return retained_evidence_labels(self_,previous); }
@@ -952,7 +1025,10 @@ fn shareable_value_records(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_value_records(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[24]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[24]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.value_records && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_value_records.len && meta.len<=pool_value_records.len-meta.start);
+ let items=pool_value_records[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[24]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_value_records(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_value_records(self_,previous)&&blot_structural::equal(source,previous) { return retained_value_records(self_,previous); }
@@ -985,7 +1061,10 @@ fn shareable_record_layouts(self_: const Builder&,old: const blot_check_core::Li
 }
 fn retained_record_layouts(self_: Builder&,old: const blot_check_core::List[:]) -> const blot_check_core::List[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_core::List[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[25]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_core::List[:]>(),error; }
- self_.leases.values[25]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.record_layouts && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_record_layouts.len && meta.len<=pool_record_layouts.len-meta.start);
+ let items=pool_record_layouts[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[25]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_record_layouts(self_: Builder&,source: const blot_check_core::List[:],previous: const blot_check_core::List[:]) -> const blot_check_core::List[:],Error {
  if shareable_record_layouts(self_,previous)&&blot_structural::equal(source,previous) { return retained_record_layouts(self_,previous); }
@@ -1018,7 +1097,10 @@ fn shareable_field_names(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_field_names(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[26]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[26]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.field_names && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_field_names.len && meta.len<=pool_field_names.len-meta.start);
+ let items=pool_field_names[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[26]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_field_names(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_field_names(self_,previous)&&blot_structural::equal(source,previous) { return retained_field_names(self_,previous); }
@@ -1051,7 +1133,10 @@ fn shareable_implementation_proofs(self_: const Builder&,old: const blot_eval_im
 }
 fn retained_implementation_proofs(self_: Builder&,old: const blot_eval_implementation_evidence::Proof[:]) -> const blot_eval_implementation_evidence::Proof[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_implementation_evidence::Proof[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[27]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_implementation_evidence::Proof[:]>(),error; }
- self_.leases.values[27]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.implementation_proofs && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_implementation_proofs.len && meta.len<=pool_implementation_proofs.len-meta.start);
+ let items=pool_implementation_proofs[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[27]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_implementation_proofs(self_: Builder&,source: const blot_eval_implementation_evidence::Proof[:],previous: const blot_eval_implementation_evidence::Proof[:]) -> const blot_eval_implementation_evidence::Proof[:],Error {
  if shareable_implementation_proofs(self_,previous)&&blot_structural::equal(source,previous) { return retained_implementation_proofs(self_,previous); }
@@ -1084,7 +1169,10 @@ fn shareable_implementation_arguments(self_: const Builder&,old: const u32[:]) -
 }
 fn retained_implementation_arguments(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[28]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[28]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.implementation_arguments && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_implementation_arguments.len && meta.len<=pool_implementation_arguments.len-meta.start);
+ let items=pool_implementation_arguments[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[28]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_implementation_arguments(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_implementation_arguments(self_,previous)&&blot_structural::equal(source,previous) { return retained_implementation_arguments(self_,previous); }
@@ -1117,7 +1205,10 @@ fn shareable_implementation_members(self_: const Builder&,old: const blot_eval_i
 }
 fn retained_implementation_members(self_: Builder&,old: const blot_eval_implementation_evidence::Member[:]) -> const blot_eval_implementation_evidence::Member[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_eval_implementation_evidence::Member[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[29]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_eval_implementation_evidence::Member[:]>(),error; }
- self_.leases.values[29]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.implementation_members && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_implementation_members.len && meta.len<=pool_implementation_members.len-meta.start);
+ let items=pool_implementation_members[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[29]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_implementation_members(self_: Builder&,source: const blot_eval_implementation_evidence::Member[:],previous: const blot_eval_implementation_evidence::Member[:]) -> const blot_eval_implementation_evidence::Member[:],Error {
  if shareable_implementation_members(self_,previous)&&blot_structural::equal(source,previous) { return retained_implementation_members(self_,previous); }
@@ -1150,7 +1241,10 @@ fn shareable_implementation_edges(self_: const Builder&,old: const u32[:]) -> bo
 }
 fn retained_implementation_edges(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[30]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[30]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.implementation_edges && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_implementation_edges.len && meta.len<=pool_implementation_edges.len-meta.start);
+ let items=pool_implementation_edges[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[30]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_implementation_edges(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_implementation_edges(self_,previous)&&blot_structural::equal(source,previous) { return retained_implementation_edges(self_,previous); }
@@ -1183,7 +1277,10 @@ fn shareable_captures(self_: const Builder&,old: const blot_reuse_code_artifacts
 }
 fn retained_captures(self_: Builder&,old: const blot_reuse_code_artifacts::CapturedTemplate[:]) -> const blot_reuse_code_artifacts::CapturedTemplate[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::CapturedTemplate[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[31]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::CapturedTemplate[:]>(),error; }
- self_.leases.values[31]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.captures && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_captures.len && meta.len<=pool_captures.len-meta.start);
+ let items=pool_captures[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[31]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_captures(self_: Builder&,source: const blot_reuse_code_artifacts::CapturedTemplate[:],previous: const blot_reuse_code_artifacts::CapturedTemplate[:]) -> const blot_reuse_code_artifacts::CapturedTemplate[:],Error {
  if shareable_captures(self_,previous)&&blot_structural::equal(source,previous) { return retained_captures(self_,previous); }
@@ -1216,7 +1313,10 @@ fn shareable_field_locations(self_: const Builder&,old: const blot_reuse_code_ar
 }
 fn retained_field_locations(self_: Builder&,old: const blot_reuse_code_artifacts::FieldLocation[:]) -> const blot_reuse_code_artifacts::FieldLocation[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::FieldLocation[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[32]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::FieldLocation[:]>(),error; }
- self_.leases.values[32]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.field_locations && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_field_locations.len && meta.len<=pool_field_locations.len-meta.start);
+ let items=pool_field_locations[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[32]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_field_locations(self_: Builder&,source: const blot_reuse_code_artifacts::FieldLocation[:],previous: const blot_reuse_code_artifacts::FieldLocation[:]) -> const blot_reuse_code_artifacts::FieldLocation[:],Error {
  if shareable_field_locations(self_,previous)&&blot_structural::equal(source,previous) { return retained_field_locations(self_,previous); }
@@ -1249,7 +1349,10 @@ fn shareable_functions(self_: const Builder&,old: const blot_reuse_code_artifact
 }
 fn retained_functions(self_: Builder&,old: const blot_reuse_code_artifacts::Function[:]) -> const blot_reuse_code_artifacts::Function[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::Function[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[33]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::Function[:]>(),error; }
- self_.leases.values[33]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.functions && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_functions.len && meta.len<=pool_functions.len-meta.start);
+ let items=pool_functions[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[33]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_functions(self_: Builder&,source: const blot_reuse_code_artifacts::Function[:],previous: const blot_reuse_code_artifacts::Function[:]) -> const blot_reuse_code_artifacts::Function[:],Error {
  if shareable_functions(self_,previous)&&blot_structural::equal(source,previous) { return retained_functions(self_,previous); }
@@ -1282,7 +1385,10 @@ fn shareable_serialized(self_: const Builder&,old: const blot_reuse_code_artifac
 }
 fn retained_serialized(self_: Builder&,old: const blot_reuse_code_artifacts::Serialized[:]) -> const blot_reuse_code_artifacts::Serialized[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::Serialized[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[34]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::Serialized[:]>(),error; }
- self_.leases.values[34]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.serialized && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_serialized.len && meta.len<=pool_serialized.len-meta.start);
+ let items=pool_serialized[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[34]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_serialized(self_: Builder&,source: const blot_reuse_code_artifacts::Serialized[:],previous: const blot_reuse_code_artifacts::Serialized[:]) -> const blot_reuse_code_artifacts::Serialized[:],Error {
  if shareable_serialized(self_,previous)&&blot_structural::equal(source,previous) { return retained_serialized(self_,previous); }
@@ -1315,7 +1421,10 @@ fn shareable_runtime_globals(self_: const Builder&,old: const blot_reuse_code_ar
 }
 fn retained_runtime_globals(self_: Builder&,old: const blot_reuse_code_artifacts::RuntimeGlobal[:]) -> const blot_reuse_code_artifacts::RuntimeGlobal[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::RuntimeGlobal[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[35]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::RuntimeGlobal[:]>(),error; }
- self_.leases.values[35]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.runtime_globals && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_runtime_globals.len && meta.len<=pool_runtime_globals.len-meta.start);
+ let items=pool_runtime_globals[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[35]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_runtime_globals(self_: Builder&,source: const blot_reuse_code_artifacts::RuntimeGlobal[:],previous: const blot_reuse_code_artifacts::RuntimeGlobal[:]) -> const blot_reuse_code_artifacts::RuntimeGlobal[:],Error {
  if shareable_runtime_globals(self_,previous)&&blot_structural::equal(source,previous) { return retained_runtime_globals(self_,previous); }
@@ -1348,7 +1457,10 @@ fn shareable_runtime_order(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_runtime_order(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[36]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[36]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.runtime_order && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_runtime_order.len && meta.len<=pool_runtime_order.len-meta.start);
+ let items=pool_runtime_order[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[36]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_runtime_order(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_runtime_order(self_,previous)&&blot_structural::equal(source,previous) { return retained_runtime_order(self_,previous); }
@@ -1381,7 +1493,10 @@ fn shareable_binding_offsets(self_: const Builder&,old: const i64[:]) -> bool {
 }
 fn retained_binding_offsets(self_: Builder&,old: const i64[:]) -> const i64[:],Error {
  let previous .=self_.previous;if !previous {return default<const i64[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[37]; let error=retain(ref); if error!=blot_error::Error.none { return default<const i64[:]>(),error; }
- self_.leases.values[37]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.binding_offsets && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_binding_offsets.len && meta.len<=pool_binding_offsets.len-meta.start);
+ let items=pool_binding_offsets[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[37]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_binding_offsets(self_: Builder&,source: const i64[:],previous: const i64[:]) -> const i64[:],Error {
  if shareable_binding_offsets(self_,previous)&&blot_structural::equal(source,previous) { return retained_binding_offsets(self_,previous); }
@@ -1414,7 +1529,10 @@ fn shareable_node_offsets(self_: const Builder&,old: const i64[:]) -> bool {
 }
 fn retained_node_offsets(self_: Builder&,old: const i64[:]) -> const i64[:],Error {
  let previous .=self_.previous;if !previous {return default<const i64[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[38]; let error=retain(ref); if error!=blot_error::Error.none { return default<const i64[:]>(),error; }
- self_.leases.values[38]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.node_offsets && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_node_offsets.len && meta.len<=pool_node_offsets.len-meta.start);
+ let items=pool_node_offsets[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[38]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_node_offsets(self_: Builder&,source: const i64[:],previous: const i64[:]) -> const i64[:],Error {
  if shareable_node_offsets(self_,previous)&&blot_structural::equal(source,previous) { return retained_node_offsets(self_,previous); }
@@ -1447,7 +1565,10 @@ fn shareable_slots(self_: const Builder&,old: const blot_reuse_code_artifacts::S
 }
 fn retained_slots(self_: Builder&,old: const blot_reuse_code_artifacts::Slot[:]) -> const blot_reuse_code_artifacts::Slot[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::Slot[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[39]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::Slot[:]>(),error; }
- self_.leases.values[39]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.slots && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_slots.len && meta.len<=pool_slots.len-meta.start);
+ let items=pool_slots[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[39]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_slots(self_: Builder&,source: const blot_reuse_code_artifacts::Slot[:],previous: const blot_reuse_code_artifacts::Slot[:]) -> const blot_reuse_code_artifacts::Slot[:],Error {
  if shareable_slots(self_,previous)&&blot_structural::equal(source,previous) { return retained_slots(self_,previous); }
@@ -1480,7 +1601,10 @@ fn shareable_visited_nodes(self_: const Builder&,old: const bool[:]) -> bool {
 }
 fn retained_visited_nodes(self_: Builder&,old: const bool[:]) -> const bool[:],Error {
  let previous .=self_.previous;if !previous {return default<const bool[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[40]; let error=retain(ref); if error!=blot_error::Error.none { return default<const bool[:]>(),error; }
- self_.leases.values[40]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.visited_nodes && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_visited_nodes.len && meta.len<=pool_visited_nodes.len-meta.start);
+ let items=pool_visited_nodes[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[40]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_visited_nodes(self_: Builder&,source: const bool[:],previous: const bool[:]) -> const bool[:],Error {
  if shareable_visited_nodes(self_,previous)&&blot_structural::equal(source,previous) { return retained_visited_nodes(self_,previous); }
@@ -1513,7 +1637,10 @@ fn shareable_provider_frames(self_: const Builder&,old: const blot_backend_provi
 }
 fn retained_provider_frames(self_: Builder&,old: const blot_backend_provider_chain::Frame[:]) -> const blot_backend_provider_chain::Frame[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_provider_chain::Frame[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[41]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_provider_chain::Frame[:]>(),error; }
- self_.leases.values[41]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.provider_frames && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_provider_frames.len && meta.len<=pool_provider_frames.len-meta.start);
+ let items=pool_provider_frames[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[41]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_provider_frames(self_: Builder&,source: const blot_backend_provider_chain::Frame[:],previous: const blot_backend_provider_chain::Frame[:]) -> const blot_backend_provider_chain::Frame[:],Error {
  if shareable_provider_frames(self_,previous)&&blot_structural::equal(source,previous) { return retained_provider_frames(self_,previous); }
@@ -1546,7 +1673,10 @@ fn shareable_provider_cells(self_: const Builder&,old: const blot_backend_provid
 }
 fn retained_provider_cells(self_: Builder&,old: const blot_backend_provider_chain::Cell[:]) -> const blot_backend_provider_chain::Cell[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_backend_provider_chain::Cell[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[42]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_backend_provider_chain::Cell[:]>(),error; }
- self_.leases.values[42]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.provider_cells && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_provider_cells.len && meta.len<=pool_provider_cells.len-meta.start);
+ let items=pool_provider_cells[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[42]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_provider_cells(self_: Builder&,source: const blot_backend_provider_chain::Cell[:],previous: const blot_backend_provider_chain::Cell[:]) -> const blot_backend_provider_chain::Cell[:],Error {
  if shareable_provider_cells(self_,previous)&&blot_structural::equal(source,previous) { return retained_provider_cells(self_,previous); }
@@ -1579,7 +1709,10 @@ fn shareable_request_cells(self_: const Builder&,old: const blot_reuse_code_arti
 }
 fn retained_request_cells(self_: Builder&,old: const blot_reuse_code_artifacts::RequestCell[:]) -> const blot_reuse_code_artifacts::RequestCell[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::RequestCell[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[43]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::RequestCell[:]>(),error; }
- self_.leases.values[43]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.request_cells && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_request_cells.len && meta.len<=pool_request_cells.len-meta.start);
+ let items=pool_request_cells[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[43]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_request_cells(self_: Builder&,source: const blot_reuse_code_artifacts::RequestCell[:],previous: const blot_reuse_code_artifacts::RequestCell[:]) -> const blot_reuse_code_artifacts::RequestCell[:],Error {
  if shareable_request_cells(self_,previous)&&blot_structural::equal(source,previous) { return retained_request_cells(self_,previous); }
@@ -1612,7 +1745,10 @@ fn shareable_request_handlers(self_: const Builder&,old: const blot_reuse_code_a
 }
 fn retained_request_handlers(self_: Builder&,old: const blot_reuse_code_artifacts::RequestHandler[:]) -> const blot_reuse_code_artifacts::RequestHandler[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::RequestHandler[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[44]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::RequestHandler[:]>(),error; }
- self_.leases.values[44]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.request_handlers && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_request_handlers.len && meta.len<=pool_request_handlers.len-meta.start);
+ let items=pool_request_handlers[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[44]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_request_handlers(self_: Builder&,source: const blot_reuse_code_artifacts::RequestHandler[:],previous: const blot_reuse_code_artifacts::RequestHandler[:]) -> const blot_reuse_code_artifacts::RequestHandler[:],Error {
  if shareable_request_handlers(self_,previous)&&blot_structural::equal(source,previous) { return retained_request_handlers(self_,previous); }
@@ -1645,7 +1781,10 @@ fn shareable_break_values(self_: const Builder&,old: const u32[:]) -> bool {
 }
 fn retained_break_values(self_: Builder&,old: const u32[:]) -> const u32[:],Error {
  let previous .=self_.previous;if !previous {return default<const u32[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[45]; let error=retain(ref); if error!=blot_error::Error.none { return default<const u32[:]>(),error; }
- self_.leases.values[45]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.break_values && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_break_values.len && meta.len<=pool_break_values.len-meta.start);
+ let items=pool_break_values[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[45]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_break_values(self_: Builder&,source: const u32[:],previous: const u32[:]) -> const u32[:],Error {
  if shareable_break_values(self_,previous)&&blot_structural::equal(source,previous) { return retained_break_values(self_,previous); }
@@ -1678,7 +1817,10 @@ fn shareable_operation_relocations(self_: const Builder&,old: const blot_reuse_c
 }
 fn retained_operation_relocations(self_: Builder&,old: const blot_reuse_code_artifacts::OperationRelocation[:]) -> const blot_reuse_code_artifacts::OperationRelocation[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_reuse_code_artifacts::OperationRelocation[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[46]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_reuse_code_artifacts::OperationRelocation[:]>(),error; }
- self_.leases.values[46]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.operation_relocations && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_operation_relocations.len && meta.len<=pool_operation_relocations.len-meta.start);
+ let items=pool_operation_relocations[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[46]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_operation_relocations(self_: Builder&,source: const blot_reuse_code_artifacts::OperationRelocation[:],previous: const blot_reuse_code_artifacts::OperationRelocation[:]) -> const blot_reuse_code_artifacts::OperationRelocation[:],Error {
  if shareable_operation_relocations(self_,previous)&&blot_structural::equal(source,previous) { return retained_operation_relocations(self_,previous); }
@@ -1711,7 +1853,10 @@ fn shareable_code_origins(self_: const Builder&,old: const blot_check_staging_or
 }
 fn retained_code_origins(self_: Builder&,old: const blot_check_staging_origins::Record[:]) -> const blot_check_staging_origins::Record[:],Error {
  let previous .=self_.previous;if !previous {return default<const blot_check_staging_origins::Record[:]>(),blot_error::Error.invalid_artifact;}let ref=previous.values[47]; let error=retain(ref); if error!=blot_error::Error.none { return default<const blot_check_staging_origins::Record[:]>(),error; }
- self_.leases.values[47]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return old,blot_error::Error.none;
+ let meta=lease_meta[ref.index-1];
+ assert(meta.field==Field.code_origins && meta.len==old.len && meta.len>0 && meta.start>=0 && meta.start<=pool_code_origins.len && meta.len<=pool_code_origins.len-meta.start);
+ let items=pool_code_origins[meta.start..meta.start+meta.len];assert(blot_support::same_slice_identity(items,old));
+ self_.leases.values[47]=ref; self_.stats.shared_fields++; self_.stats.shared_bytes+=bytes_of(old).len; return items,blot_error::Error.none;
 }
 fn dupe_code_origins(self_: Builder&,source: const blot_check_staging_origins::Record[:],previous: const blot_check_staging_origins::Record[:]) -> const blot_check_staging_origins::Record[:],Error {
  if shareable_code_origins(self_,previous)&&blot_structural::equal(source,previous) { return retained_code_origins(self_,previous); }

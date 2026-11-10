@@ -6,40 +6,49 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-Latest focused prepare209 stops in **21.29s** at its caller: `prepare` shrinks
-resolved-body payloads while local `Run` remains live (§5.1). The prior incoming
-Capture store and global stamp scratch errors are cleared on that path. A copied
-lifecycle split is next: validate source keys before reset, create the lexical
-memo after reset, end its scope before final Run cleanup. Never execute the
-unstaged preparation root. See
-[the stamp iteration receipts](benchmarks/evidence/qualification/2026-11-10-goose-stamp-iteration-family.json.gz).
+Latest actual whole212 stops in **152.92s**, unchanged460 inputs, no artifacts.
+The old Capture/global-stamp failures are cleared. Its outer scoped/count wrapper
+loan is repaired afterward; no newer actual whole attempt yet. See
+[whole212](benchmarks/evidence/qualification/2026-11-10-goose-whole212.json.gz).
 
-Four affected native laws pass in **58.26s**: exact stamp snapshots and mutation
-tokens, independent lexical memos, live Capture/header keys, prepared input/session
-lifetime, and actual resolved-body/shared-gate teardown. Exact closures and logs:
-[executed family](benchmarks/evidence/qualification/2026-11-10-goose-lexical-stamp-owner-laws.json.gz).
-The stamp law does not keep a memo across Frame; the Capture law separately keeps
-real adopted semantic pins across Frame. Shared-gate checks reuse the existing
-resolved-body fixture; adding full Gate construction to Capture hit its 30s cap.
+Focused preparation211 passes21.48s. New direct phase probes collect independent
+errors together, all check-only/unstaged and NEVER executable. Latest seven-phase
+batch232 stops112.76s: capture counter sign conversion (now fixed), specialization
+row iteration across recursive layout mutation, and ambiguous substitution-buffer
+header publication into an inactive sentinel. Both latter source families are now repaired; the next phase check is pending. Split probes as needed; keep120s repair cap. See
+[phase family](benchmarks/evidence/qualification/2026-11-10-goose-phase-owner-family.json.gz).
 
-The latest actual whole build is still whole190: **157.73s**, unchanged inputs,
-no artifacts, incoming Capture store error. It predates this family. See
-[whole190](benchmarks/evidence/qualification/2026-11-10-goose-whole190.json.gz).
-Inventory is **35** and has not run together. Complete32 passed 288.97s at
-`e514479e`, before later repairs; it is not current full coverage.
+Native Result diagnostic law passes **6.64s**: text survives scratch mutation and
+source Frame cleanup, moved allocation/startup/explanation snapshots remain live,
+detach is idempotent. Cohort/pipeline law passes **9.25s**: ordinary+preborrowed
+bodies and region metadata detach, source mutation/teardown leaves the view
+unchanged, replacement avoids recloning, repeated cleanup works. Exact receipts:
+[Result](benchmarks/evidence/qualification/2026-11-10-goose-result-diagnostic-laws.json.gz),
+[cohort](benchmarks/evidence/qualification/2026-11-10-goose-cohort-owned-laws.json.gz).
+All48 lease retainers now return the same validated named-pool range, rather than
+an incoming slice; no new copy/owner/allocation. Native lease/Recorder family
+passes **6.92s**. [Lease law](benchmarks/evidence/qualification/2026-11-10-goose-retained-range-laws.json.gz).
 
-Capture views reborrow their existing registry slot/token, validate canonical
-pointer identity, and preserve keys on core publish/reset. Fragment importer
-leaves reborrow named Pools and module-header runs. Checkpoint readers use the
-existing checked slot/generation. Shared gates retain owned flag runs and borrow
-only the explicitly supplied exact source/identity pair.
+Controlled filename and timing-census differentials isolate two retained caller
+roots. Direct filename pool reads and static canonical census callers clear them;
+label bytes/counters and allocation behavior remain. Timing keeps arbitrary owned
+Result labels; the internal caller catalog/unknown-label assertion is unchanged.
+[Controls](benchmarks/evidence/qualification/2026-11-10-goose-lease-timing-owner-boundary.json.gz).
 
-Stamp entries are invocation-local growing storage; the workspace/global memo,
-retirement counter and duplicate source-pointer/optional memo fields are removed.
-Source binding validates exact publication/Context owners; scalar keys reborrow
-those same headers. Entries still snapshot full headers by value, preserving
-header-change tokens and digest/comparison behavior. Local growth replaces pooled
-stamp capacity; its cost has not been benchmarked.
+Complete **36/36** native component inventory passes in **310.32s**, frozen source,
+30s per stage and600s outer cap. [Full component receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete36-owner-laws.json.gz).
+This includes all prior laws plus Result diagnostics and strengthened cohort
+storage. It does not qualify actual whole C/header/native or CLI/server execution.
+Complete32 and the four-law4edf3a39 batches remain historical evidence.
+
+Memo scratch is lexical after preparation reset and ends before Run cleanup.
+Source validation/error/retry/publication order stays. Captures use existing
+canonical registry keys. Outer backend routes are lexical; diagnostics own text
+before cleanup. Cohort views eagerly copy instructions and optional region spans
+into existing owners; activation models copy growing substitutions; source-origin
+views own one identity snapshot. These added copies are unbenchmarked. Startup
+graph builders use fixed temporary runs, freed after scalar graph construction.
+All exact header snapshots, tokens/digests, ABI/session contracts remain.
 
 CompileRun drops its duplicate module header and reads the existing pinned input
 owner. Workspace/prior Pools reborrow checked canonical owners. Recorder reset

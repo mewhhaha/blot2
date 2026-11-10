@@ -264,9 +264,9 @@ recursive fn mapTypeDepthSink(self_: Service&, unit_id: u32, mappings: MappingSi
         let b = mapTypeDepthSink(self_, unit_id, mappings, rows, n.b, representation.b, span, depth + 1); if b != blot_error::Error.none { return b; }
         return mapTypeDepthSink(self_, unit_id, mappings, rows, n.c, representation.c, span, depth + 1);
     } else if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.nominal {
-        let children=selectedTypeChildren(source.types,n);
-        if children.len != self_.layouts.children(concrete).len { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
-        for child, index in children { let error = mapTypeDepthSink(self_, unit_id, mappings, rows, child, self_.layouts.children(concrete)[index], span, depth + 1); if error != blot_error::Error.none { return error; } }
+        let child_count=selectedTypeChildren(unit(self_,unit_id).types,n).len;
+        if child_count != self_.layouts.children(concrete).len { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
+        for index in 0..child_count {let child=selectedTypeChildren(unit(self_,unit_id).types,n)[index];let actual=self_.layouts.children(concrete)[index];let error=mapTypeDepthSink(self_,unit_id,mappings,rows,child,actual,span,depth+1);if error!=blot_error::Error.none {return error;}}
     } else if n.tag == blot_check_types::Tag.record { return mapRecordSink(self_, unit_id, mappings, rows, n, concrete, span, depth); }
     return blot_error::Error.none;
 }
@@ -283,25 +283,27 @@ recursive fn mapRecordSink(self_: Service&, unit_id: u32, mappings: MappingSink,
 }
 recursive fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, rows: RowSink, source_row: u32, actual_row: u32, span: blot_check_core::Span, covariant: bool) -> Error {
     if actual_row == blot_backend_layout::unknown_row { return blot_error::Error.none; }
-    let source = unit(self_, unit_id).types; let expected = source.row(source_row);
-    // Mapping may extend both effect stores. Keep IDs, and reload every view.
-    var actuals = blot_backend_substitution_buffers::Words {..};
-    recursive fn cleanup_continuation_12() -> Error {
+    var actuals=blot_backend_substitution_buffers::Words{..};var used=blot_backend_substitution_buffers::Flags{..};
+    var argument_ids=blot_backend_substitution_buffers::Words{..};var suffix=blot_backend_substitution_buffers::Words{..};
+    let error=mapRowPrepared(self_,unit_id,mappings,rows,source_row,actual_row,span,covariant,actuals,used,argument_ids,suffix);
+    suffix.deinit();argument_ids.deinit();used.deinit();actuals.deinit();return error;
+}
+recursive fn mapRowPrepared(self_:Service&,unit_id:u32,mappings:MappingSink,rows:RowSink,source_row:u32,actual_row:u32,span:blot_check_core::Span,covariant:bool,actuals:blot_backend_substitution_buffers::Words&,used:blot_backend_substitution_buffers::Flags&,argument_ids:blot_backend_substitution_buffers::Words&,suffix:blot_backend_substitution_buffers::Words&)->Error {
+    let expected=unit(self_,unit_id).types.row(source_row);
+    // Interning grows stores, but existing Core row/operation IDs stay immutable.
  let copied = actuals.append(self_.layouts.effects.view().rowLabels(actual_row)); if copied != blot_error::Error.none { return copied; }
-    var used = blot_backend_substitution_buffers::Flags {..};
-    recursive fn cleanup_continuation_11() -> Error {
- for actual in actuals.items { let appended = used.push(false); if appended != blot_error::Error.none { return appended; } }
-    var argument_ids = blot_backend_substitution_buffers::Words {..};
-    recursive fn cleanup_continuation_10() -> Error {
+ let actual_count=actuals.items.len;for actual_index in 0..actual_count { let appended = used.push(false); if appended != blot_error::Error.none { return appended; } }
 
-    for label in source.rowLabels(source_row) {
-        let source_operation = source.operation(label); let bound_instance = blot_backend_layout::mappedInstance(source_operation.instance, mappingItems(mappings));
+    let source_label_count=unit(self_,unit_id).types.rowLabels(source_row).len;
+    for label_index in 0..source_label_count {
+        let label=unit(self_,unit_id).types.rowLabels(source_row)[label_index];
+        let source_operation = unit(self_,unit_id).types.operation(label);let source_argument_count=unit(self_,unit_id).types.operationArguments(label).len; let bound_instance = blot_backend_layout::mappedInstance(source_operation.instance, mappingItems(mappings));
         if source_operation.instance.unit == 0 && source_operation.instance.decl != 0 && bound_instance.unit != 0 {
             var selected_arguments = blot_support::none<u32>();
-            for actual, index in actuals.items {
+            for index in 0..actual_count {let actual=actuals.items[index];
                 if used.items[index] { continue; } let operation = self_.layouts.effects.view().operation(actual);
                 if operation.identity != source_operation.identity || operation.instance != bound_instance { continue; }
-                let count = self_.layouts.effects.view().operationArguments(actual).len; if count != source.operationArguments(label).len { continue; }
+                let count = self_.layouts.effects.view().operationArguments(actual).len; if count != source_argument_count { continue; }
                 if selected_arguments.present {
                     for argument_index in 0..count {
                         let first = self_.layouts.effects.view().operationArguments(selected_arguments.value)[argument_index];
@@ -314,21 +316,23 @@ recursive fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, ro
             }
             if !selected_arguments.present { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
             let actual = selected_arguments.value;
-            for argument, index in source.operationArguments(label) {
+            for index in 0..source_argument_count {
+                let argument=unit(self_,unit_id).types.operationArguments(label)[index];
                 let concrete = self_.layouts.effects.view().operationArguments(actual)[index];
                 let semantic, semantic_error = toEvidence(self_, concrete); if semantic_error != blot_error::Error.none { return representationError(self_, semantic_error, unit_id, span, FailureCode.unresolved_type); }
                 let error = mapTypeDepthSink(self_, unit_id, mappings, rows, argument, concrete, span, 0); if error != blot_error::Error.none { return error; }
             }
         }
         argument_ids.clear();
-        for argument in source.operationArguments(label) {
+        for argument_index in 0..source_argument_count {
+            let argument=unit(self_,unit_id).types.operationArguments(label)[argument_index];
             let concrete, layout_error = codeLayoutWithRows(self_, unit_id, argument, mappingItems(mappings), rowItems(rows), span); if layout_error != blot_error::Error.none { return layout_error; }
             let semantic, semantic_error = toEvidence(self_, concrete); if semantic_error != blot_error::Error.none { return representationError(self_, semantic_error, unit_id, span, FailureCode.unresolved_type); } let appended = argument_ids.push(semantic); if appended != blot_error::Error.none { return appended; }
         }
-        let identity = source.operation(label).identity; let source_instance = source.operation(label).instance;
+        let identity = unit(self_,unit_id).types.operation(label).identity; let source_instance = unit(self_,unit_id).types.operation(label).instance;
         let instance = blot_backend_layout::mappedInstance(source_instance, mappingItems(mappings)); let unbound_instance = instance.unit == 0 && instance.decl != 0;
         var selected = blot_support::none<i64>();
-        for actual, index in actuals.items {
+        for index in 0..actual_count {let actual=actuals.items[index];
             if used.items[index] { continue; } let operation = self_.layouts.effects.view().operation(actual); if identity != operation.identity { continue; }
             if unbound_instance { if operation.instance.unit == 0 || operation.instance.decl == 0 { continue; } } else if instance != operation.instance { continue; }
             let count = self_.layouts.effects.view().operationArguments(actual).len; if count != argument_ids.items.len { continue; }
@@ -346,9 +350,7 @@ recursive fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, ro
         let index = selected.value; used.items[index] = true;
         if unbound_instance { let error = appendSink(mappings, Mapping { variable: source_instance.decl, layout: blot_backend_layout::erased, instance: self_.layouts.effects.view().operation(actuals.items[index]).instance , ..}); if error != blot_error::Error.none { return error; } }
     }
-    var suffix = blot_backend_substitution_buffers::Words {..};
-    recursive fn cleanup_continuation_9() -> Error {
- for label,index in actuals.items { if !used.items[index] { let appended = suffix.push(label); if appended != blot_error::Error.none { return appended; } } }
+ for index in 0..actual_count {let label=actuals.items[index]; if !used.items[index] { let appended = suffix.push(label); if appended != blot_error::Error.none { return appended; } } }
     var variable: u32 = 0;
     match expected.tail {
         closed => { if !covariant && suffix.items.len != 0 { return decline(self_, unit_id, span, FailureCode.unresolved_type); } return blot_error::Error.none; },
@@ -356,39 +358,19 @@ recursive fn mapRowSink(self_: Service&, unit_id: u32, mappings: MappingSink, ro
         variable v => { variable = v.value; },
         formal f => {
             let binder = f.value;
-            if binder >= source.nodes.len || source.node(binder).tag != blot_check_types::Tag.bound || source.node(binder).b != 1 || source.node(binder).c != 0 { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
+            if binder >= unit(self_,unit_id).types.nodes.len || unit(self_,unit_id).types.node(binder).tag != blot_check_types::Tag.bound || unit(self_,unit_id).types.node(binder).b != 1 || unit(self_,unit_id).types.node(binder).c != 0 { return decline(self_, unit_id, span, FailureCode.unresolved_type); }
             let key, error = blot_check_types::formalRowKey(binder); if error != blot_error::Error.none { return decline(self_, unit_id, span, FailureCode.complexity); } variable = key;
         },
     }
     let remaining, row_error = self_.layouts.effects.internRowWithFormal(suffix.items, self_.layouts.effects.rows.items[actual_row].formal);
     if row_error != blot_error::Error.none { return representationError(self_, row_error, unit_id, span, FailureCode.complexity); }
-    for entry in rowItems(rows) {
+    let row_count=rowItems(rows).len;for row_index in 0..row_count {let entry=rowItems(rows)[row_index];
         if entry.variable != variable { continue; } if entry.row == remaining { return blot_error::Error.none; }
         let prior, prior_error = rowToEvidence(self_, entry.row); if prior_error != blot_error::Error.none { return representationError(self_, prior_error, unit_id, span, FailureCode.unresolved_type); }
         let current, current_error = rowToEvidence(self_, remaining); if current_error != blot_error::Error.none { return representationError(self_, current_error, unit_id, span, FailureCode.unresolved_type); }
         if prior != current { return decline(self_, unit_id, span, FailureCode.unresolved_type); } return blot_error::Error.none;
     }
     return appendSink(rows,RowMapping { variable,remaining , ..});
-
-    }
-    let cleanup_result_9_0 = cleanup_continuation_9();
-     suffix.deinit();
-    return cleanup_result_9_0;
-
-    }
-    let cleanup_result_10_0 = cleanup_continuation_10();
-     argument_ids.deinit();
-    return cleanup_result_10_0;
-
-    }
-    let cleanup_result_11_0 = cleanup_continuation_11();
-     used.deinit();
-    return cleanup_result_11_0;
-
-    }
-    let cleanup_result_12_0 = cleanup_continuation_12();
-     actuals.deinit();
-    return cleanup_result_12_0;
 }
 fn refineMappings(self_: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,span: blot_check_core::Span) -> Error { return refineMappingsSink(self_,unit_id,root,expected,MappingSink.lexical { mappings , ..},RowSink.lexical { rows , ..},span); }
 fn refineMappings(self_: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&,span: blot_check_core::Span) -> Error { let selected,error = mappingSink(mappings); if error != blot_error::Error.none { return error; } let selected_rows,row_error = rowSink(rows); if row_error != blot_error::Error.none { return row_error; } return refineMappingsSink(self_,unit_id,root,expected,selected,selected_rows,span); }

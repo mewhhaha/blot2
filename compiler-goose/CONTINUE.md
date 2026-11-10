@@ -4,22 +4,23 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Focused prepare209 now stops in 21.29s at its caller: local Run may refer to
-resolved-body payloads across preparation cleanup (§5.1). Incoming Capture/global
-stamp errors clear on this path. Next is a copied lifecycle split: source-key
-validation before reset, lexical memo after reset, memo scope ends before final
-Run cleanup. The unstaged preparation root is check-only; never execute it.
+Latest actual whole212 stops152.92s, unchanged460inputs, no C/header/native.
+Its outer wrapper lifetime is repaired afterward; no newer actual whole yet.
+Preparation211 passes21.48s. Direct seven-phase232 reaches112.76s and reports
+capture sign conversion(nowfixed), recursive rowmapping foreach borrow, and
+inactive substitution-header publication. Those source repairs are now in place; the next phase check is pending.
 
-Four affected native laws pass in 58.26s: exact stamp snapshots/mutation tokens,
-independent memos, Capture keys, prepared inputs and resolved-body/shared-gate
-teardown. Stamps use lexical growth and scalar checked source owners; Capture
-views reuse their registry; workspace memo/counter/duplicate aliases are removed.
-Local growth replaces pooled stamp capacity; cost is unbenchmarked.
+Executed native Result ownership/detach6.64s, cohort/pipeline ownership9.25s and
+48-field lease/Recorder6.92s pass at their exact pinned source closures. New
+instruction/region/substitution/identity snapshots are unbenchmarked costs.
+Complete36/36 native component inventory passes310.32s on frozen source, with30s
+per stage and600s outer cap. This does not qualify whole compiler/CLI execution.
+Complete32 is historical. Checkpoint this batch, then resume actual whole work.
 
-Latest actual whole remains whole190: 157.73s, unchanged inputs, no artifacts,
-incoming Capture error. It predates these repairs. Inventory now 35, not run
-together; Complete32 at e514479e is historical coverage only. See root receipts
-for exact source closures, rejected fixture attempts and runtime limitations.
+All phase probes are check-only with unstaged inputs; NEVER execute. Use smaller
+phase subsets when needed, keeping120s repair cap. Actual CLI/server/OOM/retry
+qualification still requires the real executable. Root frontier links receipts
+and controlled filename/timing provenance evidence.
 
 Use private checker c2b24 at build/goose-port/argcopy-experiment-20261110/goose.
 Installed Goose/678 and the off-tree origin checker are unchanged. Selected roots

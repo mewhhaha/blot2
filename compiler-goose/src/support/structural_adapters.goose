@@ -5196,6 +5196,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::St
 fn blot_reuse_code_artifacts::blotStructuralHash<StructuralSink>(value:blot_reuse_code_artifacts::StampHash,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::StampLocation)->bool {return equalFields(left,right);}
 fn blot_reuse_code_artifacts::blotStructuralHash<StructuralSink>(value:blot_reuse_code_artifacts::StampLocation,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::StampSources)->bool {return equalFields(left,right);}
+fn blot_reuse_code_artifacts::blotStructuralHash<StructuralSink>(value:blot_reuse_code_artifacts::StampSources,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::StampedEvent)->bool {return equalFields(left,right);}
 fn blot_reuse_code_artifacts::blotStructuralHash<StructuralSink>(value:blot_reuse_code_artifacts::StampedEvent,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_code_artifacts::Stamping)->bool {return equalFields(left,right);}
