@@ -1,116 +1,89 @@
 # Continue the Goose compiler experiment
 
-Finish coherent ownership repairs, build the **actual complete C/header/native
-Goose compiler**, then qualify CLI/server, request OOM/retry and retention against
-Zig. **No whole compiler artifact exists.** Component laws never substitute for
-integrated qualification; do not forward Goose requests to the Zig oracle.
+Finish ownership repairs, build the actual complete C/header/native compiler,
+then qualify CLI/server, request OOM/retry and retention against Zig.
+**No whole compiler artifact exists.** Helper laws never substitute for
+integration; never forward Goose requests to the Zig oracle.
 
-## Current frontier and evidence
+## Current frontier
 
-All **30 production helper laws pass together in 221.34s** at map checkpoint
-`f0a602bc`. Exact sources, toolchains, C, native objects and executions are pinned
-in [the complete receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
-Later backend/owner repairs have affected executed laws; the final five-law
-checkpoint passes in 55.21s (proof leases, resolved bodies, cache, footprint and
-outline), with pinned C/link/runtime evidence in
-[the affected receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-checkpoint-five.json.gz).
-Latest workspace checkpoint passes four affected laws in **53.35s**,
-including the new registered-source lifecycle regression;
-[the exact receipt](benchmarks/evidence/qualification/2026-11-10-goose-workspace-checkpoint-four.json.gz)
-pins current per-law source closures. Full qualification remains pending.
+Actual whole159 stops after **142.92s**, with unchanged source and no artifacts:
 
-Actual whole141 stops after **143.58s**, without artifacts, at SIMD initialization
-and cached-plan publication. Both source families have subsequent repairs. See
-[the pinned whole attempt](benchmarks/evidence/qualification/2026-11-10-goose-whole141.json.gz).
-Latest strict scoped155 takes **47.61s** and still rejects the recursive child
-Generator transfer plus actual `backing_constant_state` retention through
-`replayDemand`. The unused constant State pool has been removed. Exact source,
-query catalog and registered Pools accessors now check the existing workspace
-owners. Their native lifecycle control and four expected guard rejections pass;
-full importer/replay integration remains pending. See
-[the workspace/construction receipt](benchmarks/evidence/qualification/2026-11-10-goose-workspace-construction-frontier.json.gz).
+- `backend/storage_parameter_fields.goose:51`: recursive child visitor passes
+  Walk through a differently rooted Children header (§7.8).
+- `backend/resolved_body.goose:60`: frozen dependency Module pool may retain
+  payloads, published through `reuse/dependency_closure.goose:215` (§5.1).
 
-Replay publication now preserves the destination Query allocation slot and
-reconstitutes its owned Judgment. The regression covers recursive headers,
-independent clone cleanup, both cleanup orders and slot reuse. Diagnostic bytes
-and component outcomes use their existing named owners; three affected production
-laws pass together in **16.84s** at that pinned snapshot. See
-[the executed receipt](benchmarks/evidence/qualification/2026-11-10-goose-source-component-three.json.gz).
-Actual artifact-import identity retirement passes C/link/runtime in **31.43s**
-(each stage below30s), but its Frame-spanning fixture remains rejected. The
-runtime snapshot precedes the equivalent inline View literal; do not infer exact
-current-source whole-runtime qualification.
+See [the exact whole receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole159.json.gz).
+The previous child Generator and Session/payload retention failures are cleared
+on the broader selected graph. Scoped158 takes 50.22s and reaches four signed
+counter deltas; all four were corrected before whole159.
 
-The strict `scoped` diagnostic uses deliberately invalid empty Core. Early
-failures take 19–21s; broader checks take about 47–50s. It is **check-only**, never
-runtime qualification. Scoped140's 30s no-diagnostic timeout remains incomplete.
-Repair stages retain the standard 120s cap; final emission uses at most 180s
-inside a 300s whole-build budget. Stop 3s after an actual diagnostic. Do not lift
-caps to hide unfinished work. Bulk-error experiments remain off-tree without a
-demonstrated production gain.
+Six affected production laws pass together in **67.46s**: proof leases,
+diagnostics, semantic outcomes, worker pins, key cache and resolved bodies.
+A final diagnostic-OOM correction follows; the production diagnostic law then
+passes in **6.55s**, including failed-ensure preservation. These are bounded
+family checks. The latest complete30 helper inventory is **221.34s** at
+`f0a602bc`, before these repairs. Exact closures and native C/link/runtime results:
+[affected six](benchmarks/evidence/qualification/2026-11-10-goose-active-child-six.json.gz),
+[final diagnostic law](benchmarks/evidence/qualification/2026-11-10-goose-diagnostic-restore-final.json.gz),
+[complete30](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
 
-## Current source contracts
+## Source contracts and qualification limits
 
-- Value/Root spellings and active goals use existing arena ranges; recursive
-  traversals reload flat elements instead of retaining vector views.
-- Child Generator emission paths save/install/recurse/extract/restore at the
-  same threaded address. The function-plan phase is lexical to its construction
-  owner; actual recursive transfer still fails strict checking. Parent aliases are dormant during child emission;
-  restoration precedes error handling and exactly-once cleanup. Minimal native
-  controls pass; actual generator runtime remains pending.
-- Specialization keys compare evidence contents. Cache laws cover deduplication,
-  chains, completion fallback, rollback and wrapped collisions. One owner-aware
-  removal API serves all 78 production calls without extra pools.
-- Worker/archive headers use their existing checked journals. Persisted retains
-  only its scalar Frozen owner; alias prefixes copy into their canonical owner.
-- Query caches retain owned inspection metadata and reconstruct invocation-local
-  Plan views. Retained evidence imports reborrow checked Store handles.
-- QueryScratch retains live Gate, Pools and exact lease keys instead of borrows.
-  Equivalent copied owned headers intentionally compare equal; stale/mismatched
-  authorities reject. Its packed layout grows **514→1102B**. A candidate-only
-  unoptimized probe measures 10,000 binds in 4.047ms; no whole-compiler speed claim.
-- Private transport anchors contain only binding IDs; the query carries field
-  spelling unchanged. Catalog search preserves order, privacy, budgets and cache
-  behavior using separate lexical borrows. Control/deferred-copy publication and
-  cleanup reconstitute existing named runs.
+- PlanConstruction owns scratch data. The active child stays at one Generator
+  address through all phases, is cleaned up once, and the parent is restored
+  once. Native miniature controls cover phase errors, diagnostics, max_stacks,
+  counters and dormant aliases; actual generator runtime remains pending.
+- Arena traversals retain scalar ranges and reload elements across growth.
+  QueryScratch retains checked owner/generation/lease keys, not invocation borrows.
+- Query replay preserves the destination allocation slot and reconstitutes its
+  owned Judgment. Exact workspace source/catalog accessors check existing owners.
+- Recorder event publication and stable compaction use existing named pools and
+  Query slots. Mixed-event order, coalescing, Frame/readback and cleanup pass.
+- Panic messages use the existing Session diagnostic owner. Speculative probes
+  skip prior diagnostics and discard failed probe messages. Receipt tape backs
+  up text separately from scalar/fixed metadata; fresh owned restoration reserves
+  capacity before mutation and preserves the original operation error priority.
+  Native leaf ownership laws pass; full probe/tape runtime remains pending.
+- Key equality compares evidence contents. Declined caches share storage_calls
+  own/release; duplicate copying and its pool are removed. No compatibility API.
+- Imported gates use their existing copied identity and close before that owner.
+  Producer retirement passes, but the actual factory Frame fixture remains
+  rejected. Known unqualified legacy API: host_cleanup_shapes.copyFields.
 
-Known additional unqualified legacy API: `host_cleanup_shapes.copyFields` cannot
-republish borrowed Field.name from its input slice. Its recorded failed fixture
-is preserved; the new cleanup law directly allocates its input in owned_fields
-and qualifies deinit only. Do not claim the shape factory passes.
-
-Exact family receipts and historical checkpoints remain in
+Receipts, historical checkpoints and failed experiments remain indexed in
 [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-## Toolchain and remaining qualification
+## Tooling and remaining delivery
 
-Use the pinned private copied-argument checker at
+Use the pinned private checker at
 `build/goose-port/argcopy-experiment-20261110/goose`, SHA256
 `c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632`.
-Its optional recipe and 21 lifetime controls are recorded in
-[the private tooling receipt](benchmarks/evidence/qualification/2026-11-10-goose-copied-argument-contents.json.gz).
-Installed Goose and the qualified678 binary remain unchanged. Exact storage
-identity, deep/reference reads and recursive conservatism remain intact.
+Its optional copied-argument recipe has 21 lifetime controls; exact storage identity,
+deep reads and recursive conservatism remain intact. Installed Goose and 678 are
+unchanged. The separate store-origin diagnostic binary is off-tree and never
+promoted. Do not relax checks or clear live owners to hide failures.
 
-Preserve ABI 8/session 2, named owners, explicit copies and invocation-local
-borrows. Language tasks remain retired; copied-packet host workers remain.
-Current Blot syntax is `func`, explicit `return`, curried `->`, `$Constructor`,
-Boolean primitives and `#[...]` arrays. Preserve compiler/ and sibling assets.
+Selected roots are partial, check-only paths. Scoped uses invalid empty Core;
+it never qualifies runtime. Regenerate adapters once for layouts, fully await
+completion, then freeze source. Repair cap 120s, final emission 180s, whole 300s;
+stop 3s after an actual diagnostic. Never lift caps to conceal unfinished work.
 
-`qualify_compiler.ts` has eight matching-language Zig oracle baseline passes,
-but has **not run against Goose**. Native supervisor/transport/cache controls use
-a fake compiler entry; actual compiler OOM/retry/retention remain pending.
-Unavailable live-byte counts are not zero. The required Zig full gate remains
-incomplete: all 2,974 laws compile without LLVM, but the LLVM release phase hit
-120s and cancelled after 94 laws/65 full sweeps. Smoke/harness and zero-finding
-lint pass. Zig source is unchanged; do not repeat that release build per Goose edit.
+After an actual executable exists, run `compiler-goose/tools/qualify_compiler.ts`
+with that executable and `compiler/zig-out-native-fast/bin/blotc`. Eight matching
+Zig baseline fixtures pass; Goose CLI/server/OOM/retry/retention have not run.
+Fake entry/component controls do not qualify those paths. Missing live bytes are
+not zero. Preserve compiler/ and sibling assets, ABI 8/session 2 and named owners.
+Language tasks remain retired; copied-packet host workers remain.
 
-Named-function migration across std/Ink/Gdev is checkpointed; source inventory is
-not fresh Main/frame qualification. Historical Main is 9,203,613B/5.523s on its
-older pinned release, with no reliable compilation gain. Subsecond compilation,
-sub-five-second Main and 1–2MB output remain unmet. Preserve the remaining RFC,
-runtime/export and performance requirements in
-[tasks/STORAGE_REWRITE.md](tasks/STORAGE_REWRITE.md) and
-[docs/language/NEXT_MIGRATION.md](docs/language/NEXT_MIGRATION.md).
-Environment publication and upstream comments/issues require explicit requests.
-Use Astra for concrete snags; never Terra.
+Zig source is unchanged. Its prior full gate is incomplete: all 2974 laws compile
+without LLVM, but release compilation hit 120s after 94 laws / 65 full sweeps. Smoke,
+harness and zero-finding lint pass. Do not rebuild that release per Goose edit.
+Named-function source migration is checkpointed, not fresh Main/frame coverage.
+Historical Main 9,203,613B/5.523s belongs to its older release; no reliable compile
+speed gain. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
+Preserve remaining requirements in [the storage task](tasks/STORAGE_REWRITE.md)
+and [the language migration](docs/language/NEXT_MIGRATION.md). Environment
+publication/upstream messages require explicit requests. Astra for concrete
+snags only; never Terra.

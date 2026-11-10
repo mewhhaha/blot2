@@ -139,7 +139,20 @@ fn registeredWorkspaceSources() {
  var local_state=copy(blot_compile_workspace::backing_query_state);local_state.old=workspace.capture;let query_pools .=blot_eval_completed_specialization_query::sourcePools(local_state);assert(query_pools .==pools && query_pools.generation==23);
  assert(frame.release()==blot_error::Error.none);catalog.deinit();
 }
-fn main() {replayQueryOwnership();retainedEvidence();registeredWorkspaceSources();
+fn recorderCompaction() {
+ let allocated,error=blot_eval_core_eval::initOwnedEmptySession(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && allocated);let session:blot_eval_core_eval::Session& =allocated;
+ var owner,error=blot_reuse_constant_receipt::initRecorderOwner(session);assert(error==blot_error::Error.none);let found .=owner.borrow();assert(found);let recorder:blot_reuse_constant_receipt::Recorder& =found;
+ let mapping=[blot_eval_type_evidence::Mapping{variable:7,evidence:3}];var judgment=blot_reuse_constant_receipt::Judgment{kind:blot_reuse_constant_receipt::JudgmentKind.match_,unit:1,source:3,inputs:blot_reuse_constant_receipt::Inputs{types:mapping[..],..},..};let template=blot_reuse_constant_receipt::Query{kind:blot_reuse_constant_receipt::QueryKind.judgment,judgment:judgment,..};
+ let cloned,error=template.clone();assert(error==blot_error::Error.none && cloned);let query:blot_reuse_constant_receipt::Query& =cloned;let query_slot=query.allocation_index;let query_judgment .=query.judgment;assert(query_judgment);let judgment_slot=query_judgment.allocation_index;
+ recorder.events.push(blot_reuse_constant_receipt::Event.work{blot_reuse_constant_receipt::Resources{steps:2,..}});
+ let rest:blot_reuse_constant_receipt::Event[7]=[blot_reuse_constant_receipt::Event.view{blot_reuse_constant_receipt::ViewEffect{value:17,..}},blot_reuse_constant_receipt::Event.query{query},blot_reuse_constant_receipt::Event.view{blot_reuse_constant_receipt::ViewEffect{value:0,..}},blot_reuse_constant_receipt::Event.growth{blot_reuse_constant_receipt::Growth{mutations:3,frontier:blot_support::none<blot_reuse_constant_receipt::Frontier>()}},blot_reuse_constant_receipt::Event.read{blot_reuse_constant_receipt::Read{target:blot_check_core::BindingRef{1,1},value:0,..}},blot_reuse_constant_receipt::Event.view{blot_reuse_constant_receipt::ViewEffect{value:19,..}},blot_reuse_constant_receipt::Event.work{blot_reuse_constant_receipt::Resources{steps:5,..}}];recorder.events.append(rest);recorder.view_inputs.insert(0,true);assert(recorder.events.len==8 && recorder.failure()==blot_error::Error.none);
+ let escapes,error=recorder.viewsEscape(session,0);assert(error==blot_error::Error.none && !escapes && recorder.events.len==6);
+ for event,index in recorder.events.items {match event {work item=>{assert((index==0 && item.value.steps==2)||(index==5 && item.value.steps==5));},query item=>{assert(index==1 && item.value .==query && item.value.allocation_index==query_slot);},view item=>{assert(index==2 && item.value.value==0);},growth item=>{assert(index==3 && item.value.mutations==3);},read item=>{assert(index==4 && item.value.value==0);},}}
+ session.steps+=3;assert(recorder.flush(session)==blot_error::Error.none && recorder.events.len==6);match recorder.events.items[5] {work item=>{assert(item.value.steps==8);},_=>{assert(false);}}
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);match recorder.events.items[1] {query item=>{let retained .=item.value.judgment;assert(retained && retained.inputs.types[0].variable==7);},_=>{assert(false);}}
+ owner.deinit();let replacement,error=template.clone();assert(error==blot_error::Error.none && replacement);let next:blot_reuse_constant_receipt::Query& =replacement;let next_judgment .=next.judgment;assert(next_judgment && next.allocation_index==query_slot && next_judgment.allocation_index==judgment_slot);next.destroy();blot_eval_core_eval::deinitOwnedSession(session);
+}
+fn main() {recorderCompaction();replayQueryOwnership();retainedEvidence();registeredWorkspaceSources();
     evidenceLeases();implementationLeases();patternLeases();
     print("proof leases passed: shared headers, owner/generation rejection, release/reuse");
 }

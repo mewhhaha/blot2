@@ -379,11 +379,11 @@ fn viewsEscape(self_: Recorder&, session: const Session&, result: u32) -> bool, 
         if pending.len > 65536 || children.len > 65536 - pending.len { return true, blot_error::Error.none; }
         pending.append(children);
     }
-    var count: i64 = 0; let length = self_.events.len;
+    var count: i64 = 0; let length = self_.events.len;let storage=recorderEventStorage(self_.events);
     for index in length {
-        let event = self_.events.items[index]; var keep = true;
+        let event = storage[index]; var keep = true;
         match event { view view => { keep = ::contains(seen,view.value.value); }, _ => {} }
-        if keep { self_.events.items[count] = event; count++; }
+        if keep { storage[count] = ownedRecorderEvent(event); count++; }
     }
     self_.events.resize(count); return false, blot_error::Error.none;
 }
@@ -425,7 +425,7 @@ fn flush(self_: Recorder&, session: const Session&) -> Error {
             work previous => {
                 var combined = previous.value; combined.steps += work.steps; combined.values += work.values; combined.children += work.children;
                 if work.depth > combined.depth { combined.depth = work.depth; } if work.call_depth > combined.call_depth { combined.call_depth = work.call_depth; }
-                self_.events.items[index] = Event.work { combined , ..}; appended = true;
+                let storage=recorderEventStorage(self_.events);storage[index] = Event.work { combined , ..}; appended = true;
             },
             _ => {},
         }
@@ -512,8 +512,11 @@ recursive fn withRecorder<C,F>(session: const Session&,context: C&) -> Error { v
 struct RecorderEventsBuffer { storage: Event[:]=default<Event[:]>(),items: Event[:]=default<Event[:]>(),len: i64=0,failure: Error=blot_error::Error.none }
 reusable[] var pool_RecorderEventsBuffer: Event[>..]=[];
 fn ensure(self_: RecorderEventsBuffer&,minimum: i64) -> Error { if self_.failure!=blot_error::Error.none { return self_.failure; } let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_RecorderEventsBuffer); if error!=blot_error::Error.none { self_.failure=error; } return error; }
-fn push(self_: RecorderEventsBuffer&,value: Event) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::push(self_,value,pool_RecorderEventsBuffer); self_.len=self_.items.len; }
-fn append(self_: RecorderEventsBuffer&,values: const Event[:]) { if self_.failure!=blot_error::Error.none { return; } self_.failure=blot_support_pooled_buffer::append(self_,values,pool_RecorderEventsBuffer); self_.len=self_.items.len; }
+// Recorder event queries own their registered query slot; publication moves it.
+fn ownedRecorderEvent(value:Event)->Event {match value {work item=>{return Event.work{value:item.value};},read item=>{return Event.read{value:item.value};},growth item=>{return Event.growth{value:item.value};},view item=>{return Event.view{value:item.value};},query item=>{let index=item.value.allocation_index;assert(index>=0 && index<queries.len);let owned:Query& =queries[index];assert(owned .== item.value);return Event.query{value:queries[index]};},}}
+fn recorderEventStorage(value:RecorderEventsBuffer)->Event[:] {assert(value.len==value.items.len && value.len<=value.storage.len);if value.storage.len==0 {return default<Event[:]>();}let run=pool_RecorderEventsBuffer.realloc_slice(value.storage,value.storage.len);assert(blot_support::same_slice_identity(run,value.storage));let start=pool_RecorderEventsBuffer.index_of(run[0]);let storage=pool_RecorderEventsBuffer[start..start+run.len];assert(blot_support::same_slice_identity(storage[..value.len],value.items));return storage;}
+fn push(self_:RecorderEventsBuffer&,value:Event) {if self_.failure!=blot_error::Error.none {return;}let count=self_.len+1;let error=ensure(self_,count);if error!=blot_error::Error.none {return;}let storage=recorderEventStorage(self_);storage[self_.len]=ownedRecorderEvent(value);self_.items=storage[..count];self_.len=count;}
+fn append(self_:RecorderEventsBuffer&,values:const Event[:]) {if self_.failure!=blot_error::Error.none {return;}let start=self_.len;if values.len>0x7fffffffffffffff-start {self_.failure=blot_error::Error.out_of_memory;return;}let count=start+values.len;let error=ensure(self_,count);if error!=blot_error::Error.none {return;}let storage=recorderEventStorage(self_);for value,index in values {storage[start+index]=ownedRecorderEvent(value);}self_.items=storage[..count];self_.len=count;}
 fn resize(self_: RecorderEventsBuffer&,length: i64) { blot_support_pooled_buffer::resize(self_,length); self_.len=length; }
 fn clear(self_: RecorderEventsBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: RecorderEventsBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_RecorderEventsBuffer); self_.len=0; self_.failure=blot_error::Error.none; }

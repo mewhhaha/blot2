@@ -2777,5 +2777,81 @@
       "raw_receipt": "2026-11-10-goose-workspace-checkpoint-four.json.gz",
       "full_inventory_current_source": false
     }
+  },
+  "active_child_recorder_diagnostics_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-active-child-recorder-family.json.gz",
+      "2026-11-10-goose-active-child-six.json.gz",
+      "2026-11-10-goose-panic-diagnostic-family.json.gz",
+      "2026-11-10-goose-diagnostic-restore-family.json.gz",
+      "2026-11-10-goose-diagnostic-restore-final.json.gz",
+      "2026-11-10-goose-scoped156.json.gz",
+      "2026-11-10-goose-scoped157.json.gz",
+      "2026-11-10-goose-scoped158.json.gz"
+    ],
+    "changes": [
+      "PlanConstruction no longer contains child Generator; one active address throughout phases, one cleanup/restore",
+      "Recorder event publication/compaction uses existing pool and existing Query slots",
+      "Three concrete append overflow guards restored",
+      "Panic diagnostics own text in existing Session buffer",
+      "Three speculative probes skip preexisting diagnostics and discard failed probe diagnostics; generic restore setter removed",
+      "Receipt tape backs up actual diagnostic text and scalar/fixed metadata; restores fresh owned header with OOM preflight and original error priority",
+      "Removed duplicate declined-key evidence pool and copy function; reuse tested storage_calls own/release",
+      "Retry flags explicitly narrowed; alias selection uses scalar arena ranges",
+      "Only unloaded namespace was storage_input_alias: direct import added; qualified named-call static audit0missing",
+      "Four signed recursive-admission counter deltas checked and cast to u64"
+    ],
+    "affected_six": {
+      "passed": true,
+      "seconds": 67.456,
+      "before_final_restore_oom_fix": true
+    },
+    "final_diagnostic_law": {
+      "passed": true,
+      "seconds": 6.549,
+      "includes_failed_ensure_preservation": true,
+      "source_identity_regenerated_later_by_whole_build": true
+    },
+    "latest_scoped": {
+      "attempt": 158,
+      "seconds": 50.22,
+      "partial": true,
+      "global_session_payload_retention_diagnostic_cleared": true,
+      "errors": [
+        "recursiveCall signedcounter difference i64 passed to u64 saturate; all4 corrected afterward"
+      ],
+      "source_unchanged": true
+    },
+    "whole_compiler_executable": false,
+    "limits": "Native generator miniature/diagnostic leaf/Recorder laws do not qualify full actual generator/probe/tape or compiler CLI/server runtime"
+  },
+  "whole_build_159": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 142.924,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole159.json.gz",
+    "errors": [
+      "storage_parameter_fields51: recursive Children.walk reborrows Walk atdifferent root (\u00a77.8)",
+      "resolved_body60: frozen dependency Module pool may retain payloads via dependency_closure215 (\u00a75.1)"
+    ]
   }
 }
