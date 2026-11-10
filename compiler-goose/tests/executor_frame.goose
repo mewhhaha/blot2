@@ -9,6 +9,18 @@ import reuse.specialization_receipt;
 import reuse.principal_query;
 import backend.result_owner;
 import reuse.frontend_binding_relocation;
+fn packetPublication() {
+ for cycle in 0..3 {
+  var producer:u8[>..]=[];producer.append([17,23,41]);
+  let packet=blot_project_executor::ownedPacket(producer[..]);producer.clear();producer.push(99);
+  let requests=blot_project_executor::process_requests.alloc_slice(2);
+  requests[0]=blot_process_pool::Request{bytes:blot_project_executor::registeredPacket(packet)};
+  requests[1]=blot_process_pool::Request{bytes:blot_project_executor::registeredPacket(default<const u8[:]>())};
+  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+  assert(requests[0].bytes.len==3 && requests[0].bytes[0]==17 && requests[0].bytes[1]==23 && requests[0].bytes[2]==41 && requests[1].bytes.len==0);
+  blot_project_executor::releaseCheckRequests(requests,2);
+ }
+}
 fn bindingMap()->blot_reuse_frontend_binding_relocation::Map {
  let bindings=blot_reuse_frontend_binding_relocation::words(2,17);let nominals=blot_reuse_frontend_binding_relocation::words(2,23);let constructors=blot_reuse_frontend_binding_relocation::words(2,31);let contracts=blot_reuse_frontend_binding_relocation::words(2,41);let implementations=blot_reuse_frontend_binding_relocation::words(2,47);
  let qualifications=blot_reuse_frontend_binding_relocation::owned_qualifications.alloc_slice(1);qualifications[0]=blot_reuse_frontend_binding_relocation::Qualification{blot_parse_ast::Span{1,2},blot_parse_ast::Span{3,4}};
@@ -70,6 +82,7 @@ fn selectedReceiptPublication() {
  slots[0].deinit();adapter.releaseRecords(slots);
 }
 fn main() {
+ packetPublication();
  selectedReceiptPublication();
  queryPublication();
  timingPublication();
@@ -81,5 +94,5 @@ fn main() {
  let counts,error=worker.runProjectChecks(engine,order[..],1,jobs[..0]);assert(error==blot_error::Error.none);engine.deinit();worker.deinit();
  for &job in jobs {job.deinit();}blot_reuse_project_check::project_jobs.free_slice(jobs);
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
- print("executor Frame ownership passed: invalid-size rejection, valid empty batch and pooled-slot cleanup");
+ print("executor Frame ownership passed: packet source retirement across Frame, invalid-size rejection, valid empty batch and pooled-slot cleanup");
 }

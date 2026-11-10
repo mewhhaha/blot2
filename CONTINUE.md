@@ -6,40 +6,45 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-Actual whole173 checks 458 unchanged build inputs in **151.03s**, then stops:
+Actual whole177 checks 459 unchanged inputs in **155.05s**, then stops:
 
-- `backend/scoped_backend.goose:2604`: publishing the emitted diagnostic inside
-  recursive `run` crosses the recursive-store boundary (§7.8).
-- `backend/resolved_body.goose:60`: `process_requests` may retain payloads through
-  `driver/project_executor.goose:61` (§5.1).
+- `backend/core_backend.goose:1830`: module stamps retain the run-local module
+  view (§9.2). Reborrow the existing pinned input owner before publication.
+- `backend/resolved_body.goose:60`: global `source_runs` may retain payloads
+  through `reuse/zig_project_server.goose:66` (§5.1). Its headers are invocation
+  scratch; source text is copied by existing revision snapshots.
 
-There are no C/header/native artifacts. The prior whole160 footprint/effect-key
-failures and the assembler Session/Matcher stores are cleared. Exact source and
-raw diagnostics: [whole173](benchmarks/evidence/qualification/2026-11-10-goose-whole173.json.gz).
+No C/header/native artifact exists. The prior whole173 scoped-diagnostic and
+worker-request failures are cleared. Exact source/diagnostics:
+[whole177](benchmarks/evidence/qualification/2026-11-10-goose-whole177.json.gz).
 
-The complete **32-law component inventory passes in 288.97s**, with unchanged
-import closures and actual C emission, linking and native execution. Every stage
-retains its 30s cap. This qualifies the component laws, not the complete compiler.
-See [complete32](benchmarks/evidence/qualification/2026-11-10-goose-complete32.json.gz).
-The affected assembler/outline/worker trio separately passes in **18.06s**:
-[assembly family](benchmarks/evidence/qualification/2026-11-10-goose-assembly-family-laws.json.gz).
+The actual scoped backend path now checks cleanly in **61.47s**, with unchanged
+source. This is a partial check using deliberately invalid empty Core, not runtime
+qualification: [selected176](benchmarks/evidence/qualification/2026-11-10-goose-scoped176.json.gz).
+The recursive scoped run is removed. A cleanup-only helper preserves the 13
+result-before-cleanup exits and original order. Internal diagnostics now store
+only scalar unit/span/code/detail ID; public diagnostics expand at the result
+boundary. All original string literals are unchanged; 61 exact message IDs have
+matching lookup/render controls. No new owner, buffer, pool or allocation. Lookup
+occurs only when recording a failure. Native diagnostic/executor/assembly laws
+pass in **24.30s**, including scalar diagnostics across producer retirement and
+Frame. See [the source audit](benchmarks/evidence/qualification/2026-11-10-goose-scalar-diagnostic-family.json.gz)
+and [executed trio](benchmarks/evidence/qualification/2026-11-10-goose-scalar-diagnostic-laws.json.gz).
 
-Assembly retries now own their scratch directly. The nested recursive attempt is
-removed; cleanup remains bodies → parallel → matcher → passes → profile, with
-original error/retry order. Worker packets own copied arrays. Profiling and
-collector analysis choose source/detached instruction views lexically. The new
-law executes empty/nonempty assembly, collector rejection cleanup, packet/image
-round trips after Module retirement and type/instruction-buffer reuse, and
-profile hash parity and changed-instruction inequality. It does not exercise nonempty
-names/data retirement, Frame spanning, real process scheduling or full CLI/server.
-Slice-only packet copies stage through a grow array; cost is not benchmarked.
+Both lower/check request publications now reborrow exact existing packet runs.
+The executor law retires its producer, opens/releases a compiler Frame, then
+reads the live request bytes. The executor/resolved-body pair passes **44.82s**:
+[packet laws](benchmarks/evidence/qualification/2026-11-10-goose-lexical-packet-laws.json.gz).
 
-Two next repairs are prepared off-tree and are not part of this checkpoint:
-remove compileScoped's recursive `run`, keeping result construction outside a
-cleanup-only helper; reify exact existing packet allocations before lower/check
-request publication. Review found all scoped diagnostic details are static
-strings, so this path needs no extra text owner. Preserve result-before-cleanup
-order and original cleanup/error priority. Run a strict actual boundary afterward.
+The complete **32-law inventory passes in 288.97s at e514479e**, before this last
+family. All stages keep their 30s cap. Do not present that older run as a complete
+current-source gate: [complete32](benchmarks/evidence/qualification/2026-11-10-goose-complete32.json.gz).
+Assembly retries own scratch lexically; cleanup remains bodies → parallel →
+matcher → passes → profile, with original error/retry order. Native assembly,
+collector rejection, owned packet/image round trips and profile hash controls
+pass. Packet names/data retirement, Frame spanning of those Wasm images, real
+process scheduling and full CLI/server remain pending. Slice-only packet copies
+stage through a grow array; cost is not benchmarked.
 
 ## Contracts and remaining coverage
 

@@ -480,11 +480,11 @@
     }
   },
   "latest_selected_frontier": {
-    "whole_batch": 173,
-    "seconds": 151.028,
+    "whole_batch": 177,
+    "seconds": 155.047,
     "errors": [
-      "scoped_backend2604: emitted diagnostic publication inside recursive run (\u00a77.8)",
-      "resolved_body60: process_requests may retain payloads via project_executor61 (\u00a75.1)"
+      "core_backend1830: module_stamps.current stores run-local module view (\u00a79.2)",
+      "resolved_body60: source_runs retains payloads through zig_project_server66 (\u00a75.1)"
     ],
     "artifacts": {},
     "whole_compiler_executable": false
@@ -494,7 +494,8 @@
     "single_batch": true,
     "seconds": 288.969,
     "raw_receipt": "2026-11-10-goose-complete32.json.gz",
-    "whole_runtime_qualified": false
+    "whole_runtime_qualified": false,
+    "source_checkpoint": "e514479e63d46214857d9cdbaa60c5b5a9e6db4d"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -522,13 +523,13 @@
     "compiler-goose/src/reuse/restart_cache.goose": "e47d33975ec6d08e3274cf44ece02417c9cc1a82f1dcf41eb1f3c231242ab70d",
     "compiler-goose/src/reuse/zig_project_server.goose": "cc77ae7d4609f38ec2d3eb6ae29331467499602d7c1895183057f09689e98f2e",
     "compiler-goose/src/reuse/zig_project_server_loop.goose": "c34e758464a39e92f4427b99c6a52ff5227e4db7f95437a01dee81b3104c1b8c",
-    "compiler-goose/src/support/json_adapters.goose": "f8ca3030c7b094ca9d7a42d53fbcc150685ba8b1571919b9c911fc03d15f0b45",
-    "compiler-goose/src/support/structural_adapters.goose": "8922c3f5b044a0b0f1146c098a1485c370b6da09f6a34d6affd666c6b9e247ae",
+    "compiler-goose/src/support/json_adapters.goose": "f188cbd36447c54625ee5d3448074a637859c67daca39d228a6c4cfdbafaf7b0",
+    "compiler-goose/src/support/structural_adapters.goose": "256a97c815a683f8a010da59662a923ba76acc9debe8430ea5e60e374f726d97",
     "compiler-goose/src/reuse/hole_diagnostics.goose": "e94e56d1cb5a9807ec54cb99c25e5537f12ccd1d59f54aafb6fbef0bba43a867",
     "compiler-goose/src/reuse/dispatch_explanation.goose": "88d649bb129cbe432932a81225248cc667063c05afa6ee03fb1232263563a80e",
     "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
     "compiler-goose/src/backend/core_backend.goose": "50c901c2c75d46402989ceba9d0ba853bd987c264e11d883f7174b7b61c27cdc",
-    "compiler-goose/src/backend/scoped_backend.goose": "5a0eeb54836edb309ddcfdb731f27e302f9be8d61d0b7e7b5ba45ad10e6925e4",
+    "compiler-goose/src/backend/scoped_backend.goose": "6fd0311ac06a3ed45edb9ddd429d313bc009da76da598c8e40b07d3e5c85b7c4",
     "compiler-goose/src/check/frozen_types.goose": "da4542a805c716156f6d7043a2c174a34c49edc646a764cc0bda3bd62b3e42b9",
     "compiler-goose/src/check/parameter_patterns.goose": "80e54c0df28a360299311ec14bc356770537f6b86a9b374971d3d23e7c16b754",
     "compiler-goose/src/check/types.goose": "501b0302dce71519dde8fe95956c21ca70c081b70cc53ead408cf27b7652662e",
@@ -580,7 +581,7 @@
     "compiler-goose/src/driver/cli_pipeline.goose": "9c02f342fecb67f6d990ab2f573a674d727aa06c91741a51fd5ba97115eda404",
     "compiler-goose/src/driver/compile_workspace.goose": "71321c983df6474f98a8d0e6e2585a22957ef51f4243acaa28d4b68c4096ff1a",
     "compiler-goose/src/driver/compile_workspace_backing.goose": "3395ccd7f45c2605db3c9c046c8212e482b1d3f124e7235d0a03f12a8c0104d6",
-    "compiler-goose/src/driver/project_executor.goose": "26fa186f5c820163bfb6ce00b24c92acfabeb0469a6cdba66766fb045442e6ff",
+    "compiler-goose/src/driver/project_executor.goose": "a526d9251f76a9bcc4aaafc0c27fd12b605591b381de24a195f6e2097a2616de",
     "compiler-goose/src/reuse/editor_completion.goose": "4d7d39ab578f3196dfd9ce32daf387a5d401a8ea198e9d2e3586c75996aae411",
     "compiler-goose/src/reuse/partial_dependency.goose": "939653b628e63cab497fc5c3c883f84d5f7f767e9e40ca09b37bb6baf2f04d64",
     "compiler-goose/src/reuse/project.goose": "e07b04b085b7ea7615142d6559023482148c0ca86744ebbbea805ae1d5d88803",
@@ -657,7 +658,8 @@
     "compiler-goose/src/backend/collector_contract.goose": "7ed6ec3d8f61d8e920fe1218a481bbcf1ae39fa343705cbc70dd28cd00eb3aa5",
     "compiler-goose/src/backend/memory_profile.goose": "ce272eb8583805dcf49895ee5629583ca2d59750d7267cf44d8b39b8aceaa015",
     "compiler-goose/src/backend/runtime_body_relocation.goose": "d880a84d5795bfa071771e817b52279282e326f2904fe70c73e540f970df530e",
-    "compiler-goose/src/backend/runtime_job.goose": "a9363f4b9bf03960d8f4e28dc9d7ce6124f3edd53614f404fe72d92479696fce"
+    "compiler-goose/src/backend/runtime_job.goose": "a9363f4b9bf03960d8f4e28dc9d7ce6124f3edd53614f404fe72d92479696fce",
+    "compiler-goose/src/backend/storage_diagnostic.goose": "09e911051c5cf7e06ec5a2208832533c853f33437e281976646a3b3c16339b50"
   },
   "unqualified": [
     "whole compiler executable",
@@ -3096,9 +3098,78 @@
       "Actual whole CLI/server/OOM/retry/retention remain pending"
     ],
     "inventory_count": 32,
-    "complete_inventory_current_source": true,
+    "complete_inventory_current_source": false,
     "whole173_prior160_errors_cleared": true,
     "whole_compiler_executable": false,
     "complete_inventory_seconds": 288.969
+  },
+  "scoped_lexical_diagnostic_packet_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-lexical-packet-laws.json.gz",
+      "2026-11-10-goose-scoped174.json.gz",
+      "2026-11-10-goose-scoped175.json.gz",
+      "2026-11-10-goose-scalar-diagnostic-laws.json.gz",
+      "2026-11-10-goose-scalar-diagnostic-family.json.gz",
+      "2026-11-10-goose-scoped176.json.gz",
+      "2026-11-10-goose-whole177.json.gz"
+    ],
+    "changes": [
+      "Removed recursive scoped run; cleanup-only helper preserves all 13 result-before-cleanup exits and order",
+      "Generator/FunctionMark store scalar unit/span/code/detailID diagnostics; public core Diagnostic expanded only at outer result boundary",
+      "Removed unused rich diagnostic reference payloads from internal scoped carrier; every original literal preserved",
+      "Static lookup/render has 61 exact-byte IDs, no buffers/pools/allocations; lookup occurs only when recording failure",
+      "Exact packet owner observer validates whole existing allocations; both lower/check request publication and check release use it",
+      "Native packet fixture retires producer, opens/releases compiler Frame then observes request bytes"
+    ],
+    "native_laws": {
+      "executor_resolved_pair": 44.817,
+      "final_diagnostic_executor_assembly_trio": 24.301
+    },
+    "latest_scoped": {
+      "partial": true,
+      "engines": [
+        "scoped"
+      ],
+      "exit": 0,
+      "seconds": 61.467,
+      "stop": "completed",
+      "errors": [],
+      "full_qualification": false,
+      "source_sha256": "7081d582095903d44c91bde64d8fc2db5bed8bc00f5d587bae9543b0b3fd2c2b",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "whole_compiler_executable": false,
+    "limits": "Partial scoped pass uses invalid empty Core; actual compiler CLI/server remains unqualified. Complete32 belongs to e514479e before this family; affected final trio passes.",
+    "whole173_errors_cleared_by_whole177": true
+  },
+  "whole_build_177": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 155.047,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole177.json.gz",
+    "errors": [
+      "core_backend1830: module_stamps.current stores run-local module view (\u00a79.2)",
+      "resolved_body60: source_runs retains payloads through zig_project_server66 (\u00a75.1)"
+    ]
   }
 }

@@ -86,6 +86,7 @@ import backend.startup_occurrence_flow;
 import backend.startup_runtime_reach;
 import backend.storage_calls;
 import backend.storage_deferred_join;
+import backend.storage_diagnostic;
 import backend.storage_field_plan;
 import backend.storage_function_plan_input;
 import backend.storage_global_footprint;
@@ -1593,6 +1594,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_deferred
 fn blot_backend_storage_deferred_join::blotStructuralHash<StructuralSink>(value:blot_backend_storage_deferred_join::Join,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_deferred_join::Lane)->bool {return equalFields(left,right);}
 fn blot_backend_storage_deferred_join::blotStructuralHash<StructuralSink>(value:blot_backend_storage_deferred_join::Lane,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_diagnostic::Diagnostic)->bool {return equalFields(left,right);}
+fn blot_backend_storage_diagnostic::blotStructuralHash<StructuralSink>(value:blot_backend_storage_diagnostic::Diagnostic,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_field_plan::Cache)->bool {return equalFields(left,right);}
 fn blot_backend_storage_field_plan::blotStructuralHash<StructuralSink>(value:blot_backend_storage_field_plan::Cache,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_field_plan::Key)->bool {return equalFields(left,right);}

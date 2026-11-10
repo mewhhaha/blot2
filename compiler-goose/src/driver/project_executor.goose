@@ -45,7 +45,14 @@ reusable[] var process_requests:blot_process_pool::Request[>..]=[];
 fn init()->Executor {return Executor{..};}
 fn valid(self_:Executor)->bool {return self_.slot!=0&&self_.slot-1<lower_states.len&&lower_states[self_.slot-1].live&&lower_states[self_.slot-1].generation==self_.generation;}
 fn ownedPacket(bytes:const u8[:])->u8[:] {let result=packets.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
-fn releasePacket(bytes:u8[:]) {if bytes.len!=0 {packets.free_slice(bytes);}}
+// Packet headers may be forwarded through executor/Engine state, but requests
+// must publish the exact live allocation owned by this coordinator.
+fn registeredPacket(bytes:const u8[:])->u8[:] {
+ if bytes.len==0 {return default<u8[:]>();}
+ let owned=packets.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(owned,bytes));
+ let start=packets.index_of(owned[0]);return packets[start..start+owned.len];
+}
+fn releasePacket(bytes:const u8[:]) {if bytes.len!=0 {packets.free_slice(registeredPacket(bytes));}}
 fn begin(self_:Executor&,length:i64)->Error {
  if self_.slot!=0||length<0||length>blot_project_packet::element_limit {return blot_error::Error.invalid_request;}if lower_states.len>=0xffffffff {return blot_error::Error.out_of_memory;}
  let slots=lower_slots.alloc_slice(length);for &slot in slots {slot=LowerSlot{..};}let generation=blot_native::fresh_owner_id();let at=lower_states.alloc_index(LowerState{live:true,generation:generation,slots:slots,..});self_=Executor{(at+1) as u32,generation};return blot_error::Error.none;
@@ -58,7 +65,7 @@ fn prepare(self_:Executor&,index:i64,tree:const blot_parse_ast::Tree&,names:cons
 fn execute(self_:Executor&,order:const u32[:],width:i64)->Error {
  if !self_.valid()||width<1||width>16 {return blot_error::Error.invalid_request;}let state:LowerState& =lower_states[self_.slot-1];if state.executed {return blot_error::Error.invalid_request;}
  let requests=process_requests.alloc_slice(order.len);for &request in requests {request=blot_process_pool::Request{bytes:default<const u8[:]>()};}
- for index,position in order {if index>=state.slots.len||!state.slots[index].requested {process_requests.free_slice(requests);return blot_error::Error.invalid_request;}for previous in order[..position] {if previous==index {process_requests.free_slice(requests);return blot_error::Error.invalid_request;}}requests[position]=blot_process_pool::Request{state.slots[index].packet};}
+ for index,position in order {if index>=state.slots.len||!state.slots[index].requested {process_requests.free_slice(requests);return blot_error::Error.invalid_request;}for previous in order[..position] {if previous==index {process_requests.free_slice(requests);return blot_error::Error.invalid_request;}}requests[position]=blot_process_pool::Request{bytes:registeredPacket(state.slots[index].packet)};}
  state.executed=true;var replies,error=blot_process_pool::run(blot_process_pool::Kind.lower,requests,width as u8);process_requests.free_slice(requests);if error!=blot_error::Error.none {replies.deinit();return error;}if replies.items.len!=order.len {replies.deinit();return blot_error::Error.invalid_artifact;}
  var failure=blot_error::Error.none;for reply,position in replies.items {let slot:LowerSlot& =state.slots[order[position]];if reply.failure!=blot_error::Error.none {slot.failure=reply.failure;continue;}let decoded,error=decodeLowerReply(reply.bytes,order[position] as i64);if error!=blot_error::Error.none {slot.failure=error;if failure==blot_error::Error.none {failure=error;}}else {slot.output=decoded;}}
  replies.deinit();return failure;
@@ -121,12 +128,12 @@ fn encodeCheck(parent:const Engine&,unit:u32)->u8[:],Error {
 }
 fn runProjectChecks(self_:Executor&,parent:Engine&,order:const u32[:],width:i64,jobs:Job[:])->blot_work_counters::Frontend,Error {
  var totals=blot_work_counters::Frontend{..};if width<1||width>16||jobs.len!=parent.source.units.len {return totals,blot_error::Error.invalid_request;}let started=blot_native::clock_ns();let requests=process_requests.alloc_slice(order.len);for &request in requests {request=blot_process_pool::Request{bytes:default<const u8[:]>()};}
- var made:i64=0;for unit,position in order {if unit==0||unit>jobs.len {releaseCheckRequests(requests,made);return totals,blot_error::Error.invalid_request;}for previous in order[..position] {if previous==unit {releaseCheckRequests(requests,made);return totals,blot_error::Error.invalid_request;}}let packet,error=encodeCheck(parent,unit);if error!=blot_error::Error.none {releaseCheckRequests(requests,made);return totals,error;}requests[position]=blot_process_pool::Request{packet};made++;}
+ var made:i64=0;for unit,position in order {if unit==0||unit>jobs.len {releaseCheckRequests(requests,made);return totals,blot_error::Error.invalid_request;}for previous in order[..position] {if previous==unit {releaseCheckRequests(requests,made);return totals,blot_error::Error.invalid_request;}}let packet,error=encodeCheck(parent,unit);if error!=blot_error::Error.none {releaseCheckRequests(requests,made);return totals,error;}requests[position]=blot_process_pool::Request{bytes:registeredPacket(packet)};made++;}
  let prepared=blot_native::clock_ns();if prepared>=started {totals.parallel_capacity_us=(prepared-started)/1000;}var replies,error=blot_process_pool::run(blot_process_pool::Kind.check,requests,width as u8);releaseCheckRequests(requests,made);if error!=blot_error::Error.none {replies.deinit();return totals,error;}if replies.items.len!=order.len {replies.deinit();return totals,blot_error::Error.invalid_artifact;}
  var failure=blot_error::Error.none;for reply,position in replies.items {let unit=order[position];let job:Job& =jobs[unit-1];job.deinit();if reply.failure!=blot_error::Error.none {job.failure=reply.failure;continue;}let error=decodeCheckReply(parent,unit,reply.bytes,job);if error!=blot_error::Error.none {job.deinit();job.failure=error;if failure==blot_error::Error.none {failure=error;}}}
  replies.deinit();let ended=blot_native::clock_ns();if ended>=prepared {totals.parallel_batch_us=(ended-prepared)/1000;}totals.parallel_worker_slots=width as u64;totals.parallel_worker_jobs=order.len as u64;return totals,failure;
 }
-fn releaseCheckRequests(requests:blot_process_pool::Request[:],made:i64) {for request in requests[..made] {if request.bytes.len!=0 {packets.free_slice(request.bytes);}}process_requests.free_slice(requests);}
+fn releaseCheckRequests(requests:blot_process_pool::Request[:],made:i64) {for request in requests[..made] {releasePacket(request.bytes);}process_requests.free_slice(requests);}
 fn cloneDiagnostic(parent:const Engine&,source:blot_reuse_project_check::Diagnostic)->blot_reuse_project_check::Diagnostic,Error {
  var value=blot_reuse_project_check::Diagnostic{unit:source.unit,span:source.span,code:source.code,semantic:source.semantic,type_application:source.type_application,symbol:source.symbol,implicit_type_witness:source.implicit_type_witness,source_terminator:source.source_terminator,numeric_literal:source.numeric_literal,contexts:source.contexts,context_len:source.context_len,..};
  if source.source.present {var found=false;let old=source.source.value;let count=parent.source.diagnostics.len;for index in 0..count {let original=blot_reuse_project::diagnosticAt(parent.source,index);if old.unit!=original.unit||old.span!=original.span||old.code!=original.code||old.target!=original.target {continue;}if old.lexical_details!=original.lexical_details {continue;}value.source=blot_support::Option<blot_reuse_project::Diagnostic>{true,original};found=true;break;}if !found {return default<blot_reuse_project_check::Diagnostic>(),blot_error::Error.invalid_artifact;}}

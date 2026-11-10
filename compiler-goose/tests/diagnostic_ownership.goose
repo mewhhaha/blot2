@@ -11,6 +11,7 @@ import support.option;
 import support.error;
 import check.types;
 import parse.ast;
+import backend.storage_diagnostic;
 type Text=blot_reuse_hole_diagnostics::Text;
 type Node=blot_reuse_hole_diagnostics::Node;
 type Edge=blot_reuse_hole_diagnostics::Edge;
@@ -98,4 +99,17 @@ fn diagnosticRestoration() {
  let actual=session.diagnostic.value;assert(actual.unit==4 && actual.span==blot_parse_ast::Span{7,19} && actual.code==blot_check_diagnostic_code::Code.unsupported && actual.detail=="static prior detail" && actual.tag_origin && actual.related.value.unit==2 && actual.origins.len==1 && actual.dispatch.value.member==17 && actual.implementation_trace.value.request==23);
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);assert(session.diagnostic.value.detail=="static prior detail");let length=session.owned_diagnostic_message.len;let replacement=blot_support::Option<blot_eval_core_eval::Diagnostic>{true,blot_eval_core_eval::Diagnostic{unit:77,span:blot_parse_ast::Span{100,200},code:blot_check_diagnostic_code::Code.const_panic}};session.owned_diagnostic_message.failure=blot_error::Error.out_of_memory;assert(blot_eval_core_eval::restoreDiagnostic(session,replacement,"replacement") == blot_error::Error.out_of_memory);assert(session.diagnostic.value.unit==4 && session.diagnostic.value.span==blot_parse_ast::Span{7,19} && session.diagnostic.value.detail=="static prior detail" && session.owned_diagnostic_message.len==length && session.owned_diagnostic_message.failure==blot_error::Error.out_of_memory && blot_eval_core_eval::registeredDiagnosticMessage(session.owned_diagnostic_message)=="static prior detail");session.owned_diagnostic_message.failure=blot_error::Error.none;message.deinit();session.discardDiagnostic();assert(blot_eval_core_eval::diagnosticProbeAllowed(session) && session.owned_diagnostic_message.len==0);assert(blot_eval_core_eval::restoreDiagnostic(session,blot_support::none<blot_eval_core_eval::Diagnostic>(),default<const u8[:]>())==blot_error::Error.none && !session.diagnostic.present);blot_eval_core_eval::deinitOwnedSession(session);
 }
-fn main() {diagnosticRestoration();panicMessageOwnership();sessionDiagnostic();for cycle in 0..3 {for mode in 0..3 {holes(mode);}dispatch();}print("diagnostic ownership passed: canonical names, move, clone and cleanup");}
+fn scopedDiagnostic(text:const u8[:])->blot_backend_storage_diagnostic::Diagnostic {
+ var producer:u8[>..]=[];producer.append(text);
+ let value=blot_backend_storage_diagnostic::Diagnostic{unit:7,span:blot_check_core::Span{11,19},code:blot_check_diagnostic_code::Code.storage_unsupported,detail:blot_backend_storage_diagnostic::detailId(producer[..])};
+ producer.clear();producer.append("retired");return value;
+}
+fn scopedDiagnostics() {
+ for index in 0..blot_backend_storage_diagnostic::detail_count {
+  let value=scopedDiagnostic(blot_backend_storage_diagnostic::detailText(blot_backend_storage_diagnostic::Diagnostic{detail:index as u32,..}));
+  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+  assert(value.unit==7 && value.span.start==11 && value.span.end==19 && value.code==blot_check_diagnostic_code::Code.storage_unsupported && value.detail==index);
+  assert(blot_backend_storage_diagnostic::detailId(blot_backend_storage_diagnostic::detailText(value))==index);
+ }
+}
+fn main() {scopedDiagnostics();diagnosticRestoration();panicMessageOwnership();sessionDiagnostic();for cycle in 0..3 {for mode in 0..3 {holes(mode);}dispatch();}print("diagnostic ownership passed: canonical names, move, clone and cleanup");}

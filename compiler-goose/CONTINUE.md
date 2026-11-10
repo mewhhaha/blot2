@@ -4,18 +4,22 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole173 stops after 151.03s with 458 unchanged inputs and no artifacts.
-Two errors remain: scoped_backend2604 diagnostic publication inside recursive
-run (§7.8), and process_requests retaining payloads through project_executor61
-(§5.1). Their lexical-factory/exact-packet-owner repairs are prepared off-tree.
+Actual whole177 stops after 155.05s with 459 unchanged inputs and no artifacts.
+It clears the preceding diagnostic/request failures. Two new boundaries remain:
+core_backend1830 publishes run-local module views to module stamps (§9.2), and
+source_runs retains request payloads through zig_project_server66 (§5.1).
 
-The complete 32-law component inventory passes in 288.97s: actual C emission,
-linking and native execution with unchanged import closures. Stages retain the
-30s cap. The affected assembly trio separately passes in 18.06s. Assembly now
-owns retry scratch lexically, preserving cleanup/error/retry order. The new
-fixture covers success/rejection cleanup, packet source retirement and profile
-hash parity; nonempty names/data, Frame and process scheduling remain pending.
-These laws do not qualify the complete compiler runtime.
+Selected176 now checks the actual scoped backend path cleanly in 61.47s. It uses
+invalid empty Core and does not qualify runtime. Recursive scoped run is removed;
+cleanup-only helper preserves all 13 result-before-cleanup exits. Scoped diagnostic
+carriers are scalar; all original strings survive through 61 exact lookup/render
+IDs. The native diagnostic/executor/assembly trio passes 24.30s. Executor/resolved
+body laws pass 44.82s, including request bytes across producer retirement/Frame.
+
+The complete 32-law inventory passed in 288.97s at e514479e, before this last
+family. Stages retain 30s caps. Assembly retry ownership, cleanup, success/rejection,
+worker-image copies and profile digest laws pass; full compiler/process runtime
+is still pending. See the root frontier for exact scopes and limits.
 
 Use private checker c2b24 at build/goose-port/argcopy-experiment-20261110/goose.
 Installed Goose/678 and the off-tree origin checker are unchanged. Selected roots

@@ -87,6 +87,7 @@ import backend.startup_occurrence_flow;
 import backend.startup_runtime_reach;
 import backend.storage_calls;
 import backend.storage_deferred_join;
+import backend.storage_diagnostic;
 import backend.storage_field_plan;
 import backend.storage_function_plan_input;
 import backend.storage_global_footprint;
@@ -935,6 +936,7 @@ fn blot_backend_storage_calls::blotJsonWrite<JsonWriter>(value:blot_backend_stor
 fn blot_backend_storage_deferred_join::blotJsonWrite<JsonWriter>(value:blot_backend_storage_deferred_join::Holes,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_deferred_join::blotJsonWrite<JsonWriter>(value:blot_backend_storage_deferred_join::Join,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_deferred_join::blotJsonWrite<JsonWriter>(value:blot_backend_storage_deferred_join::Lane,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_backend_storage_diagnostic::blotJsonWrite<JsonWriter>(value:blot_backend_storage_diagnostic::Diagnostic,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_field_plan::blotJsonWrite<JsonWriter>(value:blot_backend_storage_field_plan::Cache,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_field_plan::blotJsonWrite<JsonWriter>(value:blot_backend_storage_field_plan::Key,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_field_plan::blotJsonWrite<JsonWriter>(value:blot_backend_storage_field_plan::Recipe,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -4017,6 +4019,8 @@ fn blot_backend_startup_runtime_reach::blotJsonWrite<T>(value:T?,writer:blot_jso
 fn blot_backend_storage_calls::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_backend_storage_deferred_join::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
+
+fn blot_backend_storage_diagnostic::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_backend_storage_field_plan::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
