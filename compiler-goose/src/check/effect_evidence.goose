@@ -5,11 +5,10 @@ import support.error;
 import support.native;
 import support.option;
 import support.pooled_buffer;
-import support.pooled_map;
+import support.u64_id_map;
 import support.wyhash;
 
 import std;
-import dictionary;
 type Id = u32;
 type Label = u32;
 type Error = blot_error::Error;
@@ -51,22 +50,7 @@ fn resize(self_: WordBuffer&,length: i64) { blot_support_pooled_buffer::resize(s
 fn resize(self_: WordBuffer&,length: i64,value: u32) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: WordBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: WordBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_WordBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
-struct Buckets { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
-reusable[] var bucket_slots: dictionary_slot<u64,u32>[>..]=[];
-fn get(self_: const Buckets&,key: u64) -> u32? { let view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let index=blot_support_pooled_map::probe(view,key); if index<0 { return null; } return self_.slots[index].val; }
-fn canonicalBucketsSlots(source: const dictionary_slot<u64,u32>[:]) -> dictionary_slot<u64,u32>[:] {
- if source.len==0 {return default<dictionary_slot<u64,u32>[:]>();}
- let owned=bucket_slots.realloc_slice(source,source.len);
- assert(blot_support::same_slice_identity(owned,source));
- let start=bucket_slots.index_of(owned[0]);
- assert(start>=0 && source.len<=bucket_slots.len-start);
- return bucket_slots[start..start+source.len];
-}
-fn insert(self_: Buckets&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,bucket_slots); self_.count=view.count; self_.slots=canonicalBucketsSlots(view.slots); }
-fn clear(self_: Buckets&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
-fn deinit(self_: Buckets&) { if self_.slots.len!=0 { bucket_slots.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
-fn reserve(self_: Buckets&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,bucket_slots); self_.count=view.count; self_.slots=canonicalBucketsSlots(view.slots); } return blot_error::Error.none; }
-fn copyBuckets(destination: Buckets&,source: const Buckets&) { if destination.slots.len!=0 { bucket_slots.free_slice(destination.slots); } destination.slots=default<dictionary_slot<u64,u32>[:]>(); destination.count=source.count; if source.slots.len!=0 { destination.slots=bucket_slots.alloc_slice(source.slots.len); for slot,index in source.slots { destination.slots[index]=slot; } } }
+type Buckets=blot_support_u64_id_map::Buckets;
 reusable[] var scratch_words: u32[>..]=[];
 struct State { owner_id: u64=0,generation: u64=0,operations: OperationBuffer=OperationBuffer {},arguments: WordBuffer=WordBuffer {},rows: RowBuffer=RowBuffer {},labels: WordBuffer=WordBuffer {},operation_next: WordBuffer=WordBuffer {},row_next: WordBuffer=WordBuffer {},operation_buckets: Buckets=Buckets {},row_buckets: Buckets=Buckets {} }
 reusable var states: State[>..]=[];
@@ -101,7 +85,7 @@ fn init() -> Store,Error { if next_generation==0xffffffffffffffff||states.len>=0
 fn deinit(self_: Store&) { if self_.lease==0 { return; } assert(valid(self_)); self_.operations.deinit(); self_.arguments.deinit(); self_.rows.deinit(); self_.labels.deinit(); self_.operation_next.deinit(); self_.row_next.deinit(); self_.operation_buckets.deinit(); self_.row_buckets.deinit(); let index=self_.lease-1; states[index].owner_id=0; states.free(index); self_=Store {}; }
 fn view(self_: const Store&) -> View { assert(valid(self_)); return View {self_.operations.items,self_.arguments.items,self_.rows.items,self_.labels.items,self_.owner_id}; }
 fn copyOwned(self_: const Store&,target: SnapshotTables) -> Snapshot,Error { let os=target.operations.len; let ars=target.arguments.len; let rs=target.rows.len; let ls=target.labels.len; target.operations.append(self_.operations.items); target.arguments.append(self_.arguments.items); target.rows.append(self_.rows.items); target.labels.append(self_.labels.items); return Snapshot {target.operations[os..],target.arguments[ars..],target.rows[rs..],target.labels[ls..],blot_native::fresh_owner_id()},blot_error::Error.none; }
-fn clone(self_: const Store&) -> Store,Error { let initialized,error=init(); if error!=blot_error::Error.none { return Store {},error; } var result=initialized; result.operations.clear(); result.operations.append(self_.operations.items); result.arguments.clear(); result.arguments.append(self_.arguments.items); result.rows.clear(); result.rows.append(self_.rows.items); result.labels.clear(); result.labels.append(self_.labels.items); result.operation_next.clear(); result.operation_next.append(self_.operation_next.items); result.row_next.clear(); result.row_next.append(self_.row_next.items); copyBuckets(result.operation_buckets,self_.operation_buckets); copyBuckets(result.row_buckets,self_.row_buckets); return result,blot_error::Error.none; }
+fn clone(self_: const Store&) -> Store,Error { let initialized,error=init(); if error!=blot_error::Error.none { return Store {},error; } var result=initialized; result.operations.clear(); result.operations.append(self_.operations.items); result.arguments.clear(); result.arguments.append(self_.arguments.items); result.rows.clear(); result.rows.append(self_.rows.items); result.labels.clear(); result.labels.append(self_.labels.items); result.operation_next.clear(); result.operation_next.append(self_.operation_next.items); result.row_next.clear(); result.row_next.append(self_.row_next.items); blot_support_u64_id_map::copyBuckets(result.operation_buckets,self_.operation_buckets); blot_support_u64_id_map::copyBuckets(result.row_buckets,self_.row_buckets); return result,blot_error::Error.none; }
 fn internOperation(self_: Store, identity: blot_check_types::NominalIdentity, values: const u32[:]) -> Label, Error {
     return internOperationInstance(self_, identity, values, blot_check_types::NominalIdentity { 0, 0 });
 }
@@ -198,12 +182,7 @@ fn ownedBuffer(value:const WordBuffer&)->WordBuffer {
  let start=pool_WordBuffer.index_of(registered[0]);let storage=pool_WordBuffer[start..start+registered.len];
  return WordBuffer{storage:storage,items:storage[..value.len],len:value.len,failure:value.failure};
 }
-fn ownedBuckets(value:const Buckets&)->Buckets {
- assert(value.count>=0 && value.count<=value.slots.len);
- if value.slots.len==0 {assert(value.count==0);return Buckets{};}
- let registered=bucket_slots.realloc_slice(value.slots,value.slots.len);assert(blot_support::same_slice_identity(registered,value.slots));
- let start=bucket_slots.index_of(registered[0]);return Buckets{count:value.count,slots:bucket_slots[start..start+registered.len]};
-}
+fn ownedBuckets(value:const Buckets&)->Buckets {return blot_support_u64_id_map::ownedBuckets(value);}
 fn commit(source: Store&,destination: Store&) { assert(valid(source)&&valid(destination)&&source.owner_id!=destination.owner_id);
  destination.operations.deinit(); destination.operations=ownedBuffer(source.operations); source.operations=OperationBuffer {};
  destination.arguments.deinit(); destination.arguments=ownedBuffer(source.arguments); source.arguments=WordBuffer {};

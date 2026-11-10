@@ -384,7 +384,7 @@ recursive fn mapRowPrepared(self_:Service&,unit_id:u32,mappings:MappingSink,rows
             let key, error = blot_check_types::formalRowKey(binder); if error != blot_error::Error.none { return decline(self_, unit_id, span, FailureCode.complexity); } variable = key;
         },
     }
-    let remaining, row_error = self_.layouts.effects.internRowWithFormal(suffix.items, self_.layouts.effects.rows.items[actual_row].formal);
+    let remaining, row_error = self_.layouts.effects.internRowWithFormal(suffix.items, self_.layouts.effects.view().rows[actual_row].formal);
     if row_error != blot_error::Error.none { return representationError(self_, row_error, unit_id, span, FailureCode.complexity); }
     let row_count=rowItems(rows).len;for row_index in 0..row_count {let entry=rowItems(rows)[row_index];
         if entry.variable != variable { continue; } if entry.row == remaining { return blot_error::Error.none; }

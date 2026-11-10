@@ -364,6 +364,7 @@ import support.process_pool;
 import support.project_packet;
 import support.project_packet_owners;
 import support.sha256;
+import support.u64_id_map;
 import support.wyhash;
 import work_counters;
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_activation_graph::Call)->bool {return equalFields(left,right);}
@@ -2732,8 +2733,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_authority::
 fn blot_check_effect_authority::blotStructuralHash<StructuralSink>(value:blot_check_effect_authority::State,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_authority::Store)->bool {return equalFields(left,right);}
 fn blot_check_effect_authority::blotStructuralHash<StructuralSink>(value:blot_check_effect_authority::Store,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::Buckets)->bool {return equalFields(left,right);}
-fn blot_check_effect_evidence::blotStructuralHash<StructuralSink>(value:blot_check_effect_evidence::Buckets,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::Handle)->bool {return equalFields(left,right);}
 fn blot_check_effect_evidence::blotStructuralHash<StructuralSink>(value:blot_check_effect_evidence::Handle,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::List)->bool {return equalFields(left,right);}
@@ -6278,6 +6277,8 @@ fn equal<StructuralLeft,K,V>(left:StructuralLeft,right:blot_support_pooled_map::
 fn blot_support_pooled_map::blotStructuralHash<StructuralSink,K,V>(value:blot_support_pooled_map::Map<K,V>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_sha256::State)->bool {return equalFields(left,right);}
 fn blot_support_sha256::blotStructuralHash<StructuralSink>(value:blot_support_sha256::State,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_u64_id_map::Buckets)->bool {return equalFields(left,right);}
+fn blot_support_u64_id_map::blotStructuralHash<StructuralSink>(value:blot_support_u64_id_map::Buckets,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_wyhash::Wyhash)->bool {return equalFields(left,right);}
 fn blot_support_wyhash::blotStructuralHash<StructuralSink>(value:blot_support_wyhash::Wyhash,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_work_counters::Counters)->bool {return equalFields(left,right);}

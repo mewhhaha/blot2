@@ -10,6 +10,7 @@ import backend.core_backend;
 import backend.function_facts;
 import backend.layout;
 import backend.layout_bridge;
+import support.u64_id_map;
 import backend.numeric_rows;
 import backend.optimized_bodies;
 import backend.optimizer_buffers;
@@ -227,7 +228,7 @@ var backing_generator_representations_store: blot_backend_layout::Store = blot_b
 var backing_generator_representations_connection_partial_nodes: blot_reuse_code_expectation::Nodes = blot_reuse_code_expectation::Nodes{..};
 var backing_generator_representations_connection_partial_extra: blot_reuse_code_expectation::Ids = blot_reuse_code_expectation::Ids{..};
 var backing_generator_representations_connection_partial_next: blot_reuse_code_expectation::Ids = blot_reuse_code_expectation::Ids{..};
-var backing_generator_representations_connection_partial_buckets: dictionary<u64, blot_reuse_code_expectation::Id> = dictionary<u64, blot_reuse_code_expectation::Id>{..};
+var backing_generator_representations_connection_partial_buckets: blot_support_u64_id_map::Buckets = blot_support_u64_id_map::Buckets{..};
 var backing_generator_representations_connection_partial: blot_reuse_code_expectation::Store = blot_reuse_code_expectation::Store{nodes:backing_generator_representations_connection_partial_nodes,extra:backing_generator_representations_connection_partial_extra,next:backing_generator_representations_connection_partial_next,buckets:backing_generator_representations_connection_partial_buckets,..};
 var backing_generator_representations_connection_to: blot_backend_optimizer_buffers::Words = blot_backend_optimizer_buffers::Words{..};
 var backing_generator_representations_connection_from: blot_backend_optimizer_buffers::Words = blot_backend_optimizer_buffers::Words{..};

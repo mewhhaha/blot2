@@ -15,6 +15,7 @@ fn rows(key:Handle,decl:u32) {
  let observed=blot_check_effect_evidence::fromHandle(key);let view=observed.view();
  assert(view.owner_id==key.owner_id && view.operation(op).identity.decl==decl && view.operationArguments(op)==[11 as u32,13 as u32]);
  assert(view.rows[row].formal==5 && view.rowLabels(row)==[op]);
+ let direct=key.view();assert(direct.owner_id==key.owner_id && direct.rows[row].formal==5 && direct.rowLabels(row)==[op] && direct.operationArguments(op)==[11 as u32,13 as u32]);
  let checked=blot_check_effect_evidence::handle(observed);assert(checked.owner_id==key.owner_id && checked.lease==key.lease && checked.generation==key.generation);
 }
 fn main() {

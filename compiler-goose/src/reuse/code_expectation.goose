@@ -2,7 +2,7 @@
 // becomes semantic type evidence or guest authority.
 namespace blot_reuse_code_expectation;
 import std;
-import dictionary;
+import support.u64_id_map;
 import eval.type_evidence_schema;
 import support.error;
 import support.bytes;
@@ -31,7 +31,7 @@ fn clear(self_:Ids&) {blot_support_pooled_buffer::clear(self_);self_.len=0;}
 fn deinit(self_:Ids&) {blot_support_pooled_buffer::deinit(self_,pool_Ids);self_.len=0;}
 struct Store {
     owner_id: u64, nodes: Nodes&, extra: Ids&,
-    next: Ids&, buckets: dictionary<u64, Id>&,
+    next: Ids&, buckets: blot_support_u64_id_map::Buckets&,
 }
 fn node(view: View, id: Id) -> Node { view.nodes[id] }
 fn children(view: View, id: Id) -> const Id[:] {
@@ -46,7 +46,7 @@ fn children(view: View, id: Id) -> const Id[:] {
     }
 }
 fn seed(store:Store&)->u64,Error {
-    store.nodes.clear();store.extra.clear();store.next.clear();::clear(store.buckets);
+    store.nodes.clear();store.extra.clear();store.next.clear();store.buckets.clear();
     let owner=blot_native::fresh_owner_id();
     let node_error=store.nodes.ensure(6);if node_error!=blot_error::Error.none {return owner,node_error;}
     let next_error=store.next.ensure(6);if next_error!=blot_error::Error.none {return owner,next_error;}
@@ -54,15 +54,15 @@ fn seed(store:Store&)->u64,Error {
     for tag in tags {store.nodes.push(Node{tag:tag,..});store.next.push(0);}
     return owner,blot_error::Error.none;
 }
-fn init(nodes:Nodes&,extra:Ids&,next:Ids&,buckets:dictionary<u64,Id>&)->Store,Error {
+fn init(nodes:Nodes&,extra:Ids&,next:Ids&,buckets:blot_support_u64_id_map::Buckets&)->Store,Error {
     var store=Store{0,nodes,extra,next,buckets};let owner,error=seed(store);store.owner_id=owner;return store,error;
 }
 fn reset(store:Store&)->Error {
     let owner,error=seed(store);if error==blot_error::Error.none {store.owner_id=owner;}return error;
 }
-fn deinit(store: Store&) { store.nodes.clear(); store.extra.clear(); store.next.clear(); ::clear(store.buckets); }
+fn deinit(store: Store&) { store.nodes.clear(); store.extra.clear(); store.next.clear(); store.buckets.clear(); }
 fn view(store: Store&) -> View { View { store.nodes.items, store.extra.items } }
-recursive fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const Id[:]) -> Id, Error {
+fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const Id[:]) -> Id, Error {
     return internFields(store, tag, a, b, 0, values);
 }
 fn internBound(store: Store&, ordinal: u32, sort: u32, depth: u32) -> Id, Error {
@@ -71,17 +71,20 @@ fn internBound(store: Store&, ordinal: u32, sort: u32, depth: u32) -> Id, Error 
 fn internStateProvider(store: Store&, read: Id, write: Id, state: Id) -> Id, Error {
     return internFields(store, blot_eval_type_evidence::Tag.state_provider, read, write, state, []);
 }
-recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, values: const Id[:]) -> Id, Error {
+fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, values: const Id[:]) -> Id, Error {
     if (tag == blot_eval_type_evidence::Tag.forall || tag == blot_eval_type_evidence::Tag.existential) && values.len == 0 {
         if b == 0 || b > 128 { return 0, blot_error::Error.type_mismatch; }
         var binders: Id[128] = default<Id[128]>();
         for ordinal in b {
-            let value, error = intern(store, blot_eval_type_evidence::Tag.bound, ordinal, 0, []);
+            let value, error = internCanonical(store, blot_eval_type_evidence::Tag.bound, ordinal, 0, 0, []);
             if error != blot_error::Error.none { return 0, error; }
             binders[ordinal] = value;
         }
-        return internFields(store, tag, a, b, c, binders[..b]);
+        return internCanonical(store, tag, a, b, c, binders[..b]);
     }
+    return internCanonical(store,tag,a,b,c,values);
+}
+fn internCanonical(store:Store&,tag:Tag,a:u32,b:u32,c:u32,values:const Id[:])->Id,Error {
     match tag {
         scoped => { return 0, blot_error::Error.type_mismatch; },
         projection => { return 0, blot_error::Error.type_mismatch; },
@@ -137,7 +140,7 @@ recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, value
     for value in values { hash.value(value); }
     let fingerprint = hash.final();
     var head: Id = 0;
-    { let optional_source_2 .= ::get(store.buckets,fingerprint); if optional_source_2 { let found = optional_source_2; head = found;  } }
+    { let optional_source_2 .= store.buckets.get(fingerprint); if optional_source_2 { let found = optional_source_2; head = found;  } }
     var candidate = head;
     while candidate != 0 {
         let n = store.nodes.items[candidate];
@@ -174,6 +177,6 @@ recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, c: u32, value
         _ => {},
     }
     let id = store.nodes.len as Id;
-    store.nodes.push(n); store.next.push(head); ::insert(store.buckets,fingerprint,id);
+    store.nodes.push(n); store.next.push(head); store.buckets.insert(fingerprint,id);
     return id, blot_error::Error.none;
 }

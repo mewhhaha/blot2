@@ -1,12 +1,12 @@
 import std;
-import dictionary;
+import support.u64_id_map;
 import reuse.code_expectation;
 import support.error;
 fn main() {
     var nodes=blot_reuse_code_expectation::Nodes{..};
     var extra=blot_reuse_code_expectation::Ids{..};
     var next=blot_reuse_code_expectation::Ids{..};
-    var buckets=dictionary<u64,u32>{};
+    var buckets=blot_support_u64_id_map::Buckets{};
     for cycle in 0..3 {
         var store,error=blot_reuse_code_expectation::init(nodes,extra,next,buckets);
         assert(error==blot_error::Error.none);
@@ -34,6 +34,7 @@ fn main() {
         store.deinit();
         assert(nodes.len==0 && extra.len==0 && next.len==0);
     }
+    buckets.deinit();
     nodes.deinit();
     extra.deinit();
     next.deinit();

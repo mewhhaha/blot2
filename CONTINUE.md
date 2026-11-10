@@ -6,11 +6,23 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** Latest whole288 clears
-physical interning, then fails in recursive type conversion at layout342 because
-three scratch stacks shrink through the persistent Store.158.74s, unchanged461
-inputs, no artifact. Whole289 with the fixed-stack batch is running.
-[Whole288](benchmarks/evidence/qualification/2026-11-10-goose-layout-scalars-whole288.json.gz).
+**No complete C/header/native Goose compiler exists.** Whole289 clears fixed
+conversion stacks; whole290 clears the effect Handle reader and stops at partial
+expectation interning (`code_expectation.goose:79`).163.377s, unchanged461 inputs,
+no artifact. A grouped backend check reproduces that frontier in77.878s, so use
+that bounded partial check for repairs before another whole build.
+[Whole/backend receipts](benchmarks/evidence/qualification/2026-11-10-goose-backend-batch290.json.gz).
+
+The current batch moves the existing effect u64-to-ID map and its slot pool into
+a lightweight support module, reused by partial expectations. This removes their
+GS dictionary and avoids an effect-evidence import cycle. Fixed-tag binder
+normalization shares one canonical leaf. Five executed native laws pass19.705s
+summed stages; all receipt input hashes match final generated source. Exact IDs,
+validation, owner reset, capacity reuse and lexical initialization pass. Combined
+compile/record/emit advances in75.582s to an emission index header copied into a
+block-local value (`backend_emission.goose:792`), unchanged source. Auditing all
+unitUses bindings as the next family; whole/runtime pending.
+[Focused receipt](benchmarks/evidence/qualification/2026-11-10-goose-shared-map-shape-laws.json.gz).
 
 The physical Store now keeps only mutable physical owners: one existing scalar
 publication owner replaces both Core views, and a checked effect Handle replaces

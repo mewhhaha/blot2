@@ -4,9 +4,18 @@ Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
 No forwarding to compiler/ and no ABI fallback.
 
-Whole288 clears physical interning, then fails at layout342 recursive conversion
-because three scratch stacks shrink Store.158.74s, unchanged461inputs, noartifact.
-Whole289 with fixed stacks is running.
+Whole289 clears fixed conversion stacks. Whole290 clears the effect Handle
+reader, then stops at partial expectation interning (`code_expectation:79`).
+163.377s, unchanged461 inputs, no artifacts. A grouped backend check reproduces
+that frontier in77.878s; use that bounded partial probe before another whole.
+
+Current shared-map/shape batch passes five native laws in19.705s summed stages,
+with all receipt input hashes matching final source. The existing effect u64-ID
+map/pool moves into lightweight support; partial shapes reuse it and one acyclic
+canonical interning leaf. Combined compile/record/emit diagnostics advance in75.582s to
+backend_emission792: a copied index header escapes its block; audit unitUses
+bindings as the next family. Source unchanged throughout checks.
+Whole build and actual CLI/server/OOM/retry/retention remain pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
@@ -19,7 +28,7 @@ Three hard-bounded stacks use fixed128/128/16384 backing andscalarcounts. Five
 native laws pass26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; currentfull42law inventory stillpending.
+receipts/rawlogs automatically; current full43-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic

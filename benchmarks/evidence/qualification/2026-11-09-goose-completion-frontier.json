@@ -4044,7 +4044,86 @@
       "Frame+pinnedCore+staleowners",
       "growth views valid/reset views rejected"
     ],
-    "whole289": "pending",
+    "whole289": {
+      "receipt": "2026-11-10-goose-layout-fixed-whole289.json.gz",
+      "exit": 1,
+      "seconds": 158.141,
+      "source_unchanged": true,
+      "artifacts": {},
+      "frontier": "specialization387 old effect Handle.rows reader"
+    },
     "actual_compiler_runtime": false
+  },
+  "shape_interner_frontier": {
+    "whole290": {
+      "receipt": "2026-11-10-goose-backend-batch290.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 163.377,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "partial_backend": {
+      "seconds": 77.878,
+      "source_unchanged": true,
+      "same_error": true,
+      "full_qualification": false
+    },
+    "remaining": "Cleared by shared map and acyclic shape leaf; current partial frontier backend_emission792 copied unitUses header escaping block",
+    "actual_compiler_executable": false
+  },
+  "shared_map_shape_batch": {
+    "receipt": "2026-11-10-goose-shared-map-shape-laws.json.gz",
+    "native_passed": true,
+    "tests": [
+      "expectation",
+      "code_expectation_leaf",
+      "effect_evidence_handles",
+      "layout_bridge_words",
+      "empty_session"
+    ],
+    "sum_stage_seconds": 19.705,
+    "input_hashes_match_current": true,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-shared-map291.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 75.582,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 792,
+          "message": "error: storing a reference rooted at index, which does not outlive the destination (\u00a79.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "69e1c6e7cf857ad5e7ef1000064208e2e9cedf4ad6a838c3ff0076528f8fb0d8",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "whole_compiler_executable": false
   }
 }

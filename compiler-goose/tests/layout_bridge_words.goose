@@ -3,7 +3,7 @@ import bootstrap_globals;
 import driver.cli;
 import driver.cli_workers;
 import std;
-import dictionary;
+import support.u64_id_map;
 import backend.layout_bridge;
 import backend.optimizer_buffers;
 import reuse.code_artifacts;
@@ -20,7 +20,7 @@ fn seed(table:Words&,id:u32,value:u32) {
  assert(blot_backend_layout_bridge::publish(table,id,value+1)==blot_error::Error.none && table.items[id]==value+1);
 }
 fn main() {
- var nodes=blot_reuse_code_expectation::Nodes {..};var extra=blot_reuse_code_expectation::Ids {..};var next=blot_reuse_code_expectation::Ids {..};var buckets:dictionary<u64,u32> =dictionary<u64,u32>{};
+ var nodes=blot_reuse_code_expectation::Nodes {..};var extra=blot_reuse_code_expectation::Ids {..};var next=blot_reuse_code_expectation::Ids {..};var buckets=blot_support_u64_id_map::Buckets{};
  var partial,error=blot_reuse_code_expectation::init(nodes,extra,next,buckets);assert(error==blot_error::Error.none);
  var to=Words {..};var from=Words {..};var row_to=Words {..};var row_from=Words {..};var shapes=Words {..};
  let original_owner=partial.owner_id;assert(partial.reset()==blot_error::Error.none && partial.owner_id!=original_owner && partial.nodes.len==6 && partial.next.len==6 && partial.extra.len==0);
@@ -40,6 +40,6 @@ fn main() {
  assert(to.storage.len==to_capacity && from.storage.len==from_capacity && row_to.storage.len==row_to_capacity && row_from.storage.len==row_from_capacity && shapes.storage.len==shapes_capacity);
  assert(snapshot.nodes.len==6 && snapshot.to[9]==101 && snapshot.from[17]==201 && snapshot.row_to[25]==301 && snapshot.row_from[33]==401 && snapshot.shapes[41]==501);
  assert(snapshot.to[0]==blot_backend_layout_bridge::missing && snapshot.shapes[40]==blot_backend_layout_bridge::missing);
- snapshot.deinit();store.deinit();to.deinit();from.deinit();row_to.deinit();row_from.deinit();shapes.deinit();nodes.deinit();extra.deinit();next.deinit();
+ snapshot.deinit();store.deinit();to.deinit();from.deinit();row_to.deinit();row_from.deinit();shapes.deinit();nodes.deinit();extra.deinit();next.deinit();buckets.deinit();
  print("layout bridge words passed: independent sparse memos, overwrite, failure guard, clear/reuse and owned snapshots");
 }
