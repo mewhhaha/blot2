@@ -3,6 +3,7 @@ namespace blot_backend_backend_static_data;
 import .layout;
 import eval.core_eval;
 import support.error;
+import driver.compile_workspace;
 import support.pooled_map;
 import support.pooled_buffer;
 type Error = blot_error::Error;
@@ -54,9 +55,9 @@ fn representation(g: Generator&,evidence: u32,owner: u32) -> u32,Error {
     if error == blot_error::Error.none || error == blot_error::Error.out_of_memory { return result,error; }
     return 0,staticFailure(g,owner,blot_check_diagnostic_code::Code.unresolved_type);
 }
-fn staticOwner(g: Generator&,unit: u32,mappings: const blot_backend_layout::Mapping[:]) -> blot_backend_backend_emission::Owner,Error {
+fn staticOwner(g: Generator&,unit: u32,mappings: blot_backend_backend_emission::MappingRead) -> blot_backend_backend_emission::Owner,Error {
     let cleanup,error = blot_runtime_runtime_cleanup::initPooled();
-    return blot_backend_backend_emission::Owner { generator: g,unit_id: unit,function_id: 0,provider_local: blot_support::some(0 as u32),mappings: mappings,cleanups: cleanup,..},error;
+    return blot_backend_backend_emission::Owner { frame: blot_compile_workspace::frameForGenerator(g,g.evaluator),unit_id: unit,function_id: 0,provider_local: blot_support::some(0 as u32),mapping_read: mappings,cleanups: cleanup,..},error;
 }
 recursive fn taskCallbackRows(source: const blot_check_core::Module&,ty: u32,depth: i64) -> bool {
     if depth >= 128 { return false; } if blot_check_task_types::scopeCallback(source.types,ty).present { return true; }
@@ -94,7 +95,7 @@ recursive fn serializeCarrier(self_: State&,g: Generator&,value: ValueId,from: u
     }
     if input.tag != output.tag { return 0,staticFailure(g,owner,blot_check_diagnostic_code::Code.unresolved_type); }
     if input.tag == blot_backend_layout::Tag.function {
-        let initialized,error = staticOwner(g,owner,[]); if error != blot_error::Error.none { return 0,error; } var emitter = initialized;
+        let initialized,error = staticOwner(g,owner,blot_backend_backend_emission::MappingRead{}); if error != blot_error::Error.none { return 0,error; } var emitter = initialized;
         let rows = emitter.carrierRows(input.c,output.c,0); if rows != blot_error::Error.none { emitter.deinit(); return 0,rows; }
         let adapter,adapted = emitter.carrierFunction(from,to,depth + 1); emitter.deinit(); if adapted != blot_error::Error.none { return 0,adapted; }
         let captured,serialized = serialize(self_,g,value,from,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; } return closureData(self_,g,adapter,captured);
@@ -191,8 +192,8 @@ recursive fn serializePackage(self_: State&,g: Generator&,value: ValueId,ty: u32
         if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,staticFailure(g,selected_unit,blot_check_diagnostic_code::Code.unresolved_type); }
         let payload,serialized = serializeCarrier(self_,g,g.evaluator.valueChildren(value)[0],payload_type,package.a,selected_unit,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; }
         let appended = words.push(payload); if appended != blot_error::Error.none { return 0,appended; }
-        let abstract_value,abstract_error = staticOwner(g,selected_unit,[]); if abstract_error != blot_error::Error.none { return 0,abstract_error; } var abstract = abstract_value;
-        let concrete_value,concrete_error = staticOwner(g,selected_unit,mappings.items); if concrete_error != blot_error::Error.none { abstract.deinit(); return 0,concrete_error; } var concrete = concrete_value;
+        let abstract_value,abstract_error = staticOwner(g,selected_unit,blot_backend_backend_emission::MappingRead{}); if abstract_error != blot_error::Error.none { return 0,abstract_error; } var abstract = abstract_value;
+        let concrete_value,concrete_error = staticOwner(g,selected_unit,blot_backend_backend_emission::bufferMappings(mappings)); if concrete_error != blot_error::Error.none { abstract.deinit(); return 0,concrete_error; } var concrete = concrete_value;
         recursive fn members() -> u32,Error {
             for goal_ordinal in 0..goals.len {
                 let goal = goals[goal_ordinal]; var found = false; var members = blot_check_core::List {..};
@@ -501,7 +502,7 @@ recursive fn serializeStagedClosure(self_: State&,g: Generator&,value: ValueId,t
         else { let argument = g.mapType(header.unit,mappings,metadata.parameter.ty,arrow.a,metadata.parameter.span); if argument != blot_error::Error.none { return 0,argument; } let result = g.mapType(header.unit,mappings,source.typeOf(metadata.body),arrow.b,source.span(metadata.body)); if result != blot_error::Error.none { return 0,result; } }
         for index in 0..bindings.len { let added = hints.push(blot_eval_core_eval::RetainedCapture { value: captured.items[index], binding: bindings[index], unit: header.unit, node: 0, .. }); if added != blot_error::Error.none { return 0,added; } }
         let refined = g.refineAccessorMappings(header.unit,header.identity,ty,mappings,rows,source.span(metadata.body),hints.items); if refined != blot_error::Error.none { return 0,refined; }
-        let function,error = g.capturedClosureFunction(header,ty,captured.items,mappings.items,rows.items); if error != blot_error::Error.none { return 0,error; }
+        let function,error = g.capturedClosureFunction(header,ty,captured.items,blot_backend_backend_emission::bufferMappings(mappings),blot_backend_backend_emission::bufferRows(rows)); if error != blot_error::Error.none { return 0,error; }
         let address,allocated = closureData(self_,g,function,0); if allocated != blot_error::Error.none { return 0,allocated; } let cached = self_.cache.insert(SerializedKey {value,ty},address); return address,cached;
     }
     let address,error = build(); hints.deinit(); rows.deinit(); mappings.deinit(); captured.deinit(); return address,error;

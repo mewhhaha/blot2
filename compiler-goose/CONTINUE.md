@@ -5,16 +5,18 @@ request OOM/retry and retention against Zig. **No whole compiler artifact exists
 No forwarding to compiler/ and no ABI fallback.
 
 Whole 290 remains the latest complete attempt: 163.377s, unchanged 461 inputs,
-no artifact. Partial backend 297 clears scalar layout selectors in 79.058s, then
-rejects nested recursive Owner construction in prepareMapped (emission894,
-§7.8). Astra is reviewing existing Frame authority and all implicated fields for
-a coherent source family. No new registries/copies or relaxed checking.
+no artifact. Partial backend 298 clears the seven-module Owner rewrite in 76.467s,
+unchanged, then stops at core_eval885: parameters borrowed at 883 across typedView
+may refer into shrinking code-origin type storage. Repair evaluator span lifetime
+as a coherent family before another whole attempt.
 
-Owner-scan native law passes in 2.897s, covering branches, record names, cycles,
-invalid roots and exact breadth-first 4096-node budget. The sibling closedType
-selector is checked by backend297 but not executed by that native law. Prior
-bridge family passes real-Frame all-four-conversion law. Whole executable and
-actual CLI/server/OOM/retry/retention remain pending.
+21 Owner/12 Config sites and 348 Generator reads now use scalar Frame/read keys.
+StaticClosurePlan takes existing buffer leases, removing two copy pools/four
+helpers without new payload allocation/registry. Three native laws pass in 45.1s summed
+stages. InstanceRead requires decisions frozen; deinit/reuse rejection is checked.
+The actual prepareMapped probe caps emission at 30s, emits no C and is unqualified;
+it is explicit opt-in outside 48 default laws. Whole executable and actual CLI/server/
+OOM/retry/retention still pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
@@ -27,7 +29,7 @@ Three hard-bounded stacks use fixed 128/128/16384 backing and scalar counts. Fiv
 native laws pass 26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; current full 47-law inventory still pending.
+receipts/rawlogs automatically; current full 48-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic

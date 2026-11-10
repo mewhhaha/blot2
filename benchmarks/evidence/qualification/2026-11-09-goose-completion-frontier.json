@@ -4352,5 +4352,59 @@
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     },
     "whole_compiler_executable": false
+  },
+  "emission_owner_scalar_authority": {
+    "receipt": "2026-11-10-goose-emission-owner-scalars-laws.json.gz",
+    "source_files": 7,
+    "owner_constructors": 21,
+    "config_constructors": 12,
+    "generator_reads": 348,
+    "removed_copy_pools": 2,
+    "removed_copy_helpers": 4,
+    "extra_payload_copies_or_registry": false,
+    "native_passed": true,
+    "tests": [
+      "emission_owner_reads",
+      "resolved_body",
+      "layout_frame_store"
+    ],
+    "native_sum_stage_seconds": 45.101,
+    "instance_read_limit": "Decisions frozen between snapshot and consuming preparation; validates owning deinit/reuse",
+    "metadata_tradeoff": "May prepare one existing empty facts-header slot as nonempty decision lifetime anchor",
+    "whole_compiler_executable": false,
+    "actual_prepare_probe": {
+      "receipt": "2026-11-10-goose-emission-prepare-cap.json.gz",
+      "native_passed": false,
+      "emission_cap_seconds": 30,
+      "executed": false,
+      "default_inventory": false,
+      "qualification": "pending, explicit opt-in probe; never a pass",
+      "fixture_after_cap": "Unexecuted fixture corrected to actual Code<u32> quote type with copied type/effect tables; cap receipt preserves exact earlier fixture. No runtime claim."
+    },
+    "default_native_inventory": 48,
+    "default_inventory_full_run": false,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-owner-scalars298.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 76.467,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 885,
+          "message": "error: cannot call typedView, which shrinks backing_origins_code_module_types while parameters (bound at /home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose:883) is still used: it may refer into backing_origins_code_module_types (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "932ce3220f7acf3b2e4383a6fbe8edec128309834a8cf0a1058bb2d69a939a8b",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }

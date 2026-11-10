@@ -77,6 +77,7 @@ fn canonicalGenerator(source:Generator&)->Generator& {
  return owned;
 }
 // Session backpointers borrow the existing active frame; they never retain it.
+fn generatorForFrame(frame:Frame)->Generator& {let workspace:Workspace& =workspaceForFrame(frame);return canonicalGenerator(workspace.generator);}
 fn generatorForSession(frame:Frame,session:blot_eval_core_eval::Session&)->Generator& {
  assert(frame.valid()&&frame==active);let state:FrameState& =frames[frame.slot-1];
  let registered_ref .=state.generator;let session_ref .=state.session;assert(registered_ref&&session_ref);let registered:Generator& =registered_ref;let registered_session:blot_eval_core_eval::Session& =session_ref;
