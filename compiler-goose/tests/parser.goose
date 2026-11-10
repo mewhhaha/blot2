@@ -133,6 +133,22 @@ fn qualified_named_headers() {
  assert(names.get(tree.value_decl(tree.roots.items[2]).name)=="namespace.member"&&!tree.value_decl(tree.roots.items[3]).function_declaration);
  tree.deinit();names.deinit();
 }
+fn opaque_declarations() {
+ var names,error=blot_parse_symbols::initPooled();assert(error==blot_error::Error.none);
+ var tree,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+ parse_source("type Token is opaque = U32\nprivate type Box a is opaque = { value: a }\ntype Plain = U32\n",names,tree);
+ assert(tree.diagnostics.len==0 && tree.roots.len==3);
+ let token=tree.roots.items[0];let boxed=tree.roots.items[1];let plain=tree.roots.items[2];
+ assert(tree.node(token).tag==blot_parse_ast::tag_data_decl && names.get(tree.node(token).a)=="Token");
+ let token_traits=blot_parse_ast::declaration_traits(tree,token);assert(token_traits.is_opaque && !token_traits.private);
+ let box_traits=blot_parse_ast::declaration_traits(tree,boxed);assert(tree.node(boxed).tag==blot_parse_ast::tag_data_decl && box_traits.is_opaque && box_traits.private);
+ assert(tree.node(plain).tag!=blot_parse_ast::tag_data_decl && !blot_parse_ast::declaration_traits(tree,plain).is_opaque);
+ tree.deinit();
+ var retired,error=blot_parse_ast::initPooled();assert(error==blot_error::Error.none);
+ parse_source("opaque type Token = U32\nconst opaque = 1\n",names,retired);
+ assert(retired.diagnostics.len==1 && retired.diagnostics.items[0].start==0 && retired.roots.len==1);
+ retired.deinit();names.deinit();
+}
 fn main() {
- for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();named_functions();named_local_ambiguity();named_recovery();qualified_named_headers();}
+ for cycle in 0..3 {values();fixities();recovery();staging();depth_limit();named_functions();named_local_ambiguity();named_recovery();qualified_named_headers();opaque_declarations();}
 }

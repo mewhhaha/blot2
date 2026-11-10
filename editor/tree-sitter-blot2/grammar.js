@@ -39,6 +39,7 @@ export default grammar({
         $.staging_marker,
         $.where_clause,
         $.contract_header,
+        $.opaque_header,
         $.implementation_header,
         $.parenthesized,
         $.bracketed,
@@ -247,6 +248,7 @@ export default grammar({
     // keyword: `const where` and `func where =>` remain ordinary identifiers.
     where_clause: ($) => prec(4, seq("where", $.braced)),
     contract_header: ($) => prec(4, seq("is", "contract", "=")),
+    opaque_header: ($) => prec(4, seq("is", "opaque", "=")),
     implementation_header: ($) =>
       prec(
         4,
@@ -265,7 +267,6 @@ export default grammar({
         2,
         seq(
           optional(alias("private", $.private_modifier)),
-          optional(alias("opaque", $.opaque_modifier)),
           choice("type", "data"),
           field("name", $.type_identifier),
           optional(field("parameter", $._type_parameter)),

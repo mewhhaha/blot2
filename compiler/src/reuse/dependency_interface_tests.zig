@@ -537,7 +537,7 @@ test "decoded malformed Core declines before symbols or interface are published"
 }
 
 const abstraction_producer =
-    \\opaque type Token = U32
+    \\type Token is opaque = U32
     \\private const offset = 1
     \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
     \\const read: Token -> U32 = func ($Token value) => return value
@@ -1281,7 +1281,7 @@ const callable_container_producer =
     \\const alias = func unused => return func retained => return do:
     \\  let version = retained
     \\  break {nested: #[version]}
-    \\opaque type Wrapper a = a
+    \\type Wrapper a is opaque = a
     \\const wrap = func unused => return func retained => return $Wrapper retained
     \\const unwrap = func unused => return func wrapped => return case wrapped of
     \\  $Wrapper retained => retained

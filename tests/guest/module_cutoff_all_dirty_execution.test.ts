@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 const producer = (offset: number) =>
-  `opaque type Token = U32
+  `type Token is opaque = U32
 private const offset = ${offset}
 const make: U32 -> Token = func value => return $Token (@u32.add value offset)
 const read: Token -> U32 = func ($Token value) => return value

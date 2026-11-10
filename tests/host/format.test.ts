@@ -147,8 +147,8 @@ const apply:(state:State a)->((Unit->a!{state.get|e})->a!{state.get|e})=func inp
 
 Deno.test("formatter preserves private opaque forwarding and constructor lambda syntax", async () => {
   const source = `export {Token as Ticket, make} from "./tokens"
-private opaque type Token=F32
-opaque type Box a={value:a}
+private type Token is opaque=F32
+type Box a is opaque={value:a}
 private type Alias=U32
 private type Choice is data= $Choice U32
 private type Read a is contract={type_rep a}
@@ -164,7 +164,7 @@ export {Box} from "./tokens"
   const formatted = await formatSource(source);
   equal(await formatSource(formatted), formatted);
   equal(await formatSource(source.replaceAll("\n", "\r\n")), formatted);
-  equal(formatted.includes("private opaque type Token = F32"), true);
+  equal(formatted.includes("private type Token is opaque = F32"), true);
   equal(formatted.includes("func ($Box value)"), true);
   equal(formatted.includes("func ((left, right))"), true);
   equal(
@@ -191,7 +191,7 @@ Deno.test({
         [entry]:
           'import {make} from "./tokens"\nimport * as facade from "./facade"\ntype Alias=facade.Ticket\nentry const answer=func (value:F32)=> return facade.read (make value)\nentry const folded=facade.read (make 40.0)\n',
         [`${directory}/tokens.blot`]:
-          "opaque type Token=F32\nprivate const offset=2.0\nconst make:F32->Token=func value=> return $Token (@f32.add value offset)\nconst read:Token->F32=func ($Token value)=> return value\nprivate const Token.hidden=read\n",
+          "type Token is opaque=F32\nprivate const offset=2.0\nconst make:F32->Token=func value=> return $Token (@f32.add value offset)\nconst read:Token->F32=func ($Token value)=> return value\nprivate const Token.hidden=read\n",
         [`${directory}/facade.blot`]:
           'export {Token as Ticket,read} from "./tokens"\n',
       };

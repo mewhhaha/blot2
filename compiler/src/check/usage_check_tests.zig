@@ -761,16 +761,16 @@ test "usage nominal payload affinity follows closed owning fields and nested fam
     try law("type Box is data = $Box (unique U32)\nconst duplicate = func (owner: Box) => return (owner, owner)\n", .use_after_move);
     try law("type Box is data = $Box (unique U32)\ntype Outer is data = $Outer Box\nconst duplicate = func (owner: Outer) => return (owner, owner)\n", .use_after_move);
     try law("type Box is data = $Box (unique U32)\nconst bad = func (owner: shared Box) => return owner\n", .usage_evidence_mismatch);
-    try law("opaque type Box = unique U32\nconst move = func (owner: Box) => return owner\n", null);
+    try law("type Box is opaque = unique U32\nconst move = func (owner: Box) => return owner\n", null);
 }
 
 test "usage nominal Core independently reconstructs hidden affinity before allowing moves" {
     try portableControl("type Box is data = $Box (unique U32)\nconst move = func (owner: Box) => return owner\n", .none);
-    try portableControl("opaque type Box = unique U32\nconst move = func (owner: Box) => return owner\n", .none);
+    try portableControl("type Box is opaque = unique U32\nconst move = func (owner: Box) => return owner\n", .none);
 }
 
 fn nominalOwnershipArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "type Box is data = $Box (unique U32)\nopaque type Secret = unique U32\nconst move = func (owner: Box) => return owner\nconst secret = func (owner: Secret) => return owner\n";
+    const source = "type Box is data = $Box (unique U32)\ntype Secret is opaque = unique U32\nconst move = func (owner: Box) => return owner\nconst secret = func (owner: Secret) => return owner\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -1007,7 +1007,7 @@ test "usage nominal phantom package witnesses cannot erase affinity before paylo
 }
 test "usage nominal affinity cannot be lifted across a stage through an opaque payload" {
     try law("type Box is data = $Box (unique U32)\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
-    try law("opaque type Box = unique U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("type Box is opaque = unique U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
 }
 
 test "resource closed aggregate payloads preserve fresh ownership and reject hidden authority" {
@@ -1086,14 +1086,14 @@ test "resource closed aggregate shape walks charge repeated DAG edges to one bud
 }
 
 test "usage nominal repeatable owners still carry lifetime authority across lift and package boundaries" {
-    try law("opaque type Box = shared U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
+    try law("type Box is opaque = shared U32\nconst make = func (value: Box) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
     try law("type Box is data = $Box (shared U32)\ntype Outer is data = $Outer Box\nconst make = func (value: Outer) => return @code.quote (@code.lift value)\n", .cross_stage_authority);
-    try law("opaque type Box = shared U32\nconst hide = func (value: Box) => return pack [Box] value as exists [a] => a\n", .usage_evidence_mismatch);
-    try portableControl("opaque type Box = shared U32\nconst duplicate = func (value: Box) => return (value, value)\n", .none);
+    try law("type Box is opaque = shared U32\nconst hide = func (value: Box) => return pack [Box] value as exists [a] => a\n", .usage_evidence_mismatch);
+    try portableControl("type Box is opaque = shared U32\nconst duplicate = func (value: Box) => return (value, value)\n", .none);
 }
 
 fn repeatableNominalArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "type Box is data = $Box (shared U32)\nopaque type Hidden = shared U32\nconst phantom = pack [U32] () as exists [a] => Unit\n";
+    const source = "type Box is data = $Box (shared U32)\ntype Hidden is opaque = shared U32\nconst phantom = pack [U32] () as exists [a] => Unit\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);
@@ -1143,14 +1143,14 @@ test "usage nominal repeatable lifetime metadata independently rejects erasure a
 
 test "resource nominal closed storage owns fresh constructor payloads without hidden authority" {
     try portableControl("type Box[a] is data = $Box a\nconst run = func () => return @resource.scope (func () => return $Box 7) (func owner => return ()) (func loan => return 42)\n", .none);
-    try portableControl("opaque type Box = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return $Box {left: 7, right: #[1, 2]}) (func owner => return ()) (func loan => return 42)\n", .none);
-    try law("opaque type Box = Unit -> U32\nconst run = func () => return @resource.scope (func () => return $Box (func () => return 7)) (func owner => return ()) (func loan => return ())\n", .cleanup_not_safe);
+    try portableControl("type Box is opaque = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return $Box {left: 7, right: #[1, 2]}) (func owner => return ()) (func loan => return 42)\n", .none);
+    try law("type Box is opaque = Unit -> U32\nconst run = func () => return @resource.scope (func () => return $Box (func () => return 7)) (func owner => return ()) (func loan => return ())\n", .cleanup_not_safe);
     try portableControl("type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)\nconst run = func () => return @resource.scope (func () => return $Branch ($Leaf 7, $Leaf 9)) (func owner => return ()) (func loan => return 42)\n", .none);
     try portableControl("const run = func () => return do:\n  let owner: unique {left: U32, right: Array U32} = {right: #[1, 2], left: 7}\n  break @usage.borrow owner (func loan => return 42)\n", .none);
 }
 
 fn closedNominalArtifact(a: std.mem.Allocator, corrupt: bool) !void {
-    const source = "type Box[a] is data = $Box a\nopaque type Secret = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return $Box 7) (func owner => return ()) (func loan => return 42)\nconst secret = func () => return @resource.scope (func () => return $Secret {right: #[1, 2], left: 7}) (func owner => return ()) (func loan => return 42)\n";
+    const source = "type Box[a] is data = $Box a\ntype Secret is opaque = {left: U32, right: Array U32}\nconst run = func () => return @resource.scope (func () => return $Box 7) (func owner => return ()) (func loan => return 42)\nconst secret = func () => return @resource.scope (func () => return $Secret {right: #[1, 2], left: 7}) (func owner => return ()) (func loan => return 42)\n";
     var pool: symbols.Pool = .{};
     defer pool.deinit(a);
     var tokens = try lexer.lex(a, source);

@@ -537,11 +537,11 @@ test "editor completion follows named aliases namespace boundaries fields constr
 
 test "module abstraction completion keeps source origins without exposing constructors or fields" {
     const a = std.testing.allocator;
-    const library = "opaque type Token = { secret: U32 }\nprivate const hidden = 7\nconst make = func value => return $Token { secret: value }\n";
+    const library = "type Token is opaque = { secret: U32 }\nprivate const hidden = 7\nconst make = func value => return $Token { secret: value }\n";
     for ([_][]const u8{
         "import * as lib from \"./library\"\nconst work = lib.",
         "import {Token} from \"./library\"\nconst work = func (value: Token) => return value.",
-        "opaque type Token = U32\nconst work = To",
+        "type Token is opaque = U32\nconst work = To",
     }, 0..) |text, index| {
         var snapshot = try inputs.Snapshot.initWithSources(a, std.testing.io, .{}, &.{
             .{ .path = "/editor/main.blot", .contents = text },

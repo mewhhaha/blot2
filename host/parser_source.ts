@@ -39,6 +39,13 @@ export function parserSource(
     );
     position = right;
   };
+  const reservedMarker = (token: PreparedSource["tokens"][number]) =>
+    new SourceError(
+      "reserved_declaration_marker",
+      "Use ordinary declaration spellings",
+      prepared.originalOffsets[token.span.start],
+      prepared.originalOffsets[token.span.end],
+    );
   let moduleDeclaration = false;
   let declarationStart = true;
   let delimiters = 0;
@@ -67,23 +74,14 @@ export function parserSource(
     // Same-width markers preserve original CST text and source offsets.
     const topLevel = delimiters === 0 && indentation === 0;
     if (topLevel && declarationStart) {
-      if (["privatE", "opaquE", "exporT", "impL"].includes(token.text)) {
-        throw new SourceError(
-          "reserved_declaration_marker",
-          "Use ordinary declaration spellings",
-          prepared.originalOffsets[token.span.start],
-          prepared.originalOffsets[token.span.end],
-        );
+      if (["privatE", "exporT", "impL"].includes(token.text)) {
+        throw reservedMarker(token);
       }
       if (token.text === "private") {
         replace(token.span.end - 1, token.span.end, "E");
       } else {
         declarationStart = false;
         if (
-          token.text === "opaque" && prepared.tokens[index + 1]?.text === "type"
-        ) {
-          replace(token.span.end - 1, token.span.end, "E");
-        } else if (
           token.text === "export" && prepared.tokens[index + 1]?.text === "{"
         ) {
           replace(token.span.end - 1, token.span.end, "T");
@@ -91,6 +89,13 @@ export function parserSource(
         } else if (token.text === "impl") {
           replace(token.span.end - 1, token.span.end, "L");
         } else if (token.text === "import") moduleDeclaration = true;
+      }
+    }
+    // `is` occurs only in type headers, where `opaque` names the kind.
+    if (prepared.tokens[index - 1]?.text === "is") {
+      if (token.text === "opaquE") throw reservedMarker(token);
+      if (token.text === "opaque") {
+        replace(token.span.end - 1, token.span.end, "E");
       }
     }
     if (token.text === "\uE000" && topLevel) {

@@ -56,7 +56,7 @@ entry const answer = func () => return do:
   break #[value, left, right, again]
 `;
         const library = (value: number, step: number) =>
-          `opaque type Token = U32
+          `type Token is opaque = U32
 const make = func () => return $Token ${value}
 const read = func (value: Token) => return case value of
   $Token number => number

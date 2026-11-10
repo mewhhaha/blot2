@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
 const producer = (offset: number) =>
-  `opaque type Token = F32
+  `type Token is opaque = F32
 private const offset = ${offset}.0
 const make: F32 -> Token = func value => return $Token (@f32.add value offset)
 const read: Token -> F32 = func ($Token value) => return value
@@ -162,7 +162,7 @@ Deno.test("opaque generic field requirements cannot derive hidden producer paylo
   try {
     await Deno.writeTextFile(
       `${directory}/library.blot`,
-      "opaque type Box = {value:U32}\nconst make = func value => return $Box {value:value}\n",
+      "type Box is opaque = {value:U32}\nconst make = func value => return $Box {value:value}\n",
     );
     await Deno.writeTextFile(
       entry,
@@ -196,7 +196,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
     );
     await Deno.writeTextFile(
       library,
-      "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n",
+      "type Token is opaque = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n",
     );
     const retained = await createZigProjectCompiler(options);
     try {
@@ -204,7 +204,7 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
       assert(scalar.success, JSON.stringify(scalar));
       await Deno.writeTextFile(
         library,
-        "opaque type Token = {word: U32}\nconst make: U32 -> Token = func value => return $Token {word: value}\nconst read: Token -> U32 = func ($Token value) => return value.word\n",
+        "type Token is opaque = {word: U32}\nconst make: U32 -> Token = func value => return $Token {word: value}\nconst read: Token -> U32 = func ($Token value) => return value.word\n",
       );
       const reference = await retained.build();
       assert(reference.success, JSON.stringify(reference));

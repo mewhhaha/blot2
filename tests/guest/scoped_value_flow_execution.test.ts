@@ -26,7 +26,7 @@ const keep = func unused => return func (state: State a) => return {callbacks: #
 const aliases = func unused => return func retained => return do:
   let version = retained
   break {nested: #[version]}
-opaque type Wrapper a = a
+type Wrapper a is opaque = a
 const wrap = func unused => return func retained => return $Wrapper retained
 const unwrap = func unused => return func wrapped => return case wrapped of
   $Wrapper retained => retained

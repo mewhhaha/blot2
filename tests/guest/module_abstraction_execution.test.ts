@@ -1,9 +1,9 @@
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 const scalarSource = `
-opaque type Count = U32
-opaque type Floating = F32
-opaque type Box a = a
+type Count is opaque = U32
+type Floating is opaque = F32
+type Box a is opaque = a
 const make_count: U32 -> Count = func value => return $Count value
 const read_count: Count -> U32 = func ($Count value) => return value
 const make_floating: F32 -> Floating = func value => return $Floating value
@@ -52,8 +52,8 @@ for (const asynchronous of [false, true]) {
 Deno.test("opaque reference storage keeps representation aliases and projections", async () => {
   await compileAndRun(
     `
-opaque type Box a = { value: a }
-opaque type Wrapped a = Array a
+type Box a is opaque = { value: a }
+type Wrapped a is opaque = Array a
 const make = func value => return $Box { value: value }
 const read = func ($Box value) => return value.value
 const field = func value => return value.value
@@ -77,7 +77,7 @@ entry const shared = func (value: U32) => return do:
 Deno.test("opaque callback captures preserve effects and scalar wrapping adds no guest heap", async () => {
   await compileAndRun(
     `
-opaque type Token = U32
+type Token is opaque = U32
 const make: U32 -> Token = func value => return $Token value
 const read: Token -> U32 = func ($Token value) => return value
 private entry const run = func (value: U32) => return read (make value)
@@ -96,7 +96,7 @@ private entry const run = func (value: U32) => return read (make value)
   );
   await compileAndRun(
     `
-opaque type Callback a = a
+type Callback a is opaque = a
 const wrap = $Callback
 const unwrap = func ($Callback value) => return value
 entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
@@ -123,13 +123,13 @@ entry const run = func (host: U32 -> U32 ! {Foreign}) => return do:
 Deno.test("opaque structured generic parameters and staged aggregate words preserve F32 storage", async () => {
   await compileAndRun(
     `
-opaque type First [left, right] = left
-opaque type Second {left, right} = right
+type First [left, right] is opaque = left
+type Second {left, right} is opaque = right
 const first: F32 -> First [F32,U32] = $First
 const read_first = func ($First value) => return value
 const second: F32 -> Second {left:U32,right:F32} = $Second
 const read_second = func ($Second value) => return value
-opaque type Float = F32
+type Float is opaque = F32
 const floats = #[$Float 40.0, $Float 2.5]
 const read = func ($Float value) => return value
 entry const tuple = func (value: F32) => return read_first (first value)

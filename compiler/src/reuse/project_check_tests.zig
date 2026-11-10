@@ -614,7 +614,7 @@ test "generated monadic progress preserves designated prelude identity through l
 
 test "module abstraction public opaque factories hide constructor and representation" {
     const producer =
-        \\opaque type Token = U32
+        \\type Token is opaque = U32
         \\private const offset = 1
         \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
         \\const read: Token -> U32 = func ($Token value) => return value
@@ -655,7 +655,7 @@ test "module abstraction private named imports and associated declarations stay 
 
 test "module abstraction selective forwarding preserves type and value producers" {
     var fixture = try Fixture.init(&.{
-        .{ .name = "tokens.blot", .text = "opaque type Token = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n" },
+        .{ .name = "tokens.blot", .text = "type Token is opaque = U32\nconst make: U32 -> Token = func value => return $Token value\nconst read: Token -> U32 = func ($Token value) => return value\n" },
         .{ .name = "facade.blot", .text = "export { Token as Ticket, make, read } from \"./tokens\"\n" },
         .{ .name = "outward.blot", .text = "export { Ticket, make, read } from \"./facade\"\n" },
         .{ .name = "main.blot", .text = "import * as outward from \"./outward\"\nconst direct: outward.Ticket = outward.make 42\nentry const answer = outward.read direct\n" },
@@ -669,7 +669,7 @@ test "module abstraction selective forwarding preserves type and value producers
 
 test "module abstraction public signatures cannot escape private identities" {
     for ([_][]const u8{
-        "private opaque type Secret = U32\nconst leak: Secret = $Secret 42\n",
+        "private type Secret is opaque = U32\nconst leak: Secret = $Secret 42\n",
         "private type Secret is data = $Secret U32\nconst leak = $Secret 42\n",
         "private type Reader is effect = Unit -> U32\nconst leak = func () => return Reader ()\n",
     }) |source| {
@@ -682,7 +682,7 @@ test "module abstraction public signatures cannot escape private identities" {
 }
 
 test "module abstraction opaque import aliases cannot construct project or coerce" {
-    const producer = "opaque type Token = { value: U32 }\nconst make: U32 -> Token = func value => return $Token { value: value }\n";
+    const producer = "type Token is opaque = { value: U32 }\nconst make: U32 -> Token = func value => return $Token { value: value }\n";
     for ([_]struct { text: []const u8, code: []const u8 }{
         .{ .text = "import { Token, make } from \"./producer\"\nentry const answer = (make 42).value\n", .code = "private_access" },
         .{ .text = "import { Token as Ticket } from \"./producer\"\nentry const answer = $Ticket { value: 42 }\n", .code = "private_access" },
@@ -700,8 +700,8 @@ test "module abstraction opaque import aliases cannot construct project or coerc
 
 test "module abstraction nominal identity ignores unrelated declaration insertion" {
     for ([_][]const u8{
-        "opaque type Token = U32\nconst make = $Token\n",
-        "private const inserted = 7\nopaque type Token = U32\nconst make = $Token\n",
+        "type Token is opaque = U32\nconst make = $Token\n",
+        "private const inserted = 7\ntype Token is opaque = U32\nconst make = $Token\n",
     }) |text| {
         var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text = text }});
         defer fixture.deinit();
@@ -720,7 +720,7 @@ test "module abstraction nominal identity ignores unrelated declaration insertio
 test "module abstraction private helpers remain usable in public factory bodies" {
     var fixture = try Fixture.init(&.{.{ .name = "main.blot", .text =
         \\private const identity = func value => return value
-        \\opaque type Token a = a
+        \\type Token a is opaque = a
         \\const make = func value => return $Token (identity value)
         \\const read = func ($Token value) => return value
         \\entry const answer = read (make 42)
@@ -732,7 +732,7 @@ test "module abstraction private helpers remain usable in public factory bodies"
 }
 
 test "module abstraction distinct producers namespace privacy and reexports cannot bypass access" {
-    const producer = "opaque type Token = U32\nprivate const hidden = 42\nconst make = $Token\nprivate const Token.hidden = func ($Token value) => return value\n";
+    const producer = "type Token is opaque = U32\nprivate const hidden = 42\nconst make = $Token\nprivate const Token.hidden = func ($Token value) => return value\n";
     for ([_]struct { source: []const u8, code: []const u8 }{
         .{ .source = "import * as producer from \"./producer\"\nentry const answer = producer.hidden\n", .code = "unknown_value" },
         .{ .source = "export { hidden } from \"./producer\"\nentry const answer = 42\n", .code = "unknown_export" },

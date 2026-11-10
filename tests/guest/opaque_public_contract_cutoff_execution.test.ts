@@ -6,7 +6,7 @@ const executable = Deno.args[0];
 assert(executable);
 const header = "type Public a is contract = {type_rep a}\n";
 for (const usedContract of [false, true]) {
-  const body = "opaque type Token = U32\n" +
+  const body = "type Token is opaque = U32\n" +
     (usedContract
       ? "const keep: a -> a where {Public a} = func value => return value\n"
       : "") +

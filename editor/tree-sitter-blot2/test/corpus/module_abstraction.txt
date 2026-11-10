@@ -2,8 +2,8 @@
 Privacy opacity forwarding and constructor parameters
 ==================
 
-private opaque type Token = U32
-opaque type Box a = { value: a }
+private type Token is opaque = U32
+type Box a is opaque = { value: a }
 private type Alias = U32
 private type Protocol a is contract = { type_rep a }
 private effect Hidden: Unit -> U32
@@ -16,15 +16,13 @@ export { Token as Ticket, read } from "./tokens"
 (source_file
   (type_header
     (private_modifier)
-    (opaque_modifier)
     (type_identifier))
-  (operator)
+  (opaque_header)
   (type_identifier)
   (type_header
-    (opaque_modifier)
     (type_identifier)
     (type_parameter))
-  (operator)
+  (opaque_header)
   (braced
     (record_field
       (identifier))

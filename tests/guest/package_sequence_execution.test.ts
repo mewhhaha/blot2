@@ -182,7 +182,7 @@ entry const answer = func (value: U32) => return read (make value)
 });
 Deno.test("package adapters preserve opaque nominal erasure across scalar and abstract payload layouts", async () => {
   await compileAndRun(
-    `opaque type Box a = a
+    `type Box a is opaque = a
 type Item = exists [a] => (Box a, Box a -> U32)
 const make: U32 -> Item = func value => return pack [U32] ($Box value, func (box: Box U32) => return case box of
   $Box inner => inner
@@ -239,7 +239,7 @@ const nominal: U32 -> Nominal = func value => return pack [Array U32] (if @u32.e
   $Link (head, tail) => @array.get head 0
 ) as Nominal
 entry const tagged = func (value: U32) => return unpack (nominal value) as [a] body in (@product.get body 1) (@product.get body 0)
-opaque type Box a = a
+type Box a is opaque = a
 type Opaque = exists [a] => (Box a, Box a -> U32)
 const opaque: U32 -> Opaque = func value => return pack [Array U32] ($Box (@array.fill 3 value), func box => return case box of
   $Box inner => @array.get inner 2

@@ -32,7 +32,7 @@ const producer = (storage: Storage, parameter = "value") => {
     : storage === "renamed_record"
     ? "value.renamed"
     : "value";
-  return `opaque type Token = ${representation}
+  return `type Token is opaque = ${representation}
 private const offset = 2
 const make: U32 -> Token = func ${parameter} => return $Token (${payload})
 const read: Token -> U32 = func ($Token value) => return ${observed}
@@ -48,7 +48,7 @@ const transform = func (value: U32) => return (readers[@u32.rem value 2]) ((fact
 const main = `import {transform} from "./bridge"
 entry const answer = func (value: U32) => return transform value
 `;
-const carrier = `opaque type Envelope = Token
+const carrier = `type Envelope is opaque = Token
 const pack = func value => return $Envelope (make value)
 const unpack = func ($Envelope value) => return read value
 const factories = #[pack, func value => return pack value]
@@ -290,12 +290,12 @@ for (const codegenTier of ["development", "optimized"] as const) {
         const bridgeSource = scenario === "module"
           ? `import {Token, make, read} from "./tokens"\n${carrier}const transform = carry\n`
           : bridge +
-            (scenario === "unrelated" ? "opaque type Unrelated = U32\n" : "");
+            (scenario === "unrelated" ? "type Unrelated is opaque = U32\n" : "");
         const entrySource = scenario === "entry"
           ? `import {transform} from "./bridge"\nimport {Token, make, read} from "./tokens"\n${carrier}entry const answer = carry\n`
           : main +
             (scenario === "unrelated_entry"
-              ? "opaque type Unrelated = U32\nopaque type Nested = Unrelated\n"
+              ? "type Unrelated is opaque = U32\ntype Nested is opaque = Unrelated\n"
               : "");
         await Deno.writeTextFile(entry, entrySource);
         await Deno.writeTextFile(`${directory}/bridge.blot`, bridgeSource);

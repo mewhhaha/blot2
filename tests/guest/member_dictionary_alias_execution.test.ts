@@ -115,7 +115,7 @@ Deno.test("associated type equations cannot erase direct or opaque shared owners
     const source of [
       `type Source a is contract = { type Item }
 impl Number : Source U32 = { type Item = unique U32 }`,
-      `opaque type Hidden = shared U32
+      `type Hidden is opaque = shared U32
 type Source a is contract = { type Item }
 impl Number : Source U32 = { type Item = Hidden }`,
       `type Hidden is data = $Hidden (shared U32)

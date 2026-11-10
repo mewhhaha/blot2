@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0];
 assert(executable);
-const initial = "opaque type Token = U32\nopaque type Other = U32\n" +
+const initial = "type Token is opaque = U32\ntype Other is opaque = U32\n" +
   "const make: U32 -> Token = func value => return $Token value\n" +
   "const make_other: U32 -> Other = func value => return $Other value\n" +
   "const Token.read: Token -> U32 = func ($Token value) => return value\n" +

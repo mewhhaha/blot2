@@ -1422,15 +1422,16 @@ Imports precede declarations: `import * as math from "./math"` or
 `import { Point as Position, distance } from "./geometry"`. Relative paths may
 omit `.blot`; the CLI maps `std/` to the source library. Cycles are errors.
 Top-level declarations are public by default. `private` before a value, alias,
-data, contract, effect or named function declaration keeps its name inside its defining module;
+data, opaque, contract, effect or named function declaration keeps its name inside its defining module;
 constructors and operations inherit that visibility. `private entry func` keeps
 the host export while hiding the Blot import. Importing a type does not import
 differently named constructors. Imported operator functions need local fixity
 declarations. `export { answer as forwarded, Token } from "./producer"` forwards
 selected public names while retaining their original producer and kind.
 
-`opaque type Token = U32` declares a nominal type with one private constructor,
-`$Token`. The producer can construct and match it, including
+`type Token is opaque = U32` declares a nominal type with one private
+constructor, `$Token`. `opaque` takes the kind position used by `data`,
+`contract` and `effect`. The producer can construct and match it, including
 `func ($Token value) => return value`, and inspect record representation fields.
 Callers use public factories, observers and associated declarations; aliases and
 type witnesses preserve opacity. Token remains distinct from U32 inside its

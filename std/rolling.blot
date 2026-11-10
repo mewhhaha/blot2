@@ -6,7 +6,7 @@ func fold step -> initial -> (width: U32) -> values => return do:
     break @panic "rolling requires a positive width"
   break iter.map (iter.fold_left step initial) (iter.windows width values)
 
-opaque type Monoid [i, s, f] = {
+type Monoid [i, s, f] is opaque = {
   width: U32,
   cursor: i,
   combine: f,
@@ -32,7 +32,7 @@ func Monoid.next (state: Monoid [i, s, f]) => return case state.window of
     let summarized = tree.shift state.combine value previous
     break $Some (tree.total state.identity summarized, $Monoid { width: state.width, cursor: rest, combine: state.combine, identity: state.identity, window: $Some summarized })
 
-opaque type Group [i, s, f, g] = {
+type Group [i, s, f, g] is opaque = {
   width: U32,
   cursor: i,
   combine: f,

@@ -27,8 +27,9 @@ the host can invoke main, while another Blot module cannot import it. `private`
 precedes `entry`; repeated or misplaced modifiers reject at the modifier. No
 public modifier or export list is required for existing programs. Imported
 modules retain the existing prohibition on entry declarations. The new words
-`private`, `opaque` and `export` are contextual at declaration starts; ordinary
-identifier uses remain legal. Privacy introduces no runtime check.
+`private` and `export` are contextual at declaration starts, and `opaque` is
+contextual after `is` in a type header; ordinary identifier uses remain legal.
+Privacy introduces no runtime check.
 
 An importer can see only the producer's public names through named or namespace
 imports. A namespace exposes that public table, including public types,
@@ -68,12 +69,13 @@ producer locations.
 
 ## Opaque representations
 
-Add an opaque nominal declaration, with the existing type-parameter syntax:
+Add an opaque nominal declaration, with the existing type-parameter syntax and
+the `is` kind position used by `is data`, `is contract` and `is effect`:
 
 ```blot
-opaque type Token = U32
-opaque type Box a = { value: a }
-private opaque type InternalToken = U32
+type Token is opaque = U32
+type Box a is opaque = { value: a }
+private type InternalToken is opaque = U32
 ```
 
 The right side is an ordinary checked representation type. Token and Box are
@@ -87,7 +89,7 @@ Each opaque declaration supplies one private constructor with its type's name.
 Use ordinary constructor application and matching inside the defining module:
 
 ```blot
-opaque type Token = U32
+type Token is opaque = U32
 const make: U32 -> Token = func value => return $Token value
 const read: Token -> U32 = func ($Token value) => return value
 ```
@@ -201,7 +203,7 @@ same public identity:
 
 ```blot
 // tokens.blot
-opaque type Token = U32
+type Token is opaque = U32
 private const offset = 1
 const make: U32 -> Token = func value => return $Token (value + offset)
 const read: Token -> U32 = func ($Token value) => return value
@@ -222,8 +224,8 @@ entry const answer = facade.read forwarded
 
 The result is 42. Importing offset, importing/re-exporting the hidden Token
 constructor, matching `$Token` in main, or passing 42 where Ticket is expected
-must reject at that use. A different module's `opaque type Token = U32` remains
-a distinct type, even through a same-spelled forwarding alias.
+must reject at that use. A different module's `type Token is opaque = U32`
+remains a distinct type, even through a same-spelled forwarding alias.
 
 Changing offset from 1 to 2 preserves each public semantic interface and must
 reuse main's checked semantics. Rebuild executable readers of make so fresh,

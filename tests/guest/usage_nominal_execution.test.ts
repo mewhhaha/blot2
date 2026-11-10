@@ -4,8 +4,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Box is data = $Box (unique U32)
-opaque type Secret = unique U32
-opaque type Shared = shared U32
+type Secret is opaque = unique U32
+type Shared is opaque = shared U32
 const make_box = func (owner: unique U32) => return $Box owner
 const read_box = func ($Box owner) => return @usage.borrow owner (func loan => return @usage.read loan)
 const make_secret = func (owner: unique U32) => return $Secret owner

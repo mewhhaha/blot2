@@ -1408,7 +1408,7 @@ test "unrestricted associated equations reject direct and hidden lifetime author
         "type Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = once (Unit -> U32) }\n",
         "type Source a is contract = { type Item = shared U32 }\n",
         "type Hidden is data = $Hidden (unique U32)\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
-        "opaque type Hidden = shared U32\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
+        "type Hidden is opaque = shared U32\ntype Source a is contract = { type Item }\nimpl Number : Source U32 = { type Item = Hidden }\n",
         "type Hidden is data = $Hidden (shared U32)\ntype Source a is contract = { type Item = Hidden }\n",
         "type Source a is contract = { type Item }\nimpl All a : Source a = { type Item = a }\nconst keep: unique U32 -> (Source.Item (unique U32)) = func value => return value\n",
     };
@@ -1428,7 +1428,7 @@ fn expectAssociatedError(expected: anyerror, result: anytype) !void {
 fn associatedUsageReader(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator,
         \\type Hidden is data = $Hidden (shared U32)
-        \\opaque type Sealed = shared U32
+        \\type Sealed is opaque = shared U32
         \\type Source a is contract = { type Item }
         \\impl Number : Source U32 = { type Item = U32 }
         \\type Fixed a is contract = { type Item = U32 }

@@ -2704,7 +2704,7 @@ test "portable typed staging generic operation rows match permutations and retai
 test "portable typed staging lifts preserve nominal usage authority before executable admission" {
     var module = try lower(a,
         \\type Box is data = $Box U32
-        \\opaque type Other = U32
+        \\type Other is opaque = U32
         \\const lifted = @code.quote (@code.lift ($Box 42))
         \\const sealed = @code.quote (@code.lift ($Other 43))
     );

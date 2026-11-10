@@ -621,6 +621,56 @@ test "implementation contextual headers retain explicit parameters heads prerequ
     }
 }
 
+fn opaqueSyntax(allocator: std.mem.Allocator) !void {
+    const source =
+        \\type Token is opaque = U32
+        \\private type Box a is opaque = { value: a }
+        \\type Pair left => type right is opaque = (left, right)
+        \\private type Alias = U32
+        \\const opaque = func opaque => return opaque
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(allocator);
+    var tree = try parsed(allocator, source, &pool);
+    defer tree.deinit(allocator);
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expectEqual(@as(usize, 5), tree.roots.items.len);
+    for (tree.roots.items[0..3], [_]bool{ false, true, false }) |root, private| {
+        const declaration = tree.node(root);
+        try std.testing.expectEqual(ast.Tag.data_decl, declaration.tag);
+        try std.testing.expectEqual(ast.DeclarationTraits{ .declaration = root, .private = private, .is_opaque = true }, tree.declarationTraits(root));
+        // The representation is the payload of one constructor named like its type.
+        const constructors = tree.children(declaration.b);
+        try std.testing.expectEqual(@as(usize, 1), constructors.len);
+        try std.testing.expectEqual(declaration.a, tree.node(constructors[0]).a);
+        try std.testing.expect(tree.node(constructors[0]).b != 0);
+    }
+    try std.testing.expectEqual(ast.Tag.type_alias_decl, tree.node(tree.roots.items[3]).tag);
+    try std.testing.expectEqual(ast.DeclarationTraits{ .declaration = tree.roots.items[3], .private = true }, tree.declarationTraits(tree.roots.items[3]));
+    try std.testing.expectEqual(ast.Tag.value_decl, tree.node(tree.roots.items[4]).tag);
+    try std.testing.expect(!tree.declarationTraits(tree.roots.items[4]).is_opaque);
+}
+
+test "opaque declarations use the is kind position and reject the retired prefix" {
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, opaqueSyntax, .{});
+    for ([_][]const u8{
+        "opaque type Token = U32\n",
+        "private opaque type Token = U32\n",
+        "type Token is opaque\n",
+        "type Token is opaque data = $Token U32\n",
+        "type Token is opaque = $Token U32\n",
+        "data Token is opaque = U32\n",
+        "type Token is data opaque = U32\n",
+    }) |source| {
+        var pool: symbols.Pool = .{};
+        defer pool.deinit(std.testing.allocator);
+        var tree = try parsed(std.testing.allocator, source, &pool);
+        defer tree.deinit(std.testing.allocator);
+        try std.testing.expect(tree.diagnostics.items.len != 0);
+        try std.testing.expectEqual(@as(usize, 0), tree.declaration_traits.items.len);
+    }
+}
+
 fn usageQualifierSyntax(a: std.mem.Allocator) !void {
     const source =
         \\const unique = 1

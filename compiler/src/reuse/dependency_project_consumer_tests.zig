@@ -437,7 +437,7 @@ test "implementation and associated members preserve compiled forwarding opaque 
         \\entry const answer: Unit -> U32 = func () => return Source.first #[passthrough (read (make 42))]
     ;
     const producer =
-        \\opaque type Token = U32
+        \\type Token is opaque = U32
         \\type Identity a is contract = { type Item = a }
         \\type Tokens is contract = { type Item = Token }
         \\type Source s is contract = { type Item, const first: s -> (Source.Item s) }

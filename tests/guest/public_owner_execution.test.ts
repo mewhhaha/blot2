@@ -8,7 +8,7 @@ import {
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Box a is data = $Box a
-opaque type Secret = {left: U32, right: Array U32}
+type Secret is opaque = {left: U32, right: Array U32}
 type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
 const closed = func () => return @resource.acquire (func () => return $Secret {right: #[8, 9], left: 7}) (func owner => return ())
 const tree = func () => return @resource.acquire (func () => return $Branch ($Leaf 7, $Leaf 9)) (func owner => return ())

@@ -153,7 +153,7 @@ for (const shape of cases) {
   const input = scalar ? type : generic ? "a" : "Array U32";
   const representation = scalar ? type : generic ? "{value:a}" : "Array U32";
   const lib = (opaque: boolean, bonus: number) =>
-    `${opaque ? "opaque " : ""}type ${nominal} = ${representation}
+    `type ${nominal}${opaque ? " is opaque" : ""} = ${representation}
 const make: ${input} -> ${nominal} = func value => return ${
       opaque ? "$Token " : ""
     }${generic ? "{value}" : "value"}

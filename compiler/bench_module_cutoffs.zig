@@ -24,56 +24,56 @@ const entry =
     \\
 ;
 const scalar =
-    \\opaque type Token = U32
+    \\type Token is opaque = U32
     \\private const offset = 2
     \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
     \\const read: Token -> U32 = func ($Token value) => return value
     \\
 ;
 const floating =
-    \\opaque type Token = F32
+    \\type Token is opaque = F32
     \\private const offset = 2
     \\const make: U32 -> Token = func value => return $Token (@u32.to_f32 (@u32.add value offset))
     \\const read: Token -> U32 = func ($Token value) => return @f32.to_u32 value
     \\
 ;
 const reference =
-    \\opaque type Token = Array U32
+    \\type Token is opaque = Array U32
     \\private const offset = 2
     \\const make: U32 -> Token = func value => return $Token #[@u32.add value offset]
     \\const read: Token -> U32 = func ($Token value) => return value[0]
     \\
 ;
 const record =
-    \\opaque type Token = {word: U32}
+    \\type Token is opaque = {word: U32}
     \\private const offset = 2
     \\const make: U32 -> Token = func value => return $Token {word: @u32.add value offset}
     \\const read: Token -> U32 = func ($Token value) => return value.word
     \\
 ;
 const renamed =
-    \\opaque type Token = {renamed: U32}
+    \\type Token is opaque = {renamed: U32}
     \\private const offset = 2
     \\const make: U32 -> Token = func value => return $Token {renamed: @u32.add value offset}
     \\const read: Token -> U32 = func ($Token value) => return value.renamed
     \\
 ;
 const moved =
-    \\opaque type Token = U32
+    \\type Token is opaque = U32
     \\const make: U32 -> Token = func value => return $Token (@u32.add value offset)
     \\const read: Token -> U32 = func ($Token value) => return value
     \\private const offset = 2
     \\
 ;
 const alpha =
-    \\opaque type Token = U32
+    \\type Token is opaque = U32
     \\private const offset = 2
     \\const make: U32 -> Token = func argument => return $Token (@u32.add argument offset)
     \\const read: Token -> U32 = func ($Token argument) => return argument
     \\
 ;
 const generic =
-    \\opaque type Token element = element
+    \\type Token element is opaque = element
     \\private const offset = 2
     \\const make: a -> Token a = func value => return $Token value
     \\const read: Token a -> a = func ($Token value) => return value
@@ -81,7 +81,7 @@ const generic =
     \\
 ;
 const generic_type_alpha =
-    \\opaque type Token payload = payload
+    \\type Token payload is opaque = payload
     \\private const offset = 2
     \\const make: a -> Token a = func value => return $Token value
     \\const read: Token a -> a = func ($Token value) => return value
@@ -89,7 +89,7 @@ const generic_type_alpha =
     \\
 ;
 const generic_scheme_alpha =
-    \\opaque type Token payload = payload
+    \\type Token payload is opaque = payload
     \\private const offset = 2
     \\const make: item -> Token item = func argument => return $Token argument
     \\const read: Token item -> item = func ($Token argument) => return argument
@@ -108,7 +108,7 @@ const generic_bridge =
 const Case = struct { name: []const u8, source: []const u8, expected: u32 = 42 };
 const public_header = "type Public a is contract = {type_rep a}\n";
 const qualified_scalar =
-    \\opaque type Token = U32
+    \\type Token is opaque = U32
     \\private const offset = 2
     \\const keep: a -> a where {Public a} = func value => return value
     \\const make: U32 -> Token = func value => return $Token (keep (@u32.add value offset))
@@ -131,8 +131,8 @@ const public_contract_cases = [_]Case{
     .{ .name = "public_revert", .source = public_header ++ scalar },
 };
 
-const associated_scalar = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst Token.read: Token -> U32 = func ($Token value) => return value\n";
-const associated_alpha = "opaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst Token.read: Token -> U32 = func ($Token item) => return item\n";
+const associated_scalar = "type Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst Token.read: Token -> U32 = func ($Token value) => return value\n";
+const associated_alpha = "type Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst Token.read: Token -> U32 = func ($Token item) => return item\n";
 const associated_bridge = "import {Token, make} from \"./tokens\"\nconst read: Token -> U32 = func token => return token.read\nconst factories = #[make, func value => return make value]\nconst readers = #[read, func value => return read value]\nconst transform = func (value: U32) => return (readers[@u32.rem value 2]) ((factories[@u32.rem value 2]) value)\n";
 const associated_cases = [_]Case{
     .{ .name = "associated_initial", .source = associated_scalar },
@@ -143,20 +143,20 @@ const associated_cases = [_]Case{
 };
 
 const implementation_unused_cases = [_]Case{
-    .{ .name = "implementation_unused_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
-    .{ .name = "implementation_unused_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
-    .{ .name = "implementation_unused_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
-    .{ .name = "implementation_unused_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func item => return @u32.add item 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst read: Token -> U32 = func ($Token item) => return item\n", .expected = 42 },
-    .{ .name = "implementation_unused_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 300,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
-    .{ .name = "implementation_unused_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
+    .{ .name = "implementation_unused_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
+    .{ .name = "implementation_unused_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
+    .{ .name = "implementation_unused_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
+    .{ .name = "implementation_unused_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func item => return @u32.add item 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst read: Token -> U32 = func ($Token item) => return item\n", .expected = 42 },
+    .{ .name = "implementation_unused_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 300,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
+    .{ .name = "implementation_unused_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n", .expected = 42 },
 };
 const implementation_selected_cases = [_]Case{
-    .{ .name = "implementation_selected_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
-    .{ .name = "implementation_selected_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
-    .{ .name = "implementation_selected_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
-    .{ .name = "implementation_selected_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func item => return @u32.add item 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst read: Token -> U32 = func ($Token item) => return Source.first item\n", .expected = 43 },
-    .{ .name = "implementation_selected_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 300,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 342 },
-    .{ .name = "implementation_selected_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\nopaque type Token = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_initial", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_private_binding_insert", .source = "private const unrelated = 99\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_private_catalog_insert", .source = "private type Hidden a is contract = { type Item }\nprivate impl HiddenSource : Hidden F32 = { type Item = F32 }\ntype Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
+    .{ .name = "implementation_selected_alpha", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func item => return @u32.add item 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func item => return $Token (@u32.add item offset)\nconst read: Token -> U32 = func ($Token item) => return Source.first item\n", .expected = 43 },
+    .{ .name = "implementation_selected_body", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 300,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 342 },
+    .{ .name = "implementation_selected_revert", .source = "type Source s is contract = { type Item, const first: s -> (Source.Item s) }\nimpl ScalarSource : Source U32 = {\n  type Item = U32,\n  const first = func value => return @u32.add value 1,\n}\ntype Token is opaque = U32\nprivate const offset = 2\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return Source.first value\n", .expected = 43 },
 };
 
 const cases = [_]Case{
@@ -167,7 +167,7 @@ const cases = [_]Case{
     .{ .name = "private_contract_insert", .source = "private type Hidden a is contract = {type_rep a}\n" ++ scalar },
     .{ .name = "private_binding_move", .source = moved },
     .{ .name = "value_parameter_alpha", .source = alpha },
-    .{ .name = "private_body", .expected = 43, .source = "opaque type Token = U32\nprivate const offset = 3\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n" },
+    .{ .name = "private_body", .expected = 43, .source = "type Token is opaque = U32\nprivate const offset = 3\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n" },
     .{ .name = "opaque_f32", .source = floating },
     .{ .name = "opaque_reference", .source = reference },
     .{ .name = "opaque_record", .source = record },

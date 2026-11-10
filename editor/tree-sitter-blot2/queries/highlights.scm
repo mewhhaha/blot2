@@ -6,7 +6,6 @@
   (#match? @_entry "^entry[ \t]+(const|let)"))
 (entry_binding (binding_keyword) @keyword.storage.type)
 (private_modifier) @variable
-(opaque_modifier) @variable
 ((named_function_header
     (private_modifier)? @keyword.storage.modifier
     (entry_modifier)? @keyword.storage.modifier) @_named_function
@@ -16,13 +15,11 @@
   (#match? @_private "^private[ \t]+(entry[ \t]+)?(const|let)"))
 ((private_effect_header (private_modifier) @keyword.storage.modifier) @_private_effect
   (#match? @_private_effect "^private[ \t]+effect"))
-((type_header . (private_modifier) @keyword.storage.modifier
-    (opaque_modifier)? @keyword.storage.modifier) @_private_type
-  (#match? @_private_type "^private[ \t]+(opaque[ \t]+)?(type|data)"))
-((type_header . (opaque_modifier) @keyword.storage.modifier) @_opaque
-  (#match? @_opaque "^opaque[ \t]+type"))
+((type_header . (private_modifier) @keyword.storage.modifier) @_private_type
+  (#match? @_private_type "^private[ \t]+(type|data)"))
 (where_clause "where" @keyword.control)
 (contract_header "contract" @keyword.storage.type)
+(opaque_header "opaque" @keyword.storage.type)
 (implementation_header "impl" @keyword.storage.type)
 (implementation_header (private_modifier) @keyword.storage.modifier)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive

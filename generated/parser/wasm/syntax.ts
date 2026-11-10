@@ -131,11 +131,11 @@ export type LiteralKind =
   | ","
   | "}"
   | "privatE"
-  | "opaquE"
   | "type"
   | "=>"
-  | "="
   | "is"
+  | "opaquE"
+  | "="
   | "impL"
   | ":"
   | "const"
@@ -475,16 +475,19 @@ export interface ImportBindingCursor extends RuleCursorBase<"import_binding"> {
 }
 
 export interface DeclarationCursor extends RuleCursorBase<"declaration"> {
-  field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor> | null;
-  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor | OpaqueTypeCursor;
+  field(name: "attributes"): ReadonlyArray<DeclarationAttributeCursor>;
+  field(name: "value"): ContractTypeCursor | DataTypeCursor | EffectDeclarationCursor | EffectTypeCursor | ImplementationDeclarationCursor | NamedFixityCursor | NamedFunctionDeclarationCursor | OpaqueTypeCursor | SymbolicFixityCursor | TypeAliasCursor | ValueDeclarationCursor;
   field(name: "visibility"): TokenCursor<"literal", "privatE"> | null;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 
 export interface OpaqueTypeCursor extends RuleCursorBase<"opaque_type"> {
-  field(name: "value"): TypeAliasCursor;
+  field(name: "name"): TokenCursor<"named", "TYPE_IDENT">;
+  field(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
+  field(name: "value"): TypeExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: "parameters"): ReadonlyArray<TypeAtomCursor | TypeAtomCursor | null>;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
 

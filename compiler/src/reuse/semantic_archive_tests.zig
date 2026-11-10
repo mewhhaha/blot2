@@ -468,7 +468,7 @@ test "persisted typed staging reconstructs nominal constructor substitutions and
 
 test "persisted typed staging opaque record lifts preserve whole producer payloads through OOM" {
     const text =
-        \\opaque type Token = {item: U32}
+        \\type Token is opaque = {item: U32}
         \\private const make = func (number: U32) => return $Token {item: number}
         \\private const open = func (token: Token) => return case token of
         \\  $Token payload => payload.item

@@ -9,7 +9,7 @@ import {
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
-opaque type Secret = {items: Array U32, nonce: U32}
+type Secret is opaque = {items: Array U32, nonce: U32}
 const record = func (drop: cleanup ((unique {items: Array U32, nonce: U32}) -> Unit ! {Foreign})) => return @resource.scope (func () => return {nonce: 7, items: #[1, 2]}) drop (func loan => return 42)
 const product = func (drop: cleanup ((unique (U32, Array F32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return (7, #[1.5, 2.5])) drop (func loan => return 42)
 const listed = func (drop: cleanup ((unique (List U32)) -> Unit ! {Foreign})) => return @resource.scope (func () => return [1, 2, 3]) drop (func loan => return 42)

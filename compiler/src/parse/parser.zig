@@ -249,15 +249,11 @@ const Parser = struct {
                 return self.fail(.unexpected_token);
             }
         }
-        if (self.word("opaque") and self.peek(1) == .kw_type) {
-            is_opaque = true;
-            _ = self.advance();
-        }
         if (self.word("export") and self.peek(1) == .l_brace) {
-            if (private or is_opaque) return self.fail(.unexpected_token);
+            if (private) return self.fail(.unexpected_token);
             return self.importDecl(true);
         }
-        const id = try self.declarationBody(declarations_seen, body_declarations_seen, is_opaque);
+        const id = try self.declarationBody(declarations_seen, body_declarations_seen, &is_opaque);
         if (private or is_opaque) {
             const tag = self.tree.node(id).tag;
             if (tag == .import_decl or tag == .fixity_decl) return self.fail(.unexpected_token);
@@ -265,7 +261,7 @@ const Parser = struct {
         }
         return id;
     }
-    fn declarationBody(self: *Parser, declarations_seen: bool, body_declarations_seen: bool, is_opaque: bool) Error!Id {
+    fn declarationBody(self: *Parser, declarations_seen: bool, body_declarations_seen: bool, is_opaque: *bool) Error!Id {
         _ = body_declarations_seen;
         self.declaration_origin = .{ .start = self.current().start, .end = self.current().end };
         if (self.depth == 0) self.collection_names = 0;
@@ -290,7 +286,7 @@ const Parser = struct {
             return self.fixityDecl(attrs, start);
         }
         if (self.word("impl")) {
-            if (is_opaque or attrs.len != 0) return self.fail(.unexpected_token);
+            if (attrs.len != 0) return self.fail(.unexpected_token);
             return self.implementationDeclaration(start);
         }
         if (self.at(.kw_type) or self.at(.kw_data)) return self.typeDeclaration(attrs, start, is_opaque);
@@ -402,7 +398,7 @@ const Parser = struct {
         try self.tree.operator_origins.append(self.allocator, .{ .node = id, .span = target_span });
         return id;
     }
-    fn typeDeclaration(self: *Parser, attrs: ast.List, start: u32, is_opaque: bool) Error!Id {
+    fn typeDeclaration(self: *Parser, attrs: ast.List, start: u32, is_opaque: *bool) Error!Id {
         const old_data = self.eat(.kw_data);
         if (!old_data) _ = try self.expect(.kw_type);
         const name = try self.typeIdentifier();
@@ -416,14 +412,8 @@ const Parser = struct {
         if (!old_data and self.eat(.equal)) {
             const body = try self.typeExpression();
             const range = try self.list(params.items);
-            if (is_opaque) {
-                const constructor = try self.add(.constructor_ref, name, body, 0, start);
-                const constructors = try self.listNode(.constructors, &.{constructor}, start);
-                return self.add(.data_decl, name, constructors, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
-            }
             return self.add(.type_alias_decl, name, body, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
         }
-        if (is_opaque) return self.fail(.expected_token);
         var effect = false;
         if (!old_data) {
             _ = try self.expect(.kw_is);
@@ -433,6 +423,18 @@ const Parser = struct {
                 const body = try self.predicateBody(self.current().start, true);
                 const range = try self.list(params.items);
                 return self.add(.contract_decl, name, body.node, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
+            }
+            // An opaque representation is data with one private constructor
+            // spelled like its type.
+            if (self.word("opaque")) {
+                _ = self.advance();
+                _ = try self.expect(.equal);
+                const body = try self.typeExpression();
+                const range = try self.list(params.items);
+                const constructor = try self.add(.constructor_ref, name, body, 0, start);
+                const constructors = try self.listNode(.constructors, &.{constructor}, start);
+                is_opaque.* = true;
+                return self.add(.data_decl, name, constructors, try self.extra(&.{ range.start, range.len, attrs.start, attrs.len }), start);
             }
             if (self.eat(.kw_effect)) effect = true else _ = try self.expect(.kw_data);
         }

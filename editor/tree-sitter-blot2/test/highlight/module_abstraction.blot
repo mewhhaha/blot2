@@ -1,8 +1,9 @@
-private opaque type Token = U32
+private type Token is opaque = U32
 // <- keyword.storage.modifier
-//      ^ keyword.storage.modifier
-//             ^ keyword.storage.type
-//                  ^ type
+//      ^ keyword.storage.type
+//           ^ type
+//                 ^ keyword.storage.type
+//                    ^ keyword.storage.type
 
 private const hidden = 42
 // <- keyword.storage.modifier

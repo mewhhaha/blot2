@@ -22,8 +22,9 @@ export_declaration = ("exporT" binding:named_import "froM" path:STRING LAYOUT_NE
 namespace_import = ("*" "as" name:source_identifier) ;
 named_import = ("{" (bindings:import_binding ("," bindings:import_binding)* ","?)? "}") ;
 import_binding = (name:(source_identifier | TYPE_IDENT) alias:("as" (source_identifier | TYPE_IDENT))?) ;
-declaration = (visibility:"privatE"? (value:opaque_type | attributes:declaration_attribute* value:(value_declaration | named_function_declaration | implementation_declaration | data_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity)) LAYOUT_NEWLINE) ;
-opaque_type = ("opaquE" value:type_alias) ;
+declaration = (visibility:"privatE"? attributes:declaration_attribute* value:(value_declaration | named_function_declaration | implementation_declaration | data_type | opaque_type | type_alias | contract_type | effect_declaration | effect_type | symbolic_fixity | named_fixity) LAYOUT_NEWLINE) ;
+// The source adapter marks `opaque` only directly after `is`.
+opaque_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" "opaquE" "=" value:type_expression) ;
 type_alias = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "=" value:type_expression) ;
 contract_type = ("type" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* "is" kind:source_identifier "=" body:contract_body) ;
 implementation_declaration = (marker:"impL" name:TYPE_IDENT parameters:type_atom? ("=>" "type" parameters:type_atom)* ":" head:constraint_predicate where:where_clause? "=" body:implementation_body) ;

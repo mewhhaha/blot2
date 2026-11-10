@@ -1743,7 +1743,7 @@ test "scoped value origins distinguish enclosing inputs from the fresh scope par
 const precise_path_source = scoped_state_header ++
     \\const bundle = func (discarded: State a) => return func (retained: State a) => return {discarded: func () => return discarded.get (), retained: func () => return retained.get ()}
     \\const select = func value => return value.retained
-    \\opaque type Wrapper a = a
+    \\type Wrapper a is opaque = a
     \\const unwrap = func value => return case value of
     \\  $Wrapper retained => retained
     \\entry const answer = func () => return @effect.scope (func (older: State U32) => return do:

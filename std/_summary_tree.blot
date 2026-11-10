@@ -9,7 +9,7 @@ private type Node s is data =
     left: Node s,
     right: Node s,
   }
-opaque type Tree s = Node s
+type Tree s is opaque = Node s
 
 private func node_length (node: Node s) : U32 => return case node of
   $Empty => 0

@@ -559,7 +559,7 @@ test "numeric proof check plans refine false equality and short circuit edges wi
 test "numeric proof preserves exact collection identity through opaque reference adapters" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
-        \\opaque type Token = Array U32
+        \\type Token is opaque = Array U32
         \\const make: Array U32 -> Token = func value => return $Token value
         \\const read: Token -> Array U32 = func ($Token value) => return value
         \\entry const exact = func () => return (read (make #[42]))[0]

@@ -876,6 +876,7 @@ export const devCheckAreas = {
       "parse.lexer_tests.test.all lexer allocation failures release tokens, trivia and scratch",
       "parse.parser_tests.test.surface syntax preserves nested blocks patterns loops and handlers",
       "parse.parser_tests.test.malformed syntax reports diagnostics and preserves later declarations",
+      "parse.parser_tests.test.opaque declarations use the is kind position and reject the retired prefix",
       "parse.parser_tests.test.parser allocation failures release trees symbols and scratch stacks",
       "parse.parser_adjacent_call_tests.test.retained adjacent-call tree stays immutable across another parse and teardown",
       "parse.syntax_diagnostics_tests.test.UTF16 publication counts supplementary scalars and declines split byte boundaries",

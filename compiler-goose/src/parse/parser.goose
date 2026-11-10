@@ -130,20 +130,19 @@ recursive fn declaration(p: Parser&,source: const u8[:],tokens: const Token[:],d
  var private=false; var is_opaque=false;
  if word(p,source,tokens,"entry")&&peek(p,tokens,1)==t_identifier&&text(p,source,tokens[p.index+1])=="private" { advance(p,source,tokens); let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end}; return fail(p,source,tokens,c_unexpected_token); }
  if word(p,source,tokens,"private") { private=true; advance(p,source,tokens); if word(p,source,tokens,"private") { let t=current(p,source,tokens); p.declaration_origin=Span {t.start,t.end}; return fail(p,source,tokens,c_unexpected_token); } }
- if word(p,source,tokens,"opaque")&&peek(p,tokens,1)==t_kw_type { is_opaque=true; advance(p,source,tokens); }
- if word(p,source,tokens,"export")&&peek(p,tokens,1)==t_l_brace { if private||is_opaque { return fail(p,source,tokens,c_unexpected_token); } return import_decl(p,source,tokens,true); }
+ if word(p,source,tokens,"export")&&peek(p,tokens,1)==t_l_brace { if private { return fail(p,source,tokens,c_unexpected_token); } return import_decl(p,source,tokens,true); }
  let id=declaration_body(p,source,tokens,declarations_seen,body_declarations_seen,is_opaque); if p.failure!=blot_error::Error.none { return 0; }
  if private||is_opaque { let tag=p.tree.node(id).tag; if tag==a_import_decl||tag==a_fixity_decl { return fail(p,source,tokens,c_unexpected_token); } p.tree.declaration_traits.push(blot_parse_ast::DeclarationTraits {id,private,is_opaque}); }
  return id;
 }
-recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token[:],declarations_seen: bool,body_declarations_seen: bool,is_opaque: bool) -> Id {
+recursive fn declaration_body(p: Parser&,source: const u8[:],tokens: const Token[:],declarations_seen: bool,body_declarations_seen: bool,is_opaque: bool&) -> Id {
  let first=current(p,source,tokens); p.declaration_origin=Span {first.start,first.end}; if p.depth==0 {p.collection_names=0;} let start=first.start;
  if at(p,source,tokens,t_kw_import) { if declarations_seen { return fail(p,source,tokens,c_unexpected_token); } return import_decl(p,source,tokens,false); }
  var attributes=ScratchIdBuffer {};
  while p.failure==blot_error::Error.none&&at(p,source,tokens,t_at) { let point=current(p,source,tokens).start; eat(p,source,tokens,t_at); expect(p,source,tokens,t_l_bracket); let body=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); attributes.push(add(p,source,tokens,a_attribute,body,0,0,point)); newlines(p,source,tokens); }
  let attrs=list(p,source,tokens,attributes.items); if p.failure!=blot_error::Error.none { let __cleanup_result_4_0: Id = 0; attributes.deinit(); return __cleanup_result_4_0; }
  if at(p,source,tokens,t_kw_infixl)||at(p,source,tokens,t_kw_infixr)||at(p,source,tokens,t_kw_infix) { let __cleanup_result_5_0: Id = fixity_decl(p,source,tokens,attrs,start); attributes.deinit(); return __cleanup_result_5_0; }
- if word(p,source,tokens,"impl") { if is_opaque||attrs.len!=0 { let __cleanup_result_6_0: Id = fail(p,source,tokens,c_unexpected_token); attributes.deinit(); return __cleanup_result_6_0; } let __cleanup_result_7_0: Id = implementation_declaration(p,source,tokens,start); attributes.deinit(); return __cleanup_result_7_0; }
+ if word(p,source,tokens,"impl") { if attrs.len!=0 { let __cleanup_result_6_0: Id = fail(p,source,tokens,c_unexpected_token); attributes.deinit(); return __cleanup_result_6_0; } let __cleanup_result_7_0: Id = implementation_declaration(p,source,tokens,start); attributes.deinit(); return __cleanup_result_7_0; }
  if at(p,source,tokens,t_kw_type)||at(p,source,tokens,t_kw_data) { let __cleanup_result_8_0: Id = type_declaration(p,source,tokens,attrs,start,is_opaque); attributes.deinit(); return __cleanup_result_8_0; }
  if eat(p,source,tokens,t_kw_effect) { let name=qualified(p,source,tokens); expect(p,source,tokens,t_colon); let signature=type_expression(p,source,tokens); let __cleanup_result_9_0: Id = add(p,source,tokens,a_effect_decl,name,signature,extra(p,source,tokens,[attrs.start,attrs.len]),start); attributes.deinit(); return __cleanup_result_9_0; }
  var modifier: Symbol=0; var flags: u32=0;
@@ -372,21 +371,21 @@ let c_table_limit=blot_parse_ast::code_table_limit;
 let c_private_marker=blot_parse_ast::code_private_marker;
 let c_GPU_FRONTEND_SYNTAX_ERROR=blot_parse_ast::code_GPU_FRONTEND_SYNTAX_ERROR;
 let c_function_return_required=blot_parse_ast::code_function_return_required;
-fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs: List,start: u32,is_opaque: bool) -> Id {
+fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs: List,start: u32,is_opaque: bool&) -> Id {
  let old_data=eat(p,source,tokens,t_kw_data); if !old_data { expect(p,source,tokens,t_kw_type); }
  let name=type_identifier(p,source,tokens); var params=ScratchIdBuffer {};
  if type_atom_tag(current(p,source,tokens).tag) { params.push(type_atom(p,source,tokens)); }
  while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_fat_arrow) { expect(p,source,tokens,t_kw_type); params.push(type_atom(p,source,tokens)); }
  if !old_data&&eat(p,source,tokens,t_equal) {
   let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items);
-  if is_opaque { let constructor=add(p,source,tokens,a_constructor_ref,name,body,0,start); let constructors=list_node(p,source,tokens,a_constructors,[constructor],start); let __cleanup_result_16_0: Id = add(p,source,tokens,a_data_decl,name,constructors,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_16_0; }
   let __cleanup_result_17_0: Id = add(p,source,tokens,a_type_alias_decl,name,body,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_17_0;
  }
- if is_opaque { let __cleanup_result_18_0: Id = fail(p,source,tokens,c_expected_token); params.deinit(); return __cleanup_result_18_0; }
  var effect=false;
  if !old_data {
   expect(p,source,tokens,t_kw_is);
   if word(p,source,tokens,"contract") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=predicate_body(p,source,tokens,current(p,source,tokens).start,true); let range=list(p,source,tokens,params.items); let __cleanup_result_19_0: Id = add(p,source,tokens,a_contract_decl,name,body.node,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_19_0; }
+  // An opaque representation is data with one private constructor spelled like its type.
+  if word(p,source,tokens,"opaque") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items); let constructor=add(p,source,tokens,a_constructor_ref,name,body,0,start); let constructors=list_node(p,source,tokens,a_constructors,[constructor],start); is_opaque=true; let opaque_result: Id = add(p,source,tokens,a_data_decl,name,constructors,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return opaque_result; }
   if eat(p,source,tokens,t_kw_effect) { effect=true; } else { expect(p,source,tokens,t_kw_data); }
  }
  expect(p,source,tokens,t_equal); var body: Id=0;

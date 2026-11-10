@@ -282,7 +282,7 @@ Deno.test("body checker reuse relocates opaque receipts through source and compi
   const entry = `${directory}/main.blot`;
   const producer = `${directory}/tokens.blot`;
   const bundle = `${directory}/tokens.blotdep`;
-  const library = `opaque type Token = U32
+  const library = `type Token is opaque = U32
 const make = func (value: U32) => return $Token value
 const read = func ($Token value) => return value
 `;
@@ -342,7 +342,7 @@ entry const run = func (value: U32) => return @u32.add (read (make (${
             await fresh.close();
           }
         }
-        const referenceLibrary = `opaque type Token = Array U32
+        const referenceLibrary = `type Token is opaque = Array U32
 const make = func (value: U32) => return $Token #[value]
 const read = func ($Token value) => return @array.get value 0
 `;
@@ -404,7 +404,7 @@ Deno.test("body checker reuse relocates generic opaque scalar and owning referen
   });
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", helper = "make") =>
-    `${prefix}opaque type Box a = a
+    `${prefix}type Box a is opaque = a
 const make = func value => return $Box value
 const read = func ($Box value) => return value
 const identity = func (value: Box a) : Box a => return ${genericSpine("value")}
@@ -573,7 +573,7 @@ Deno.test("body checker reuse relocates shaped records with owning payloads and 
   const directory = await Deno.makeTempDir({ prefix: "blot-body-record-" });
   const entry = `${directory}/main.blot`;
   const source = (prefix = "", read = "read") =>
-    `${prefix}opaque type Entry { head, tail } = { head: head, tail: tail }
+    `${prefix}type Entry { head, tail } is opaque = { head: head, tail: tail }
 const make = func value => return $Entry value
 const read = func ($Entry { tail }) => return tail
 entry const unsigned = func (value: U32) => return ${read} (make { head: value, tail: #[${

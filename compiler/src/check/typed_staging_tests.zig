@@ -148,7 +148,7 @@ test "typed staging nominal descriptors expose only common public constructor fi
         \\const bad = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 1})).result
     , .descriptor_private);
     try law(std.testing.allocator,
-        \\opaque type Packet = {payload: U32}
+        \\type Packet is opaque = {payload: U32}
         \\const bad = @descriptor.fields (@code.describe (@code.quote $Packet {payload: 1})).result
     , .descriptor_private);
 }

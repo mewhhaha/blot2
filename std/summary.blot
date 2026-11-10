@@ -1,6 +1,6 @@
 import * as tree from "./_summary_tree"
 
-opaque type Summary s = tree.Tree s
+type Summary s is opaque = tree.Tree s
 func build (combine: s -> s -> s) -> (identity: s) -> values => return do:
   use value <- tree.build combine values
   break $Summary value

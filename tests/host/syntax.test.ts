@@ -252,8 +252,8 @@ Deno.test("privacy opacity exports and constructor parameters preserve contextua
   try {
     const source = `// 🌱 declaration offsets stay original
 export {Token as Ticket, make} from "./tokens"
-private opaque type Token = U32
-opaque type Box a = {value: a}
+private type Token is opaque = U32
+type Box a is opaque = {value: a}
 private type Alias = U32
 private type Choice is data = $Choice U32
 private type Read a is contract = {type_rep a}
@@ -287,16 +287,16 @@ export {Box} from "./tokens"
       rows,
     );
     for (
-      const text of [
-        "privatE const answer = 42\n",
-        "opaquE type Token = U32\n",
-        'exporT {Token} from "./tokens"\n',
-      ]
+      const [text, start] of [
+        ["privatE const answer = 42\n", 0],
+        ["type Token is opaquE = U32\n", 14],
+        ['exporT {Token} from "./tokens"\n', 0],
+      ] as const
     ) {
       throws(() => frontend.parse(text), (error) => {
         ok(error instanceof SourceError);
         equal(error.code, "reserved_declaration_marker");
-        equal(error.start, 0);
+        equal(error.start, start);
         return true;
       });
     }
@@ -314,7 +314,10 @@ export {Box} from "./tokens"
         'private export {Token} from "./tokens"\n',
         'export * as tokens from "./tokens"\n',
         "private private const value = 42\n",
-        "opaque type Token is data = $Token U32\n",
+        "opaque type Token = U32\n",
+        "private opaque type Token = U32\n",
+        "type Token is opaque data = $Token U32\n",
+        "type Token is opaque\n",
         'const value = 42\nimport {Token} from "./tokens"\n',
       ]
     ) throws(() => frontend.parse(text));

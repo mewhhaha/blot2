@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 const library = `type Box a is data = $Box a
-opaque type Secret = {left: U32, right: Array U32}
+type Secret is opaque = {left: U32, right: Array U32}
 type Tree a is data = $Leaf a | $Branch (Tree a, Tree a)
 const inspect = func (value: U32) => return @resource.scope (func () => return $Box #[value, 7]) (func owner => return ()) (func loan => return 42)
 const make_secret = func (value: U32) => return @resource.acquire (func () => return $Secret {right: #[value, 8], left: value}) (func owner => return ())

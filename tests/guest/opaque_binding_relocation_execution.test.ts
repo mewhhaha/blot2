@@ -30,7 +30,7 @@ function library(edit: Edit) {
     ? "private type Spare is data = $Spare U32\n"
     : "";
   return inserted + privateType + (edit === "move" ? "" : offset) +
-    `opaque type Token ${parameter} = ${parameter}\n` +
+    `type Token ${parameter} is opaque = ${parameter}\n` +
     `const make: ${variable} -> Token ${variable} = func ${argument} => return $Token ${argument}\n` +
     `const read: Token ${variable} -> ${variable} = func ($Token ${argument}) => return ${argument}\n` +
     "const adjust: U32 -> U32 = func value => return @u32.add value offset\n" +
@@ -48,7 +48,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
       const entry = directory + "/main.blot";
       const tokens = directory + "/tokens.blot";
       const bundle = directory + "/dependencies.blotdep";
-      const body = "opaque type Token = U32\n" +
+      const body = "type Token is opaque = U32\n" +
         "const make: Unit -> Token = func () => return $Token 42\n" +
         "const read: Token -> Unit = func ($Token value) => return ()\n";
       const producer = (name: string) =>

@@ -23,14 +23,14 @@ entry const answer = func () => return @code.emit generated
     }
     const library = (value: number) => {
       if (consumerQuote) {
-        return `opaque type Token = U32
+        return `type Token is opaque = U32
 const make = func () => return $Token ${value}
 const read = func (value: Token) => return case value of
   $Token number => number
 `;
       }
       return `private type Packet a is data = $Packet {payload: a}
-opaque type Token = U32
+type Token is opaque = U32
 private const make = func value => return $Packet {payload: $Token value}
 private const token = func (value: Token) => return case value of
   $Token number => number

@@ -112,7 +112,7 @@ not justify circular type equations or circular evidence prerequisites.
 An implementation adds no initializer, effect, provider or guest export. Method
 bodies execute only when called, with ordinary argument evaluation, effect,
 failure, fuel, capture and ownership behavior. `entry impl` and `opaque impl`
-are invalid modifiers. `private impl` is permitted. Evidence selection and
+are invalid. `private impl` is permitted. Evidence selection and
 normalization never evaluate a method or force its captures. Creating a selected
 method callback materializes captures using the ordinary named-function rules at
 that expression's source position.

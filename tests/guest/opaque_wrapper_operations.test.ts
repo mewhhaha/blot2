@@ -134,8 +134,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
       let plain: ReturnType<typeof observeGuestAllocations> | undefined;
       let plainFunctions: ReturnType<typeof functionSections> | undefined;
       for (const opaque of [false, true]) {
-        const source = `${opaque ? "opaque " : ""}type Token${
-          record ? " a" : ""
+        const source = `type Token${record ? " a" : ""}${
+          opaque ? " is opaque" : ""
         } = ${record ? "{value: a}" : "Array U32"}
 const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
           opaque ? "$Token " : ""
@@ -182,8 +182,8 @@ entry const captured = func (value: U32) => return do:
 
   Deno.test(`opaque payload bindings remove only irrefutable pattern control (${codegenTier})`, async () => {
     await inspectBuild(
-      `opaque type Token = U32
-opaque type Pair = (U32, U32)
+      `type Token is opaque = U32
+type Pair is opaque = (U32, U32)
 entry const guarded = func (value: U32) => return do:
   let $Token 7 = $Token value else:
     break 99
@@ -216,7 +216,7 @@ for (const type of ["U32", "F32"]) {
       let plain: ReturnType<typeof exportedFunction> | undefined;
       try {
         for (const opaque of [false, true]) {
-          const source = `${opaque ? "opaque " : ""}type Token = ${type}
+          const source = `type Token${opaque ? " is opaque" : ""} = ${type}
 const make: ${type} -> Token = func value => return ${opaque ? "$Token " : ""}value
 const read: Token -> ${type} = func ${
             opaque ? "($Token value)" : "value"

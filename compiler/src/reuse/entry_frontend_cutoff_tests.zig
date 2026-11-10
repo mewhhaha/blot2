@@ -226,7 +226,7 @@ test "module abstraction publication OOM preserves old opaque owners and retry" 
     var fixture = try Fixture.init();
     defer fixture.deinit();
     const consumer = "import {Token, make, read} from \"./changed\"\nentry const answer = read (make 41)\n";
-    const producer = "opaque type Token = U32\nprivate const offset = 1\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
+    const producer = "type Token is opaque = U32\nprivate const offset = 1\nconst make: U32 -> Token = func value => return $Token (@u32.add value offset)\nconst read: Token -> U32 = func ($Token value) => return value\n";
     try fixture.write("main.blot", consumer);
     try fixture.write("changed.blot", producer);
     var session = try retained.Session.initEmpty(a, .{});

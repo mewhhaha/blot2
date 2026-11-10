@@ -473,22 +473,22 @@ test "body check cache relocates nominal identities and revokes retargeted local
 }
 
 test "body check cache opaque storage roles revoke scalar to reference consumers" {
-    const original = "opaque type Token = U32\nconst make = func (n: U32) => return $Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
+    const original = "type Token is opaque = U32\nconst make = func (n: U32) => return $Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var before = try prepare(a, original, null);
     defer before.deinit(a);
     try std.testing.expect(before.bodies.find("identity") != null);
-    const inserted = "const earlier_spelling = func (f: F32) : F32 => return @f32.add f 2.0\nopaque type Token = U32\nconst make = func (n: U32) => return $Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
+    const inserted = "const earlier_spelling = func (f: F32) : F32 => return @f32.add f 2.0\ntype Token is opaque = U32\nconst make = func (n: U32) => return $Token n\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     var fresh = try prepare(a, inserted, null);
     defer fresh.deinit(a);
     var expected = try compile(a, &fresh);
     defer expected.deinit(a);
     try compare(a, &before.bodies, inserted, expected.bytes, 1);
-    const changed = "opaque type Token = Array U32\nconst make = func (n: U32) => return $Token #[n]\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
+    const changed = "type Token is opaque = Array U32\nconst make = func (n: U32) => return $Token #[n]\nconst identity = func (value: Token) : Token => return value\nconst read = func ($Token value) => return value\nentry const run = func (n: U32) => return read (identity (make n))\n";
     try parity(original, changed, 4);
 }
 
 test "body check cache relocates generic nominal arguments and opaque parameter recipes" {
-    const source = "opaque type Box a = a\nconst make = func value => return $Box value\nconst read = func ($Box value) => return value\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make value))\nentry const floating = func (value: F32) => return read (identity (make value))\nentry const reference = func (value: U32) => return read (identity (make #[value]))\n";
+    const source = "type Box a is opaque = a\nconst make = func value => return $Box value\nconst read = func ($Box value) => return value\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make value))\nentry const floating = func (value: F32) => return read (identity (make value))\nentry const reference = func (value: U32) => return read (identity (make #[value]))\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("unsigned") != null);
@@ -505,7 +505,7 @@ test "body check cache relocates generic nominal arguments and opaque parameter 
 }
 
 test "body check cache relocates structural field spellings and shaped nominal arguments" {
-    const source = "opaque type Entry { head, tail } = { head: head, tail: tail }\nconst make = func value => return $Entry value\nconst read = func ($Entry { tail }) => return tail\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make { head: value, tail: #[value] }))\nentry const floating = func (value: F32) => return read (identity (make { head: value, tail: #[value] }))\n";
+    const source = "type Entry { head, tail } is opaque = { head: head, tail: tail }\nconst make = func value => return $Entry value\nconst read = func ($Entry { tail }) => return tail\nconst identity = func value => return value\nentry const unsigned = func (value: U32) => return read (identity (make { head: value, tail: #[value] }))\nentry const floating = func (value: F32) => return read (identity (make { head: value, tail: #[value] }))\n";
     var first = try prepare(a, source, null);
     defer first.deinit(a);
     try std.testing.expect(first.bodies.find("unsigned") != null);
