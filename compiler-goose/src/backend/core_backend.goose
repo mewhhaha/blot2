@@ -94,6 +94,7 @@ import compiler_defaults;
 import support.native;
 import phase_profile;
 import support.option;
+import support.pooled_buffer;
 import support.error;
 import support.path;
 import support.host_layout;
@@ -768,7 +769,7 @@ fn function(generator: Generator&, key: Key) -> u32, blot_error::Error {
     if !body.is_function { let exit_id, exit_error = namedAlias(generator, key, body, function_id, scope); return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
     let service, service_error = specializer(generator); if service_error != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = service_error; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
 
-    let resolved, resolved_error = service.named(key, generator.representations.instance_arguments.get(key.instance_arguments), mappings, rows);
+    let instance_copy = generator.representations.instance_arguments.copy(key.instance_arguments); let resolved, resolved_error = service.named(key, instance_copy.values[..instance_copy.len], mappings, rows);
     if resolved_error != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = specializationFailure(generator, service, resolved_error); return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
     if key.dictionaries {
         let owner = blot_check_dictionary_owner::forBinding(source, body.binding); if !owner.present { let exit_id: u32 = 0; let exit_error = decline(generator, unit_id, body.span, blot_check_diagnostic_code::Code.unsupported); return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
@@ -801,32 +802,41 @@ recursive fn releaseRetainedCapture(capture: blot_eval_core_eval::RetainedCaptur
     if capture.values.len != 0 { retained_values.free_slice(capture.values); }
     if capture.captures.len != 0 { retained_children.free_slice(capture.captures); }
 }
-fn finishRetainedCapture(children: blot_eval_core_eval::RetainedCapture[>..<]&,published: bool,value: blot_eval_core_eval::RetainedCapture,error: blot_error::Error) -> blot_eval_core_eval::RetainedCapture,blot_error::Error {
-    if !published { for child in children { releaseRetainedCapture(child); } }
-    return value,error;
-}
+// Recursive retention keeps only fixed-size pooled handles in scope (§7.8).
+struct RetainedChildBuffer { storage: blot_eval_core_eval::RetainedCapture[:] = default<blot_eval_core_eval::RetainedCapture[:]>(),items: blot_eval_core_eval::RetainedCapture[:] = default<blot_eval_core_eval::RetainedCapture[:]>() }
+reusable[] var buffer_RetainedChildBuffer: blot_eval_core_eval::RetainedCapture[>..] = [];
+fn push(buffer: RetainedChildBuffer&,value: blot_eval_core_eval::RetainedCapture) -> blot_error::Error { return blot_support_pooled_buffer::push(buffer,value,buffer_RetainedChildBuffer); }
+fn deinit(buffer: RetainedChildBuffer&) { blot_support_pooled_buffer::deinit(buffer,buffer_RetainedChildBuffer); }
+struct RetainedValueBuffer { storage: blot_eval_core_eval::RetainedValue[:] = default<blot_eval_core_eval::RetainedValue[:]>(),items: blot_eval_core_eval::RetainedValue[:] = default<blot_eval_core_eval::RetainedValue[:]>() }
+reusable[] var buffer_RetainedValueBuffer: blot_eval_core_eval::RetainedValue[>..] = [];
+fn push(buffer: RetainedValueBuffer&,value: blot_eval_core_eval::RetainedValue) -> blot_error::Error { return blot_support_pooled_buffer::push(buffer,value,buffer_RetainedValueBuffer); }
+fn deinit(buffer: RetainedValueBuffer&) { blot_support_pooled_buffer::deinit(buffer,buffer_RetainedValueBuffer); }
 recursive fn retainedCapture(generator: Generator&, binding: blot_check_core::BindingId, template: CapturedTemplate, depth: i64) -> blot_eval_core_eval::RetainedCapture, blot_error::Error {
     if depth >= 256 { return default<blot_eval_core_eval::RetainedCapture>(), fail(generator, template.unit, template.node, blot_check_diagnostic_code::Code.complexity); }
-    var rows: blot_eval_type_evidence::RowMapping[>..<] = []; for row in generator.representations.row_keys.get(template.rows) { rows.push(blot_eval_type_evidence::RowMapping { row.variable, row.value , ..}); }
-    var children: blot_eval_core_eval::RetainedCapture[>..<] = []; var values: blot_eval_core_eval::RetainedValue[>..<] = []; var published = false;
-
-    let source .= unit(generator, template.unit); let n = source.node(template.node);
-    if n.tag == blot_check_core::Tag.closure {
-        let capture_list = source.extra[source.closures[n.a].captures.start..source.closures[n.a].captures.start + source.closures[n.a].captures.len];
-        for captured, index in capture_list {
+    var children = RetainedChildBuffer {..}; var values = RetainedValueBuffer {..};
+    recursive fn collect() -> blot_error::Error {
+        let n = unit(generator, template.unit).node(template.node); if n.tag != blot_check_core::Tag.closure { return blot_error::Error.none; }
+        let capture_count = unit(generator, template.unit).closureCaptures(template.node).len;
+        for index in 0..capture_count {
+            let captured = unit(generator, template.unit).closureCaptures(template.node)[index];
             let child = capturedTemplate(generator, template.templates, captured);
-            if child.present { let value, error = retainedCapture(generator, captured, child.value, depth + 1); if error != blot_error::Error.none { let __retained_capture_0_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_0_1: blot_error::Error = error; return finishRetainedCapture(children,published,__retained_capture_0_0,__retained_capture_0_1); } children.push(value); }
+            if child.present { let value, error = retainedCapture(generator, captured, child.value, depth + 1); if error != blot_error::Error.none { return error; } let pushed = children.push(value); if pushed != blot_error::Error.none { releaseRetainedCapture(value); return pushed; } }
             else if index < generator.representations.store.children(template.captures).len {
                 let actual, error = generator.toEvidence(generator.representations.store.children(template.captures)[index]);
-                if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { let __retained_capture_1_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_1_1: blot_error::Error = error; return finishRetainedCapture(children,published,__retained_capture_1_0,__retained_capture_1_1); } let __retained_capture_2_0: blot_eval_core_eval::RetainedCapture = default<blot_eval_core_eval::RetainedCapture>(); let __retained_capture_2_1: blot_error::Error = fail(generator, template.unit, template.node, blot_check_diagnostic_code::Code.unresolved_type); return finishRetainedCapture(children,published,__retained_capture_2_0,__retained_capture_2_1); }
-                values.push(blot_eval_core_eval::RetainedValue { captured, actual , ..});
+                if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } if error == blot_error::Error.out_of_memory { return error; } return fail(generator, template.unit, template.node, blot_check_diagnostic_code::Code.unresolved_type); }
+                let pushed = values.push(blot_eval_core_eval::RetainedValue { captured, actual , ..}); if pushed != blot_error::Error.none { return pushed; }
             }
         }
+        return blot_error::Error.none;
     }
+    let collected = collect();
+    if collected != blot_error::Error.none { for child in children.items { releaseRetainedCapture(child); } values.deinit(); children.deinit(); return default<blot_eval_core_eval::RetainedCapture>(), collected; }
+    var rows: blot_eval_type_evidence::RowMapping[>..<] = []; for row in generator.representations.row_keys.get(template.rows) { rows.push(blot_eval_type_evidence::RowMapping { row.variable, row.value , ..}); }
     let owned_rows = retained_rows.alloc_slice(rows.len); for row, index in rows { owned_rows[index] = row; }
-    let owned_values = retained_values.alloc_slice(values.len); for value, index in values { owned_values[index] = value; }
-    let owned_children = retained_children.alloc_slice(children.len); for child, index in children { owned_children[index] = child; }
-    published = true; let __retained_capture_3_0: blot_eval_core_eval::RetainedCapture = blot_eval_core_eval::RetainedCapture { binding: binding, unit: template.unit, node: template.node, mappings: template.evidence, rows: owned_rows, values: owned_values, captures: owned_children, computation: template.computation , ..}; let __retained_capture_3_1: blot_error::Error = blot_error::Error.none; return finishRetainedCapture(children,published,__retained_capture_3_0,__retained_capture_3_1);
+    let owned_values = retained_values.alloc_slice(values.items.len); for value, index in values.items { owned_values[index] = value; }
+    let owned_children = retained_children.alloc_slice(children.items.len); for child, index in children.items { owned_children[index] = child; }
+    values.deinit(); children.deinit();
+    return blot_eval_core_eval::RetainedCapture { binding: binding, unit: template.unit, node: template.node, mappings: template.evidence, rows: owned_rows, values: owned_values, captures: owned_children, computation: template.computation , ..}, blot_error::Error.none;
 }
 fn finishClosureHints(hints: blot_backend_substitution_buffers::Hints&,error: blot_error::Error) -> blot_error::Error {
     for hint in hints.items { releaseRetainedCapture(hint); }
@@ -1841,8 +1851,7 @@ fn ownsArrayUpdate(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_erro
 }
 fn numericCheck(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_error::Error {
     if id == 0 { return false,blot_error::Error.none; } block { let known = generator.planning.numeric_plans.get(unit_id); if known { return known.admits(id),blot_error::Error.none; } }
-    var units: (const blot_check_core::Module&)[>..<] = []; for source in generator.units { units.push(source); }
-    let plan,error = blot_check_numeric_proof_core::analyze(unit(generator,unit_id),units,blot_check_numeric_proof_core::Options {..}); if error != blot_error::Error.none { return false,error; }
+    let plan,error = blot_check_numeric_proof_core::analyze(unit(generator,unit_id),generator.units,blot_check_numeric_proof_core::Options {..}); if error != blot_error::Error.none { return false,error; }
     let admitted = plan.admits(id); generator.planning.numeric_plans.insert(unit_id,plan); return admitted,blot_error::Error.none;
 }
 let default_artifact_replay = blot_compiler_defaults::artifact_replay;

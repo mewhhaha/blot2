@@ -5186,5 +5186,42 @@
     },
     "zero_initialized_scalar_scratch_arrays": 29,
     "whole_compiler_executable": false
+  },
+  "specialization_retention_and_numeric_owners": {
+    "receipt": "2026-11-11-goose-backend-numeric326.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 97.465,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/check/numeric_proof_core.goose",
+          "line": 327,
+          "message": "error: cannot call version, which may shrink self_ while self_ (bound at /home/jacobt/src/blot2/compiler-goose/src/check/numeric_proof_core.goose:322) is still used: it may refer into self_ (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "38c9d036150a04c98d2416fe787635324ffcb66c0f782c03b0043799c4878f2f",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "intermediate_probes": {
+      "317": "Body span/root copy; Expression handle type",
+      "318": "named instances may alias mappings",
+      "319": "retainedCapture growable locals across recursion (\u00a77.8)",
+      "320": "stale Owner.mappings field",
+      "321": "numeric_proof_terms.intern self-call",
+      "322": "numeric_proof_core.body contract header held across version",
+      "323": "self_ may refer into self_ at version",
+      "324-325": "GOOSE_SHRINK_ORIGINS runs; no origin witness",
+      "narrow_root": "prepareNumeric root passes in 1.4s after numericCheck fix"
+    },
+    "whole_compiler_executable": false
   }
 }

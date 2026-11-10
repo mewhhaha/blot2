@@ -88,8 +88,10 @@ fn charge(self_: Store&, amount: i64) -> blot_error::Error {
     let account = self_.account; if account { account += amount; }
     return blot_error::Error.none;
 }
-recursive fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
+// A literal complement charges the visit its nested intern would have charged.
+fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
     let charged = charge(self_, 1); if charged != blot_error::Error.none { return 0, charged; }
+    var selected = term;
     match term.tag {
         literal => { if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
         formal, capture => { if term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; } },
@@ -103,17 +105,17 @@ recursive fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
             if term.kind != Kind.unsigned32 || term.b != 0 { return 0, blot_error::Error.invalid_proof_operand; }
             let child, error = get(view(self_), term.a); if error != blot_error::Error.none { return 0, error; }
             if child.kind != Kind.unsigned32 { return 0, blot_error::Error.invalid_proof_operand; }
-            if child.tag == Tag.literal { return intern(self_, Term { tag: Tag.literal, a: 0xffffffff - child.a , ..}); }
+            if child.tag == Tag.literal { let recharged = charge(self_, 1); if recharged != blot_error::Error.none { return 0, recharged; } selected = Term { tag: Tag.literal, a: 0xffffffff - child.a , ..}; }
             if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
         },
     }
-    block { let saved = ::get(self_.index,term); if saved { return saved, blot_error::Error.none; } }
+    block { let saved = ::get(self_.index,selected); if saved { return saved, blot_error::Error.none; } }
     if self_.index.count >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
     let position=self_.index.count;
-    if position<self_.terms.len {self_.terms[position]=term;}
-    else {self_.terms.push(term);}
+    if position<self_.terms.len {self_.terms[position]=selected;}
+    else {self_.terms.push(selected);}
     let id = (position+1) as u32;
-    ::insert(self_.index,term,id);
+    ::insert(self_.index,selected,id);
     return id, blot_error::Error.none;
 }
 fn copyOwned(self_: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {

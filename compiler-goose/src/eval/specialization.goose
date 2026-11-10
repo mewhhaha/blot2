@@ -86,35 +86,35 @@ fn internFunction(self_: Service&, argument: u32, result: u32, row: u32) -> u32,
 fn named(self_: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: Mapping[>..<]&,rows: RowMapping[>..<]&) -> ResolvedBody,Error { return namedSink(self_,key,instances,MappingSink.lexical { mappings , ..},RowSink.lexical { rows , ..}); }
 fn named(self_: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&) -> ResolvedBody,Error { let selected,error = mappingSink(mappings); if error != blot_error::Error.none { return default<ResolvedBody>(),error; } let selected_rows,row_error = rowSink(rows); if row_error != blot_error::Error.none { return default<ResolvedBody>(),row_error; } return namedSink(self_,key,instances,selected,selected_rows); }
 fn namedSink(self_: Service&, key: blot_reuse_code_artifacts::Key, instances: const blot_check_types::NominalIdentity[:], mappings: MappingSink, rows: RowSink) -> ResolvedBody, Error {
-    clearSink(mappings); clearSink(rows); let unit_id = key.target.unit; let source .= unit(self_, unit_id); let body .= source.body(key.target.binding); assert(body);
+    clearSink(mappings); clearSink(rows); let unit_id = key.target.unit; let source .= unit(self_, unit_id); let body .= source.body(key.target.binding); assert(body); let body_span = body.span; let body_root = body.root;
     let previous = self_.dictionary_unit; self_.dictionary_unit = 0;
     block {
 
     if key.dictionaries {
-        let owner = blot_check_dictionary_owner::forBinding(source, key.target.binding); if !owner.present { let __flat_cleanup_0_0_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_0_1: Error = decline(self_, unit_id, body.span, FailureCode.unresolved_type); block {
+        let owner = blot_check_dictionary_owner::forBinding(source, key.target.binding); if !owner.present { let __flat_cleanup_0_0_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_0_1: Error = decline(self_, unit_id, body_span, FailureCode.unresolved_type); block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_0_0,__flat_cleanup_0_0_1; }
         var remaining: i64 = 65536; let valid = blot_check_package_core::parametricBodyModules(source,key.target.binding,self_.units,remaining);
-        if valid != blot_error::Error.none { let __flat_cleanup_0_1_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_1_1: Error = decline(self_, unit_id, body.span, FailureCode.unresolved_type); block {
+        if valid != blot_error::Error.none { let __flat_cleanup_0_1_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_1_1: Error = decline(self_, unit_id, body_span, FailureCode.unresolved_type); block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_1_0,__flat_cleanup_0_1_1; }
         let bound = blot_backend_dictionary_layout::bindOwner(source, self_.layouts, mappings, owner.value, 0, owner.value.formals(source), false);
-        if bound != blot_error::Error.none { let __flat_cleanup_0_2_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_2_1: Error = representationError(self_, bound, unit_id, body.span, FailureCode.unresolved_type); block {
+        if bound != blot_error::Error.none { let __flat_cleanup_0_2_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_2_1: Error = representationError(self_, bound, unit_id, body_span, FailureCode.unresolved_type); block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_2_0,__flat_cleanup_0_2_1; } self_.dictionary_unit = unit_id;
     }
     var ty = source.binding(key.target.binding).ty; var rank_depth = 0;
     while source.types.node(ty).tag == blot_check_types::Tag.forall || source.types.node(ty).tag == blot_check_types::Tag.usage {
-        if rank_depth == 128 { let __flat_cleanup_0_3_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_3_1: Error = decline(self_, unit_id, body.span, FailureCode.complexity); block {
+        if rank_depth == 128 { let __flat_cleanup_0_3_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_3_1: Error = decline(self_, unit_id, body_span, FailureCode.complexity); block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_3_0,__flat_cleanup_0_3_1; } rank_depth++; ty = source.types.node(ty).a;
     }
     var source_rows: u32[16] = [0; 16];
     for scalar_type, index in key.parameters[..key.count] {
-        let n = source.types.node(ty); if n.tag != blot_check_types::Tag.function { let __flat_cleanup_0_4_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_4_1: Error = decline(self_, unit_id, body.span, FailureCode.unresolved_type); block {
+        let n = source.types.node(ty); if n.tag != blot_check_types::Tag.function { let __flat_cleanup_0_4_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_4_1: Error = decline(self_, unit_id, body_span, FailureCode.unresolved_type); block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_4_0,__flat_cleanup_0_4_1; }
-        let error = mapTypeDepthSink(self_, unit_id, mappings, rows, n.a, scalar_type, body.span, 0); if error != blot_error::Error.none { let __flat_cleanup_0_5_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_5_1: Error = error; block {
+        let error = mapTypeDepthSink(self_, unit_id, mappings, rows, n.a, scalar_type, body_span, 0); if error != blot_error::Error.none { let __flat_cleanup_0_5_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_5_1: Error = error; block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_5_0,__flat_cleanup_0_5_1; }
         if index < instances.len && instances[index].unit != 0 {
@@ -124,10 +124,10 @@ self_.dictionary_unit = previous;
         }
         source_rows[index] = n.c; ty = n.b;
     }
-    let result_error = mapFunctionResultSink(self_, unit_id, mappings, rows, ty, key.result, body.span, 0); if result_error != blot_error::Error.none { let __flat_cleanup_0_7_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_7_1: Error = result_error; block {
+    let result_error = mapFunctionResultSink(self_, unit_id, mappings, rows, ty, key.result, body_span, 0); if result_error != blot_error::Error.none { let __flat_cleanup_0_7_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_7_1: Error = result_error; block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_7_0,__flat_cleanup_0_7_1; }
-    for row, index in source_rows[..key.count] { let e = mapRowSink(self_, unit_id, mappings, rows, row, key.effects[index], body.span, true); if e != blot_error::Error.none { let __flat_cleanup_0_8_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_8_1: Error = e; block {
+    for row, index in source_rows[..key.count] { let e = mapRowSink(self_, unit_id, mappings, rows, row, key.effects[index], body_span, true); if e != blot_error::Error.none { let __flat_cleanup_0_8_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_8_1: Error = e; block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_8_0,__flat_cleanup_0_8_1; } }
     var full = key.result; var reverse = key.count as i64;
@@ -135,11 +135,11 @@ self_.dictionary_unit = previous;
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_9_0,__flat_cleanup_0_9_1; } full = value; }
     if !key.dictionaries && source.binding(key.target.binding).capability_flow != blot_check_capability_flow::Contract.consume_task {
-        let e = refineMappingsSink(self_, unit_id, blot_reuse_refinement_receipt::Root.body { key.target , ..}, full, mappings, rows, body.span); if e != blot_error::Error.none { let __flat_cleanup_0_10_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_10_1: Error = e; block {
+        let e = refineMappingsSink(self_, unit_id, blot_reuse_refinement_receipt::Root.body { key.target , ..}, full, mappings, rows, body_span); if e != blot_error::Error.none { let __flat_cleanup_0_10_0: ResolvedBody = ResolvedBody { source: key.target,root: blot_eval_semantic_handles::Expression{0},mappings: mappings,rows: rows , ..}; let __flat_cleanup_0_10_1: Error = e; block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_10_0,__flat_cleanup_0_10_1; }
     }
-    let __flat_cleanup_0_11_0: ResolvedBody = ResolvedBody { source: key.target, root: body.root, mappings: mappings, rows: rows , ..}; let __flat_cleanup_0_11_1: Error = blot_error::Error.none; block {
+    let __flat_cleanup_0_11_0: ResolvedBody = ResolvedBody { source: key.target, root: blot_eval_semantic_handles::Expression{body_root}, mappings: mappings, rows: rows , ..}; let __flat_cleanup_0_11_1: Error = blot_error::Error.none; block {
 self_.dictionary_unit = previous;
 } return __flat_cleanup_0_11_0,__flat_cleanup_0_11_1;
 

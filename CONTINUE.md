@@ -35,10 +35,35 @@ borrowed-Core-slice family:
 
 [Receipt](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz).
 
-**Next:** `eval/specialization.goose:138` calls `refineMappingsSink`, which shrinks
-`backing_origins_code_module_types` while `body` (bound at :89) is still live.
-Fix the whole family the same way: scalar ids or ranges plus per-index reads, never
-cleared owners or relaxed checks.
+Backend 326 (97.465s, unchanged source) clears the specialization, retention and
+numeric-owner batch:
+
+- `namedSink` copies Body span/root before refinement.
+- Instance argument runs (capped at 16) are copied into a fixed value before
+  `Service.named`.
+- `retainedCapture` keeps only pooled buffer handles across its recursion (§7.8).
+- Stale `Owner.mappings` assignments use `mapping_read`/`row_read` keys.
+- Numeric `intern` inlines its literal-complement self-call, with the same visit
+  charge.
+- `body` re-reads its contract header at each use.
+- `numericCheck` uses the `Module[:]` analyze overload.
+
+[Receipt](benchmarks/evidence/qualification/2026-11-11-goose-backend-numeric326.json.gz).
+
+**Next:** `check/numeric_proof_core.goose:327`: "cannot call version, which may
+shrink self_ while self_ (bound at 322) is still used". The same
+`prepareNumeric → analyzePrepared → body` chain passes under a narrow root, so the
+error depends on reaching it inside the recursive emission cycle.
+`GOOSE_SHRINK_ORIGINS` gives no witness. Find what `version` may shrink
+(`Store.intern`'s dictionary insert or `account`) before restructuring.
+Never clear owners or relax checks.
+
+A narrow root is a ~1.5s loop for context-free errors. Write a temporary
+`compiler-goose/src/_numeric_probe.goose` exporting a no-argument function, then
+run `GOOSE_DIAGNOSTIC_ROOTS=<namespace>::<fn> <goose> check <file> --stdlib …`.
+Remove the file before a full probe, because full probes hash every source.
+[A copy](compiler-goose/tools/narrow_root_example.goose)
+of the prepareNumeric root is kept in tools.
 
 The last complete component inventory passed 36/36 on its pinned source in
 307.14s summed stages. The current 49-law inventory has not run in full. Focused

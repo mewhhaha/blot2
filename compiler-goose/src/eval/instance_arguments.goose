@@ -10,6 +10,9 @@ struct Store { owner_id: u64=blot_native::fresh_owner_id(), values: Identity[>..
 fn init(values: Identity[>..<]&,spans: Span[>..<]&) -> Store { return Store {values:values,spans:spans}; }
 fn get(self_: Owned&,id: u32) -> const Identity[:] { if id==0 { return self_.values[..0]; } let span=self_.spans[id-1]; return self_.values[span.start..span.start+span.len]; }
 fn get(self_: Store&,id: u32) -> const Identity[:] { if id==0 { return self_.values[..0]; } let span=self_.spans[id-1]; return self_.values[span.start..span.start+span.len]; }
+// Interned argument runs never exceed 16; callers copy one before growing its store.
+struct Arguments { values: Identity[16] = [Identity { unit: 0, decl: 0 };16], len: i64 = 0 }
+fn copy(self_: Store&,id: u32) -> Arguments { var result = Arguments {..}; let values = self_.get(id); assert(values.len <= 16); for value,index in values { result.values[index] = value; } result.len = values.len; return result; }
 fn intern(self_: Store&,arguments: const Identity[:]) -> u32,blot_error::Error {
  var present=false; for identity in arguments { present=present||identity.decl!=0; } if !present { return 0,blot_error::Error.none; }
  for span,index in self_.spans {
