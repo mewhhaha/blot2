@@ -93,7 +93,7 @@ fn readRows(key:RowRead)->const RowMapping[:] {assert(valid(key));if key.body!=0
 let max_parameters: i64 = 16;
 let max_local_instances: i64 = 4;
 struct CarrierKey { from: u32,to: u32 }
-struct Template { scalar_environment: bool = false,callable_instances: u32 = 0,staged: u32 = 0,unit: u32 = 0,node: u32,environment: blot_support::Option<u32>,captures: u32 = 0,templates: u32 = 0,computation: bool = false,evidence: u32 = 0,rows: u32 = 0 }
+struct Template { scalar_environment: bool = false,callable_instances: u32 = 0,staged: u32 = 0,unit: u32 = 0,node: u32,environment: blot_support::Option<u32> = blot_support::none<u32>(),captures: u32 = 0,templates: u32 = 0,computation: bool = false,evidence: u32 = 0,rows: u32 = 0 }
 struct ReturnTarget { node: u32,label: u32,cleanup: blot_runtime_runtime_cleanup::Mark,template_result: bool = false }
 struct CarryRoot { iteration: u32,outgoing: u32,slot: u32 }
 struct ContinueTarget { plan: blot_backend_resolved_flow::Loop,metadata: blot_check_core::LoopInfo,input: LoopInput,outer_cleanup: blot_runtime_runtime_cleanup::Mark,inner_cleanup: blot_runtime_runtime_cleanup::Mark,row_label: u32,head_label: u32 }
@@ -101,7 +101,7 @@ struct LoopTarget { node: u32,label: u32,cleanup: blot_runtime_runtime_cleanup::
 struct RaggedCount { plan: blot_backend_ragged_builder::Plan,count: u32,eligible: u32,budget: u32,limit: u32,exit: u32,cleanup: blot_runtime_runtime_cleanup::Mark }
 enum ResolverPlan { monad,forward,run { value: blot_backend_resolved_call::Arrow },call { value: blot_backend_resolved_call::Applied } }
 enum DispatchPlan { scalar { value: blot_backend_runtime_ir::Op },simd_ { input: u32,result: u32 },selected { key: Key,call: blot_backend_resolved_call::Applied } }
-struct TemplatePreparation { metadata: Template,capture_types: u32[:],capture_roles: blot_backend_runtime_ir::Role[:],static_key: blot_support::Option<blot_reuse_code_artifacts::ClosureKey> }
+struct TemplatePreparation { metadata: Template,capture_types: u32[:],capture_roles: blot_backend_runtime_ir::Role[:],static_key: blot_support::Option<blot_reuse_code_artifacts::ClosureKey> = blot_support::none<blot_reuse_code_artifacts::ClosureKey>() }
 struct FieldPlan { index: u32,projection: blot_check_core::Projection,variants: blot_check_core::ProjectionVariant[:],slots: u32[:] }
 enum ProjectionPlan { field { value: FieldPlan },member { direct: Key,wrapper: blot_reuse_code_artifacts::CallableKey },empty_cursor { value: u32 } }
 enum FactoryCallee { named { key: Key },closure { key: blot_reuse_code_artifacts::ClosureKey } }

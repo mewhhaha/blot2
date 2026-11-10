@@ -45,13 +45,13 @@ was confined to numeric_rows/function_facts. Cursor arrays retain their 256/1024
 capacities, logical counts and overflow behavior; nine adjacent helpers had no
 matching uninitialized locals. Earlier nullable contexts/Proof callers are pushed.
 
-Current frontier: emission3947 Template{node:id} omits required environment, an
-Option field with no default. Audit its constructor family and oracle intent;
-choose a consistent optional default or explicit absent values without filling
-other required fields blindly. Whole compiler and actual CLI/server/OOM/retry/
-retention still await the real executable. Runtime probes remain capped and
-unqualified; full current 49-law inventory has not run.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-cursor309.json.gz).
+Backend 310 matches the oracle's absent defaults for Template.environment and
+TemplatePreparation.static_key (23 constructors audited; required fields stay
+required) in 82.384s, unchanged source. Current frontier: emission3955
+template_keys.intern may shrink generators while closureCaptures(id) at 3947 is
+still used. Whole compiler and actual CLI/server/OOM/retry/retention still await
+the real executable; full current 49-law inventory has not run.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-template-defaults310.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion

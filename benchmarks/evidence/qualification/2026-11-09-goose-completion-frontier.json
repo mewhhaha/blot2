@@ -5119,5 +5119,38 @@
     "source": "Explicitfixedarrayinitialization; nineadjacentmodules audited",
     "runtime_qualification": false,
     "whole_compiler_executable": false
+  },
+  "template_optional_defaults": {
+    "receipt": "2026-11-10-goose-backend-template-defaults310.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 82.384,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 3955,
+          "message": "error: cannot call intern, which may shrink generators while captures (bound at /home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose:3947) is still used: it may refer into generators (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "64f3845ea9c4ea37e2add17682d67f3d46366b72f3bf3c61abc6858a27a1bda5",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "oracle_matched_fields": [
+      "Template.environment",
+      "TemplatePreparation.static_key"
+    ],
+    "constructors_audited": 23,
+    "required_fields_remain_required": true,
+    "additional_matching_lost_defaults_found": 0,
+    "whole_compiler_executable": false
   }
 }
