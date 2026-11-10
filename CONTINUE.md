@@ -7,17 +7,19 @@ integration; never forward Goose requests to the Zig oracle.
 
 ## Current frontier
 
-Actual whole159 stops after **142.92s**, with unchanged source and no artifacts:
+Actual whole160 stops after **157.07s**, with unchanged source and no artifacts:
 
-- `backend/storage_parameter_fields.goose:51`: recursive child visitor passes
-  Walk through a differently rooted Children header (§7.8).
-- `backend/resolved_body.goose:60`: frozen dependency Module pool may retain
-  payloads, published through `reuse/dependency_closure.goose:215` (§5.1).
+- `backend/storage_global_footprint.goose:92`: a borrowed slot slice is stored in
+  the completed cache (§9.2).
+- `backend/resolved_body.goose:60`: saved effect identities may retain payloads,
+  published through `eval/purity_type_key.goose:59` (§5.1).
 
-See [the exact whole receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole159.json.gz).
-The previous child Generator and Session/payload retention failures are cleared
-on the broader selected graph. Scoped158 takes 50.22s and reaches four signed
-counter deltas; all four were corrected before whole159.
+See [the exact whole receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole160.json.gz).
+The preceding visitor and frozen Module publication failures are cleared. Their
+affected laws pass in **17.94s**: parameter traversal order/deduplication,
+foreign/whole/depth/unsupported fallbacks, result-owner independence and adopted
+fresh/cloned nested Module payloads across Frame/reclamation. See
+[the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-parameter-frozen-module-laws.json.gz).
 
 Six affected production laws pass together in **67.46s**: proof leases,
 diagnostics, semantic outcomes, worker pins, key cache and resolved bodies.

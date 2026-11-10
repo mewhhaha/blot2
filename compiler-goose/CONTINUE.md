@@ -4,12 +4,11 @@ Repair ownership, emit the actual complete C/header/native compiler, then qualif
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Whole159 stops 142.92s with unchanged source and no artifacts. The current two
-errors are storage_parameter_fields51 (recursive Children.walk root) and
-resolved_body60 (frozen dependency Module publication at dependency_closure215).
-The preceding active-child Generator and Session/payload retention errors are
-cleared on the broader selected graph. See
-[whole159](../benchmarks/evidence/qualification/2026-11-10-goose-whole159.json.gz).
+Whole160 stops 157.07s with unchanged source and no artifacts. The current two
+errors are storage_global_footprint92 (completed slot-cache publication) and
+resolved_body60 (saved effect identities at purity_type_key59). Prior visitor
+and frozen Module errors clear. Their two affected native laws pass in 17.94s.
+See [whole160](../benchmarks/evidence/qualification/2026-11-10-goose-whole160.json.gz).
 
 Six affected production laws pass 67.46s before the last diagnostic-OOM correction;
 the final production diagnostic law passes 6.55s afterward. The most recent

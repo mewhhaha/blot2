@@ -2853,5 +2853,52 @@
       "storage_parameter_fields51: recursive Children.walk reborrows Walk atdifferent root (\u00a77.8)",
       "resolved_body60: frozen dependency Module pool may retain payloads via dependency_closure215 (\u00a75.1)"
     ]
+  },
+  "whole_build_160": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 157.072,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole160.json.gz",
+    "errors": [
+      "storage_global_footprint.slots92 self.all borrowed slice stored in completed map",
+      "resolved_body60 saved_identities may retain payloads via purity_type_key59"
+    ]
+  },
+  "parameter_frozen_module_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-parameter-frozen-module-laws.json.gz",
+      "2026-11-10-goose-frozen-module-owner-family.json.gz"
+    ],
+    "changes": [
+      "Children callback carries existing scalarWalkslot; visit reborrows sameexistingWalkentry",
+      "Returned field names reify existingnamedrun, independentofWalk/Moduleproducer",
+      "Adopted frozenModule stores canonicalnestedheader through adoptedparentowner; sameallocation/copy/errororder"
+    ],
+    "native_laws": {
+      "footprint_owner": 7.447,
+      "dependency_ownership": 10.496,
+      "total": 17.944
+    },
+    "whole160_previous_errors_cleared": true,
+    "whole_compiler_executable": false
   }
 }

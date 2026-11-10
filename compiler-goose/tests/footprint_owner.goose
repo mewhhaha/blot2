@@ -6,6 +6,7 @@ import std;
 import backend.storage_global_footprint;
 import backend.host_cleanup_shapes;
 import backend.storage_recursive_admission;
+import backend.storage_parameter_fields;
 import backend.scoped_backend;
 import backend.storage_type_arguments;
 import driver.compile_workspace;
@@ -101,7 +102,22 @@ fn pooledCleanup() {
   let node=blot_backend_host_cleanup_shapes::Node{id:1,tag:blot_backend_host_cleanup_shapes::Tag.record,children:blot_backend_host_cleanup_shapes::copyChildren([1 as u32,2 as u32]),fields:field,variants:blot_backend_host_cleanup_shapes::copyVariants([blot_backend_host_cleanup_shapes::Variant{tag:3,child:2}]),..};blot_backend_host_cleanup_shapes::deinit(node);
  }
 }
-fn main() {
+fn parameterFieldWalk() {
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let nodes,error=blot_reuse_dependency_payload::alloc<blot_check_core::Node>(owner,141);assert(error==blot_error::Error.none);for &node in nodes {node=blot_check_core::Node{tag:blot_check_core::Tag.invalid,..};}
+ nodes[1]=blot_check_core::Node{tag:blot_check_core::Tag.reference,a:0,..};nodes[2]=blot_check_core::Node{tag:blot_check_core::Tag.project,a:1,b:0,..};nodes[3]=blot_check_core::Node{tag:blot_check_core::Tag.project,a:1,b:1,..};nodes[4]=blot_check_core::Node{tag:blot_check_core::Tag.product,a:0,b:3,..};nodes[5]=blot_check_core::Node{tag:blot_check_core::Tag.reference,a:1,..};nodes[6]=blot_check_core::Node{tag:blot_check_core::Tag.product,a:3,b:1,..};
+ for index in 7..140 {nodes[index]=blot_check_core::Node{tag:blot_check_core::Tag.bind,b:(index-1) as u32,..};}nodes[140]=blot_check_core::Node{tag:blot_check_core::Tag.match_,..};
+ let references,error=owner.copy([blot_check_core::BindingRef{0,11},blot_check_core::BindingRef{0,12}]);assert(error==blot_error::Error.none);let extra,error=owner.copy([2 as u32,3 as u32,2 as u32,5 as u32]);assert(error==blot_error::Error.none);
+ let names,error=owner.copy("ab");assert(error==blot_error::Error.none);let fields,error=owner.copy([blot_check_core::FieldName{symbol:7,spelling:blot_check_core::Name{0,1}},blot_check_core::FieldName{symbol:9,spelling:blot_check_core::Name{1,1}}]);assert(error==blot_error::Error.none);
+ let projections,error=owner.copy([blot_check_core::Projection{field:7,..},blot_check_core::Projection{field:9,..}]);assert(error==blot_error::Error.none);
+ let modules,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(owner,1);assert(error==blot_error::Error.none);modules[0]=blot_reuse_dependency_owned_headers::canonical(owner,blot_check_core::Module{field_names:fields,unit:1,nodes:nodes,extra:extra,references:references,names:names,projections:projections,..});
+ let nominal=blot_support::none<blot_backend_storage_parameter_fields::NominalRecord>();
+ var selected,error=blot_backend_storage_parameter_fields::collect(modules[0],4,11,nominal);assert(error==blot_error::Error.none && !selected.whole && selected.names.items.len==2 && selected.names.items[0]==7 && selected.names.items[1]==9);
+ var foreign,error=blot_backend_storage_parameter_fields::collect(modules[0],6,11,nominal);assert(error==blot_error::Error.none && !foreign.whole && foreign.names.items.len==0);foreign.deinit();
+ for root in [1 as u32,139 as u32,140 as u32] {var whole,error=blot_backend_storage_parameter_fields::collect(modules[0],root,11,nominal);assert(error==blot_error::Error.none && whole.whole);whole.deinit();}
+ owner.deinit();var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);assert(selected.names.items.len==2 && selected.names.items[0]==7 && selected.names.items[1]==9);selected.deinit();
+}
+fn main() {parameterFieldWalk();
     pooledCleanup();
     transportAnchors();
     typeKeyHeader();

@@ -4,6 +4,7 @@ import driver.cli;
 import driver.cli_workers;
 import std;
 import reuse.retained_dependency;
+import reuse.dependency_closure;
 import reuse.dependency_owned_headers;
 import support.error;
 import driver.compile_workspace;
@@ -61,4 +62,15 @@ fn relocatedPublication() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
  assert(result.relocated_modules[0].present);inspect(result.relocated_modules[0].value);result.deinit();assert(!child.valid());
 }
-fn main() {relocatedPublication();for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}
+fn frozenModulePublication() {
+ var root,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let modules,error=blot_reuse_dependency_payload::alloc<FrozenModule>(root,2);assert(error==blot_error::Error.none);
+ var owned=module(1);let child=owned.owner;
+ assert(blot_reuse_dependency_closure::publishOwnedModule(root,modules,0,owned)==blot_error::Error.none);
+ assert(owned.owner.lease==0&&!child.valid());
+ var original=module(1);let copied,error=blot_reuse_dependency_payload::clone(original.value);assert(error==blot_error::Error.none);var selected=copied;
+ assert(blot_reuse_dependency_closure::publishOwnedModule(root,modules,1,selected)==blot_error::Error.none);assert(selected.owner.lease==0);original.deinit();
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+ inspect(modules[0]);inspect(modules[1]);root.deinit();
+}
+fn main() {frozenModulePublication();relocatedPublication();for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}

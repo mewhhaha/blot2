@@ -11,6 +11,13 @@ struct Names { storage: u32[:] = default<u32[:]>(),items: u32[:] = default<u32[:
 reusable[] var name_runs: u32[>..] = [];
 struct Fields { names: Names,whole: bool = false }
 fn deinit(fields: Fields&) { blot_support_pooled_buffer::deinit(fields.names,name_runs); }
+fn ownedNames(source: Names) -> Names {
+    let length = source.items.len; assert(length <= source.storage.len);
+    if source.storage.len == 0 { return Names {..}; }
+    let run = name_runs.realloc_slice(source.storage,source.storage.len); assert(blot_support::same_slice_identity(run,source.storage));
+    let start = name_runs.index_of(run[0]); let storage = name_runs[start..start + run.len];
+    assert(blot_support::same_slice_identity(storage[..length],source.items)); return Names { storage: storage,items: storage[..length] };
+}
 fn namedRecordProjection(module: const blot_check_core::Module&,index: u32) -> bool {
     let projection = module.projection(index); if projection.nominal.unit != 0 || projection.nominal.decl != 0 || projection.variants.len != 1 { return false; } let record = module.types.node(projection.source_type); if record.tag != blot_check_types::Tag.record { return false; } let variant = module.projectionVariants(index)[0]; return variant.tag == 0 && variant.field < record.b && module.types.recordField(record,variant.field).name == projection.field;
 }
@@ -26,15 +33,16 @@ fn nominalRecord(module: const blot_check_core::Module&,ty: u32,remaining: i64&)
 struct Walk { module: const blot_check_core::Module&,parameter: u32,nominal: blot_support::Option<NominalRecord>,fields: Fields,remaining: i64 = 100000 }
 reusable var walks: Walk[>..] = [];
 fn collect(module: const blot_check_core::Module&,root: u32,parameter: u32,nominal: blot_support::Option<NominalRecord>) -> Fields,Error {
-    let index = walks.alloc_index(Walk { module,parameter,nominal , ..}); let walk: Walk& = walks[index]; let error = visit(walk,root,0);
-    if error != blot_error::Error.none && error != blot_error::Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {..},error; } if error == blot_error::Error.plan_limit { walk.fields.whole = true; } let fields = walk.fields; walk.fields = Fields {..}; walks.free(index); return fields,blot_error::Error.none;
+    let index = walks.alloc_index(Walk { module,parameter,nominal , ..}); let walk: Walk& = walks[index]; let error = visit(index,root,0);
+    if error != blot_error::Error.none && error != blot_error::Error.plan_limit { walk.fields.deinit(); walks.free(index); return Fields {..},error; } if error == blot_error::Error.plan_limit { walk.fields.whole = true; } let fields = Fields { names: ownedNames(walk.fields.names),whole: walk.fields.whole }; walk.fields = Fields {..}; walks.free(index); return fields,blot_error::Error.none;
 }
 fn target(walk: const Walk&,reference: blot_check_core::BindingRef) -> bool { (reference.unit == 0 || reference.unit == walk.module.unit) && reference.binding == walk.parameter }
 fn wholeBinding(walk: Walk&,binding: u32) { if binding == walk.parameter { walk.fields.whole = true; } }
-struct Children { walk: Walk&,depth: i64 }
+struct Children { walk: i64,depth: i64 }
 fn append(children: Children&,id: u32) -> Error { visit(children.walk,id,children.depth) }
 fn appendSlice(children: Children&,ids: const u32[:]) -> Error { for id in ids { let error = append(children,id); if error != blot_error::Error.none { return error; } } return blot_error::Error.none; }
-recursive fn visit(walk: Walk&,id: u32,depth: i64) -> Error {
+recursive fn visit(index: i64,id: u32,depth: i64) -> Error {
+    let walk: Walk& = walks[index];
     if id == 0 || walk.fields.whole { return blot_error::Error.none; } if walk.remaining == 0 || depth > 128 { return blot_error::Error.plan_limit; } walk.remaining--; let module: const blot_check_core::Module& = walk.module; let node = module.node(id);
     match node.tag {
         reference=>{ if target(walk,module.reference(id)) { walk.fields.whole = true; } return blot_error::Error.none; },
@@ -48,5 +56,5 @@ recursive fn visit(walk: Walk&,id: u32,depth: i64) -> Error {
         constant,scalar,associated,logical,apply,record_merge,block_,suite,bind,return_,product,record,construct,array,array_op,storage,call,panic,break_=>{},
         _=>{ return blot_error::Error.plan_limit; },
     }
-    var children = Children { walk: walk,depth: depth + 1 , ..}; return blot_eval_body_recipe::appendChildren(children,module,id,false);
+    var children = Children { walk: index,depth: depth + 1 , ..}; return blot_eval_body_recipe::appendChildren(children,module,id,false);
 }
