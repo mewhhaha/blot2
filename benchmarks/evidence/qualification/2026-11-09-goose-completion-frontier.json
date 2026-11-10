@@ -2986,5 +2986,29 @@
     },
     "next": "Astra rename-onlycopieddiagnostic identifies owningfunction beforeargumentinterfacechanges",
     "whole_compiler_executable": false
+  },
+  "layout_admission_cursor_family": {
+    "raw_receipt": "2026-11-10-goose-layout-admission-cursors.json.gz",
+    "changes": [
+      "Nominal/layout/evidence loops use scalarcounts+leafloads, no retained arguments/parameter/constructor/type-fieldviews",
+      "Paired mapTypesUnder from/to slices replaced bycount+scalarID pairs",
+      "planValue product/record/call/capture paths, numericChildren Core-node-ID API andall6callers, recursivepatternchildlists converted",
+      "No newpool/allocation/copy, traversal/budget/effect-call ordering unchanged"
+    ],
+    "diagnostic_scope": "Identifier-only copiedrenames with exactroundtrip identifyshapeUncached.arguments andplanValue.children; productionidentifiers unchanged",
+    "partial167": "60.62s cappedwithoutdiagnostic, incomplete",
+    "partial168": "61.133s completed: pairedtypes to loan",
+    "partial169": "58.523s completed: planValue children loan",
+    "latest_scoped": {
+      "attempt": 170,
+      "seconds": 57.246,
+      "partial": true,
+      "source_unchanged": true,
+      "errors": [
+        "outeremit2600 whilemodule held; exactholderidentification pending"
+      ]
+    },
+    "current_runtime_qualification": "Cursor-only sourcefamily staticallyaudited; selectedgraph progresses; actualgeneratorexecution pending",
+    "whole_compiler_executable": false
   }
 }
