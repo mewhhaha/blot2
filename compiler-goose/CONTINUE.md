@@ -6,34 +6,34 @@ No forwarding to compiler/ and no ABI fallback.
 
 Whole289 clears fixed conversion stacks. Whole290 clears the effect Handle
 reader, then stops at partial expectation interning (`code_expectation:79`).
-163.377s, unchanged461 inputs, no artifacts. A grouped backend check reproduces
-that frontier in77.878s; use that bounded partial probe before another whole.
+163.377s, unchanged 461 inputs, no artifacts. A grouped backend check reproduces
+that frontier in 77.878s; use that bounded partial probe before another whole.
 
-Shared-map/shape batch passes five native laws19.705s and clears interning in
-backend291(75.582s). Eleven emission unitUses bindings now borrow canonical
-headers; backend292 clears the escape in76.47s. Next infinite lookup probe uses
-Goose `loop`. Combined native law passes6.56s: identity, lazy parent/flow upgrades,
-collision wraparound/missing lookups and owned snapshot independence. Backend293 clears both fixes in76.593s, then reaches a copied
-loop-local Module returned by reference in closed_local_value18. Broad pattern
-audit is running before the next batch. Whole build and actual CLI/server/OOM/retry/retention remain pending.
+The emission index and infinite lookup fixes clear their backend frontiers.
+Seven closed-local bindings now preserve borrowed module/body identity. Its native
+law passes in 2.666s, covering lookup order, fallback/missing IDs, data shapes and
+actual function dependencies. The wider loop-copy audit finds no other definite
+matches. Backend 294 clears the family in 78.281s with unchanged source, then
+stops at `owned_arrays.goose:103`: a nullable field needs a locally narrowed
+reference. Audit that pattern before the next repair batch.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
 no payload copies/newpins. Core catalog identity and effect generation checked.
-Retainedchildren survivegrowth; resetwithaliveview rejects2.755s. Frame release
+Retained children survive growth; reset with a live view rejects2.755s. Frame release
 invalidates both keys. Six stable-array experiment removed afterclear failures;
 original GS physicaltables retained. Two maps reuse existing Buckets.
 
-Three hard-bounded stacks use fixed128/128/16384 backing andscalarcounts. Five
-native laws pass26.09s summed stages, including full bounds, overflow, nested
+Three hard-bounded stacks use fixed 128/128/16384 backing and scalar counts. Five
+native laws pass 26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; current full44-law inventory still pending.
+receipts/rawlogs automatically; current full 45-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic
-controls; metadata/traversal build repeats33lifetime/24semantic controls.
-Unknown/inexact/local/recursive/over64root paths remain conservative. Installed
+controls; metadata/traversal build repeats 33 lifetime/24 semantic controls.
+Unknown/inexact/local/recursive/over-64-root paths remain conservative. Installed
 Goose unchanged. Trace:GOOSE_OPTIONS_ROOT_TRACE=1. Repair120s/emission180s/
 whole300s limits remain. No cap lifting or suppressed borrow checks.
 

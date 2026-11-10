@@ -15,7 +15,7 @@ type BindingRef=blot_check_core::BindingRef;
 struct Proof { dependencies: BindingRef[16],len: i64=0 }
 struct Scan { units: const Module[:],proof: Proof=Proof {..},remaining: i64=512 }
 fn unit(self_: Scan&,id: u32) -> const Module? {
- for module,index in self_.units { var actual=module.unit; if actual==0 { actual=(index+1) as u32; } if actual==id { return module; } } return null;
+ for &module,index in self_.units { var actual=module.unit; if actual==0 { actual=(index+1) as u32; } if actual==id { return module; } } return null;
 }
 fn step(self_: Scan&,depth: i64) -> bool { if depth>=32||self_.remaining==0 { return false; } self_.remaining--; return true; }
 fn row(m: const Module&,id: u32,certificates: blot_check_types::List) -> bool {
@@ -40,16 +40,16 @@ recursive fn shape(self_: Scan&,m: const Module&,id: u32,certificates: blot_chec
 }
 fn dependency(self_: Scan&,target: BindingRef) -> bool { for prior in self_.proof.dependencies[..self_.proof.len] { if prior.unit==target.unit&&prior.binding==target.binding { return true; } } if self_.proof.len==16 { return false; } self_.proof.dependencies[self_.proof.len]=target; self_.proof.len++; return true; }
 recursive fn value(self_: Scan&,owner: u32,id: u32,parameters: const Parameter[:],depth: i64) -> bool {
- if !step(self_,depth)||id==0 { return false; } let module=unit(self_,owner); if module==null { return false; } let m=module; let n=m.node(id); let tag=n.tag;
+ if !step(self_,depth)||id==0 { return false; } let module .=unit(self_,owner); if module==null { return false; } let m .=module; let n=m.node(id); let tag=n.tag;
  if tag!=blot_check_core::Tag.return_||m.types.node(n.ty).tag!=blot_check_types::Tag.never { if !shape(self_,m,n.ty,blot_check_types::List {},false,depth+1) { return false; } }
  if tag==blot_check_core::Tag.constant { return shape(self_,m,n.ty,blot_check_types::List {},true,depth+1); }
  if tag==blot_check_core::Tag.reference {
   let reference=m.reference(id); if reference.unit==0||reference.unit==owner { for parameter in parameters { if parameter.binding!=0&&parameter.binding==reference.binding { return true; } } }
   var target=reference; if target.unit==0 { target.unit=owner; }
   for i in 0..16 {
-   let producer=unit(self_,target.unit); if producer==null { return false; } let binding=producer.binding(target.binding);
+   let producer .=unit(self_,target.unit); if producer==null { return false; } let binding=producer.binding(target.binding);
    if binding.kind==blot_reuse_principal_interface::Kind.external { target=binding.target; continue; }
-   let body=producer.body(target.binding); if body==null { return false; }
+   let body .=producer.body(target.binding); if body==null { return false; }
    if !body.is_function||body.runtime||binding.capability_flow!=blot_check_capability_flow::Contract.input_shape||binding.scheme.generative.len!=0||!binding.capability_parameters.valid() { return false; } return dependency(self_,target);
   }
   return false;
@@ -61,9 +61,9 @@ recursive fn value(self_: Scan&,owner: u32,id: u32,parameters: const Parameter[:
  if tag==blot_check_core::Tag.call {
   var target=m.call(id).target; if target.unit==0 { target.unit=owner; }
   for i in 0..16 {
-   let producer=unit(self_,target.unit); if producer==null { return false; } let binding=producer.binding(target.binding);
+   let producer .=unit(self_,target.unit); if producer==null { return false; } let binding=producer.binding(target.binding);
    if binding.kind==blot_reuse_principal_interface::Kind.external { target=binding.target; continue; }
-   let body=producer.body(target.binding); if body==null { return false; } if !body.is_function||body.runtime||body.scheme.obligations.len!=0 { return false; }
+   let body .=producer.body(target.binding); if body==null { return false; } if !body.is_function||body.runtime||body.scheme.obligations.len!=0 { return false; }
    let arguments=m.children(id); if arguments.len!=body.parameters.len { return false; }
    if !shape(self_,producer,binding.ty,body.closed_rows,false,depth+1) { return false; }
    var arrow=binding.ty;
@@ -76,4 +76,4 @@ recursive fn value(self_: Scan&,owner: u32,id: u32,parameters: const Parameter[:
  return false;
 }
 fn analyze(units: const Module[:],owner: u32,initializer: u32) -> Proof,bool { var scan=Scan {units:units}; let proven=value(scan,owner,initializer,[],0); return scan.proof,proven; }
-fn dataShape(units: const Module[:],owner: u32,ty: u32) -> bool { var scan=Scan {units:units}; let module=unit(scan,owner); if module==null { return false; } return shape(scan,module,ty,blot_check_types::List {},false,0); }
+fn dataShape(units: const Module[:],owner: u32,ty: u32) -> bool { var scan=Scan {units:units}; let module .=unit(scan,owner); if module==null { return false; } return shape(scan,module,ty,blot_check_types::List {},false,0); }

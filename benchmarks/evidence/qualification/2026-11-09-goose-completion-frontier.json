@@ -4188,5 +4188,47 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "closed_local_reference_family": {
+    "source_edits": 7,
+    "native": {
+      "receipt": "2026-11-10-goose-closed-local-laws.json.gz",
+      "passed": true,
+      "sum_stage_seconds": 2.666
+    },
+    "coverage": [
+      "module identity across nested block",
+      "explicit duplicate ID lookup order",
+      "zero-ID ordinal fallback",
+      "missing IDs",
+      "primitive/array/function dataShape",
+      "constant analysis",
+      "actual function call dependency"
+    ],
+    "read_only_port_audit": "No other definite by-value loop binding returned by reference found",
+    "whole_compiler_executable": false,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-closed-local294.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 78.281,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/owned_arrays.goose",
+          "line": 103,
+          "message": "error: optional value must be narrowed (if/guard/assert) before use"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "c0fc90413a6b22f71a32601aaca8401231764368a7115255cd7f3dcc3c4e300b",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }
