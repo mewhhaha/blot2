@@ -20,6 +20,24 @@ reusable[] var owned_words: u32[>..] = [];
 reusable[] var node_runs: Node[>..] = [];
 reusable[] var bucket_slots: dictionary_slot<u64,u32>[>..] = [];
 reusable[] var memo_slots: dictionary_slot<Reference,Memo>[>..] = [];
+// Invocation-only span; its Words owner retains this unchanged run.
+struct WordRun { start: i64 = 0,len: i64 = 0,capacity: i64 = 0 }
+fn wordRun(words: const Words&) -> WordRun {
+    assert(words.items.len >= 0 && words.items.len <= words.storage.len);
+    if words.storage.len == 0 { assert(words.items.len == 0); return WordRun {..}; }
+    let storage = word_runs.realloc_slice(words.storage,words.storage.len);
+    assert(blot_support::same_slice_identity(storage,words.storage));
+    assert(blot_support::same_slice_identity(storage[..words.items.len],words.items));
+    return WordRun { start: word_runs.index_of(storage[0]),len: words.items.len,capacity: storage.len };
+}
+fn view(run: WordRun) -> const u32[:] {
+    assert(run.start >= 0 && run.len >= 0 && run.capacity >= run.len && run.start <= word_runs.len && run.capacity <= word_runs.len - run.start);
+    if run.capacity == 0 { return default<const u32[:]>(); }
+    let source = word_runs[run.start..run.start + run.capacity];
+    let storage = word_runs.realloc_slice(source,source.len);
+    assert(blot_support::same_slice_identity(storage,source));
+    return word_runs[run.start..run.start + run.len];
+}
 fn push(words: Words&,word: u32) -> Error { blot_support_pooled_buffer::push(words,word,word_runs) }
 fn append(words: Words&,values: const u32[:]) -> Error { blot_support_pooled_buffer::append(words,values,word_runs) }
 fn resize(words: Words&,length: i64) { blot_support_pooled_buffer::resize(words,length); }

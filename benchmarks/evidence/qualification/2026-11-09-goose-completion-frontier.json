@@ -2928,5 +2928,38 @@
     },
     "next": "Astra reviewing bounded scalar planning request IR over existing pools; no checker changes",
     "whole_compiler_executable": false
+  },
+  "scalar_planning_request_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-scalar-plan-input-laws.json.gz",
+      "2026-11-10-goose-scalar-plan-input-family.json.gz",
+      "2026-11-10-goose-scoped163.json.gz"
+    ],
+    "changes": [
+      "New small storage_function_plan_input module: genericInput<V> uses moduleunitID, existingordinalTable/word/access ranges, existingrejectionslot",
+      "Graph/key/access observations revalidateexactexistingruns; synchronouscallerownershipretained; no newpool/clone/copy",
+      "Two requestconstructors andallconsumersconverted; oldreferencefieldsremoved",
+      "Graph ordinalSnapshot onlyretains hashTableRange, ownerorderalreadyinMetadata.indexes"
+    ],
+    "independent_review": "Sol found no semanticblocker in ownerlifetimes, identity, lookup/order, errors or retry/rollback",
+    "native_laws": {
+      "function_plan_input": 3.441,
+      "footprint_owner": 7.599,
+      "storage_call_cache": 6.342,
+      "total": 17.382
+    },
+    "current_inventory": 31,
+    "complete_inventory_current_source": false,
+    "latest_scoped": {
+      "attempt": 163,
+      "seconds": 56.406,
+      "partial": true,
+      "source_unchanged": true,
+      "old_request_frontier_cleared": true,
+      "errors": [
+        "scoped_backend2426 expressionProduct Corechild view held acrossrecursiveexpression (\u00a75.2)"
+      ]
+    },
+    "runtime_qualification": "ActualgenericInput<Value> typechecked to nextfrontier; fullgenerator/CLI/server stillpending"
   }
 }

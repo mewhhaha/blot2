@@ -21,15 +21,24 @@ foreign/whole/depth/unsupported fallbacks, result-owner independence and adopted
 fresh/cloned nested Module payloads across Frame/reclamation. See
 [the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-parameter-frozen-module-laws.json.gz).
 
-Current selected162 reaches FunctionPlanInput publication at scoped_backend1843
-(§7.8), after footprint-cache repair; a bounded scalar request IR is under review.
-The cache/effect-key pair passes 14.68s; added transitive cache/Frame coverage
-passes 7.56s. Footprint cache publication now reifies existing slot/node runs.
-Effect scratch owns already-required encodings plus scalar text ranges, preserving
-exact order/bytes without more successful text copies/allocations. Encodings stay
-live through sort/emit; scratch headers grow 8B/entry. See
-[the family receipt](benchmarks/evidence/qualification/2026-11-10-goose-footprint-purity-laws.json.gz)
-and [transitive cache law](benchmarks/evidence/qualification/2026-11-10-goose-footprint-cache-transitive.json.gz).
+Current selected163 takes 56.41s and clears FunctionPlanInput publication. The
+next boundary is scoped_backend2426: a Core child-ID view held across recursive
+expression evaluation (§5.2). A coherent Core-view traversal repair is next.
+
+Planning requests now contain scalar unit IDs and ranges into existing graph,
+evidence and recursive-access owners, plus the existing rejection slot. They
+retain no module/graph/key headers; observations reborrow unchanged existing
+runs. No new pool, copy or clone. The durable snapshot/cache/footprint trio passes
+**17.38s**. Actual Input<Value> checks through the old request frontier;
+full generator runtime remains pending. Inventory now 31 laws, not yet run together.
+See [the scalar request receipt](benchmarks/evidence/qualification/2026-11-10-goose-scalar-plan-input-family.json.gz)
+and [production trio](benchmarks/evidence/qualification/2026-11-10-goose-scalar-plan-input-laws.json.gz).
+
+The cache/effect-key pair passes 14.68s; transitive cache/Frame coverage passes 7.56s.
+Footprint cache publication reifies existing slot/node runs. Effect scratch owns
+already-required encodings and scalar text ranges, preserving exact order/bytes
+without more successful text copies/allocations. Encodings stay live through
+sort/emit; scratch headers grow 8B/entry. Exact scopes remain in the receipt index.
 
 Six affected production laws pass together in **67.46s**: proof leases,
 diagnostics, semantic outcomes, worker pins, key cache and resolved bodies.

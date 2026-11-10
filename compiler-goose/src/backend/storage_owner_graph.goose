@@ -40,6 +40,24 @@ recursive fn visit<V,C>(graph: Graph<V>&,context: const C&,value: V,owner_count:
     match value.tag { callable=>{ if !value.callable.present { return blot_error::Error.declined; } },_=>{}, }
     if value.root.present { let error = add(graph,value.root.value,owner_count); if error != blot_error::Error.none { return error; } } for owner in context.otherRoots(value) { let error = add(graph,owner,owner_count); if error != blot_error::Error.none { return error; } } for field in context.children(value) { let error = visit(graph,context,field,owner_count,stored,depth + 1); if error != blot_error::Error.none { return error; } } return blot_error::Error.none;
 }
+// Invocation-only view: the graph owner must remain alive and unchanged.
+struct OrdinalRun { start: i64 = 0,len: i64 = 0 }
+fn ordinalRun<V>(graph: const Graph<V>&) -> OrdinalRun {
+    if graph.ordinals.slots.len == 0 { assert(graph.ordinals.count == 0); return OrdinalRun {..}; }
+    let slots = ordinal_slots.realloc_slice(graph.ordinals.slots,graph.ordinals.slots.len);
+    assert(blot_support::same_slice_identity(slots,graph.ordinals.slots));
+    return OrdinalRun { start: ordinal_slots.index_of(slots[0]),len: slots.len };
+}
+fn ordinal(run: OrdinalRun,owner: i64) -> i64,Error {
+    assert(run.start >= 0 && run.len >= 0 && run.start <= ordinal_slots.len && run.len <= ordinal_slots.len - run.start);
+    if run.len == 0 { return 0,blot_error::Error.declined; }
+    let source = ordinal_slots[run.start..run.start + run.len];
+    let slots = ordinal_slots.realloc_slice(source,source.len);
+    assert(blot_support::same_slice_identity(slots,source));
+    let found .= blot_support_pooled_map::getSlots(slots,owner);
+    if found { return found,blot_error::Error.none; }
+    return 0,blot_error::Error.declined;
+}
 fn ordinal<V>(graph: const Graph<V>&,owner: i64) -> i64,Error { let found .= blot_support_pooled_map::get(graph.ordinals,owner); if found { return found,blot_error::Error.none; } return 0,blot_error::Error.declined; }
 recursive fn edges<V,C,D>(graph: const Graph<V>&,context: const C&,value: V,evidence: D&) -> Error {
     var first: u32 = 4294967295; if value.root.present { let selected,error = ordinal(graph,value.root.value); if error != blot_error::Error.none { return error; } first = selected as u32; } let root = blot_backend_storage_type_key::appendOutput(evidence,first); if root != blot_error::Error.none { return root; } let others = context.otherRoots(value); let count = blot_backend_storage_type_key::appendOutput(evidence,others.len as u32); if count != blot_error::Error.none { return count; }

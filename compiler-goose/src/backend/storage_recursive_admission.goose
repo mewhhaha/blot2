@@ -33,6 +33,22 @@ reusable[] var solved_pool: dictionary_slot<Ref,Contract>[>..] = [];
 reusable[] var alias_pool: dictionary_slot<u32,u32>[>..] = [];
 struct Cache {candidates: blot_support_pooled_map::Map<Ref,bool> = blot_support_pooled_map::Map<Ref,bool> {..},sources: blot_support_pooled_map::Map<Ref,blot_support::Option<Direct>> = blot_support_pooled_map::Map<Ref,blot_support::Option<Direct>> {..},completed: blot_support_pooled_map::Map<Ref,blot_support::Option<Contract>> = blot_support_pooled_map::Map<Ref,blot_support::Option<Contract>> {..},contracts: Contracts = Contracts {..},discovery_bodies: i64 = 0,discovery_nodes: i64 = 0,scans: i64 = 0,nodes: i64 = 0}
 fn registeredAccess(values:const Access[:])->const Access[:] {if values.len==0 {return default<const Access[:]>();}let owned=access_pool.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));return owned;}
+// Invocation-only access run retained by the admission cache.
+struct AccessRun { start: i64 = 0,len: i64 = 0 }
+fn accessRun(contract: Contract) -> AccessRun {
+    if contract.parameter_access.len == 0 { return AccessRun {..}; }
+    let access = access_pool.realloc_slice(contract.parameter_access,contract.parameter_access.len);
+    assert(blot_support::same_slice_identity(access,contract.parameter_access));
+    return AccessRun { start: access_pool.index_of(access[0]),len: access.len };
+}
+fn accessAt(run: AccessRun,index: i64) -> Access {
+    assert(run.start >= 0 && run.len >= 0 && run.start <= access_pool.len && run.len <= access_pool.len - run.start);
+    assert(index >= 0 && index < run.len);
+    let source = access_pool[run.start..run.start + run.len];
+    let access = access_pool.realloc_slice(source,source.len);
+    assert(blot_support::same_slice_identity(access,source));
+    return access[index];
+}
 fn registeredContract(value:Contract)->Contract {return Contract{parameter_access:registeredAccess(value.parameter_access),self_recursive:value.self_recursive,work:value.work,backedges:value.backedges};}
 
 fn freeAccess(values: const Access[:]) {if values.len != 0 {let owned=access_pool.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(owned,values));access_pool.free_slice(owned);}}
