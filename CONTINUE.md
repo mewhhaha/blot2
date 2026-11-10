@@ -6,45 +6,48 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-Actual whole177 checks 459 unchanged inputs in **155.05s**, then stops:
+Actual whole190 stops after **157.73s** with unchanged inputs and no artifacts.
+Its sole error is `reuse/artifact_fragment.goose:102`: an incoming Capture value
+retains the invocation's `old` reference (§9.2). The previous whole177 module-stamp
+and server source-header failures are cleared. See
+[whole190](benchmarks/evidence/qualification/2026-11-10-goose-whole190.json.gz).
 
-- `backend/core_backend.goose:1830`: module stamps retain the run-local module
-  view (§9.2). Reborrow the existing pinned input owner before publication.
-- `backend/resolved_body.goose:60`: global `source_runs` may retain payloads
-  through `reuse/zig_project_server.goose:66` (§5.1). Its headers are invocation
-  scratch; source text is copied by existing revision snapshots.
+A focused `prepare` root reproduces that same source error in **2.87s**. This is
+an iteration improvement, not compiler throughput. The root traverses actual
+preparation with deliberately unstaged inputs; never execute it. Source/diagnostic
+history is in [the preparation receipts](benchmarks/evidence/qualification/2026-11-10-goose-prepare-boundary-family.json.gz).
+The earlier actual scoped path checks cleanly in 61.47s at e3bf1904; it also uses
+invalid empty Core and does not qualify runtime.
 
-No C/header/native artifact exists. The prior whole173 scoped-diagnostic and
-worker-request failures are cleared. Exact source/diagnostics:
-[whole177](benchmarks/evidence/qualification/2026-11-10-goose-whole177.json.gz).
+The affected five native laws pass in **63.48s**: record ordering, proof/Recorder
+leases, identity authority, prepared input/session lifetime and server request
+snapshot ownership. Exact closures, C/link/run logs and audits:
+[executed family](benchmarks/evidence/qualification/2026-11-10-goose-preparation-owner-laws.json.gz).
+The earlier input/server/proof trio passes 53.88s, before final strengthening.
+Inventory is now **34**; it has not run together. Complete32 passes 288.97s at
+`e514479e`, before the later families. Do not present it as current-source coverage.
 
-The actual scoped backend path now checks cleanly in **61.47s**, with unchanged
-source. This is a partial check using deliberately invalid empty Core, not runtime
-qualification: [selected176](benchmarks/evidence/qualification/2026-11-10-goose-scoped176.json.gz).
-The recursive scoped run is removed. A cleanup-only helper preserves the 13
-result-before-cleanup exits and original order. Internal diagnostics now store
-only scalar unit/span/code/detail ID; public diagnostics expand at the result
-boundary. All original string literals are unchanged; 61 exact message IDs have
-matching lookup/render controls. No new owner, buffer, pool or allocation. Lookup
-occurs only when recording a failure. Native diagnostic/executor/assembly laws
-pass in **24.30s**, including scalar diagnostics across producer retirement and
-Frame. See [the source audit](benchmarks/evidence/qualification/2026-11-10-goose-scalar-diagnostic-family.json.gz)
-and [executed trio](benchmarks/evidence/qualification/2026-11-10-goose-scalar-diagnostic-laws.json.gz).
+CompileRun drops its duplicate module header and reads the existing pinned input
+owner. Workspace/prior Pools reborrow checked canonical owners. Recorder reset
+clears transient fields in place, preserving its tables and lease/generation.
+Server source headers are invocation-local; the global scratch pool is removed.
+Source/deletion/UTF8/assets validation and existing snapshot text copies remain.
+Record-name maps hold scalar unit/name spans, resolving text in O(1) for exact
+lexical ordering, duplicate checks and fallback. No name copying or new owner.
 
-Both lower/check request publications now reborrow exact existing packet runs.
-The executor law retires its producer, opens/releases a compiler Frame, then
-reads the live request bytes. The executor/resolved-body pair passes **44.82s**:
-[packet laws](benchmarks/evidence/qualification/2026-11-10-goose-lexical-packet-laws.json.gz).
+Compile identities now state their authority: CLI Metadata pools or a retained
+project journal. Read-only observers validate exact existing runs; journal reads
+work while shared and never call unique/mutable. All three journal producers pass
+their actual owner key. The unused arbitrary-View entry is removed. No new pool,
+registry or copy. Reusable server header capacity becomes local growth, and name
+reads add an O(1) module lookup; these costs have not been benchmarked.
 
-The complete **32-law inventory passes in 288.97s at e514479e**, before this last
-family. All stages keep their 30s cap. Do not present that older run as a complete
-current-source gate: [complete32](benchmarks/evidence/qualification/2026-11-10-goose-complete32.json.gz).
-Assembly retries own scratch lexically; cleanup remains bodies → parallel →
-matcher → passes → profile, with original error/retry order. Native assembly,
-collector rejection, owned packet/image round trips and profile hash controls
-pass. Packet names/data retirement, Frame spanning of those Wasm images, real
-process scheduling and full CLI/server remain pending. Slice-only packet copies
-stage through a grow array; cost is not benchmarked.
+Scoped diagnostic carriers remain scalar; all original strings and 61 exact
+lookup/render IDs are preserved. Assembly scratch is lexical and retains its
+original cleanup/error/retry order. Current native leaf controls do not qualify
+full generation, process scheduling, CLI/server or retained compilation runtime.
+The next Capture registry repair is prepared off-tree and not checkpointed yet;
+reuse its existing registry and preserve the header key at core publish/reset.
 
 ## Contracts and remaining coverage
 

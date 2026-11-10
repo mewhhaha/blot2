@@ -1549,11 +1549,11 @@ recursive fn recordMerge(owner: Owner&,id: u32,depth: i64) -> Error {
 }
 fn physicalOrder(owner: Owner&,record: blot_check_types::Node,out: WordBuffer&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); assert(record.tag == blot_check_types::Tag.record); if record.b < 2 { return blot_error::Error.none; } var ordered = true;
-    for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return blot_error::Error.none; }
+    for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return blot_error::Error.none; }
     var sorted = WordBuffer {..};
     recursive fn cleanup_continuation_23() -> Error {
  for index in 0..record.b { let appended = sorted.push(index as u32); if appended != blot_error::Error.none { return appended; } }
-    for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
+    for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
     for index in 0..record.b { let appended = out.push(0); if appended != blot_error::Error.none { return appended; } } for original,index in sorted.items { out.items[original] = index as u32; } return blot_error::Error.none;
 
     }

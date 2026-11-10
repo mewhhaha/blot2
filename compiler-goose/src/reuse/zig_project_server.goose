@@ -59,11 +59,16 @@ struct Request {
 }
 fn validPath(path:const u8[:])->bool {if path.len==0 || path[0]!='/' {return false;}for byte in path {if byte==0 {return false;}}return true;}
 fn utf8(bytes:const u8[:])->bool {var at:i64=0;while at<bytes.len {let width=blot_parse_lexer::utf8_width(bytes[at]);if width==0 || width>bytes.len-at {return false;}let point,error=blot_parse_lexer::decode_point(bytes[at..at+width]);if error!=blot_error::Error.none {return false;}at+=width;}return true;}
-reusable[] var source_runs:Source[>..]=[];
-fn sourceViews(ranges:const SourceRange[:],payload:const u8[:])->Source[:],Error {return rangeViews(ranges,payload,0,true);}
-fn rangeViews(ranges:const SourceRange[:],payload:const u8[:],start:i64,require_utf8:bool)->Source[:],Error {
-    if ranges.len>4096 {return default<Source[:]>(),blot_error::Error.source_limit;}if start<0 || start>payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}var end=start;for range in ranges {if !validPath(range.path) || range.start!=end || range.length>payload.len-end || (range.deleted && range.length!=0) {return default<Source[:]>(),blot_error::Error.invalid_sources;}end+=range.length;if require_utf8 && !utf8(payload[range.start..end]) {return default<Source[:]>(),blot_error::Error.invalid_sources;}}if end!=payload.len {return default<Source[:]>(),blot_error::Error.invalid_sources;}
-    let result=source_runs.alloc_slice(ranges.len);for range,index in ranges {var contents=blot_support::none<const u8[:]>();if !range.deleted {contents=blot_support::some<const u8[:]>(payload[range.start..range.start+range.length]);}result[index]=Source{path:range.path,contents:contents};}return result,blot_error::Error.none;
+fn sourceViews(ranges:const SourceRange[:],payload:const u8[:],result:Source[>..]&)->Error {return rangeViews(ranges,payload,0,true,result);}
+// Only invocation-local headers borrow the live request; snapshots own their bytes.
+fn rangeViews(ranges:const SourceRange[:],payload:const u8[:],start:i64,require_utf8:bool,result:Source[>..]&)->Error {
+    assert(result.len==0);
+    if ranges.len>4096 {return blot_error::Error.source_limit;}if start<0 || start>payload.len {return blot_error::Error.invalid_sources;}var end=start;for range in ranges {if !validPath(range.path) || range.start!=end || range.length>payload.len-end || (range.deleted && range.length!=0) {return blot_error::Error.invalid_sources;}end+=range.length;if require_utf8 && !utf8(payload[range.start..end]) {return blot_error::Error.invalid_sources;}}if end!=payload.len {return blot_error::Error.invalid_sources;}
+    for range in ranges {
+        if range.deleted {result.push(Source{path:range.path,contents:blot_support::none<const u8[:]>()});}
+        else {result.push(Source{path:range.path,contents:blot_support::Option<const u8[:]> {true,payload[range.start..range.start+range.length]}});}
+    }
+    return blot_error::Error.none;
 }
 // Composition borrows byte payloads; the revision snapshot performs the owned copy.
 fn composeSources(sources:const Source[:],assets:const blot_backend_native_assets::Candidate?,merged:Source[>..]&)->const Source[:] {
@@ -74,7 +79,6 @@ fn composeSources(sources:const Source[:],assets:const blot_backend_native_asset
     }
     return sources;
 }
-fn releaseSources(sources:Source[:]) {if sources.len!=0 {source_runs.free_slice(sources);}}
 fn validateOpen(request:Request)->Options,Error {
     if !request.version.present || request.version.value!=protocol_version {return Options{..},blot_error::Error.version_mismatch;}if request.codegenWorkers==0 || request.codegenWorkers>16 {return Options{..},blot_error::Error.invalid_open;}if request.storage.present && !request.storage.value.valid() {return Options{..},blot_error::Error.invalid_open;}if !request.entry.present || !validPath(request.entry.value) || request.epoch.present || request.revision.present {return Options{..},blot_error::Error.invalid_open;}
     for path in [request.prelude,request.stdRoot,request.dependencies] {if path.present && !validPath(path.value) {return Options{..},blot_error::Error.invalid_open;}}

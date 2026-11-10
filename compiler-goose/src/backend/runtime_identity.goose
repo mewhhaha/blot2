@@ -65,3 +65,17 @@ fn copy(names:View)->Metadata,blot_error::Error {
  let bytes=metadata_bytes.alloc_slice(names.bytes.len);let symbols=metadata_names.alloc_slice(names.symbols.len);let owners=metadata_names.alloc_slice(names.owners.len);
  for byte,index in names.bytes {bytes[index]=byte;}for name,index in names.symbols {symbols[index]=name;}for name,index in names.owners {owners[index]=name;}return Metadata {bytes,symbols,owners, ..},blot_error::Error.none;
 }
+
+fn registeredMetadataBytes(bytes:const u8[:])->const u8[:] {
+ if bytes.len==0 {return default<const u8[:]>();}
+ let owned=metadata_bytes.realloc_slice(bytes,bytes.len);assert(blot_support::same_slice_identity(owned,bytes));
+ let start=metadata_bytes.index_of(owned[0]);return metadata_bytes[start..start+owned.len];
+}
+fn registeredMetadataNames(names:const Name[:])->const Name[:] {
+ if names.len==0 {return default<const Name[:]>();}
+ let owned=metadata_names.realloc_slice(names,names.len);assert(blot_support::same_slice_identity(owned,names));
+ let start=metadata_names.index_of(owned[0]);return metadata_names[start..start+owned.len];
+}
+fn registeredMetadataView(value:View)->View {
+ return View{bytes:registeredMetadataBytes(value.bytes),symbols:registeredMetadataNames(value.symbols),owners:registeredMetadataNames(value.owners)};
+}

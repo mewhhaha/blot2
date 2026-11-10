@@ -55,7 +55,7 @@ struct Store {
 // Private probes enter with one lexical set of typed owners. Their callback
 // returns before any of this physical store's backing storage is released.
 fn withStore<C,F>(context: C&) -> blot_error::Error {
-    var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id> = dictionary<u64,Id>{}; var names: dictionary<u32,const u8[:]> = dictionary<u32,const u8[:]>{};
+    var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id> = dictionary<u64,Id>{}; var names: dictionary<u32,blot_check_record_order::RecordName> = dictionary<u32,blot_check_record_order::RecordName>{};
     var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets: dictionary<u64,u32> = dictionary<u64,u32>{}; var solver_owners: blot_backend_runtime_ir::Range[>..<] = []; var solver_binders: u32[>..<] = []; var type_owners: u32[>..<] = [];
     let effects,error = blot_check_effect_evidence::init(); if error != blot_error::Error.none { return error; }
     var store = Store { closed: ClosedLayouts { units: default<const blot_check_core::Module[:]>(),kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts , ..},opaque_sources: default<const blot_check_core::Module[:]>(),record_names: blot_check_record_order::init(names),effects: effects,nodes: nodes,extra: extra,universal_dictionaries: universal_dictionaries,next: next,buckets: buckets,solver_owners: solver_owners,solver_binders: solver_binders,type_owners: type_owners , ..};
@@ -191,12 +191,12 @@ fn internStateProvider(store: Store&, read: Id, write: Id, state: Id) -> Id, blo
 fn internRecord(store: Store&, values: const u32[:]) -> Id, blot_error::Error {
     if values.len % 2 != 0 { return 0, blot_error::Error.type_mismatch; }
     var ordered = true; var offset = 2;
-    while offset < values.len { if !store.record_names.less(values[offset - 2], values[offset]) { ordered = false; break; } offset += 2; }
+    while offset < values.len { if !store.record_names.less(store.opaque_sources,values[offset - 2], values[offset]) { ordered = false; break; } offset += 2; }
     if ordered { return intern(store, Tag.record, 0, 0, values); }
     var fields: u32[>..<] = []; fields.append(values); let count = values.len / 2;
     for index in 1..count {
         let field_name = fields[index * 2]; let field_type = fields[index * 2 + 1]; var next = index;
-        while next > 0 && store.record_names.less(field_name, fields[(next - 1) * 2]) { fields[next * 2] = fields[(next - 1) * 2]; fields[next * 2 + 1] = fields[(next - 1) * 2 + 1]; next--; }
+        while next > 0 && store.record_names.less(store.opaque_sources,field_name, fields[(next - 1) * 2]) { fields[next * 2] = fields[(next - 1) * 2]; fields[next * 2 + 1] = fields[(next - 1) * 2 + 1]; next--; }
         fields[next * 2] = field_name; fields[next * 2 + 1] = field_type;
     }
     for index in 1..count { if fields[index * 2] == fields[(index - 1) * 2] { return 0, blot_error::Error.type_mismatch; } }

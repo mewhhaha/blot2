@@ -4,22 +4,24 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole177 stops after 155.05s with 459 unchanged inputs and no artifacts.
-It clears the preceding diagnostic/request failures. Two new boundaries remain:
-core_backend1830 publishes run-local module views to module stamps (§9.2), and
-source_runs retains request payloads through zig_project_server66 (§5.1).
+Actual whole190 stops in 157.73s with unchanged source and no artifacts. The
+sole error is artifact_fragment102 storing an incoming Capture value (§9.2).
+Previous module-stamp and source_runs errors are cleared. Its existing-registry
+Capture reborrow repair is prepared off-tree; preserve header keys during publish.
 
-Selected176 now checks the actual scoped backend path cleanly in 61.47s. It uses
-invalid empty Core and does not qualify runtime. Recursive scoped run is removed;
-cleanup-only helper preserves all 13 result-before-cleanup exits. Scoped diagnostic
-carriers are scalar; all original strings survive through 61 exact lookup/render
-IDs. The native diagnostic/executor/assembly trio passes 24.30s. Executor/resolved
-body laws pass 44.82s, including request bytes across producer retirement/Frame.
+Focused prepare reproduces the same error in 2.87s. This is partial/check-only,
+with deliberately unstaged inputs; never execute it. The actual scoped path
+checked cleanly in 61.47s at e3bf1904, also without runtime qualification.
 
-The complete 32-law inventory passed in 288.97s at e514479e, before this last
-family. Stages retain 30s caps. Assembly retry ownership, cleanup, success/rejection,
-worker-image copies and profile digest laws pass; full compiler/process runtime
-is still pending. See the root frontier for exact scopes and limits.
+Five current native laws pass in 63.48s: record ordering, proof/Recorder leases,
+identity owners, prepared inputs and request snapshots. CompileRun uses pinned
+inputs; Recorder resets in place; source headers are local; record names are
+scalar coordinates. Identity views explicitly select Metadata pools or shared
+journal authority and reborrow exact readonly runs without new copies/pools.
+
+Inventory now 34, not yet run together. Complete32 passed 288.97s at e514479e
+before later repairs; it is not a current full gate. Actual full compiler/process
+runtime remains pending. See root frontier for exact evidence and tradeoffs.
 
 Use private checker c2b24 at build/goose-port/argcopy-experiment-20261110/goose.
 Installed Goose/678 and the off-tree origin checker are unchanged. Selected roots

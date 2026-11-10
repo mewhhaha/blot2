@@ -152,7 +152,24 @@ fn recorderCompaction() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);match recorder.events.items[1] {query item=>{let retained .=item.value.judgment;assert(retained && retained.inputs.types[0].variable==7);},_=>{assert(false);}}
  owner.deinit();let replacement,error=template.clone();assert(error==blot_error::Error.none && replacement);let next:blot_reuse_constant_receipt::Query& =replacement;let next_judgment .=next.judgment;assert(next_judgment && next.allocation_index==query_slot && next_judgment.allocation_index==judgment_slot);next.destroy();blot_eval_core_eval::deinitOwnedSession(session);
 }
-fn main() {recorderCompaction();replayQueryOwnership();retainedEvidence();registeredWorkspaceSources();
+var recorder_reset_job:u32=7;
+var recorder_reset_clock:u64=11;
+fn recorderReset() {
+ let allocated,error=blot_reuse_artifact_emitter::initPooledRef();assert(error==blot_error::Error.none && allocated);
+ let recorder:blot_reuse_artifact_emitter::Recorder& =allocated;let lease=recorder.recorder_lease;let generation=recorder.recorder_generation;
+ {
+  let records .=recorder.records;let bytes .=recorder.bytes;let parameters .=recorder.parameters;let operations .=recorder.operations;let pending .=recorder.pending_instructions;
+  recorder.owner .=recorder_reset_job;recorder.clock .=recorder_reset_clock;recorder.local_clock=19;
+  recorder.bytes.append([17,23]);assert(recorder.bytes.failure==blot_error::Error.none);recorder.frozen_instructions=true;recorder.sealed=true;
+  recorder.reset();
+  assert(recorder.recorder_lease==lease && recorder.recorder_generation==generation && recorder.validRecorder());
+  assert(recorder.owner==null && recorder.clock==null && recorder.local_clock==0 && !recorder.frozen_instructions && !recorder.sealed && !recorder.arena.present && !recorder.lists.present);
+  assert(recorder.records .==records && recorder.bytes .==bytes && recorder.parameters .==parameters && recorder.operations .==operations && recorder.pending_instructions .==pending && recorder.bytes.len==0);
+ }
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+ recorder.bytes.append([31]);assert(recorder.bytes.failure==blot_error::Error.none && recorder.bytes.items[0]==31);recorder.releasePooled();
+}
+fn main() {recorderReset();recorderCompaction();replayQueryOwnership();retainedEvidence();registeredWorkspaceSources();
     evidenceLeases();implementationLeases();patternLeases();
     print("proof leases passed: shared headers, owner/generation rejection, release/reuse");
 }

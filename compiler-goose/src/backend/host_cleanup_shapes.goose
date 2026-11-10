@@ -48,8 +48,8 @@ recursive fn add<C>(builder: Builder<C>&, id: u32, depth: i64) -> Error {
             node.tag = Tag.record; var fields: Field[>..<] = []; let children = builder.context.layouts.children(id);
             for index in 0..layout.b {
                 let error = charge(builder); if error != blot_error::Error.none { return error; }
-                let name = builder.context.layouts.record_names.map.get(children[index * 2]); if name == null { return blot_error::Error.layout_limit; }
-                fields.push(Field { name, children[index * 2 + 1] , ..});
+                let name = builder.context.layouts.record_names.get(builder.context.layouts.opaque_sources,children[index * 2]); if !name.present { return blot_error::Error.layout_limit; }
+                fields.push(Field { name.value, children[index * 2 + 1] , ..});
             }
             node.fields = copyFields(fields);
         },

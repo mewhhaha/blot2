@@ -120,10 +120,13 @@ fn deinit(self_: Recorder&) {
     self_.functions = default<FunctionArtifact[:]>(); self_.locals = default<ValueType[:]>(); self_.instructions = default<SymbolicInstruction[:]>(); self_.pending_instructions.clear();
 }
 fn reset(self_:Recorder&) {
-    let lease=self_.recorder_lease;let generation=self_.recorder_generation;
-    let tables=Tables{records:self_.records,bytes:self_.bytes,parameters:self_.parameters,operations:self_.operations,pending_instructions:self_.pending_instructions,..};
-    self_.deinit();self_=init(tables);self_.recorder_lease=lease;self_.recorder_generation=generation;
+    self_.deinit();
+    self_.owner .=null;self_.clock .=null;self_.local_clock=0;
+    self_.frozen_instructions=false;self_.sealed=false;
+    self_.arena=blot_support::none<blot_backend_wasm::Arena>();
+    self_.lists=blot_support::none<blot_runtime_list_runtime::Runtime>();
 }
+
 fn append(self_: Recorder&, event: Event) -> Error {
     assert(!self_.sealed);let reserved=self_.records.ensure(self_.records.len+1);if reserved!=blot_error::Error.none {return reserved;} var sequence = self_.local_clock;
     { let optional_source_58 .= self_.clock; if optional_source_58 { let clock .= optional_source_58; sequence = clock; clock++;  } else { self_.local_clock++; } }

@@ -70,3 +70,12 @@ export "probe_scoped" fn scoped() {
  let result,error=blot_backend_scoped_backend::compileWithOptions(workspace,units,1,blot_backend_scoped_backend::CompileOptions{..});if error==blot_error::Error.none {var owned=result;owned.deinit();}
  let released=frame.release();assert(released==blot_error::Error.none);blot_backend_result_publication::module_runs.free_slice(units);
 }
+
+// Preparation traversal only. Inputs are deliberately unstaged: never execute.
+export "probe_prepare" fn prepare() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ let error=blot_backend_core_backend::prepare(run,false);run.deinit();
+ let released=frame.release();assert(released==blot_error::Error.none);
+}

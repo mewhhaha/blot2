@@ -121,7 +121,7 @@ fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&)->Error {
  {for &copy in copies {copy.deinit();}} }
 fn emit(self_:const Prepared&,workspace:Workspace&)->Result,Error {return self_.emitWithOptions(workspace,CompileOptions{..});}
 fn emitWithOptions(self_:const Prepared&,workspace:Workspace&,options:CompileOptions)->Result,Error {
- var actual=options;actual.source_completion.entry .=self_.source_completion;actual.identity=blot_support::Option<blot_backend_runtime_identity::View>{true,self_.identity.view()};actual.diagnostic_source_digests=self_.source_digests;actual.unit_order=self_.unit_order;actual.diagnostic_prelude_unit=self_.prelude;actual.diagnostic_source_mode=self_.source_mode;
+ var actual=options;actual.source_completion.entry .=self_.source_completion;actual.identity=blot_support::Option<blot_backend_runtime_identity::View>{true,self_.identity.view()};actual.identity_owner=blot_support::Option<Owner>{true,self_.catalog_owner};actual.diagnostic_source_digests=self_.source_digests;actual.unit_order=self_.unit_order;actual.diagnostic_prelude_unit=self_.prelude;actual.diagnostic_source_mode=self_.source_mode;
  let staged=blot_backend_core_backend::pinWorkspaceInputs(workspace,self_.units,self_.catalog_owner,self_.unit_owners,self_.seed_pin.owners());if staged!=blot_error::Error.none {return Result{},staged;}
  let compiled,error=blot_backend_core_backend::compileWithOptions(workspace,self_.units,self_.entry,actual);if error!=blot_error::Error.none {return Result{},error;}
  var output=Result{result:ConsumerResult{compiled:compiled,stats:self_.stats},source_bytes:self_.source_bytes,fresh_modules:self_.units.len-self_.cachedCount(),cached_modules:self_.cachedCount()};var published=false;

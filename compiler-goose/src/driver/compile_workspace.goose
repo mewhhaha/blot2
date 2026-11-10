@@ -35,6 +35,13 @@ var active_optimized_headers:blot_backend_optimized_bodies::Capture[>..]=[];
 fn activeOptimized()->blot_backend_optimized_bodies::Capture& {if active_optimized_headers.len==0 {active_optimized_headers.push(blot_backend_optimized_bodies::Capture{..});}return active_optimized_headers[0];}
 fn resetOptimized() {let current:blot_backend_optimized_bodies::Capture& =activeOptimized();current=blot_backend_optimized_bodies::Capture{..};}
 fn valid(self_:Frame)->bool {return self_.slot!=0&&self_.slot-1<frames.len&&frames[self_.slot-1].live&&frames[self_.slot-1].generation==self_.generation;}
+fn canonicalWorkspace(source:Workspace&)->Workspace& {
+ assert(active.valid());let state:FrameState& =frames[active.slot-1];
+ assert(state.workspace_slot!=0 && state.workspace_slot-1<workspaces.len);
+ let registered .=state.workspace;assert(registered);
+ let owned:Workspace& =workspaces[state.workspace_slot-1];
+ assert(source .==owned && registered .==owned);return owned;
+}
 fn canonicalGenerator(source:Generator&)->Generator& {
  assert(active.valid());let state:FrameState& =frames[active.slot-1];
  assert(state.generator_slot!=0 && state.generator_slot-1<generators.len);
