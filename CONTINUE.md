@@ -14,19 +14,32 @@ Later backend/owner repairs have affected executed laws; the final five-law
 checkpoint passes in 55.21s (proof leases, resolved bodies, cache, footprint and
 outline), with pinned C/link/runtime evidence in
 [the affected receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-checkpoint-five.json.gz).
-Full qualification remains pending.
+Latest workspace checkpoint passes four affected laws in **53.35s**,
+including the new registered-source lifecycle regression;
+[the exact receipt](benchmarks/evidence/qualification/2026-11-10-goose-workspace-checkpoint-four.json.gz)
+pins current per-law source closures. Full qualification remains pending.
 
 Actual whole141 stops after **143.58s**, without artifacts, at SIMD initialization
 and cached-plan publication. Both source families have subsequent repairs. See
 [the pinned whole attempt](benchmarks/evidence/qualification/2026-11-10-goose-whole141.json.gz).
-Broader strict scoped145 finishes in 47.31s and reaches recursive-contract
-publication plus retained constant-query state. The contract header is now
-reconstituted through its existing pool. The remaining retention diagnostic is
-`resolved_body.deinit`: global constant `state_owners` may retain payload storage
-through `core_backend.constantLookup`. A copied diagnostic identifies an inexact Generator-root class propagated
-through pairedImporter, rather than a concrete payload reference. Exact State
-reborrowing is being tested. No checker relaxation or live-owner clearing is
-authorized.
+Latest strict scoped155 takes **47.61s** and still rejects the recursive child
+Generator transfer plus actual `backing_constant_state` retention through
+`replayDemand`. The unused constant State pool has been removed. Exact source,
+query catalog and registered Pools accessors now check the existing workspace
+owners. Their native lifecycle control and four expected guard rejections pass;
+full importer/replay integration remains pending. See
+[the workspace/construction receipt](benchmarks/evidence/qualification/2026-11-10-goose-workspace-construction-frontier.json.gz).
+
+Replay publication now preserves the destination Query allocation slot and
+reconstitutes its owned Judgment. The regression covers recursive headers,
+independent clone cleanup, both cleanup orders and slot reuse. Diagnostic bytes
+and component outcomes use their existing named owners; three affected production
+laws pass together in **16.84s** at that pinned snapshot. See
+[the executed receipt](benchmarks/evidence/qualification/2026-11-10-goose-source-component-three.json.gz).
+Actual artifact-import identity retirement passes C/link/runtime in **31.43s**
+(each stage below30s), but its Frame-spanning fixture remains rejected. The
+runtime snapshot precedes the equivalent inline View literal; do not infer exact
+current-source whole-runtime qualification.
 
 The strict `scoped` diagnostic uses deliberately invalid empty Core. Early
 failures take 19–21s; broader checks take about 47–50s. It is **check-only**, never
@@ -40,8 +53,9 @@ demonstrated production gain.
 
 - Value/Root spellings and active goals use existing arena ranges; recursive
   traversals reload flat elements instead of retaining vector views.
-- Both child Generator emission paths save/install/recurse/extract/restore at the
-  same threaded address. Parent aliases are dormant during child emission;
+- Child Generator emission paths save/install/recurse/extract/restore at the
+  same threaded address. The function-plan phase is lexical to its construction
+  owner; actual recursive transfer still fails strict checking. Parent aliases are dormant during child emission;
   restoration precedes error handling and exactly-once cleanup. Minimal native
   controls pass; actual generator runtime remains pending.
 - Specialization keys compare evidence contents. Cache laws cover deduplication,

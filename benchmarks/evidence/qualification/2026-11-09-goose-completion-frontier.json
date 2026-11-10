@@ -2730,5 +2730,52 @@
     "path": "compiler-goose/src/backend/host_cleanup_shapes.goose:22",
     "qualified": false,
     "receipt": "2026-11-10-goose-retained-family-partial.json.gz"
+  },
+  "workspace_source_replay_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-constant-source-publication.json.gz",
+      "2026-11-10-goose-principal-source-publication.json.gz",
+      "2026-11-10-goose-replayed-query-ownership.json.gz",
+      "2026-11-10-goose-replayed-query-slots.json.gz",
+      "2026-11-10-goose-session-component-publication.json.gz",
+      "2026-11-10-goose-source-component-three.json.gz",
+      "2026-11-10-goose-source-query-frontier.json.gz",
+      "2026-11-10-goose-store-origin-diagnostic.json.gz",
+      "2026-11-10-goose-workspace-construction-frontier.json.gz"
+    ],
+    "changes": [
+      "Removed unused constant State pool and standalone pooled constructors",
+      "Existing registered workspace source/catalog and Pools accessors check identity/liveness",
+      "Replay publication preserves destination Query allocation slot and reconstitutes existing owned Judgment",
+      "Diagnostic and component outcome publication uses existing named pools",
+      "Function-plan preparation/materialization retains scalar arena cursors instead of growable slices",
+      "Artifact import gate uses the existing copied identity and deinitializes gate before identity"
+    ],
+    "native_controls": "Query catalog/Pools lifecycle positive plus4 expected guard rejections; principal and constant source controls; actual importer producer retirement passes but Frame remains rejected",
+    "latest_scoped": {
+      "attempt": 155,
+      "seconds": 47.614,
+      "partial": true,
+      "source_unchanged": true,
+      "errors": [
+        "scoped_backend1759 recursive child Generator transfer \u00a77.8",
+        "resolved_body60 backing_constant_state may hold payloads via replayDemand at constant_receipt_reuse72"
+      ],
+      "runtime_qualified": false
+    },
+    "diagnostic_checker": "Metadata-only off-tree origin trace:9 parity controls pass, never promoted; qualified c2b24 checker unchanged",
+    "whole_compiler_executable": false,
+    "affected_checkpoint": {
+      "passed": true,
+      "seconds": 53.348,
+      "laws": {
+        "proof_leases": 6.847,
+        "diagnostic_ownership": 6.288,
+        "semantic_outcomes": 6.405,
+        "resolved_body": 33.808
+      },
+      "raw_receipt": "2026-11-10-goose-workspace-checkpoint-four.json.gz",
+      "full_inventory_current_source": false
+    }
   }
 }

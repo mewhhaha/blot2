@@ -1413,3 +1413,5 @@ self_.independent_calls.deinit();
 self_.principal_graphs.deinit();context_owners[at].live=false;self_=Context{..};context_owners.free(at);}
 
 fn selectedOwnerPath(identity:blot_support::Option<IdentityMetadata>,unit:u32)->const u8[:] {if identity.present {let found=identity.value.view().owner(unit);if found.present {return found.value;}}return default<const u8[:]>();}
+
+fn registeredPools(source:const Context&)->const Pools& {assert(source.validContext());let state:const ContextOwner& =context_owners[source.context_lease-1];let owned:const Context& =state.canonical;assert(source .== owned && owned.pools.present);return owned.pools.value;}

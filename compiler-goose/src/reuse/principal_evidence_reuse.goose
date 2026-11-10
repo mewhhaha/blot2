@@ -1,6 +1,7 @@
 // Principal facts have a separate source/input gate from executable artifacts.
 namespace blot_reuse_principal_evidence_reuse;
 import check.core;
+import driver.compile_workspace;
 import check.check;
 import check.types;
 import eval.core_eval;
@@ -111,11 +112,11 @@ fn deinit(self_: State&) {
 fn ensureGraphs(self_: State&) -> bool, Error {
     if self_.graphs.present { return self_.graphs.value.enabled, blot_error::Error.none; }
     if !self_.gate.enabled { return false, blot_error::Error.none; } let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
-    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, old.metadata().pools.value, self_.gate.units, self_.gate);
+    let prepared, error = blot_reuse_artifact_import::initCheckedQuery(self_.allocation_owner, blot_reuse_code_artifacts::registeredPools(old.metadata()), blot_compile_workspace::principalUnits(self_), self_.gate);
     if error != blot_error::Error.none { return false, error; }
     var graphs = prepared;
     if !graphs.present {
-        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, old.metadata().pools.value, self_.gate.units, self_.names, self_.gate.units.len);
+        let fresh, failure = blot_reuse_artifact_import::init(self_.allocation_owner, blot_reuse_code_artifacts::registeredPools(old.metadata()), blot_compile_workspace::principalUnits(self_), self_.names, self_.gate.units.len);
         if failure != blot_error::Error.none { return false, failure; } graphs = blot_support::some(fresh);
     }
     if !graphs.value.enabled { graphs.value.deinit(); return false, blot_error::Error.none; }
@@ -234,7 +235,7 @@ fn currentInputs<G>(self_: State&, g: G&, target: BindingRef, inputs: const Inpu
     var translated, clone_error = inputs.clone(); if clone_error != blot_error::Error.none { return null, clone_error; }
     let admitted, failure = self_.translateInputs(g, translated);
     if failure != blot_error::Error.none || !admitted { translated.deinit(); return null, failure; }
-    self_.imported_inputs = blot_support::some(translated);
+    self_.imported_inputs = blot_support::Option<Inputs>{true,blot_reuse_principal_inputs::canonicalOwned(translated)};
     return self_.imported_inputs.value, blot_error::Error.none;
 }
 fn translateInputs<G>(self_: State&, g: G&, translated: Inputs&) -> bool, Error {

@@ -145,7 +145,7 @@ fn initialize(self_: Importer&, old: const Pools&, units: const Module[:], names
 }
 fn initializeMaps(self_: Importer&, old: const Pools&, units: const Module[:], names: blot_support::Option<View>, cached_units: i64, stamps: blot_reuse_code_artifacts::ModuleStamps?, producers: TextMap&, spellings: TextMap&) -> Error {
     if !old.project_identity || !names.present || !old.identity.present || cached_units > self_.units.len { return blot_error::Error.none; }
-    self_.names = blot_support::some(copyIdentity(names.value)); let current = self_.names.value.view(); let old_names = old.identity.value.view();
+    let copied_names = copyIdentity(names.value); self_.names = blot_support::Option<IdentityMetadata>{true,copied_names}; let current=View{bytes:copied_names.bytes,symbols:copied_names.symbols,owners:copied_names.owners}; let old_names = old.identity.value.view();
     if current.owners.len != self_.units.len || old_names.owners.len != old.modules.len || current.symbols.len == 0 || old_names.symbols.len == 0 { return blot_error::Error.none; }
     for module, index in self_.units {
         if module.unit != 0 && module.unit != index + 1 { return blot_error::Error.none; } let path = current.owner((index + 1) as u32);
@@ -165,7 +165,7 @@ fn initializeMaps(self_: Importer&, old: const Pools&, units: const Module[:], n
         let intact, error = blot_reuse_code_artifacts::pinIntact(pin, stamps); if error != blot_error::Error.none { return error; } if !intact { continue; }
         let equal, failure = self_.coreEqual(pin.module, self_.units[mapped - 1]); if failure == blot_error::Error.out_of_memory { return failure; } self_.stable[index] = failure == blot_error::Error.none && equal;
     }
-    let gate, error = blot_reuse_code_body_validity::init(self_.allocation_owner, old, units, names, stamps); if error != blot_error::Error.none { return error; } self_.code_gate = blot_support::some(gate); return blot_error::Error.none;
+    let gate, error = blot_reuse_code_body_validity::init(self_.allocation_owner, old, units, blot_support::Option<View>{true,current}, stamps); if error != blot_error::Error.none { return error; } self_.code_gate = blot_support::Option<blot_reuse_code_body_validity::Gate>{true,gate}; return blot_error::Error.none;
 }
 fn initCheckedQuery(allocation_owner: u64, old: const Pools&, units: const Module[:], checked: const Gate&) -> blot_support::Option<Importer>, Error {
     if allocation_owner == 0 || checked.allocation_owner != allocation_owner { return blot_support::none<Importer>(), blot_error::Error.none; } return initIndependentQuery(allocation_owner, old, units, checked);
@@ -186,9 +186,10 @@ fn deinit(self_: Importer&) {
     for &slot in self_.static_plans.table.slots { if slot.tag != 0 { slot.val.deinit(); } } self_.static_plans.deinit();
     if self_.static_scratch.present { self_.static_scratch.value.deinit(); self_.static_scratch.present = false; } self_.knowledge.deinit();
     if self_.operation_labels.len != 0 { unit_words.free_slice(self_.operation_labels); } if self_.operation_scopes.len != 0 { operation_scope_runs.free_slice(self_.operation_scopes); }
+    if self_.code_gate.present { self_.code_gate.value.deinit(); self_.code_gate.present = false; }
     if self_.names.present { self_.names.value.deinit(); self_.names.present = false; }
     if self_.unit_map.len != 0 { unit_words.free_slice(self_.unit_map); } if self_.symbol_map.len != 0 { unit_words.free_slice(self_.symbol_map); }
-    if self_.code_gate.present { self_.code_gate.value.deinit(); self_.code_gate.present = false; } if self_.stable.len != 0 { stable_flags.free_slice(self_.stable); }
+    if self_.stable.len != 0 { stable_flags.free_slice(self_.stable); }
     self_ = Importer {..};
 }
 fn bind<G>(self_: Importer&, generator: G&) -> Error {

@@ -10,12 +10,15 @@ pins its sources and actual C/link/runtime results. Later repairs have affected
 laws; the final five-law checkpoint passes in 55.21s; full qualification is pending.
 
 Whole141 stops143.58s without artifacts at SIMD initialization/cached-plan
-publication. Source repairs follow. Strict scoped145 takes47.31s, reaching
-recursive-contract publication and retained constant-query state. The contract
-header is now reconstituted through existing access_pool. Remaining failure:
-`resolved_body.deinit` sees payload storage retained by global constant
-state_owners through core_backend.constantLookup. A copied trace identifies an inexact Generator-root class at pairedImporter;
-exact State reborrowing is under test. Do not relax the checker or clear live owners.
+publication. Source repairs follow. Strict scoped155 takes47.61s and still rejects
+recursive child Generator transfer and actual backing_constant_state retention
+through replayDemand. The unused constant State pool is removed; source/catalog
+accessors now check existing workspace owners. Their positive native lifecycle
+and four expected guard rejections pass. Query replay preserves destination
+allocation slots and republishes owned Judgments. Diagnostic bytes and component
+outcomes use existing named owners; three production laws pass together16.84s
+at the pinned snapshot. Exact receipts and remaining scopes are in
+[the root frontier](../CONTINUE.md). Full importer/replay qualification is pending.
 
 The scoped root is check-only with invalid empty Core. Early failures take
 19–21s; broader checks take47–50s. A30s no-diagnostic timeout was incomplete.

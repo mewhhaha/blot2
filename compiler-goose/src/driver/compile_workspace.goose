@@ -159,3 +159,17 @@ fn takeCapture(frame:Frame&,result:Result&,units:const Core[:],catalog:InputOwne
 fn retainCaptureInputs(state:CaptureState&,catalog:InputOwner,unit_owners:const InputOwner[:],seed_owners:const InputOwner[:],next:i64&)->Error {
  let error=retainJournal(state,catalog,next);if error!=blot_error::Error.none {return error;}for owner in unit_owners {let error=retainJournal(state,owner,next);if error!=blot_error::Error.none {return error;}}for owner in seed_owners {let error=retainJournal(state,owner,next);if error!=blot_error::Error.none {return error;}}return blot_error::Error.none;
 }
+
+fn constantSource(source:const blot_reuse_constant_receipt_reuse::State&)->const blot_reuse_code_artifacts::Pools& {assert(source .== backing_constant_state && backing_constant_state.live && backing_constant_state.old.present);return backing_constant_state.old.value;}
+
+fn registeredWorkspaceUnits()->const Core[:] {
+ assert(active.valid());let frame:const FrameState& =frames[active.slot-1];
+ assert(frame.workspace_slot!=0 && frame.workspace_slot-1<workspaces.len);let workspace:const Workspace& =workspaces[frame.workspace_slot-1];let registered .=frame.workspace;assert(registered && registered .== workspace);
+ let units,error=blot_backend_result_publication::registeredInputUnits(workspace.publication_owner);assert(error==blot_error::Error.none);return units;
+}
+fn principalUnits(source:const blot_reuse_principal_evidence_reuse::State&)->const Core[:] {
+ assert(source .== backing_principal_state);let units=registeredWorkspaceUnits();assert(blot_support::same_slice_identity(units,source.gate.units));return units;
+}
+fn queryUnits(source:const blot_eval_completed_specialization_query::State&)->const Core[:] {
+ assert(source .== backing_query_state);let units=registeredWorkspaceUnits();assert(blot_support::same_slice_identity(units,source.gate.units));return units;
+}

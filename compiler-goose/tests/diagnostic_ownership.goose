@@ -3,6 +3,7 @@ import driver.cli;
 import driver.cli_workers;
 import std;
 import reuse.hole_diagnostics;
+import eval.core_eval;
 import reuse.dispatch_explanation;
 import driver.compile_workspace;
 import support.native;
@@ -67,4 +68,13 @@ fn dispatch() {
     assert(copied.steps[0].member.value=="member" && copied.steps[0].ty.present && copied.steps[0].ty.value.len==0);
     copied.deinit();builder.deinit();
 }
-fn main() {for cycle in 0..3 {for mode in 0..3 {holes(mode);}dispatch();}print("diagnostic ownership passed: canonical names, move, clone and cleanup");}
+fn sessionDiagnostic() {
+ let allocated,error=blot_eval_core_eval::initOwnedEmptySession(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && allocated);let session:blot_eval_core_eval::Session& =allocated;
+ assert(blot_eval_core_eval::registeredDiagnosticMessage(session.owned_diagnostic_message).len==0);
+ {var source:u8[>..]=[];source.append("owned session diagnostic");session.owned_diagnostic_message.append(source[..]);}
+ session.diagnostic=blot_support::Option<blot_eval_core_eval::Diagnostic>{true,blot_eval_core_eval::Diagnostic{unit:1,span:blot_parse_ast::Span{0,1},code:blot_check_diagnostic_code::Code.missing_field,detail:blot_eval_core_eval::registeredDiagnosticMessage(session.owned_diagnostic_message)}};
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);assert(session.diagnostic.value.detail=="owned session diagnostic");
+ let capacity=session.owned_diagnostic_message.storage.len;session.discardDiagnostic();assert(!session.diagnostic.present && session.owned_diagnostic_message.storage.len==capacity && blot_eval_core_eval::registeredDiagnosticMessage(session.owned_diagnostic_message).len==0);
+ session.owned_diagnostic_message.append("again");assert(blot_eval_core_eval::registeredDiagnosticMessage(session.owned_diagnostic_message)=="again");blot_eval_core_eval::deinitOwnedSession(session);
+}
+fn main() {sessionDiagnostic();for cycle in 0..3 {for mode in 0..3 {holes(mode);}dispatch();}print("diagnostic ownership passed: canonical names, move, clone and cleanup");}
