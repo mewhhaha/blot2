@@ -28,12 +28,26 @@ outside the 49 default component laws. Full current inventory has not run. The
 seven-module scalar Owner batch passes its three focused laws and prior backend
 frontier; buffer ownership transfer removes two copy pools without a new registry.
 
-Current frontier: `core_eval.goose:614`, indexed edit-plan iteration retains a
-borrow over indexedEdit, which may shrink code-origin type storage. Audit matching
-context-plan loops and use captured scalar counts/per-index metadata values,
-preserving order and visibility. Whole compiler and actual CLI/server/OOM/retry/
-retention remain pending.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-evaluator-field300.json.gz).
+The corrected Core metadata family clears its frontier in backend 303: 81.102s,
+unchanged source. 38 catalog aliases/22 span loops now use scalar metadata/per-index
+reads. 42 removed bindings across six names have no stale bare references; the
+failed 302 variants snapshot is preserved, not counted as a pass. Entry bounds,
+original counts, order and next-element visibility are retained.
+
+Independent storage audit: backing_origins_code_module_types is detached diagnostic
+Wasm ValueType scratch, not Core input types. source_origins retains no Core units;
+Session.units uses registered Core headers with retained dependency owners. These
+reborrows cannot revive a discarded Core input; its storage stays pinned.
+
+Backend 304 clears the missing staging-origin buffer.items call after auditing
+all six calls. Backend 305 clears two emitter Plan cleanup declarations widened to the
+full enum type. Current frontier is emission1624: closed-local analyze returns
+Proof,bool; its two callers incorrectly use Option fields. A combined candidate
+fixes those callers and six no-payload enum-cleanup declarations across four
+reuse modules. Backend 306 is running; these changes are not yet qualified.
+Whole compiler and actual CLI/server/OOM/retry/retention remain pending; neither
+capped runtime probe is being repeated.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-enum-cleanup305.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion

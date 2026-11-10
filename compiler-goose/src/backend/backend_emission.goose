@@ -1147,7 +1147,7 @@ recursive fn prepareStaging(owner: Owner&,id: u32,depth: i64) -> StagingPlan,Err
     let previous_trace = generator.staging_trace;
     block {
 
-    let traced = blot_check_staging_origins::code(generator.staging_trace,generator.evaluator.units,metadata,blot_check_staging_origins::Source { owner.unit_id,id , ..},blot_check_staging_origins::generator(generator.evaluator.storage.code_origins,value),op == blot_check_typed_staging::Op.splice);
+    let traced = blot_check_staging_origins::code(generator.staging_trace,generator.evaluator.units,metadata,blot_check_staging_origins::Source { owner.unit_id,id , ..},blot_check_staging_origins::generator(generator.evaluator.storage.code_origins.items,value),op == blot_check_typed_staging::Op.splice);
     if traced != blot_error::Error.none { var issue = blot_check_diagnostic_code::Code.staging_budget; if traced == blot_error::Error.invalid_origin { issue = blot_check_diagnostic_code::Code.code_shape_mismatch; } let __flat_cleanup_47_0_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_47_0_1: Error = generator.fail(owner.unit_id,id,issue); block {
 generator.staging_trace = previous_trace;
 } return __flat_cleanup_47_0_0,__flat_cleanup_47_0_1; }
@@ -1613,7 +1613,7 @@ recursive fn preparePrivateBinding(owner: Owner&,body: u32,id: u32,depth: i64) -
 recursive fn prepareNode(owner: Owner&,body: u32,id: u32,depth: i64,template: bool) -> Error {
     assert(owner.preparing); let generator .= owner.generator(); if id == 0 || blot_backend_resolved_body::contains(body,id) { return blot_error::Error.none; } let source .= generator.unit(owner.unit_id); if depth >= 1024 { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } let n = source.node(id);
     if source.has_usage_contracts && !blot_backend_resolved_body::headers[body - 1].has_owners { let owns,error = blot_check_usage_check::containsNominal(source.types,source.nominals,n.ty); if error != blot_error::Error.none { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } blot_backend_resolved_body::headers[body - 1].has_owners = owns; }
-    if n.tag == blot_check_core::Tag.staging { let staged,error = prepareStaging(owner,id,depth); if error != blot_error::Error.none { return error; } var plan = Plan.staging { staged , ..}; let stored = blot_backend_resolved_body::put(body,id,plan); if stored != blot_error::Error.none { plan.deinit(); } return stored; }
+    if n.tag == blot_check_core::Tag.staging { let staged,error = prepareStaging(owner,id,depth); if error != blot_error::Error.none { return error; } var plan: Plan = Plan.staging { staged , ..}; let stored = blot_backend_resolved_body::put(body,id,plan); if stored != blot_error::Error.none { plan.deinit(); } return stored; }
     if n.tag == blot_check_core::Tag.proof_guard || (n.tag == blot_check_core::Tag.array_op && (source.arrayOperation(id) == blot_backend_collection_ops::Op.get || source.arrayOperation(id) == blot_backend_collection_ops::Op.set)) { blot_backend_resolved_body::headers[body - 1].has_numeric_checks = true; }
     if n.tag == blot_check_core::Tag.bind {
         let compile_only,error = blot_check_typed_staging::compileOnly(source.types,source.binding(n.a).ty); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.staging_budget); }
@@ -1633,7 +1633,7 @@ recursive fn prepareNode(owner: Owner&,body: u32,id: u32,depth: i64,template: bo
                 } }
             }
         }
-        if owner.local_instances.present { let decision .= owner.local_instances.value.find(id); if decision != null { let instances,error = prepareInstances(owner,owner.local_instances.value,decision,depth); if error != blot_error::Error.none { return error; } var plan = Plan.instances { instances , ..}; let stored = blot_backend_resolved_body::put(body,id,plan); if stored != blot_error::Error.none { plan.deinit(); } return stored; } }
+        if owner.local_instances.present { let decision .= owner.local_instances.value.find(id); if decision != null { let instances,error = prepareInstances(owner,owner.local_instances.value,decision,depth); if error != blot_error::Error.none { return error; } var plan: Plan = Plan.instances { instances , ..}; let stored = blot_backend_resolved_body::put(body,id,plan); if stored != blot_error::Error.none { plan.deinit(); } return stored; } }
     }
     var entry = blot_support::none<Plan>();
     match n.tag {

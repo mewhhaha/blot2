@@ -5,16 +5,16 @@ request OOM/retry and retention against Zig. **No whole compiler artifact exists
 No forwarding to compiler/ and no ABI fallback.
 
 Whole 290 remains latest complete attempt: 163.377s, unchanged 461 inputs, no artifact.
-Partial backend 300 clears evaluator metadata reacquisition and pure field lookup
-in 77.8s, then stops at core_eval614 indexed-edit plan array borrow over indexedEdit.
-Preserve captured count/order with scalar metadata reads as a coherent loop family.
+Partial backend 303 clears corrected 38-alias/22-loop Core metadata family in 81.102s,
+unchanged. 42 removed bindings have zero stale uses; failed 302 preserved separately.
+Diagnostic Wasm type scratch is distinct from publication-pinned Core input storage.
+Backend 304 clears the staging-origin span. Backend 305 clears two Plan cleanup
+declarations; current emission1624 wrongly treats Proof,bool as Option. Two caller
+corrections plus six enum annotations/four reuse modules are in backend 306 running,
+unqualified. Whole executable still absent.
 
-Pure field law passes in 4.903s, including real records/nominals, exact lookup/error
-reasons and prior diagnostic preservation. Three of six failure branches executed;
-others source-reviewed. Full invocation hit its 30s emission cap/no C and is explicit opt-in,
-unqualified like prepareMapped. Full run of 49 default laws is pending. Scalar Owner
-batch prior native/backend laws pass. Whole executable and actual CLI/server/OOM/
-retry/retention pending.
+Full invocation/preparation probes remain capped/unqualified; full run of 49 default laws
+pending. Whole executable and actual CLI/server/OOM/retry/retention still pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;

@@ -4481,5 +4481,145 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "evaluator_context_plan_iteration": {
+    "receipt": "2026-11-10-goose-backend-evaluator-edit301.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 78.664,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 775,
+          "message": "error: cannot call matchPattern, which shrinks backing_origins_code_module_types while carries (bound at /home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose:773) is still used: it may refer into backing_origins_code_module_types (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "ab284b68c53185d393b977bf743e22cd6248a7fbc9b9ed7bde487f5f7ffe78c7",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "representation": "Capture validated original edit count; copy scalar Edit per index; reacquire expression Core metadata",
+    "following_batch": "Broad immutable Core metadata alias/span audit in expression/loop evaluation, including loop carries across matchPattern",
+    "runtime_qualification": false,
+    "whole_compiler_executable": false
+  },
+  "evaluator_core_metadata_family": {
+    "source_audit": "37catalog aliases/21span loops; grouped302 caught stale variants binding, correction+reflectionfollowup pending",
+    "receipt": "2026-11-10-goose-backend-evaluator-metadata302.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 40.018,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 725,
+          "message": "error: unknown variable: variants"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "3517acec63efddd33a2cf9ec8d7b7c70717796ef7626f71ccaea927609c705f2",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "runtime_qualification": false,
+    "whole_compiler_executable": false,
+    "corrected": {
+      "receipt": "2026-11-10-goose-backend-evaluator-metadata303.json.gz",
+      "aliases_removed": 38,
+      "span_loops": 22,
+      "removed_bindings": 42,
+      "stale_bare_uses": 0,
+      "partial_backend": {
+        "partial": true,
+        "engines": [
+          "compile",
+          "record_artifact",
+          "emit"
+        ],
+        "exit": 1,
+        "seconds": 81.102,
+        "stop": "completed",
+        "errors": [
+          {
+            "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+            "line": 1150,
+            "message": "error: no matching overload for call to blot_check_staging_origins::generator"
+          }
+        ],
+        "full_qualification": false,
+        "source_sha256": "734fee0331f4f913790f6287efb92ff448080c1bd5ab96c6f35e4ad0d4bdb116",
+        "source_unchanged": true,
+        "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+      },
+      "runtime_qualification": false
+    }
+  },
+  "staging_origin_span": {
+    "receipt": "2026-11-10-goose-backend-origin-span304.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 81.191,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 1616,
+          "message": "error: no matching overload for call to deinit"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "676ebc30e2e529075a44bcec5ea71e3bb2da334de507b7907ad44593f3ebed47",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "fix": "One missing buffer.items at staging-origin generator reader, all6calls audited"
+  },
+  "enum_cleanup_full_types": {
+    "receipt": "2026-11-10-goose-backend-enum-cleanup305.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 81.785,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 1624,
+          "message": "error: struct Proof has no field present"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "87dbd654e6bfa0aa84f473809b24fdc533e89d8f73635da776975f6f02f496aa",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "qualified_prefix": "Two emitter Plan declarations explicitly typed before mutable cleanup",
+    "followup_pending": "Six no-payload enum declarations plus2Proof,bool caller corrections combined306"
   }
 }
