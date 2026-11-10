@@ -1,6 +1,7 @@
 // Pinned backend metadata. Numeric IDs refer to these exact owning pools.
 namespace blot_reuse_code_artifacts;
 import check.core;
+import .dependency_stamp_view;
 import backend.layout;
 import backend.call_limits;
 import backend.provider_chain;
@@ -1144,7 +1145,8 @@ fn deinit(self_: Pools&) {
     self_ = default<Pools>();
 }
 
-fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
+fn capture<G>(input_owner:blot_backend_result_publication::Owner,generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
+    let units,input_error=blot_backend_result_publication::registeredInputUnits(input_owner);assert(input_error==blot_error::Error.none && blot_support::same_slice_identity(units,generator.units));
     var previous: const Pools? = null;
     { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous .=previousStampPools(cache.previous_context,cache.previous_generation);  } }
     var candidate = default<Pools>();
@@ -1160,11 +1162,11 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
             copying.capture_identity_owners(identity.value.owners, old.owners),
          ..});
     }
-    let modules = allocateOwned_pins(generator.units.len);
-    for &module, index in generator.units {
-        var unit = module.unit; if unit == 0 { unit = (index + 1) as u32; }
+    let modules=allocateOwned_pins(units.len);
+    for &module,index in units {
+        var unit=module.unit;if unit==0 {unit=(index+1) as u32;}
         let path=selectedOwnerPath(candidate.identity,unit);
-        modules[index] = init(unit, module, copyOwned(path));
+        modules[index]=ModulePin{unit:unit,module:module,canonical_path:copyOwned(path),token:freshToken(),header:blot_backend_result_publication::registeredInputHeader(input_owner,index),..};
     }
     candidate.modules = modules;
     { let optional_source_9 .= memo; if optional_source_9 { let tokens .= optional_source_9;
@@ -1373,14 +1375,14 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     session.counters.metadata_copied_bytes += copying.shared.stats.copied_bytes as u64;
     return candidate, blot_error::Error.none;
 }
-fn capturePools<G>(self_: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>) -> Error {
-    return self_.capturePoolsWithStamps(generator, identity, null);
+fn capturePools<G>(self_: Context&,input_owner:blot_backend_result_publication::Owner, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>) -> Error {
+    return self_.capturePoolsWithStamps(input_owner,generator, identity, null);
 }
-fn capturePoolsWithStamps<G>(self_: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps?) -> Error {
+fn capturePoolsWithStamps<G>(self_: Context&,input_owner:blot_backend_result_publication::Owner, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps?) -> Error {
     let table_error=self_.tableFailure();if table_error!=blot_error::Error.none {return table_error;}
 
     assert(self_.active_job == 0);
-    var candidate, error = capture(generator, identity, memo); if error != blot_error::Error.none { return error; }
+    var candidate, error = capture(input_owner,generator, identity, memo); if error != blot_error::Error.none { return error; }
     candidate.generation = 1;
     if self_.pools.present { candidate.generation = self_.pools.value.generation + 1; self_.pools.value.deinit(); }
     self_.pools = blot_support::some(candidate); return blot_error::Error.none;

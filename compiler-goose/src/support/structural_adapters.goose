@@ -576,6 +576,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_emission
 fn blot_backend_backend_emission::blotStructuralHash<StructuralSink>(value:blot_backend_backend_emission::StaticBinding,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_emission::StaticClosurePlan)->bool {return equalFields(left,right);}
 fn blot_backend_backend_emission::blotStructuralHash<StructuralSink>(value:blot_backend_backend_emission::StaticClosurePlan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_emission::StorageUse)->bool {return equalFields(left,right);}
+fn blot_backend_backend_emission::blotStructuralHash<StructuralSink>(value:blot_backend_backend_emission::StorageUse,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_emission::TaskExportName)->bool {return equalFields(left,right);}
 fn blot_backend_backend_emission::blotStructuralHash<StructuralSink>(value:blot_backend_backend_emission::TaskExportName,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_emission::Template)->bool {return equalFields(left,right);}

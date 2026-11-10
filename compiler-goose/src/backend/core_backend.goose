@@ -271,13 +271,14 @@ fn scalarWithRows(generator: Generator&, unit_id: u32, ty: blot_check_types::Id,
     let scalar = generator.representations.store.scalar(selected); if scalar.present { return scalar.value, blot_error::Error.none; } return blot_backend_runtime_ir::SC_pointer, blot_error::Error.none;
 }
 fn evaluationFailure(generator: Generator&) -> blot_error::Error {
-    if generator.evaluator.diagnostic.present {
-        let item = generator.evaluator.diagnostic.value; var code = item.code;
+    let session:blot_eval_core_eval::Session& =blot_eval_core_eval::canonicalSession(generator.evaluator);
+    if session.diagnostic.present {
+        var code = session.diagnostic.value.code;
         if code == blot_check_diagnostic_code::Code.unsupported || code == blot_check_diagnostic_code::Code.cycle { code = blot_check_diagnostic_code::Code.constant_expression; }
-        var span = item.span;
-        if code == blot_check_diagnostic_code::Code.const_panic && !item.tag_origin && item.origins.len == 0 && generator.staging_trace.len == 0 { span = blot_check_core::Span {..}; }
-        let fresh = !generator.diagnostic.present; let result = decline(generator, item.unit, span, code); generator.diagnostic.value.detail = item.detail;
-        if fresh { generator.diagnostic.value.dispatch = item.dispatch; generator.diagnostic.value.implementation_trace = item.implementation_trace; generator.diagnostic.value.related = item.related; if item.origins.len != 0 { generator.diagnostic.value.origins = item.origins; } }
+        var span = session.diagnostic.value.span;
+        if code == blot_check_diagnostic_code::Code.const_panic && !session.diagnostic.value.tag_origin && session.diagnostic.value.origins.len == 0 && generator.staging_trace.len == 0 { span = blot_check_core::Span {..}; }
+        let fresh = !generator.diagnostic.present; let result = decline(generator, session.diagnostic.value.unit, span, code); generator.diagnostic.value.detail = session.diagnostic.value.detail;
+        if fresh { generator.diagnostic.value.dispatch = session.diagnostic.value.dispatch; generator.diagnostic.value.implementation_trace = session.diagnostic.value.implementation_trace; generator.diagnostic.value.related = session.diagnostic.value.related; if session.diagnostic.value.origins.len != 0 { generator.diagnostic.value.origins = session.diagnostic.value.origins; } }
         return result;
     }
     return decline(generator, 1, blot_check_core::Span {..}, blot_check_diagnostic_code::Code.constant_expression);
@@ -1723,9 +1724,14 @@ fn quantifiedVariable(generator: Generator&,unit_id: u32,variable: u32,row: bool
     let found = set.has(variable,row); generator.planning.quantified.insert(unit_id,set); return found,blot_error::Error.none;
 }
 fn unitUses(generator: Generator&,unit_id: u32,need: blot_backend_unit_index::Need) -> const blot_backend_unit_index::Uses&,blot_error::Error {
-    var index: blot_backend_unit_index::Uses&? = null; block { let known = generator.planning.uses.get(unit_id); if known { index .= known; } }
-    if index == null { let fresh,error .= blot_backend_unit_index::createUses(unit(generator,unit_id),unit_id); if error != blot_error::Error.none { return fresh,error; } generator.planning.uses.insert(unit_id,fresh); index .= fresh; }
-    let error = index.ensure(unit(generator,unit_id),unit_id,need); return index,error;
+    block {
+        let known = generator.planning.uses.get(unit_id);
+        if known { let error = known.ensure(unit(generator,unit_id),unit_id,need); return known,error; }
+    }
+    let fresh,error .= blot_backend_unit_index::createUses(unit(generator,unit_id),unit_id);
+    if error != blot_error::Error.none { return fresh,error; }
+    generator.planning.uses.insert(unit_id,fresh);
+    let ensured = fresh.ensure(unit(generator,unit_id),unit_id,need); return fresh,ensured;
 }
 fn ownsArrayUpdate(generator: Generator&,unit_id: u32,id: u32) -> bool,blot_error::Error {
     block { let proof = generator.planning.array_proofs.get(unit_id); if proof { return proof.admits(id),blot_error::Error.none; } }
@@ -2001,39 +2007,44 @@ fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
     return blot_error::Error.none;
 }
 struct ArtifactCounts { globals: i64,imports: i64,signatures: i64,data_bytes: i64 }
-fn recordArtifact(run: CompileRun&,result: Result&,memo:blot_reuse_code_artifacts::ModuleStamps&) -> blot_error::Error {
-    if !run.recording { return blot_error::Error.none; } let workspace .= runWorkspace(run); let generator .= workspace.generator; let metadata .= workspace.metadata; let journal .= workspace.journal;
-    let graphs = metadata.principal_graphs.capture(generator.evaluator); if graphs != blot_error::Error.none { return graphs; }
+fn recordArtifact(run: CompileRun&,result: Result&,memo:blot_reuse_code_artifacts::ModuleStamps&) -> ArtifactCounts,blot_error::Error {
+    if !run.recording { return ArtifactCounts{..},blot_error::Error.none; } let workspace .= runWorkspace(run); let generator .= workspace.generator; let metadata .= workspace.metadata; let journal .= workspace.journal;
+    let graphs = metadata.principal_graphs.capture(generator.evaluator); if graphs != blot_error::Error.none { return ArtifactCounts{..},graphs; }
     for record in generator.evaluator.retained.specialization_receipts.items {
         var input = record.input; if record.member.present { input = record.member.value.function; }
-        let cloned,clone_error = record.clone(); if clone_error != blot_error::Error.none { return clone_error; }
-        let remembered,inserted,error = blot_eval_selected_query::remember(metadata.specialization_queries,generator.evaluator.closureInfo(input),cloned); if error != blot_error::Error.none { return error; }
+        let cloned,clone_error = record.clone(); if clone_error != blot_error::Error.none { return ArtifactCounts{..},clone_error; }
+        let remembered,inserted,error = blot_eval_selected_query::remember(metadata.specialization_queries,generator.evaluator.closureInfo(input),cloned); if error != blot_error::Error.none { return ArtifactCounts{..},error; }
     }
     for record in metadata.specialization_queries.records { if record.dependencies.member.present { result.completed_queries.member_payload_bytes += blot_host_layout::selected_query_record + blot_reuse_specialization_receipt::ownedBytes(record.dependencies); } }
-    let query_state .= run.query_state; if query_state && run.options.policy.semantic_workers > 1 { for record in query_state.independent_calls.items { let copied,error = record.clone(); if error != blot_error::Error.none { return error; } var cloned=copied;metadata.independent_calls.push(cloned);if metadata.independent_calls.failure!=blot_error::Error.none {cloned.deinit();return metadata.independent_calls.failure;} } }
+    let query_state .= run.query_state; if query_state && run.options.policy.semantic_workers > 1 { for record in query_state.independent_calls.items { let copied,error = record.clone(); if error != blot_error::Error.none { return ArtifactCounts{..},error; } var cloned=copied;metadata.independent_calls.push(cloned);if metadata.independent_calls.failure!=blot_error::Error.none {cloned.deinit();return ArtifactCounts{..},metadata.independent_calls.failure;} } }
     result.query_tables.selected = metadata.specialization_queries.storage(); result.query_tables.principal = metadata.principal_queries.storage();
     var stamps: blot_reuse_code_artifacts::ModuleStamps&? = null; if memo.previous_context != 0 || run.options.validate_pins { stamps .= memo; }
-    let captured = metadata.capturePoolsWithStamps(generator,runIdentity(run),stamps); if captured != blot_error::Error.none { return captured; } result.counters = generator.evaluator.counters; assert(metadata.pools.present);
+    let captured = metadata.capturePoolsWithStamps(workspace.publication_owner,generator,runIdentity(run),stamps); if captured != blot_error::Error.none { return ArtifactCounts{..},captured; } result.counters = generator.evaluator.counters; assert(metadata.pools.present);
     let principal_state .= run.principal_state;
     if principal_state {
-        let certificate,error = principal_state.gate.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return error; } metadata.pools.value.dependency_certificate = certificate;
+        let certificate,error = principal_state.gate.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return ArtifactCounts{..},error; } metadata.pools.value.dependency_certificate = certificate;
     } else {
         let retained .= run.retained;
-        if retained { let code_gate = retained.importer.code_gate; if code_gate.present { let certificate,error = code_gate.value.semantic.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return error; } metadata.pools.value.dependency_certificate = certificate; } }
+        if retained { let code_gate = retained.importer.code_gate; if code_gate.present { let certificate,error = code_gate.value.semantic.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return ArtifactCounts{..},error; } metadata.pools.value.dependency_certificate = certificate; } }
     }
     if metadata.pools.value.dependency_certificate.present { let certificate = metadata.pools.value.dependency_certificate.value; result.source_validation.retained = certificate.storage(); result.source_validation.reused_images = certificate.reused_images; }
-    journal.seal(); let functions = journal.freezeFunctions(metadata.function_jobs.items); if functions != blot_error::Error.none { return functions; }
+    journal.seal(); let functions = journal.freezeFunctions(metadata.function_jobs.items); if functions != blot_error::Error.none { return ArtifactCounts{..},functions; }
     for function_id in generator.static_data.closures.items { journal.functions[function_id].role = blot_reuse_artifact_emitter::FunctionRole.static_closure; }
     for slot in metadata.pools.value.runtime_globals { journal.functions[slot.initializer].role = blot_reuse_artifact_emitter::FunctionRole.runtime_initializer; }
     generator.planning.task_movers.each() { layout,function_id => { journal.functions[function_id].role = blot_reuse_artifact_emitter::FunctionRole.task_mover; } }
-    for function in journal.functions { if function.role == blot_reuse_artifact_emitter::FunctionRole.unknown { return blot_error::Error.invalid_function_reference; } }
-    if journal.functions.len != generator.module.functions.len { return blot_error::Error.invalid_function_reference; }
-    for job in metadata.jobs.items { if job.state == blot_reuse_code_artifacts::State.failed || job.state == blot_reuse_code_artifacts::State.pending || job.state == blot_reuse_code_artifacts::State.reserved { return blot_error::Error.invalid_function_reference; } }
+    for function in journal.functions { if function.role == blot_reuse_artifact_emitter::FunctionRole.unknown { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; } }
+    if journal.functions.len != generator.module.functions.len { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; }
+    for job in metadata.jobs.items { if job.state == blot_reuse_code_artifacts::State.failed || job.state == blot_reuse_code_artifacts::State.pending || job.state == blot_reuse_code_artifacts::State.reserved { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; } }
     for function in metadata.pools.value.functions {
-        if function.function >= journal.functions.len { return blot_error::Error.invalid_function_reference; } let owner = journal.functions[function.function].owner; if owner == 0 || owner > metadata.jobs.len { return blot_error::Error.invalid_function_reference; } let job = metadata.jobs.items[owner - 1];
-        if job.state != blot_reuse_code_artifacts::State.complete || !job.function.present || job.function.value != function.function || job.request != function.request || job.result_template != function.result_template { return blot_error::Error.invalid_function_reference; }
+        if function.function >= journal.functions.len { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; } let owner = journal.functions[function.function].owner; if owner == 0 || owner > metadata.jobs.len { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; } let job = metadata.jobs.items[owner - 1];
+        if job.state != blot_reuse_code_artifacts::State.complete || !job.function.present || job.function.value != function.function || job.request != function.request || job.result_template != function.result_template { return ArtifactCounts{..},blot_error::Error.invalid_function_reference; }
     }
     let counts = ArtifactCounts { generator.module.globals.len,generator.module.imports.len,generator.module.signatures.len,generator.module.data.len , ..};
+    return counts,blot_error::Error.none;
+}
+// Stamping has ended lexically before replay may reset planning payloads.
+fn finishArtifact(run:CompileRun&,result:Result&,counts:ArtifactCounts)->blot_error::Error {
+    if !run.recording {return blot_error::Error.none;}let workspace .=runWorkspace(run);let metadata .=workspace.metadata;let journal .=workspace.journal;
     if run.options.artifact_replay { let replayed = replayArtifact(run,result); if replayed != blot_error::Error.none { return replayed; } }
     result.artifacts = blot_support::some(ArtifactSummary { demands: metadata.jobs.len,jobs: metadata.pools.value.functions.len,functions: journal.functions.len,helpers: journal.functions.len - metadata.pools.value.functions.len,emission_events: journal.records.len,metadata_events: metadata.events.len,operation_symbols: journal.operations.len,templates: metadata.pools.value.captures.len,pinned_modules: metadata.pools.value.modules.len , ..});
     if run.options.artifact_dump { return dumpArtifact(run,result,counts); } return blot_error::Error.none;
@@ -2071,7 +2082,7 @@ fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
     if !blot_backend_wasm::equal(result.bytes.items,workspace.replay_bytes[..]) { return finishReplayArtifact(workspace,blot_error::Error.invalid_function_reference,module_alive,origins_alive,candidate_alive,vectors,bytes_started); }
     result.bytes.clear(); return finishReplayArtifact(workspace,result.bytes.append(workspace.replay_bytes[..]),module_alive,origins_alive,candidate_alive,vectors,bytes_started);
 }
-fn publish(run: CompileRun&,result: Result&,memo:blot_reuse_code_artifacts::ModuleStamps&) -> blot_error::Error {
+fn publish(run: CompileRun&,result: Result&,stamp_counts:ModuleStamps) -> blot_error::Error {
     let workspace .= runWorkspace(run);
     if run.options.retain_artifacts {
         workspace.capture.resetHeader(workspace.metadata,workspace.journal,workspace.capture.executable_queries,run.options.cached_units); let optimized .=run.optimized;if optimized {let owned:blot_backend_optimized_bodies::Capture& =blot_compile_workspace::activeOptimized();assert(optimized .==owned && owned .==workspace.optimized);workspace.capture.optimized .=owned;}
@@ -2079,29 +2090,35 @@ fn publish(run: CompileRun&,result: Result&,memo:blot_reuse_code_artifacts::Modu
         let sealed = workspace.capture.sealExecutableQueries(); if sealed != blot_error::Error.none { return sealed; } result.query_tables.executable_fragment = workspace.capture.executable_queries.storage();
         let optimized .=workspace.capture.optimized;if optimized {result.query_tables.executable_optimizer=optimized.queries.storage();}
     }
-    result.module_stamps = ModuleStamps { memo.computed,memo.reused,memo.comparisons,memo.copied,memo.hashed , ..};
+    result.module_stamps=stamp_counts;
     run.timing.capture_us = run.clock.lap(); result.timing = run.timing; return blot_error::Error.none;
 }
-fn completePreparedPhases(workspace:CompileWorkspace&,run:CompileRun&,skip_constant_replay:bool,memo:blot_reuse_code_artifacts::ModuleStamps&)->Result,blot_error::Error {
-    let prepared=finishPreparation(run,skip_constant_replay,memo);if prepared!=blot_error::Error.none {return emptyResult(workspace),prepared;}
-    let emitted,error = emit(run); if error != blot_error::Error.none { return emptyResult(workspace),error; }
+fn completePreparedPhases(workspace:CompileWorkspace&,run:CompileRun&,skip_constant_replay:bool,memo:blot_reuse_code_artifacts::ModuleStamps&)->Result,ArtifactCounts,ModuleStamps,bool,blot_error::Error {
+    let prepared=finishPreparation(run,skip_constant_replay,memo);if prepared!=blot_error::Error.none {return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,prepared;}
+    let emitted,error = emit(run); if error != blot_error::Error.none { return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,error; }
     match emitted {
-        diagnostic failure=>{ var result = failure.value; if !workspace.generator.speculated { return result,blot_error::Error.none; } result.deinit(); return emptyResult(workspace),blot_error::Error.speculative_local_retry; },complete=>{},
+        diagnostic failure=>{ var result = failure.value; if !workspace.generator.speculated { return result,ArtifactCounts{..},ModuleStamps{..},false,blot_error::Error.none; } result.deinit(); return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,blot_error::Error.speculative_local_retry; },complete=>{},
     }
-    let speculated = workspace.generator.speculated; let assembled,assembly_error = assemble(run); if assembly_error != blot_error::Error.none { return assembled,assembly_error; } var result = assembled;
-    if result.diagnostic.present { if !speculated { return result,blot_error::Error.none; } result.deinit(); return emptyResult(workspace),blot_error::Error.speculative_local_retry; }
-    let observed = observe(run,result); if observed != blot_error::Error.none { result.deinit(); return emptyResult(workspace),observed; }
-    let recorded = recordArtifact(run,result,memo); if recorded != blot_error::Error.none { result.deinit(); return emptyResult(workspace),recorded; }
-    let published = publish(run,result,memo); if published != blot_error::Error.none { result.deinit(); return emptyResult(workspace),published; } return result,blot_error::Error.none;
+    let speculated = workspace.generator.speculated; let assembled,assembly_error = assemble(run); if assembly_error != blot_error::Error.none { return assembled,ArtifactCounts{..},ModuleStamps{..},false,assembly_error; } var result = assembled;
+    if result.diagnostic.present { if !speculated { return result,ArtifactCounts{..},ModuleStamps{..},false,blot_error::Error.none; } result.deinit(); return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,blot_error::Error.speculative_local_retry; }
+    let observed = observe(run,result); if observed != blot_error::Error.none { result.deinit(); return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,observed; }
+    let counts,recorded=recordArtifact(run,result,memo);if recorded!=blot_error::Error.none {result.deinit();return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,recorded;}
+    return result,counts,ModuleStamps{memo.computed,memo.reused,memo.comparisons,memo.copied,memo.hashed},true,blot_error::Error.none;
 }
-// This scope owns every borrowed header snapshot and ends before Run cleanup.
-fn completePreparedAttempt(workspace:CompileWorkspace&,run:CompileRun&,skip_constant_replay:bool)->Result,blot_error::Error {
+// This entire scope ends before replay or Run cleanup can reset payloads.
+fn recordPreparedAttempt(workspace:CompileWorkspace&,run:CompileRun&,skip_constant_replay:bool)->Result,ArtifactCounts,ModuleStamps,bool,blot_error::Error {
     var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
     var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
-    let bound=memo.bindValidatedSources(run.stamp_sources);if bound!=blot_error::Error.none {return emptyResult(workspace),bound;}
+    let bound=memo.bindValidatedSources(run.stamp_sources);if bound!=blot_error::Error.none {return emptyResult(workspace),ArtifactCounts{..},ModuleStamps{..},false,bound;}
     memo.compare_contents=true;memo.validate=run.options.validate_pins;
-    let result,error=completePreparedPhases(workspace,run,skip_constant_replay,memo);
-    memo.deinit();return result,error;
+    let result,counts,stamp_counts,complete,error=completePreparedPhases(workspace,run,skip_constant_replay,memo);
+    memo.deinit();return result,counts,stamp_counts,complete,error;
+}
+fn completePreparedAttempt(workspace:CompileWorkspace&,run:CompileRun&,skip_constant_replay:bool)->Result,blot_error::Error {
+    let prepared,counts,stamp_counts,complete,error=recordPreparedAttempt(workspace,run,skip_constant_replay);
+    if error!=blot_error::Error.none || !complete {return prepared,error;}var result=prepared;
+    let finished=finishArtifact(run,result,counts);if finished!=blot_error::Error.none {result.deinit();return emptyResult(workspace),finished;}
+    let published=publish(run,result,stamp_counts);if published!=blot_error::Error.none {result.deinit();return emptyResult(workspace),published;}return result,blot_error::Error.none;
 }
 fn compileAttempt(source_workspace:CompileWorkspace&,entry:u32,options:CompileOptions,skip_constant_replay:bool,speculative_locals:bool)->Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::canonicalWorkspace(source_workspace);
@@ -2112,7 +2129,11 @@ fn compileAttempt(source_workspace:CompileWorkspace&,entry:u32,options:CompileOp
 }
 fn compileLocals(source_workspace: CompileWorkspace&,entry: u32,options: CompileOptions,speculative: bool) -> Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::canonicalWorkspace(source_workspace);
-    let first,error = compileAttempt(workspace,entry,options,false,speculative); if error != blot_error::Error.constant_receipt_retry { return first,error; } assert(options.constant_receipts);
+    block {
+        var first,error = compileAttempt(workspace,entry,options,false,speculative);
+        if error != blot_error::Error.constant_receipt_retry { return first,error; }
+        assert(options.constant_receipts); first.deinit();
+    }
     let retried,retry_error = compileAttempt(workspace,entry,options,true,speculative); assert(retry_error != blot_error::Error.constant_receipt_retry); if retry_error != blot_error::Error.none { return retried,retry_error; } var result = retried; result.constant_receipts.retries = 1; return result,blot_error::Error.none;
 }
 fn scopedStorage(options: CompileOptions) -> blot_backend_storage_plan::Config {
@@ -2133,7 +2154,11 @@ fn finishCompilation(source_workspace:CompileWorkspace&,units:const blot_check_c
 }
 fn compileCounted(source_workspace:CompileWorkspace&,entry:u32,options:CompileOptions)->Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::canonicalWorkspace(source_workspace);
-    let first,error=compileLocals(workspace,entry,options,true);if error!=blot_error::Error.speculative_local_retry {return first,error;}
+    block {
+        var first,error=compileLocals(workspace,entry,options,true);
+        if error!=blot_error::Error.speculative_local_retry {return first,error;}
+        first.deinit();
+    }
     return compileLocals(workspace,entry,options,false);
 }
 fn compileWithOptions(source_workspace:CompileWorkspace&,source_units:const blot_check_core::Module[:],entry:u32,options:CompileOptions)->Result,blot_error::Error {
@@ -2387,11 +2412,11 @@ fn jsonStringify(value: WireOwnedPools,writer: blot_json::Writer&) -> blot_error
     let pools .= value.value; writer.beginObject(); writer.field("project_identity",pools.project_identity); writer.field("identity",pools.identity); writer.field("layouts",WireLayouts { pools.layouts , ..}); writer.field("evaluator",WireEvaluatorSnapshot { pools.evaluator , ..}); writer.field("rows",pools.rows); writer.field("templates",pools.templates); writer.field("captures",pools.captures); writer.field("bridge",WireBridge { pools.bridge , ..}); writer.field("field_locations",pools.field_locations); writer.field("field_locations_stamp",pools.field_locations_stamp[..]); writer.field("functions",WireFunctions { pools.functions , ..}); writer.field("serialized",pools.serialized); writer.field("runtime_globals",pools.runtime_globals); writer.field("runtime_order",pools.runtime_order); writer.field("operations",pools.operations); writer.field("operation_relocations",WireOperationRelocations { pools.operation_relocations , ..}); writer.field("operations_finalized",pools.operations_finalized); return writer.endObject();
 }
 fn printArtifact<T>(label: const u8[:],value: T) -> blot_error::Error {
-    var bytes: u8[>..<] = []; let error = blot_json::toBytes(value,bytes,blot_json::Options { emit_strings_as_arrays: true,emit_nonportable_numbers_as_strings: true , ..}); if error != blot_error::Error.none { return error; }
+    var bytes: u8[>..] = []; let error = blot_json::toBytes(value,bytes,blot_json::Options { emit_strings_as_arrays: true,emit_nonportable_numbers_as_strings: true , ..}); if error != blot_error::Error.none { return error; }
     var line: u8[>..<] = []; line.append(label); line.push(' '); line.append(bytes); line.push('\n'); blot_native::debug_write(line); return blot_error::Error.none;
 }
-struct WireModulePin { unit: u32,path: const u8[:],token: blot_reuse_code_artifacts::Token,stamp: u8[32] }
-fn jsonStringify(value: WireModulePin,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("unit",value.unit); writer.field("path",value.path); writer.field("token",value.token); writer.field("stamp",value.stamp[..]); return writer.endObject(); }
+struct WireModulePin { unit: u32,path: const u8[:],token: blot_reuse_code_artifacts::Token,stamp: blot_support::Option<u8[32]> }
+fn jsonStringify(value: WireModulePin,writer: blot_json::Writer&) -> blot_error::Error { writer.beginObject(); writer.field("unit",value.unit); writer.field("path",value.path); writer.field("token",value.token); writer.key("stamp"); if value.stamp.present { writer.write(value.stamp.value[..]); } else { writer.nullValue(); } return writer.endObject(); }
 fn dumpArtifact(run: CompileRun&,result: Result&,counts: ArtifactCounts) -> blot_error::Error {
     let metadata .= runWorkspace(run).metadata; let journal .= runWorkspace(run).journal; assert(metadata.pools.present); let pools: const blot_reuse_code_artifacts::Pools& = metadata.pools.value;
     let jobs = printArtifact("ARTIFACT_JOBS",WireJobs { metadata , ..}); if jobs != blot_error::Error.none { return jobs; } let demands = printArtifact("ARTIFACT_DEMAND_EVENTS",WireDemandEvents { metadata.events.items , ..}); if demands != blot_error::Error.none { return demands; }
@@ -2403,7 +2428,8 @@ fn dumpArtifact(run: CompileRun&,result: Result&,counts: ArtifactCounts) -> blot
 }
 fn associatedTarget(source: Generator&,origin: u32,identity: blot_check_types::NominalIdentity,member: u32,op: blot_check_types::Operator) -> blot_support::Option<blot_check_core::BindingRef>,blot_error::Error {
     let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
-    let target,error = generator.evaluator.associatedTarget(origin,identity,member,op); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return target,error; } return blot_support::none<blot_check_core::BindingRef>(),evaluationFailure(generator); } return target,blot_error::Error.none;
+    let session:blot_eval_core_eval::Session& =blot_eval_core_eval::canonicalSession(generator.evaluator);
+    let target,error = session.associatedTarget(origin,identity,member,op); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return target,error; } return blot_support::none<blot_check_core::BindingRef>(),evaluationFailure(generator); } return target,blot_error::Error.none;
 }
 struct CapturedClosureEmission { header: blot_eval_core_eval::ClosureValue,captured: const blot_eval_core_eval::ValueId[:] }
 fn emitCapturedClosureOwner(context: CapturedClosureEmission&,emitter: blot_backend_backend_emission::Owner&) -> blot_error::Error {

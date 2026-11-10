@@ -6,9 +6,47 @@ import std;
 import reuse.code_artifacts;
 import backend.result_publication;
 import reuse.dependency_payload;
+import reuse.dependency_stamp_view;
 var module_text:u8[4]=[117,110,105,116];
 var previous_module:blot_check_core::Module=blot_check_core::Module{unit:1,names:module_text[..],..};
+fn registeredStampLeafViews() {
+ var catalog,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let names,error=catalog.copy("registered-leaf-module");assert(error==blot_error::Error.none);
+ let selected,error=catalog.copy([11 as u32,22 as u32,33 as u32,44 as u32]);assert(error==blot_error::Error.none);
+ let modules,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(catalog,1);assert(error==blot_error::Error.none);
+ modules[0]=blot_check_core::Module{unit:1,names:names,selected_edges:selected,..};
+ let expected=blot_check_core::stampView(modules[0]);let units=catalog.mutable(modules);
+ var retained,error=catalog.retain();assert(error==blot_error::Error.none && !retained.unique());
+ var publication,error=blot_backend_result_publication::init(blot_native::fresh_owner_id(),blot_native::fresh_owner_id());assert(error==blot_error::Error.none);
+ let owners:blot_reuse_dependency_payload::Owner[1]=[catalog];assert(blot_backend_result_publication::stageInputs(publication,units,catalog,owners[..],default<const blot_reuse_dependency_payload::Owner[:]>())==blot_error::Error.none);
+ catalog.deinit();
+ let registered,error=blot_backend_result_publication::registeredInputUnits(publication);assert(error==blot_error::Error.none && registered.len==1);
+ let observed=blot_backend_result_publication::registeredInputHeader(publication,0);assert(observed==expected);
+ let full=blot_backend_result_publication::registeredStampSlice(publication,selected);
+ assert(blot_support::same_slice_identity(full,selected) && full.len==4 && full[0]==11 && full[3]==44);
+ let name_full=blot_backend_result_publication::registeredStampSlice(publication,names);
+ assert(blot_support::same_slice_identity(name_full,names) && name_full.len==names.len && name_full[0]=='r' && name_full[1]=='e');
+ let name_prefix=blot_backend_result_publication::registeredStampSlice(publication,names[..5]);
+ assert(blot_support::same_slice_identity(name_prefix,names[..5]) && name_prefix.len==5 && name_prefix[4]=='s');
+ let name_interior=blot_backend_result_publication::registeredStampSlice(publication,names[2..7]);
+ assert(blot_support::same_slice_identity(name_interior,names[2..7]) && name_interior.len==5 && name_interior[0]=='g' && name_interior[4]=='e');
+ assert(blot_support::same_slice_identity(blot_backend_result_publication::registeredStampSlice(publication,names),names) && names[0]=='r');
+ let prefix=blot_backend_result_publication::registeredStampSlice(publication,selected[..3]);
+ assert(blot_support::same_slice_identity(prefix,selected[..3]) && prefix.len==3 && prefix[2]==33);
+ let interior=blot_backend_result_publication::registeredStampSlice(publication,selected[1..3]);
+ assert(blot_support::same_slice_identity(interior,selected[1..3]) && interior.len==2 && interior[0]==22 && interior[1]==33);
+ assert(blot_support::same_slice_identity(blot_backend_result_publication::registeredStampSlice(publication,selected),selected));
+ let writable=blot_backend_result_publication::module_runs.realloc_slice(registered,registered.len);assert(blot_support::same_slice_identity(writable,registered));
+ writable[0].has_numeric_proofs=true;assert(!observed.has_numeric_proofs && !expected.has_numeric_proofs);
+ assert(blot_backend_result_publication::registeredInputHeader(publication,0).has_numeric_proofs);
+ assert(blot_support::same_slice_identity(blot_backend_result_publication::registeredStampSlice(publication,selected),selected) && selected[0]==11 && selected[3]==44);
+ assert(blot_backend_result_publication::destroy(publication)==blot_error::Error.none);
+ assert(selected[0]==11 && selected[1]==22 && selected[2]==33 && selected[3]==44);
+ retained.deinit();
+}
+
 fn main() {
+ registeredStampLeafViews();
  var catalog,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
  let source,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(catalog,1);assert(error==blot_error::Error.none);
  source[0]=blot_check_core::Module{unit:1,names:module_text[..],..};

@@ -3488,5 +3488,72 @@
     "changed_inputs": [],
     "artifacts": {},
     "whole_compiler_executable": false
+  },
+  "readonly_header_and_lifetime_boundary_family": {
+    "scope": "Seven affected native component laws and partial diagnostic roots; complete compiler/runtime pending",
+    "header_observer": {
+      "fields": 74,
+      "slice_leaves": 65,
+      "concrete_pool_overloads": 56,
+      "generator": "compiler-goose/tools/write_dependency_stamp_view.py",
+      "preserves": "Every original StampView field and slice identity, full allocation before subrange reborrow",
+      "authority": "Existing valid shared journals pinned by publication; no unique/mutable calls",
+      "no_new_payload_copy_or_allocation": true,
+      "compatibility": "Nonempty capture leaves must belong to a pinned dependency journal; arbitrary headerPrint callers unchanged",
+      "cost": "Journal scans; interior fallback linear in candidate allocation length, not benchmarked"
+    },
+    "lifecycle": "Memo lexical scope ends after stamp/record work, before replay resets generator; only scalar ArtifactCounts/ModuleStamps reach publication. Core snapshots unchanged.",
+    "retry": "Failed constant-receipt and speculative Result carriers deinit and leave lexical scope before restart",
+    "diagnostic": "Canonical Session fields read directly, preserving arbitrary detail and all metadata; no full local Diagnostic holder",
+    "mapping": "Direct branch selection and scalar use-analysis results replace mixed-root slice rebinds; synthetic body preparation cleanup flattened",
+    "json": "Three output locals align with existing growable serializer; optional module stamp wire value emits array/null like Zig",
+    "native": {
+      "receipt": "2026-11-10-goose-readonly-lifecycle-laws.json.gz",
+      "passed": true,
+      "tests": 7,
+      "sum_stage_seconds": 74.102,
+      "full_inventory_current_source": false
+    },
+    "prior_native": "2026-11-10-goose-readonly-stamp-laws.json.gz",
+    "partial_receipts": [
+      "2026-11-10-goose-readonly-retry-frontier.json.gz",
+      "2026-11-10-goose-memo-diagnostic-boundaries.json.gz"
+    ],
+    "partial_recording": {
+      "passed": true,
+      "seconds": 11.248,
+      "scope": "Copied full recordArtifact plus replay after memo scope"
+    },
+    "partial_diagnostic": {
+      "passed": true,
+      "seconds": 2.668,
+      "scope": "Copied direct Generator diagnostic/unit-use root; never execute"
+    },
+    "latest_phase266": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "publish",
+        "detach_result",
+        "observe",
+        "generator_diagnostic"
+      ],
+      "exit": 1,
+      "seconds": 69.777,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 1069,
+          "message": "error: cannot call principalEvidenceFallback: it may shrink context while context is still used, and context may refer into context (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "9dcd01839ab1fe747442f2839187f98cc96a6e18c662f2529f581e3844e1d1dd",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "remaining": "PrincipalEvidenceFallback context shrink at core_eval1069; actual whole261 remains latest actual build and produced no C/header/native. CLI/server/OOM/retry/retention pending."
   }
 }

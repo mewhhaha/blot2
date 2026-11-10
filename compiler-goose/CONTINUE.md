@@ -4,22 +4,25 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole261 fails154.61s, unchanged460inputs, no C/header/native. Prepare
-still sees a retry Result loan through compileLocals. Next end failed Result
-scopes before constant-receipt/speculative retries; preserve Zig catch semantics.
+Actual whole261 fails154.61s, unchanged460inputs, no C/header/native. Lexical
+retry Result cleanup clears that original blocker in selected compile262.
+Combined26669.78s now has one principalEvidenceFallback context-shrink error at
+core_eval1069. No newer actual whole yet. Direct diagnostic/unit-use2.67s and
+full recording/replay11.25s copied checks pass; all are check-only/unstaged.
 
-Complete36/36 native component inventory passes on frozen source, summed stage
-time290.53s,30s per stage/600s outer cap. Whole261 later regenerates source
-identity. Component laws do not qualify complete compiler/CLI/server execution.
-Refinement/emission/replay cleanup is lexical; emitter mappings/rows use existing
-named descriptors. Hook restoration and retained Image sharing pass native laws.
-New scratch-owner allocation costs remain unbenchmarked.
+Seven affected native laws pass after the complete readonly/lifecycle family,
+summed stage74.10s. Complete36/36 (290.53s summed stage) is historical exact-source
+evidence, not current inventory or actual compiler runtime qualification.
 
-Phase25953.45s finds replay equal buffer types, associatedTarget origin and full
-ModulePin.header origin. The first two are fixed afterward; next check pending.
-Header/scalar-owner/referenced snapshot controls failed. Names-only typed-leaf
-reborrow clears retention but deliberately omits other fields: never promote it.
-Complete read-only snapshot leaf reconstruction remains the next source lever.
+Generated read-only StampView reconstruction covers74fields/65slice leaves/56
+concrete pools, preserving exact identities through full/prefix/interior ranges.
+Valid shared pinned journals work; nonempty leaves require that journal authority.
+No new payload copy/allocation; scan costs unbenchmarked. Memo scope ends before
+replay; scalar stats reach publish, original Core snapshots/tokens/digests remain.
+Retry carriers end before restart; diagnostic text/metadata remain exact; mapping
+selections are lexical. Next fix principal fallback, then actual whole retry.
+A copied fail-closed transformer for92remaining fake cleanup wrappers is only an
+experiment; no broad transformation is promoted.
 
 All phase probes are check-only with unstaged inputs; NEVER execute. Use smaller
 phase subsets when needed, keeping120s repair cap. Actual CLI/server/OOM/retry

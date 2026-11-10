@@ -119,15 +119,17 @@ export "probe_assemble" fn assemble() {
  run.deinit();var result=compiled;result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
 
+fn recordArtifactScope(run:blot_backend_core_backend::CompileRun&,result:blot_backend_core_backend::Result&)->blot_backend_core_backend::ArtifactCounts,blot_error::Error {
+ var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+ let counts,error=blot_backend_core_backend::recordArtifact(run,result,memo);memo.deinit();return counts,error;
+}
 export "probe_record_artifact" fn record_artifact() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
  var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  var result=blot_backend_core_backend::emptyResult(workspace);
- var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
- var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
- let error=blot_backend_core_backend::recordArtifact(run,result,memo);
- memo.deinit();run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+ let counts,error=recordArtifactScope(run,result);if error==blot_error::Error.none {let finished=blot_backend_core_backend::finishArtifact(run,result,counts);}
+run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
 
 export "probe_publish" fn publish() {
@@ -135,10 +137,8 @@ export "probe_publish" fn publish() {
  let workspace=frame.borrow();assert(workspace);
  var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  var result=blot_backend_core_backend::emptyResult(workspace);
- var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
- var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
- let error=blot_backend_core_backend::publish(run,result,memo);
- memo.deinit();run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
+ let error=blot_backend_core_backend::publish(run,result,blot_backend_core_backend::ModuleStamps{..});
+ run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
 
 export "probe_detach_result" fn detach_result() {
@@ -165,5 +165,15 @@ export "probe_source_interface" fn source_interface() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
  let header,error=workspace.generator.evaluator.sourceInterface(blot_check_core::BindingRef{1,1});
+ let released=frame.release();assert(released==blot_error::Error.none);
+}
+
+// Diagnostic publication and unit-use cache only; unstaged Core, never execute.
+export "probe_generator_diagnostic" fn generator_diagnostic() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ let target,error=blot_backend_core_backend::associatedTarget(workspace.generator,1,blot_check_types::NominalIdentity{0,0},0,blot_check_types::Operator.none);
+ let uses,error=blot_backend_core_backend::unitUses(workspace.generator,1,blot_backend_unit_index::Need{..});
+ blot_backend_resolved_body::deinit();
  let released=frame.release();assert(released==blot_error::Error.none);
 }

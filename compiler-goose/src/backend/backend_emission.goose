@@ -289,13 +289,8 @@ fn withOwner<C,F>(config: Config,context: C&) -> Error {
     let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != blot_error::Error.none { return error; }
     var owner = Owner { staged: config.staged,generator: config.generator,unit_id: config.unit_id,function_id: config.function_id,provider_local: config.provider_local,mappings: config.mappings,row_mappings: config.row_mappings,cleanups: cleanups,factory_template: config.factory_template , ..};
 
-    recursive fn cleanup_continuation_82() -> Error {
- return F(context,owner);
-
-    }
-    let cleanup_result_82_0 = cleanup_continuation_82();
-     owner.deinit();
-    return cleanup_result_82_0;
+    let result = F(context,owner);
+    owner.deinit(); return result;
 }
 reusable[] var owned_words: u32[>..] = [];
 reusable[] var owned_roles: blot_backend_runtime_ir::Role[>..] = [];
@@ -569,21 +564,55 @@ fn decideInstances(owner: Owner&,statement: u32,previous: const Mapping[:],previ
      if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
     return cleanup_result_78_0;
 }
+fn withStorageFacts(owner: Owner&,mappings: MappingBuffer&,facts: const Mapping[:],out: MappingBuffer&) -> Error {
+    if mappings.items.len != 0 { return withFacts(mappings.items,facts,out); }
+    return withFacts(owner.mappings,facts,out);
+}
+struct StorageUse { instance: u32 = 0,unresolved: bool = false,closed: bool = false,widened: bool = false }
+fn inspectStorageUse(owner: Owner&,use: u32,context_mappings: const Mapping[:],context_rows: const RowMapping[:],mappings: MappingBuffer&,instances: InstanceDecisions&,reader: const InstanceDecision&?,context: i64,ambiguous: Ambiguous&,widened: bool,scratch_plain: MappingBuffer&) -> StorageUse,Error {
+    let generator .= owner.generator; let source .= generator.unit(owner.unit_id);
+    let use_type = source.typeOf(use); let span = source.span(use);
+    let instance,error = generator.codeLayoutWithRows(owner.unit_id,use_type,context_mappings,context_rows,span);
+    if error != blot_error::Error.none { return StorageUse {..},error; }
+    if hasErasedType(owner,instance,0) {
+        let closed,closed_error = closeAmbiguousUse(owner,use_type,context_mappings,context_rows,span,ambiguous);
+        if closed_error != blot_error::Error.none { return StorageUse {..},closed_error; }
+        return StorageUse { instance: instance,unresolved: true,closed: closed,widened: widened , ..},blot_error::Error.none;
+    }
+    var selected = StorageUse { instance: instance,widened: widened , ..};
+    if ambiguous.types.items.len != 0 && !widened {
+        scratch_plain.clear(); var merged_plain: Error;
+        if reader != null { merged_plain = withStorageFacts(owner,mappings,instances.factsAt(reader,context),scratch_plain); }
+        else { merged_plain = withStorageFacts(owner,mappings,default<const Mapping[:]>(),scratch_plain); }
+        if merged_plain != blot_error::Error.none { return StorageUse {..},merged_plain; }
+        let plain_layout,plain_error = generator.codeLayoutWithRows(owner.unit_id,use_type,scratch_plain.items,context_rows,span);
+        if plain_error != blot_error::Error.none { return StorageUse {..},plain_error; }
+        selected.widened = hasErasedType(owner,plain_layout,0);
+    }
+    return selected,blot_error::Error.none;
+}
+fn mergeStorageAmbiguity(owner: Owner&,mappings: MappingBuffer&,rows: RowBuffer&,ambiguous: Ambiguous&) -> Error {
+    if ambiguous.types.items.len == 0 { return blot_error::Error.none; }
+    var merged = MappingBuffer {..};
+    let facts = withStorageFacts(owner,mappings,ambiguous.types.items,merged);
+    if facts != blot_error::Error.none { merged.deinit(); return facts; }
+    mappings.deinit(); mappings = merged;
+    if ambiguous.rows.items.len == 0 { return blot_error::Error.none; }
+    rows.clear(); return withFacts(owner.row_mappings,ambiguous.rows.items,rows);
+}
+fn finishStorageMappings(scratch_plain: MappingBuffer&,with_ambiguous_rows: RowBuffer&,with_ambiguous: MappingBuffer&,ambiguous: Ambiguous&,scratch_rows: RowBuffer&,scratch: MappingBuffer&,error: Error) -> Error {
+    scratch_plain.deinit(); with_ambiguous_rows.deinit(); with_ambiguous.deinit(); ambiguous.deinit(); scratch_rows.deinit(); scratch.deinit();
+    return error;
+}
 fn localStorageMappings(owner: Owner&,root: u32,mappings: MappingBuffer&,rows: RowBuffer&,instances: InstanceDecisions&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var unit_uses: const blot_backend_unit_index::Uses? = null; let statements = source.children(root);
     var dead_aliases: u32[16]; var dead_count: i64 = 0; var scratch = MappingBuffer {..};
-    recursive fn cleanup_continuation_73() -> Error {
- var scratch_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_72() -> Error {
+    var scratch_rows = RowBuffer {..};
 
     var ambiguous = Ambiguous {..};
-    recursive fn cleanup_continuation_71() -> Error {
- var with_ambiguous = MappingBuffer {..};
-    recursive fn cleanup_continuation_70() -> Error {
- var with_ambiguous_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_69() -> Error {
- var scratch_plain = MappingBuffer {..};
-    recursive fn cleanup_continuation_68() -> Error {
+    var with_ambiguous = MappingBuffer {..};
+    var with_ambiguous_rows = RowBuffer {..};
+    var scratch_plain = MappingBuffer {..};
 
     var position = statements.len;
     while position > 0 {
@@ -591,26 +620,33 @@ fn localStorageMappings(owner: Owner&,root: u32,mappings: MappingBuffer&,rows: R
         let built = producer.tag == blot_check_core::Tag.construct || producer.tag == blot_check_core::Tag.product || producer.tag == blot_check_core::Tag.record || producer.tag == blot_check_core::Tag.array;
         if !built && producer.tag != blot_check_core::Tag.call && producer.tag != blot_check_core::Tag.apply && producer.tag != blot_check_core::Tag.project && producer.tag != blot_check_core::Tag.reference { continue; }
         let binding = source.binding(n.a); if binding.kind != blot_reuse_principal_interface::Kind.local || binding.scheme.variables.len == 0 { continue; }
-        let produced,produced_error = codeLayout(owner,binding.ty,source.span(statement)); if produced_error != blot_error::Error.none { return produced_error; } if !hasErasedType(owner,produced,0) { continue; }
+        let produced,produced_error = codeLayout(owner,binding.ty,source.span(statement)); if produced_error != blot_error::Error.none { let storage_error: Error = produced_error; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } if !hasErasedType(owner,produced,0) { continue; }
         if producer.tag == blot_check_core::Tag.project {
-            if source.projectionVariants(producer.b).len != 0 { continue; } let projection = source.projection(producer.b); let receiver,error = codeLayout(owner,projection.source_type,source.span(n.b)); if error != blot_error::Error.none { return error; }
-            let target,target_error = memberTarget(owner,n.b,projection.field,receiver); if target_error != blot_error::Error.none { return target_error; } if !target.present { continue; }
+            if source.projectionVariants(producer.b).len != 0 { continue; } let projection = source.projection(producer.b); let receiver,error = codeLayout(owner,projection.source_type,source.span(n.b)); if error != blot_error::Error.none { let storage_error: Error = error; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
+            let target,target_error = memberTarget(owner,n.b,projection.field,receiver); if target_error != blot_error::Error.none { let storage_error: Error = target_error; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } if !target.present { continue; }
         }
         if producer.tag == blot_check_core::Tag.reference { let aliased = source.reference(n.b); if aliased.unit != 0 && aliased.unit != owner.unit_id { continue; } if source.binding(aliased.binding).kind != blot_reuse_principal_interface::Kind.local { continue; } }
-        var plain = owner.mappings; if mappings.items.len != 0 { plain = mappings.items; }
-        with_ambiguous.clear(); let merged = withFacts(plain,ambiguous.types.items,with_ambiguous); if merged != blot_error::Error.none { return merged; } let previous = with_ambiguous.items;
-        with_ambiguous_rows.clear(); let merged_rows = withFacts(owner.row_mappings,ambiguous.rows.items,with_ambiguous_rows); if merged_rows != blot_error::Error.none { return merged_rows; } let previous_rows = with_ambiguous_rows.items;
+        with_ambiguous.clear(); let merged = withStorageFacts(owner,mappings,ambiguous.types.items,with_ambiguous); if merged != blot_error::Error.none { let storage_error: Error = merged; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } let previous = with_ambiguous.items;
+        with_ambiguous_rows.clear(); let merged_rows = withFacts(owner.row_mappings,ambiguous.rows.items,with_ambiguous_rows); if merged_rows != blot_error::Error.none { let storage_error: Error = merged_rows; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } let previous_rows = with_ambiguous_rows.items;
         var uses: u32[4]; var use_count: i64 = 0; var open = false; var widened = false; var restart = false;
-        if unit_uses == null { let index,error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need {..}); if error != blot_error::Error.none { return error; } unit_uses .= index; } assert(unit_uses != null); let index .= unit_uses;
-        for use in index.references.get(n.a) {
+        if unit_uses == null { let index,error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need {..}); if error != blot_error::Error.none { let storage_error: Error = error; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } unit_uses .= index; } assert(unit_uses != null); let index .= unit_uses;
+        let reference_count = index.references.get(n.a).len;
+        for reference_position in 0..reference_count {
+            let use = index.references.get(n.a)[reference_position];
             let reference = source.reference(use); if reference.unit != 0 && reference.unit != owner.unit_id { continue; } if containsValue(dead_aliases[..dead_count],use) { continue; }
             let reader .= instances.reader(use); var contexts: i64 = 1; if reader != null { contexts = reader.count; }
             for context in 0..contexts {
-                var context_mappings: const Mapping[:] = previous; var context_rows: const RowMapping[:] = previous_rows;
-                if reader != null { scratch.clear(); let facts = withFacts(previous,instances.factsAt(reader,context),scratch); if facts != blot_error::Error.none { return facts; } context_mappings = scratch.items; scratch_rows.clear(); let row_facts = withFacts(previous_rows,instances.rowsAt(reader,context),scratch_rows); if row_facts != blot_error::Error.none { return row_facts; } context_rows = scratch_rows.items; }
-                let use_type = source.typeOf(use); let span = source.span(use); let instance,error = generator.codeLayoutWithRows(owner.unit_id,use_type,context_mappings,context_rows,span); if error != blot_error::Error.none { return error; }
-                if hasErasedType(owner,instance,0) { let closed,closed_error = closeAmbiguousUse(owner,use_type,context_mappings,context_rows,span,ambiguous); if closed_error != blot_error::Error.none { return closed_error; } if closed { restart = true; } else { open = true; } break; }
-                if ambiguous.types.items.len != 0 && !widened { scratch_plain.clear(); let facts=if reader!=null {instances.factsAt(reader,context)}else {default<const Mapping[:]>()}; let merged_plain = withFacts(plain,facts,scratch_plain); if merged_plain != blot_error::Error.none { return merged_plain; } let plain_layout,plain_error = generator.codeLayoutWithRows(owner.unit_id,use_type,scratch_plain.items,context_rows,span); if plain_error != blot_error::Error.none { return plain_error; } widened = hasErasedType(owner,plain_layout,0); }
+                var inspected: StorageUse; var inspect_error: Error;
+                if reader != null {
+                    scratch.clear(); let facts = withFacts(previous,instances.factsAt(reader,context),scratch); if facts != blot_error::Error.none { let storage_error: Error = facts; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
+                    scratch_rows.clear(); let row_facts = withFacts(previous_rows,instances.rowsAt(reader,context),scratch_rows); if row_facts != blot_error::Error.none { let storage_error: Error = row_facts; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
+                    inspected,inspect_error = inspectStorageUse(owner,use,scratch.items,scratch_rows.items,mappings,instances,reader,context,ambiguous,widened,scratch_plain);
+                } else {
+                    inspected,inspect_error = inspectStorageUse(owner,use,previous,previous_rows,mappings,instances,reader,context,ambiguous,widened,scratch_plain);
+                }
+                if inspect_error != blot_error::Error.none { let storage_error: Error = inspect_error; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
+                if inspected.unresolved { if inspected.closed { restart = true; } else { open = true; } break; }
+                widened = inspected.widened; let instance = inspected.instance;
                 if containsValue(uses[..use_count],instance) { continue; } if use_count == 4 { open = true; break; } uses[use_count] = instance; use_count++;
             }
             if restart || open { break; }
@@ -620,99 +656,54 @@ fn localStorageMappings(owner: Owner&,root: u32,mappings: MappingBuffer&,rows: R
         let flags = index.flagsOf(n.a); if flags.captured || flags.merge_branch || flags.carried { continue; }
         let promotable = producer.tag == blot_check_core::Tag.call || producer.tag == blot_check_core::Tag.apply || producer.tag == blot_check_core::Tag.project || producer.tag == blot_check_core::Tag.construct || producer.tag == blot_check_core::Tag.product || producer.tag == blot_check_core::Tag.record;
         if widened && generator.speculative_locals && promotable { generator.speculated = true; continue; }
-        if use_count > 1 || (built && use_count == 1) { let decided = decideInstances(owner,statement,previous,previous_rows,uses[..use_count],instances); if decided != blot_error::Error.none { return decided; } continue; } if built { continue; }
-        var next = MappingBuffer {..};  let copied = next.append(previous); if copied != blot_error::Error.none { let __cleanup_result_36_0: Error = copied; { next.deinit(); } return __cleanup_result_36_0; }
-        if use_count == 1 { let a = generator.mapTypeDepth(owner.unit_id,next,null,binding.ty,uses[0],source.span(statement),0); if a != blot_error::Error.none { let __cleanup_result_37_0: Error = a; { next.deinit(); } return __cleanup_result_37_0; } let b = generator.mapTypeDepth(owner.unit_id,next,null,source.typeOf(n.b),uses[0],source.span(statement),0); if b != blot_error::Error.none { let __cleanup_result_38_0: Error = b; { next.deinit(); } return __cleanup_result_38_0; } }
+        if use_count > 1 || (built && use_count == 1) { let decided = decideInstances(owner,statement,previous,previous_rows,uses[..use_count],instances); if decided != blot_error::Error.none { let storage_error: Error = decided; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } continue; } if built { continue; }
+        var next = MappingBuffer {..};  let copied = next.append(previous); if copied != blot_error::Error.none { let __cleanup_result_36_0: Error = copied; { next.deinit(); } let storage_error: Error = __cleanup_result_36_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
+        if use_count == 1 { let a = generator.mapTypeDepth(owner.unit_id,next,null,binding.ty,uses[0],source.span(statement),0); if a != blot_error::Error.none { let __cleanup_result_37_0: Error = a; { next.deinit(); } let storage_error: Error = __cleanup_result_37_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } let b = generator.mapTypeDepth(owner.unit_id,next,null,source.typeOf(n.b),uses[0],source.span(statement),0); if b != blot_error::Error.none { let __cleanup_result_38_0: Error = b; { next.deinit(); } let storage_error: Error = __cleanup_result_38_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } }
         else {
-            for variable in source.types.list(binding.scheme.variables) { var found = false; for mapping in next.items { if mapping.variable == variable { found = true; break; } } if !found { let added = next.push(Mapping { variable: variable,layout: blot_backend_layout::word , ..}); if added != blot_error::Error.none { let __cleanup_result_39_0: Error = added; { next.deinit(); } return __cleanup_result_39_0; } } }
-            let closed,error = generator.codeLayoutWithRows(owner.unit_id,binding.ty,next.items,previous_rows,source.span(statement)); if error != blot_error::Error.none { let __cleanup_result_40_0: Error = error; { next.deinit(); } return __cleanup_result_40_0; } if hasErasedType(owner,closed,0) { { next.deinit(); } continue; } let mapped = generator.mapTypeDepth(owner.unit_id,next,null,source.typeOf(n.b),closed,source.span(statement),0); if mapped != blot_error::Error.none { let __cleanup_result_42_0: Error = mapped; { next.deinit(); } return __cleanup_result_42_0; }
+            for variable in source.types.list(binding.scheme.variables) { var found = false; for mapping in next.items { if mapping.variable == variable { found = true; break; } } if !found { let added = next.push(Mapping { variable: variable,layout: blot_backend_layout::word , ..}); if added != blot_error::Error.none { let __cleanup_result_39_0: Error = added; { next.deinit(); } let storage_error: Error = __cleanup_result_39_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } } }
+            let closed,error = generator.codeLayoutWithRows(owner.unit_id,binding.ty,next.items,previous_rows,source.span(statement)); if error != blot_error::Error.none { let __cleanup_result_40_0: Error = error; { next.deinit(); } let storage_error: Error = __cleanup_result_40_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); } if hasErasedType(owner,closed,0) { { next.deinit(); } continue; } let mapped = generator.mapTypeDepth(owner.unit_id,next,null,source.typeOf(n.b),closed,source.span(statement),0); if mapped != blot_error::Error.none { let __cleanup_result_42_0: Error = mapped; { next.deinit(); } let storage_error: Error = __cleanup_result_42_0; return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error); }
         }
         var private = true; for mapping in next.items { if mapping.layout != mappingAt(previous,mapping.variable) && !containsValue(source.types.list(binding.scheme.variables),mapping.variable) { private = false; } } if !private { { next.deinit(); } continue; }
         mappings.deinit(); mappings = next; next = MappingBuffer {..};
      { next.deinit(); } }
-    if ambiguous.types.items.len == 0 { return blot_error::Error.none; } var merged = MappingBuffer {..}; var transferred = false;
-    recursive fn cleanup_continuation_67() -> Error {
- var base = owner.mappings; if mappings.items.len != 0 { base = mappings.items; }
-    let facts = withFacts(base,ambiguous.types.items,merged); if facts != blot_error::Error.none { return facts; } mappings.deinit(); mappings = merged; transferred = true;
-    if ambiguous.rows.items.len == 0 { return blot_error::Error.none; } rows.clear(); return withFacts(owner.row_mappings,ambiguous.rows.items,rows);
+    let storage_error: Error = mergeStorageAmbiguity(owner,mappings,rows,ambiguous); return finishStorageMappings(scratch_plain,with_ambiguous_rows,with_ambiguous,ambiguous,scratch_rows,scratch,storage_error);
+}
 
-    }
-    let cleanup_result_67_0 = cleanup_continuation_67();
-     if !transferred { merged.deinit(); }
-    return cleanup_result_67_0;
-
-    }
-    let cleanup_result_68_0 = cleanup_continuation_68();
-     scratch_plain.deinit();
-    return cleanup_result_68_0;
-
-    }
-    let cleanup_result_69_0 = cleanup_continuation_69();
-     with_ambiguous_rows.deinit();
-    return cleanup_result_69_0;
-
-    }
-    let cleanup_result_70_0 = cleanup_continuation_70();
-     with_ambiguous.deinit();
-    return cleanup_result_70_0;
-
-    }
-    let cleanup_result_71_0 = cleanup_continuation_71();
-     ambiguous.deinit();
-    return cleanup_result_71_0;
-
-    }
-    let cleanup_result_72_0 = cleanup_continuation_72();
-     scratch_rows.deinit();
-    return cleanup_result_72_0;
-
-    }
-    let cleanup_result_73_0 = cleanup_continuation_73();
-     scratch.deinit();
-    return cleanup_result_73_0;
+fn finishBodyPreparation(owner: Owner&,previous_stage: blot_work_counters::InferenceStage,instances: InstanceDecisions&,storage_rows: RowBuffer&,storage: MappingBuffer&,body: u32,error: Error) -> u32,Error {
+    instances.deinit(); storage_rows.deinit(); storage.deinit();
+    owner.generator.evaluator.inference_stage = previous_stage; return body,error;
+}
+fn prepareStorageInstances(owner: Owner&,root: u32,depth: i64,template: bool,mappings: const Mapping[:],rows: const RowMapping[:],instances: InstanceDecisions&) -> u32,Error {
+    if instances.decisions.items.len != 0 { return prepareMapped(owner,root,depth,template,mappings,rows,instances); }
+    return prepareMapped(owner,root,depth,template,mappings,rows,null);
+}
+fn prepareStorageRows(owner: Owner&,root: u32,depth: i64,template: bool,mappings: const Mapping[:],storage_rows: RowBuffer&,instances: InstanceDecisions&) -> u32,Error {
+    if storage_rows.items.len != 0 { return prepareStorageInstances(owner,root,depth,template,mappings,storage_rows.items,instances); }
+    return prepareStorageInstances(owner,root,depth,template,mappings,owner.row_mappings,instances);
+}
+fn prepareStorageMappings(owner: Owner&,root: u32,depth: i64,template: bool,storage: MappingBuffer&,storage_rows: RowBuffer&,instances: InstanceDecisions&) -> u32,Error {
+    if storage.items.len != 0 { return prepareStorageRows(owner,root,depth,template,storage.items,storage_rows,instances); }
+    return prepareStorageRows(owner,root,depth,template,owner.mappings,storage_rows,instances);
 }
 recursive fn prepareBody(owner: Owner&,root: u32,depth: i64,template: bool) -> u32,Error {
-    let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation);
-    recursive fn cleanup_continuation_66() -> u32,Error {
+    let generator .= owner.generator; let previous_stage = generator.evaluator.inference_stage;
+    generator.evaluator.inference_stage = blot_work_counters::InferenceStage.preparation;
+    if owner.preparation_depth >= 256 {
+        let error = generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity);
+        generator.evaluator.inference_stage = previous_stage; return 0,error;
+    }
+    var storage = MappingBuffer {..}; var storage_rows = RowBuffer {..}; var instances = InstanceDecisions {..};
 
-    if owner.preparation_depth >= 256 { return 0,generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity); }
-    var storage = MappingBuffer {..};
-    recursive fn cleanup_continuation_65() -> u32,Error {
- var storage_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_64() -> u32,Error {
- var instances = InstanceDecisions {..};
-    recursive fn cleanup_continuation_63() -> u32,Error {
-
-    let selected = localStorageMappings(owner,root,storage,storage_rows,instances); if selected != blot_error::Error.none { return 0,selected; }
+    let selected = localStorageMappings(owner,root,storage,storage_rows,instances); if selected != blot_error::Error.none { let prepared_value: u32 = 0; let preparation_error: Error = selected; return finishBodyPreparation(owner,previous_stage,instances,storage_rows,storage,prepared_value,preparation_error); }
     let source .= generator.unit(owner.unit_id);
     if blot_backend_bottom_result::proves(generator.units,owner.unit_id,root) {
-        let result,result_error = codeLayout(owner,source.typeOf(root),source.span(root)); if result_error != blot_error::Error.none { return 0,result_error; }
-        if result == blot_backend_layout::erased { if storage.items.len == 0 { let copied = storage.append(owner.mappings); if copied != blot_error::Error.none { return 0,copied; } } var rows = RowBuffer {..};  let mapped = generator.mapTypeDepth(owner.unit_id,storage,rows,source.typeOf(root),5,source.span(root),0); if mapped != blot_error::Error.none { let __cleanup_result_44_0: u32 = 0; let __cleanup_result_44_1: Error = mapped; { rows.deinit(); } return __cleanup_result_44_0, __cleanup_result_44_1; }  { rows.deinit(); } }
+        let result,result_error = codeLayout(owner,source.typeOf(root),source.span(root)); if result_error != blot_error::Error.none { let prepared_value: u32 = 0; let preparation_error: Error = result_error; return finishBodyPreparation(owner,previous_stage,instances,storage_rows,storage,prepared_value,preparation_error); }
+        if result == blot_backend_layout::erased { if storage.items.len == 0 { let copied = storage.append(owner.mappings); if copied != blot_error::Error.none { let prepared_value: u32 = 0; let preparation_error: Error = copied; return finishBodyPreparation(owner,previous_stage,instances,storage_rows,storage,prepared_value,preparation_error); } } var rows = RowBuffer {..};  let mapped = generator.mapTypeDepth(owner.unit_id,storage,rows,source.typeOf(root),5,source.span(root),0); if mapped != blot_error::Error.none { let __cleanup_result_44_0: u32 = 0; let __cleanup_result_44_1: Error = mapped; { rows.deinit(); } let prepared_value: u32 = __cleanup_result_44_0; let preparation_error: Error = __cleanup_result_44_1; return finishBodyPreparation(owner,previous_stage,instances,storage_rows,storage,prepared_value,preparation_error); }  { rows.deinit(); } }
     }
-    var mappings = owner.mappings; if storage.items.len != 0 { mappings = storage.items; } var rows = owner.row_mappings; if storage_rows.items.len != 0 { rows = storage_rows.items; }
-    var selected_instances: const InstanceDecisions? = null; if instances.decisions.items.len != 0 { selected_instances .= instances; }
-    return prepareMapped(owner,root,depth,template,mappings,rows,selected_instances);
-
-    }
-    let cleanup_result_63_0,cleanup_result_63_1 = cleanup_continuation_63();
-     instances.deinit();
-    return cleanup_result_63_0,cleanup_result_63_1;
-
-    }
-    let cleanup_result_64_0,cleanup_result_64_1 = cleanup_continuation_64();
-     storage_rows.deinit();
-    return cleanup_result_64_0,cleanup_result_64_1;
-
-    }
-    let cleanup_result_65_0,cleanup_result_65_1 = cleanup_continuation_65();
-     storage.deinit();
-    return cleanup_result_65_0,cleanup_result_65_1;
-
-    }
-    let cleanup_result_66_0,cleanup_result_66_1 = cleanup_continuation_66();
-     stage.deinit();
-    return cleanup_result_66_0,cleanup_result_66_1;
+    let prepared_body,prepared_error = prepareStorageMappings(owner,root,depth,template,storage,storage_rows,instances);
+    let prepared_value: u32 = prepared_body; let preparation_error: Error = prepared_error; return finishBodyPreparation(owner,previous_stage,instances,storage_rows,storage,prepared_value,preparation_error);
 }
+
 recursive fn prepareMapped(owner: Owner&,root: u32,depth: i64,template: bool,mappings: const Mapping[:],rows: const RowMapping[:],instances: const InstanceDecisions?) -> u32,Error {
     let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation);
     recursive fn cleanup_continuation_62() -> u32,Error {

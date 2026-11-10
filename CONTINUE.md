@@ -6,41 +6,50 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-Actual whole261 stops in **154.61s**, unchanged460 inputs, **no C/header/native
-artifacts**. It still finds a prepare/reset loan through the first Result in
-compileLocals before retry. Lexical outer wrappers alone did not clear it.
-Next audit both constant-receipt and speculative-local retry Result scopes
-against the Zig catch paths. [Whole261 receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole261.json.gz).
+**No complete C/header/native Goose compiler exists.** Actual whole261 failed in
+154.61s on a prepare/reset loan across retry, unchanged460 inputs. Subsequent
+lexical retry Result cleanup clears that blocker in selected compile262; no newer
+actual whole attempt yet. [Whole261](benchmarks/evidence/qualification/2026-11-10-goose-whole261.json.gz).
 
-Complete **36/36** native component inventory passes on frozen source: summed
-stage time **290.53s**, 30s per stage, 600s outer cap. This includes nested hook
-restore to exact previous references/null, retained Image sharing across Frame,
-real code-artifact key-cache equality, optional timing Scope and prior owner laws.
-The whole attempt subsequently regenerated source identity. Component coverage
-never qualifies complete generation or CLI/server execution.
-[Full receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete36-refinement-laws.json.gz).
+Combined phase266 reaches **69.78s**, frozen source, and now reports one deeper
+principalEvidenceFallback context-shrink error at core_eval1069. All earlier
+header/memo/diagnostic/mapping frontiers are cleared in that check. These roots
+are unstaged, check-only and **NEVER executable**. A direct diagnostic/unit-use
+root reduces that specific repair loop to **2.67s**; full recording plus replay
+passes a copied check in **11.25s**.
+[Boundary receipt](benchmarks/evidence/qualification/2026-11-10-goose-memo-diagnostic-boundaries.json.gz).
 
-Refinement, named/closure/runtime initializer emission and replay now use lexical
-cleanup. Named substitution descriptors replace local growers stored in emitter
-Config; added scratch-owner allocation costs are unbenchmarked. Retained capture
-traversal uses scalar cursors. Refinement hooks resolve the registered Session;
-returned results reborrow their existing owned runs. Validation-image sharing
-reborrows the same named bytes without new copy/allocation. Capture field/hash/
-counter adapters match their actual types. ABI/session/error/cleanup order stays.
+Seven affected native laws pass after the full source family, summed stage time
+**74.10s**: full header equality, exact full/prefix/interior slice identity and
+contents, shared journals without unique access, scalar snapshot stability,
+retention across owner teardown, leases, pipeline, server component and diagnostics.
+[Native receipt](benchmarks/evidence/qualification/2026-11-10-goose-readonly-lifecycle-laws.json.gz).
+Complete36/36 is the preceding checkpoint's frozen evidence (290.53s summed stage
+time), not current complete inventory or actual compiler/CLI qualification.
+[Historical complete36](benchmarks/evidence/qualification/2026-11-10-goose-complete36-refinement-laws.json.gz).
 
-Seven-phase259 stops **53.45s** with replay equal buffer type, associatedTarget
-Generator origin, and persistent ModulePin.header origin errors. The first two
-are repaired afterward; next combined check pending. All probes are unstaged,
-check-only and **NEVER executable**. [Phase evidence](benchmarks/evidence/qualification/2026-11-10-goose-refinement-artifact-phases.json.gz).
+Complete read-only header reconstruction covers **74 fields / 65 slice leaves**,
+generated from actual schemas and56 concrete typed pools. It validates existing
+publication journals, recovers full allocation extents before returning subspans,
+and preserves every snapshot field/identity without new copy/allocation. Shared
+valid journals work; nonempty capture leaves must belong to those pinned journals.
+Journal scans and the interior linear fallback are unbenchmarked costs. Arbitrary
+headerPrint callers remain. Reduced-header prototypes stay rejected/non-promotable.
+[Full observer proof](benchmarks/evidence/qualification/2026-11-10-goose-readonly-retry-frontier.json.gz).
 
-Header controls isolate StampView slice fields, not the Module pointer. Whole
-header reborrows, scalar-owner construction and referenced snapshot prototypes
-are rejected; the latter only moves retention into module_runs. A names-only
-control reborrowing the exact dependency_payload byte pool clears that origin;
-it omits other fields and is never promotable. Next generate complete read-only
-leaf reconstruction preserving every snapshot field and exact slice identity.
-No checker rule is weakened. The [receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
-links all negative and positive controls and earlier checkpoints.
+Memo scope now ends after recording, before replay resets the generator; only
+scalar counts reach publication. Original Core snapshots, token/digest behavior,
+replay/error order and final timing lap stay. Failed retry Results end scope
+before the next attempt. Diagnostic publication reads registered Session fields
+directly, preserving arbitrary text and metadata without extra copy. Emitter
+mapping selection uses direct branches and scalar outcomes. JSON output locals
+match the existing writer; optional pin stamps emit array/null like Zig.
+
+Next: repair the principal fallback context owner; retry the actual whole build.
+There are92 remaining generated recursive cleanup wrappers in6files. A copied,
+fail-closed batch transformer is being explored with exact inventory/control
+requirements; no such broad transformation is promoted. Native/phase evidence
+never qualifies full generation or CLI/server/OOM/retry/retention runtime.
 
 ## Contracts and remaining coverage
 
