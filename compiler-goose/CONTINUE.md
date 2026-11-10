@@ -10,6 +10,10 @@ resolved_body60 (saved effect identities at purity_type_key59). Prior visitor
 and frozen Module errors clear. Their two affected native laws pass in 17.94s.
 See [whole160](../benchmarks/evidence/qualification/2026-11-10-goose-whole160.json.gz).
 
+Current selected162 reaches recursive FunctionPlanInput publication at 1843.
+A scalar request IR is under review. Footprint-cache/effect-key laws pass 14.68s;
+expanded transitive cache/Frame law passes 7.56s. No whole artifact exists.
+
 Six affected production laws pass 67.46s before the last diagnostic-OOM correction;
 the final production diagnostic law passes 6.55s afterward. The most recent
 complete30 inventory remains 221.34s at f0a602bc, before these repairs. Exact

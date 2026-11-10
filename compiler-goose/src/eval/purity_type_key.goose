@@ -15,7 +15,9 @@ struct IdentityRun { bytes: u8[:]=default<u8[:]>() }
 reusable[] var key_bytes: u8[>..]=[];
 reusable[] var identity_runs: IdentityRun[>..]=[];
 reusable[] var saved_words: u32[>..]=[];
-reusable[] var saved_identities: Identity[>..]=[];
+// Sort owned encodings by their original byte ranges; no source header escapes into scratch.
+struct SavedIdentity {encoded:const u8[:],module_start:i64,module_len:i64,declaration_start:i64}
+reusable[] var saved_identities: SavedIdentity[>..]=[];
 struct IdentityRuns { storage: IdentityRun[:]=default<IdentityRun[:]>(),items: IdentityRun[:]=default<IdentityRun[:]>() }
 fn push(self_: IdentityRuns&,run: IdentityRun) -> Error { return blot_support_pooled_buffer::push(self_,run,identity_runs); }
 fn deinit(self_: IdentityRuns&) { for run in self_.items { if run.bytes.len!=0 { key_bytes.free_slice(run.bytes); } } blot_support_pooled_buffer::deinit(self_,identity_runs); }
@@ -53,12 +55,40 @@ fn compareBytes(a:const u8[:],b:const u8[:])->i64 {
  var index:i64=0;while index<a.len && index<b.len {if a[index]<b[index] {return -1;}if a[index]>b[index] {return 1;}index+=1;}
  if a.len<b.len {return -1;}if a.len>b.len {return 1;}return 0;
 }
-fn less(left: Identity,right: Identity) -> bool { return compareBytes(left.module,right.module)<0||(left.module==right.module&&compareBytes(left.declaration,right.declaration)<0); }
-recursive fn rowKey<S>(self_: Context<S>&,row: u32,fuel: i64) -> const u8[:],Error {
- let resolved,error=self_.types.resolveEffects(row,0); if error!=blot_error::Error.none { return default<const u8[:]>(),error; } if self_.types.row(resolved).tail!=blot_check_effects::Tail.closed { return default<const u8[:]>(),blot_error::Error.ambiguous_type_key; } let source=self_.types.rowLabels(resolved); let labels=saved_words.alloc_slice(source.len); for label,index in source { labels[index]=label; }  let identities=saved_identities.alloc_slice(labels.len);
- for label,index in labels { let identity,e=operation(self_,label,65536); if e!=blot_error::Error.none { let __cleanup_result_7_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_7_1: Error = e; { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } return __cleanup_result_7_0, __cleanup_result_7_1; } identities[index]=identity; } ::sort(identities,less); var bytes=BytesBuffer {};
- for identity in identities { let name,e=nominal(identity); if e!=blot_error::Error.none { let __cleanup_result_8_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_8_1: Error = e; { bytes.deinit(); } { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } return __cleanup_result_8_0, __cleanup_result_8_1; } let key,e2=pack(name); release(name); if e2!=blot_error::Error.none { let __cleanup_result_9_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_9_1: Error = e2; { bytes.deinit(); } { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } return __cleanup_result_9_0, __cleanup_result_9_1; } let appended=bytes.append(key); release(key); if appended!=blot_error::Error.none { let __cleanup_result_10_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_10_1: Error = appended; { bytes.deinit(); } { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } return __cleanup_result_10_0, __cleanup_result_10_1; } } let __cleanup_result_11_0, __cleanup_result_11_1 = bytes.finish(); { bytes.deinit(); } { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } return __cleanup_result_11_0, __cleanup_result_11_1;
- { bytes.deinit(); } { saved_identities.free_slice(identities); } { saved_words.free_slice(labels); } }
+fn savedIdentity(identity:Identity)->SavedIdentity,Error {
+ let name,error=nominal(identity);if error!=blot_error::Error.none {return default<SavedIdentity>(),error;}
+ let owned=key_bytes.realloc_slice(name,name.len);assert(blot_support::same_slice_identity(owned,name));
+ var module_start:i64=0;while owned[module_start]!=58 {module_start++;}module_start++;
+ var declaration_start=module_start+identity.module.len;while owned[declaration_start]!=58 {declaration_start++;}declaration_start++;
+ return SavedIdentity{encoded:owned,module_start:module_start,module_len:identity.module.len,declaration_start:declaration_start},blot_error::Error.none;
+}
+fn less(left:SavedIdentity,right:SavedIdentity)->bool {
+ let module=compareBytes(left.encoded[left.module_start..left.module_start+left.module_len],right.encoded[right.module_start..right.module_start+right.module_len]);
+ if module!=0 {return module<0;}
+ return compareBytes(left.encoded[left.declaration_start..],right.encoded[right.declaration_start..])<0;
+}
+fn releaseIdentities(identities:SavedIdentity[:],initialized:i64) {
+ for index in initialized {release(identities[index].encoded);}saved_identities.free_slice(identities);
+}
+recursive fn rowKey<S>(self_:Context<S>&,row:u32,fuel:i64)->const u8[:],Error {
+ let resolved,error=self_.types.resolveEffects(row,0);if error!=blot_error::Error.none {return default<const u8[:]>(),error;}
+ if self_.types.row(resolved).tail!=blot_check_effects::Tail.closed {return default<const u8[:]>(),blot_error::Error.ambiguous_type_key;}
+ let source=self_.types.rowLabels(resolved);let labels=saved_words.alloc_slice(source.len);for label,index in source {labels[index]=label;}
+ let identities=saved_identities.alloc_slice(labels.len);var initialized:i64=0;var encoding_error=blot_error::Error.none;
+ for label,index in labels {
+  let identity,error=operation(self_,label,65536);if error!=blot_error::Error.none {releaseIdentities(identities,initialized);saved_words.free_slice(labels);return default<const u8[:]>(),error;}
+  if encoding_error!=blot_error::Error.none {continue;}
+  let saved,error=savedIdentity(identity);if error!=blot_error::Error.none {encoding_error=error;continue;}
+  identities[index]=saved;initialized++;
+ }
+ if encoding_error!=blot_error::Error.none {releaseIdentities(identities,initialized);saved_words.free_slice(labels);return default<const u8[:]>(),encoding_error;}
+ ::sort(identities,less);var bytes=BytesBuffer{};
+ for identity in identities {
+  let key,error=pack(identity.encoded);if error!=blot_error::Error.none {bytes.deinit();releaseIdentities(identities,initialized);saved_words.free_slice(labels);return default<const u8[:]>(),error;}
+  let error=bytes.append(key);release(key);if error!=blot_error::Error.none {bytes.deinit();releaseIdentities(identities,initialized);saved_words.free_slice(labels);return default<const u8[:]>(),error;}
+ }
+ let result,error=bytes.finish();bytes.deinit();releaseIdentities(identities,initialized);saved_words.free_slice(labels);return result,error;
+}
 recursive fn functionKey<S>(self_: Context<S>&,parameter_id: u32,result_id: u32,row: u32,fuel: i64) -> const u8[:],Error {
  if fuel==0 { return default<const u8[:]>(),blot_error::Error.specialization_limit; } let parameter,error=typeKey(self_,parameter_id,fuel-1); if error!=blot_error::Error.none { return default<const u8[:]>(),error; }  let result,e=typeKey(self_,result_id,fuel-1); if e!=blot_error::Error.none { let __cleanup_result_12_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_12_1: Error = e; { release(parameter); } return __cleanup_result_12_0, __cleanup_result_12_1; }  let effects,e2=rowKey(self_,row,fuel-1); if e2!=blot_error::Error.none { let __cleanup_result_13_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_13_1: Error = e2; { release(result); } { release(parameter); } return __cleanup_result_13_0, __cleanup_result_13_1; }  let pk,e3=pack(parameter); if e3!=blot_error::Error.none { let __cleanup_result_14_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_14_1: Error = e3; { release(effects); } { release(result); } { release(parameter); } return __cleanup_result_14_0, __cleanup_result_14_1; }  let rk,e4=pack(result); if e4!=blot_error::Error.none { let __cleanup_result_15_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_15_1: Error = e4; { release(pk); } { release(effects); } { release(result); } { release(parameter); } return __cleanup_result_15_0, __cleanup_result_15_1; }  let ek,e5=pack(effects); if e5!=blot_error::Error.none { let __cleanup_result_16_0: const u8[:] = default<const u8[:]>(); let __cleanup_result_16_1: Error = e5; { release(rk); } { release(pk); } { release(effects); } { release(result); } { release(parameter); } return __cleanup_result_16_0, __cleanup_result_16_1; }  let __cleanup_result_17_0, __cleanup_result_17_1 = join([BytePart {"c"},BytePart {pk},BytePart {rk},BytePart {ek}]); { release(ek); } { release(rk); } { release(pk); } { release(effects); } { release(result); } { release(parameter); } return __cleanup_result_17_0, __cleanup_result_17_1;
  { release(ek); } { release(rk); } { release(pk); } { release(effects); } { release(result); } { release(parameter); } }

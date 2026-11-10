@@ -117,7 +117,24 @@ fn parameterFieldWalk() {
  for root in [1 as u32,139 as u32,140 as u32] {var whole,error=blot_backend_storage_parameter_fields::collect(modules[0],root,11,nominal);assert(error==blot_error::Error.none && whole.whole);whole.deinit();}
  owner.deinit();var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);assert(selected.names.items.len==2 && selected.names.items[0]==7 && selected.names.items[1]==9);selected.deinit();
 }
-fn main() {parameterFieldWalk();
+fn completedSlotCache() {
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let nodes,error=owner.copy([blot_check_core::Node{tag:blot_check_core::Tag.invalid,..},blot_check_core::Node{tag:blot_check_core::Tag.reference,a:0,..},blot_check_core::Node{tag:blot_check_core::Tag.reference,a:1,..},blot_check_core::Node{tag:blot_check_core::Tag.product,a:0,b:2,..},blot_check_core::Node{tag:blot_check_core::Tag.reference,a:2,..}]);assert(error==blot_error::Error.none);
+ let references,error=owner.copy([blot_check_core::BindingRef{0,22},blot_check_core::BindingRef{0,33},blot_check_core::BindingRef{0,44}]);assert(error==blot_error::Error.none);let extra,error=owner.copy([1 as u32,2 as u32]);assert(error==blot_error::Error.none);
+ let bindings,error=blot_reuse_dependency_payload::alloc<blot_check_core::Binding>(owner,45);assert(error==blot_error::Error.none);for &binding in bindings {binding=blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.global,..};}
+ bindings[44].body_id=1;let bodies,error=owner.copy([blot_check_core::Body{..},blot_check_core::Body{binding:44,root:2,..}]);assert(error==blot_error::Error.none);
+ let units,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(owner,1);assert(error==blot_error::Error.none);units[0]=blot_reuse_dependency_owned_headers::canonical(owner,blot_check_core::Module{unit:1,nodes:nodes,extra:extra,bindings:bindings,bodies:bodies,references:references,..});
+ let globals=[blot_check_core::BindingRef{1,22},blot_check_core::BindingRef{1,33}];var index,error=blot_backend_storage_global_footprint::init(units,globals);assert(error==blot_error::Error.none);
+ let first,error=index.slots(1,1,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && first.len==1 && first[0]==0);
+ let second,error=index.slots(1,2,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && second.len==1 && second[0]==1);
+ let both,error=index.slots(1,3,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && both.len==2 && both[0]==0 && both[1]==1);
+ let indirect,error=index.slots(1,4,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && indirect.len==1 && indirect[0]==1);let edge .=blot_support_pooled_map::get(index.direct,blot_backend_storage_global_footprint::Node{unit:1,root:4,..});assert(edge && edge.nodes.len==1 && edge.nodes[0].root==2);
+ let fallback,error=index.slots(2,0,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && blot_support::same_slice_identity(fallback,index.all));
+ let count=index.completed.count;let again,error=index.slots(1,1,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && index.completed.count==count && blot_support::same_slice_identity(first,again));
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);assert(first[0]==0 && second[0]==1 && both[1]==1 && indirect[0]==1 && fallback.len==2);index.deinit();owner.deinit();
+ let no_units:blot_check_core::Module[0]=default<blot_check_core::Module[0]>();let no_globals:blot_check_core::BindingRef[0]=default<blot_check_core::BindingRef[0]>();var empty,error=blot_backend_storage_global_footprint::init(no_units[..],no_globals[..]);assert(error==blot_error::Error.none);let no_slots,error=empty.slots(1,0,blot_check_types::Scheme{..});assert(error==blot_error::Error.none && no_slots.len==0 && empty.completed.count==0);empty.deinit();
+}
+fn main() {completedSlotCache();parameterFieldWalk();
     pooledCleanup();
     transportAnchors();
     typeKeyHeader();

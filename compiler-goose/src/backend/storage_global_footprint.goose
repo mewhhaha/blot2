@@ -40,6 +40,20 @@ reusable[] var completed_map_pool: dictionary_slot<Node,const i64[:]>[>..] = [];
 struct Index {
     units: const Module[:] = default<const Module[:]>(),unit_indices: blot_support_pooled_map::Map<u32,i64> = blot_support_pooled_map::Map<u32,i64> {..},globals: blot_support_pooled_map::Map<Ref,i64> = blot_support_pooled_map::Map<Ref,i64> {..},names: blot_support_pooled_map::Map<const u8[:],Targets> = blot_support_pooled_map::Map<const u8[:],Targets> {..},operators: blot_support_pooled_map::Map<blot_check_types::Operator,Targets> = blot_support_pooled_map::Map<blot_check_types::Operator,Targets> {..},unknown_names: bool = false,direct: blot_support_pooled_map::Map<Node,Edges> = blot_support_pooled_map::Map<Node,Edges> {..},completed: blot_support_pooled_map::Map<Node,const i64[:]> = blot_support_pooled_map::Map<Node,const i64[:]> {..},all: const i64[:] = default<const i64[:]>(),slot_runs: SlotRuns = SlotRuns {..},node_runs: NodeRuns = NodeRuns {..},
 }
+fn registeredSlots(source: const i64[:]) -> const i64[:] {
+    if source.len == 0 { return default<const i64[:]>(); }
+    let run = slots_pool.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(run,source));
+    let start = slots_pool.index_of(run[0]); return slots_pool[start..start + run.len];
+}
+fn registeredNodes(source: const Node[:]) -> const Node[:] {
+    if source.len == 0 { return default<const Node[:]>(); }
+    let run = nodes_pool.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(run,source));
+    let start = nodes_pool.index_of(run[0]); return nodes_pool[start..start + run.len];
+}
+fn ownedEdges(source: Edges) -> Edges { return Edges {nodes: registeredNodes(source.nodes),slots: registeredSlots(source.slots),all: source.all}; }
+fn publishCompleted(self_: Index&,node: Node,source: const i64[:]) -> const i64[:] {
+    let slots = registeredSlots(source); blot_support_pooled_map::insert(self_.completed,node,slots,completed_map_pool); return slots;
+}
 fn ownSlots(self_: Index&,values: const i64[:]) -> const i64[:],Error {if values.len == 0 {return default<const i64[:]>(),blot_error::Error.none;}let owned = slots_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.slot_runs,SlotRun {items: owned},slot_run_pool);if error != blot_error::Error.none {slots_pool.free_slice(owned);return default<const i64[:]>(),error;}return owned,blot_error::Error.none;}
 fn ownNodes(self_: Index&,values: const Node[:]) -> const Node[:],Error {if values.len == 0 {return default<const Node[:]>(),blot_error::Error.none;}let owned = nodes_pool.alloc_slice(values.len);for index in 0..values.len {owned[index] = values[index];}let error = blot_support_pooled_buffer::push(self_.node_runs,NodeRun {items: owned},node_run_pool);if error != blot_error::Error.none {nodes_pool.free_slice(owned);return default<const Node[:]>(),error;}return owned,blot_error::Error.none;}
 fn deinit(self_: Index&) {
@@ -85,14 +99,19 @@ fn scan(self_: Index&,node: Node) -> Edges,Error {
     }
     let result,result_error = capture();expression.deinit();return result,result_error;
 }
-fn edges(self_: Index&,node: Node) -> Edges,Error {let known .= blot_support_pooled_map::get(self_.direct,node);if known {return known,blot_error::Error.none;}let value,error = self_.scan(node);if error == blot_error::Error.out_of_memory {return Edges {..},error;}var selected = value;if error != blot_error::Error.none {selected = Edges {all: true,..};}blot_support_pooled_map::insert(self_.direct,node,selected,direct_map_pool);return selected,blot_error::Error.none;}
+fn edges(self_: Index&,node: Node) -> Edges,Error {
+    let known .= blot_support_pooled_map::get(self_.direct,node); if known { return ownedEdges(known),blot_error::Error.none; }
+    let value,error = self_.scan(node); if error == blot_error::Error.out_of_memory { return Edges {..},error; }
+    var selected = Edges {all: true,..}; if error == blot_error::Error.none { selected = ownedEdges(value); }
+    blot_support_pooled_map::insert(self_.direct,node,selected,direct_map_pool); return ownedEdges(selected),blot_error::Error.none;
+}
 fn slots(self_: Index&,unit: u32,root: u32,scheme: blot_check_types::Scheme) -> const i64[:],Error {
-    if self_.all.len == 0 {return self_.all,blot_error::Error.none;}let query = key(unit,root,scheme);let cached .= blot_support_pooled_map::get(self_.completed,query);if cached {return cached,blot_error::Error.none;}var pending: Node[>..<] = [];var seen: dictionary<Node,bool> = dictionary<Node,bool> {};var selected: bool[>..] = [];for slot in self_.all {selected.push(false);}pending.push(query);var remaining = limit;
+    let all = registeredSlots(self_.all); if all.len == 0 {return all,blot_error::Error.none;}let query = key(unit,root,scheme);let cached .= blot_support_pooled_map::get(self_.completed,query);if cached {return registeredSlots(cached),blot_error::Error.none;}var pending: Node[>..<] = [];var seen: dictionary<Node,bool> = dictionary<Node,bool> {};var selected: bool[>..] = [];for slot in all {selected.push(false);}pending.push(query);var remaining = limit;
     while pending.len != 0 {
-        let node = pending[pending.len - 1];pending.resize(pending.len - 1);if seen.get(node) {continue;}if remaining == 0 {blot_support_pooled_map::insert(self_.completed,query,self_.all,completed_map_pool);return self_.all,blot_error::Error.none;}remaining--;seen.insert(node,true);
-        let known .= blot_support_pooled_map::get(self_.completed,node);if known {for slot in known {selected[slot] = true;}continue;}
-        let value,error = self_.edges(node);if error != blot_error::Error.none {return default<const i64[:]>(),error;}if value.all {blot_support_pooled_map::insert(self_.completed,query,self_.all,completed_map_pool);return self_.all,blot_error::Error.none;}for slot in value.slots {selected[slot] = true;}
-        if value.nodes.len > limit || pending.len > limit - value.nodes.len {blot_support_pooled_map::insert(self_.completed,query,self_.all,completed_map_pool);return self_.all,blot_error::Error.none;}pending.append(value.nodes);
+        let node = pending[pending.len - 1];pending.resize(pending.len - 1);if seen.get(node) {continue;}if remaining == 0 {return publishCompleted(self_,query,all),blot_error::Error.none;}remaining--;seen.insert(node,true);
+        let known .= blot_support_pooled_map::get(self_.completed,node);if known {for slot in registeredSlots(known) {selected[slot] = true;}continue;}
+        let value,error = self_.edges(node);if error != blot_error::Error.none {return default<const i64[:]>(),error;}if value.all {return publishCompleted(self_,query,all),blot_error::Error.none;}for slot in value.slots {selected[slot] = true;}
+        if value.nodes.len > limit || pending.len > limit - value.nodes.len {return publishCompleted(self_,query,all),blot_error::Error.none;}pending.append(value.nodes);
     }
-    var selected_slots: i64[>..] = [];for present,slot in selected {if present {selected_slots.push(slot);}}let result,error = self_.ownSlots(selected_slots);if error != blot_error::Error.none {return default<const i64[:]>(),error;}blot_support_pooled_map::insert(self_.completed,query,result,completed_map_pool);return result,blot_error::Error.none;
+    var selected_slots: i64[>..] = [];for present,slot in selected {if present {selected_slots.push(slot);}}let result,error = self_.ownSlots(selected_slots);if error != blot_error::Error.none {return default<const i64[:]>(),error;}return publishCompleted(self_,query,result),blot_error::Error.none;
 }

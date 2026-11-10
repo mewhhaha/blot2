@@ -2900,5 +2900,33 @@
     },
     "whole160_previous_errors_cleared": true,
     "whole_compiler_executable": false
+  },
+  "footprint_purity_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-footprint-purity-laws.json.gz",
+      "2026-11-10-goose-purity-identity-family.json.gz",
+      "2026-11-10-goose-footprint-cache-transitive.json.gz",
+      "2026-11-10-goose-scoped161.json.gz",
+      "2026-11-10-goose-scoped162.json.gz"
+    ],
+    "native_pair_seconds": 14.683,
+    "final_transitive_footprint_seconds": 7.556,
+    "changes": [
+      "Footprint cached slot/node slices reify existing pools on all stores/returns; sole completed publication helper",
+      "SavedIdentity owns already-required encodings and scalar original-text ranges; no extra successful text allocations/copies",
+      "Lexical graph-input selection avoids rebinding caller view to owned buffer; branchsurvivor selection similarly split"
+    ],
+    "tradeoff": "Owned encoded names remain live until rowKey exit; scratchheader+8B/entry; initialized encodings released on everyerror/exit; sourceerrors retain priority",
+    "latest_scoped": {
+      "attempt": 162,
+      "seconds": 52.12,
+      "partial": true,
+      "source_unchanged": true,
+      "errors": [
+        "scoped_backend1843 FunctionPlanInput construction stores reference-carrying graph/key/module through recursivecycle"
+      ]
+    },
+    "next": "Astra reviewing bounded scalar planning request IR over existing pools; no checker changes",
+    "whole_compiler_executable": false
   }
 }

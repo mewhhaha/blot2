@@ -4369,6 +4369,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_purity_type_key::Id
 fn blot_eval_purity_type_key::blotStructuralHash<StructuralSink>(value:blot_eval_purity_type_key::IdentityRun,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_purity_type_key::IdentityRuns)->bool {return equalFields(left,right);}
 fn blot_eval_purity_type_key::blotStructuralHash<StructuralSink>(value:blot_eval_purity_type_key::IdentityRuns,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_purity_type_key::SavedIdentity)->bool {return equalFields(left,right);}
+fn blot_eval_purity_type_key::blotStructuralHash<StructuralSink>(value:blot_eval_purity_type_key::SavedIdentity,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_region_arena::Allocation)->bool {return equalFields(left,right);}
 fn blot_eval_region_arena::blotStructuralHash<StructuralSink>(value:blot_eval_region_arena::Allocation,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_region_arena::Arena)->bool {return equalFields(left,right);}
