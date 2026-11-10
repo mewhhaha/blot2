@@ -39,18 +39,19 @@ Wasm ValueType scratch, not Core input types. source_origins retains no Core uni
 Session.units uses registered Core headers with retained dependency owners. These
 reborrows cannot revive a discarded Core input; its storage stays pinned.
 
-Backend 307 clears the Proof/bool caller fixes, enum-cleanup declarations and
-25 nullable context guards (31 artifact calls, two retained arguments). 81.201s,
-unchanged source. Branch, lazy-read and error ordering remain; optional fields
-are bound once and narrowed as locals before mutable calls. No new payload copy
-or registry. These prefixes are checked, not whole-runtime qualification.
+Backend 309 clears six explicitly qualified dictionary operations and the cursor
+scratch initialization batch in 82.694s, unchanged source. Dictionary shadowing
+was confined to numeric_rows/function_facts. Cursor arrays retain their 256/1024
+capacities, logical counts and overflow behavior; nine adjacent helpers had no
+matching uninitialized locals. Earlier nullable contexts/Proof callers are pushed.
 
-Current frontier: numeric_rows87 dictionary get resolves to the enclosing cache
-get wrapper (wrong arity). Audit dictionary operations in shadowing namespaces and
-qualify standard dictionary calls explicitly; pooled-map APIs remain separate.
-Whole compiler and actual CLI/server/OOM/retry/retention still await the real
-executable. The two full-evaluator probes remain capped and unqualified.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-nullable-contexts307.json.gz).
+Current frontier: emission3947 Template{node:id} omits required environment, an
+Option field with no default. Audit its constructor family and oracle intent;
+choose a consistent optional default or explicit absent values without filling
+other required fields blindly. Whole compiler and actual CLI/server/OOM/retry/
+retention still await the real executable. Runtime probes remain capped and
+unqualified; full current 49-law inventory has not run.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-cursor309.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion

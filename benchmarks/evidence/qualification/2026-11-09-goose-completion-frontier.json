@@ -5053,5 +5053,71 @@
       ]
     },
     "whole_compiler_executable": false
+  },
+  "dictionary_namespace_operations": {
+    "receipt": "2026-11-10-goose-backend-dictionary308.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 81.688,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/private_cursor.goose",
+          "line": 63,
+          "message": "error: variable nodes may be used before it is assigned"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "b4614d50ccbe0bd825a15edf9bdd31dfa10ef051922eb6f76f8239d75e49ffe3",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "fixes": 6,
+    "modules": [
+      "numeric_rows",
+      "function_facts"
+    ],
+    "following": "private_cursor carries/nodes prefix scratch explicit initialization; adjacent9module audit found noothermatchinglocals",
+    "runtime_qualification": false,
+    "whole_compiler_executable": false
+  },
+  "cursor_scratch_initialization": {
+    "receipt": "2026-11-10-goose-backend-cursor309.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 82.694,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 3947,
+          "message": "error: missing initializer for field environment of Template (it has no default)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "f2ddf8a041198f557dab6259221bad0d6ba155bcf9b2f7d2d6f5824090756040",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "arrays": [
+      256,
+      1024
+    ],
+    "capacity_counts_unchanged": true,
+    "source": "Explicitfixedarrayinitialization; nineadjacentmodules audited",
+    "runtime_qualification": false,
+    "whole_compiler_executable": false
   }
 }

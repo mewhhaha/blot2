@@ -84,8 +84,8 @@ fn analyze<G>(generator: G&, ty: blot_backend_layout::Id) -> blot_support::Optio
 }
 struct Cache { rows: dictionary<blot_backend_layout::Id, Plan>& }
 fn get<G>(cache: Cache&, generator: G&, ty: blot_backend_layout::Id) -> blot_support::Option<Plan>, blot_error::Error {
-    let known = cache.rows.get(ty); if known { if known.word_count == 0 { return blot_support::none<Plan>(), blot_error::Error.none; } return blot_support::some(copy(known)), blot_error::Error.none; }
+    let known = ::get(cache.rows,ty); if known { if known.word_count == 0 { return blot_support::none<Plan>(), blot_error::Error.none; } return blot_support::some(copy(known)), blot_error::Error.none; }
     let plan, error = analyze(generator, ty); if error != blot_error::Error.none { return plan, error; }
-    var value = Plan {..}; if plan.present { value = plan.value; } cache.rows.insert(ty, value); return plan, blot_error::Error.none;
+    var value = Plan {..}; if plan.present { value = plan.value; } ::insert(cache.rows,ty, value); return plan, blot_error::Error.none;
 }
-fn deinit(cache: Cache&) { cache.rows.clear(); }
+fn deinit(cache: Cache&) { ::clear(cache.rows); }

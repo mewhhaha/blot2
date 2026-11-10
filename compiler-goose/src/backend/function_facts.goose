@@ -18,16 +18,16 @@ struct Stats {
     requested: i64 = 0,reused: i64 = 0,analyzed: i64 = 0,small_collections: i64 = 0,exact_builders: i64 = 0,layout_requests: i64 = 0,layout_reused: i64 = 0,region_requests: i64 = 0,evidence_import_requests: i64 = 0,evidence_import_reused: i64 = 0,closed_source_imports: i64 = 0,closed_source_reused: i64 = 0,split_attempts: i64 = 0,split_accepted: i64 = 0,split_declined: i64 = 0,region_reused: i64 = 0,region_retained_bytes: i64 = 0,region_arena: blot_eval_region_arena::Stats,
 }
 struct Store { entries: dictionary<blot_check_core::BindingRef,Facts>&,stats: Stats }
-fn deinit(store: Store&) { store.entries.clear(); store.stats = Stats {..}; }
+fn deinit(store: Store&) { ::clear(store.entries); store.stats = Stats {..}; }
 fn get(store: Store&,units: const blot_check_core::Module[:],target: blot_check_core::BindingRef) -> Facts,blot_error::Error {
-    store.stats.requested++; { let known .= store.entries.get(target); if known != null { store.stats.reused++; return known,blot_error::Error.none; } }
+    store.stats.requested++; { let known .= ::get(store.entries,target); if known != null { store.stats.reused++; return known,blot_error::Error.none; } }
     let module .= units[target.unit - 1]; let body .= module.body(target.binding); if body == null { return Facts {..},blot_error::Error.none; } let size = blot_backend_inline_body::cost(module,body.root); var facts = Facts { inline_cost: size , ..};
     if size.present { var budget: i64 = 256; facts.behavior = behavior(module,body.root,budget); let parameters = module.bodyParameters(body); let node = module.node(body.root);
         if node.tag == blot_check_core::Tag.array { facts.length = Length.constant { module.children(body.root).len as u32 , ..}; }
         if node.tag == blot_check_core::Tag.reference { for parameter,index in parameters { if index < 16 && local(module,body.root,parameter.binding) { facts.length = Length.parameter { index as u8 , ..}; } } }
         for parameter,index in parameters { if index >= 16 { break; } let ty = module.types.node(parameter.ty).tag; if ty != blot_check_types::Tag.array && ty != blot_check_types::Tag.list { continue; } if privateBinding(module,body.root,parameter.binding) { facts.borrowed_collections |= (1 as u16) << index as u32; } }
     }
-    store.entries.insert(target,facts); store.stats.analyzed++; return facts,blot_error::Error.none;
+    ::insert(store.entries,target,facts); store.stats.analyzed++; return facts,blot_error::Error.none;
 }
 fn local(module: const blot_check_core::Module&,id: u32,binding: u32) -> bool { if module.node(id).tag != blot_check_core::Tag.reference { return false; } let reference = module.reference(id); return (reference.unit == 0 || reference.unit == module.unit) && reference.binding == binding; }
 recursive fn borrowed(module: const blot_check_core::Module&,id: u32,binding: u32,allow: bool,budget: i64&) -> bool {

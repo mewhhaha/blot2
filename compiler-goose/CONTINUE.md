@@ -5,13 +5,13 @@ request OOM/retry and retention against Zig. **No whole compiler artifact exists
 No forwarding to compiler/ and no ABI fallback.
 
 Whole 290 remains latest complete attempt: 163.377s, unchanged 461 inputs,
-no artifact. Partial backend 307 clears Proof/bool callers, enum annotations and
-25 nullable context guards in 81.201s, unchanged. Current numeric_rows87 dictionary
-get is shadowed by its wrapper; qualify standard dictionary operations explicitly.
+no artifact. Partial backend 309 clears dictionary namespace/cursor scratch fixes
+in 82.694s, unchanged. Current emission3947 Template{node:id} misses environment
+Option initializer. Audit constructor family/oracle before a consistent fix.
 
-49 default component laws have not run in full on current source. Full invocation/
-preparation probes remain capped, explicit opt-in and unqualified. Whole executable
-and actual CLI/server/OOM/retry/retention remain pending. See root receipt index.
+Full run of 49 default component laws pending; actual invocation/preparation probes remain
+capped/explicit opt-in/unqualified. Whole compiler and actual CLI/server/OOM/retry/
+retention still await a real executable. Older families/evidence in root index/history.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
