@@ -4125,5 +4125,68 @@
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     },
     "whole_compiler_executable": false
+  },
+  "emission_unit_index_borrows": {
+    "bindings": 11,
+    "preserves_lazy_optional_cache": true,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-unit-uses292.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 76.47,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/unit_index.goose",
+          "line": 18,
+          "message": "error: expected a value of type bool, got void"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "6fe1be7a5b64738d7404ba7b305aec1dbab8e116432ad566c9754b1bad47b9cc",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "native_identity_law_copied_candidate": {
+      "passed": true,
+      "seconds": 5.921,
+      "receipt_local": "build/goose-port/emission-unit-uses-candidate/native-receipt.json"
+    },
+    "whole_compiler_executable": false,
+    "native_final": {
+      "receipt": "2026-11-10-goose-unit-index-laws.json.gz",
+      "passed": true,
+      "sum_stage_seconds": 5.936,
+      "test": "unit_uses_identity"
+    },
+    "lookup_port_fix": "Infinite probe uses loop, preserving original return behavior; qualified-set law exercises collision chain wrapping from7to0, missing keys and owned snapshot independence",
+    "partial_backend_after_loop": {
+      "receipt": "2026-11-10-goose-backend-unit-index293.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 76.593,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/closed_local_value.goose",
+          "line": 18,
+          "message": "error: returning a reference rooted in module, which dies with this function (\u00a79.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "e505229792f9cae76f0ee01e325573369aaf5c1dabba34dfcb271a59feebd3dd",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }

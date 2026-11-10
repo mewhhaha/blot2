@@ -13,83 +13,35 @@ no artifact. A grouped backend check reproduces that frontier in77.878s, so use
 that bounded partial check for repairs before another whole build.
 [Whole/backend receipts](benchmarks/evidence/qualification/2026-11-10-goose-backend-batch290.json.gz).
 
-The current batch moves the existing effect u64-to-ID map and its slot pool into
-a lightweight support module, reused by partial expectations. This removes their
-GS dictionary and avoids an effect-evidence import cycle. Fixed-tag binder
-normalization shares one canonical leaf. Five executed native laws pass19.705s
-summed stages; all receipt input hashes match final generated source. Exact IDs,
-validation, owner reset, capacity reuse and lexical initialization pass. Combined
-compile/record/emit advances in75.582s to an emission index header copied into a
-block-local value (`backend_emission.goose:792`), unchanged source. Auditing all
-unitUses bindings as the next family; whole/runtime pending.
-[Focused receipt](benchmarks/evidence/qualification/2026-11-10-goose-shared-map-shape-laws.json.gz).
+The shared-map/shape batch removes the partial GS dictionary and an import
+cycle using the existing effect slot pool in lightweight support. Five native
+laws pass19.705s summed stages with matching input hashes. Combined backend291
+clears interning in75.582s and finds a copied unit-index header escaping its block.
+[Shape laws](benchmarks/evidence/qualification/2026-11-10-goose-shared-map-shape-laws.json.gz).
 
-The physical Store now keeps only mutable physical owners: one existing scalar
-publication owner replaces both Core views, and a checked effect Handle replaces
-eight foreign buffer/map refs. Data is reborrowed from existing registries/pools;
-no new payload copies/pins. Retained child views survive append-only interning;
-reset with a live view correctly rejects in2.755s. Frame release invalidates both
-input and effect keys. A six-grow-array experiment failed teardown checks and
-was removed; the original GS table contract remains.
-[Owner laws](benchmarks/evidence/qualification/2026-11-10-goose-layout-scalar-owner-laws.json.gz).
+All11emission unitUses bindings now explicitly borrow their canonical cached
+header. Backend292 clears that error in76.47s, then reaches a lookup porting
+mistake: value-returning infinite probe needs `loop`, not `while true`. The
+combined native index law passes6.56s, covering scoped reference identity, cache
+reuse, lazy parent/flow upgrades, empty/missing keys, collision wraparound and
+owned snapshot independence. Backend293 clears both
+fixes in76.593s, unchanged source, then reaches a loop-local Module copy returned
+by reference at `eval/closed_local_value.goose:18`. Audit that pattern across the
+port before the next repair batch.
+[Index law](benchmarks/evidence/qualification/2026-11-10-goose-unit-index-laws.json.gz).
 
-Three already bounded stacks now use fixed arrays and scalar counts:128 type
-owners,128 solver owners and16384 binder IDs. Five native laws pass26.09s summed
-stages, including real conversions at the complete limits, overflow rejection,
-nested-error unwind and repeated canonical IDs. No runtime heap allocation for
-those stack buffers; production uses about66KiB fixed backing. Raw stage logs
-and source fingerprints are sealed automatically per native batch.
-[Stack laws](benchmarks/evidence/qualification/2026-11-10-goose-layout-fixed-stack-laws.json.gz).
+Previous checked families clear Run preparation, startup planning, declaration
+scanning, bridge cleanup/publication, physical interning and fixed conversion
+stacks. Physical layouts retain scalar publication/effect keys; invocation-local
+views come from existing registries and pools, with exact identity/generation
+checks. Append-only growth preserves child views; reset with a live child rejects.
+Conversion stacks retain their128-owner/128-binder limits in fixed backing,
+including overflow rejection and nested-error unwind. No payload clones/new pins.
 
-Other checked batches clear the old Run prepare/reset loan (scalar source and
-validation receipts plus exact input roots), startup planner loan (Frame/scalar
-requests), declaration scan (generation marks, logical LIFO and stable scratch),
-bridge cleanup (five pooled Words memos) and aggregate republication (in-place
-expectation reset). Fixed-tag layout normalization is acyclic; exact prior IDs
-and wire snapshot values pass. CLI digest scratch is a stable grow owner and
-metadata views are reborrowed at construction. All exact prior failures/controls
-remain in the receipt index. CLI/server/OOM/retry/retention still await the real
-executable; component laws never qualify it.
-
-Complete **36/36 native component laws pass** on the same frozen source as the
-whole attempt: summed stage time **307.14s**,30s/stage,600s outer cap. Includes
-Frame accessor identity, actual bucket growth/dedup across Frame teardown,
-read-only header subranges/shared journals and all prior ownership laws.
-Component success never qualifies complete generation or CLI/server runtime.
-[Full receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete36-scalar-cleanup-map-laws.json.gz).
-
-All **92 synthetic recursive cleanup wrappers are removed** across6files:
-82recognized by a guarded offset-preserving transformer and10manually audited
-exclusions. Every return evaluates before cleanup; scopes, aliases and control
-flow remain.22authoring controls and qualified original/transformed executable
-witnesses pass (nested order, tuple side effects, loops, reference identity and
-mutation). The one-time transform/idempotence pass fell62s→35.7s→**2.97s** after
-rescan fixes; this is tooling time, not compiler throughput. The authoring tool
-and complete evidence stay in the reproduction capsule, not production tooling.
-[Controls/capsule](benchmarks/evidence/qualification/2026-11-10-goose-cleanup92-controls.json.gz).
-
-**68map adapters /134publications across14files** now publish exact named-pool
-slot ranges instead of a borrowed local Map view. Full-capacity identity/bounds
-checks preserve data, counters, growth and no-op reserve behavior. No new owner,
-payload copy or allocation. [Map audit](benchmarks/evidence/qualification/2026-11-10-goose-map-publication68.json.gz).
-
-Principal region callbacks use scalar requests and owned output; constant
-initializers keep scalar Body/Binding snapshots. CompileRun uses scalar Frame
-with validated registry access. The focused compile advanced to type/effect
-bucket publication before the broad map batch; actual whole still repeats the
-Run loan. [Phase evidence](benchmarks/evidence/qualification/2026-11-10-goose-scalar-frame-frontier.json.gz).
-
-Run retains scalar Frame/registry authority and enabled workspace flags.
-CompileOptions now uses four scalar keys at its public construction boundary;
-the late sanitizer and duplicate Run keys are removed. Immutable input spans
-are reborrowed from the original journal; source receipts use exact canonical
-registry addresses. Timing labels remain statically reconstructed.
-
-Complete read-only StampView reconstruction remains74fields/65slice leaves,
-with full-allocation recovery before prefix/interior subspans. Valid shared pinned
-journals work; nonempty capture leaves must belong to those journals. Scanning
-costs remain unbenchmarked. Memo ends before replay; scalar counters reach publish.
-All rejected prototypes, exact source identities and prior scope are linked in
+The last complete component inventory passed36/36 on its pinned source in
+307.14s summed stages. The current44-law inventory has not run in full; focused
+family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
+68map adapters and all rejected prototypes remain in pinned history and
 [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 ## Contracts and remaining coverage

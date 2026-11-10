@@ -9,13 +9,13 @@ reader, then stops at partial expectation interning (`code_expectation:79`).
 163.377s, unchanged461 inputs, no artifacts. A grouped backend check reproduces
 that frontier in77.878s; use that bounded partial probe before another whole.
 
-Current shared-map/shape batch passes five native laws in19.705s summed stages,
-with all receipt input hashes matching final source. The existing effect u64-ID
-map/pool moves into lightweight support; partial shapes reuse it and one acyclic
-canonical interning leaf. Combined compile/record/emit diagnostics advance in75.582s to
-backend_emission792: a copied index header escapes its block; audit unitUses
-bindings as the next family. Source unchanged throughout checks.
-Whole build and actual CLI/server/OOM/retry/retention remain pending.
+Shared-map/shape batch passes five native laws19.705s and clears interning in
+backend291(75.582s). Eleven emission unitUses bindings now borrow canonical
+headers; backend292 clears the escape in76.47s. Next infinite lookup probe uses
+Goose `loop`. Combined native law passes6.56s: identity, lazy parent/flow upgrades,
+collision wraparound/missing lookups and owned snapshot independence. Backend293 clears both fixes in76.593s, then reaches a copied
+loop-local Module returned by reference in closed_local_value18. Broad pattern
+audit is running before the next batch. Whole build and actual CLI/server/OOM/retry/retention remain pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
@@ -28,7 +28,7 @@ Three hard-bounded stacks use fixed128/128/16384 backing andscalarcounts. Five
 native laws pass26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; current full43-law inventory still pending.
+receipts/rawlogs automatically; current full44-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic

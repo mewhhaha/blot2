@@ -15,7 +15,7 @@ reusable[] var owned_sets: SetSlot[>..] = [];
 fn freezeSet(values: const dictionary<u32,bool>&) -> Set { if values.slots.len == 0 { return Set {..}; } let out = owned_sets.alloc_slice(values.slots.len); for slot,index in values.slots { out[index] = slot; } return Set { out , ..}; }
 fn contains(set: Set,key: u32) -> bool {
     if set.slots.len == 0 { return false; } let hash = ::hash(key); let tag = (hash as! u32) | 2147483648; let mask = set.slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    while true { let slot = set.slots[index]; if slot.tag == tag && slot.key == key { return true; } if slot.tag == 0 { return false; } index = (index + 1) & mask; }
+    loop { let slot = set.slots[index]; if slot.tag == tag && slot.key == key { return true; } if slot.tag == 0 { return false; } index = (index + 1) & mask; }
 }
 fn deinit(set: Set&) { if set.slots.len != 0 { owned_sets.free_slice(set.slots); } set.slots=default<const SetSlot[:]>(); }
 fn deinit(quantified: Quantified&) { quantified.types.deinit(); quantified.rows.deinit(); }
