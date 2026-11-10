@@ -21,6 +21,7 @@ import reuse.source_overlays;
 import backend.runtime_identity;
 import support.error;
 import support.option;
+import support.archive_core_headers;
 import support.pooled_buffer;
 import support.pooled_map;
 type Error=blot_error::Error;
@@ -103,7 +104,7 @@ fn adopt<C>(factory:C&,snapshot:blot_reuse_dependency_format::Owned<Snapshot>&)-
  pools.project_identity=true;let names=snapshot.value.identity;pools.identity=blot_support::some(blot_reuse_code_artifacts::IdentityMetadata{copying.capture_identity_bytes(names.bytes,default<const u8[:]>()),copying.capture_identity_symbols(names.symbols,default<const blot_backend_runtime_identity::Name[:]>()),copying.capture_identity_owners(names.owners,default<const blot_backend_runtime_identity::Name[:]>())});
  let pins=blot_reuse_code_artifacts::allocateOwned_pins(snapshot.value.units.len);pools.modules=pins;var offsets:i64[>..<]=[];var next:i64=0;
  let units=snapshot.owner.mutable(snapshot.value.units);
- for &unit,index in units {pins[index]=blot_reuse_code_artifacts::init(unit.unit,unit.core,blot_reuse_code_artifacts::copyOwned(unit.canonical_path));pins[index].stamp=blot_support::some(unit.stamp);offsets.push(next);next+=unit.core.bindings.len;}
+ for &unit,index in units {let path=blot_reuse_code_artifacts::copyOwned(unit.canonical_path);let header=blot_archive_core_headers::canonical(snapshot.owner,blot_reuse_code_artifacts::headerPrint(unit.core));pins[index]=blot_reuse_code_artifacts::ModulePin{unit:unit.unit,module:unit.core,canonical_path:path,token:blot_reuse_code_artifacts::freshToken(),header:header,stamp:blot_support::Option<Digest>{true,unit.stamp}};offsets.push(next);next+=unit.core.bindings.len;}
  pools.binding_offsets=copying.capture_binding_offsets(offsets[..],default<const i64[:]>());pools.slots=copying.capture_slots(snapshot.value.slots,default<const blot_reuse_code_artifacts::Slot[:]>());pools.field_locations=copying.capture_field_locations(snapshot.value.field_locations,default<const blot_reuse_code_artifacts::FieldLocation[:]>());pools.field_locations_stamp=blot_reuse_code_artifacts::stamp(snapshot.value.field_locations);
  let source=snapshot.value.evaluator;pools.evaluator.owner_id=source.owner_id;pools.evaluator.evidence.owner_id=source.evidence.owner_id;pools.evaluator.evidence.effects.owner_id=source.evidence.effects.owner_id;pools.evaluator.implementation_proofs.owner_id=source.implementation_proofs.owner_id;
  pools.evaluator.code_origins=copying.capture_code_origins(source.code_origins,default<const blot_check_staging_origins::Record[:]>());

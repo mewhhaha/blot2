@@ -3,6 +3,8 @@ namespace blot_diagnostic_roots;
 import bootstrap_globals;
 import support.error;
 import backend.runtime_parallel;
+import backend.scoped_backend;
+import driver.compile_workspace;
 import eval.component_worker;
 import reuse.independent_worker;
 import driver.project_executor;
@@ -58,4 +60,13 @@ export "probe_executor" fn executor() {
 // Completion reply schema checking only; no query or runtime qualification.
 export "probe_metadata" fn metadata() {
  var bytes:u8[>..]=[];let error=blot_reuse_zig_project_server::encodeMetadata(default<blot_reuse_zig_project_server::CompletionReply>(),bytes);if error!=blot_error::Error.none {return;}
+}
+
+// Traverses the scoped backend without loading/checking a source project.
+// Empty Core is deliberate: this is type checking, never a runtime test.
+export "probe_scoped" fn scoped() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);let units=blot_backend_result_publication::module_runs.alloc_slice(1);units[0]=blot_check_core::Module{unit:1,..};
+ let result,error=blot_backend_scoped_backend::compileWithOptions(workspace,units,1,blot_backend_scoped_backend::CompileOptions{..});if error==blot_error::Error.none {var owned=result;owned.deinit();}
+ let released=frame.release();assert(released==blot_error::Error.none);blot_backend_result_publication::module_runs.free_slice(units);
 }

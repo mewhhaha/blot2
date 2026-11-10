@@ -101,7 +101,7 @@ type EvidenceTag=blot_eval_type_evidence::Tag;
 struct FrozenCapture { slot: u32,value: ValueId }
 struct SourceInterface { evidence: u32=0,generic: bool=false,pending: i64=0,selected: bool=true }
 struct Options { reuse_body_recipes: bool=true,reuse_validated_calls: bool=true,reuse_lexical_summaries: bool=true,max_steps: i64=1000000,max_depth: i64=65536,max_call_depth: i64=4096,max_type_depth: i64=256,max_summary_transitions: i64=1000000,max_values: i64=1000000,max_children: i64=4194304,trace_runtime_dependencies: bool=false }
-struct StartupDependencies { selected: BindingRef[:],complete: bool }
+struct StartupDependencies { selected: BindingRef[:]=default<BindingRef[:]>(),complete: bool=false }
 struct SolvedEvidence { types: Mapping[:]=default<Mapping[:]>(),rows: RowMapping[:]=default<RowMapping[:]>(),selected: BindingRef[:]=default<BindingRef[:]>() }
 struct ReceiptJudgment { matched: bool=true,solved: SolvedEvidence }
 reusable[] var solved_types: Mapping[>..]=[];

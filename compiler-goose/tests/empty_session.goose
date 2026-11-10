@@ -183,7 +183,11 @@ fn sessionCatalogs() {
  let worker_child,error=blot_eval_core_eval::initOwnedSharedSession(worker_parent,blot_native::fresh_owner_id());assert(error==blot_error::Error.none && worker_child && worker_child.unit_source==blot_eval_core_eval::SessionUnitSource.worker && blot_support::same_slice_identity(worker_child.units,worker));
  blot_eval_core_eval::deinitOwnedSession(worker_child);blot_eval_core_eval::deinitOwnedSession(worker_parent);blot_eval_worker_packet::core_modules.free_slice(worker);owner.deinit();
 }
+fn canonicalAliases() {
+ var prefix:u8[>..]=[];prefix.append("owned-prefix");let aliases=[blot_reuse_project::Alias{prefix:prefix[..],root:"/tmp"}];let raw=blot_reuse_project::Options{input_mode:blot_reuse_project::InputMode.project,aliases:aliases[..],..};var canonical,error=blot_reuse_dependency_cli::initCanonical(raw);assert(error==blot_error::Error.none && canonical.aliases.len==1 && canonical.aliases[0].prefix=="owned-prefix" && !blot_support::same_slice_identity(canonical.aliases[0].prefix,prefix[..]));prefix=[];workspaceLifecycle();assert(canonical.aliases[0].prefix=="owned-prefix" && canonical.aliases[0].root=="/tmp");canonical.deinit();
+}
 fn main() {
+    canonicalAliases();
     sessionCatalogs();
     var previous:u64=0;
     for cycle in 0..4 {

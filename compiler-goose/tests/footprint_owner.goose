@@ -32,6 +32,20 @@ fn nameRanges() {
  var values=[z,a];blot_backend_scoped_backend::orderFields(metadata,values[..]);assert(blot_backend_scoped_backend::valueName(metadata,values[0])=="alpha" && blot_backend_scoped_backend::valueName(metadata,values[1])=="zebra");
  let copied=z;assert(copied.name.start==z.name.start && copied.name.len==z.name.len && bytes.len==4111);
 }
+struct GoalArena {goals:blot_check_core::Obligation[>..<]&}
+struct GoalReader {metadata:GoalArena&,units:const blot_check_core::Module[:]}
+fn goalContexts() {
+ let cache=blot_backend_storage_field_plan::init();assert(cache.entries.count==0 && cache.maximum_entries==65536);let startup=blot_eval_core_eval::StartupDependencies{};assert(startup.selected.len==0 && !startup.complete);let relocation=blot_reuse_dependency_closure::Relocation{};assert(relocation.seed==null && relocation.library==null && relocation.relocated==0);
+ let empty=blot_backend_scoped_backend::GoalContext{};assert(empty.unit==0 && empty.span.len==0);
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let obligations,error=owner.copy([blot_check_core::Obligation{name:17,..}]);assert(error==blot_error::Error.none);
+ let units=blot_backend_result_publication::module_runs.alloc_slice(1);units[0]=blot_reuse_dependency_owned_headers::canonical(owner,blot_check_core::Module{unit:1,obligations:obligations,..});
+ var goals:blot_check_core::Obligation[>..<]=[];var metadata=GoalArena{goals};var reader=GoalReader{metadata,units};
+ let source=blot_backend_scoped_backend::GoalContext{unit:1,span:blot_backend_scoped_backend::Range{start:0,len:1}};assert(blot_backend_scoped_backend::contextGoals(reader,source)[0].name==17);
+ let saved=blot_backend_scoped_backend::captureGoals(reader,source);let captured=blot_backend_scoped_backend::GoalContext{span:saved};for index in 0..100 {goals.push(blot_check_core::Obligation{name:index as u32,..});}
+ let before=goals.len;let again=blot_backend_scoped_backend::captureGoals(reader,captured);assert(again.start==saved.start && again.len==saved.len && goals.len==before && blot_backend_scoped_backend::contextGoals(reader,captured)[0].name==17);
+ blot_backend_result_publication::module_runs.free_slice(units);owner.deinit();var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);assert(blot_backend_scoped_backend::contextGoals(reader,captured)[0].name==17);
+}
 fn rootRuns() {
     var regions=blot_backend_scoped_backend::IndexSet{};assert(regions.insert(-7,true)==blot_error::Error.none && regions.contains(-7));regions.clear();assert(!regions.contains(-7));regions.deinit();
     var bytes:u8[>..<]=[];var arena=NameArena{bytes};let spelling=blot_backend_scoped_backend::publishName(arena,"element");
@@ -57,7 +71,19 @@ fn nonemptyCompletedViews() {
  assert(modules.len==1 && modules[0].unit==1 && modules[0].names=="completed-core" && modules[0].types.nodes[0].tag==blot_check_types::Tag.boolean && lengths[0]==23);
  blot_reuse_dependency_closure::completed_modules.free_slice(modules);blot_reuse_dependency_closure::completed_lengths.free_slice(lengths);owner.deinit();
 }
+fn typeKeyHeader() {
+ var key=blot_backend_storage_type_key::init(100);var output=blot_backend_storage_type_key::Words{};
+ let reference=blot_backend_storage_type_key::Reference{unit:1,ty:2,..};let pending,error=key.enter(reference,0);assert(error==blot_error::Error.none && !pending.present);
+ let start=key.beginDescriptor();assert(key.descriptorWord(start,42)==blot_error::Error.none);
+ let result,error=key.completeDescriptor(reference,start,1);assert(error==blot_error::Error.none);key.endDescriptor(start);
+ assert(key.root(output,result)==blot_error::Error.none && key.finish(output)==blot_error::Error.none);
+ assert(output.items.len==7 && output.items[0]==0 && output.items[1]==0x53444b31 && output.items[2]==1 && output.items[3]==1 && output.items[4]==1 && output.items[5]==1 && output.items[6]==42);
+ output.deinit();key.deinit();
+}
+
 fn main() {
+    typeKeyHeader();
+    goalContexts();
     nameRanges();
     nonemptyCompletedViews();
     for cycle in 0..4 {

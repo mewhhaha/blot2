@@ -189,7 +189,8 @@ struct PersistedImport {source:const u8[:]=default<const u8[:]>(),request:const 
 struct Wire {options:Options,paths:const Pair[:],files:const Pair[:],imports:const PersistedImport[:]}
 reusable[] var pairs_pool:Pair[>..]=[];
 reusable[] var persisted_imports_pool:PersistedImport[>..]=[];
-struct Persisted {wire:Wire=default<Wire>(),paths:const Entry[:]=default<const Entry[:]>(),files:const Entry[:]=default<const Entry[:]>(),imports:const Resolution[:]=default<const Resolution[:]>(),owner:Frozen=Frozen{}}
+// The frozen owner is the sole authority; portable header arrays are made only for encoding.
+struct Persisted {owner:Frozen=Frozen{}}
 fn capturePersisted(owner:const Frozen&)->blot_support::Option<Wire>,Error {
  let record=owner.view();
  let paths=pairs_pool.alloc_slice(record.paths.len);let files=pairs_pool.alloc_slice(record.files.len);let imports=persisted_imports_pool.alloc_slice(record.imports.len);var published=false;
@@ -200,10 +201,10 @@ fn cloneWire(wire:Wire)->Persisted,Error {
  let value,error=init(wire.options);if error!=blot_error::Error.none {return Persisted{},error;}var snapshot=value;var transferred=false;
  for pair in wire.paths {let outcome,error=snapshot.publish(snapshot.state().paths,snapshot.state().path_index,pair.key,Outcome.bytes{own(pair.value)});if error!=blot_error::Error.none {let __cleanup_result_29_0: Persisted = Persisted{}; let __cleanup_result_29_1: Error = error; {if !transferred {snapshot.deinit();}} return __cleanup_result_29_0, __cleanup_result_29_1;}}for pair in wire.files {let outcome,error=snapshot.publish(snapshot.state().files,snapshot.state().file_index,pair.key,Outcome.bytes{own(pair.value)});if error!=blot_error::Error.none {let __cleanup_result_30_0: Persisted = Persisted{}; let __cleanup_result_30_1: Error = error; {if !transferred {snapshot.deinit();}} return __cleanup_result_30_0, __cleanup_result_30_1;}}
  for entry in wire.imports {let result=Resolution{own(entry.source),own(entry.request),Outcome.bytes{own(entry.value)}};let error=pushResolution(snapshot.state().imports,result);if error!=blot_error::Error.none {result.deinit();let __cleanup_result_31_0: Persisted = Persisted{}; let __cleanup_result_31_1: Error = error; {if !transferred {snapshot.deinit();}} return __cleanup_result_31_0, __cleanup_result_31_1;}}
- var owner=snapshot.freeze();transferred=true;let captured,error=capturePersisted(owner);if error!=blot_error::Error.none {owner.deinit();let __cleanup_result_32_0: Persisted = Persisted{}; let __cleanup_result_32_1: Error = error; {if !transferred {snapshot.deinit();}} return __cleanup_result_32_0, __cleanup_result_32_1;}assert(captured.present);let view=owner.view();let __cleanup_result_33_0: Persisted = Persisted{captured.value,view.paths,view.files,view.imports,owner}; let __cleanup_result_33_1: Error = blot_error::Error.none; {if !transferred {snapshot.deinit();}} return __cleanup_result_33_0, __cleanup_result_33_1;
+ let owner=snapshot.freeze();transferred=true;return Persisted{owner},blot_error::Error.none;
  {if !transferred {snapshot.deinit();}} }
 // Decoded wire always arrives with its typed decoder owner. Success consumes
 // that owner; failure leaves it intact. No const-cast or foreign-pool free occurs.
 fn adoptPersisted<W>(decoded:W&)->Persisted,Error {let result,error=cloneWire(decoded.value);if error!=blot_error::Error.none {return Persisted{},error;}decoded.deinit();return result,blot_error::Error.none;}
-fn deinit(self_:Persisted&) {releaseWire(self_.wire);self_.owner.deinit();self_=Persisted{};}
-fn view(self_:const Persisted&)->View {return View{self_.wire.options,self_.paths,self_.files,self_.imports,Counts{}};}
+fn deinit(self_:Persisted&) {self_.owner.deinit();self_=Persisted{};}
+fn view(self_:const Persisted&)->View {let record=self_.owner.view();return View{record.options,record.paths,record.files,record.imports,Counts{}};}

@@ -1349,6 +1349,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::Global,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::Globals)->bool {return equalFields(left,right);}
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::Globals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::GoalContext)->bool {return equalFields(left,right);}
+fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::GoalContext,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::IndexSet)->bool {return equalFields(left,right);}
 fn blot_backend_scoped_backend::blotStructuralHash<StructuralSink>(value:blot_backend_scoped_backend::IndexSet,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_scoped_backend::Indices)->bool {return equalFields(left,right);}

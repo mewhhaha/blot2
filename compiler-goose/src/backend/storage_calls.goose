@@ -46,7 +46,7 @@ reusable[] var entry_slots: dictionary_slot<Key,Chain>[>..] = [];
 reusable[] var plan_slots: dictionary_slot<Key,i64>[>..] = [];
 struct Cache {entries: Entries = Entries {..},plans: Admissions = Admissions {..},entry_positions: blot_support_pooled_map::Map<Key,Chain> = blot_support_pooled_map::Map<Key,Chain> {..},plan_positions: blot_support_pooled_map::Map<Key,i64> = blot_support_pooled_map::Map<Key,i64> {..},removed_keys: i64 = 0}
 fn own(key: Key) -> Key {var owned = key;if key.evidence.len == 0 {owned.evidence=default<const u32[:]>();}else {let values = evidence_runs.alloc_slice(key.evidence.len);for index in 0..values.len {values[index] = key.evidence[index];}owned.evidence = values;}return owned;}
-fn release(key: Key) {if key.evidence.len != 0 {let first: const u32& = key.evidence[0];let index = evidence_runs.index_of(first);evidence_runs.free_slice(evidence_runs[index..index + key.evidence.len]);}}
+fn release(key: Key) {if key.evidence.len != 0 {let owned=evidence_runs.realloc_slice(key.evidence,key.evidence.len);assert(blot_support::same_slice_identity(owned,key.evidence));evidence_runs.free_slice(owned);}}
 fn deinit(self_: Cache&) {blot_support_pooled_map::deinit(self_.entry_positions,entry_slots);blot_support_pooled_map::deinit(self_.plan_positions,plan_slots);for entry in self_.entries.items {release(entry.key);}for plan in self_.plans.items {release(plan.key);}blot_support_pooled_buffer::deinit(self_.entries,entry_runs);blot_support_pooled_buffer::deinit(self_.plans,admission_runs);self_.removed_keys = 0;}
 fn checkpoint(self_: const Cache&) -> i64 {return self_.entries.items.len;}
 fn rollbackEntries(self_: Cache&,mark: i64) {

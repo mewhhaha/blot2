@@ -7,8 +7,17 @@ then qualify CLI/server, request OOM/retry and retention against Zig.
 All 26 production helper laws pass in 190.63s on the copied-argument checker.
 The exact [C/link/runtime receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete26.json.gz)
 qualifies its pinned sources. The IndexSet method regression additionally passes
-in 7.45s. Whole 114 reaches active-goal self-borrow and worker metadata-pin publication
-without artifacts; method lookup and effect moves now have executed controls.
+in 7.45s. Whole 115 reaches GoalContext defaults and semantic Outcome publication
+in 135.30s without artifacts. Their repairs, worker/archive header publication and
+retained output restore have affected executed controls. All 29 helper laws pass in two batches (24 + 5), with each passed input closure
+matching current source. The initial attempt stopped at a new test setup error.
+See [the split receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete29-split.json.gz);
+the latest uninterrupted complete pass remains 26 laws.
+
+The strict `scoped` diagnostic root checks backend bodies in about 19s. It uses
+invalid empty Core and does not execute or qualify the backend. Current failure:
+pooled-map removal of borrowed-evidence keys. Bulk-error checker experiments stay
+off-tree: no demonstrated production gain.
 
 Current representation:
 

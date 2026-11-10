@@ -16,6 +16,7 @@ import reuse.dependency_certificate;
 import reuse.independent_worker;
 import support.bytes;
 import support.core_packet;
+import support.core_packet_headers;
 import support.error;
 import support.evidence_packet;
 import support.native;
@@ -56,7 +57,7 @@ reusable[] var core_modules: blot_check_core::Module[>..]=[];
 reusable[] var core_refs: blot_check_frozen_core_validation::ModuleRef[>..]=[];
 fn deinit(catalog: Catalog&) { for &owner in catalog.owners { if owner.lease!=0 { owner.deinit(); } } core_owners.free_slice(catalog.owners); core_refs.free_slice(catalog.refs); core_modules.free_slice(catalog.modules); catalog=Catalog {}; }
 fn writeCatalog(w: Writer&,modules: const blot_check_core::Module[:]) { count(w,modules.len); for module in modules { var packet: u8[>..<]=[]; let error=blot_core_packet::encode(module,packet); if error!=blot_error::Error.none { w.failure=error; return; } blob(w,packet); if w.failure!=blot_error::Error.none { return; } } }
-fn readCatalog(r: Reader&) -> Catalog { let length=count(r,8); if r.failure!=blot_error::Error.none { return Catalog {}; } var catalog=Catalog {owners:core_owners.alloc_slice(length),modules:core_modules.alloc_slice(length),refs:core_refs.alloc_slice(length)}; for &owner in catalog.owners { owner=default<blot_core_packet::Owned>(); } for index in 0..length { let packet=blob(r); if r.failure!=blot_error::Error.none { deinit(catalog); return Catalog {}; } let owner,error=blot_core_packet::decode(packet); if error!=blot_error::Error.none { r.failure=error; deinit(catalog); return Catalog {}; } catalog.owners[index]=owner; catalog.modules[index]=owner.module; } for &module,index in catalog.modules { catalog.refs[index]=blot_check_frozen_core_validation::ModuleRef {value:module}; } return catalog; }
+fn readCatalog(r: Reader&) -> Catalog { let length=count(r,8); if r.failure!=blot_error::Error.none { return Catalog {}; } let owners=core_owners.alloc_slice(length);let modules=core_modules.alloc_slice(length);let refs=core_refs.alloc_slice(length);var catalog=Catalog {owners:owners,modules:modules,refs:refs}; for &owner in owners { owner=default<blot_core_packet::Owned>(); } for index in 0..length { let packet=blob(r); if r.failure!=blot_error::Error.none { deinit(catalog); return Catalog {}; } let owner,error=blot_core_packet::decode(packet); if error!=blot_error::Error.none { r.failure=error; deinit(catalog); return Catalog {}; } owners[index]=owner; modules[index]=owner.module; } for &module,index in modules { refs[index]=blot_check_frozen_core_validation::ModuleRef {value:module}; } return catalog; }
 fn validate(catalog: const Catalog&,symbols: blot_support::Option<i64>) -> Error { var spawn=false; for module in catalog.modules { spawn=spawn||blot_check_frozen_core_validation::moduleHasSpawnContracts(module); } let context=blot_check_frozen_core_validation::Context {units:catalog.refs,symbol_count:symbols,source_length:blot_support::none<u32>(),forbidden_owner:blot_support::none<u32>()}; let batch=blot_check_frozen_core_validation::Batch {context,spawn}; var remaining: i64=0x7fffffffffffffff; for module in catalog.modules { let error=batch.validateWithBudget(module,blot_support::none<u32>(),remaining); if error!=blot_error::Error.none { return error; } } return blot_error::Error.none; }
 struct Identity { bytes: u8[:]=default<u8[:]>(),symbols: blot_backend_runtime_identity::Name[:]=default<blot_backend_runtime_identity::Name[:]>(),owners: blot_backend_runtime_identity::Name[:]=default<blot_backend_runtime_identity::Name[:]>() }
 reusable[] var identity_bytes: u8[>..]=[];
@@ -84,16 +85,26 @@ fn get(r: Reader&,values: i64[15]&) { for &value in values { get(r,value); } }
 fn writeCatalog(w: Writer&,modules: const blot_reuse_code_artifacts::ModulePin[:]) { count(w,modules.len); for pin in modules { var packet: u8[>..<]=[]; let error=blot_core_packet::encode(pin.module,packet); if error!=blot_error::Error.none { w.failure=error; return; } blob(w,packet); if w.failure!=blot_error::Error.none { return; } } }
 reusable[] var pins: blot_reuse_code_artifacts::ModulePin[>..]=[];
 fn ownedPath(identity:Identity,id:u32)->blot_support::Option<const u8[:]> {
- let owners=identity_names.realloc_slice(identity.owners,identity.owners.len);
- if id==0 || id>owners.len {return blot_support::none<const u8[:]>();}
- let name=owners[id-1]; let bytes=identity_bytes.realloc_slice(identity.bytes,identity.bytes.len);
- if name.start>bytes.len || name.len>bytes.len-name.start {return blot_support::none<const u8[:]>();}
- return blot_support::some<const u8[:]>(bytes[name.start..name.start+name.len]);
+ let registered_names=identity_names.realloc_slice(identity.owners,identity.owners.len);assert(blot_support::same_slice_identity(registered_names,identity.owners));
+ if id==0 || id>registered_names.len {return blot_support::none<const u8[:]>();}
+ let names_start=identity_names.index_of(registered_names[0]);let name=identity_names[names_start+id-1];
+ let registered_bytes=identity_bytes.realloc_slice(identity.bytes,identity.bytes.len);assert(blot_support::same_slice_identity(registered_bytes,identity.bytes));
+ if name.start>registered_bytes.len || name.len>registered_bytes.len-name.start {return blot_support::none<const u8[:]>();}
+ if registered_bytes.len==0 {return blot_support::Option<const u8[:]>{true,default<const u8[:]>()};}
+ let bytes_start=identity_bytes.index_of(registered_bytes[0]);return blot_support::Option<const u8[:]>{true,identity_bytes[bytes_start+name.start..bytes_start+name.start+name.len]};
 }
 fn pin(catalog: const Catalog&,identity: const Identity&) -> blot_reuse_code_artifacts::ModulePin[:],Error {
- // Retained pins borrow the exact decoded runs, validated by their private pools.
- let modules=core_modules.realloc_slice(catalog.modules,catalog.modules.len);
- let result=pins.alloc_slice(modules.len); for &module,index in modules { let path=ownedPath(identity,(index+1) as u32); if !path.present { pins.free_slice(result); return default<blot_reuse_code_artifacts::ModulePin[:]>(),blot_error::Error.invalid_identity; } result[index]=blot_reuse_code_artifacts::validated((index+1) as u32,module,path.value); } return result,blot_error::Error.none; }
+ // Publish complete pins through the exact decoded-module and identity owners.
+ let registered=core_modules.realloc_slice(catalog.modules,catalog.modules.len);assert(blot_support::same_slice_identity(registered,catalog.modules));
+ let result=pins.alloc_slice(registered.len);if registered.len==0 {return result,blot_error::Error.none;}
+ let start=core_modules.index_of(registered[0]);assert(catalog.owners.len==registered.len);let registered_owners=core_owners.realloc_slice(catalog.owners,catalog.owners.len);assert(blot_support::same_slice_identity(registered_owners,catalog.owners));let owners_start=core_owners.index_of(registered_owners[0]);
+ for index in 0..registered.len {
+  let path=ownedPath(identity,(index+1) as u32);if !path.present {pins.free_slice(result);return default<blot_reuse_code_artifacts::ModulePin[:]>(),blot_error::Error.invalid_identity;}
+  let owned=blot_core_packet_headers::canonical(core_owners[owners_start+index],blot_reuse_code_artifacts::headerPrint(core_modules[start+index]));
+  result[index]=blot_reuse_code_artifacts::ModulePin{unit:(index+1) as u32,module:core_modules[start+index],canonical_path:path.value,token:blot_reuse_code_artifacts::freshToken(),header:owned,stamp:blot_support::Option<u8[32]>{true,blot_reuse_code_artifacts::stamp(core_modules[start+index])}};
+ }
+ return result,blot_error::Error.none;
+}
 fn writeRecord(w: Writer&,record: blot_reuse_independent_call_proof::Record) { put(w,record.target); put(w,record.evidence); put(w,record.options); put(w,record.depth); count(w,record.sources.len); for source in record.sources { put(w,source); } count(w,record.scalar_reads.len); for scalar in record.scalar_reads { put(w,scalar); } }
 fn readRecord(r: Reader&) -> blot_reuse_independent_call_proof::Record { var result=default<blot_reuse_independent_call_proof::Record>(); get(r,result.target); get(r,result.evidence); get(r,result.options); get(r,result.depth); let source_count=count(r,8); if r.failure!=blot_error::Error.none { return result; } var sources: blot_check_core::BindingRef[>..<]=[]; for index in 0..source_count { var source=blot_check_core::BindingRef {0,0}; get(r,source); sources.push(source); } let scalar_count=count(r,13); if r.failure!=blot_error::Error.none { return result; } var scalars: blot_reuse_independent_call_proof::ScalarInput[>..<]=[]; for index in 0..scalar_count { var input=default<blot_reuse_independent_call_proof::ScalarInput>(); get(r,input); if input.evidence>4 { r.failure=blot_error::Error.invalid_artifact; } if input.value.present&&input.value.value.scalar>3 { r.failure=blot_error::Error.invalid_artifact; } scalars.push(input); } if r.failure!=blot_error::Error.none { return result; } result.sources=blot_reuse_independent_call_proof::copySources(sources); result.scalar_reads=blot_reuse_independent_call_proof::copyScalars(scalars); return result; }
 reusable[] var proof_records: blot_reuse_independent_call_proof::Record[>..]=[];

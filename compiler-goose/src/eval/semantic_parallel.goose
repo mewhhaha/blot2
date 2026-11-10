@@ -80,10 +80,23 @@ fn deinit(self_:Slots&) {blot_support_pooled_buffer::deinit(self_,pool_Slots);se
 struct Outcomes {storage:blot_eval_semantic_job_batch::Outcome<Result>[:]=default<blot_eval_semantic_job_batch::Outcome<Result>[:]>(),items:blot_eval_semantic_job_batch::Outcome<Result>[:]=default<blot_eval_semantic_job_batch::Outcome<Result>[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Outcomes:blot_eval_semantic_job_batch::Outcome<Result>[>..];
 fn ensure(self_:Outcomes&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}self_.failure=blot_support_pooled_buffer::ensure(self_,minimum,pool_Outcomes);return self_.failure;}
-fn push(self_:Outcomes&,value:blot_eval_semantic_job_batch::Outcome<Result>) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Outcomes);self_.len=self_.items.len;}
-fn append(self_:Outcomes&,values:const blot_eval_semantic_job_batch::Outcome<Result>[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Outcomes);self_.len=self_.items.len;}
+fn canonicalOwned(value:blot_eval_semantic_job_batch::Outcome<Result>)->blot_eval_semantic_job_batch::Outcome<Result> {
+ match value {
+  complete item=>{return blot_eval_semantic_job_batch::Outcome<Result>.complete{Result{record:blot_reuse_independent_call_proof::canonicalOwned(item.value.record),counts:item.value.counts}};},
+  pending=>{return blot_eval_semantic_job_batch::Outcome<Result>.pending{};},
+  declined=>{return blot_eval_semantic_job_batch::Outcome<Result>.declined{};},
+  out_of_memory=>{return blot_eval_semantic_job_batch::Outcome<Result>.out_of_memory{};},
+  cancelled=>{return blot_eval_semantic_job_batch::Outcome<Result>.cancelled{};},
+ }
+}
+fn outcomeStorage(self_:const Outcomes&)->blot_eval_semantic_job_batch::Outcome<Result>[:] {
+ if self_.storage.len==0 {return default<blot_eval_semantic_job_batch::Outcome<Result>[:]>();}
+ let registered=pool_Outcomes.realloc_slice(self_.storage,self_.storage.len);assert(blot_support::same_slice_identity(registered,self_.storage));let start=pool_Outcomes.index_of(registered[0]);return pool_Outcomes[start..start+registered.len];
+}
+fn push(self_:Outcomes&,value:blot_eval_semantic_job_batch::Outcome<Result>) {if self_.failure!=blot_error::Error.none {return;}let count=self_.len+1;let error=ensure(self_,count);if error!=blot_error::Error.none {return;}let storage=outcomeStorage(self_);storage[self_.len]=canonicalOwned(value);self_.items=storage[..count];self_.len=count;}
+fn append(self_:Outcomes&,values:const blot_eval_semantic_job_batch::Outcome<Result>[:]) {if self_.failure!=blot_error::Error.none {return;}let start=self_.len;let count=start+values.len;let error=ensure(self_,count);if error!=blot_error::Error.none {return;}let storage=outcomeStorage(self_);for value,index in values {storage[start+index]=canonicalOwned(value);}self_.items=storage[..count];self_.len=count;}
 fn resize(self_:Outcomes&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Outcomes&,length:i64,value:blot_eval_semantic_job_batch::Outcome<Result>) {if length<=self_.len {resize(self_,length);return;}let error=ensure(self_,length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
+fn resize(self_:Outcomes&,length:i64,value:blot_eval_semantic_job_batch::Outcome<Result>) {if length<=self_.len {resize(self_,length);return;}let error=ensure(self_,length);if error!=blot_error::Error.none {return;}let storage=outcomeStorage(self_);for index in self_.len..length {storage[index]=canonicalOwned(value);}self_.items=storage[..length];self_.len=length;}
 fn clear(self_:Outcomes&) {blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
 fn deinit(self_:Outcomes&) {blot_support_pooled_buffer::deinit(self_,pool_Outcomes);self_.len=0;self_.failure=blot_error::Error.none;}
 

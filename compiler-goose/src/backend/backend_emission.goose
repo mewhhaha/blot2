@@ -1001,7 +1001,7 @@ fn describeCallable(owner: Owner&,body: u32,id: u32) -> blot_support::Option<Tem
 recursive fn prepareFactory(owner: Owner&,body: u32,id: u32) -> blot_support::Option<FactoryPlan>,Error {
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let result_type = source.types.node(node.ty);
     if result_type.tag != blot_check_types::Tag.nominal || result_type.a != 4294967295 || result_type.b != 5 { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } if owner.preparation_depth >= 256 { return blot_support::none<FactoryPlan>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); }
-    var admitted: bool[16] = [false;16]; var callee: FactoryCallee = FactoryCallee.named { Key {} , ..}; var unit: u32 = 0; var root: u32 = 0; var mappings = MappingBuffer {..};
+    var admitted: bool[16] = [false;16]; var callee: FactoryCallee = FactoryCallee.named { Key {..} , ..}; var unit: u32 = 0; var root: u32 = 0; var mappings = MappingBuffer {..};
     recursive fn cleanup_continuation_44() -> blot_support::Option<FactoryPlan>,Error {
  var rows = RowBuffer {..};
     recursive fn cleanup_continuation_43() -> blot_support::Option<FactoryPlan>,Error {

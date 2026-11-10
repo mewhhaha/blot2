@@ -490,12 +490,13 @@
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
-    "raw_receipt": "2026-11-10-goose-complete26.json.gz",
-    "passed": true,
-    "count": 26,
-    "seconds": 190.629,
-    "checker_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632",
-    "scope": "Complete isolated production helper inventory; actual C/link/runtime, not whole compiler"
+    "count": 29,
+    "split_batches": [
+      24,
+      5
+    ],
+    "raw_receipt": "2026-11-10-goose-complete29-split.json.gz",
+    "whole_runtime_qualified": false
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -2577,5 +2578,61 @@
     "artifacts": {},
     "whole_compiler_executable": false,
     "raw_receipt": "2026-11-10-goose-whole114.json.gz"
+  },
+  "whole_build_115": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 135.299,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole115.json.gz"
+  },
+  "owner_publication_family": {
+    "raw_receipt": "2026-11-10-goose-owner-publication-family.json.gz",
+    "changes": [
+      "Active goal contexts and numeric admission evidence use scalar arena ranges",
+      "31 arena traversals reload flat elements across recursive growth without retaining vector slices",
+      "Worker and archive StampView publication reconstructs every borrowed schema field through existing owner journals",
+      "Semantic Outcome publication handles all five variants through exact named runs",
+      "Persisted retains only its existing scalar Frozen owner; three duplicate metadata allocations removed",
+      "Canonical alias prefixes are copied into the same owner as their roots",
+      "Concrete empty-constructor source audit fixed23 sites across four types; not a typecheck"
+    ],
+    "runtime_scope": "All29 helper laws C/link/runtime pass in two batches with current-source closure identity checks",
+    "remaining": "Combined full initOpen C emission exceeded30s; actual complete compiler, CLI/server and OOM/retention qualification remain pending",
+    "helper_receipt": "2026-11-10-goose-complete29-split.json.gz",
+    "passed_seconds": 233.257
+  },
+  "scoped_backend_discovery": {
+    "raw_receipt": "2026-11-10-goose-scoped-discovery.json.gz",
+    "root": "scoped",
+    "seconds": "18-20",
+    "partial": true,
+    "runtime_qualified": false,
+    "frontier": "pooled_map remove relocation of borrowed-evidence specialization keys; local slots snapshot failed and was reverted",
+    "comparison": "latest actual whole115 took135.299s before diagnostic; scoped root omits frontend/CLI/server and does not qualify those bodies"
+  },
+  "bulk_diagnostic_experiment": {
+    "raw_receipt": "2026-11-10-goose-bulk-diagnostic-experiment.json.gz",
+    "promoted": false,
+    "result": "Off-tree V2 early CLI guard controls pass; controlled3vs1 errors but no demonstrated real production discovery gain; Main120s incomplete; server failures use unintercepted recovery paths",
+    "next": "Prefer strict selected roots; do not broaden checker or lift caps without evidence"
   }
 }

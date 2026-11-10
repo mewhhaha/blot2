@@ -29,11 +29,26 @@ Current source uses existing named pools and owner journals:
   diagnostic ownership, nested type cursors and query-table growth have executed
   laws. Source retains 49 alias guards; no project graphs are cloned.
 
-Whole 113 reaches IndexSet method lookup and effect-evidence publication after
-144.86s; both source families now pass their affected laws. Whole 114 reaches active-goal self-borrow and worker metadata-pin publication
-without artifacts. Each whole build pins inputs and stops 3s after its first actual
-diagnostic. Repair checks cap at 120s; final emission may use 180s within a 300s
-whole-build budget. Do not extend caps to hide slow or unfinished checks.
+Whole 115 reaches GoalContext defaults and semantic Outcome publication in
+135.30s without artifacts; both families now have executed controls. Worker and
+archive headers reborrow their existing owner journals. Persisted retains only
+its scalar Frozen owner, removing three duplicate metadata allocations; alias
+prefixes now copy into the same owner as their canonical roots.
+
+Use `check_engines.py --engines scoped` for strict backend discovery: about 19s
+per check. It constructs deliberately invalid empty Core and is **check-only**.
+It does not qualify runtime behavior or omitted frontend/server bodies. Current
+frontier: borrowed-key relocation in pooled-map removal. An off-tree bulk-error
+checker produced no demonstrated real-project gain and remains unpromoted.
+
+All 29 production helper laws now pass across two batches (24 + 5), with every
+passed source closure verified against current files. The initial full attempt
+stopped at a test setup error, then the corrected remaining five passed. See
+[the split receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete29-split.json.gz).
+The latest uninterrupted complete pass remains the pinned 26 above. Each whole build pins
+inputs and stops 3s after its first actual diagnostic. Repair checks cap at 120s;
+final emission may use 180s within a 300s whole-build budget. Do not extend caps
+to hide slow or unfinished checks.
 
 Current and historical exact-candidate evidence is in
 [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

@@ -29,13 +29,15 @@ fn releaseScalars(source: const ScalarInput[:]) { if source.len != 0 { proof_sca
 fn deinit(self_: Record&) { releaseSources(self_.sources); releaseScalars(self_.scalar_reads); self_.sources = default<BindingRef[:]>(); self_.scalar_reads = default<ScalarInput[:]>(); }
 fn clone(self_: Record) -> Record, Error { var result = self_; result.sources = copySources(self_.sources); result.scalar_reads = copyScalars(self_.scalar_reads); return result, blot_error::Error.none; }
 // The record owns these runs until transfer or deinit.
-fn canonicalOwned(source:Record)->Record {
- return Record{target:source.target,evidence:source.evidence,options:source.options,depth:source.depth,
-  sources:proof_sources.realloc_slice(source.sources,source.sources.len),
-  scalar_reads:proof_scalars.realloc_slice(source.scalar_reads,source.scalar_reads.len)};
+fn ownedSources(values:const BindingRef[:])->BindingRef[:] {
+ if values.len==0 {return default<BindingRef[:]>();}let registered=proof_sources.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(registered,values));let start=proof_sources.index_of(registered[0]);return proof_sources[start..start+values.len];
 }
+fn ownedScalars(values:const ScalarInput[:])->ScalarInput[:] {
+ if values.len==0 {return default<ScalarInput[:]>();}let registered=proof_scalars.realloc_slice(values,values.len);assert(blot_support::same_slice_identity(registered,values));let start=proof_scalars.index_of(registered[0]);return proof_scalars[start..start+values.len];
+}
+fn canonicalOwned(source:Record)->Record {return Record{target:source.target,evidence:source.evidence,options:source.options,depth:source.depth,sources:ownedSources(source.sources),scalar_reads:ownedScalars(source.scalar_reads)};}
 fn canonicalOwned(source:blot_support::Option<Record>)->blot_support::Option<Record> {
- if source.present {return blot_support::some(canonicalOwned(source.value));}
+ if source.present {return blot_support::Option<Record>{true,canonicalOwned(source.value)};}
  return blot_support::none<Record>();
 }
 fn reject<S>(state: S&, reason: DeclineReason) -> blot_support::Option<Record> { state.stats.independent_rejections[reasonCode(reason)]++; return blot_support::none<Record>(); }
