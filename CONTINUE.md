@@ -7,12 +7,11 @@ substitute component tests for integrated qualification.
 
 ## Current evidence
 
-All **26 production helper laws pass together in 190.63s** on the private copied-
-argument checker. They emit C, link and execute real production code. The exact
-input closures, compiler and native object identities are pinned in
-[the complete receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete26.json.gz).
-The extended IndexSet method regression also passes in 7.45s. These are helper
-laws, not whole-compiler qualification.
+All **30 production helper laws pass together in 221.34s** on the private
+copied-argument checker. They emit C, link and execute real production code. Exact
+input closures, compiler and native objects are pinned in
+[the complete receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
+These are helper laws, not whole-compiler qualification.
 
 Current source uses existing named pools and owner journals:
 
@@ -38,17 +37,19 @@ prefixes now copy into the same owner as their canonical roots.
 Use `check_engines.py --engines scoped` for strict backend discovery: about 19s
 per check. It constructs deliberately invalid empty Core and is **check-only**.
 It does not qualify runtime behavior or omitted frontend/server bodies. Current
-frontier: borrowed-key relocation in pooled-map removal. An off-tree bulk-error
-checker produced no demonstrated real-project gain and remains unpromoted.
+frontier: recursive child Generator emission changes the recursive reference root
+(scoped131, 19.68s). Astra is testing parent/child context save/restore at the same
+address, without weakening the checker.
 
-All 29 production helper laws now pass across two batches (24 + 5), with every
-passed source closure verified against current files. The initial full attempt
-stopped at a test setup error, then the corrected remaining five passed. See
-[the split receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete29-split.json.gz).
-The latest uninterrupted complete pass remains the pinned 26 above. Each whole build pins
-inputs and stops 3s after its first actual diagnostic. Repair checks cap at 120s;
-final emission may use 180s within a 300s whole-build budget. Do not extend caps
-to hide slow or unfinished checks.
+Specialization key lookup now compares evidence contents. An actual native
+witness reproduced lookup failure after copying identical evidence; the new law
+checks admission deduplication, candidate chains, rollback and wrapped hash
+collisions. Map deletion has one owner-aware API; all 78 production call sites
+supply their existing named pool. No extra pool or compatibility overload.
+
+Whole builds stop 3s after the first diagnostic. Repair checks cap at 120s; final
+emission may use 180s within a 300s build budget. Do not extend caps to hide slow
+or unfinished checks. Off-tree bulk-error experiments remain unpromoted.
 
 Current and historical exact-candidate evidence is in
 [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

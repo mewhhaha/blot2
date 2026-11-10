@@ -490,12 +490,10 @@
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
-    "count": 29,
-    "split_batches": [
-      24,
-      5
-    ],
-    "raw_receipt": "2026-11-10-goose-complete29-split.json.gz",
+    "count": 30,
+    "single_batch": true,
+    "seconds": 221.34,
+    "raw_receipt": "2026-11-10-goose-complete30.json.gz",
     "whole_runtime_qualified": false
   },
   "source_repair_sha256": {
@@ -2634,5 +2632,23 @@
     "promoted": false,
     "result": "Off-tree V2 early CLI guard controls pass; controlled3vs1 errors but no demonstrated real production discovery gain; Main120s incomplete; server failures use unintercepted recovery paths",
     "next": "Prefer strict selected roots; do not broaden checker or lift caps without evidence"
+  },
+  "specialization_key_map_family": {
+    "raw_receipt": "2026-11-10-goose-storage-call-cache.json.gz",
+    "actual_runtime_pass_seconds": 6.473,
+    "bug": "Map composite equality compared evidence pointer/length while Key hashing used content; own() copying made equivalent nonempty lookups miss",
+    "fix": "Type-namespace keyEqual protocol with structural== fallback; sole remove(map,key,pool) reifies existing exact slot run before backward-shift relocation",
+    "production_remove_calls": 78,
+    "files_with_remove_calls": 18,
+    "new_pools": 0,
+    "compatibility_overloads": 0,
+    "laws": "Cache admission dedupe and maxheight, shared candidate chains, rollback, wrapped hash collisions/deletion/replacement, missing keys, scalar fallback and Frame reuse",
+    "full30": {
+      "passed": true,
+      "seconds": 221.34,
+      "raw_receipt": "2026-11-10-goose-complete30.json.gz"
+    },
+    "next_frontier": "scoped13119.679s: recursive buildClosure applyUse(child) changes self_ root (\u00a77.8); source redesign under review, no checker relaxation",
+    "pending_source_audit": "Other backend annotation buffer consumers and SIMD output-ref initialization await source freeze end"
   }
 }

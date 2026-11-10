@@ -31,7 +31,7 @@ fn shadow(self_:Collector&,name:Symbol)->Error {
  return blot_support_pooled_buffer::push(self_.trail,name,scratch_words);
 }
 fn restore(self_:Collector&,mark:i64) {
- var index=self_.trail.items.len;while index>mark {index--;let name=self_.trail.items[index];var remove=false;{let found=blot_support_pooled_map::get(self_.shadowed,name);assert(found!=null);let count=copy(found);if count==1 {remove=true;}else {found=count-1;}}if remove {blot_support_pooled_map::remove(self_.shadowed,name);}}blot_support_pooled_buffer::resize(self_.trail,mark);
+ var index=self_.trail.items.len;while index>mark {index--;let name=self_.trail.items[index];var remove=false;{let found=blot_support_pooled_map::get(self_.shadowed,name);assert(found!=null);let count=copy(found);if count==1 {remove=true;}else {found=count-1;}}if remove {blot_support_pooled_map::remove(self_.shadowed,name,shadow_slots);}}blot_support_pooled_buffer::resize(self_.trail,mark);
 }
 recursive fn pattern(self_:Collector&,id:u32,depth:i64)->Error {
  if id==0 {return blot_error::Error.none;}if depth>=1024 {return blot_error::Error.target_limit;}let value=self_.tree.node(id);

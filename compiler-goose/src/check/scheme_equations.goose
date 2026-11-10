@@ -227,7 +227,7 @@ reusable[] var bodymap_slots:dictionary_slot<Body,bool>[>..];
 fn contains(self_:const BodyMap&,key:Body)->bool {return blot_support_pooled_map::contains(self_,key);}
 fn get(self_:const BodyMap&,key:Body)->bool? {return blot_support_pooled_map::get(self_,key);}
 fn insert(self_:BodyMap&,key:Body,value:bool)->bool {if self_.count>=0x1555555555555555 {self_.failure=blot_error::Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self_,key,value,bodymap_slots);}
-fn remove(self_:BodyMap&,key:Body)->bool {return blot_support_pooled_map::remove(self_,key);}
+fn remove(self_:BodyMap&,key:Body)->bool {return blot_support_pooled_map::remove(self_,key,bodymap_slots);}
 fn clear(self_:BodyMap&) {blot_support_pooled_map::clear(self_);self_.failure=blot_error::Error.none;}
 fn deinit(self_:BodyMap&) {blot_support_pooled_map::deinit(self_,bodymap_slots);self_.failure=blot_error::Error.none;}
 struct IdMap {count:i64=0,slots:dictionary_slot<u32,bool>[:]=default<dictionary_slot<u32,bool>[:]>(),failure:Error=blot_error::Error.none}
@@ -235,7 +235,7 @@ reusable[] var idmap_slots:dictionary_slot<u32,bool>[>..];
 fn contains(self_:const IdMap&,key:u32)->bool {return blot_support_pooled_map::contains(self_,key);}
 fn get(self_:const IdMap&,key:u32)->bool? {return blot_support_pooled_map::get(self_,key);}
 fn insert(self_:IdMap&,key:u32,value:bool)->bool {if self_.count>=0x1555555555555555 {self_.failure=blot_error::Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self_,key,value,idmap_slots);}
-fn remove(self_:IdMap&,key:u32)->bool {return blot_support_pooled_map::remove(self_,key);}
+fn remove(self_:IdMap&,key:u32)->bool {return blot_support_pooled_map::remove(self_,key,idmap_slots);}
 fn clear(self_:IdMap&) {blot_support_pooled_map::clear(self_);self_.failure=blot_error::Error.none;}
 fn deinit(self_:IdMap&) {blot_support_pooled_map::deinit(self_,idmap_slots);self_.failure=blot_error::Error.none;}
 struct GoalMap {count:i64=0,slots:dictionary_slot<SharedGoal,i64>[:]=default<dictionary_slot<SharedGoal,i64>[:]>(),failure:Error=blot_error::Error.none}
@@ -243,7 +243,7 @@ reusable[] var goalmap_slots:dictionary_slot<SharedGoal,i64>[>..];
 fn contains(self_:const GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::contains(self_,key);}
 fn get(self_:const GoalMap&,key:SharedGoal)->i64? {return blot_support_pooled_map::get(self_,key);}
 fn insert(self_:GoalMap&,key:SharedGoal,value:i64)->bool {if self_.count>=0x1555555555555555 {self_.failure=blot_error::Error.out_of_memory;return false;}return blot_support_pooled_map::insert(self_,key,value,goalmap_slots);}
-fn remove(self_:GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::remove(self_,key);}
+fn remove(self_:GoalMap&,key:SharedGoal)->bool {return blot_support_pooled_map::remove(self_,key,goalmap_slots);}
 fn clear(self_:GoalMap&) {blot_support_pooled_map::clear(self_);self_.failure=blot_error::Error.none;}
 fn deinit(self_:GoalMap&) {blot_support_pooled_map::deinit(self_,goalmap_slots);self_.failure=blot_error::Error.none;}
 fn initPooledAdmission(remaining:i64&)->Admission,Error {return Admission{remaining:remaining, ..},blot_error::Error.none;}

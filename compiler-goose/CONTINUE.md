@@ -4,20 +4,20 @@ Repair coherent ownership families, build the actual C/header/native compiler,
 then qualify CLI/server, request OOM/retry and retention against Zig.
 **No whole compiler artifact exists yet.**
 
-All 26 production helper laws pass in 190.63s on the copied-argument checker.
-The exact [C/link/runtime receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete26.json.gz)
-qualifies its pinned sources. The IndexSet method regression additionally passes
-in 7.45s. Whole 115 reaches GoalContext defaults and semantic Outcome publication
-in 135.30s without artifacts. Their repairs, worker/archive header publication and
-retained output restore have affected executed controls. All 29 helper laws pass in two batches (24 + 5), with each passed input closure
-matching current source. The initial attempt stopped at a new test setup error.
-See [the split receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete29-split.json.gz);
-the latest uninterrupted complete pass remains 26 laws.
+All 30 production helper laws pass together in 221.34s on the copied-argument
+checker. The exact [C/link/runtime receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz)
+qualifies its pinned sources. Whole 115 still has no compiler artifacts.
 
-The strict `scoped` diagnostic root checks backend bodies in about 19s. It uses
-invalid empty Core and does not execute or qualify the backend. Current failure:
-pooled-map removal of borrowed-evidence keys. Bulk-error checker experiments stay
-off-tree: no demonstrated production gain.
+The strict `scoped` diagnostic root checks backend bodies in about 19s, using
+invalid empty Core without executing it. Current failure: recursive child
+Generator emission changes the threaded reference root (scoped131). Astra is
+testing same-address context save/restore; no checker weakening.
+
+Specialization key equality now compares evidence content; copied keys dedupe
+admissions and share candidate chains. Map removal has one explicit owner-pool
+API across all 78 production calls. The new law executes wrapped hash collisions,
+rollback, replacement, scalar fallback and Frame reuse. No new pool/registry.
+Bulk-error experiments remain off-tree without demonstrated production gain.
 
 Current representation:
 

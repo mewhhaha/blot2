@@ -230,7 +230,7 @@ reusable[] var slots_LocalMap: dictionary_slot<u32,u32>[>..] = [];
 fn get(map: const LocalMap&,key: u32) -> u32? { return blot_support_pooled_map::get(map.table,key); }
 fn contains(map: const LocalMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map.table,key); }
 fn insert(map: LocalMap&,key: u32,value: u32) -> bool { return blot_support_pooled_map::insert(map.table,key,value,slots_LocalMap); }
-fn remove(map: LocalMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key); }
+fn remove(map: LocalMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key,slots_LocalMap); }
 fn clear(map: LocalMap&) { blot_support_pooled_map::clear(map.table); }
 fn clone(map: const LocalMap&) -> LocalMap { return LocalMap { blot_support_pooled_map::clone(map.table,slots_LocalMap) , ..}; }
 fn deinit(map: LocalMap&) { blot_support_pooled_map::deinit(map.table,slots_LocalMap); }
@@ -240,7 +240,7 @@ reusable[] var slots_TemplateMap: dictionary_slot<u32,Template>[>..] = [];
 fn get(map: const TemplateMap&,key: u32) -> Template? { return blot_support_pooled_map::get(map.table,key); }
 fn contains(map: const TemplateMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map.table,key); }
 fn insert(map: TemplateMap&,key: u32,value: Template) -> bool { return blot_support_pooled_map::insert(map.table,key,value,slots_TemplateMap); }
-fn remove(map: TemplateMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key); }
+fn remove(map: TemplateMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key,slots_TemplateMap); }
 fn clear(map: TemplateMap&) { blot_support_pooled_map::clear(map.table); }
 fn clone(map: const TemplateMap&) -> TemplateMap { return TemplateMap { blot_support_pooled_map::clone(map.table,slots_TemplateMap) , ..}; }
 fn deinit(map: TemplateMap&) { blot_support_pooled_map::deinit(map.table,slots_TemplateMap); }
@@ -250,7 +250,7 @@ reusable[] var slots_SmallMap: dictionary_slot<u32,SmallCollection>[>..] = [];
 fn get(map: const SmallMap&,key: u32) -> SmallCollection? { return blot_support_pooled_map::get(map.table,key); }
 fn contains(map: const SmallMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map.table,key); }
 fn insert(map: SmallMap&,key: u32,value: SmallCollection) -> bool { return blot_support_pooled_map::insert(map.table,key,value,slots_SmallMap); }
-fn remove(map: SmallMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key); }
+fn remove(map: SmallMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key,slots_SmallMap); }
 fn clear(map: SmallMap&) { blot_support_pooled_map::clear(map.table); }
 fn clone(map: const SmallMap&) -> SmallMap { return SmallMap { blot_support_pooled_map::clone(map.table,slots_SmallMap) , ..}; }
 fn deinit(map: SmallMap&) { blot_support_pooled_map::deinit(map.table,slots_SmallMap); }
@@ -260,7 +260,7 @@ reusable[] var slots_CursorMap: dictionary_slot<u32,CursorDirectory>[>..] = [];
 fn get(map: const CursorMap&,key: u32) -> CursorDirectory? { return blot_support_pooled_map::get(map.table,key); }
 fn contains(map: const CursorMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map.table,key); }
 fn insert(map: CursorMap&,key: u32,value: CursorDirectory) -> bool { return blot_support_pooled_map::insert(map.table,key,value,slots_CursorMap); }
-fn remove(map: CursorMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key); }
+fn remove(map: CursorMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key,slots_CursorMap); }
 fn clear(map: CursorMap&) { blot_support_pooled_map::clear(map.table); }
 fn clone(map: const CursorMap&) -> CursorMap { return CursorMap { blot_support_pooled_map::clone(map.table,slots_CursorMap) , ..}; }
 fn deinit(map: CursorMap&) { blot_support_pooled_map::deinit(map.table,slots_CursorMap); }
@@ -270,7 +270,7 @@ reusable[] var slots_InstanceMap: dictionary_slot<u32,InstanceLocals>[>..] = [];
 fn get(map: const InstanceMap&,key: u32) -> InstanceLocals? { return blot_support_pooled_map::get(map.table,key); }
 fn contains(map: const InstanceMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map.table,key); }
 fn insert(map: InstanceMap&,key: u32,value: InstanceLocals) -> bool { return blot_support_pooled_map::insert(map.table,key,value,slots_InstanceMap); }
-fn remove(map: InstanceMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key); }
+fn remove(map: InstanceMap&,key: u32) -> bool { return blot_support_pooled_map::remove(map.table,key,slots_InstanceMap); }
 fn clear(map: InstanceMap&) { blot_support_pooled_map::clear(map.table); }
 fn clone(map: const InstanceMap&) -> InstanceMap { return InstanceMap { blot_support_pooled_map::clone(map.table,slots_InstanceMap) , ..}; }
 fn deinit(map: InstanceMap&) { blot_support_pooled_map::deinit(map.table,slots_InstanceMap); }

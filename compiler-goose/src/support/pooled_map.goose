@@ -2,14 +2,16 @@
 namespace blot_support_pooled_map;
 import .word_hash;
 import dictionary;
+// Keys may define content equality in their own namespace.
+fn keyEqual<K>(left:K,right:K)->bool {return left==right;}
 struct Map<K,V> { count: i64 = 0, slots: dictionary_slot<K,V>[:] = default<dictionary_slot<K,V>[:]>() }
 fn probe<M,K>(map: const M&,key: K) -> i64 {
     if map.count == 0 { return -1; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key == key { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
+    loop { let present = map.slots[index].tag; if present == tag && map.slots[index].key.keyEqual(key) { return index; } if present == 0 { return -1; } index = (index + 1) & mask; }
 }
 fn getSlots<K,V>(slots: dictionary_slot<K,V>[:],key: K) -> V? {
     if slots.len == 0 { return null; } let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = slots[index].tag; if present == tag && slots[index].key == key { return slots[index].val; } if present == 0 { return null; } index = (index + 1) & mask; }
+    loop { let present = slots[index].tag; if present == tag && slots[index].key.keyEqual(key) { return slots[index].val; } if present == 0 { return null; } index = (index + 1) & mask; }
 }
 fn get<M,K>(map: const M&,key: K) { return getSlots(map.slots,key); }
 fn contains<M,K>(map: const M&,key: K) -> bool { return probe(map,key) >= 0; }
@@ -31,12 +33,13 @@ fn insert<M,K,V>(map: M&,key: K,value: V,pool: dictionary_slot<K,V>[>..]&) -> bo
     if map.slots.len == 0 { grow(map,8,pool); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2,pool); }
     let slots = pool.realloc_slice(map.slots,map.slots.len);
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = slots[index].tag; if present == 0 { slots[index] = dictionary_slot<K,V> { key,value,tag }; map.count++; return true; } if present == tag && slots[index].key == key { slots[index] = dictionary_slot<K,V> { slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+    loop { let present = slots[index].tag; if present == 0 { slots[index] = dictionary_slot<K,V> { key,value,tag }; map.count++; return true; } if present == tag && slots[index].key.keyEqual(key) { slots[index] = dictionary_slot<K,V> { slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
 }
-fn remove<M,K>(map: M&,key: K) -> bool {
-    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
-    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
-    eraseSlot(map.slots[hole]); map.count--; return true;
+fn remove<M,K,V>(map:M&,key:K,pool:dictionary_slot<K,V>[>..]&)->bool {
+    var hole=probe(map,key);if hole<0 {return false;}
+    let slots=pool.realloc_slice(map.slots,map.slots.len);let mask=slots.len-1;var index=hole;
+    loop {index=(index+1)&mask;let tag=slots[index].tag;if tag==0 {break;}let home=(slots[index].key.hash()&(mask as u64)) as i64;if ((index-home)&mask)>=((index-hole)&mask) {slots[hole]=slots[index];hole=index;}}
+    eraseSlot(slots[hole]);map.count--;return true;
 }
 fn eraseSlot<K,V>(slot:dictionary_slot<K,V>&) {slot=default<dictionary_slot<K,V>>();}
 fn clear<M>(map: M&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }

@@ -20,7 +20,7 @@ type Tag = blot_check_core::Tag;
 type TypeTag = blot_check_types::Tag;
 type Words = blot_backend_optimizer_buffers::Words;
 struct Key {unit: u32,binding: u32,context: u32 = 0,context_free: bool = false,evidence: const u32[:]}
-fn eql(self_: Key,other: Key) -> bool {return self_.unit == other.unit && self_.binding == other.binding && self_.context == other.context && self_.context_free == other.context_free && self_.evidence == other.evidence;}
+fn keyEqual(self_: Key,other: Key) -> bool {return self_.unit == other.unit && self_.binding == other.binding && self_.context == other.context && self_.context_free == other.context_free && self_.evidence == other.evidence;}
 fn hash(key: Key) -> u64 {var free: u32 = 0;if key.context_free {free = 1;}let header: u32[4] = [key.unit,key.binding,key.context,free];var state = blot_support_wyhash::init(0);blot_support_wyhash::update(state,bytes_of(header));blot_support_wyhash::update(state,bytes_of(key.evidence));return blot_support_wyhash::final(state);}
 struct Entry {key: Key,function: u32,floating: bool,building: bool = true,context_sensitive: bool = true,next: blot_support::Option<i64> = blot_support::none<i64>(),previous: blot_support::Option<i64> = blot_support::none<i64>()}
 enum TargetKind {named,closure}
@@ -51,7 +51,7 @@ fn deinit(self_: Cache&) {blot_support_pooled_map::deinit(self_.entry_positions,
 fn checkpoint(self_: const Cache&) -> i64 {return self_.entries.items.len;}
 fn rollbackEntries(self_: Cache&,mark: i64) {
     assert(mark <= self_.entries.items.len);var at = self_.entries.items.len;
-    while at > mark {at--;let entry = self_.entries.items[at];let chain .= blot_support_pooled_map::get(self_.entry_positions,entry.key);assert(chain != null);assert(chain.last == at && !entry.next.present);if entry.previous.present {self_.entries.items[entry.previous.value].next = blot_support::none<i64>();chain.last = entry.previous.value;}else {assert(chain.first == at);let removed = blot_support_pooled_map::remove(self_.entry_positions,entry.key);assert(removed);self_.removed_keys++;}release(entry.key);}
+    while at > mark {at--;let entry = self_.entries.items[at];let chain .= blot_support_pooled_map::get(self_.entry_positions,entry.key);assert(chain != null);assert(chain.last == at && !entry.next.present);if entry.previous.present {self_.entries.items[entry.previous.value].next = blot_support::none<i64>();chain.last = entry.previous.value;}else {assert(chain.first == at);let removed = blot_support_pooled_map::remove(self_.entry_positions,entry.key,entry_slots);assert(removed);self_.removed_keys++;}release(entry.key);}
     blot_support_pooled_buffer::resize(self_.entries,mark);
     // Backward-shift deletion already removes every tombstone. Preserve the
     // native amortization epoch counters without a redundant full-table scan.
@@ -60,7 +60,7 @@ fn rollbackEntries(self_: Cache&,mark: i64) {
 fn admitted(self_: const Cache&,key: Key) -> blot_support::Option<i64> {let index .= blot_support_pooled_map::get(self_.plan_positions,key);if !index {return blot_support::none<i64>();}return blot_support::some(self_.plans.items[index].height);}
 fn admit(self_: Cache&,key: Key,height: i64) -> Error {
     let existing .= blot_support_pooled_map::get(self_.plan_positions,key);if existing {self_.plans.items[existing].height = max(self_.plans.items[existing].height,height);return blot_error::Error.none;}if self_.plans.items.len >= 65536 {return blot_error::Error.none;}
-    let owned = own(key);let capacity = blot_support_pooled_buffer::ensure(self_.plans,self_.plans.items.len + 1,admission_runs);if capacity != blot_error::Error.none {release(owned);return capacity;}let index = self_.plans.items.len;blot_support_pooled_map::insert(self_.plan_positions,owned,index,plan_slots);let inserted = blot_support_pooled_buffer::push(self_.plans,Admission {key: owned,height: height},admission_runs);if inserted != blot_error::Error.none {blot_support_pooled_map::remove(self_.plan_positions,owned);release(owned);}return inserted;
+    let owned = own(key);let capacity = blot_support_pooled_buffer::ensure(self_.plans,self_.plans.items.len + 1,admission_runs);if capacity != blot_error::Error.none {release(owned);return capacity;}let index = self_.plans.items.len;blot_support_pooled_map::insert(self_.plan_positions,owned,index,plan_slots);let inserted = blot_support_pooled_buffer::push(self_.plans,Admission {key: owned,height: height},admission_runs);if inserted != blot_error::Error.none {blot_support_pooled_map::remove(self_.plan_positions,owned,plan_slots);release(owned);}return inserted;
 }
 fn findExact(self_: const Cache&,key: Key) -> blot_support::Option<i64> {let chain .= blot_support_pooled_map::get(self_.entry_positions,key);if !chain {return blot_support::none<i64>();}return blot_support::some(chain.first);}
 fn canonical(key: Key) -> Key {var result = key;result.context = 0;result.context_free = true;return result;}

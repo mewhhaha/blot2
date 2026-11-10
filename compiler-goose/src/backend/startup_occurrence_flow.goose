@@ -85,21 +85,21 @@ reusable[] var pool_Bindings:dictionary_slot<u32,u32>[>..]=[];
 fn get(self_:const Bindings&,key:u32)->u32? {return blot_support_pooled_map::get(self_.table,key);}
 fn contains(self_:const Bindings&,key:u32)->bool {return blot_support_pooled_map::contains(self_.table,key);}
 fn insert(self_:Bindings&,key:u32,value:u32) {blot_support_pooled_map::insert(self_.table,key,value,pool_Bindings);}
-fn remove(self_:Bindings&,key:u32) {blot_support_pooled_map::remove(self_.table,key);}
+fn remove(self_:Bindings&,key:u32) {blot_support_pooled_map::remove(self_.table,key,pool_Bindings);}
 fn deinit(self_:Bindings&) {blot_support_pooled_map::deinit(self_.table,pool_Bindings);}
 struct Constants {table:blot_support_pooled_map::Map<BindingRef,ValueId> =blot_support_pooled_map::Map<BindingRef,ValueId>{..}}
 reusable[] var pool_Constants:dictionary_slot<BindingRef,ValueId>[>..]=[];
 fn get(self_:const Constants&,key:BindingRef)->ValueId? {return blot_support_pooled_map::get(self_.table,key);}
 fn contains(self_:const Constants&,key:BindingRef)->bool {return blot_support_pooled_map::contains(self_.table,key);}
 fn insert(self_:Constants&,key:BindingRef,value:ValueId) {blot_support_pooled_map::insert(self_.table,key,value,pool_Constants);}
-fn remove(self_:Constants&,key:BindingRef) {blot_support_pooled_map::remove(self_.table,key);}
+fn remove(self_:Constants&,key:BindingRef) {blot_support_pooled_map::remove(self_.table,key,pool_Constants);}
 fn deinit(self_:Constants&) {blot_support_pooled_map::deinit(self_.table,pool_Constants);}
 struct Preparing {table:blot_support_pooled_map::Map<BindingRef,bool> =blot_support_pooled_map::Map<BindingRef,bool>{..}}
 reusable[] var pool_Preparing:dictionary_slot<BindingRef,bool>[>..]=[];
 fn get(self_:const Preparing&,key:BindingRef)->bool? {return blot_support_pooled_map::get(self_.table,key);}
 fn contains(self_:const Preparing&,key:BindingRef)->bool {return blot_support_pooled_map::contains(self_.table,key);}
 fn insert(self_:Preparing&,key:BindingRef,value:bool) {blot_support_pooled_map::insert(self_.table,key,value,pool_Preparing);}
-fn remove(self_:Preparing&,key:BindingRef) {blot_support_pooled_map::remove(self_.table,key);}
+fn remove(self_:Preparing&,key:BindingRef) {blot_support_pooled_map::remove(self_.table,key,pool_Preparing);}
 fn deinit(self_:Preparing&) {blot_support_pooled_map::deinit(self_.table,pool_Preparing);}
 struct Frame {values:Bindings=Bindings{..},possible_return:blot_support::Option<Return> =blot_support::Option<Return>{..}}
 fn deinit(self_:Frame&) {self_.values.deinit();self_.possible_return=blot_support::none<Return>();}

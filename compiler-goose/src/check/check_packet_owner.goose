@@ -14,7 +14,7 @@ fn attachCheckedPacket(owner:CheckedOwner,packet:blot_project_packet::Owner)->bl
  if !owner.valid() {return blot_error::Error.invalid_artifact;}let key=CheckedPacketKey{owner.lease,owner.generation};if blot_support_pooled_map::contains(checked_packets,key) {return blot_error::Error.invalid_artifact;}
  let held,error=packet.retain();if error!=blot_error::Error.none {return error;}let inserted=blot_support_pooled_map::insert(checked_packets,key,held,checked_packet_slots);assert(inserted);return blot_error::Error.none;
 }
-fn releaseCheckedPacket(owner:CheckedOwner) {let key=CheckedPacketKey{owner.lease,owner.generation};let found .= blot_support_pooled_map::get(checked_packets,key);if !found {return;}var held=found;blot_support_pooled_map::remove(checked_packets,key);held.deinit();}
+fn releaseCheckedPacket(owner:CheckedOwner) {let key=CheckedPacketKey{owner.lease,owner.generation};let found .= blot_support_pooled_map::get(checked_packets,key);if !found {return;}var held=found;blot_support_pooled_map::remove(checked_packets,key,checked_packet_slots);held.deinit();}
 
 fn hash(key:CheckedPacketKey)->u64 {return ::hash_combine(::hash(key.lease),::hash(key.generation));}
 

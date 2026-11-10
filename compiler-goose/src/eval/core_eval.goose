@@ -1443,7 +1443,7 @@ reusable[] var pool_SummaryKeysMap: dictionary_slot<CallSummaryKey,i64>[>..]=[];
 fn get(self_: const SummaryKeysMap&,key: CallSummaryKey) -> i64? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryKeysMap&,key: CallSummaryKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryKeysMap&,key: CallSummaryKey,value: i64) { var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryKeysMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryKeysMap&,key: CallSummaryKey) { var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryKeysMap&,key: CallSummaryKey) { var view=blot_support_pooled_map::Map<CallSummaryKey,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryKeysMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryKeysMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn reserve(self_: SummaryKeysMap&,needed: i64) {
  if needed<=0||needed<=self_.slots.len-(self_.slots.len+2)/3 {return;}
@@ -1457,7 +1457,7 @@ reusable[] var pool_SummaryActiveMap: dictionary_slot<Target,i64>[>..]=[];
 fn get(self_: const SummaryActiveMap&,key: Target) -> i64? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryActiveMap&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryActiveMap&,key: Target,value: i64) { var view=blot_support_pooled_map::Map<Target,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryActiveMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryActiveMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryActiveMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryActiveMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryActiveMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: SummaryActiveMap&) { if self_.slots.len!=0 { pool_SummaryActiveMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,i64>[:]>(); self_.count=0; }
 
@@ -1466,7 +1466,7 @@ reusable[] var pool_SummaryLexicalMap: dictionary_slot<u32,i64>[>..]=[];
 fn get(self_: const SummaryLexicalMap&,key: u32) -> i64? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryLexicalMap&,key: u32) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryLexicalMap&,key: u32,value: i64) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryLexicalMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryLexicalMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryLexicalMap&,key: u32) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryLexicalMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryLexicalMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: SummaryLexicalMap&) { if self_.slots.len!=0 { pool_SummaryLexicalMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,i64>[:]>(); self_.count=0; }
 
@@ -1475,7 +1475,7 @@ reusable[] var pool_SummaryTargetFlags: dictionary_slot<Target,bool>[>..]=[];
 fn get(self_: const SummaryTargetFlags&,key: Target) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryTargetFlags&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryTargetFlags&,key: Target,value: bool) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryTargetFlags); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryTargetFlags&,key: Target) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryTargetFlags&,key: Target) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryTargetFlags); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryTargetFlags&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: SummaryTargetFlags&) { if self_.slots.len!=0 { pool_SummaryTargetFlags.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,bool>[:]>(); self_.count=0; }
 
@@ -1484,7 +1484,7 @@ reusable[] var pool_SummaryInterfacesMap: dictionary_slot<Target,blot_support::O
 fn get(self_: const SummaryInterfacesMap&,key: Target) -> blot_support::Option<const Target[:]>? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryInterfacesMap&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryInterfacesMap&,key: Target,value: blot_support::Option<const Target[:]>) { var view=blot_support_pooled_map::Map<Target,blot_support::Option<const Target[:]>> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryInterfacesMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryInterfacesMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,blot_support::Option<const Target[:]>> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryInterfacesMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,blot_support::Option<const Target[:]>> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryInterfacesMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryInterfacesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: SummaryInterfacesMap&) { if self_.slots.len!=0 { pool_SummaryInterfacesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,blot_support::Option<const Target[:]>>[:]>(); self_.count=0; }
 
@@ -1493,7 +1493,7 @@ reusable[] var pool_SummaryHeadersMap: dictionary_slot<Target,HeaderParts>[>..]=
 fn get(self_: const SummaryHeadersMap&,key: Target) -> HeaderParts? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const SummaryHeadersMap&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: SummaryHeadersMap&,key: Target,value: HeaderParts) { var view=blot_support_pooled_map::Map<Target,HeaderParts> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_SummaryHeadersMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: SummaryHeadersMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,HeaderParts> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: SummaryHeadersMap&,key: Target) { var view=blot_support_pooled_map::Map<Target,HeaderParts> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_SummaryHeadersMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: SummaryHeadersMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: SummaryHeadersMap&) { if self_.slots.len!=0 { pool_SummaryHeadersMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,HeaderParts>[:]>(); self_.count=0; }
 
@@ -1502,7 +1502,7 @@ reusable[] var pool_PrincipalDeclinesMap: dictionary_slot<PrincipalGraphKey,bool
 fn get(self_: const PrincipalDeclinesMap&,key: PrincipalGraphKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const PrincipalDeclinesMap&,key: PrincipalGraphKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: PrincipalDeclinesMap&,key: PrincipalGraphKey,value: bool) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PrincipalDeclinesMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: PrincipalDeclinesMap&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: PrincipalDeclinesMap&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_PrincipalDeclinesMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: PrincipalDeclinesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: PrincipalDeclinesMap&) { if self_.slots.len!=0 { pool_PrincipalDeclinesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<PrincipalGraphKey,bool>[:]>(); self_.count=0; }
 
@@ -1511,7 +1511,7 @@ reusable[] var pool_CallableDefinitionsMap: dictionary_slot<DefinitionKey,u32>[>
 fn get(self_: const CallableDefinitionsMap&,key: DefinitionKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CallableDefinitionsMap&,key: DefinitionKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CallableDefinitionsMap&,key: DefinitionKey,value: u32) { var view=blot_support_pooled_map::Map<DefinitionKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CallableDefinitionsMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CallableDefinitionsMap&,key: DefinitionKey) { var view=blot_support_pooled_map::Map<DefinitionKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CallableDefinitionsMap&,key: DefinitionKey) { var view=blot_support_pooled_map::Map<DefinitionKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CallableDefinitionsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CallableDefinitionsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CallableDefinitionsMap&) { if self_.slots.len!=0 { pool_CallableDefinitionsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<DefinitionKey,u32>[:]>(); self_.count=0; }
 
@@ -1520,7 +1520,7 @@ reusable[] var pool_CallableUnitsMap: dictionary_slot<i64,bool>[>..]=[];
 fn get(self_: const CallableUnitsMap&,key: i64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CallableUnitsMap&,key: i64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CallableUnitsMap&,key: i64,value: bool) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CallableUnitsMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CallableUnitsMap&,key: i64) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CallableUnitsMap&,key: i64) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CallableUnitsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CallableUnitsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CallableUnitsMap&) { if self_.slots.len!=0 { pool_CallableUnitsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<i64,bool>[:]>(); self_.count=0; }
 
@@ -1529,7 +1529,7 @@ reusable[] var pool_ValidatedCallsMap: dictionary_slot<CallProofKey,bool>[>..]=[
 fn get(self_: const ValidatedCallsMap&,key: CallProofKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const ValidatedCallsMap&,key: CallProofKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: ValidatedCallsMap&,key: CallProofKey,value: bool) { var view=blot_support_pooled_map::Map<CallProofKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_ValidatedCallsMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: ValidatedCallsMap&,key: CallProofKey) { var view=blot_support_pooled_map::Map<CallProofKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: ValidatedCallsMap&,key: CallProofKey) { var view=blot_support_pooled_map::Map<CallProofKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_ValidatedCallsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: ValidatedCallsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn reserve(self_: ValidatedCallsMap&,needed: i64) {
  if needed<=0||needed<=self_.slots.len-(self_.slots.len+2)/3 {return;}
@@ -1543,7 +1543,7 @@ reusable[] var pool_PlainNominalsMap: dictionary_slot<u64,bool>[>..]=[];
 fn get(self_: const PlainNominalsMap&,key: u64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const PlainNominalsMap&,key: u64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: PlainNominalsMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PlainNominalsMap); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: PlainNominalsMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: PlainNominalsMap&,key: u64) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_PlainNominalsMap); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: PlainNominalsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn reserve(self_: PlainNominalsMap&,needed: i64) {
  if needed<=0||needed<=self_.slots.len-(self_.slots.len+2)/3 {return;}
@@ -3606,7 +3606,7 @@ struct PooledValues { table: ValueMap& =inactive_values.table,slots: (dictionary
 fn activate(self_: PooledValues&) -> Error { if self_.lease!=0 { assert(self_.lease-1<values_headers.len&&values_headers[self_.lease-1].live&&values_headers[self_.lease-1].generation==self_.generation); return blot_error::Error.none; } if next_values_generation==0xffffffffffffffff||values_headers.len>=0xffffffff { return blot_error::Error.out_of_memory; } let generation=next_values_generation; next_values_generation++; let at=values_headers.alloc_index(ValuesHeader {generation:generation,live:true}); self_.table .= values_headers[at].table; self_.slots .= values_headers[at].table.slots; self_.count .= values_headers[at].table.count; self_.failure .= values_headers[at].failure; self_.lease=(at+1) as u32; self_.generation=generation; return blot_error::Error.none; }
 fn get(self_: PooledValues,key: u32) -> ValueId? { if self_.lease==0 { return null; } return blot_support_pooled_map::get(self_.table,key); }
 fn insert(self_: PooledValues&,key: u32,value: ValueId) { let error=activate(self_); if error!=blot_error::Error.none { self_.failure=error; return; } blot_support_pooled_map::insert(self_.table,key,value,values_slots); }
-fn remove(self_: PooledValues,key: u32) -> bool { if self_.lease==0 { return false; } return blot_support_pooled_map::remove(self_.table,key); }
+fn remove(self_: PooledValues,key: u32) -> bool { if self_.lease==0 { return false; } return blot_support_pooled_map::remove(self_.table,key,values_slots); }
 fn clear(self_: PooledValues) { if self_.lease!=0 { blot_support_pooled_map::clear(self_.table); } }
 fn deinit(self_: PooledValues&) { if self_.lease==0 { return; } let error=activate(self_); assert(error==blot_error::Error.none); blot_support_pooled_map::deinit(self_.table,values_slots); let at=self_.lease-1; values_headers[at].live=false; values_headers.free(at); self_=PooledValues {}; }
 fn prepareFrame(values: PooledValues&,mappings: blot_eval_type_evidence::PooledMappings&,rows: blot_eval_type_evidence::PooledRows&) -> Error { let first=activate(values); if first!=blot_error::Error.none { return first; } let second=blot_eval_type_evidence::activate(mappings); if second!=blot_error::Error.none { return second; } return blot_eval_type_evidence::activate(rows); }
@@ -3753,7 +3753,7 @@ fn insert(self_: RegionImportedMap&,key: Import,value: u32) { var view=blot_supp
 fn clear(self_: RegionImportedMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionImportedMap&) { if self_.slots.len!=0 { pool_RegionImportedMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Import,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionImportedMap&,slots: const dictionary_slot<Import,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionImportedMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionImportedMap&,key: Import) -> bool { var view=blot_support_pooled_map::Map<Import,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionImportedMap&,key: Import) -> bool { var view=blot_support_pooled_map::Map<Import,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionImportedMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionImportedRowsMap { count: i64=0,slots: dictionary_slot<RowImport,u32>[:]=default<dictionary_slot<RowImport,u32>[:]>() }
 reusable[] var pool_RegionImportedRowsMap: dictionary_slot<RowImport,u32>[>..]=[];
 fn get(self_: const RegionImportedRowsMap&,key: RowImport) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3762,7 +3762,7 @@ fn insert(self_: RegionImportedRowsMap&,key: RowImport,value: u32) { var view=bl
 fn clear(self_: RegionImportedRowsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionImportedRowsMap&) { if self_.slots.len!=0 { pool_RegionImportedRowsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RowImport,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionImportedRowsMap&,slots: const dictionary_slot<RowImport,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionImportedRowsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionImportedRowsMap&,key: RowImport) -> bool { var view=blot_support_pooled_map::Map<RowImport,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionImportedRowsMap&,key: RowImport) -> bool { var view=blot_support_pooled_map::Map<RowImport,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionImportedRowsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionImportedLabelsMap { count: i64=0,slots: dictionary_slot<LabelImport,u32>[:]=default<dictionary_slot<LabelImport,u32>[:]>() }
 reusable[] var pool_RegionImportedLabelsMap: dictionary_slot<LabelImport,u32>[>..]=[];
 fn get(self_: const RegionImportedLabelsMap&,key: LabelImport) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3771,7 +3771,7 @@ fn insert(self_: RegionImportedLabelsMap&,key: LabelImport,value: u32) { var vie
 fn clear(self_: RegionImportedLabelsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionImportedLabelsMap&) { if self_.slots.len!=0 { pool_RegionImportedLabelsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<LabelImport,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionImportedLabelsMap&,slots: const dictionary_slot<LabelImport,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionImportedLabelsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionImportedLabelsMap&,key: LabelImport) -> bool { var view=blot_support_pooled_map::Map<LabelImport,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionImportedLabelsMap&,key: LabelImport) -> bool { var view=blot_support_pooled_map::Map<LabelImport,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionImportedLabelsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionRowVariablesMap { count: i64=0,slots: dictionary_slot<RowVariable,u32>[:]=default<dictionary_slot<RowVariable,u32>[:]>() }
 reusable[] var pool_RegionRowVariablesMap: dictionary_slot<RowVariable,u32>[>..]=[];
 fn get(self_: const RegionRowVariablesMap&,key: RowVariable) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3780,7 +3780,7 @@ fn insert(self_: RegionRowVariablesMap&,key: RowVariable,value: u32) { var view=
 fn clear(self_: RegionRowVariablesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionRowVariablesMap&) { if self_.slots.len!=0 { pool_RegionRowVariablesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RowVariable,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionRowVariablesMap&,slots: const dictionary_slot<RowVariable,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionRowVariablesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionRowVariablesMap&,key: RowVariable) -> bool { var view=blot_support_pooled_map::Map<RowVariable,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionRowVariablesMap&,key: RowVariable) -> bool { var view=blot_support_pooled_map::Map<RowVariable,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionRowVariablesMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionRowParametersMap { count: i64=0,slots: dictionary_slot<RowParameter,u32>[:]=default<dictionary_slot<RowParameter,u32>[:]>() }
 reusable[] var pool_RegionRowParametersMap: dictionary_slot<RowParameter,u32>[>..]=[];
 fn get(self_: const RegionRowParametersMap&,key: RowParameter) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3789,7 +3789,7 @@ fn insert(self_: RegionRowParametersMap&,key: RowParameter,value: u32) { var vie
 fn clear(self_: RegionRowParametersMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionRowParametersMap&) { if self_.slots.len!=0 { pool_RegionRowParametersMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RowParameter,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionRowParametersMap&,slots: const dictionary_slot<RowParameter,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionRowParametersMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionRowParametersMap&,key: RowParameter) -> bool { var view=blot_support_pooled_map::Map<RowParameter,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionRowParametersMap&,key: RowParameter) -> bool { var view=blot_support_pooled_map::Map<RowParameter,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionRowParametersMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionEvidenceRowsMap { count: i64=0,slots: dictionary_slot<u32,u32>[:]=default<dictionary_slot<u32,u32>[:]>() }
 reusable[] var pool_RegionEvidenceRowsMap: dictionary_slot<u32,u32>[>..]=[];
 fn get(self_: const RegionEvidenceRowsMap&,key: u32) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3798,7 +3798,7 @@ fn insert(self_: RegionEvidenceRowsMap&,key: u32,value: u32) { var view=blot_sup
 fn clear(self_: RegionEvidenceRowsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionEvidenceRowsMap&) { if self_.slots.len!=0 { pool_RegionEvidenceRowsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionEvidenceRowsMap&,slots: const dictionary_slot<u32,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionEvidenceRowsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionEvidenceRowsMap&,key: u32) -> bool { var view=blot_support_pooled_map::Map<u32,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionEvidenceRowsMap&,key: u32) -> bool { var view=blot_support_pooled_map::Map<u32,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionEvidenceRowsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionFrozenMap { count: i64=0,slots: dictionary_slot<u32,ValueId>[:]=default<dictionary_slot<u32,ValueId>[:]>() }
 reusable[] var pool_RegionFrozenMap: dictionary_slot<u32,ValueId>[>..]=[];
 fn get(self_: const RegionFrozenMap&,key: u32) -> ValueId? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3807,7 +3807,7 @@ fn insert(self_: RegionFrozenMap&,key: u32,value: ValueId) { var view=blot_suppo
 fn clear(self_: RegionFrozenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionFrozenMap&) { if self_.slots.len!=0 { pool_RegionFrozenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,ValueId>[:]>(); self_.count=0; }
 fn restore(self_: RegionFrozenMap&,slots: const dictionary_slot<u32,ValueId>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionFrozenMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionFrozenMap&,key: u32) -> bool { var view=blot_support_pooled_map::Map<u32,ValueId> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionFrozenMap&,key: u32) -> bool { var view=blot_support_pooled_map::Map<u32,ValueId> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionFrozenMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionValueScopesMap { count: i64=0,slots: dictionary_slot<ValueId,u32>[:]=default<dictionary_slot<ValueId,u32>[:]>() }
 reusable[] var pool_RegionValueScopesMap: dictionary_slot<ValueId,u32>[>..]=[];
 fn get(self_: const RegionValueScopesMap&,key: ValueId) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3816,7 +3816,7 @@ fn insert(self_: RegionValueScopesMap&,key: ValueId,value: u32) { var view=blot_
 fn clear(self_: RegionValueScopesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionValueScopesMap&) { if self_.slots.len!=0 { pool_RegionValueScopesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<ValueId,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionValueScopesMap&,slots: const dictionary_slot<ValueId,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionValueScopesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionValueScopesMap&,key: ValueId) -> bool { var view=blot_support_pooled_map::Map<ValueId,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionValueScopesMap&,key: ValueId) -> bool { var view=blot_support_pooled_map::Map<ValueId,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionValueScopesMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionCallInstancesMap { count: i64=0,slots: dictionary_slot<CallKey,u32>[:]=default<dictionary_slot<CallKey,u32>[:]>() }
 reusable[] var pool_RegionCallInstancesMap: dictionary_slot<CallKey,u32>[>..]=[];
 fn get(self_: const RegionCallInstancesMap&,key: CallKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3825,7 +3825,7 @@ fn insert(self_: RegionCallInstancesMap&,key: CallKey,value: u32) { var view=blo
 fn clear(self_: RegionCallInstancesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionCallInstancesMap&) { if self_.slots.len!=0 { pool_RegionCallInstancesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CallKey,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionCallInstancesMap&,slots: const dictionary_slot<CallKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionCallInstancesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionCallInstancesMap&,key: CallKey) -> bool { var view=blot_support_pooled_map::Map<CallKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionCallInstancesMap&,key: CallKey) -> bool { var view=blot_support_pooled_map::Map<CallKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionCallInstancesMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionCandidateInstancesMap { count: i64=0,slots: dictionary_slot<CandidateKey,u32>[:]=default<dictionary_slot<CandidateKey,u32>[:]>() }
 reusable[] var pool_RegionCandidateInstancesMap: dictionary_slot<CandidateKey,u32>[>..]=[];
 fn get(self_: const RegionCandidateInstancesMap&,key: CandidateKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3834,7 +3834,7 @@ fn insert(self_: RegionCandidateInstancesMap&,key: CandidateKey,value: u32) { va
 fn clear(self_: RegionCandidateInstancesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionCandidateInstancesMap&) { if self_.slots.len!=0 { pool_RegionCandidateInstancesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<CandidateKey,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionCandidateInstancesMap&,slots: const dictionary_slot<CandidateKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionCandidateInstancesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionCandidateInstancesMap&,key: CandidateKey) -> bool { var view=blot_support_pooled_map::Map<CandidateKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionCandidateInstancesMap&,key: CandidateKey) -> bool { var view=blot_support_pooled_map::Map<CandidateKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionCandidateInstancesMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionUnresolvedCallsMap { count: i64=0,slots: dictionary_slot<Target,u32>[:]=default<dictionary_slot<Target,u32>[:]>() }
 reusable[] var pool_RegionUnresolvedCallsMap: dictionary_slot<Target,u32>[>..]=[];
 fn get(self_: const RegionUnresolvedCallsMap&,key: Target) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3843,7 +3843,7 @@ fn insert(self_: RegionUnresolvedCallsMap&,key: Target,value: u32) { var view=bl
 fn clear(self_: RegionUnresolvedCallsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionUnresolvedCallsMap&) { if self_.slots.len!=0 { pool_RegionUnresolvedCallsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionUnresolvedCallsMap&,slots: const dictionary_slot<Target,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionUnresolvedCallsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionUnresolvedCallsMap&,key: Target) -> bool { var view=blot_support_pooled_map::Map<Target,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionUnresolvedCallsMap&,key: Target) -> bool { var view=blot_support_pooled_map::Map<Target,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionUnresolvedCallsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionSchemeInstancesMap { count: i64=0,slots: dictionary_slot<SchemeInstance,bool>[:]=default<dictionary_slot<SchemeInstance,bool>[:]>() }
 reusable[] var pool_RegionSchemeInstancesMap: dictionary_slot<SchemeInstance,bool>[>..]=[];
 fn get(self_: const RegionSchemeInstancesMap&,key: SchemeInstance) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3852,7 +3852,7 @@ fn insert(self_: RegionSchemeInstancesMap&,key: SchemeInstance,value: bool) { va
 fn clear(self_: RegionSchemeInstancesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionSchemeInstancesMap&) { if self_.slots.len!=0 { pool_RegionSchemeInstancesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<SchemeInstance,bool>[:]>(); self_.count=0; }
 fn restore(self_: RegionSchemeInstancesMap&,slots: const dictionary_slot<SchemeInstance,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionSchemeInstancesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionSchemeInstancesMap&,key: SchemeInstance) -> bool { var view=blot_support_pooled_map::Map<SchemeInstance,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionSchemeInstancesMap&,key: SchemeInstance) -> bool { var view=blot_support_pooled_map::Map<SchemeInstance,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionSchemeInstancesMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionSchemeKeysMap { count: i64=0,slots: dictionary_slot<const u8[:],u32>[:]=default<dictionary_slot<const u8[:],u32>[:]>() }
 reusable[] var pool_RegionSchemeKeysMap: dictionary_slot<const u8[:],u32>[>..]=[];
 fn get(self_: const RegionSchemeKeysMap&,key: const u8[:]) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3861,7 +3861,7 @@ fn insert(self_: RegionSchemeKeysMap&,key: const u8[:],value: u32) { var view=bl
 fn clear(self_: RegionSchemeKeysMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionSchemeKeysMap&) { if self_.slots.len!=0 { pool_RegionSchemeKeysMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<const u8[:],u32>[:]>(); self_.count=0; }
 fn restore(self_: RegionSchemeKeysMap&,slots: const dictionary_slot<const u8[:],u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionSchemeKeysMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionSchemeKeysMap&,key: const u8[:]) -> bool { var view=blot_support_pooled_map::Map<const u8[:],u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionSchemeKeysMap&,key: const u8[:]) -> bool { var view=blot_support_pooled_map::Map<const u8[:],u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionSchemeKeysMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionCollectionSeenMap { count: i64=0,slots: dictionary_slot<WalkSeenKey,bool>[:]=default<dictionary_slot<WalkSeenKey,bool>[:]>() }
 reusable[] var pool_RegionCollectionSeenMap: dictionary_slot<WalkSeenKey,bool>[>..]=[];
 fn get(self_: const RegionCollectionSeenMap&,key: WalkSeenKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3870,7 +3870,7 @@ fn insert(self_: RegionCollectionSeenMap&,key: WalkSeenKey,value: bool) { var vi
 fn clear(self_: RegionCollectionSeenMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionCollectionSeenMap&) { if self_.slots.len!=0 { pool_RegionCollectionSeenMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<WalkSeenKey,bool>[:]>(); self_.count=0; }
 fn restore(self_: RegionCollectionSeenMap&,slots: const dictionary_slot<WalkSeenKey,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionCollectionSeenMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionCollectionSeenMap&,key: WalkSeenKey) -> bool { var view=blot_support_pooled_map::Map<WalkSeenKey,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionCollectionSeenMap&,key: WalkSeenKey) -> bool { var view=blot_support_pooled_map::Map<WalkSeenKey,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionCollectionSeenMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionNormalizationMemoMap { count: i64=0,slots: dictionary_slot<NormalizationKey,bool>[:]=default<dictionary_slot<NormalizationKey,bool>[:]>() }
 reusable[] var pool_RegionNormalizationMemoMap: dictionary_slot<NormalizationKey,bool>[>..]=[];
 fn get(self_: const RegionNormalizationMemoMap&,key: NormalizationKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
@@ -3879,7 +3879,7 @@ fn insert(self_: RegionNormalizationMemoMap&,key: NormalizationKey,value: bool) 
 fn clear(self_: RegionNormalizationMemoMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RegionNormalizationMemoMap&) { if self_.slots.len!=0 { pool_RegionNormalizationMemoMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<NormalizationKey,bool>[:]>(); self_.count=0; }
 fn restore(self_: RegionNormalizationMemoMap&,slots: const dictionary_slot<NormalizationKey,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RegionNormalizationMemoMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
-fn remove(self_: RegionNormalizationMemoMap&,key: NormalizationKey) -> bool { var view=blot_support_pooled_map::Map<NormalizationKey,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: RegionNormalizationMemoMap&,key: NormalizationKey) -> bool { var view=blot_support_pooled_map::Map<NormalizationKey,bool> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_RegionNormalizationMemoMap); self_.count=view.count; self_.slots=view.slots; return removed; }
 struct RegionTableState { callback_origins: RegionCallbackOriginsBuffer=RegionCallbackOriginsBuffer {},sources: RegionSourcesBuffer=RegionSourcesBuffer {},row_variable_entries: RegionRowVariableEntriesBuffer=RegionRowVariableEntriesBuffer {},variables: RegionVariablesBuffer=RegionVariablesBuffer {},edges: RegionEdgesBuffer=RegionEdgesBuffer {},constraints: RegionConstraintsBuffer=RegionConstraintsBuffer {},selected_targets: RegionSelectedTargetsBuffer=RegionSelectedTargetsBuffer {},summary_arguments: RegionSummaryArgumentsBuffer=RegionSummaryArgumentsBuffer {},data_aliases: RegionDataAliasesBuffer=RegionDataAliasesBuffer {},source_functions: RegionSummaryArgumentsBuffer=RegionSummaryArgumentsBuffer {},principal_references: RegionPrincipalReferencesBuffer=RegionPrincipalReferencesBuffer {},principal_actions: RegionPrincipalActionsBuffer=RegionPrincipalActionsBuffer {},constraint_names: RegionConstraintNamesBuffer=RegionConstraintNamesBuffer {},collection_frames: RegionCollectionFramesBuffer=RegionCollectionFramesBuffer {},collection_words: RegionSummaryArgumentsBuffer=RegionSummaryArgumentsBuffer {},collection_seen_words: RegionSummaryArgumentsBuffer=RegionSummaryArgumentsBuffer {},rank_evidence_frames: RegionRankEvidenceFramesBuffer=RegionRankEvidenceFramesBuffer {},rank_evidence_words: RegionSummaryArgumentsBuffer=RegionSummaryArgumentsBuffer {},imported: RegionImportedMap=RegionImportedMap {},imported_rows: RegionImportedRowsMap=RegionImportedRowsMap {},imported_labels: RegionImportedLabelsMap=RegionImportedLabelsMap {},row_variables: RegionRowVariablesMap=RegionRowVariablesMap {},row_parameters: RegionRowParametersMap=RegionRowParametersMap {},evidence_rows: RegionEvidenceRowsMap=RegionEvidenceRowsMap {},evidence_labels: RegionEvidenceRowsMap=RegionEvidenceRowsMap {},frozen: RegionFrozenMap=RegionFrozenMap {},value_scopes: RegionValueScopesMap=RegionValueScopesMap {},call_instances: RegionCallInstancesMap=RegionCallInstancesMap {},candidate_instances: RegionCandidateInstancesMap=RegionCandidateInstancesMap {},unresolved_calls: RegionUnresolvedCallsMap=RegionUnresolvedCallsMap {},target_scopes: RegionUnresolvedCallsMap=RegionUnresolvedCallsMap {},witness_inputs: RegionEvidenceRowsMap=RegionEvidenceRowsMap {},scheme_instances: RegionSchemeInstancesMap=RegionSchemeInstancesMap {},scheme_keys: RegionSchemeKeysMap=RegionSchemeKeysMap {},collection_seen: RegionCollectionSeenMap=RegionCollectionSeenMap {},projection_scopes: RegionEvidenceRowsMap=RegionEvidenceRowsMap {},normalization_memo: RegionNormalizationMemoMap=RegionNormalizationMemoMap {} }
 reusable var region_table_states: RegionTableState[>..]=[];
 fn deinitRegionTables(index: i64) { let tables: RegionTableState& =region_table_states[index]; tables.callback_origins.deinit(); tables.sources.deinit(); tables.row_variable_entries.deinit(); tables.variables.deinit(); tables.edges.deinit(); tables.constraints.deinit(); tables.selected_targets.deinit(); tables.summary_arguments.deinit(); tables.data_aliases.deinit(); tables.source_functions.deinit(); tables.principal_references.deinit(); tables.principal_actions.deinit(); tables.constraint_names.deinit(); tables.collection_frames.deinit(); tables.collection_words.deinit(); tables.collection_seen_words.deinit(); tables.rank_evidence_frames.deinit(); tables.rank_evidence_words.deinit(); release(tables.imported); release(tables.imported_rows); release(tables.imported_labels); release(tables.row_variables); release(tables.row_parameters); release(tables.evidence_rows); release(tables.evidence_labels); release(tables.frozen); release(tables.value_scopes); release(tables.call_instances); release(tables.candidate_instances); release(tables.unresolved_calls); release(tables.target_scopes); release(tables.witness_inputs); release(tables.scheme_instances); release(tables.scheme_keys); release(tables.collection_seen); release(tables.projection_scopes); release(tables.normalization_memo); region_table_states.free(index); }
@@ -4294,7 +4294,7 @@ reusable[] var pool_CoreMapu32Toi64: dictionary_slot<u32,i64>[>..]=[];
 fn get(self_: const CoreMapu32Toi64&,key: u32) -> i64? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapu32Toi64&,key: u32) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapu32Toi64&,key: u32,value: i64) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapu32Toi64); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapu32Toi64&,key: u32) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapu32Toi64&,key: u32) { var view=blot_support_pooled_map::Map<u32,i64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapu32Toi64); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapu32Toi64&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapu32Toi64&) { if self_.slots.len!=0 { pool_CoreMapu32Toi64.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,i64>[:]>(); self_.count=0; }
 struct CoreMapValueIdTobool { count: i64=0,slots: dictionary_slot<ValueId,bool>[:]=default<dictionary_slot<ValueId,bool>[:]>() }
@@ -4302,7 +4302,7 @@ reusable[] var pool_CoreMapValueIdTobool: dictionary_slot<ValueId,bool>[>..]=[];
 fn get(self_: const CoreMapValueIdTobool&,key: ValueId) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapValueIdTobool&,key: ValueId) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapValueIdTobool&,key: ValueId,value: bool) { var view=blot_support_pooled_map::Map<ValueId,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapValueIdTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapValueIdTobool&,key: ValueId) { var view=blot_support_pooled_map::Map<ValueId,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapValueIdTobool&,key: ValueId) { var view=blot_support_pooled_map::Map<ValueId,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapValueIdTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapValueIdTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapValueIdTobool&) { if self_.slots.len!=0 { pool_CoreMapValueIdTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<ValueId,bool>[:]>(); self_.count=0; }
 struct CoreMapRowVariableTobool { count: i64=0,slots: dictionary_slot<RowVariable,bool>[:]=default<dictionary_slot<RowVariable,bool>[:]>() }
@@ -4310,7 +4310,7 @@ reusable[] var pool_CoreMapRowVariableTobool: dictionary_slot<RowVariable,bool>[
 fn get(self_: const CoreMapRowVariableTobool&,key: RowVariable) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapRowVariableTobool&,key: RowVariable) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapRowVariableTobool&,key: RowVariable,value: bool) { var view=blot_support_pooled_map::Map<RowVariable,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapRowVariableTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapRowVariableTobool&,key: RowVariable) { var view=blot_support_pooled_map::Map<RowVariable,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapRowVariableTobool&,key: RowVariable) { var view=blot_support_pooled_map::Map<RowVariable,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapRowVariableTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapRowVariableTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapRowVariableTobool&) { if self_.slots.len!=0 { pool_CoreMapRowVariableTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RowVariable,bool>[:]>(); self_.count=0; }
 struct CoreMapu32Tobool { count: i64=0,slots: dictionary_slot<u32,bool>[:]=default<dictionary_slot<u32,bool>[:]>() }
@@ -4318,7 +4318,7 @@ reusable[] var pool_CoreMapu32Tobool: dictionary_slot<u32,bool>[>..]=[];
 fn get(self_: const CoreMapu32Tobool&,key: u32) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapu32Tobool&,key: u32) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapu32Tobool&,key: u32,value: bool) { var view=blot_support_pooled_map::Map<u32,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapu32Tobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapu32Tobool&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapu32Tobool&,key: u32) { var view=blot_support_pooled_map::Map<u32,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapu32Tobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapu32Tobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapu32Tobool&) { if self_.slots.len!=0 { pool_CoreMapu32Tobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,bool>[:]>(); self_.count=0; }
 struct CoreMapu64Tobool { count: i64=0,slots: dictionary_slot<u64,bool>[:]=default<dictionary_slot<u64,bool>[:]>() }
@@ -4326,7 +4326,7 @@ reusable[] var pool_CoreMapu64Tobool: dictionary_slot<u64,bool>[>..]=[];
 fn get(self_: const CoreMapu64Tobool&,key: u64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapu64Tobool&,key: u64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapu64Tobool&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapu64Tobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapu64Tobool&,key: u64) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapu64Tobool&,key: u64) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapu64Tobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapu64Tobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapu64Tobool&) { if self_.slots.len!=0 { pool_CoreMapu64Tobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
 struct CoreMapFirstOrderKeyTobool { count: i64=0,slots: dictionary_slot<FirstOrderKey,bool>[:]=default<dictionary_slot<FirstOrderKey,bool>[:]>() }
@@ -4334,7 +4334,7 @@ reusable[] var pool_CoreMapFirstOrderKeyTobool: dictionary_slot<FirstOrderKey,bo
 fn get(self_: const CoreMapFirstOrderKeyTobool&,key: FirstOrderKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapFirstOrderKeyTobool&,key: FirstOrderKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapFirstOrderKeyTobool&,key: FirstOrderKey,value: bool) { var view=blot_support_pooled_map::Map<FirstOrderKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapFirstOrderKeyTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapFirstOrderKeyTobool&,key: FirstOrderKey) { var view=blot_support_pooled_map::Map<FirstOrderKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapFirstOrderKeyTobool&,key: FirstOrderKey) { var view=blot_support_pooled_map::Map<FirstOrderKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapFirstOrderKeyTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapFirstOrderKeyTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapFirstOrderKeyTobool&) { if self_.slots.len!=0 { pool_CoreMapFirstOrderKeyTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<FirstOrderKey,bool>[:]>(); self_.count=0; }
 struct CoreMapu32Tou32 { count: i64=0,slots: dictionary_slot<u32,u32>[:]=default<dictionary_slot<u32,u32>[:]>() }
@@ -4342,7 +4342,7 @@ reusable[] var pool_CoreMapu32Tou32: dictionary_slot<u32,u32>[>..]=[];
 fn get(self_: const CoreMapu32Tou32&,key: u32) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapu32Tou32&,key: u32) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapu32Tou32&,key: u32,value: u32) { var view=blot_support_pooled_map::Map<u32,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapu32Tou32); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapu32Tou32&,key: u32) { var view=blot_support_pooled_map::Map<u32,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapu32Tou32&,key: u32) { var view=blot_support_pooled_map::Map<u32,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapu32Tou32); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapu32Tou32&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapu32Tou32&) { if self_.slots.len!=0 { pool_CoreMapu32Tou32.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u32,u32>[:]>(); self_.count=0; }
 struct CoreMapTargetTou32 { count: i64=0,slots: dictionary_slot<Target,u32>[:]=default<dictionary_slot<Target,u32>[:]>() }
@@ -4350,7 +4350,7 @@ reusable[] var pool_CoreMapTargetTou32: dictionary_slot<Target,u32>[>..]=[];
 fn get(self_: const CoreMapTargetTou32&,key: Target) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapTargetTou32&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapTargetTou32&,key: Target,value: u32) { var view=blot_support_pooled_map::Map<Target,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapTargetTou32); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapTargetTou32&,key: Target) { var view=blot_support_pooled_map::Map<Target,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapTargetTou32&,key: Target) { var view=blot_support_pooled_map::Map<Target,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapTargetTou32); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapTargetTou32&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapTargetTou32&) { if self_.slots.len!=0 { pool_CoreMapTargetTou32.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,u32>[:]>(); self_.count=0; }
 struct CoreMapPrincipalGraphKeyTobool { count: i64=0,slots: dictionary_slot<PrincipalGraphKey,bool>[:]=default<dictionary_slot<PrincipalGraphKey,bool>[:]>() }
@@ -4358,7 +4358,7 @@ reusable[] var pool_CoreMapPrincipalGraphKeyTobool: dictionary_slot<PrincipalGra
 fn get(self_: const CoreMapPrincipalGraphKeyTobool&,key: PrincipalGraphKey) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapPrincipalGraphKeyTobool&,key: PrincipalGraphKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapPrincipalGraphKeyTobool&,key: PrincipalGraphKey,value: bool) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapPrincipalGraphKeyTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapPrincipalGraphKeyTobool&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapPrincipalGraphKeyTobool&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapPrincipalGraphKeyTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapPrincipalGraphKeyTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapPrincipalGraphKeyTobool&) { if self_.slots.len!=0 { pool_CoreMapPrincipalGraphKeyTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<PrincipalGraphKey,bool>[:]>(); self_.count=0; }
 struct CoreMapi64Tobool { count: i64=0,slots: dictionary_slot<i64,bool>[:]=default<dictionary_slot<i64,bool>[:]>() }
@@ -4366,7 +4366,7 @@ reusable[] var pool_CoreMapi64Tobool: dictionary_slot<i64,bool>[>..]=[];
 fn get(self_: const CoreMapi64Tobool&,key: i64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapi64Tobool&,key: i64) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapi64Tobool&,key: i64,value: bool) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapi64Tobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapi64Tobool&,key: i64) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapi64Tobool&,key: i64) { var view=blot_support_pooled_map::Map<i64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapi64Tobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapi64Tobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapi64Tobool&) { if self_.slots.len!=0 { pool_CoreMapi64Tobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<i64,bool>[:]>(); self_.count=0; }
 struct CoreMapPrincipalGraphKeyTou64 { count: i64=0,slots: dictionary_slot<PrincipalGraphKey,u64>[:]=default<dictionary_slot<PrincipalGraphKey,u64>[:]>() }
@@ -4374,7 +4374,7 @@ reusable[] var pool_CoreMapPrincipalGraphKeyTou64: dictionary_slot<PrincipalGrap
 fn get(self_: const CoreMapPrincipalGraphKeyTou64&,key: PrincipalGraphKey) -> u64? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapPrincipalGraphKeyTou64&,key: PrincipalGraphKey) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapPrincipalGraphKeyTou64&,key: PrincipalGraphKey,value: u64) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,u64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapPrincipalGraphKeyTou64); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapPrincipalGraphKeyTou64&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,u64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapPrincipalGraphKeyTou64&,key: PrincipalGraphKey) { var view=blot_support_pooled_map::Map<PrincipalGraphKey,u64> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapPrincipalGraphKeyTou64); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapPrincipalGraphKeyTou64&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapPrincipalGraphKeyTou64&) { if self_.slots.len!=0 { pool_CoreMapPrincipalGraphKeyTou64.free_slice(self_.slots); } self_.slots=default<dictionary_slot<PrincipalGraphKey,u64>[:]>(); self_.count=0; }
 struct CoreMapTargetTobool { count: i64=0,slots: dictionary_slot<Target,bool>[:]=default<dictionary_slot<Target,bool>[:]>() }
@@ -4382,7 +4382,7 @@ reusable[] var pool_CoreMapTargetTobool: dictionary_slot<Target,bool>[>..]=[];
 fn get(self_: const CoreMapTargetTobool&,key: Target) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapTargetTobool&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapTargetTobool&,key: Target,value: bool) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapTargetTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapTargetTobool&,key: Target) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapTargetTobool&,key: Target) { var view=blot_support_pooled_map::Map<Target,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapTargetTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapTargetTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapTargetTobool&) { if self_.slots.len!=0 { pool_CoreMapTargetTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,bool>[:]>(); self_.count=0; }
 struct CoreMapTargetToHeaderAnalysis { count: i64=0,slots: dictionary_slot<Target,HeaderAnalysis>[:]=default<dictionary_slot<Target,HeaderAnalysis>[:]>() }
@@ -4390,7 +4390,7 @@ reusable[] var pool_CoreMapTargetToHeaderAnalysis: dictionary_slot<Target,Header
 fn get(self_: const CoreMapTargetToHeaderAnalysis&,key: Target) -> HeaderAnalysis? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapTargetToHeaderAnalysis&,key: Target) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapTargetToHeaderAnalysis&,key: Target,value: HeaderAnalysis) { var view=blot_support_pooled_map::Map<Target,HeaderAnalysis> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapTargetToHeaderAnalysis); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapTargetToHeaderAnalysis&,key: Target) { var view=blot_support_pooled_map::Map<Target,HeaderAnalysis> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapTargetToHeaderAnalysis&,key: Target) { var view=blot_support_pooled_map::Map<Target,HeaderAnalysis> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapTargetToHeaderAnalysis); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapTargetToHeaderAnalysis&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapTargetToHeaderAnalysis&) { if self_.slots.len!=0 { pool_CoreMapTargetToHeaderAnalysis.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Target,HeaderAnalysis>[:]>(); self_.count=0; }
 struct CoreMapStartupWalkTobool { count: i64=0,slots: dictionary_slot<StartupWalk,bool>[:]=default<dictionary_slot<StartupWalk,bool>[:]>() }
@@ -4398,7 +4398,7 @@ reusable[] var pool_CoreMapStartupWalkTobool: dictionary_slot<StartupWalk,bool>[
 fn get(self_: const CoreMapStartupWalkTobool&,key: StartupWalk) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const CoreMapStartupWalkTobool&,key: StartupWalk) -> bool { return self_.get(key)!=null; }
 fn insert(self_: CoreMapStartupWalkTobool&,key: StartupWalk,value: bool) { var view=blot_support_pooled_map::Map<StartupWalk,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_CoreMapStartupWalkTobool); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: CoreMapStartupWalkTobool&,key: StartupWalk) { var view=blot_support_pooled_map::Map<StartupWalk,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; }
+fn remove(self_: CoreMapStartupWalkTobool&,key: StartupWalk) { var view=blot_support_pooled_map::Map<StartupWalk,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::remove(view,key,pool_CoreMapStartupWalkTobool); self_.count=view.count; self_.slots=view.slots; }
 fn clear(self_: CoreMapStartupWalkTobool&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: CoreMapStartupWalkTobool&) { if self_.slots.len!=0 { pool_CoreMapStartupWalkTobool.free_slice(self_.slots); } self_.slots=default<dictionary_slot<StartupWalk,bool>[:]>(); self_.count=0; }
 

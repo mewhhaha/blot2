@@ -70,7 +70,7 @@ fn deinit(self_:Banks&) {blot_support_pooled_buffer::deinit(self_,pool_Banks);se
 struct Pending {table:blot_support_pooled_map::Map<i64,bool> =blot_support_pooled_map::Map<i64,bool>{..}}
 reusable[] var pending_slots:dictionary_slot<i64,bool>[>..]=[];
 fn insert(self_:Pending&,key:i64) {blot_support_pooled_map::insert(self_.table,key,true,pending_slots);}
-fn remove(self_:Pending&,key:i64) {blot_support_pooled_map::remove(self_.table,key);}
+fn remove(self_:Pending&,key:i64) {blot_support_pooled_map::remove(self_.table,key,pending_slots);}
 fn deinit(self_:Pending&) {blot_support_pooled_map::deinit(self_.table,pending_slots);}
 struct Root {function:u32,scanned:i64=0,totals:Totals=Totals{..},helpers:Words=Words{..},pending:Pending=Pending{..}}
 fn deinit(self_:Root&) {self_.totals.deinit();self_.helpers.deinit();self_.pending.deinit();}

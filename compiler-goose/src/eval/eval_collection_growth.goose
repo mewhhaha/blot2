@@ -55,4 +55,4 @@ fn extend(self_: Store&,children: blot_eval_eval_values::Words&,before: Span,val
  var slot=after.start+before.len; if front { slot=after.start; } children.items[slot]=value; self_.buffers.insert(after,buffer); mutation(self_); return after,blot_error::Error.none;
 }
 
-fn remove(self_: BufferMap&,key: Span) -> bool { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; let result=blot_support_pooled_map::remove(view,key); self_.count=view.count; self_.slots=view.slots; return result; }
+fn remove(self_: BufferMap&,key: Span) -> bool { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; let result=blot_support_pooled_map::remove(view,key,pool_BufferMap); self_.count=view.count; self_.slots=view.slots; return result; }

@@ -12,7 +12,7 @@ struct Cache {count:i64=0,slots:dictionary_slot<SerializedKey,u32>[:]=default<di
 reusable[] var cache_slots: dictionary_slot<SerializedKey,u32>[>..] = [];
 fn get(self_: const Cache&,key: SerializedKey) -> u32? { blot_support_pooled_map::get(self_,key) }
 fn insert(self_: Cache&,key: SerializedKey,value: u32) -> Error { blot_support_pooled_map::insert(self_,key,value,cache_slots); return blot_error::Error.none; }
-fn remove(self_: Cache&,key: SerializedKey) -> bool { blot_support_pooled_map::remove(self_,key) }
+fn remove(self_: Cache&,key: SerializedKey) -> bool { blot_support_pooled_map::remove(self_,key,cache_slots) }
 fn clear(self_: Cache&) { blot_support_pooled_map::clear(self_); }
 fn deinit(self_: Cache&) { blot_support_pooled_map::deinit(self_,cache_slots); }
 struct Closures { storage: u32[:] = default<u32[:]>(),items: u32[:] = default<u32[:]>() }
