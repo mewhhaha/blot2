@@ -286,9 +286,12 @@ fn evaluationFailure(generator: Generator&) -> blot_error::Error {
 fn constant(generator: Generator&, target: blot_check_core::BindingRef, ty: blot_backend_layout::Id) -> Value, blot_error::Error {
     let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.constants);
     var scope = blot_support::none<blot_reuse_code_artifacts::Scope>();
-    if generator.artifacts {
-        let opened, error = generator.artifacts.enter(blot_reuse_code_artifacts::Request.constant { key: blot_reuse_code_artifacts::ConstantKey { target: target, ty: ty , ..} , ..});
-        if error != blot_error::Error.none { timing.deinit(); return Value {..}, error; } scope = blot_support::some(opened);
+    {
+        let artifacts .=generator.artifacts;
+        if artifacts {
+            let opened, error = artifacts.enter(blot_reuse_code_artifacts::Request.constant { key: blot_reuse_code_artifacts::ConstantKey { target: target, ty: ty , ..} , ..});
+            if error != blot_error::Error.none { timing.deinit(); return Value {..}, error; } scope = blot_support::some(opened);
+        }
     }
     let value, error = constantScoped(generator, target, ty, scope);
     if scope.present { scope.value.deinit(); } timing.deinit(); return value, error;

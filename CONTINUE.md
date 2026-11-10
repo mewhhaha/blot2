@@ -6,27 +6,27 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** Whole289 clears fixed
-conversion stacks; whole290 clears the effect Handle reader and stops at partial
-expectation interning (`code_expectation.goose:79`).163.377s, unchanged 461 inputs,
-no artifact. A grouped backend check reproduces that frontier in 77.878s, so use
-that bounded partial check for repairs before another whole build.
-[Whole/backend receipts](benchmarks/evidence/qualification/2026-11-10-goose-backend-batch290.json.gz).
+**No complete C/header/native Goose compiler exists.** The latest complete build,
+whole 290, stopped at partial expectation interning in 163.377s with unchanged
+461 inputs and no artifact. Use grouped backend diagnostics for repairs: they
+reproduce and advance the relevant frontier in about 75–78s. These are partial,
+check-only probes and never qualify the full compiler.
 
-The shared-map/shape batch removes the partial GS dictionary and an import
-cycle using the existing effect slot pool in lightweight support. Five native
-laws pass 19.705s summed stages with matching input hashes. Combined backend 291
-clears interning in 75.582s and finds a copied unit-index header escaping its block.
-[Shape laws](benchmarks/evidence/qualification/2026-11-10-goose-shared-map-shape-laws.json.gz).
+Backend 295 clears shared-map interning, emission index borrows, infinite lookup,
+closed-local module/body references, nullable fields and recursive array borrowing.
+It stops after 77.441s, unchanged source, at `backend_representations.goose:38`:
+generic bridge binding stores a projected state reference into the global bridge.
+Migrate production callers to the existing checked `bridgeForGenerator` accessor;
+retain generic representations for lexical contexts.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-borrow-walk295.json.gz).
 
-The emission index and infinite lookup fixes clear their backend frontiers.
-Seven closed-local bindings now preserve borrowed module/body identity. Its native
-law passes in 2.666s, covering lookup order, fallback/missing IDs, data shapes and
-actual function dependencies. The wider loop-copy audit finds no other definite
-matches. Backend 294 clears the family in 78.281s with unchanged source, then
-stops at `owned_arrays.goose:103`: a nullable field needs a locally narrowed
-reference. Audit that pattern before the next repair batch.
-[Closed-local law](benchmarks/evidence/qualification/2026-11-10-goose-closed-local-laws.json.gz).
+Array walkers now receive the original borrow engine as an invocation parameter
+instead of storing it in each recursive walker. No new pool/registry/cache copy.
+The actual captured-borrow law passes in 2.848s, including absent/present sinks,
+repeated reads and public captured-read updates. Three artifact hooks also narrow
+nullable references locally. Earlier shape/index/closed-local families have
+focused native receipts in the index; none qualifies whole runtime.
+[Borrow law](benchmarks/evidence/qualification/2026-11-10-goose-borrow-walk-laws.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion
@@ -37,7 +37,7 @@ Conversion stacks retain their 128-owner/128-binder limits in fixed backing,
 including overflow rejection and nested-error unwind. No payload clones/new pins.
 
 The last complete component inventory passed 36/36 on its pinned source in
-307.14s summed stages. The current 45-law inventory has not run in full; focused
+307.14s summed stages. The current 46-law inventory has not run in full; focused
 family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
 68 map adapters and all rejected prototypes remain in pinned history and
 [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

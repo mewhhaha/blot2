@@ -4230,5 +4230,42 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "borrow_walk_invocation_context": {
+    "receipt": "2026-11-10-goose-borrow-walk-laws.json.gz",
+    "native_passed": true,
+    "sum_stage_seconds": 2.848,
+    "representation": "Walk has no Borrows& field; invocation parameters pass original Borrows& down through recursive calls",
+    "same_cache_owner": true,
+    "new_pools_or_registries": false,
+    "extra_optional_sites_fixed": [
+      "backend_static_data225",
+      "backend_static_data243",
+      "core_backend289"
+    ],
+    "whole_compiler_executable": false,
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-borrow-walk295.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 77.441,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_representations.goose",
+          "line": 38,
+          "message": "error: call bind stores a reference rooted at state through its parameter store, whose argument may point into backing_generator_representations_connection, which state does not outlive (\u00a79.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "2024f90e871f11b69242c6bd66a96fc1c7cfeafe0cb34f6512d967cb2a31db1d",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }

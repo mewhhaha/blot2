@@ -4,18 +4,18 @@ Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
 No forwarding to compiler/ and no ABI fallback.
 
-Whole289 clears fixed conversion stacks. Whole290 clears the effect Handle
-reader, then stops at partial expectation interning (`code_expectation:79`).
-163.377s, unchanged 461 inputs, no artifacts. A grouped backend check reproduces
-that frontier in 77.878s; use that bounded partial probe before another whole.
+Whole 290 is the latest complete build attempt: 163.377s, unchanged 461 inputs,
+no artifact. Grouped backend repairs take about 75–78s and remain partial,
+check-only. Backend 295 clears the array walker/nullable-field family, then stops
+at backend_representations38 projected-state bridge binding (77.441s, unchanged).
+Production callers should use existing compile_workspace.bridgeForGenerator;
+generic representations API remains for lexical contexts.
 
-The emission index and infinite lookup fixes clear their backend frontiers.
-Seven closed-local bindings now preserve borrowed module/body identity. Its native
-law passes in 2.666s, covering lookup order, fallback/missing IDs, data shapes and
-actual function dependencies. The wider loop-copy audit finds no other definite
-matches. Backend 294 clears the family in 78.281s with unchanged source, then
-stops at `owned_arrays.goose:103`: a nullable field needs a locally narrowed
-reference. Audit that pattern before the next repair batch.
+Actual captured-borrow law passes in 2.848s: recursive invocation parameters carry
+the original borrow engine without storing it in local walkers; shared caches and
+captured-read updates pass. No new pools/registries. Three nullable artifact hooks
+also fixed. Shape/index/closed-local native receipts are in the root index.
+Whole build and actual CLI/server/OOM/retry/retention remain pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
@@ -28,7 +28,7 @@ Three hard-bounded stacks use fixed 128/128/16384 backing and scalar counts. Fiv
 native laws pass 26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; current full 45-law inventory still pending.
+receipts/rawlogs automatically; current full 46-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic

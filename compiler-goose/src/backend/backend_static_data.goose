@@ -222,7 +222,7 @@ recursive fn serialize(self_: State&,g: Generator&,id: ValueId,ty: u32,depth: i6
     if depth >= 256 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.complexity); }
     let shape = g.representations.store.node(ty);
     if shape.tag == blot_backend_layout::Tag.owning {
-        if g.artifacts { g.artifacts.materializeStaticValue(); }
+        { let artifacts .=g.artifacts; if artifacts { artifacts.materializeStaticValue(); } }
         let payload,error = serialize(self_,g,id,shape.a,depth + 1); if error != blot_error::Error.none { return 0,error; }
         let address,allocated = g.module.dataWords([payload,0]); if allocated != blot_error::Error.none { return 0,allocated; }
         if g.layoutRole(shape.a) == blot_backend_runtime_ir::ROLE_reference { let marked = dataValueReference(self_,g,address,id,payload); if marked != blot_error::Error.none { return 0,marked; } } return address,blot_error::Error.none;
@@ -240,7 +240,7 @@ recursive fn serialize(self_: State&,g: Generator&,id: ValueId,ty: u32,depth: i6
     let event = g.planning.startup_facts.event(blot_backend_startup_emission_facts::Event {kind: blot_backend_startup_emission_facts::EventKind.retained_value,caller: g.planning.startup_facts.active,target: id,auxiliary: blot_eval_eval_values::valueKindCode(info.kind),..}); if event != blot_error::Error.none { return 0,event; }
     if info.kind == blot_eval_eval_values::ValueKind.type_constructor || info.kind == blot_eval_eval_values::ValueKind.resolver { return 0,blot_error::Error.none; }
     let key = SerializedKey {value: id,ty: ty}; { let known .= self_.cache.get(key); if known { let demanded = g.module.demandResource(blot_reuse_artifact_emitter::ResourceKind.static_data,known,true); return known,demanded; } }
-    if g.artifacts { g.artifacts.materializeStaticValue(); }
+    { let artifacts .=g.artifacts; if artifacts { artifacts.materializeStaticValue(); } }
     if info.kind == blot_eval_eval_values::ValueKind.package { let address,error = serializePackage(self_,g,id,ty,depth); if error != blot_error::Error.none { return 0,error; } let cached = self_.cache.insert(key,address); return address,cached; }
     if info.kind == blot_eval_eval_values::ValueKind.computation || info.kind == blot_eval_eval_values::ValueKind.request_decision { return serializeDecision(self_,g,id,ty,depth,info,key); }
     if info.kind == blot_eval_eval_values::ValueKind.provider || info.kind == blot_eval_eval_values::ValueKind.state_provider { return serializeProvider(self_,g,id,ty,depth,info,key); }
