@@ -16,7 +16,7 @@ fn arrows(store: const blot_backend_layout::Store&,ty: u32,count: i64,out: Arrow
     var current = ty; for index in 0..count { let node = store.nodes[current]; if node.tag != blot_backend_layout::Tag.function { return 0,blot_error::Error.not_function; } out.push(Arrow { node.a,node.b,node.c , ..}); current = node.b; } return current,blot_error::Error.none;
 }
 fn arrows(store: const blot_backend_layout::Store&,ty: u32,count: i64,out: Arrow[:]& ) -> u32,blot_error::Error {
-    let before = out.len; var extended = owned_arrows.realloc_slice(out,before + count); var current = ty; var appended: i64 = 0;
+    let previous: Arrow[:] = out; let before = previous.len; var extended = owned_arrows.realloc_slice(previous,before + count); var current = ty; var appended: i64 = 0;
     for index in 0..count {
         let node = store.nodes[current]; if node.tag != blot_backend_layout::Tag.function { out = owned_arrows.realloc_slice(extended,before + appended); return 0,blot_error::Error.not_function; }
         extended[before + appended] = Arrow { node.a,node.b,node.c , ..}; appended++; current = node.b;

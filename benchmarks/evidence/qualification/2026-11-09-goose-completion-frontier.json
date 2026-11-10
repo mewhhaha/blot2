@@ -5152,5 +5152,39 @@
     "required_fields_remain_required": true,
     "additional_matching_lost_defaults_found": 0,
     "whole_compiler_executable": false
+  },
+  "capture_spawn_and_resolved_flow_ranges": {
+    "receipt": "2026-11-11-goose-backend-flow316.json.gz",
+    "partial_backend": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 101.165,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/specialization.goose",
+          "line": 138,
+          "message": "error: cannot call refineMappingsSink, which shrinks backing_origins_code_module_types while body (bound at /home/jacobt/src/blot2/compiler-goose/src/eval/specialization.goose:89) is still used: it may refer into backing_origins_code_module_types (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "e5a56bca0de42a575a3447d480199163c8c154621f0ba068fb3edbae2b11b3a5",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "intermediate_probes": {
+      "311": "captures cleared; spawnApplication overload + owned_fields payload hold",
+      "312": "spawn and field rebasing cleared; resolved_call arrows realloc type",
+      "313": "arrows cleared; CodeProjection Option type",
+      "314": "projection cleared; uninitialized arguments scratch",
+      "315": "scratch cleared; Match plan stores Core slices"
+    },
+    "zero_initialized_scalar_scratch_arrays": 29,
+    "whole_compiler_executable": false
   }
 }

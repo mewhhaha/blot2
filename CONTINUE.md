@@ -6,65 +6,44 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** The latest complete build,
-whole 290, stopped at partial expectation interning in 163.377s with unchanged
-461 inputs and no artifact. Use grouped backend diagnostics for repairs: they
-reproduce and advance the relevant frontier in about 75–78s. These are partial,
-check-only probes and never qualify the full compiler.
+The latest complete build, whole 290, stopped at partial expectation interning in
+163.377s with 461 unchanged inputs and no artifact. Repairs advance through the
+grouped backend probe, which takes about 85–100s:
 
-Backend 300 clears evaluator parameter/capture reacquisition and pure field
-lookup in 77.800s, unchanged source. Invocation paths retain scalar counts and
-Body metadata, with per-index Parameter/Capture value reads. Speculative member
-lookup no longer saves/restores a borrowed Diagnostic: pure lookup returns the
-original reason, and the real-error wrapper still creates the original diagnostic.
-The 4.903s native field law covers actual record/nominal values, lookup locations,
-selected failure reasons and diagnostic preservation. The audit marks three of
-six failure branches executed; the others are source-reviewed only.
-[Field law](benchmarks/evidence/qualification/2026-11-10-goose-evaluator-field-laws.json.gz).
+```sh
+flock /var/tmp/blot2-heavy.lock systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=2G \
+  python3 compiler-goose/tools/check_engines.py --goose build/goose-port/finite-root-diagnostics/goose \
+  --engines compile record_artifact emit --jobs 1 --timeout 120 --output build/goose-port/<name>
+python3 compiler-goose/tools/seal_probe.py build/goose-port/<name> <date>-goose-<name> --audit "..."
+```
 
-Full invocation emission hit its original 30s cap before C/native execution.
-Like the actual preparation probe, it remains explicit opt-in and unqualified,
-outside the 49 default component laws. Full current inventory has not run. The
-seven-module scalar Owner batch passes its three focused laws and prior backend
-frontier; buffer ownership transfer removes two copy pools without a new registry.
+The checker reports one error per run. These are partial, check-only probes and
+never qualify the full compiler.
 
-The corrected Core metadata family clears its frontier in backend 303: 81.102s,
-unchanged source. 38 catalog aliases/22 span loops now use scalar metadata/per-index
-reads. 42 removed bindings across six names have no stale bare references; the
-failed 302 variants snapshot is preserved, not counted as a pass. Entry bounds,
-original counts, order and next-element visibility are retained.
+Backend 316 (101.165s, unchanged source) clears all of `backend_emission`'s
+borrowed-Core-slice family:
 
-Independent storage audit: backing_origins_code_module_types is detached diagnostic
-Wasm ValueType scratch, not Core input types. source_origins retains no Core units;
-Session.units uses registered Core headers with retained dependency owners. These
-reborrows cannot revive a discarded Core input; its storage stays pinned.
+- Closure captures, static-closure bindings and task-move captures are read per
+  index instead of being held across key interning and emission.
+- Resolved-flow `Join`, `Match`, `Loop`, `RequestLoop` and exits hold Core `List`
+  ranges. Consumers read merges, arms, inputs, carries and break values per index
+  from their unit.
+- Spawn applications build `ModuleRef` views at the call. The oracle's
+  `spawn_units` becomes a `spawn_tasks` flag.
+- Published update-field plans rebase their slices onto their owning pools.
+- 29 scalar fixed scratch arrays are zero-initialized.
 
-Backend 309 clears six explicitly qualified dictionary operations and the cursor
-scratch initialization batch in 82.694s, unchanged source. Dictionary shadowing
-was confined to numeric_rows/function_facts. Cursor arrays retain their 256/1024
-capacities, logical counts and overflow behavior; nine adjacent helpers had no
-matching uninitialized locals. Earlier nullable contexts/Proof callers are pushed.
+[Receipt](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz).
 
-Backend 310 matches the oracle's absent defaults for Template.environment and
-TemplatePreparation.static_key (23 constructors audited; required fields stay
-required) in 82.384s, unchanged source. Current frontier: emission3955
-template_keys.intern may shrink generators while closureCaptures(id) at 3947 is
-still used. Whole compiler and actual CLI/server/OOM/retry/retention still await
-the real executable; full current 49-law inventory has not run.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-template-defaults310.json.gz).
-
-Previous checked families clear Run preparation, startup planning, declaration
-scanning, bridge cleanup/publication, physical interning and fixed conversion
-stacks. Physical layouts retain scalar publication/effect keys; invocation-local
-views come from existing registries and pools, with exact identity/generation
-checks. Append-only growth preserves child views; reset with a live child rejects.
-Conversion stacks retain their 128-owner/128-binder limits in fixed backing,
-including overflow rejection and nested-error unwind. No payload clones/new pins.
+**Next:** `eval/specialization.goose:138` calls `refineMappingsSink`, which shrinks
+`backing_origins_code_module_types` while `body` (bound at :89) is still live.
+Fix the whole family the same way: scalar ids or ranges plus per-index reads, never
+cleared owners or relaxed checks.
 
 The last complete component inventory passed 36/36 on its pinned source in
-307.14s summed stages. The current 49-law inventory has not run in full; focused
-family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
-68 map adapters and all rejected prototypes remain in pinned history and
+307.14s summed stages. The current 49-law inventory has not run in full. Focused
+receipts qualify only their exact inputs. Rejected prototypes and superseded
+families stay in pinned history and
 [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
 ## Contracts and remaining coverage
@@ -77,43 +56,40 @@ family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
 - Active child Generator remains at one address through emission, is cleaned
   once and restores its parent once. Workspace/query/Recorder publications name
   existing owners. Diagnostic/tape OOM laws preserve prior messages and errors.
+- Physical layouts keep scalar publication/effect keys with exact
+  identity/generation checks. Conversion stacks keep their 128-owner/128-binder
+  limits with overflow rejection and nested-error unwind.
+- `backing_origins_code_module_types` is detached diagnostic Wasm ValueType
+  scratch, not Core input types; reborrows cannot revive a discarded Core input.
 - Native leaf laws never qualify full generator/probe/tape/CLI/server runtime.
   Known pending API coverage: artifact_import factory across Frame and
-  host_cleanup_shapes.copyFields.
+  host_cleanup_shapes.copyFields. Full invocation emission and actual
+  preparation probes stay explicit opt-in, capped and unqualified.
 - Requirements and rejected experiments remain in
   [the storage task](tasks/STORAGE_REWRITE.md),
-  [the language migration](docs/language/NEXT_MIGRATION.md) and
-  [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+  [the language migration](docs/language/NEXT_MIGRATION.md) and the receipt index.
 
 ## Tools and next checks
 
-Current private experimental checker:
-build/goose-port/finite-root-diagnostics/goose; binary/source hashes and exact
-recipes in [the controls](benchmarks/evidence/qualification/2026-11-10-goose-options-roots-and-traversal.json.gz).
-Its parent finite-input-root precision has 33 lifetime/3 runtime/24 semantic controls;
-the combined metadata/traversal build repeats 33 lifetime/24 semantic controls.
-Unknown/inexact/local/recursive/over-64-root paths keep the conservative behavior.
-Metadata-only options tracing is enabled with GOOSE_OPTIONS_ROOT_TRACE=1.
-Traversal-local nominal buckets roughly halve TypeEq counts, but 150s versus 154s
-is a single pair and establishes no robust speed gain. Installed Goose unchanged.
+Private experimental checker: build/goose-port/finite-root-diagnostics/goose
+(sha256 689721da…). Binary/source hashes and recipes are in
+[the controls](benchmarks/evidence/qualification/2026-11-10-goose-options-roots-and-traversal.json.gz):
+33 lifetime/3 runtime/24 semantic controls. Unknown/inexact/local/recursive/
+over-64-root paths keep the conservative behavior. `GOOSE_OPTIONS_ROOT_TRACE=1`
+enables metadata-only options tracing. Installed Goose is unchanged.
 
-Selected roots are partial, check-only; scoped uses invalid empty Core. They do
-not qualify runtime. Regenerate adapters for layouts, await completion, then
-freeze source. Repair cap 120s, final emission 180s, whole 300s; stop 3s after a
-reported error. Never lift caps, relax checks or clear live owners to hide errors.
+Caps: repair 120s, final emission 180s, whole 300s; stop 3s after a reported
+error. Never lift caps, relax checks or clear live owners to hide errors.
 
 Once the real executable exists, run compiler-goose/tools/qualify_compiler.ts
-against it and compiler/zig-out-native-fast/bin/blotc. Eight matching Zig baseline
-fixtures pass; Goose CLI/server/OOM/retry/retention have not run. The runner now
-covers cold and retained-revision request OOM/retry plus 2 warmup/6 measured
-edit/restore revisions under a 16MiB process-tree RSS growth budget. Its format,
-type and lint checks pass. This does not measure allocator live bytes; those
-remain unavailable. No ABI fallback.
+against it and compiler/zig-out-native-fast/bin/blotc. It covers CLI/executed
+ABI 8, project lifecycle, cold and retained-revision request OOM/retry, and
+2 warmup/6 measured edit/restore revisions under a 16MiB process-tree RSS growth
+budget. Allocator live bytes remain unavailable. No ABI fallback.
 
-Zig source is unchanged. Its prior full gate remains incomplete: all 2974 laws
-compile without LLVM; release compilation hit its cap. Smoke, harness and zero
-finding lint pass. Do not rebuild that release for each Goose edit. No fresh
-current-port Gdev Main/frame exists. Historical Main 9,203,613 B/5.523s belongs to
-its older release; no reliable compile speed gain. Subsecond compilation,
-sub-five-second Main and 1–2MB remain unmet. Environment publication and upstream
-messages require explicit requests. Use Astra for concrete snags only; never Terra.
+Zig source for the Goose oracle is unchanged. Its prior full gate remains
+incomplete: all 2974 laws compile without LLVM; release compilation hit its cap.
+No fresh current-port Gdev Main/frame exists. Historical Main 9,203,613 B/5.523s
+belongs to its older release. Subsecond compilation, sub-five-second Main and
+1–2MB remain unmet. Environment publication and upstream messages require
+explicit requests. Use Astra for concrete snags only; never Terra.

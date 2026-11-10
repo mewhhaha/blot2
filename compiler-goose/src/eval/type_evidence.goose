@@ -266,7 +266,7 @@ fn internWithEffects(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const 
 fn internStateProvider(self_: Store,read: Id,write: Id,state: Id) -> Id,Error { return internFields(self_,Tag.state_provider,read,write,state,[]); }
 fn internFields(self_: Store,tag: Tag,a: u32,b: u32,row: u32,values: const Id[:]) -> Id,Error {
  if (tag==Tag.forall||tag==Tag.existential)&&values.len==0 {
-  if b==0||b>128 { return 0,blot_error::Error.type_mismatch; } var binders: Id[128];
+  if b==0||b>128 { return 0,blot_error::Error.type_mismatch; } var binders: Id[128] = [0;128];
   for ordinal in 0..b { let binder,err=internNormalizedFields(self_,Tag.bound,ordinal as u32,0,0,[]); if err!=blot_error::Error.none { return 0,err; } binders[ordinal]=binder; } return internNormalizedFields(self_,tag,a,b,row,binders[..b]);
  }
  return internNormalizedFields(self_,tag,a,b,row,values);
@@ -405,7 +405,7 @@ recursive fn projectNodeDepth<S,R>(work: ProjectionWork&,self_:Store,source:S,ma
    var body_budget=budget; if body_budget>4096 { body_budget=4096; } let available=body_budget;
 
   let body=projectDepth(work,self_,source,owned.items,rows,resolver_context,resolver_remaining,resolver_enabled,n.a,depth+1,body_budget,false,null,height); var result_tag=Tag.existential; if tag==blot_check_types::Tag.forall { result_tag=Tag.forall; }
-  var binders: Id[128]; for mapping,index in owned.items[..n.c] { binders[index]=mapping.evidence; } var goals=GoalBuffer {};
+  var binders: Id[128] = [0;128]; for mapping,index in owned.items[..n.c] { binders[index]=mapping.evidence; } var goals=GoalBuffer {};
   let source_count_1=source.quantifierGoals(ty).len; for source_index_1 in 0..source_count_1 { let goal=source.quantifierGoals(ty)[source_index_1];
    if body_budget==0 { let __cleanup_result_87_0: Id = reject(work,blot_error::Error.evidence_limit); {  self_.projection_owners.resize(self_.projection_owners.len-1); self_.projection_quantifiers.resize(self_.projection_quantifiers.len-1); budget-=available-body_budget; } let __cleanup_result_8_0: Id = __cleanup_result_87_0; goals.deinit(); owned.deinit(); return __cleanup_result_8_0; } body_budget--; var value=Goal {ty:0,kind:goal.kind,name:goal.name,operator:goal.operator,identity:goal.identity,explicit:goal.explicit};
    if goal.ty!=0 { value.ty=projectDepth(work,self_,source,owned.items,rows,resolver_context,resolver_remaining,resolver_enabled,goal.ty,depth+1,body_budget,false,null,height); } if goal.other!=0 { value.other=projectDepth(work,self_,source,owned.items,rows,resolver_context,resolver_remaining,resolver_enabled,goal.other,depth+1,body_budget,false,null,height); } if goal.result!=0 { value.result=projectDepth(work,self_,source,owned.items,rows,resolver_context,resolver_remaining,resolver_enabled,goal.result,depth+1,body_budget,false,null,height); } if goal.signature!=0 { value.signature=projectDepth(work,self_,source,owned.items,rows,resolver_context,resolver_remaining,resolver_enabled,goal.signature,depth+1,body_budget,false,null,height); } goals.push(value);
