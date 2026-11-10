@@ -523,7 +523,7 @@ fn unusedAggregate(generator: Generator&, unit_id: u32, binding: blot_check_core
 }
 fn specializer(source: Generator&) -> blot_eval_specialization::Service, blot_error::Error {
     let generator:Generator& =blot_compile_workspace::canonicalGenerator(source);
-    let bridge, error .= generator.representations.representationBridge(generator.evaluator.evidenceStore());
+    let bridge, error .= blot_compile_workspace::bridgeForGenerator(generator);
     return blot_eval_specialization::Service { timing: generator.work_timing, units: generator.units, evaluator: generator.evaluator, layouts: generator.representations.store, bridge: bridge, refinement_stats: generator.refinement_stats, refinement_regions: generator.work.refinement_regions, cache: generator , ..}, error;
 }
 fn lookupRefinement(generator: Generator&, root: blot_reuse_refinement_receipt::Root, shape: blot_reuse_code_expectation::View, expected: u32, seeds: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> blot_support::Option<blot_eval_core_eval::SolvedEvidence>, blot_error::Error {
@@ -1953,7 +1953,7 @@ fn resetGenerator(source_workspace: CompileWorkspace&,journal: blot_reuse_artifa
     assert(blot_backend_result_publication::canMutate(workspace.publication_owner));
     let generator .= workspace.generator; generator.diagnostic_contexts.deinit(); generator.numeric_rows.deinit(); generator.planning.deinit(); generator.module.reset(); generator.static_data.deinit();
     let evaluator_error = generator.evaluator.reset(workspace.session_tables,units); if evaluator_error != blot_error::Error.none { return evaluator_error; }
-    let representation_error = generator.representations.init(units); if representation_error != blot_error::Error.none { return representation_error; }
+    let representation_error = generator.representations.init(units,workspace.publication_owner); if representation_error != blot_error::Error.none { return representation_error; }
     generator.allocation_owner = workspace.allocation_owner; generator.inline_named = true; generator.speculative_locals = true; generator.speculated = false; generator.ragged_probe_limit = blot_backend_ragged_builder::probe_limit; generator.work_timing = blot_backend_backend_timing::Work {..}; generator.units = units; generator.spawn_units=default<const blot_check_core::Module[:]>();
     generator.artifacts .= null; generator.retained .= null; generator.principal_state .= null; generator.persisted_principals .= null; generator.query_state .= null; generator.constant_state .= null; generator.refinement_owner .= null;
     generator.principal_stats = blot_reuse_principal_evidence_reuse::Stats {..}; generator.refinement_stats = blot_reuse_refinement_receipt::Stats {..}; generator.work = blot_reuse_artifact_fragment::Stats {..}; generator.persistent_outputs = false; generator.memory_profile = false;

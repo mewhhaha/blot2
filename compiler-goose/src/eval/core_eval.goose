@@ -362,7 +362,7 @@ fn constructorTag(self_: const Session&,id: ValueId) -> blot_support::Option<u32
 fn closureInfo(self_: const Session&,id: ValueId) -> ClosureValue { let info=valueInfo(self_,id); assert(info.kind==blot_eval_eval_values::ValueKind.closure); return self_.storage.closures.items[info.bits]; }
 fn valueEvidence(self_: const Session&,id: ValueId) -> u32 { return self_.storage.value_evidence.items[id]; }
 fn associatedBudget(self_:Session&)->i64& {return canonicalSession(self_).associated_remaining;}
-fn evidenceStore(self_: Session&) -> blot_eval_type_evidence::Store& { return self_.storage.evidence; }
+fn evidenceStore(self_: Session&) -> blot_eval_type_evidence::Store& { return blot_eval_eval_values::canonicalEvidenceStore(self_.storage); }
 fn evidenceView(self_: const Session&) -> blot_eval_type_evidence::View { return self_.storage.evidence.view(); }
 fn recordFieldNames(self_: const Session&,id: ValueId) -> const u32[:] { let span=self_.storage.record_layouts.items[self_.storage.value_records.items[id]]; return self_.storage.field_names.items[span.start..span.start+span.len]; }
 fn snapshot(self_: const Session&) -> View { return self_.storage.view(self_.implementation_proofs.view()); }

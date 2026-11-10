@@ -2734,6 +2734,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_authority::
 fn blot_check_effect_authority::blotStructuralHash<StructuralSink>(value:blot_check_effect_authority::Store,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::Buckets)->bool {return equalFields(left,right);}
 fn blot_check_effect_evidence::blotStructuralHash<StructuralSink>(value:blot_check_effect_evidence::Buckets,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::Handle)->bool {return equalFields(left,right);}
+fn blot_check_effect_evidence::blotStructuralHash<StructuralSink>(value:blot_check_effect_evidence::Handle,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::List)->bool {return equalFields(left,right);}
 fn blot_check_effect_evidence::blotStructuralHash<StructuralSink>(value:blot_check_effect_evidence::List,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_effect_evidence::Operation)->bool {return equalFields(left,right);}

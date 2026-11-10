@@ -6,37 +6,38 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** Actual whole283 advances
-past the long-standing Run prepare/reset loan and startup planner loan, then
-fails in declaration_dependencies.scheme at its visited-dictionary insert.
-**162.11s**, unchanged461inputs, no C/header/native artifact.
-[Whole283](benchmarks/evidence/qualification/2026-11-10-goose-startup-whole283.json.gz).
+**No complete C/header/native Goose compiler exists.** Latest whole288 clears
+physical interning, then fails in recursive type conversion at layout342 because
+three scratch stacks shrink through the persistent Store.158.74s, unchanged461
+inputs, no artifact. Whole289 with the fixed-stack batch is running.
+[Whole288](benchmarks/evidence/qualification/2026-11-10-goose-layout-scalars-whole288.json.gz).
 
-CompileOptions now carries source-completion and validation identities by value.
-Zero/stale/reused-generation receipt laws pass; snapshot/Prepared still own and
-release the receipts. Exact input identity/digest/order spans name their original
-journals. The private checker preserves bounded complete sets of exact global
-input roots, rather than collapsing them to a depth-only class. Actual whole282
-confirms all5roots survive through compileAttempt, clearing the Run loan.
-[Receipt law](benchmarks/evidence/qualification/2026-11-10-goose-scalar-source-receipt-law.json.gz),
-[Whole282](benchmarks/evidence/qualification/2026-11-10-goose-scalar-source-receipts-whole282.json.gz).
+The physical Store now keeps only mutable physical owners: one existing scalar
+publication owner replaces both Core views, and a checked effect Handle replaces
+eight foreign buffer/map refs. Data is reborrowed from existing registries/pools;
+no new payload copies/pins. Retained child views survive append-only interning;
+reset with a live view correctly rejects in2.755s. Frame release invalidates both
+input and effect keys. A six-grow-array experiment failed teardown checks and
+was removed; the original GS table contract remains.
+[Owner laws](benchmarks/evidence/qualification/2026-11-10-goose-layout-scalar-owner-laws.json.gz).
 
-Startup planning now takes a scalar Frame and reborrows its existing named
-planning header only after dependency queries. StartupDependencyQuery/RecheckProof
-hold scalar requests; callbacks use the canonical region Session and explicit
-owned selected-output transfer. Two native laws pass18.58s summed stages,
-including planning identity and mutation through the original workspace.
-[Native laws](benchmarks/evidence/qualification/2026-11-10-goose-startup-frame-laws.json.gz).
+Three already bounded stacks now use fixed arrays and scalar counts:128 type
+owners,128 solver owners and16384 binder IDs. Five native laws pass26.09s summed
+stages, including real conversions at the complete limits, overflow rejection,
+nested-error unwind and repeated canonical IDs. No runtime heap allocation for
+those stack buffers; production uses about66KiB fixed backing. Raw stage logs
+and source fingerprints are sealed automatically per native batch.
+[Stack laws](benchmarks/evidence/qualification/2026-11-10-goose-layout-fixed-stack-laws.json.gz).
 
-Declaration scans replace the visited hash with fixed binding-indexed u32
-generation marks in append-only stable local owners. Normal scans reset in O(1);
-only generation rollover clears all marks. A new executed native law passes
-cycles/repeats at63/64/65, DFS order, selection, per-body reset, invalid targets
-and forced rollover. A bitset prototype was superseded before whole integration
-to avoid a full binding-table clear per body. Whole284 fails160.00s at Capture.work.pop live alias; the complete scratch
-family is next. No whole artifact.
-[Declaration law](benchmarks/evidence/qualification/2026-11-10-goose-declaration-generation-law.json.gz).
-CLI/server/OOM/retry/retention still require the actual executable.
+Other checked batches clear the old Run prepare/reset loan (scalar source and
+validation receipts plus exact input roots), startup planner loan (Frame/scalar
+requests), declaration scan (generation marks, logical LIFO and stable scratch),
+bridge cleanup (five pooled Words memos) and aggregate republication (in-place
+expectation reset). Fixed-tag layout normalization is acyclic; exact prior IDs
+and wire snapshot values pass. CLI digest scratch is a stable grow owner and
+metadata views are reborrowed at construction. All exact prior failures/controls
+remain in the receipt index. CLI/server/OOM/retry/retention still await the real
+executable; component laws never qualify it.
 
 Complete **36/36 native component laws pass** on the same frozen source as the
 whole attempt: summed stage time **307.14s**,30s/stage,600s outer cap. Includes

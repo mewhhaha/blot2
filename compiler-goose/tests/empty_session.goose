@@ -15,6 +15,8 @@ fn inspectWorkspace(frame:blot_compile_workspace::Frame) {
     assert(workspace.generator.evaluator.units.len==0 && workspace.capture.metadata().validContext());
     let planning:blot_backend_backend_plan::State& =blot_compile_workspace::planningForFrame(frame);assert(planning .==workspace.generator.planning);
     planning.runtime_plan_confirmed=true;assert(workspace.generator.planning.runtime_plan_confirmed);planning.runtime_plan_confirmed=false;
+    let evidence:blot_eval_type_evidence::Store& =workspace.generator.evaluator.evidenceStore();assert(evidence .==workspace.generator.evaluator.storage.evidence);
+    let bridge,error .=blot_compile_workspace::bridgeForGenerator(workspace.generator);assert(error==blot_error::Error.none && bridge .==workspace.generator.representations.connection && workspace.generator.representations.connection_bound);
     let key=blot_backend_backend_static_data::SerializedKey{1,2};assert(workspace.generator.static_data.cache.insert(key,17)==blot_error::Error.none);let stored=workspace.generator.static_data.cache.get(key);assert(stored && stored==17);
 }
 fn workspaceLifecycle() {

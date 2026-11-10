@@ -52,7 +52,7 @@ if !published { deinit(node); }
                 let error = charge(builder); if error != blot_error::Error.none { let __flat_cleanup_1_1_0: Error = error; block {
 if !published { deinit(node); }
 } return __flat_cleanup_1_1_0; }
-                let name = builder.context.layouts.record_names.get(builder.context.layouts.opaque_sources,children[index * 2]); if !name.present { let __flat_cleanup_1_2_0: Error = blot_error::Error.layout_limit; block {
+                let name = builder.context.layouts.record_names.get(blot_backend_layout::sourceUnits(builder.context.layouts.closed),children[index * 2]); if !name.present { let __flat_cleanup_1_2_0: Error = blot_error::Error.layout_limit; block {
 if !published { deinit(node); }
 } return __flat_cleanup_1_2_0; }
                 fields.push(Field { name.value, children[index * 2 + 1] , ..});

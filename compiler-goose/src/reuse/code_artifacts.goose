@@ -834,7 +834,7 @@ fn capture(store: const blot_reuse_substitution_keys::Store&) -> Substitutions {
 fn deinit(self_: Substitutions&) { releaseOwned(self_.entries); releaseOwned(self_.spans); self_ = Substitutions {..}; }
 fn captureBridge<C>(store: const C&) -> Bridge {
     return Bridge { copyOwned(store.partial.nodes.items), copyOwned(store.partial.extra.items),
-        copyOwned(store.to), copyOwned(store.from), copyOwned(store.row_to), copyOwned(store.row_from), copyOwned(store.shapes) , ..};
+        copyOwned(store.to.items), copyOwned(store.from.items), copyOwned(store.row_to.items), copyOwned(store.row_from.items), copyOwned(store.shapes.items) , ..};
 }
 fn deinit(self_: Bridge&) {
     releaseOwned(self_.nodes); releaseOwned(self_.extra); releaseOwned(self_.to); releaseOwned(self_.from);
@@ -1187,10 +1187,10 @@ fn capture<G>(input_owner:blot_backend_result_publication::Owner,generator: G&, 
     candidate.layouts.nodes = copying.capture_layout_nodes(layout_store.nodes, old_layouts.nodes);
     candidate.layouts.extra = copying.capture_layout_extra(layout_store.extra, old_layouts.extra);
     candidate.layouts.universal_dictionaries = copying.capture_layout_universal_dictionaries(layout_store.universal_dictionaries, old_layouts.universal_dictionaries);
-    candidate.layouts.effects.operations = copying.capture_layout_operations(layout_store.effects.operations.items, old_layouts.effects.operations);
-    candidate.layouts.effects.arguments = copying.capture_layout_arguments(layout_store.effects.arguments.items, old_layouts.effects.arguments);
-    candidate.layouts.effects.rows = copying.capture_layout_rows(layout_store.effects.rows.items, old_layouts.effects.rows);
-    candidate.layouts.effects.labels = copying.capture_layout_labels(layout_store.effects.labels.items, old_layouts.effects.labels);
+    candidate.layouts.effects.operations = copying.capture_layout_operations(layout_store.effects.view().operations, old_layouts.effects.operations);
+    candidate.layouts.effects.arguments = copying.capture_layout_arguments(layout_store.effects.view().arguments, old_layouts.effects.arguments);
+    candidate.layouts.effects.rows = copying.capture_layout_rows(layout_store.effects.view().rows, old_layouts.effects.rows);
+    candidate.layouts.effects.labels = copying.capture_layout_labels(layout_store.effects.view().labels, old_layouts.effects.labels);
     candidate.layouts.effects.owner_id = blot_native::fresh_owner_id();
     let before_evaluator = copying.shared.stats;
     let session .= generator.evaluator;

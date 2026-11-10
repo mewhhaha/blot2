@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Execute the isolated engine laws against live Goose sources.
 
-Usage: python3 compiler-goose/tools/test_engines.py [coalesce expectation package_owner_frames parser proof_leases source_sort diagnostic_ownership body_freeze immutable_readers import_arena source_validation_ownership editor_budget cache_root_frames native_asset_metadata completion_probe completion_project_load dependency_ownership empty_session archive_capture resolved_body wasm_scope_outline core_validation_borrow retained_seed executor_frame footprint_owner effect_evidence_owner worker_runtime_pins semantic_outcomes server_session storage_call_cache function_plan_input wasm_pipeline_scope record_order identity_owner module_stamps result_diagnostic declaration_scheme_cycles]
+Usage: python3 compiler-goose/tools/test_engines.py [coalesce expectation package_owner_frames parser proof_leases source_sort diagnostic_ownership body_freeze immutable_readers import_arena source_validation_ownership editor_budget cache_root_frames native_asset_metadata completion_probe completion_project_load dependency_ownership empty_session archive_capture resolved_body wasm_scope_outline core_validation_borrow retained_seed executor_frame footprint_owner effect_evidence_owner worker_runtime_pins semantic_outcomes server_session storage_call_cache function_plan_input wasm_pipeline_scope record_order identity_owner module_stamps result_diagnostic declaration_scheme_cycles layout_bridge_words layout_intern_leaf layout_frame_store effect_evidence_handles layout_fixed_stacks]
 Evidence and cached native objects live in build/goose-port/engine-tests/.
 """
 from __future__ import annotations
 import argparse
+import base64
+import gzip
 import importlib.util
 import json
 import math
@@ -48,7 +50,7 @@ def inputs(entry: Path, stdlib: Path) -> list[dict]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("tests", nargs="*", choices=["coalesce", "expectation", "package_owner_frames", "parser", "proof_leases", "source_sort", "diagnostic_ownership", "body_freeze", "immutable_readers", "import_arena", "source_validation_ownership", "editor_budget", "cache_root_frames", "native_asset_metadata", "completion_probe", "completion_project_load", "dependency_ownership", "empty_session", "archive_capture", "resolved_body", "wasm_scope_outline", "core_validation_borrow", "retained_seed", "executor_frame", "footprint_owner", "effect_evidence_owner", "worker_runtime_pins", "semantic_outcomes", "server_session", "storage_call_cache", "function_plan_input", "wasm_pipeline_scope", "record_order", "identity_owner", "module_stamps", "result_diagnostic", "declaration_scheme_cycles"])
+    parser.add_argument("tests", nargs="*", choices=["coalesce", "expectation", "package_owner_frames", "parser", "proof_leases", "source_sort", "diagnostic_ownership", "body_freeze", "immutable_readers", "import_arena", "source_validation_ownership", "editor_budget", "cache_root_frames", "native_asset_metadata", "completion_probe", "completion_project_load", "dependency_ownership", "empty_session", "archive_capture", "resolved_body", "wasm_scope_outline", "core_validation_borrow", "retained_seed", "executor_frame", "footprint_owner", "effect_evidence_owner", "worker_runtime_pins", "semantic_outcomes", "server_session", "storage_call_cache", "function_plan_input", "wasm_pipeline_scope", "record_order", "identity_owner", "module_stamps", "result_diagnostic", "declaration_scheme_cycles", "layout_bridge_words", "layout_intern_leaf", "layout_frame_store", "effect_evidence_handles", "layout_fixed_stacks"])
     parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", str(ROOT.parent.parent / "goose-to-wasm/build/native/goose")))
     parser.add_argument("--stdlib", type=Path, default=ROOT.parent.parent / "goose-to-wasm/build/source/stdlib")
     parser.add_argument("--cc", default=os.environ.get("CC", "clang"))
@@ -106,7 +108,7 @@ def main() -> int:
             "compile_command": [str(cc)] + flags + ["-c", str(source), "-o", str(path)]}
             for path, source in zip(objects, [runtime, ROOT / "native/platform.c"])]
         evidence["runtime_sha256"] = build.digest_file(runtime)
-        for name in args.tests or ["coalesce", "expectation", "package_owner_frames", "parser", "proof_leases", "source_sort", "diagnostic_ownership", "body_freeze", "immutable_readers", "import_arena", "source_validation_ownership", "editor_budget", "cache_root_frames", "native_asset_metadata", "completion_probe", "completion_project_load", "dependency_ownership", "empty_session", "archive_capture", "resolved_body", "wasm_scope_outline", "core_validation_borrow", "retained_seed", "executor_frame", "footprint_owner", "effect_evidence_owner", "worker_runtime_pins", "semantic_outcomes", "server_session", "storage_call_cache", "function_plan_input", "wasm_pipeline_scope", "record_order", "identity_owner", "module_stamps", "result_diagnostic", "declaration_scheme_cycles"]:
+        for name in args.tests or ["coalesce", "expectation", "package_owner_frames", "parser", "proof_leases", "source_sort", "diagnostic_ownership", "body_freeze", "immutable_readers", "import_arena", "source_validation_ownership", "editor_budget", "cache_root_frames", "native_asset_metadata", "completion_probe", "completion_project_load", "dependency_ownership", "empty_session", "archive_capture", "resolved_body", "wasm_scope_outline", "core_validation_borrow", "retained_seed", "executor_frame", "footprint_owner", "effect_evidence_owner", "worker_runtime_pins", "semantic_outcomes", "server_session", "storage_call_cache", "function_plan_input", "wasm_pipeline_scope", "record_order", "identity_owner", "module_stamps", "result_diagnostic", "declaration_scheme_cycles", "layout_bridge_words", "layout_intern_leaf", "layout_frame_store", "effect_evidence_handles", "layout_fixed_stacks"]:
             started = time.monotonic()
             test = ROOT / "tests" / (name + ".goose")
             before = inputs(test, stdlib)
@@ -140,7 +142,19 @@ def main() -> int:
         print(failure, file=sys.stderr)
         return 1
     finally:
+        receipts = output / "receipts"
+        receipts.mkdir(exist_ok=True)
+        archive = receipts / (str(time.time_ns()) + ".json.gz")
+        evidence["receipt"] = str(archive)
         (output / "evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
+        logs = {}
+        for stage in evidence["stages"]:
+            path = Path(stage["log"])
+            logs[str(path)] = base64.b64encode(path.read_bytes()).decode("ascii")
+        payload = {"evidence": evidence, "stage_logs_base64": logs}
+        with archive.open("xb") as stream:
+            stream.write(gzip.compress(json.dumps(payload).encode(), mtime=0))
+        print("Immutable receipt: " + str(archive), flush=True)
 
 
 if __name__ == "__main__":

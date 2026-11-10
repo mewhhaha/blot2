@@ -95,6 +95,18 @@ fn planningForFrame(frame:Frame)->blot_backend_backend_plan::State& {
  let owned:blot_backend_backend_plan::State& =backing_generator_planning;
  assert(generator.planning .==owned);return owned;
 }
+// Bind the production bridge to the active named layout and evidence owners.
+fn bridgeForGenerator(source:Generator&)->blot_backend_layout_bridge::Store&,Error {
+ let generator:Generator& =canonicalGenerator(source);
+ assert(generator.representations .==backing_generator_representations);
+ assert(backing_generator_representations.store .==backing_generator_representations_store && backing_generator_representations.connection .==backing_generator_representations_connection);
+ if !backing_generator_representations.connection_bound {
+  let error=backing_generator_representations_connection.bind(backing_generator_representations_store,generator.evaluator.evidenceStore());
+  if error!=blot_error::Error.none {return backing_generator_representations_connection,error;}
+  backing_generator_representations.connection_bound=true;
+ }
+ return backing_generator_representations_connection,blot_error::Error.none;
+}
 fn borrow(self_:Frame)->Workspace? {if !self_.valid() {return null;}return frames[self_.slot-1].workspace;}
 fn retain(self_:Frame)->Frame,Error {if !self_.valid() {return Frame{..},blot_error::Error.invalid_artifact;}let state:FrameState& =frames[self_.slot-1];if state.references==0xffffffffffffffff {return Frame{..},blot_error::Error.dependency_limit;}state.references++;return self_,blot_error::Error.none;}
 fn create(allocation_owner:u64)->Frame,Error {

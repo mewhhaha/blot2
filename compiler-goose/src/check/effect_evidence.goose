@@ -77,6 +77,26 @@ var inactive_RowBuffer: RowBuffer=RowBuffer {};
 var inactive_Buckets: Buckets=Buckets {};
 struct Store { owner_id: u64=0,lease: u32=0,generation: u64=0,operations: OperationBuffer& =inactive_OperationBuffer,arguments: WordBuffer& =inactive_WordBuffer,rows: RowBuffer& =inactive_RowBuffer,labels: WordBuffer& =inactive_WordBuffer,operation_next: WordBuffer& =inactive_WordBuffer,row_next: WordBuffer& =inactive_WordBuffer,operation_buckets: Buckets& =inactive_Buckets,row_buckets: Buckets& =inactive_Buckets }
 fn valid(self_: const Store&) -> bool { return self_.lease!=0&&self_.lease-1<states.len&&states[self_.lease-1].owner_id==self_.owner_id&&states[self_.lease-1].generation==self_.generation&&self_.owner_id!=0; }
+// A scalar key names only its original live owner lease.
+struct Handle { owner_id:u64=0,lease:u32=0,generation:u64=0 }
+fn valid(key:Handle)->bool {return key.lease!=0&&key.lease-1<states.len&&key.owner_id!=0&&states[key.lease-1].owner_id==key.owner_id&&states[key.lease-1].generation==key.generation;}
+fn handle(source:const Store&)->Handle {
+ assert(valid(source));let state:State& =states[source.lease-1];
+ assert(source.operations .== state.operations);
+ assert(source.arguments .== state.arguments);
+ assert(source.rows .== state.rows);
+ assert(source.labels .== state.labels);
+ assert(source.operation_next .== state.operation_next);
+ assert(source.row_next .== state.row_next);
+ assert(source.operation_buckets .== state.operation_buckets);
+ assert(source.row_buckets .== state.row_buckets);
+ return Handle{source.owner_id,source.lease,source.generation};
+}
+fn fromHandle(key:Handle)->Store {
+ assert(valid(key));let state:State& =states[key.lease-1];
+ return Store{owner_id:key.owner_id,lease:key.lease,generation:key.generation,operations:state.operations,arguments:state.arguments,rows:state.rows,labels:state.labels,operation_next:state.operation_next,row_next:state.row_next,operation_buckets:state.operation_buckets,row_buckets:state.row_buckets};
+}
+fn deinit(key:Handle&) {if key.lease==0 {return;}var source=fromHandle(key);source.deinit();key=Handle{};}
 fn init() -> Store,Error { if next_generation==0xffffffffffffffff||states.len>=0xffffffff { return Store {},blot_error::Error.out_of_memory; } let generation=next_generation; next_generation++; let owner=blot_native::fresh_owner_id(); let index=states.alloc_index(State {owner_id:owner,generation:generation}); let state: State& =states[index]; var self_=Store {owner_id:owner,lease:(index+1) as u32,generation:generation,operations:state.operations,arguments:state.arguments,rows:state.rows,labels:state.labels,operation_next:state.operation_next,row_next:state.row_next,operation_buckets:state.operation_buckets,row_buckets:state.row_buckets}; self_.operations.push(Operation {blot_check_types::NominalIdentity {0,0},List {}}); self_.operation_next.push(0); self_.rows.push(Row {}); self_.row_next.push(0); return self_,blot_error::Error.none; }
 fn deinit(self_: Store&) { if self_.lease==0 { return; } assert(valid(self_)); self_.operations.deinit(); self_.arguments.deinit(); self_.rows.deinit(); self_.labels.deinit(); self_.operation_next.deinit(); self_.row_next.deinit(); self_.operation_buckets.deinit(); self_.row_buckets.deinit(); let index=self_.lease-1; states[index].owner_id=0; states.free(index); self_=Store {}; }
 fn view(self_: const Store&) -> View { assert(valid(self_)); return View {self_.operations.items,self_.arguments.items,self_.rows.items,self_.labels.items,self_.owner_id}; }
@@ -194,3 +214,13 @@ fn commit(source: Store&,destination: Store&) { assert(valid(source)&&valid(dest
  destination.operation_buckets.deinit(); destination.operation_buckets=ownedBuckets(source.operation_buckets); source.operation_buckets=Buckets {};
  destination.row_buckets.deinit(); destination.row_buckets=ownedBuckets(source.row_buckets); source.row_buckets=Buckets {};
  let identity=destination.owner_id; destination.owner_id=source.owner_id; states[destination.lease-1].owner_id=destination.owner_id; source.owner_id=identity; states[source.lease-1].owner_id=source.owner_id; }
+
+// Handle operations borrow the existing descriptor only for this invocation.
+fn view(key:Handle)->View {
+ let source=fromHandle(key);let operations=ownedBuffer(source.operations);let arguments=ownedBuffer(source.arguments);let rows=ownedBuffer(source.rows);let labels=ownedBuffer(source.labels);
+ return View{operations.items,arguments.items,rows.items,labels.items,key.owner_id};
+}
+fn internOperation(key:Handle,identity:blot_check_types::NominalIdentity,values:const u32[:])->Label,Error {return internOperation(fromHandle(key),identity,values);}
+fn internOperationInstance(key:Handle,identity:blot_check_types::NominalIdentity,values:const u32[:],instance:blot_check_types::NominalIdentity)->Label,Error {return internOperationInstance(fromHandle(key),identity,values,instance);}
+fn internRow(key:Handle,values:const Label[:])->Id,Error {return internRow(fromHandle(key),values);}
+fn internRowWithFormal(key:Handle,values:const Label[:],formal:u32)->Id,Error {return internRowWithFormal(fromHandle(key),values,formal);}

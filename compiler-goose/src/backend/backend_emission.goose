@@ -2250,13 +2250,13 @@ roles.deinit();
 }
 fn physicalOrder(owner: Owner&,record: blot_check_types::Node,out: WordBuffer&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); assert(record.tag == blot_check_types::Tag.record); if record.b < 2 { return blot_error::Error.none; } var ordered = true;
-    for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return blot_error::Error.none; }
+    for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,blot_backend_layout::sourceUnits(generator.representations.store.closed),source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return blot_error::Error.none; }
     var sorted = WordBuffer {..};
     block {
  for index in 0..record.b { let appended = sorted.push(index as u32); if appended != blot_error::Error.none { let __flat_cleanup_20_0_0: Error = appended; block {
 sorted.deinit();
 } return __flat_cleanup_20_0_0; } }
-    for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
+    for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,blot_backend_layout::sourceUnits(generator.representations.store.closed),source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
     for index in 0..record.b { let appended = out.push(0); if appended != blot_error::Error.none { let __flat_cleanup_20_1_0: Error = appended; block {
 sorted.deinit();
 } return __flat_cleanup_20_1_0; } } for original,index in sorted.items { out.items[original] = index as u32; } let __flat_cleanup_20_2_0: Error = blot_error::Error.none; block {
@@ -4854,8 +4854,8 @@ recursive fn proofGuard(owner: Owner&,id: u32,depth: i64) -> Error {
     return emitInstructions(owner,[blot_backend_runtime_ir::instruction(op),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]);
 }
 fn carrierRows(owner: Owner&,from: u32,to: u32,source: u32) -> Error {
-    let generator .= owner.generator; if from == blot_backend_layout::unknown_row || to == blot_backend_layout::unknown_row || from >= generator.representations.store.effects.rows.len || to >= generator.representations.store.effects.rows.len { return generator.fail(owner.unit_id,source,blot_check_diagnostic_code::Code.unresolved_type); } if from == to { return blot_error::Error.none; }
-    if generator.representations.store.effects.rows.items[from].formal == 0 && generator.representations.store.effects.rows.items[to].formal == 0 { return generator.fail(owner.unit_id,source,blot_check_diagnostic_code::Code.unresolved_type); } return blot_error::Error.none;
+    let generator .= owner.generator; if from == blot_backend_layout::unknown_row || to == blot_backend_layout::unknown_row || from >= generator.representations.store.effects.view().rows.len || to >= generator.representations.store.effects.view().rows.len { return generator.fail(owner.unit_id,source,blot_check_diagnostic_code::Code.unresolved_type); } if from == to { return blot_error::Error.none; }
+    if generator.representations.store.effects.view().rows[from].formal == 0 && generator.representations.store.effects.view().rows[to].formal == 0 { return generator.fail(owner.unit_id,source,blot_check_diagnostic_code::Code.unresolved_type); } return blot_error::Error.none;
 }
 fn invalidCarrier(tag: blot_backend_layout::Tag) -> bool { return tag == blot_backend_layout::Tag.erased || tag == blot_backend_layout::Tag.invalid || tag == blot_backend_layout::Tag.erased_proof || tag == blot_backend_layout::Tag.provider || tag == blot_backend_layout::Tag.state_provider; }
 recursive fn carrierValue(owner: Owner&,value: u32,from: u32,to: u32,depth: i64) -> u32,Error {

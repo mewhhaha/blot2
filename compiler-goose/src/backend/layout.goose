@@ -4,6 +4,7 @@ import parse.ast;
 import std;
 import dictionary;
 import .runtime_ir;
+import .result_publication;
 import .wasm;
 import check.core;
 import check.types;
@@ -44,26 +45,32 @@ fn mappedInstance(original: blot_check_types::NominalIdentity, mappings: const M
 }
 struct ClosedUnit { kinds: blot_backend_runtime_ir::Range }
 struct ClosedLayouts {
-    units: const blot_check_core::Module[:], kinds: ClosedUnit[>..<]&, kind_bytes: u8[>..<]&, layouts: dictionary<u64, Id>&,
+    input_owner: blot_backend_result_publication::Owner = blot_backend_result_publication::Owner {..}, kinds: ClosedUnit[>..<]&, kind_bytes: u8[>..<]&, layouts: blot_eval_type_evidence::Buckets&,
 }
 struct Store {
-    closed: ClosedLayouts, opaque_sources: const blot_check_core::Module[:], record_names: blot_check_record_order::Names,
-    effects: blot_check_effect_evidence::Store,
-    nodes: Node[>..<]&, extra: u32[>..<]&, universal_dictionaries: UniversalDictionaries[>..<]&, next: Id[>..<]&, buckets: dictionary<u64, Id>&,
-    solver_owners: blot_backend_runtime_ir::Range[>..<]&, solver_binders: u32[>..<]&, type_owners: blot_check_types::Id[>..<]&,
+    closed: ClosedLayouts, record_names: blot_check_record_order::Names,
+    effects: blot_check_effect_evidence::Handle,
+    nodes: Node[>..<]&, extra: u32[>..<]&, universal_dictionaries: UniversalDictionaries[>..<]&, next: Id[>..<]&, buckets: blot_eval_type_evidence::Buckets&,
+    solver_owners: blot_backend_runtime_ir::Range[128]&, solver_binders: u32[16384]&, type_owners: blot_check_types::Id[128]&,
+    solver_owner_count: i64 = 0, solver_binder_count: i64 = 0, type_owner_count: i64 = 0,
+}
+fn sourceUnits(closed: const ClosedLayouts&) -> const blot_check_core::Module[:] {
+    if closed.input_owner.slot == 0 { return default<const blot_check_core::Module[:]>(); }
+    let units,error = blot_backend_result_publication::registeredInputUnits(closed.input_owner);
+    assert(error == blot_error::Error.none); return units;
 }
 // Private probes enter with one lexical set of typed owners. Their callback
 // returns before any of this physical store's backing storage is released.
 fn withStore<C,F>(context: C&) -> blot_error::Error {
-    var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts: dictionary<u64,Id> = dictionary<u64,Id>{}; var names: dictionary<u32,blot_check_record_order::RecordName> = dictionary<u32,blot_check_record_order::RecordName>{};
-    var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets: dictionary<u64,u32> = dictionary<u64,u32>{}; var solver_owners: blot_backend_runtime_ir::Range[>..<] = []; var solver_binders: u32[>..<] = []; var type_owners: u32[>..<] = [];
+    var closed_units: ClosedUnit[>..<] = []; var closed_kind_bytes: u8[>..<] = []; var closed_layouts=blot_eval_type_evidence::Buckets{}; var names: dictionary<u32,blot_check_record_order::RecordName> = dictionary<u32,blot_check_record_order::RecordName>{};
+    var nodes: Node[>..<] = []; var extra: u32[>..<] = []; var universal_dictionaries: UniversalDictionaries[>..<] = []; var next: u32[>..<] = []; var buckets=blot_eval_type_evidence::Buckets{}; var solver_owners: blot_backend_runtime_ir::Range[128] = default<blot_backend_runtime_ir::Range[128]>(); var solver_binders: u32[16384] = default<u32[16384]>(); var type_owners: u32[128] = default<u32[128]>();
     let effects,error = blot_check_effect_evidence::init(); if error != blot_error::Error.none { return error; }
-    var store = Store { closed: ClosedLayouts { units: default<const blot_check_core::Module[:]>(),kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts , ..},opaque_sources: default<const blot_check_core::Module[:]>(),record_names: blot_check_record_order::init(names),effects: effects,nodes: nodes,extra: extra,universal_dictionaries: universal_dictionaries,next: next,buckets: buckets,solver_owners: solver_owners,solver_binders: solver_binders,type_owners: type_owners , ..};
-    let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); return initialized; } let result = F(context,store); store.deinit(); return result;
+    var store = Store { closed: ClosedLayouts { kinds: closed_units,kind_bytes: closed_kind_bytes,layouts: closed_layouts , ..},record_names: blot_check_record_order::init(names),effects: blot_check_effect_evidence::handle(effects),nodes: nodes,extra: extra,universal_dictionaries: universal_dictionaries,next: next,buckets: buckets,solver_owners: solver_owners,solver_binders: solver_binders,type_owners: type_owners , ..};
+    let initialized = init(store); if initialized != blot_error::Error.none { store.deinit(); buckets.deinit(); closed_layouts.deinit(); return initialized; } let result = F(context,store); store.deinit(); buckets.deinit(); closed_layouts.deinit(); return result;
 }
 fn init(store: Store&) -> blot_error::Error {
-    store.nodes.clear(); store.next.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.buckets.clear(); store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
-    assert(store.effects.rows.len != 0); // Caller initializes the effect-evidence context from its Tables first.
+    store.nodes.clear(); store.next.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.buckets.clear(); store.solver_owner_count = 0; store.solver_binder_count = 0; store.type_owner_count = 0;
+    assert(store.effects.view().rows.len != 0); // Caller initializes the effect-evidence context from its Tables first.
     for tag in [Tag.invalid, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, Tag.never, Tag.erased] { store.nodes.push(Node { tag: tag , ..}); store.next.push(0); }
     return blot_error::Error.none;
 }
@@ -131,8 +138,9 @@ recursive fn scalarDepth(store: const Store&, id: Id, depth: i64) -> blot_suppor
     return blot_support::none<blot_backend_runtime_ir::Scalar>();
 }
 recursive fn opaqueScalar(store: const Store&, id: Id, depth: i64) -> blot_support::Option<blot_backend_runtime_ir::Scalar> {
-    let n = node(store, id); if n.a == 0 || n.a > store.opaque_sources.len { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
-    let source .= store.opaque_sources[n.a - 1];
+    let units = sourceUnits(store.closed);
+    let n = node(store, id); if n.a == 0 || n.a > units.len { return blot_support::none<blot_backend_runtime_ir::Scalar>(); }
+    let source .= units[n.a - 1];
     for nominal in source.nominals {
         if !nominal.is_opaque || nominal.identity.decl != n.b { continue; }
         if nominal.storage.kind == blot_backend_opaque_storage::Kind.unit { return blot_support::some(blot_backend_runtime_ir::SC_unit); }
@@ -169,44 +177,50 @@ fn abi(store: const Store&, id: Id) -> blot_support::Option<blot_backend_runtime
     if node(store, n.a).tag == Tag.floating32 { return blot_support::some(blot_backend_runtime_ir::SC_array_f32); }
     return blot_support::none<blot_backend_runtime_ir::Scalar>();
 }
-recursive fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const u32[:]) -> Id, blot_error::Error { return internWithEffects(store, tag, a, b, 0, values); }
-recursive fn internWithEffects(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error {
+fn intern(store: Store&, tag: Tag, a: u32, b: u32, values: const u32[:]) -> Id, blot_error::Error { return internWithEffects(store, tag, a, b, 0, values); }
+fn internWithEffects(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error {
     if tag == Tag.opened && (a >= 128 || b >= 128 || row > 2 || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.existential || tag == Tag.universal {
         if a == 0 || a >= store.nodes.len || b == 0 || b > 128 || row != 0 { return 0, blot_error::Error.type_mismatch; }
         if values.len == 0 {
             var binders: Id[128] = [0; 128];
-            for ordinal in 0..b { let binder, error = intern(store, Tag.opened, ordinal as u32, 0, []); if error != blot_error::Error.none { return 0, error; } binders[ordinal] = binder; }
-            return internWithEffects(store, tag, a, b, row, binders[..b]);
+            for ordinal in 0..b { let binder, error = internFields(store, Tag.opened, ordinal as u32, 0, 0, []); if error != blot_error::Error.none { return 0, error; } binders[ordinal] = binder; }
+            return internFields(store, tag, a, b, row, binders[..b]);
         }
         if values.len != b { return 0, blot_error::Error.type_mismatch; }
         for binder, ordinal in values { if binder >= store.nodes.len { return 0, blot_error::Error.type_mismatch; } let leaf = node(store, binder); if leaf.tag != Tag.opened || leaf.a != ordinal || leaf.b != 0 || leaf.c > 2 || (tag == Tag.existential && leaf.c != 0) { return 0, blot_error::Error.type_mismatch; } }
     }
-    if tag == Tag.nominal && a != 0 && a <= store.opaque_sources.len {
-        for nominal in store.opaque_sources[a - 1].nominals { if nominal.identity.decl == b && nominal.is_opaque && nominal.storage.kind == blot_backend_opaque_storage::Kind.unknown { return 0, blot_error::Error.unresolved_type; } }
+    if tag == Tag.nominal && a != 0 {
+        let units = sourceUnits(store.closed);
+        if a <= units.len { for nominal in units[a - 1].nominals { if nominal.identity.decl == b && nominal.is_opaque && nominal.storage.kind == blot_backend_opaque_storage::Kind.unknown { return 0, blot_error::Error.unresolved_type; } } }
     }
     return internFields(store, tag, a, b, row, values);
 }
 fn internStateProvider(store: Store&, read: Id, write: Id, state: Id) -> Id, blot_error::Error { return internFields(store, Tag.state_provider, read, write, state, []); }
 fn internRecord(store: Store&, values: const u32[:]) -> Id, blot_error::Error {
     if values.len % 2 != 0 { return 0, blot_error::Error.type_mismatch; }
+    let units = sourceUnits(store.closed);
     var ordered = true; var offset = 2;
-    while offset < values.len { if !store.record_names.less(store.opaque_sources,values[offset - 2], values[offset]) { ordered = false; break; } offset += 2; }
+    while offset < values.len { if !store.record_names.less(units,values[offset - 2], values[offset]) { ordered = false; break; } offset += 2; }
     if ordered { return intern(store, Tag.record, 0, 0, values); }
     var fields: u32[>..<] = []; fields.append(values); let count = values.len / 2;
     for index in 1..count {
         let field_name = fields[index * 2]; let field_type = fields[index * 2 + 1]; var next = index;
-        while next > 0 && store.record_names.less(store.opaque_sources,field_name, fields[(next - 1) * 2]) { fields[next * 2] = fields[(next - 1) * 2]; fields[next * 2 + 1] = fields[(next - 1) * 2 + 1]; next--; }
+        while next > 0 && store.record_names.less(units,field_name, fields[(next - 1) * 2]) { fields[next * 2] = fields[(next - 1) * 2]; fields[next * 2 + 1] = fields[(next - 1) * 2 + 1]; next--; }
         fields[next * 2] = field_name; fields[next * 2 + 1] = field_type;
     }
     for index in 1..count { if fields[index * 2] == fields[(index - 1) * 2] { return 0, blot_error::Error.type_mismatch; } }
     return intern(store, Tag.record, 0, 0, fields);
 }
-recursive fn internFields(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error { return internFieldsWithDictionaries(store, tag, a, b, row, values, [], false); }
-recursive fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:], slots: const Id[:], dictionary_abi: bool) -> Id, blot_error::Error {
-    if tag == Tag.nominal && a == blot_check_task_types::handle.unit && b == blot_check_task_types::handle.decl { return intern(store, Tag.product, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type]); }
+fn internFields(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:]) -> Id, blot_error::Error { return internFieldsWithDictionaries(store, tag, a, b, row, values, [], false); }
+fn internFieldsWithDictionaries(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:], slots: const Id[:], dictionary_abi: bool) -> Id, blot_error::Error {
+    if tag == Tag.nominal && a == blot_check_task_types::handle.unit && b == blot_check_task_types::handle.decl { return internCanonicalFields(store, Tag.product, 0, 0, 0, [blot_check_types::u32_type, blot_check_types::u32_type], [], false); }
+    return internCanonicalFields(store, tag, a, b, row, values, slots, dictionary_abi);
+}
+// All surface normalization precedes this leaf; no path calls an interning wrapper.
+fn internCanonicalFields(store: Store&, tag: Tag, a: u32, b: u32, row: u32, values: const u32[:], slots: const Id[:], dictionary_abi: bool) -> Id, blot_error::Error {
     if tag == Tag.nominal && blot_check_typed_staging::isIdentity(a, b) { return 0, blot_error::Error.unresolved_type; }
-    if tag != Tag.state_provider && tag != Tag.scoped && tag != Tag.opened && tag != Tag.associated && ((row != unknown_row && row >= store.effects.rows.len) || (row != 0 && tag != Tag.function && tag != Tag.provider)) { return 0, blot_error::Error.type_mismatch; }
+    if tag != Tag.state_provider && tag != Tag.scoped && tag != Tag.opened && tag != Tag.associated && ((row != unknown_row && row >= store.effects.view().rows.len) || (row != 0 && tag != Tag.function && tag != Tag.provider)) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.owning && (a == 0 || a >= store.nodes.len || row != 0 || values.len != 0 || (b != blot_parse_ast::usagekind_unique && b != blot_parse_ast::usagekind_shared)) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.scoped && (a == 0 || a >= store.nodes.len || node(store, a).tag != Tag.nominal || b == 0 || row == 0 || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
     if tag == Tag.state_provider && (a == 0 || b == 0 || row == 0 || a >= store.nodes.len || b >= store.nodes.len || row >= store.nodes.len || values.len != 0) { return 0, blot_error::Error.type_mismatch; }
@@ -301,10 +315,11 @@ recursive fn closedType(module: const blot_check_core::Module&, kinds: u8[:], ty
     kinds[ty] = 2; if closed { kinds[ty] = 1; } return closed;
 }
 fn closedKey(closed: ClosedLayouts&, module: const blot_check_core::Module&, ty: blot_check_types::Id) -> blot_support::Option<u64> {
-    if closed.units.len == 0 { return blot_support::none<u64>(); }
-    var unit: i64 = -1; for &source, index in closed.units { if source .== module { unit = index; break; } }
+    let units = sourceUnits(closed);
+    if units.len == 0 { return blot_support::none<u64>(); }
+    var unit: i64 = -1; for &source, index in units { if source .== module { unit = index; break; } }
     if unit < 0 || ty >= module.types.nodes.len { return blot_support::none<u64>(); }
-    if closed.kinds.len == 0 { for index in 0..closed.units.len { closed.kinds.push(ClosedUnit {..}); } }
+    if closed.kinds.len == 0 { for index in 0..units.len { closed.kinds.push(ClosedUnit {..}); } }
     if closed.kinds[unit].kinds.len != module.types.nodes.len {
         let range = blot_backend_runtime_ir::Range { start: closed.kind_bytes.len, len: module.types.nodes.len , ..};
         for index in 0..range.len { closed.kind_bytes.push(0); } closed.kinds[unit].kinds = range;
@@ -314,7 +329,8 @@ fn closedKey(closed: ClosedLayouts&, module: const blot_check_core::Module&, ty:
     return blot_support::some((unit as u64 << 32) | ty);
 }
 fn checkSubstitutions(closed: ClosedLayouts&, module: const blot_check_core::Module&, mappings: const Mapping[:]) {
-    var unit: i64 = -1; for &source, index in closed.units { if source .== module { unit = index; break; } } assert(unit >= 0);
+    let units = sourceUnits(closed);
+    var unit: i64 = -1; for &source, index in units { if source .== module { unit = index; break; } } assert(unit >= 0);
     let kinds = closed.kinds[unit].kinds;
     for mapping in mappings { if mapping.variable >= module.types.nodes.len { continue; } assert(!closedType(module, closed.kind_bytes[kinds.start..kinds.start + kinds.len], mapping.variable, 0)); }
 }
@@ -350,11 +366,11 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
         if n.b == blot_parse_ast::usagekind_unique || n.b == blot_parse_ast::usagekind_shared { return intern(store, Tag.owning, payload, n.b, []); } return payload, blot_error::Error.none;
     }
     if n.tag == blot_check_types::Tag.forall || n.tag == blot_check_types::Tag.existential {
-        if n.c == 0 || n.c > 128 || depth >= 128 || store.type_owners.len >= 128 { return 0, blot_error::Error.layout_limit; }
-        store.type_owners.push(ty); let result, error = fromTypeQuantified(store, module, n, mappings, rows, depth, allow_erased); store.type_owners.pop(); return result, error;
+        if n.c == 0 || n.c > 128 || depth >= 128 || store.type_owner_count >= 128 { return 0, blot_error::Error.layout_limit; }
+        store.type_owners[store.type_owner_count] = ty; store.type_owner_count++; let result, error = fromTypeQuantified(store, module, n, mappings, rows, depth, allow_erased); store.type_owner_count--; return result, error;
     }
     if n.tag == blot_check_types::Tag.projection {
-        let argument_count = module.types.nominalArguments(n).len; var scope = store.type_owners.len;
+        let argument_count = module.types.nominalArguments(n).len; var scope = store.type_owner_count;
         while scope != 0 {
             scope--; let owner = store.type_owners[scope];
             let goal_count=module.types.quantifierGoals(owner).len;for ordinal in 0..goal_count {let goal=module.types.quantifierGoals(owner)[ordinal];
@@ -368,7 +384,7 @@ recursive fn fromTypeNode(store: Store&, module: const blot_check_core::Module&,
                     if contract.identity.unit != n.a || contract.identity.decl != n.b { continue; }
                     if contract.members.start > module.contract_members.len || contract.members.len > module.contract_members.len - contract.members.start { return 0, blot_error::Error.unresolved_type; }
                     for member_index in 0..contract.members.len {let member=module.contract_members[contract.members.start+member_index];
-                        if member.name == member_name && member.kind != blot_reuse_principal_interface::ContractMemberKind.value { return internAssociated(store, ordinal as u32, member_name, (store.type_owners.len - 1 - scope) as u32); }
+                        if member.name == member_name && member.kind != blot_reuse_principal_interface::ContractMemberKind.value { return internAssociated(store, ordinal as u32, member_name, (store.type_owner_count - 1 - scope) as u32); }
                     }
                 }
                 return 0, blot_error::Error.unresolved_type;
@@ -461,7 +477,7 @@ recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, 
         for mapping in rows {
             if mapping.variable != key { continue; }
             if mapping.row == unknown_row { if allow_erased { return unknown_row, blot_error::Error.none; } return 0, blot_error::Error.unresolved_type; }
-            if mapping.row >= store.effects.rows.len { return 0, blot_error::Error.type_mismatch; } suffix = mapping.row; replaced = true; break;
+            if mapping.row >= store.effects.view().rows.len { return 0, blot_error::Error.type_mismatch; } suffix = mapping.row; replaced = true; break;
         }
         if !replaced {
             if kind == 1 { if allow_erased { return unknown_row, blot_error::Error.none; } return 0, blot_error::Error.unresolved_type; }
@@ -479,7 +495,7 @@ recursive fn fromTypeRow(store: Store&, module: const blot_check_core::Module&, 
         let operation = module.types.operation(label); let instance = blot_check_types::selectionAtom(module.types, mappedInstance(operation.instance, mappings));
         let mapped, error = store.effects.internOperationInstance(operation.identity, arguments.items, instance); if error != blot_error::Error.none { return 0, effectError(error); } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
-    labels.append(store.effects.view().rowLabels(suffix));if labels.failure!=blot_error::Error.none {return 0,labels.failure;} if suffix != 0 { formal = store.effects.rows.items[suffix].formal; }
+    labels.append(store.effects.view().rowLabels(suffix));if labels.failure!=blot_error::Error.none {return 0,labels.failure;} if suffix != 0 { formal = store.effects.view().rows[suffix].formal; }
     let result, error = store.effects.internRowWithFormal(labels.items, formal); if error != blot_error::Error.none { return 0, effectError(error); } return result, blot_error::Error.none;
 
         }
@@ -617,7 +633,7 @@ recursive fn toEvidenceRow(store: Store&, target: blot_eval_type_evidence::Store
         let argument_count=source.operationArguments(label).len;for argument_index in 0..argument_count {let argument=source.operationArguments(label)[argument_index]; let selected, error = toEvidenceDepth(store, target, argument, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } arguments.push(selected);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;} }
         let operation = source.operation(label); let mapped, error = target.effects.internOperationInstance(operation.identity, arguments.items, operation.instance); if error != blot_error::Error.none { return 0, error; } labels.push(mapped);if labels.failure!=blot_error::Error.none {return 0,labels.failure;}
     }
-    let old_formal = store.effects.rows.items[row].formal; var formal: u32 = 0;
+    let old_formal = store.effects.view().rows[row].formal; var formal: u32 = 0;
     if old_formal != 0 { let selected, error = toEvidenceDepth(store, target, old_formal, depth + 1, budget, bound_arity); if error != blot_error::Error.none { return 0, error; } formal = selected; }
     return target.effects.internRowWithFormal(labels.items, formal);
 
@@ -717,15 +733,15 @@ recursive fn fromSolverDepth(store: Store&, source: blot_check_types::Store&, ty
             let leaf = source.node(formal); if leaf.tag != blot_check_types::Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.unresolved_type; }
             let value, error = internWithEffects(store, Tag.opened, ordinal as u32, 0, leaf.b, []); if error != blot_error::Error.none { return 0, error; } binders[ordinal] = value;
         }
-        if store.solver_owners.len >= 128 { return 0, blot_error::Error.layout_limit; }
-        let mark = store.solver_binders.len; let range = blot_backend_runtime_ir::Range { start: mark, len: n.c , ..}; store.solver_binders.append(owned[..n.c]); store.solver_owners.push(range);
-        let body, error = fromSolverDepth(store, source, n.a, depth + 1, budget); store.solver_owners.pop(); store.solver_binders.resize(mark); if error != blot_error::Error.none { return 0, error; }
+        if store.solver_owner_count >= 128 { return 0, blot_error::Error.layout_limit; }
+        let mark = store.solver_binder_count; if n.c > 16384 - mark { return 0, blot_error::Error.layout_limit; } let range = blot_backend_runtime_ir::Range { start: mark, len: n.c , ..}; for index in 0..n.c { store.solver_binders[mark + index] = owned[index]; } store.solver_binder_count += n.c; store.solver_owners[store.solver_owner_count] = range; store.solver_owner_count++;
+        let body, error = fromSolverDepth(store, source, n.a, depth + 1, budget); store.solver_owner_count--; store.solver_binder_count = mark; if error != blot_error::Error.none { return 0, error; }
         var tag = Tag.existential; if n.tag == blot_check_types::Tag.forall { tag = Tag.universal; } return intern(store, tag, body, n.c, binders[..n.c]);
     }
     if n.tag == blot_check_types::Tag.bound {
         if n.a >= 128 || n.b > 2 || n.c != 0 { return 0, blot_error::Error.unresolved_type; }
-        var index = store.solver_owners.len;
-        while index != 0 { index--; let owner = store.solver_owners[index]; if n.a >= owner.len || store.solver_binders[owner.start + n.a] != root { continue; } return internWithEffects(store, Tag.opened, n.a, (store.solver_owners.len - 1 - index) as u32, n.b, []); }
+        var index = store.solver_owner_count;
+        while index != 0 { index--; let owner = store.solver_owners[index]; if n.a >= owner.len || store.solver_binders[owner.start + n.a] != root { continue; } return internWithEffects(store, Tag.opened, n.a, (store.solver_owner_count - 1 - index) as u32, n.b, []); }
         return internWithEffects(store, Tag.opened, n.a, 0, n.b, []);
     }
     if n.tag == blot_check_types::Tag.erased_proof { return intern(store, Tag.erased_proof, 0, 0, []); }
@@ -788,15 +804,15 @@ recursive fn fromSolverRow(store: Store&, source: blot_check_types::Store&, row:
     }
     let result,error=convertRow();source_arguments.deinit();source_labels.deinit();arguments.deinit();labels.deinit();return result,error;
 }
-fn deinit(closed: ClosedLayouts&) { closed.kinds.clear(); closed.kind_bytes.clear(); closed.layouts.clear(); }
+fn deinit(closed: ClosedLayouts&) { closed.kinds.clear(); closed.kind_bytes.clear(); closed.layouts.clear(); closed.input_owner = blot_backend_result_publication::Owner {..}; }
 fn deinit(store: Store&) {
     store.effects.deinit();
     deinit(store.closed); store.record_names.map.clear();
     store.nodes.clear(); store.extra.clear(); store.universal_dictionaries.clear(); store.next.clear(); store.buckets.clear();
-    store.solver_owners.clear(); store.solver_binders.clear(); store.type_owners.clear();
+    store.solver_owner_count = 0; store.solver_binder_count = 0; store.type_owner_count = 0;
 }
 fn reset(store: Store&) -> blot_error::Error {
     deinit(store);
     let effects,error = blot_check_effect_evidence::init();
-    if error != blot_error::Error.none { return error; } store.effects = effects; return init(store);
+    if error != blot_error::Error.none { return error; } store.effects = blot_check_effect_evidence::handle(effects); return init(store);
 }

@@ -2,23 +2,28 @@
 namespace blot_backend_backend_representations;
 import check.core;
 import .layout;
+import .result_publication;
 import .layout_bridge;
 import eval.type_evidence;
 import eval.instance_arguments;
 import reuse.substitution_keys;
 import support.error;
+import support.option;
 struct State {
     store: blot_backend_layout::Store&,connection: blot_backend_layout_bridge::Store&,connection_bound: bool = false,
     row_keys: blot_reuse_substitution_keys::Store&,template_keys: blot_reuse_substitution_keys::Store&,static_keys: blot_reuse_substitution_keys::Store&,instance_arguments: blot_eval_instance_arguments::Store&,
 }
-fn init(state: State&,units: const blot_check_core::Module[:]) -> blot_error::Error {
-    let initialized = state.store.reset(); if initialized != blot_error::Error.none { return initialized; } state.store.opaque_sources = units; state.store.closed.units = units;
-    for source in units { let error = state.store.record_names.add(state.store.opaque_sources,source); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.declined; } }
+fn init(state: State&,units: const blot_check_core::Module[:],input_owner: blot_backend_result_publication::Owner) -> blot_error::Error {
+    let registered,input_error = blot_backend_result_publication::registeredInputUnits(input_owner);
+    if input_error != blot_error::Error.none { return input_error; }
+    if !blot_support::same_slice_identity(registered,units) { return blot_error::Error.invalid_artifact; }
+    let initialized = state.store.reset(); if initialized != blot_error::Error.none { return initialized; } state.store.closed.input_owner = input_owner;
+    for source in registered { let error = state.store.record_names.add(registered,source); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return blot_error::Error.declined; } }
     resetCaches(state); return blot_error::Error.none;
 }
 fn initEmpty(state:State&)->blot_error::Error {
     let initialized=state.store.reset();if initialized!=blot_error::Error.none {return initialized;}
-    state.store.opaque_sources=default<const blot_check_core::Module[:]>();state.store.closed.units=default<const blot_check_core::Module[:]>();
+    state.store.closed.input_owner=blot_backend_result_publication::Owner {..};
     resetCaches(state);return blot_error::Error.none;
 }
 fn resetCaches(state:State&) {

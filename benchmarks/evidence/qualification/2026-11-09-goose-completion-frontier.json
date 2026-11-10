@@ -3871,7 +3871,7 @@
       "sum_stage_seconds": 2.626,
       "receipt": "2026-11-10-goose-declaration-generation-law.json.gz"
     },
-    "rejected_prototype": "Fixed bitset correct representation but per-body wholeword zeroing is avoidable quadratic work; superseded by generation marks before actualwhole",
+    "rejected_prototype": "Unqualified fixed bitset prototype superseded by generation marks before whole integration to avoid per-body full-table clearing.",
     "actual_compiler_runtime": false,
     "whole284": {
       "receipt": "2026-11-10-goose-declaration-whole284.json.gz",
@@ -3899,5 +3899,152 @@
       "whole_compiler_executable": false
     },
     "remaining": "Capture.work.pop live alias; convert whole Capture scratch family to stable owners and logical LIFO"
+  },
+  "stable_declaration_capture": {
+    "scratch_owners": 4,
+    "work_stack": "Append-only backing plus scalar logicaltop; dead slots reused",
+    "publication": "Original GS public outputs unchanged; one explicit copy afterallbodies success; original clear rollback onerror",
+    "native": {
+      "tests": 1,
+      "passed": true,
+      "wall_seconds": 3.383,
+      "sum_stage_seconds": 2.755,
+      "receipt": "2026-11-10-goose-stable-declaration-law.json.gz"
+    },
+    "scope": [
+      "actual Core product/reference DFS+location order",
+      "two scansreuse workhighwater2",
+      "nonempty copyout",
+      "laterbody failure rollback",
+      "generation wrap and prior admission/order cases"
+    ],
+    "whole285": {
+      "receipt": "2026-11-10-goose-stable-capture-whole285.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 163.748,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "performance": "Not measured; extra public publication copy and4bytes/binding marks explicit tradeoffs",
+    "cleared": "Both visited dictionary growth andworkpop Capturealias paths",
+    "remaining": "layout_bridge.deinit five borrowed GS memoarray fields; convertcoherentWords ownerfamily"
+  },
+  "layout_bridge_pooled_words": {
+    "memo_headers": 5,
+    "owner": "Existing optimizer_buffers.Words named pool; backing headers retaincapacity acrossclear",
+    "publication": "One resize/ensure+missingfill; explicitError propagation inall5conversions",
+    "snapshot": "copy .items preservingallfivefield order andownedBridge lifetime",
+    "native": {
+      "passed": true,
+      "tests": [
+        "layout_bridge_words",
+        "empty_session"
+      ],
+      "sum_stage_seconds": 13.81,
+      "receipt": "2026-11-10-goose-bridge-words-laws.json.gz"
+    },
+    "whole286": "pending",
+    "actual_compiler_runtime": false
+  },
+  "layout_scalar_owner_boundary": {
+    "owner": "One existing result_publication.Owner forbothCoreuses; effect_evidence.Handle for8buffer/maprefs",
+    "representation": "SixGSphysicaltables+2existingBuckets; threeGSboundedstacks pendingfixedreplacement",
+    "no_new_payload_copy_or_pin": true,
+    "native_receipt": "2026-11-10-goose-layout-scalar-owner-laws.json.gz",
+    "native_tests": [
+      "effect_evidence_handles",
+      "layout_frame_store",
+      "layout_intern_leaf",
+      "layout_bridge_words",
+      "empty_session"
+    ],
+    "frame_positive": "PinnedrealCore/productionphysicalStore/256interns/retainedchildrenacrossgrowth/stalepub+effectafterrelease",
+    "reset_negative": "2.755s staticrejection ofretainedchildviewacrossreset",
+    "growth_note": "Priornegativegrowthassumptionwaswrong: BF_PUSH/BF_APPEND doNOTshrink; resetnegativeusesactualclear. No checkerchange.",
+    "whole288": {
+      "receipt": "2026-11-10-goose-layout-scalars-whole288.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 158.736,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "remaining": "Threehardboundedquantifierstacks; preparingfixedarraysandscalarcounts"
+  },
+  "native_runner_immutable_receipts": {
+    "path": "compiler-goose/tools/test_engines.py",
+    "behavior": "Everybatch writes immutablegzipJSON withrawbase64stagelogs beforelateroverwrites",
+    "verified": "OneexecutedHandlelawpassed;4rawstageloghashesmatchrecordedSHA",
+    "full_inventory_current_source": false
+  },
+  "layout_fixed_conversion_stacks": {
+    "scope": "Five affected native laws; whole289 pending",
+    "representation": {
+      "type_owners": 128,
+      "solver_owners": 128,
+      "solver_binders": 16384,
+      "counts": "three owned scalar counters",
+      "heap_allocation_for_stacks": false
+    },
+    "limits_preserved": true,
+    "native": {
+      "passed": true,
+      "tests": [
+        "layout_fixed_stacks",
+        "layout_frame_store",
+        "layout_intern_leaf",
+        "effect_evidence_handles",
+        "empty_session"
+      ],
+      "sum_stage_seconds": 26.09,
+      "receipt": "2026-11-10-goose-layout-fixed-stack-laws.json.gz"
+    },
+    "coverage": [
+      "actual fromType/fromSolver",
+      "128 nested owners",
+      "16384 binder slots",
+      "129 owner rejection",
+      "nested failure restores allcounts",
+      "repeat returns samecanonicalid",
+      "Frame+pinnedCore+staleowners",
+      "growth views valid/reset views rejected"
+    ],
+    "whole289": "pending",
+    "actual_compiler_runtime": false
   }
 }

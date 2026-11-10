@@ -45,14 +45,20 @@ fn children(view: View, id: Id) -> const Id[:] {
         _ => { return view.extra[..0]; },
     }
 }
-fn init(nodes: Nodes&, extra: Ids&, next: Ids&, buckets: dictionary<u64, Id>&) -> Store, Error {
-    nodes.clear(); extra.clear(); next.clear(); ::clear(buckets);
-    let store=Store{blot_native::fresh_owner_id(),nodes,extra,next,buckets,..};
-    let node_error=nodes.ensure(6);if node_error!=blot_error::Error.none {return store,node_error;}
-    let next_error=next.ensure(6);if next_error!=blot_error::Error.none {return store,next_error;}
-    let tags = [blot_eval_type_evidence::Tag.absent, blot_eval_type_evidence::Tag.unit, blot_eval_type_evidence::Tag.boolean, blot_eval_type_evidence::Tag.unsigned32, blot_eval_type_evidence::Tag.floating32, blot_eval_type_evidence::Tag.never];
-    for tag in tags { nodes.push(Node { tag: tag , ..}); next.push(0); }
-    return store, blot_error::Error.none;
+fn seed(store:Store&)->u64,Error {
+    store.nodes.clear();store.extra.clear();store.next.clear();::clear(store.buckets);
+    let owner=blot_native::fresh_owner_id();
+    let node_error=store.nodes.ensure(6);if node_error!=blot_error::Error.none {return owner,node_error;}
+    let next_error=store.next.ensure(6);if next_error!=blot_error::Error.none {return owner,next_error;}
+    let tags=[blot_eval_type_evidence::Tag.absent,blot_eval_type_evidence::Tag.unit,blot_eval_type_evidence::Tag.boolean,blot_eval_type_evidence::Tag.unsigned32,blot_eval_type_evidence::Tag.floating32,blot_eval_type_evidence::Tag.never];
+    for tag in tags {store.nodes.push(Node{tag:tag,..});store.next.push(0);}
+    return owner,blot_error::Error.none;
+}
+fn init(nodes:Nodes&,extra:Ids&,next:Ids&,buckets:dictionary<u64,Id>&)->Store,Error {
+    var store=Store{0,nodes,extra,next,buckets};let owner,error=seed(store);store.owner_id=owner;return store,error;
+}
+fn reset(store:Store&)->Error {
+    let owner,error=seed(store);if error==blot_error::Error.none {store.owner_id=owner;}return error;
 }
 fn deinit(store: Store&) { store.nodes.clear(); store.extra.clear(); store.next.clear(); ::clear(store.buckets); }
 fn view(store: Store&) -> View { View { store.nodes.items, store.extra.items } }

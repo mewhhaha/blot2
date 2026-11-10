@@ -164,6 +164,11 @@ fn initPooled() -> Store,Error { if next_generation==0xffffffffffffffff||states.
 fn initPooledRef() -> Store?,Error { let value,error=initPooled(); if error!=blot_error::Error.none { return null,error; } let index=handles.alloc_index(value); handles[index].handle_index=index; return handles[index],blot_error::Error.none; }
 fn seedEmpty(self_: Store) { self_.values.push(ValueInfo {}); self_.value_evidence.push(1); self_.value_records.push(0); self_.record_layouts.push(blot_check_core::List {}); self_.record_shape_next.push(0); }
 fn valid(self_: Store) -> bool { return self_.lease!=0&&self_.lease-1<states.len&&states[self_.lease-1].live&&states[self_.lease-1].generation==self_.generation; }
+// Evidence belongs to this live value owner, not to a projected caller class.
+fn canonicalEvidenceStore(source:const Store&)->blot_eval_type_evidence::Store& {
+ assert(source.valid());let owned:blot_eval_type_evidence::Store& =states[source.lease-1].evidence;
+ assert(source.evidence .==owned);return owned;
+}
 fn scalar(self_: Store,value: Value) -> ValueId,Error {
  let id=self_.values.len as ValueId; self_.values.push(ValueInfo { bits:value.bits, scalar:value.scalar }); var evidence: u32=0;
  if value.scalar==blot_backend_runtime_ir::SC_unit { evidence=1; } else if value.scalar==blot_backend_runtime_ir::SC_bool { evidence=2; } else if value.scalar==blot_backend_runtime_ir::SC_u32 { evidence=3; } else if value.scalar==blot_backend_runtime_ir::SC_f32 { evidence=4; }

@@ -1,42 +1,39 @@
 # Finish the Goose compiler experiment
 
-Build the complete Goose C/header/native executable, then qualify CLI/server,
+Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
-Preserve compiler/ as the independent oracle; no forwarding or ABI fallback.
+No forwarding to compiler/ and no ABI fallback.
 
-Whole283 clears the Run prepare/reset and startup planner loans, then fails at
-reuse/declaration_dependencies.goose54 visited-dictionary insert.162.11s,
-unchanged461inputs, no artifact. Declaration scans now use fixed u32 generation
-marks with O(1) normal reset over append-only stable local owners. New native
-cycle/order/reset/invalid-target/rollover law passes. Whole284 fails160.00s at Capture.work.pop live alias; the complete scratch
-family is next. No whole artifact.
+Whole288 clears physical interning, then fails at layout342 recursive conversion
+because three scratch stacks shrink Store.158.74s, unchanged461inputs, noartifact.
+Whole289 with fixed stacks is running.
 
-Source-completion/validation receipts carry existing scalar identities. Zero,
-stale and reused-generation laws pass. Input identity/digest/order spans reborrow
-the original named journals. Whole282 confirms all5inputroots survive through
-compileAttempt. Startup planning takes Frame and reborrows named planning only
-after dependency queries; two evaluator requests are scalar. Two native laws
-pass18.58s summed stages. These are component laws, not compiler runtime proof.
+Physical Store now keeps scalar publication/effect authority instead of foreign
+Core/effect views. Existing registries/pools supply invocation-local descriptors;
+no payload copies/newpins. Core catalog identity and effect generation checked.
+Retainedchildren survivegrowth; resetwithaliveview rejects2.755s. Frame release
+invalidates both keys. Six stable-array experiment removed afterclear failures;
+original GS physicaltables retained. Two maps reuse existing Buckets.
 
-Use private experimental build/goose-port/finite-root-diagnostics/goose.
-Finite exact-global contents sets cap64; inexact/local/recursive/unknown and
-larger sets keep conservative behavior. Parent33lifetime/3runtime/24semantic
-controls pass; metadata/traversal build repeats33lifetime/24semantic controls.
-Installed Goose unchanged. Trace:GOOSE_OPTIONS_ROOT_TRACE=1. Nominal buckets halve
-TypeEq calls but single150s/154s pair does not establish robust speedup.
+Three hard-bounded stacks use fixed128/128/16384 backing andscalarcounts. Five
+native laws pass26.09s summed stages, including full bounds, overflow, nested
+failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
+loans cleared by coherent source families. Native runner now seals immutable
+receipts/rawlogs automatically; currentfull42law inventory stillpending.
 
-Current source full inventory pending. Earlier36/36 component laws and removal
-of92cleanup wrappers/68map adapters/134publications remain exact historical
-receipts, not whole compiler acceptance. All selected roots are partial,
-check-only and never executable. Repair120s/emission180s/whole300s caps remain.
-No cap lifting, suppressed borrow checks or clearing live owners to hide errors.
+Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
+exact-global copiedcontents precision passes33lifetime/3runtime/24semantic
+controls; metadata/traversal build repeats33lifetime/24semantic controls.
+Unknown/inexact/local/recursive/over64root paths remain conservative. Installed
+Goose unchanged. Trace:GOOSE_OPTIONS_ROOT_TRACE=1. Repair120s/emission180s/
+whole300s limits remain. No cap lifting or suppressed borrow checks.
 
-Once the real executable exists, run tools/qualify_compiler.ts against it and
-compiler/zig-out-native-fast/bin/blotc. Runner covers CLI/ABI8, project lifecycle,
-cold and retained OOM/retry plus2warmup/6measured edit/restore RSS observations
-under16MiB growth budget. Allocator live bytes unavailable. Static runner checks
-pass; actual Goose runtime checks have not run. No fresh Gdev/Main/frame or
-compile-speed/output-size win. Preserve ABI8/session2, owners, copies and siblings.
+Once actual executable exists, run tools/qualify_compiler.ts withit and
+compiler/zig-out-native-fast/bin/blotc. Covers CLI/executedABI8, project lifecycle,
+cold/retained OOM/retry,2warmup/6measured edit/restore revisions under16MiB RSS
+growth. Allocator livebytes unavailable. Runnerstatic checks pass; actualGoose
+runtime checks have notrun. No freshGdev/Main/frame orspeed/sizewin. Preserve
+ABI8/session2, explicitowners/copies andsiblings. No environment publication.
 
-See [the root frontier](../CONTINUE.md), [receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
-and [storage task](../tasks/STORAGE_REWRITE.md) for remaining requirements.
+See [root frontier](../CONTINUE.md), [receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
+and [storage task](../tasks/STORAGE_REWRITE.md) forremaining requirements.
