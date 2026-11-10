@@ -4,9 +4,10 @@ import check.core;
 import reuse.code_artifacts;
 import reuse.principal_reuse_gate;
 import support.option;
+import backend.runtime_identity;
 type Gate = blot_reuse_principal_reuse_gate::Gate;
 fn share(allocation_owner: u64, old: const blot_reuse_code_artifacts::Pools&,
-    units: const blot_check_core::Module[:], checked: const Gate&) -> blot_support::Option<Gate> {
+    units: const blot_check_core::Module[:], names:blot_support::Option<blot_backend_runtime_identity::View>, checked: const Gate&) -> blot_support::Option<Gate> {
     if allocation_owner == 0 || checked.allocation_owner != allocation_owner ||
         checked.source_pools .!= old || !blot_support::same_slice_identity(checked.units, units) { return blot_support::none<Gate>(); }
     if checked.structural_units.len != units.len || checked.offsets.len != units.len + 1 ||
@@ -16,7 +17,14 @@ fn share(allocation_owner: u64, old: const blot_reuse_code_artifacts::Pools&,
             return blot_support::none<Gate>();
         }
     }
-    return blot_support::some(checked.retain());
+    if checked.validation_names.present {
+        if !names.present {return blot_support::none<Gate>();}
+        let old_names=checked.validation_names.value;let current=names.value;
+        if !blot_support::same_slice_identity(old_names.bytes,current.bytes)||!blot_support::same_slice_identity(old_names.symbols,current.symbols)||!blot_support::same_slice_identity(old_names.owners,current.owners) {return blot_support::none<Gate>();}
+    }
+    var retained=checked.retainOwned();retained.units=units;retained.source_pools .=old;
+    if checked.validation_names.present {retained.validation_names=names;}
+    return blot_support::Option<Gate>{true,retained};
 }
 fn validationBytes(gate: const Gate&) -> i64 {
     return gate.structural_units.len + gate.certified_images.len + gate.dirty.len + gate.local_dirty.len + gate.call_origins.len +

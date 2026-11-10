@@ -101,7 +101,7 @@ fn destroyContexts(frame:Frame) {
   workspace.origins.deinit();workspace.candidate.deinit();workspace.vectors.deinit();
   workspace.replay_origins.deinit();workspace.replay_candidate.deinit();workspace.replay_vectors.deinit();workspace.replay_module.deinit();
   workspace.retained.deinit();workspace.principal_state.deinit();workspace.persisted_principals.deinit();workspace.query_state.deinit();workspace.constant_state.deinit();
-  workspace.module_stamps.deinit();workspace.allocation_snapshot.deinit();workspace.startup_snapshot.deinit();workspace.explanation.deinit();
+  workspace.allocation_snapshot.deinit();workspace.startup_snapshot.deinit();workspace.explanation.deinit();
  }
  let generator_ref .=state.generator;
  if generator_ref {

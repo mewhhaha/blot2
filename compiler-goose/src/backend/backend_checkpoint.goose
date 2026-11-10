@@ -39,6 +39,10 @@ reusable var storage:Storage[>..]=[];
 reusable var optimizer_headers:Optimizer[>..]=[];
 struct Checkpoint {slot:u32=0,generation:u64=0,principal:Principal& =inactive.principal,optimizer:OptimizerSlot& =inactive.optimizer_ref,semantic:SemanticSlot& =inactive.semantic_ref}
 fn valid(self_:Checkpoint)->bool {return self_.slot!=0 && self_.slot-1<storage.len && storage[self_.slot-1].live && storage[self_.slot-1].generation==self_.generation;}
+fn principalArchive(self_:Checkpoint)->const Principal& {
+ assert(self_.valid());let principal:const Principal& =storage[self_.slot-1].principal;
+ assert(self_.principal .==principal);return principal;
+}
 fn deinit(self_:Checkpoint&) {if self_.slot==0 {return;}assert(self_.valid());let at=self_.slot-1;let state:Storage& =storage[at];state.principal.deinit();let optimizer .= state.optimizer_ref.value;if optimizer {optimizer.deinit();assert(state.optimizer_header>=0);optimizer_headers.free(state.optimizer_header);}state.optimizer_ref.value .= null;state.optimizer_header=-1;state.semantic.archive.deinit();state.live=false;self_=Checkpoint{..};storage.free(at);}
 fn publishOptimizer(value:Optimizer)->i64 {return optimizer_headers.alloc_index(blot_backend_optimized_bodies::checkedView(value));}
 fn decode(factory:Factory&,compiler:Digest,bytes:const u8[:])->Checkpoint,Error {

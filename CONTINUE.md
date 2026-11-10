@@ -6,26 +6,40 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-Actual whole190 stops after **157.73s** with unchanged inputs and no artifacts.
-Its sole error is `reuse/artifact_fragment.goose:102`: an incoming Capture value
-retains the invocation's `old` reference (§9.2). The previous whole177 module-stamp
-and server source-header failures are cleared. See
+Latest focused prepare209 stops in **21.29s** at its caller: `prepare` shrinks
+resolved-body payloads while local `Run` remains live (§5.1). The prior incoming
+Capture store and global stamp scratch errors are cleared on that path. A copied
+lifecycle split is next: validate source keys before reset, create the lexical
+memo after reset, end its scope before final Run cleanup. Never execute the
+unstaged preparation root. See
+[the stamp iteration receipts](benchmarks/evidence/qualification/2026-11-10-goose-stamp-iteration-family.json.gz).
+
+Four affected native laws pass in **58.26s**: exact stamp snapshots and mutation
+tokens, independent lexical memos, live Capture/header keys, prepared input/session
+lifetime, and actual resolved-body/shared-gate teardown. Exact closures and logs:
+[executed family](benchmarks/evidence/qualification/2026-11-10-goose-lexical-stamp-owner-laws.json.gz).
+The stamp law does not keep a memo across Frame; the Capture law separately keeps
+real adopted semantic pins across Frame. Shared-gate checks reuse the existing
+resolved-body fixture; adding full Gate construction to Capture hit its 30s cap.
+
+The latest actual whole build is still whole190: **157.73s**, unchanged inputs,
+no artifacts, incoming Capture store error. It predates this family. See
 [whole190](benchmarks/evidence/qualification/2026-11-10-goose-whole190.json.gz).
+Inventory is **35** and has not run together. Complete32 passed 288.97s at
+`e514479e`, before later repairs; it is not current full coverage.
 
-A focused `prepare` root reproduces that same source error in **2.87s**. This is
-an iteration improvement, not compiler throughput. The root traverses actual
-preparation with deliberately unstaged inputs; never execute it. Source/diagnostic
-history is in [the preparation receipts](benchmarks/evidence/qualification/2026-11-10-goose-prepare-boundary-family.json.gz).
-The earlier actual scoped path checks cleanly in 61.47s at e3bf1904; it also uses
-invalid empty Core and does not qualify runtime.
+Capture views reborrow their existing registry slot/token, validate canonical
+pointer identity, and preserve keys on core publish/reset. Fragment importer
+leaves reborrow named Pools and module-header runs. Checkpoint readers use the
+existing checked slot/generation. Shared gates retain owned flag runs and borrow
+only the explicitly supplied exact source/identity pair.
 
-The affected five native laws pass in **63.48s**: record ordering, proof/Recorder
-leases, identity authority, prepared input/session lifetime and server request
-snapshot ownership. Exact closures, C/link/run logs and audits:
-[executed family](benchmarks/evidence/qualification/2026-11-10-goose-preparation-owner-laws.json.gz).
-The earlier input/server/proof trio passes 53.88s, before final strengthening.
-Inventory is now **34**; it has not run together. Complete32 passes 288.97s at
-`e514479e`, before the later families. Do not present it as current-source coverage.
+Stamp entries are invocation-local growing storage; the workspace/global memo,
+retirement counter and duplicate source-pointer/optional memo fields are removed.
+Source binding validates exact publication/Context owners; scalar keys reborrow
+those same headers. Entries still snapshot full headers by value, preserving
+header-change tokens and digest/comparison behavior. Local growth replaces pooled
+stamp capacity; its cost has not been benchmarked.
 
 CompileRun drops its duplicate module header and reads the existing pinned input
 owner. Workspace/prior Pools reborrow checked canonical owners. Recorder reset
@@ -46,8 +60,7 @@ Scoped diagnostic carriers remain scalar; all original strings and 61 exact
 lookup/render IDs are preserved. Assembly scratch is lexical and retains its
 original cleanup/error/retry order. Current native leaf controls do not qualify
 full generation, process scheduling, CLI/server or retained compilation runtime.
-The next Capture registry repair is prepared off-tree and not checkpointed yet;
-reuse its existing registry and preserve the header key at core publish/reset.
+The complete compiler lifecycle and CLI/server/OOM/retry remain unqualified.
 
 ## Contracts and remaining coverage
 

@@ -19,7 +19,7 @@ struct Capture {
     context: blot_reuse_code_artifacts::Context?=null, emission: blot_reuse_artifact_emitter::Recorder& =blot_reuse_artifact_emitter::inactive_recorder,
     cached_units: i64 = 0, optimized: blot_backend_optimized_bodies::Capture&? = null,
     executable_queries: blot_reuse_executable_query::FragmentTable& =inactive_queries,
-    executable_queries_complete: bool = false,
+    executable_queries_complete: bool = false,registry_slot:u32=0,registry_token:u64=0,
 }
 fn metadata(self_:Capture)->blot_reuse_code_artifacts::Context& {let context .=self_.context;assert(context!=null);return context;}
 fn init(metadata: blot_reuse_code_artifacts::Context&, emission: blot_reuse_artifact_emitter::Recorder&,
@@ -27,6 +27,11 @@ fn init(metadata: blot_reuse_code_artifacts::Context&, emission: blot_reuse_arti
     return Capture { context: metadata, emission: emission, cached_units: cached_units, executable_queries: queries , ..};
 }
 
+// Resetting a live canonical header preserves its registry authority.
+fn resetHeader(self_:Capture&,metadata:blot_reuse_code_artifacts::Context&,emission:blot_reuse_artifact_emitter::Recorder&,queries:blot_reuse_executable_query::FragmentTable&,cached_units:i64=0) {
+ let slot=self_.registry_slot;let token=self_.registry_token;
+ self_=Capture{context:metadata,emission:emission,cached_units:cached_units,executable_queries:queries,registry_slot:slot,registry_token:token,..};
+}
 fn sealExecutableQueries(self_: Capture&) -> Error {
     assert(self_.executable_queries.records.len == 0 && !self_.executable_queries_complete);
     if !self_.metadata().pools.present { return blot_error::Error.none; }
@@ -121,12 +126,20 @@ reusable var capture_owners:CaptureOwner[>..]=[];
 var capture_tokens:blot_support_pooled_map::Map<u64,u32> =blot_support_pooled_map::Map<u64,u32>{..};
 reusable[] var capture_token_slots:dictionary_slot<u64,u32>[>..]=[];
 struct Factory {allocation_owner:u64=0}
+fn validCaptureKey(slot:u32,token:u64)->bool {
+ return slot!=0&&slot-1<capture_owners.len&&capture_owners[slot-1].live&&capture_owners[slot-1].token==token;
+}
+fn validCapture(self_:const Capture&)->bool {return validCaptureKey(self_.registry_slot,self_.registry_token);}
+fn registeredCapture(self_:const Capture&)->const Capture& {
+ assert(validCapture(self_));let canonical:const Capture& =capture_owners[self_.registry_slot-1].canonical;
+ assert(self_ .== canonical);return canonical;
+}
 fn createArchiveCapture(self_:Factory&)->Capture?,u64,Error {
     if capture_owners.len>=0xffffffff {return null,0,blot_error::Error.out_of_memory;}
     let metadata,e1=blot_reuse_code_artifacts::initPooledRef(self_.allocation_owner);if e1!=blot_error::Error.none {return null,0,e1;}assert(metadata!=null);
     let emission,e2=blot_reuse_artifact_emitter::initPooledRef();if e2!=blot_error::Error.none {metadata.releasePooled();return null,0,e2;}assert(emission!=null);
     let token=blot_native::fresh_owner_id();let at=capture_owners.alloc_index(CaptureOwner{live:true,token:token,metadata:metadata,emission:emission,..});
-    let state:CaptureOwner& =capture_owners[at];state.queries=blot_reuse_executable_query::initFragments();state.canonical=init(metadata,emission,state.queries);
+    let state:CaptureOwner& =capture_owners[at];state.queries=blot_reuse_executable_query::initFragments();state.canonical=init(metadata,emission,state.queries);state.canonical.registry_slot=(at+1) as u32;state.canonical.registry_token=token;
     let inserted=blot_support_pooled_map::insert(capture_tokens,token,at as u32,capture_token_slots);assert(inserted);
     return state.canonical,token,blot_error::Error.none;
 }

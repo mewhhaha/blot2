@@ -138,9 +138,10 @@ fn preparationPublication() {
         {let workspace=frame.borrow();assert(workspace);assert(blot_backend_core_backend::pinWorkspaceInputs(workspace,ready.units,ready.catalog_owner,ready.unit_owners,ready.seed_pin.owners())==blot_error::Error.none);
          let held=workspace.compiled_units;assert(held.len==1 && held[0].unit==1 && ready.source_completion && ready.seed_pin.owners().len==1);
          ready.deinit();let registered,error=blot_backend_scoped_backend::registeredModule(held,1);assert(error==blot_error::Error.none && registered && registered.unit==1);assert(catalog.valid() && unit_owner.valid() && held[0].unit==1);
-         var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+         var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var stamp_memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+         var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},module_stamps:stamp_memo,..};
          let registered_units=blot_backend_core_backend::runUnits(run);assert(blot_support::same_slice_identity(registered_units,held) && registered_units[0].unit==1);
-         workspace.module_stamps.current=blot_backend_core_backend::runUnits(run);assert(blot_support::same_slice_identity(workspace.module_stamps.current,held));}
+         assert(stamp_memo.bindSources(workspace.publication_owner,blot_backend_core_backend::runUnits(run),null)==blot_error::Error.none);assert(blot_support::same_slice_identity(blot_reuse_code_artifacts::currentStampUnits(stamp_memo),held));stamp_memo.deinit();}
         assert(frame.release()==blot_error::Error.none && !catalog.valid() && !unit_owner.valid());
     },_=>{abort("ready preparation expected");}}
     offer.value.deinit();

@@ -93,10 +93,10 @@ fn initInto(result: State&, old: const blot_reuse_artifact_capture::Capture&, un
     assert(old.metadata().pools.present);
     var admission = admitted;
     if !admission.present {
-        let gate, error = blot_reuse_principal_reuse_gate::initWithStamps(allocation_owner, old.metadata().pools.value, units, names, stamps);
+        let gate, error = blot_reuse_principal_reuse_gate::initWithStamps(allocation_owner, blot_reuse_code_artifacts::registeredPools(old.metadata()), units, names, stamps);
         if error != blot_error::Error.none { return error; } admission = blot_support::some(gate);
     }
-    result = State { allocation_owner: allocation_owner, old: old, gate: admission.value, names: names, stats: Stats {
+    result = State { allocation_owner: allocation_owner, old: blot_reuse_artifact_capture::registeredCapture(old), gate: admission.value, names: names, stats: Stats {
         dependency_validations: admission.value.dependency_validations,
         reused_dependency_validations: admission.value.reused_dependency_validations,
         projection_scans: admission.value.projection_scans, projection_visits: admission.value.projection_visits,
@@ -139,7 +139,7 @@ fn sourceU32(module: const blot_check_core::Module&) -> bool {
 fn primitiveEvidence<G>(self_: const State&, g: G&, owner: u32, types: const blot_eval_type_evidence::Mapping[:], rows: const blot_eval_type_evidence::RowMapping[:]) -> PrimitiveResult, Error {
     if rows.len != 0 || types.len == 0 { return PrimitiveResult.fallback, blot_error::Error.none; }
     if !blot_support::same_slice_identity(g.evaluator.units, self_.gate.units) { return PrimitiveResult.declined, blot_error::Error.none; }
-    assert(self_.old); let pools .= requiredOld(self_.old).metadata().pools.value;
+    assert(self_.old); let pools .= blot_reuse_code_artifacts::registeredPools(requiredOld(self_.old).metadata());
     if owner == 0 || owner > pools.modules.len || owner > self_.gate.units.len { return PrimitiveResult.declined, blot_error::Error.none; }
     let pin = pools.modules[owner - 1];
     if pin.unit != owner || !self_.gate.structural_units[owner - 1] { return PrimitiveResult.declined, blot_error::Error.none; }
@@ -162,7 +162,7 @@ fn inputImageEqual(self_: State&) -> bool {
     if self_.input_image_equal.present { return self_.input_image_equal.value; }
     self_.stats.input_image_checks++;let old:const blot_reuse_artifact_capture::Capture& =requiredOld(self_.old);
     for &current, index in self_.gate.units {
-        if !blot_reuse_principal_input_image::moduleEqual(old.metadata().pools.value.modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
+        if !blot_reuse_principal_input_image::moduleEqual(blot_reuse_code_artifacts::registeredPools(old.metadata()).modules[index].module, current) { self_.input_image_equal = blot_support::some(false); return false; }
     }
     self_.input_image_equal = blot_support::some(true); return true;
 }

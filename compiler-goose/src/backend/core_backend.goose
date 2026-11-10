@@ -1782,15 +1782,15 @@ struct CompileOptions {
 struct CompileWorkspace {
     publication_owner: blot_backend_result_publication::Owner,compiled_units: const blot_check_core::Module[:] = default<const blot_check_core::Module[:]>(),
     allocation_owner: u64,generator: Generator&,session_tables: blot_eval_core_eval::SessionTables,
-    module_stamps: blot_reuse_code_artifacts::ModuleStamps&,journal: blot_reuse_artifact_emitter::Recorder&,metadata: blot_reuse_code_artifacts::Context&,
+    journal: blot_reuse_artifact_emitter::Recorder&,metadata: blot_reuse_code_artifacts::Context&,
     retained: blot_reuse_artifact_fragment::State&,principal_state: blot_reuse_principal_evidence_reuse::State&,persisted_principals: blot_reuse_principal_archive::Reader&,query_state: blot_eval_completed_specialization_query::State&,constant_state: blot_reuse_constant_receipt_reuse::State&,
     origins: blot_backend_source_origins::View&,candidate: blot_backend_region_candidate::Extension&,vectors: blot_backend_simd_abi::View&,optimized: blot_backend_optimized_bodies::Capture&,
     capture: blot_reuse_artifact_capture::Capture&,allocation_snapshot: blot_backend_allocation_emission::Snapshot&,startup_snapshot: blot_backend_startup_emission_facts::Snapshot&,explanation: blot_reuse_dispatch_explanation::Explanation&,
     bytes: u8[>..<]&,message: u8[>..<]&,replay_module: blot_backend_wasm::Module&,replay_origins: blot_backend_source_origins::View&,replay_candidate: blot_backend_region_candidate::Extension&,replay_vectors: blot_backend_simd_abi::View&,replay_contexts: blot_backend_source_origins::Context[>..<]&,replay_bytes: u8[>..<]&,
 }
 struct CompileRun {
-    workspace: CompileWorkspace&,entry: u32,options: CompileOptions,clock: blot_backend_backend_timing::Clock,timing: blot_backend_backend_timing::Stats,
-    recording: bool = false,speculative_locals: bool = true,stamps_alive: bool = false,stamps: blot_reuse_code_artifacts::ModuleStamps&? = null,journal_alive: bool = false,metadata_alive: bool = false,generator_alive: bool = false,
+    workspace: CompileWorkspace&,entry: u32,options: CompileOptions,module_stamps:blot_reuse_code_artifacts::ModuleStamps&,clock: blot_backend_backend_timing::Clock,timing: blot_backend_backend_timing::Stats,
+    recording: bool = false,speculative_locals: bool = true,journal_alive: bool = false,metadata_alive: bool = false,generator_alive: bool = false,
     retained: blot_reuse_artifact_fragment::State&? = null,principal_state: blot_reuse_principal_evidence_reuse::State&? = null,persisted_principals: blot_reuse_principal_archive::Reader&? = null,query_state: blot_eval_completed_specialization_query::State&? = null,constant_state: blot_reuse_constant_receipt_reuse::State&? = null,
     origins: blot_backend_source_origins::View&? = null,candidate: blot_backend_region_candidate::Extension&? = null,vectors: blot_backend_simd_abi::View&? = null,optimized: blot_backend_optimized_bodies::Capture&? = null,
 }
@@ -1817,9 +1817,11 @@ fn deinit(result: Result&) {
     result.publication_owner = blot_backend_result_publication::Owner {..}; result.publication_epoch = 0; result.publication_pinned = false; result.publication_units = default<const blot_check_core::Module[:]>(); result.active = false; result.detached = false; result.message_source = default<const u8[:]>(); result.diagnostic = blot_support::none<Diagnostic>(); result.bytes .= inactive_result_bytes; result.owned_message .= inactive_result_message;
 }
 fn deinit(run: CompileRun&) {
+    // Borrowed header scratch ends before generator/planning payload cleanup.
+    run.module_stamps.deinit();
     let optimized .=run.optimized; if optimized { optimized.deinit(); } let vectors .=run.vectors; if vectors { vectors.deinit(); } let candidate .=run.candidate; if candidate { candidate.deinit(); } let origins .=run.origins; if origins { origins.deinit(); }
     let constant_state .=run.constant_state; if constant_state { constant_state.deinit(); } let query_state .=run.query_state; if query_state { query_state.deinit(); } let persisted_principals .=run.persisted_principals; if persisted_principals { persisted_principals.deinit(); } let principal_state .=run.principal_state; if principal_state { principal_state.deinit(); } let retained .=run.retained; if retained { retained.deinit(); }
-    if run.generator_alive { runWorkspace(run).generator.deinit(); } if run.metadata_alive { runWorkspace(run).metadata.deinit(); } if run.journal_alive { runWorkspace(run).journal.deinit(); } if run.stamps_alive { runWorkspace(run).module_stamps.deinit(); }
+    if run.generator_alive { runWorkspace(run).generator.deinit(); } if run.metadata_alive { runWorkspace(run).metadata.deinit(); } if run.journal_alive { runWorkspace(run).journal.deinit(); }
 }
 fn resetGenerator(source_workspace: CompileWorkspace&,journal: blot_reuse_artifact_emitter::Recorder&?) -> blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::canonicalWorkspace(source_workspace);
@@ -1843,10 +1845,10 @@ fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
     run.recording = run.options.artifact_replay || run.options.retain_artifacts || run.options.previous != null || run.options.query_previous != null;
     var query_previous .= run.options.query_previous; if query_previous == null { query_previous .= run.options.previous; }
     if query_previous == null { let checkpoint .= run.options.checkpoint; if checkpoint { let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
-    workspace.module_stamps.deinit(); workspace.module_stamps.current = runUnits(run); workspace.module_stamps.previous .= null;
-    if query_previous != null && query_previous.metadata().pools.present { workspace.module_stamps.previous .= blot_reuse_code_artifacts::registeredPools(query_previous.metadata()); }
-    workspace.module_stamps.compare_contents = true; workspace.module_stamps.validate = run.options.validate_pins; workspace.module_stamps.computed = 0; workspace.module_stamps.reused = 0; workspace.module_stamps.comparisons = 0; workspace.module_stamps.copied = 0; workspace.module_stamps.hashed = 0; run.stamps_alive = true;
-    if workspace.module_stamps.previous != null { run.stamps .= workspace.module_stamps; }
+    run.module_stamps.deinit();var previous_context:const blot_reuse_code_artifacts::Context?=null;
+    if query_previous != null && query_previous.metadata().pools.present { previous_context .=query_previous.metadata(); }
+    let stamps_error=run.module_stamps.bindSources(workspace.publication_owner,runUnits(run),previous_context);if stamps_error!=blot_error::Error.none {return stamps_error;}
+    run.module_stamps.compare_contents = true; run.module_stamps.validate = run.options.validate_pins; run.module_stamps.computed = 0; run.module_stamps.reused = 0; run.module_stamps.comparisons = 0; run.module_stamps.copied = 0; run.module_stamps.hashed = 0;
     workspace.journal.reset(); run.journal_alive = true;
     workspace.metadata.deinit(); workspace.metadata.allocation_owner = workspace.allocation_owner; workspace.metadata.active_job = 0; workspace.metadata.clock = 0; run.metadata_alive = true;
     if run.recording { workspace.journal.owner .= workspace.metadata.active_job; workspace.journal.clock .= workspace.metadata.clock; }
@@ -1867,23 +1869,24 @@ fn prepare(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
     run.timing.prepare_us = run.clock.lap(); return blot_error::Error.none;
 }
 fn prepareReuse(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Error {
+    var stamps:blot_reuse_code_artifacts::ModuleStamps&? = null; if run.module_stamps.previous_context != 0 { stamps .= run.module_stamps; }
     let workspace .= runWorkspace(run); let generator .= workspace.generator; var principal_previous .= run.options.principal_previous; if principal_previous == null { principal_previous .= run.options.previous; }
     var query_previous .= run.options.query_previous; if query_previous == null { query_previous .= run.options.previous; } if query_previous == null { let checkpoint .= run.options.checkpoint; if checkpoint { let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
     let previous .=run.options.previous;
     if !run.options.policy.memory_profile && previous {
         if previous.emission.sealed && previous.metadata().pools.present {
-            let error = blot_reuse_artifact_fragment::initInto(workspace.retained,previous,runUnits(run),runIdentity(run),run.options.cached_units,run.stamps,workspace.allocation_owner); if error != blot_error::Error.none { return error; }
+            let error = blot_reuse_artifact_fragment::initInto(workspace.retained,previous,runUnits(run),runIdentity(run),run.options.cached_units,stamps,workspace.allocation_owner); if error != blot_error::Error.none { return error; }
             run.retained .= workspace.retained; generator.retained .= workspace.retained;
         }
     }
-    let checkpoint .= run.options.checkpoint; if checkpoint { workspace.persisted_principals = blot_reuse_principal_archive::initReader(checkpoint.principal,runUnits(run),runIdentity(run)); run.persisted_principals .= workspace.persisted_principals; }
+    let checkpoint .= run.options.checkpoint; if checkpoint { workspace.persisted_principals = blot_reuse_principal_archive::initReader(checkpoint.principalArchive(),runUnits(run),runIdentity(run)); run.persisted_principals .= workspace.persisted_principals; }
     let retained .=run.retained;let persisted .=run.persisted_principals;
     if run.options.retain_artifacts || previous || checkpoint {
-        if persisted { generator.persisted_principals .= persisted; }
+        if persisted { assert(persisted .==workspace.persisted_principals);generator.persisted_principals .=workspace.persisted_principals; }
         if principal_previous != null && principal_previous.emission.sealed && principal_previous.metadata().pools.present {
             var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>();
-            if retained { let code_gate .=retained.importer.code_gate; if code_gate { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(principal_previous.metadata()),runUnits(run),code_gate.semantic); } }
-            let error = blot_reuse_principal_evidence_reuse::initInto(workspace.principal_state,principal_previous,runUnits(run),runIdentity(run),run.stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
+            if retained { assert(retained .==workspace.retained);let code_gate .=workspace.retained.importer.code_gate; if code_gate.present { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(principal_previous.metadata()),runUnits(run),runIdentity(run),code_gate.value.semantic); } }
+            let error = blot_reuse_principal_evidence_reuse::initInto(workspace.principal_state,principal_previous,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
             run.principal_state .= workspace.principal_state; generator.principal_state .= workspace.principal_state;
         }
         generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.principal_provider_enabled = true; generator.evaluator.principal_graph_provider_enabled = true;
@@ -1891,8 +1894,8 @@ fn prepareReuse(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Erro
     generator.evaluator.retain_specialization_receipts = run.recording; generator.evaluator.retain_constant_receipts = run.recording && run.options.constant_receipts;
     let principal .=run.principal_state;
     if query_previous != null && query_previous.metadata().pools.present {
-        var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>(); if principal { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(query_previous.metadata()),runUnits(run),principal.gate); }
-        let shared = admission.present; let error = blot_eval_completed_specialization_query::initInto(workspace.query_state,query_previous,runUnits(run),runIdentity(run),run.stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
+        var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>(); if principal { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(query_previous.metadata()),runUnits(run),runIdentity(run),principal.gate); }
+        let shared = admission.present; let error = blot_eval_completed_specialization_query::initInto(workspace.query_state,query_previous,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
         run.query_state .= workspace.query_state; if shared { workspace.query_state.stats.shared_gates = 1; workspace.query_state.stats.shared_gate_bytes = blot_reuse_shared_query_gate::validationBytes(workspace.query_state.gate); } else { workspace.query_state.stats.gate_fresh = 1; }
         workspace.query_state.parallel_enabled = run.options.io; workspace.query_state.semantic_workers = run.options.policy.semantic_workers; generator.query_state .= workspace.query_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.specialization_provider_enabled = true;
     }
@@ -1900,7 +1903,7 @@ fn prepareReuse(run: CompileRun&,skip_constant_replay: bool) -> blot_error::Erro
     if run.options.constant_receipts && !skip_constant_replay && query {
         let pools .= blot_reuse_code_artifacts::registeredPools(query.old.metadata());
         if blot_reuse_constant_receipt::hasProductiveRecord(pools.constant_records,generator.evaluator.minimum_constant_steps) {
-            let error = blot_reuse_constant_receipt_reuse::initInto(workspace.constant_state,pools,runUnits(run),runIdentity(run),run.stamps,workspace.allocation_owner,query.gate); if error != blot_error::Error.none { return error; }
+            let error = blot_reuse_constant_receipt_reuse::initInto(workspace.constant_state,pools,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,query.gate); if error != blot_error::Error.none { return error; }
             run.constant_state .= workspace.constant_state; generator.constant_state .= workspace.constant_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.constant_provider_enabled = true;
         }
     }
@@ -2027,7 +2030,7 @@ fn recordArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
     for record in metadata.specialization_queries.records { if record.dependencies.member.present { result.completed_queries.member_payload_bytes += blot_support_host_layout::selected_query_record + blot_reuse_specialization_receipt::ownedBytes(record.dependencies); } }
     if run.query_state != null && run.options.policy.semantic_workers > 1 { for record in run.query_state.independent_calls.items { let cloned,error = record.clone(); if error != blot_error::Error.none { return error; } metadata.independent_calls.push(cloned); } }
     result.query_tables.selected = metadata.specialization_queries.storage(); result.query_tables.principal = metadata.principal_queries.storage();
-    var stamps: blot_reuse_code_artifacts::ModuleStamps&? = null; if run.stamps != null || run.options.validate_pins { stamps .= workspace.module_stamps; }
+    var stamps: blot_reuse_code_artifacts::ModuleStamps&? = null; if run.module_stamps.previous_context != 0 || run.options.validate_pins { stamps .= run.module_stamps; }
     let captured = metadata.capturePoolsWithStamps(generator,runIdentity(run),stamps); if captured != blot_error::Error.none { return captured; } result.counters = generator.evaluator.counters; assert(metadata.pools.present);
     if run.principal_state != null {
         let certificate,error = run.principal_state.gate.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return error; } metadata.pools.value.dependency_certificate = certificate;
@@ -2118,16 +2121,18 @@ fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
 fn publish(run: CompileRun&,result: Result&) -> blot_error::Error {
     let workspace .= runWorkspace(run);
     if run.options.retain_artifacts {
-        workspace.capture = blot_reuse_artifact_capture::init(workspace.metadata,workspace.journal,workspace.capture.executable_queries,run.options.cached_units); workspace.capture.optimized .= run.optimized;
+        workspace.capture.resetHeader(workspace.metadata,workspace.journal,workspace.capture.executable_queries,run.options.cached_units); workspace.capture.optimized .= run.optimized;
         result.capture .= workspace.capture; run.optimized .= null; run.metadata_alive = false; run.journal_alive = false;
         let sealed = workspace.capture.sealExecutableQueries(); if sealed != blot_error::Error.none { return sealed; } result.query_tables.executable_fragment = workspace.capture.executable_queries.storage();
         if workspace.capture.optimized != null { result.query_tables.executable_optimizer = workspace.capture.optimized.queries.storage(); }
     }
-    result.module_stamps = ModuleStamps { workspace.module_stamps.computed,workspace.module_stamps.reused,workspace.module_stamps.comparisons,workspace.module_stamps.copied,workspace.module_stamps.hashed , ..};
+    result.module_stamps = ModuleStamps { run.module_stamps.computed,run.module_stamps.reused,run.module_stamps.comparisons,run.module_stamps.copied,run.module_stamps.hashed , ..};
     run.timing.capture_us = run.clock.lap(); result.timing = run.timing; return blot_error::Error.none;
 }
 fn compileAttempt(workspace: CompileWorkspace&,entry: u32,options: CompileOptions,skip_constant_replay: bool,speculative_locals: bool) -> Result,blot_error::Error {
-    var run = CompileRun { workspace: workspace,entry: entry,options: options,speculative_locals: speculative_locals , ..};
+    var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];
+    var stamp_memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+    var run = CompileRun { workspace: workspace,entry: entry,options: options,module_stamps:stamp_memo,speculative_locals: speculative_locals , ..};
     recursive fn cleanup_continuation_6() -> Result,blot_error::Error {
 
     let prepared = prepare(run,skip_constant_replay); if prepared != blot_error::Error.none { return emptyResult(workspace),prepared; }

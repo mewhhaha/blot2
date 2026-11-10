@@ -36,9 +36,17 @@ fn main() {optimizerPublication();semanticPins();
     for cycle in 0..4 {
         let capture,token,error=factory.createArchiveCapture();assert(error==blot_error::Error.none && capture!=null && token!=0);
         assert(capture.metadata().validContext() && !capture.metadata().pools.present && capture.executable_queries.records.len==0);
+        assert(blot_reuse_artifact_capture::validCapture(capture));let registered:const blot_reuse_artifact_capture::Capture& =blot_reuse_artifact_capture::registeredCapture(capture);assert(registered .== capture);
+        let old_slot=capture.registry_slot;let old_token=capture.registry_token;
+        capture.cached_units=7;capture.executable_queries_complete=true;
+        blot_reuse_artifact_capture::resetHeader(capture,capture.metadata(),capture.emission,capture.executable_queries,3);
+        assert(capture.registry_slot==old_slot&&capture.registry_token==old_token&&capture.cached_units==3&&!capture.executable_queries_complete&&blot_reuse_artifact_capture::validCapture(capture));
+        let after_reset:const blot_reuse_artifact_capture::Capture& =blot_reuse_artifact_capture::registeredCapture(capture);assert(after_reset .== capture);
+
         capture.metadata().pools=blot_support::some(default<blot_reuse_code_artifacts::Pools>());
         assert(capture.metadata().pools.present);
-        factory.destroyArchiveCapture(token);
+        factory.destroyArchiveCapture(token);assert(!blot_reuse_artifact_capture::validCaptureKey(old_slot,old_token));
+        let replacement,new_token,error=factory.createArchiveCapture();assert(error==blot_error::Error.none&&replacement!=null&&new_token!=token);assert(blot_reuse_artifact_capture::validCapture(replacement)&&!blot_reuse_artifact_capture::validCaptureKey(old_slot,old_token));factory.destroyArchiveCapture(new_token);
         blot_compile_workspace::clearBacking();
         blot_compile_workspace::resetBackingDescriptors();
     }

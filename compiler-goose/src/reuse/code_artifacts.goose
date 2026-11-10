@@ -22,6 +22,7 @@ import support.blake3;
 import support.structural;
 import support.wyhash;
 import backend.runtime_identity;
+import backend.result_publication;
 import check.effect_evidence;
 import reuse.constant_receipt;
 import reuse.dependency_certificate;
@@ -441,41 +442,78 @@ struct ModuleStampEntry {
     module: blot_check_core::Module, token: Token, digest: blot_support::Option<u8[32]>,
 }
 struct ModuleStamps {
-    current: const blot_check_core::Module[:], previous: const Pools? = null,
+    storage:ModuleStampEntry[>..<]&,
+    current_owner:blot_backend_result_publication::Owner=blot_backend_result_publication::Owner{},previous_context:u32=0,previous_generation:u64=0,bound:bool=false,
     compare_contents: bool = false, validate: bool = false,
     computed: i64 = 0, reused: i64 = 0,
     comparisons: i64 = 0, copied: i64 = 0, hashed: i64 = 0,
     // Header snapshots borrow this invocation's current/previous Core owners.
-    entries: blot_support_pooled_buffer::Buffer<ModuleStampEntry> =blot_support_pooled_buffer::Buffer<ModuleStampEntry>{..},
 }
-reusable[] var module_stamp_entries:ModuleStampEntry[>..]=[];
-fn deinit(self_:ModuleStamps&) {blot_support_pooled_buffer::deinit(self_.entries,module_stamp_entries);}
-fn ownedModule(self_:const ModuleStamps&,module:const blot_check_core::Module&)->const blot_check_core::Module? {
- for &candidate in self_.current {if candidate .== module {return candidate;}}
- let old .= self_.previous;if old {if module.unit!=0 && module.unit<=old.modules.len && old.modules[module.unit-1].module .== module {return old.modules[module.unit-1].module;}for pin in old.modules {if pin.module .== module {return pin.module;}}}
- return null;
+fn deinit(self_:ModuleStamps&) {
+ self_.storage.clear();self_.bound=false;
+ self_.current_owner=blot_backend_result_publication::Owner{};self_.previous_context=0;self_.previous_generation=0;
 }
-fn owns(self_:const ModuleStamps&,module:const blot_check_core::Module&)->bool {return ownedModule(self_,module)!=null;}
+
+fn entries(self_:const ModuleStamps&)->const ModuleStampEntry[:] {assert(self_.bound);return self_.storage[..];}
+fn previousStampPools(lease:u32,generation:u64)->const Pools? {
+ if lease==0 {assert(generation==0);return null;}
+ assert(lease-1<context_owners.len&&context_owners[lease-1].live&&context_owners[lease-1].generation==generation);
+ let context:const Context& =context_owners[lease-1].canonical;assert(context.pools.present);return context.pools.value;
+}
+fn bindSources(self_:ModuleStamps&,owner:blot_backend_result_publication::Owner,current:const blot_check_core::Module[:],previous:const Context?)->Error {
+ if self_.bound||self_.storage.len!=0 {return blot_error::Error.invalid_artifact;}
+ let held,error=blot_backend_result_publication::registeredInputUnits(owner);if error!=blot_error::Error.none {return error;}
+ if !blot_support::same_slice_identity(held,current) {return blot_error::Error.invalid_artifact;}
+ var lease:u32=0;var generation:u64=0;
+ if previous {if !previous.validContext() {return blot_error::Error.invalid_artifact;}
+  let canonical:const Context& =context_owners[previous.context_lease-1].canonical;
+  if !(previous .== canonical)||!canonical.pools.present {return blot_error::Error.invalid_artifact;}
+  lease=previous.context_lease;generation=previous.context_generation;
+ }
+ self_.current_owner=owner;self_.previous_context=lease;self_.previous_generation=generation;self_.bound=true;return blot_error::Error.none;
+}
+fn currentStampUnits(self_:const ModuleStamps&)->const blot_check_core::Module[:] {
+ if self_.current_owner.slot==0 {assert(self_.current_owner.generation==0);return default<const blot_check_core::Module[:]>();}
+ let held,error=blot_backend_result_publication::registeredInputUnits(self_.current_owner);assert(error==blot_error::Error.none);return held;
+}
+fn previousStampPools(self_:const ModuleStamps&)->const Pools? {
+ return previousStampPools(self_.previous_context,self_.previous_generation);
+}
+struct StampLocation {previous:bool,index:i64}
+fn locateModule(self_:const ModuleStamps&,module:const blot_check_core::Module&)->blot_support::Option<StampLocation> {
+ let current=currentStampUnits(self_);for &candidate,index in current {if candidate .==module {return blot_support::some(StampLocation{false,index});}}
+ let old .=previousStampPools(self_);if old {
+  if module.unit!=0&&module.unit<=old.modules.len&&old.modules[module.unit-1].module .==module {return blot_support::some(StampLocation{true,(module.unit-1) as i64});}
+  for pin,index in old.modules {if pin.module .==module {return blot_support::some(StampLocation{true,index});}}
+ }
+ return blot_support::none<StampLocation>();
+}
+// Scalar authorities select the same header without borrowing the memo object.
+fn stampModule(owner:blot_backend_result_publication::Owner,lease:u32,generation:u64,location:StampLocation)->const blot_check_core::Module& {
+ if location.previous {let old .=previousStampPools(lease,generation);assert(old && location.index>=0 && location.index<old.modules.len);return old.modules[location.index].module;}
+ let current,error=blot_backend_result_publication::registeredInputUnits(owner);assert(error==blot_error::Error.none && location.index>=0 && location.index<current.len);return current[location.index];
+}
+fn owns(self_:const ModuleStamps&,module:const blot_check_core::Module&)->bool {return locateModule(self_,module).present;}
 
 fn find(self_: const ModuleStamps&, module: blot_check_core::Module) -> blot_support::Option<i64> {
-    for entry, index in self_.entries.items {
+    for entry, index in self_.storage {
         if entry.module.unit == module.unit && sameStorage(entry.module, module) { return blot_support::some(index); }
     }
     return blot_support::none<i64>();
 }
 fn record(self_: ModuleStamps&, requested: const blot_check_core::Module&, token: Token,
     digest: blot_support::Option<u8[32]>) -> i64, Error {
-    let module .= ownedModule(self_,requested);assert(module);
+    let location=locateModule(self_,requested);assert(location.present);let module:const blot_check_core::Module& =stampModule(self_.current_owner,self_.previous_context,self_.previous_generation,location.value);
     var known = digest;
     if self_.validate && !known.present { known = blot_support::some(stamp(module)); self_.hashed++; }
-    let index=self_.entries.items.len;let error=blot_support_pooled_buffer::ensure(self_.entries,index+1,module_stamp_entries);if error!=blot_error::Error.none {return 0,error;}
-    let storage=module_stamp_entries.realloc_slice(self_.entries.storage,self_.entries.storage.len);storage[index]=ModuleStampEntry{module,token,known,..};self_.entries.storage=storage;self_.entries.items=storage[..index+1];
+    let index=self_.storage.len;if index>=0x5555555555555540 {return 0,blot_error::Error.out_of_memory;}
+    self_.storage.push(ModuleStampEntry{module,token,known,..});
     return index,blot_error::Error.none;
 }
 fn proveSame(self_: ModuleStamps&, left: const blot_check_core::Module&, right: const blot_check_core::Module&) -> bool, Error {
     if !self_.compare_contents || !self_.owns(left) || !self_.owns(right) { return false, blot_error::Error.none; }
     let known = self_.find(left); if !known.present { return false, blot_error::Error.none; }
-    let entry = self_.entries.items[known.value]; if sameStorage(left, right) { return true, blot_error::Error.none; }
+    let entry = self_.storage[known.value]; if sameStorage(left, right) { return true, blot_error::Error.none; }
     self_.comparisons++; if !sameStampValue(left, right) { return false, blot_error::Error.none; }
     let index, error = self_.record(right, entry.token, entry.digest); if error != blot_error::Error.none { return false, error; }
     self_.reused++; self_.copied++; return true, blot_error::Error.none;
@@ -483,7 +521,7 @@ fn proveSame(self_: ModuleStamps&, left: const blot_check_core::Module&, right: 
 fn tokenEntry(self_: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<i64>, Error {
     if !self_.owns(module) { return blot_support::none<i64>(), blot_error::Error.none; }
     let found = self_.find(module); if found.present { self_.reused++; return found, blot_error::Error.none; }
-    { let optional_source_14 .= self_.previous; if optional_source_14 { let old .= optional_source_14;
+    { let optional_source_14 .= previousStampPools(self_); if optional_source_14 { let old .= optional_source_14;
         for pin in old.modules {
             if pin.module.unit != module.unit || !sameStorage(pin.module, module) || headerPrint(pin.module) != pin.header { continue; }
             self_.reused++; let index, error = self_.record(module, pin.token, blot_support::none<u8[32]>());
@@ -491,9 +529,9 @@ fn tokenEntry(self_: ModuleStamps&, module: const blot_check_core::Module&) -> b
         }
      } }
     if self_.compare_contents {
-        let count = self_.entries.items.len;
+        let count = self_.storage.len;
         for index in count {
-            let known = self_.entries.items[index]; if known.module.unit != module.unit { continue; }
+            let known = self_.storage[index]; if known.module.unit != module.unit { continue; }
             self_.comparisons++; if !sameStampValue(known.module, module) { continue; }
             self_.reused++; self_.copied++; let id, error = self_.record(module, known.token, known.digest);
             return blot_support::some(id), error;
@@ -505,24 +543,24 @@ fn tokenEntry(self_: ModuleStamps&, module: const blot_check_core::Module&) -> b
 fn get(self_: ModuleStamps&, module: const blot_check_core::Module&) -> Token, Error {
     let known, error = self_.tokenEntry(module); if error != blot_error::Error.none { return 0, error; }
     if !known.present { return freshToken(), blot_error::Error.none; }
-    return self_.entries.items[known.value].token, blot_error::Error.none;
+    return self_.storage[known.value].token, blot_error::Error.none;
 }
 fn intact(self_: ModuleStamps&, pin: const ModulePin&) -> bool, Error {
     if headerPrint(pin.module) != pin.header { return false, blot_error::Error.none; }
     let known, error = self_.tokenEntry(pin.module); if error != blot_error::Error.none { return false, error; }
     if !known.present { return pinIntact(pin, null); }
-    if self_.entries.items[known.value].token != pin.token { return false, blot_error::Error.none; }
+    if self_.storage[known.value].token != pin.token { return false, blot_error::Error.none; }
     if !pin.stamp.present { return true, blot_error::Error.none; }
-    if !self_.entries.items[known.value].digest.present {
-        self_.entries.items[known.value].digest = blot_support::some(stamp(self_.entries.items[known.value].module)); self_.hashed++;
+    if !self_.storage[known.value].digest.present {
+        self_.storage[known.value].digest = blot_support::some(stamp(self_.storage[known.value].module)); self_.hashed++;
     }
-    return pin.stamp.value == self_.entries.items[known.value].digest.value, blot_error::Error.none;
+    return pin.stamp.value == self_.storage[known.value].digest.value, blot_error::Error.none;
 }
 fn digestOf(self_: ModuleStamps&, module: const blot_check_core::Module&) -> blot_support::Option<u8[32]>, Error {
     if !self_.validate { return blot_support::none<u8[32]>(), blot_error::Error.none; }
     let known, error = self_.tokenEntry(module); if error != blot_error::Error.none { return blot_support::none<u8[32]>(), error; }
     if !known.present { return blot_support::some(stamp(module)), blot_error::Error.none; }
-    return self_.entries.items[known.value].digest, blot_error::Error.none;
+    return self_.storage[known.value].digest, blot_error::Error.none;
 }
 recursive fn pinIntact(pin: const ModulePin&, memo: ModuleStamps? = null) -> bool, Error {
     { let optional_source_13 .= memo; if optional_source_13 { let tokens .= optional_source_13; if tokens.owns(pin.module) { return tokens.intact(pin); }  } }
@@ -1082,7 +1120,7 @@ fn deinit(self_: Pools&) {
 
 fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>, memo: ModuleStamps? = null) -> Pools, Error {
     var previous: const Pools? = null;
-    { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous = cache.previous;  } }
+    { let optional_source_12 .= memo; if optional_source_12 { let cache .= optional_source_12; previous .= previousStampPools(cache);  } }
     var candidate = default<Pools>();
     var copying = CaptureState { shared: blot_eval_pool_leases::Builder {..} , ..};
     { let optional_source_11 .= previous; if optional_source_11 { let old .= optional_source_11; copying.shared.previous = old.leases;  } }

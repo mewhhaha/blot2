@@ -5,6 +5,7 @@ import driver.cli_workers;
 import std;
 import driver.compile_workspace_backing;
 import backend.resolved_body;
+import reuse.shared_query_gate;
 import backend.backend_emission;
 import support.error;
 fn inspectAndMutate(body:u32) {
@@ -45,6 +46,9 @@ fn scratchAuthority() {
  var pools=default<blot_reuse_code_artifacts::Pools>();pools.generation=1;pools.evaluator.owner_id=blot_native::fresh_owner_id();
  var builder=blot_eval_pool_leases::Builder{};let children,error=blot_eval_pool_leases::alloc_children(builder,1);assert(error==blot_error::Error.none);children[0]=9;pools.leases=builder.leases;
  var gate,error=blot_reuse_principal_reuse_gate::init(allocation,pools,default<const blot_check_core::Module[:]>(),blot_support::none<blot_backend_runtime_identity::View>());assert(error==blot_error::Error.none);
+ let units=default<const blot_check_core::Module[:]>();let names=blot_support::none<blot_backend_runtime_identity::View>();
+ assert(!blot_reuse_shared_query_gate::share(allocation+1,pools,units,names,gate).present);
+ var shared=blot_reuse_shared_query_gate::share(allocation,pools,units,names,gate);assert(shared.present && shared.value.live() && shared.value.storage==gate.storage && shared.value.source_pools .==pools);
  let scratch=bound_scratch.alloc_slice(1);scratch[0]=blot_reuse_source_value_template::QueryScratch{allocation_owner:allocation,..};
  let plan=blot_reuse_source_value_template::Plan{pools:pools,gate:gate,..};assert(scratch[0].bind(plan,generator)==blot_error::Error.none);
  let before=blot_native::clock_ns();for repeated in 0..10000 {assert(scratch[0].bind(plan,generator)==blot_error::Error.none);}print("scratch bind10000 ns ",blot_native::clock_ns()-before);
@@ -57,7 +61,7 @@ fn scratchAuthority() {
  var other,error=blot_reuse_principal_reuse_gate::init(allocation,pools,default<const blot_check_core::Module[:]>(),blot_support::none<blot_backend_runtime_identity::View>());assert(error==blot_error::Error.none);let distinct=blot_reuse_source_value_template::Plan{pools:pools,gate:other,..};assert(scratch[0].bind(distinct,generator)==blot_error::Error.declined);other.deinit();
  let wrong_policy=blot_reuse_source_value_template::Plan{pools:pools,gate:gate,row_policy:blot_reuse_source_value_template::RowPolicy.source_declared,..};assert(scratch[0].bind(wrong_policy,generator)==blot_error::Error.declined);
  assert(blot_eval_pool_leases::release(builder.leases.values[11])==blot_error::Error.none);assert(scratch[0].bind(plan,generator)==blot_error::Error.declined);
- gate.deinit();assert(scratch[0].bind(copied,generator)==blot_error::Error.declined);scratch[0].deinit();bound_scratch.free_slice(scratch);
+ gate.deinit();assert(shared.value.live() && shared.value.offsets.len==1 && shared.value.offsets[0]==0);shared.value.deinit();assert(scratch[0].bind(copied,generator)==blot_error::Error.declined);scratch[0].deinit();bound_scratch.free_slice(scratch);
  blot_compile_workspace::clearBacking();blot_compile_workspace::resetBackingDescriptors();
 }
 fn main() {importPlanMetadata();scratchAuthority();cacheOwnership();for index in 0..4 {cycle();}print("resolved body passed: actual plans, mutation, recursive release, owned children and attempt reset");}

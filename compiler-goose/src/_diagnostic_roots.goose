@@ -75,7 +75,8 @@ export "probe_scoped" fn scoped() {
 export "probe_prepare" fn prepare() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var stamp_memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
+ var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},module_stamps:stamp_memo,..};
  let error=blot_backend_core_backend::prepare(run,false);run.deinit();
  let released=frame.release();assert(released==blot_error::Error.none);
 }

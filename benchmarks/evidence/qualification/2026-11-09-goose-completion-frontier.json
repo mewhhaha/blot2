@@ -3242,5 +3242,50 @@
       "Identity journal reads validate exact typed runs by walking existing owner links; no new pool/registry/copy"
     ],
     "whole_compiler_executable": false
+  },
+  "capture_lexical_stamp_owner_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-capture-registry-laws.json.gz",
+      "2026-11-10-goose-prepare191.json.gz",
+      "2026-11-10-goose-stamp-iteration-family.json.gz",
+      "2026-11-10-goose-lexical-stamp-owner-laws.json.gz"
+    ],
+    "native_tests": {
+      "module_stamps": 4.323,
+      "archive_capture": 8.64,
+      "empty_session": 11.527,
+      "resolved_body": 33.77
+    },
+    "native_total_seconds": 58.261,
+    "inventory": 35,
+    "complete_inventory_current_source": false,
+    "latest_prepare": {
+      "partial": true,
+      "engines": [
+        "prepare"
+      ],
+      "exit": 1,
+      "seconds": 21.291,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/_diagnostic_roots.goose",
+          "line": 80,
+          "message": "error: cannot call blot_backend_core_backend::prepare: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "1580fff8252796db688c4505962ec0c8366570bec9c5e51f5a0e9c310369baa9",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "latest_actual_whole": "whole190 predates this source family; no newer actual whole attempt",
+    "whole_compiler_executable": false,
+    "tradeoffs": [
+      "Invocation-local stamp growth replaces pooled capacity; not benchmarked.",
+      "Exact header snapshots/token/hash behavior preserved; live memo across Frame unsupported.",
+      "Shared Gate law reuses existing resolved-body construction after added Capture fixture exceeded30s emission cap."
+    ],
+    "next": "Separate preparation reset from lexical memo lifetime; then actual C/header/native and CLI/server/OOM/retry qualification."
   }
 }
