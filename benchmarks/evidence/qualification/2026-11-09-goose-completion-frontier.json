@@ -2961,5 +2961,30 @@
       ]
     },
     "runtime_qualification": "ActualgenericInput<Value> typechecked to nextfrontier; fullgenerator/CLI/server stillpending"
+  },
+  "core_view_liveness_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-core-expression-cursors.json.gz",
+      "2026-11-10-goose-core-use-run-family.json.gz",
+      "2026-11-10-goose-core-use-run-laws.json.gz"
+    ],
+    "changes": [
+      "22 Coreexpression helperfunctions use counts/ranges/leaf scalar records rather than views held over evaluation",
+      "No extraCore allocations/copies, DFS/earlytermination/protectedstackcleanup preserved",
+      "Liveness countreturns scalarUseRun overexistinguse_runs; oldsliceAPIremoved, all3consumers/save-restores converted"
+    ],
+    "native_pair_seconds": 13.565,
+    "latest_scoped": {
+      "attempt": 166,
+      "seconds": 55.627,
+      "partial": true,
+      "source_unchanged": true,
+      "old_core_view_frontiers_cleared": true,
+      "errors": [
+        "outeremit2577 may shrink array generator leads to while ambiguousarguments stillused (\u00a75.2)"
+      ]
+    },
+    "next": "Astra rename-onlycopieddiagnostic identifies owningfunction beforeargumentinterfacechanges",
+    "whole_compiler_executable": false
   }
 }

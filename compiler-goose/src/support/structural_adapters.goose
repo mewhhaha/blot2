@@ -91,6 +91,7 @@ import backend.storage_function_plan_input;
 import backend.storage_global_footprint;
 import backend.storage_globals;
 import backend.storage_layout;
+import backend.storage_liveness;
 import backend.storage_owner_graph;
 import backend.storage_parameter_fields;
 import backend.storage_plan;
@@ -1632,6 +1633,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_globals:
 fn blot_backend_storage_globals::blotStructuralHash<StructuralSink>(value:blot_backend_storage_globals::Plan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_layout::InlineFields)->bool {return equalFields(left,right);}
 fn blot_backend_storage_layout::blotStructuralHash<StructuralSink>(value:blot_backend_storage_layout::InlineFields,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_liveness::UseRun)->bool {return equalFields(left,right);}
+fn blot_backend_storage_liveness::blotStructuralHash<StructuralSink>(value:blot_backend_storage_liveness::UseRun,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft,V>(left:StructuralLeft,right:blot_backend_storage_owner_graph::Graph<V>)->bool {return equalFields(left,right);}
 fn blot_backend_storage_owner_graph::blotStructuralHash<StructuralSink,V>(value:blot_backend_storage_owner_graph::Graph<V>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_owner_graph::OrdinalRun)->bool {return equalFields(left,right);}

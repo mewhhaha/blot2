@@ -92,6 +92,7 @@ import backend.storage_function_plan_input;
 import backend.storage_global_footprint;
 import backend.storage_globals;
 import backend.storage_layout;
+import backend.storage_liveness;
 import backend.storage_owner_graph;
 import backend.storage_parameter_fields;
 import backend.storage_plan;
@@ -954,6 +955,7 @@ fn blot_backend_storage_globals::blotJsonWrite<JsonWriter>(value:blot_backend_st
 fn blot_backend_storage_globals::blotJsonWrite<JsonWriter>(value:blot_backend_storage_globals::Node,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_globals::blotJsonWrite<JsonWriter>(value:blot_backend_storage_globals::Plan,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_layout::blotJsonWrite<JsonWriter>(value:blot_backend_storage_layout::InlineFields,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_backend_storage_liveness::blotJsonWrite<JsonWriter>(value:blot_backend_storage_liveness::UseRun,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_owner_graph::blotJsonWrite<JsonWriter,V>(value:blot_backend_storage_owner_graph::Graph<V>,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_owner_graph::blotJsonWrite<JsonWriter>(value:blot_backend_storage_owner_graph::OrdinalRun,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_storage_owner_graph::blotJsonWrite<JsonWriter>(value:blot_backend_storage_owner_graph::Owners,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -4025,6 +4027,8 @@ fn blot_backend_storage_global_footprint::blotJsonWrite<T>(value:T?,writer:blot_
 fn blot_backend_storage_globals::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_backend_storage_layout::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
+
+fn blot_backend_storage_liveness::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_backend_storage_owner_graph::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 

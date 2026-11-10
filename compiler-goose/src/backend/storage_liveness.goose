@@ -4,10 +4,23 @@ import check.core;
 import support.error;
 type Error = blot_error::Error;
 reusable[] var use_runs: u32[>..] = [];
-fn count(module: const blot_check_core::Module&,root: u32) -> u32[:],Error {
-    let uses = use_runs.alloc_slice(module.bindings.len); for &use in uses { use = 0; } var budget: i64 = 100000; let error = visit(module,root,uses,0,budget); if error != blot_error::Error.none { use_runs.free_slice(uses); return default<u32[:]>(),error; } return uses,blot_error::Error.none;
+// Invocation-owned coordinates; release ends this run's lifetime.
+struct UseRun {start:i64=0,len:i64=0}
+fn ownedUses(run:UseRun)->u32[:] {
+ assert(run.start>=0&&run.len>=0&&run.start<=use_runs.len&&run.len<=use_runs.len-run.start);
+ if run.len==0 {return default<u32[:]>();}
+ let source=use_runs[run.start..run.start+run.len];let owned=use_runs.realloc_slice(source,source.len);
+ assert(blot_support::same_slice_identity(owned,source));return owned;
 }
-fn release(uses: u32[:]) { if uses.len != 0 { use_runs.free_slice(uses); } }
+fn at(run:UseRun,index:i64)->u32 {assert(index>=0&&index<run.len);let owned=ownedUses(run);return owned[index];}
+fn count(module:const blot_check_core::Module&,root:u32)->UseRun,Error {
+ let uses=use_runs.alloc_slice(module.bindings.len);for &use in uses {use=0;}
+ var budget:i64=100000;let error=visit(module,root,uses,0,budget);
+ if error!=blot_error::Error.none {use_runs.free_slice(uses);return UseRun{},error;}
+ if uses.len==0 {return UseRun{},blot_error::Error.none;}
+ return UseRun{start:use_runs.index_of(uses[0]),len:uses.len},blot_error::Error.none;
+}
+fn release(run:UseRun) {if run.len!=0 {use_runs.free_slice(ownedUses(run));}}
 fn reference(module: const blot_check_core::Module&,binding: blot_check_core::BindingRef,uses: u32[:]) { if (binding.unit == 0 || binding.unit == module.unit) && binding.binding < uses.len { if uses[binding.binding] != 4294967295 { uses[binding.binding]++; } } }
 recursive fn visit(module: const blot_check_core::Module&,id: u32,uses: u32[:],depth: i64,budget: i64&) -> Error {
     if id == 0 { return blot_error::Error.none; } if depth > 128 || budget == 0 { return blot_error::Error.limit; } budget--; let node = module.node(id); for child in module.children(id) { let error = visit(module,child,uses,depth + 1,budget); if error != blot_error::Error.none { return error; } }

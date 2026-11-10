@@ -21,9 +21,14 @@ foreign/whole/depth/unsupported fallbacks, result-owner independence and adopted
 fresh/cloned nested Module payloads across Frame/reclamation. See
 [the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-parameter-frozen-module-laws.json.gz).
 
-Current selected163 takes 56.41s and clears FunctionPlanInput publication. The
-next boundary is scoped_backend2426: a Core child-ID view held across recursive
-expression evaluation (§5.2). A coherent Core-view traversal repair is next.
+Current selected166 takes 55.63s and reaches the outer emit call at 2577: an
+ambiguous arguments view remains live over a possible shrink (§5.2). A rename-only
+copied diagnostic is locating its owning function before redesigning that carrier.
+The cumulative 22-function Core traversal repair plus scalar liveness UseRun
+clears the preceding child/selector/liveness view failures. The affected native
+snapshot/footprint pair passes **13.56s**; Core counts, DFS and cleanup remain
+unchanged, with no additional allocation/copy. See
+[the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-core-use-run-laws.json.gz).
 
 Planning requests now contain scalar unit IDs and ranges into existing graph,
 evidence and recursive-access owners, plus the existing rejection slot. They

@@ -1,6 +1,10 @@
 import bootstrap_globals;
+import driver.cli;
+import driver.cli_workers;
 import std;
 import backend.storage_function_plan_input;
+import backend.storage_liveness;
+import driver.compile_workspace;
 reusable[] var module_runs: blot_check_core::Module[>..] = [];
 struct MiniValue { word: u32,flags: u32 }
 type Request = blot_backend_storage_function_plan_input::Input<MiniValue>;
@@ -29,7 +33,24 @@ recursive fn inspect(request: Request,depth: i64) {
     inspect(request,depth - 1);
     other.deinit();
 }
-fn main() {
+fn livenessRuns()->blot_backend_storage_liveness::UseRun,blot_backend_storage_liveness::UseRun {
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let bindings,error=blot_reuse_dependency_payload::alloc<blot_check_core::Binding>(owner,3);assert(error==blot_error::Error.none);for &binding in bindings {binding=blot_check_core::Binding{..};}
+ let nodes,error=owner.copy([blot_check_core::Node{..},blot_check_core::Node{tag:blot_check_core::Tag.reference,a:0,..},blot_check_core::Node{tag:blot_check_core::Tag.reference,a:1,..},blot_check_core::Node{tag:blot_check_core::Tag.scalar,a:1,b:2,..},blot_check_core::Node{tag:blot_check_core::Tag.scalar,a:4,..}]);assert(error==blot_error::Error.none);
+ let references,error=owner.copy([blot_check_core::BindingRef{binding:1,..},blot_check_core::BindingRef{binding:2,..}]);assert(error==blot_error::Error.none);
+ let source=blot_check_core::Module{unit:1,nodes:nodes,bindings:bindings,references:references,..};
+ let first,error=blot_backend_storage_liveness::count(source,3);assert(error==blot_error::Error.none&&first.len==3&&first.at(0)==0&&first.at(1)==1&&first.at(2)==1);
+ let second,error=blot_backend_storage_liveness::count(source,1);assert(error==blot_error::Error.none&&second.at(1)==1&&second.at(2)==0);
+ let failed,error=blot_backend_storage_liveness::count(source,4);assert(error==blot_error::Error.limit&&failed.len==0);failed.release();
+ let empty=blot_check_core::Module{..};let zero,error=blot_backend_storage_liveness::count(empty,0);assert(error==blot_error::Error.none&&zero.len==0);zero.release();
+ owner.deinit();return first,second;
+}
+fn livenessRunLifetime() {
+ let first,second=livenessRuns();
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
+ assert(first.at(1)==1&&first.at(2)==1&&second.at(1)==1&&second.at(2)==0);second.release();assert(first.at(2)==1);first.release();
+}
+fn main() {livenessRunLifetime();
     var empty = blot_backend_storage_type_key::Words {..};
     let empty_span = empty.wordRun();
     assert(empty_span.len == 0 && empty_span.capacity == 0 && empty_span.view().len == 0);
