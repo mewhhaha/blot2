@@ -4621,5 +4621,437 @@
     },
     "qualified_prefix": "Two emitter Plan declarations explicitly typed before mutable cleanup",
     "followup_pending": "Six no-payload enum declarations plus2Proof,bool caller corrections combined306"
+  },
+  "proof_enum_callers": {
+    "receipt": "2026-11-10-goose-backend-proof-enum306.json.gz",
+    "result": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 80.89,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 1625,
+          "message": "error: no matching overload for call to readInlineBody"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "2465d8d6efd8c009ff2f3b99db7d7c6add20e03165c0b267def8b6b42b1347d8",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "source": "Two callers consume existing Proof,bool API; six enum-cleanup locals explicitly full type"
+  },
+  "generator_nullable_contexts": {
+    "receipt": "2026-11-10-goose-backend-nullable-contexts307.json.gz",
+    "result": {
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 81.201,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/numeric_rows.goose",
+          "line": 87,
+          "message": "error: no matching overload for call to get"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "52076b7835de6b169dab2134de100cb1106c4a1f65227cb60f840653b10b83aa",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "guards": 25,
+    "artifact_calls": 31,
+    "retained_arguments": 2,
+    "audit": {
+      "sites": [
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1031,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1625,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 2,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1632,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1739,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 2,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1755,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1781,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1873,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 1988,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 3,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2045,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2050,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 3,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2575,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2889,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 2924,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 3253,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 4209,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 4541,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 4836,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 4844,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 5070,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 5299,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "line": 3679,
+          "guard": "id == 0 || generator.artifacts == null",
+          "rewritten_member_uses": 2,
+          "replacement": "preserve id-zero early return, bind artifact reference, negative local early return, use narrowed local in remaining function"
+        },
+        {
+          "source": "compiler-goose/src/backend/core_backend.goose",
+          "line": 726,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/core_backend.goose",
+          "line": 2331,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/core_backend.goose",
+          "line": 2602,
+          "guard": "generator.artifacts != null",
+          "rewritten_member_uses": 1,
+          "replacement": "scoped reference-tuple local artifacts; positive local truth guard; guarded local member calls"
+        },
+        {
+          "source": "compiler-goose/src/backend/core_backend.goose",
+          "line": 735,
+          "guard": "generator.retained != null",
+          "rewritten_argument_uses": 2,
+          "replacement": "scoped reference local retained, positive local guard, narrowed findRetained/reconstructRetained arguments"
+        }
+      ],
+      "identities": [
+        {
+          "source": "compiler-goose/src/backend/backend_emission.goose",
+          "candidate": "build/goose-port/generator-artifact-nullable-candidate/backend/backend_emission.goose",
+          "before_sha256": "398ac1dc1ef6f7ffb91311ab13426d6d29090907fada2a41fc2ee2be899d35c6",
+          "candidate_sha256": "509d40516ae658d6b5942b9b967b31e70d4140456efda1e3e5fa443e8eb7cd2a",
+          "guards_rewritten": 21
+        },
+        {
+          "source": "compiler-goose/src/backend/core_backend.goose",
+          "candidate": "build/goose-port/generator-artifact-nullable-candidate/backend/core_backend.goose",
+          "before_sha256": "3390cdf6bfe8131f89c3fc18d7c1cd88633e73d1aded8ae710d1dbce9078bc80",
+          "candidate_sha256": "a85444a2066003763845bd0e793193c3f59fac0793a9ce1defd3f530962705aa",
+          "guards_rewritten": 4
+        }
+      ],
+      "remaining_generator_artifact_references": [
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1031,
+          "before": "me(plan); retained = true; { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1625,
+          "before": "f proven {\n                { let artifacts .=",
+          "after": "; if artifacts { for target in proof.dep"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1632,
+          "before": " value_error; } if found { { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1739,
+          "before": "lot_error::Error.none; } } { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1755,
+          "before": "t_error::Error.none; }\n    { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1781,
+          "before": "ration.declined,refined; } { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1873,
+          "before": "value = evaluated;\n        { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 1988,
+          "before": "flat_cleanup_31_1_1; }\n    { let artifacts .=",
+          "after": "; if artifacts { if !artifacts.hasStatic"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 2045,
+          "before": "tor.evaluationFailure(); } { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 2050,
+          "before": "t_error::Error.none; }\n    { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 2575,
+          "before": "en(input.value).len == 0 { { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 2889,
+          "before": "ror::Error.none; } } }\n    { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 2924,
+          "before": "t_error::Error.none; }\n    { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 3253,
+          "before": "s(body)[0].binding,index); { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 3679,
+          "before": "rn blot_error::Error.none; } let artifacts .=",
+          "after": "; if !artifacts { return blot_error::Err"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 4209,
+          "before": "code::Code.unsupported); } { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 4541,
+          "before": "et node = source.node(id); { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 4836,
+          "before": "ow_mappings = header.rows; { let artifacts .=",
+          "after": "; if artifacts { let read = artifacts.re"
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 4844,
+          "before": "ator .= owner.generator(); { let artifacts .=",
+          "after": "; if artifacts { for dependency in plan."
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 5070,
+          "before": "id); if identity.present { { let artifacts .=",
+          "after": "; if artifacts { for target in identity."
+        },
+        {
+          "path": "backend/backend_emission.goose",
+          "line": 5299,
+          "before": "t_error::Error.none; }\n    { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 290,
+          "before": "cts::Scope>();\n    {\n        let artifacts .=",
+          "after": ";\n        if artifacts {\n            let"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 624,
+          "before": " -> blot_error::Error {\n    let artifacts .= ",
+          "after": "; if artifacts { return artifacts.record"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 632,
+          "before": "d.stats.declined;\n    }\n    let artifacts .= ",
+          "after": "; if artifacts { result.captured = artif"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 726,
+          "before": "e_artifacts::Scope>();\n    { let artifacts .=",
+          "after": "; if artifacts { let entered, error = ar"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 869,
+          "before": "pe>, blot_error::Error {\n    let artifacts .=",
+          "after": ";if !artifacts {return blot_support::non"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 1966,
+          "before": "ult<const blot_check_core::Module[:]>();\n    ",
+          "after": " .= null; generator.retained .= null; ge"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 1993,
+          "before": "tor.timing .= null; }\n    if run.recording { ",
+          "after": " .= workspace.metadata; } generator.refi"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 2331,
+          "before": ",blot_error::Error.none; } { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        },
+        {
+          "path": "backend/core_backend.goose",
+          "line": 2602,
+          "before": "_depth++;\n    block {\n\n    { let artifacts .=",
+          "after": "; if artifacts { artifacts.requireFreshC"
+        }
+      ]
+    },
+    "whole_compiler_executable": false
   }
 }

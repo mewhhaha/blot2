@@ -39,15 +39,18 @@ Wasm ValueType scratch, not Core input types. source_origins retains no Core uni
 Session.units uses registered Core headers with retained dependency owners. These
 reborrows cannot revive a discarded Core input; its storage stays pinned.
 
-Backend 304 clears the missing staging-origin buffer.items call after auditing
-all six calls. Backend 305 clears two emitter Plan cleanup declarations widened to the
-full enum type. Current frontier is emission1624: closed-local analyze returns
-Proof,bool; its two callers incorrectly use Option fields. A combined candidate
-fixes those callers and six no-payload enum-cleanup declarations across four
-reuse modules. Backend 306 is running; these changes are not yet qualified.
-Whole compiler and actual CLI/server/OOM/retry/retention remain pending; neither
-capped runtime probe is being repeated.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-enum-cleanup305.json.gz).
+Backend 307 clears the Proof/bool caller fixes, enum-cleanup declarations and
+25 nullable context guards (31 artifact calls, two retained arguments). 81.201s,
+unchanged source. Branch, lazy-read and error ordering remain; optional fields
+are bound once and narrowed as locals before mutable calls. No new payload copy
+or registry. These prefixes are checked, not whole-runtime qualification.
+
+Current frontier: numeric_rows87 dictionary get resolves to the enclosing cache
+get wrapper (wrong arity). Audit dictionary operations in shadowing namespaces and
+qualify standard dictionary calls explicitly; pooled-map APIs remain separate.
+Whole compiler and actual CLI/server/OOM/retry/retention still await the real
+executable. The two full-evaluator probes remain capped and unqualified.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-nullable-contexts307.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion

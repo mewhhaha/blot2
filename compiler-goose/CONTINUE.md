@@ -4,17 +4,14 @@ Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
 No forwarding to compiler/ and no ABI fallback.
 
-Whole 290 remains latest complete attempt: 163.377s, unchanged 461 inputs, no artifact.
-Partial backend 303 clears corrected 38-alias/22-loop Core metadata family in 81.102s,
-unchanged. 42 removed bindings have zero stale uses; failed 302 preserved separately.
-Diagnostic Wasm type scratch is distinct from publication-pinned Core input storage.
-Backend 304 clears the staging-origin span. Backend 305 clears two Plan cleanup
-declarations; current emission1624 wrongly treats Proof,bool as Option. Two caller
-corrections plus six enum annotations/four reuse modules are in backend 306 running,
-unqualified. Whole executable still absent.
+Whole 290 remains latest complete attempt: 163.377s, unchanged 461 inputs,
+no artifact. Partial backend 307 clears Proof/bool callers, enum annotations and
+25 nullable context guards in 81.201s, unchanged. Current numeric_rows87 dictionary
+get is shadowed by its wrapper; qualify standard dictionary operations explicitly.
 
-Full invocation/preparation probes remain capped/unqualified; full run of 49 default laws
-pending. Whole executable and actual CLI/server/OOM/retry/retention still pending.
+49 default component laws have not run in full on current source. Full invocation/
+preparation probes remain capped, explicit opt-in and unqualified. Whole executable
+and actual CLI/server/OOM/retry/retention remain pending. See root receipt index.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
