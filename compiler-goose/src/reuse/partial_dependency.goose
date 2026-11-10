@@ -121,7 +121,38 @@ fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&)->Error {
  {for &copy in copies {copy.deinit();}} }
 fn emit(self_:const Prepared&,workspace:Workspace&)->Result,Error {return self_.emitWithOptions(workspace,CompileOptions{..});}
 fn emitWithOptions(self_:const Prepared&,workspace:Workspace&,options:CompileOptions)->Result,Error {
- var actual=options;actual.source_completion.entry .=self_.source_completion;actual.identity=blot_support::Option<blot_backend_runtime_identity::View>{true,self_.identity.view()};actual.identity_owner=blot_support::Option<Owner>{true,self_.catalog_owner};actual.diagnostic_source_digests=self_.source_digests;actual.unit_order=self_.unit_order;actual.diagnostic_prelude_unit=self_.prelude;actual.diagnostic_source_mode=self_.source_mode;
+ let actual=CompileOptions{
+  completed_core_validation:options.completed_core_validation,
+  source_completion:blot_reuse_source_completion::registeredBorrow(blot_reuse_source_completion::Borrow{prefix:options.source_completion.prefix,entry:self_.source_completion}),
+  storage:options.storage,
+  inline_named:options.inline_named,
+  explain_allocations:options.explain_allocations,
+  ragged_builders:options.ragged_builders,
+  constant_receipts:options.constant_receipts,
+  constant_limits:options.constant_limits,
+  ragged_probe_limit:options.ragged_probe_limit,
+  checkpoint:options.checkpoint,
+  io:options.io,
+  profile_backend:options.profile_backend,
+  policy:options.policy,
+  observe_startup:options.observe_startup,
+  identity:blot_support::Option<blot_backend_runtime_identity::View>{true,blot_reuse_dependency_payload::registeredIdentity(self_.catalog_owner,self_.identity.view())},
+  identity_owner:blot_support::Option<Owner>{true,self_.catalog_owner},
+  diagnostic_source_digests:blot_reuse_dependency_payload::registeredCatalogDigests(self_.catalog_owner,self_.source_digests),
+  compiler_identity:options.compiler_identity,
+  evidence_noise:options.evidence_noise,
+  unit_order:blot_reuse_dependency_payload::registeredCatalogOrder(self_.catalog_owner,self_.unit_order),
+  diagnostic_source_mode:self_.source_mode,
+  diagnostic_prelude_unit:self_.prelude,
+  artifact_replay:options.artifact_replay,
+  artifact_dump:options.artifact_dump,
+  retain_artifacts:options.retain_artifacts,
+  previous:options.previous,
+  principal_previous:options.principal_previous,
+  query_previous:options.query_previous,
+  cached_units:options.cached_units,
+  validate_pins:options.validate_pins,
+ };
  let staged=blot_backend_core_backend::pinWorkspaceInputs(workspace,self_.units,self_.catalog_owner,self_.unit_owners,self_.seed_pin.owners());if staged!=blot_error::Error.none {return Result{},staged;}
  let compiled,error=blot_backend_core_backend::compileWithOptions(workspace,self_.units,self_.entry,actual);if error!=blot_error::Error.none {return Result{},error;}
  var output=Result{result:ConsumerResult{compiled:compiled,stats:self_.stats},source_bytes:self_.source_bytes,fresh_modules:self_.units.len-self_.cachedCount(),cached_modules:self_.cachedCount()};var published=false;

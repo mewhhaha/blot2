@@ -4,13 +4,19 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole274 fails158.91s, unchanged461inputs, no C/header/native. Same
-prepare/reset loan persists after scalarFrame, nineRunviews→flags and4mutable
-optionrefs→existing registry keys. No exact remaining field is identified.
-Sixaffected native laws pass69.94s summed stages; current full inventory pending.
-Next capture exact HolderMayPointInto hit with isolated metadata-only tracer.
-Existing GDB line-tables binaries lack locals; server120s probe was inconclusive.
-No semantic checker changes or more speculative carrier removal.
+Actual whole280 fails154.05s, unchanged461inputs, no C/header/native. The same
+prepare/reset loan persists after original options use four scalar owner keys,
+canonical identity/digest/order/receipt reborrows and scalar validation receipt.
+Three affected native laws pass48.20s summed stages. Shared journal input spans
+retain exact identity/values after the original owner releases its reference.
+
+The metadata-only trace identifies a fresh copied argument class. Millisecond
+controls show two independent safe named-owner views reject, while one passes;
+real payload references still reject. A private finite exact-global-root-set
+prototype passes33lifetime/3runtime/24semantic controls but whole280 still fails.
+No prototype is promoted. Do not make
+more speculative source field changes or repeat expensive whole checks before
+those controls pass.
 
 Complete36/36 native component laws pass on same frozen source, summed stage
 307.14s,30s/stage/600s overall. These never qualify actual compiler/CLI runtime.
@@ -19,8 +25,8 @@ qualified executable original/transformed witnesses pass.14-file publication
 batch covers68adapters/134sites; header/state payload copies and owners unchanged.
 Principal contexts/constant body descriptors are scalar, Frame guards validated.
 
-CurrentRun retains only sanitized options/Frame/keys/flags plus existing timing.
-Public options and owner lifetimes unchanged. Three Capture getters return actual
+CurrentRun retains options/Frame/flags plus existing timing. Public options use
+existing scalar keys; source owner lifetimes are unchanged. Three Capture getters return actual
 canonical headers; checkpoint key returns a lexical borrowed descriptor. Actual
 whole/CLI/server/OOM/retry/retention remains pending without binary.
 

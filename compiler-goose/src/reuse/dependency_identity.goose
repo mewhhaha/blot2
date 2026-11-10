@@ -27,3 +27,29 @@ fn registeredIdentityNames(owner:const Owner&,names:const blot_backend_runtime_i
 fn registeredIdentity(owner:const Owner&,value:blot_backend_runtime_identity::View)->blot_backend_runtime_identity::View {
  assert(owner.valid());return blot_backend_runtime_identity::View{bytes:registeredIdentityBytes(owner,value.bytes),symbols:registeredIdentityNames(owner,value.symbols),owners:registeredIdentityNames(owner,value.owners)};
 }
+
+// Recover the exact existing catalog run without exclusive journal authority.
+fn registeredCatalogDigests(owner:const Owner&,source:const HeaderDigest[:])->const HeaderDigest[:] {
+ assert(owner.valid());if source.len==0 {return default<const HeaderDigest[:]>();}
+ var next=leases[owner.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {
+  run_header_digest run=>{if blot_support::same_slice_identity(run.values,source) {
+   let owned=pool_header_digest.realloc_slice(run.values,run.values.len);assert(blot_support::same_slice_identity(owned,source));
+   let start=pool_header_digest.index_of(owned[0]);assert(start>=0 && owned.len<=pool_header_digest.len-start);
+   let result=pool_header_digest[start..start+owned.len];assert(blot_support::same_slice_identity(result,source));return result;
+  }},_=>{},
+ }}abort("catalog view must name this live journal's exact run");
+}
+
+// Recover the exact existing catalog run without exclusive journal authority.
+fn registeredCatalogOrder(owner:const Owner&,source:const u32[:])->const u32[:] {
+ assert(owner.valid());if source.len==0 {return default<const u32[:]>();}
+ var next=leases[owner.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {
+  run_u32 run=>{if blot_support::same_slice_identity(run.values,source) {
+   let owned=pool_u32.realloc_slice(run.values,run.values.len);assert(blot_support::same_slice_identity(owned,source));
+   let start=pool_u32.index_of(owned[0]);assert(start>=0 && owned.len<=pool_u32.len-start);
+   let result=pool_u32[start..start+owned.len];assert(blot_support::same_slice_identity(result,source));return result;
+  }},_=>{},
+ }}abort("catalog view must name this live journal's exact run");
+}

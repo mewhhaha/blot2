@@ -6,6 +6,7 @@ import std;
 import reuse.code_artifacts;
 import backend.result_publication;
 import reuse.dependency_payload;
+import reuse.dependency_identity;
 import reuse.dependency_stamp_view;
 var module_text:u8[4]=[117,110,105,116];
 var previous_module:blot_check_core::Module=blot_check_core::Module{unit:1,names:module_text[..],..};
@@ -45,7 +46,31 @@ fn registeredStampLeafViews() {
  retained.deinit();
 }
 
+fn registeredCatalogInputViews() {
+ var catalog,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ var first=default<u8[32]>();first[0]=7;first[31]=17;
+ var second=default<u8[32]>();second[0]=23;second[31]=41;
+ let digests,error=catalog.copy([first,second]);assert(error==blot_error::Error.none);
+ let order,error=catalog.copy([3 as u32,1 as u32,2 as u32]);assert(error==blot_error::Error.none);
+ var retained,error=catalog.retain();assert(error==blot_error::Error.none && !catalog.unique() && !retained.unique());
+ let before_digests=blot_reuse_dependency_payload::registeredCatalogDigests(catalog,digests);
+ let before_order=blot_reuse_dependency_payload::registeredCatalogOrder(catalog,order);
+ assert(blot_support::same_slice_identity(before_digests,digests) && before_digests.len==2);
+ assert(before_digests[0][0]==7 && before_digests[0][31]==17 && before_digests[1][0]==23 && before_digests[1][31]==41);
+ assert(blot_support::same_slice_identity(before_order,order) && before_order.len==3 && before_order[0]==3 && before_order[1]==1 && before_order[2]==2);
+ catalog.deinit();assert(retained.valid());
+ let after_digests=blot_reuse_dependency_payload::registeredCatalogDigests(retained,digests);
+ let after_order=blot_reuse_dependency_payload::registeredCatalogOrder(retained,order);
+ assert(blot_support::same_slice_identity(after_digests,before_digests) && after_digests.len==2);
+ assert(after_digests[0][0]==7 && after_digests[0][31]==17 && after_digests[1][0]==23 && after_digests[1][31]==41);
+ assert(blot_support::same_slice_identity(after_order,before_order) && after_order.len==3 && after_order[0]==3 && after_order[1]==1 && after_order[2]==2);
+ assert(blot_reuse_dependency_payload::registeredCatalogDigests(retained,default<const u8[32][:]>()).len==0);
+ assert(blot_reuse_dependency_payload::registeredCatalogOrder(retained,default<const u32[:]>()).len==0);
+ retained.deinit();
+}
+
 fn main() {
+ registeredCatalogInputViews();
  registeredStampLeafViews();
  var catalog,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
  let source,error=blot_reuse_dependency_payload::alloc<blot_check_core::Module>(catalog,1);assert(error==blot_error::Error.none);

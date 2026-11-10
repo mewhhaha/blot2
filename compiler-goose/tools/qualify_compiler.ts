@@ -20,6 +20,7 @@ const fixtureRoot = fileURLToPath(
 const runner = fileURLToPath(import.meta.url);
 const maxFrame = 64 * 1024 * 1024;
 const maxLog = 8 * 1024 * 1024;
+const retentionBudget = 16 * 1024 * 1024;
 
 function object(value: unknown): ObjectValue {
   ok(value !== null && typeof value === "object" && !Array.isArray(value));
@@ -136,6 +137,43 @@ function observable(value: unknown): unknown {
   return value;
 }
 
+// At a completed server reply the supervisor has retired the previous worker.
+// Sum resident sets, including shared pages once per process: this deliberately
+// measures the process tree, not live compiler allocations or physical RAM.
+async function residentTree(pid: number) {
+  const processes: { pid: number; resident_bytes: number }[] = [];
+  const pending = [pid];
+  const visited = new Set<number>();
+  while (pending.length) {
+    const current = pending.pop()!;
+    if (visited.has(current)) continue;
+    visited.add(current);
+    const root = "/proc/" + current;
+    const status = await Deno.readTextFile(root + "/status");
+    const resident = /^VmRSS:\s+(\d+) kB$/m.exec(status);
+    ok(resident, "Missing process resident-set observation: " + current);
+    processes.push({
+      pid: current,
+      resident_bytes: Number(resident[1]) * 1024,
+    });
+    for await (const thread of Deno.readDir(root + "/task")) {
+      const children = await Deno.readTextFile(
+        root + "/task/" + thread.name + "/children",
+      );
+      for (const child of children.trim().split(/\s+/).filter(Boolean)) {
+        pending.push(Number(child));
+      }
+    }
+  }
+  return {
+    processes,
+    resident_bytes: processes.reduce(
+      (sum, item) => sum + item.resident_bytes,
+      0,
+    ),
+  };
+}
+
 // Execute in a separate bounded process: a looping Wasm function cannot block
 // the qualification process's timer or prevent the next independent check.
 async function executeWasm(path: string, fixture: string) {
@@ -143,11 +181,11 @@ async function executeWasm(path: string, fixture: string) {
   try {
     equal(guest.abi.version, 8, "The candidate must emit guest ABI 8");
     const values: unknown[] = [];
-    function call(name: string, argument: unknown, expected: unknown) {
+    const call = (name: string, argument: unknown, expected: unknown) => {
       const result = observable(guest.call(name, argument));
       same(result, expected);
       values.push({ name, argument, result });
-    }
+    };
     if (fixture === "curried") {
       call("answer", null, 42);
       for (const n of [0, 1, 40, 100]) call("apply", n, n + 2);
@@ -374,6 +412,10 @@ async function qualify() {
         await Deno.realPath(args.get("--goose-compiler")!),
       ),
     );
+    ok(
+      binaries[0].sha256 !== binaries[1].sha256,
+      "Goose candidate and Zig oracle must be distinct compiler binaries",
+    );
   }
   let output = args.get("--output");
   if (output) {
@@ -481,7 +523,7 @@ async function qualify() {
   async function step(
     binary: string,
     name: string,
-    operation: () => Promise<unknown>,
+    operation: () => unknown | Promise<unknown>,
   ) {
     try {
       const value = await operation();
@@ -530,18 +572,23 @@ async function qualify() {
       }
     }
   }
-  async function session(binary: Binary, injected: boolean) {
+  async function session(
+    binary: Binary,
+    failureRequest = 0,
+    retention = false,
+  ) {
     const label = "server";
     let env: Record<string, string> = {};
-    if (injected) {
+    if (failureRequest) {
       env = {
-        BLOT_GOOSE_FAIL_REQUEST: "2",
+        BLOT_GOOSE_FAIL_REQUEST: String(failureRequest),
         BLOT_GOOSE_FAIL_AT: "1",
         BLOT_GOOSE_FAIL_KIND: "1",
       };
     }
     const peer = new Peer(binary, milliseconds, env);
-    const traceName = label + "-" + String(injected);
+    let traceName = label + "-" + String(failureRequest);
+    if (retention) traceName += "-retention";
     try {
       await peer.hello();
       const entry = projectRoot + "/main.blot";
@@ -557,7 +604,8 @@ async function qualify() {
       let id = 2;
       let revision = 0;
       const results: unknown[] = [];
-      async function build(source?: string) {
+      const residency: Awaited<ReturnType<typeof residentTree>>[] = [];
+      const build = async (source?: string) => {
         let payload = new Uint8Array();
         const request: ObjectValue = {
           kind: "build",
@@ -574,8 +622,8 @@ async function qualify() {
         equal(reply.metadata.id, request.id);
         equal(reply.metadata.epoch, "1");
         return reply;
-      }
-      async function accepted(reply: Frame, edited = false) {
+      };
+      const accepted = async (reply: Frame, edited = false) => {
         equal(reply.metadata.success, true, JSON.stringify(reply.metadata));
         equal(reply.metadata.revision, revision + 1);
         revision++;
@@ -595,8 +643,8 @@ async function qualify() {
             fixture,
           ),
         );
-      }
-      function rejected(reply: Frame, code: string) {
+      };
+      const rejected = (reply: Frame, code: string) => {
         equal(reply.metadata.success, false);
         equal(
           reply.metadata.revision,
@@ -607,8 +655,36 @@ async function qualify() {
         const issues = diagnostics(reply.metadata.diagnostics);
         ok(issues.some((issue) => issue.code === code), JSON.stringify(issues));
         results.push({ rejected: issues, revision });
-      }
-      if (injected) {
+      };
+      if (retention) {
+        equal(Deno.build.os, "linux", "Process retention requires Linux /proc");
+        const original = await Deno.readTextFile(entry);
+        const edited = original.replace(
+          "@u32.add (renamed value) (library.increment value)",
+          "@u32.add (@u32.add (renamed value) (library.increment value)) 1",
+        );
+        ok(edited !== original);
+        // Warm both versions, then repeat three complete edit/restore cycles.
+        for (let index = 0; index < 8; index++) {
+          const changed = index % 2 === 0;
+          let source = original;
+          if (changed) source = edited;
+          await accepted(await build(source), changed);
+          residency.push(await residentTree(peer.child.pid));
+        }
+        const baseline = Math.max(
+          residency[0].resident_bytes,
+          residency[1].resident_bytes,
+        );
+        for (const sample of residency.slice(2)) {
+          ok(
+            sample.resident_bytes <= baseline + retentionBudget,
+            "Resident tree exceeded warm baseline + " + retentionBudget +
+              " bytes: " + JSON.stringify({ baseline, sample }),
+          );
+        }
+      } else if (failureRequest) {
+        if (failureRequest === 3) await accepted(await build());
         rejected(await build(), "out_of_memory");
         await accepted(await build()); // Same open session survives the refused request.
       } else {
@@ -629,6 +705,29 @@ async function qualify() {
         await accepted(await build()); // Failed/temporary overlays never replace disk or retained state.
       }
       await peer.close(id, revision);
+      for (const sample of residency) {
+        for (const process of sample.processes) {
+          try {
+            await Deno.stat("/proc/" + process.pid);
+          } catch (error) {
+            if (error instanceof Deno.errors.NotFound) continue;
+            throw error;
+          }
+          throw new Error("Server process remains after close: " + process.pid);
+        }
+      }
+      if (retention) {
+        return {
+          results,
+          revision,
+          closed: true,
+          residency,
+          growth_budget_bytes: retentionBudget,
+          warmup_revisions: 2,
+          measured_revisions: 6,
+          observed_processes_released: true,
+        };
+      }
       return { results, revision, closed: true };
     } finally {
       const stderr = await peer.dispose();
@@ -750,18 +849,28 @@ async function qualify() {
         return await guest(binary.name, "execute-" + fixture, path, fixture);
       });
     }
-    await step(binary.name, "project:lifecycle", () => session(binary, false));
+    await step(binary.name, "project:lifecycle", () => session(binary));
     if (binary.name === "goose") {
       await step(
         binary.name,
         "project:request-oom",
-        () => session(binary, true),
+        () => session(binary, 2),
+      );
+      await step(
+        binary.name,
+        "project:retained-request-oom",
+        () => session(binary, 3),
+      );
+      await step(
+        binary.name,
+        "project:resident-retention",
+        () => session(binary, 0, true),
       );
     }
   }
   if (!oracleOnly) {
     for (const name of Object.keys(observations.oracle)) {
-      await step("goose", "parity:" + name, async () => {
+      await step("goose", "parity:" + name, () => {
         ok(name in observations.goose, "Missing Goose observation");
         same(observations.goose[name], observations.oracle[name]);
         return { matchesOracle: true };
@@ -809,12 +918,15 @@ async function qualify() {
       overall_ms: overall,
       max_frame_bytes: maxFrame,
       max_log_bytes: maxLog,
+      retention_growth_bytes: retentionBudget,
     },
     scope: [
       "CLI parse/check rejection codes and spans",
       "executed ABI 8 named/curried/recursive/record/array fixtures",
       "project open/build/edit/reject/retry/close",
       "Goose request-token-2 injected OOM and retry",
+      "Goose request-token-3 OOM retains an accepted revision and permits retry",
+      "Linux process-tree resident growth over 2 warmup and 6 alternating edit/restore revisions; observed processes disappear after close",
     ],
     oracle_only: oracleOnly,
     scoped_functional_pass: !failed,
@@ -824,6 +936,8 @@ async function qualify() {
     limitations: [
       "These scoped checks do not qualify the entire compiler/runtime.",
       "Null memory counters are unavailable coverage, never zero live bytes.",
+      "Revision retention and retry are functional checks; retained-byte bounds and release accounting remain unqualified.",
+      "Resident-set bounds include per-process shared pages and qualify only this fixture and repetition count; they do not measure allocator live bytes.",
     ],
     unsupported_execution: steps.filter((step) => step.status === "unsupported")
       .map((step) => ({

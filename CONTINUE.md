@@ -6,24 +6,29 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** Actual whole274 fails in
-**158.91s**, unchanged461inputs, at the same prepare/reset loan through Run's
-first attempt. This persists after all nine workspace views became scalar flags
-and all four mutable-option pointers became existing registry keys. No exact
-remaining field/path is established. Stop speculative source subtraction.
-[Whole274/source audit](benchmarks/evidence/qualification/2026-11-10-goose-scalar-run-whole274.json.gz).
+**No complete C/header/native Goose compiler exists.** Actual whole280 fails in
+**154.05s**, unchanged461inputs, at the same prepare/reset loan through Run.
+Whole278 also fails158.14s after moving the four mutable options to existing
+registry keys at their original producers. Whole279 adds exact named-owner
+reborrows for identity/digests/order/source receipts and carries the already
+scalar validation receipt by value. No payload copy, owner or allocation added.
+[Whole279](benchmarks/evidence/qualification/2026-11-10-goose-structural-options-whole279.json.gz).
 
-Six affected native laws pass (69.94s summed stages), including Capture-key
-roundtrip/reset/invalidation. Public options retain all30fields:26verbatim,
-4mutable references replaced privately; caller ownership/refcounts unchanged.
-[Native receipt](benchmarks/evidence/qualification/2026-11-10-goose-scalar-run-laws.json.gz).
+Three affected native component laws pass (48.20s summed stages): module stamps,
+empty session and server session. New shared-journal laws preserve digest/order
+identity and values after the original owner releases its reference. These do
+not qualify the actual compiler runtime.
+[Native receipt](benchmarks/evidence/qualification/2026-11-10-goose-structural-options-laws.json.gz).
 
-Next obtain exact HolderMayPointInto storeevent provenance. Existing checkers have
-line tables but no locals; selected server debugger hit120s before the event and
-GDB cannot dump StoreEvent. An isolated env-gated metadata-only trace is being
-prepared at the exact hit, with one120s build cap and existing180s actual-emission
-cap. No borrow rules/joins/equality/roots may change. Negative/inconclusive probes
-never identify a remaining field. The binaries are diagnostic-only until parity.
+The metadata-only trace captured a fresh copied-options store, with no exact
+payload root. Millisecond controls isolate a checker precision loss: two safe
+independent named-owner views collapse to a depth-only root class and reject;
+one named owner passes. Real payload references still reject. A private finite
+exact-global-root-set prototype passes33lifetime/3runtime/24semantic controls,
+but whole280 still fails. No new checker is promoted.
+Stop field guesses and use these controls before another actual whole build.
+[Trace](benchmarks/evidence/qualification/2026-11-10-goose-run-loan-provenance.json.gz),
+[original options](benchmarks/evidence/qualification/2026-11-10-goose-original-options-whole278.json.gz).
 
 Complete **36/36 native component laws pass** on the same frozen source as the
 whole attempt: summed stage time **307.14s**,30s/stage,600s outer cap. Includes
@@ -53,10 +58,11 @@ with validated registry access. The focused compile advanced to type/effect
 bucket publication before the broad map batch; actual whole still repeats the
 Run loan. [Phase evidence](benchmarks/evidence/qualification/2026-11-10-goose-scalar-frame-frontier.json.gz).
 
-Run now retains Frame/registry authority and enabled flags for workspace views.
-The current source removes those reference paths; actual whole still rejects it.
-Timing production labels are statically reconstructed; identity/digest/order are
-immutable input spans. Do not infer a cause without exact store-event evidence.
+Run retains scalar Frame/registry authority and enabled workspace flags.
+CompileOptions now uses four scalar keys at its public construction boundary;
+the late sanitizer and duplicate Run keys are removed. Immutable input spans
+are reborrowed from the original journal; source receipts use exact canonical
+registry addresses. Timing labels remain statically reconstructed.
 
 Complete read-only StampView reconstruction remains74fields/65slice leaves,
 with full-allocation recovery before prefix/interior subspans. Valid shared pinned
@@ -98,8 +104,11 @@ reported error. Never lift caps, relax checks or clear live owners to hide error
 
 Once the real executable exists, run compiler-goose/tools/qualify_compiler.ts
 against it and compiler/zig-out-native-fast/bin/blotc. Eight matching Zig baseline
-fixtures pass; Goose CLI/server/OOM/retry/retention have not run. Missing retained
-bytes are pending, not zero. No ABI fallback.
+fixtures pass; Goose CLI/server/OOM/retry/retention have not run. The runner now
+covers cold and retained-revision request OOM/retry plus 2 warmup/6 measured
+edit/restore revisions under a16MiB process-tree RSS growth budget. Its format,
+type and lint checks pass. This does not measure allocator live bytes; those
+remain unavailable. No ABI fallback.
 
 Zig source is unchanged. Its prior full gate remains incomplete: all 2974 laws
 compile without LLVM; release compilation hit its cap. Smoke, harness and zero

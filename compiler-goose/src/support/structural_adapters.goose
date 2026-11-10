@@ -744,8 +744,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::Re
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::ResourceAdapterEmission,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::Result)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::Result,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::RunOptions)->bool {return equalFields(left,right);}
-fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::RunOptions,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::TaskMoverEmission)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::TaskMoverEmission,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::WireBridge)->bool {return equalFields(left,right);}

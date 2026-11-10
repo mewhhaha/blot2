@@ -797,7 +797,17 @@
     "unsupported": [
       "ABI8 recursive selected calls"
     ],
-    "goose_runtime": "pending"
+    "goose_runtime": "pending",
+    "retention_and_retry_expansion": {
+      "scope": "runner fmt/type/lint passed; no actual Goose runtime execution",
+      "cold_request_oom_token": 2,
+      "warm_request_oom_token": 3,
+      "rss_warmup_revisions": 2,
+      "rss_measured_revisions": 6,
+      "rss_growth_budget_bytes": 16777216,
+      "allocator_live_bytes_available": false,
+      "identical_oracle_candidate_rejected": true
+    }
   },
   "split_selected_batch25": {
     "partial": true,
@@ -3666,5 +3676,109 @@
     },
     "remaining": "Same prepare/reset loan at first compile attempt. No exact remaining Run leaf identified; metadata trace required before more source changes.",
     "debugger": "Existing binaries line-tables-only: no local variables/StoreEvent types; selected-server120s cap and GDB preflight inconclusive. Isolated env-gated metadata-only tracer being prepared; no checker rules changed."
+  },
+  "original_options_and_named_owner_family": {
+    "scope": "Source boundaries and native components; whole279 still refuses before generation",
+    "mutable_option_keys": 4,
+    "scalar_validation_borrow": true,
+    "all_option_fields_preserved": 30,
+    "new_payload_copy_or_owner": false,
+    "native": {
+      "passed": true,
+      "tests": [
+        "module_stamps",
+        "empty_session",
+        "server_session"
+      ],
+      "sum_stage_seconds": 48.198,
+      "receipt": "2026-11-10-goose-structural-options-laws.json.gz",
+      "complete_inventory_current_source": false
+    },
+    "whole278": {
+      "receipt": "2026-11-10-goose-original-options-whole278.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 158.144,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "whole279": {
+      "receipt": "2026-11-10-goose-structural-options-whole279.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 153.918,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "trace_receipt": "2026-11-10-goose-run-loan-provenance.json.gz",
+    "cause_control": "Two exact independent global owners collapse to one depth-only copied argument class; one owner accepts, actual payload reference rejects. Finite-set candidate not yet whole-qualified."
+  },
+  "finite_copied_global_precision": {
+    "control_receipt": "2026-11-10-goose-finite-copied-globals-controls.json.gz",
+    "binary_sha256": "e4f9c539e3701caa2aa643a700d7381ae28359ceab87cc596b88867c2b13ed38",
+    "lifetime_controls": 33,
+    "runtime_witnesses": 3,
+    "semantic_parity_controls": 24,
+    "finite_cap": 64,
+    "scope": "Exact global finite copied-argument sets only; conservative fallback unchanged for other provenance. Fixes reducer but NOT whole280.",
+    "whole280": {
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/multi-owner-argcopy-checker/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 154.052,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "next": "Metadata-only real incoming options root trace; independent local traversal bucket tool-speed candidate, no whole success."
   }
 }

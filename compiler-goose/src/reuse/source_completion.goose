@@ -52,6 +52,20 @@ fn matches(self_:const Entry&,units:const Core[:],entry:u32,names:Identity)->boo
  for left,index in saved.symbols {if left!=names.symbols[index] {return false;}}for left,index in saved.owners {if left!=names.owners[index] {return false;}}return true;
 }
 struct Borrow {prefix:const Prefix?=null,entry:const Entry?=null}
+// Receipts keep their original owner; these refs name the live registry slots.
+fn registeredBorrow(source:Borrow)->Borrow {
+ var prefix:const Prefix?=null;let incoming_prefix .=source.prefix;
+ if incoming_prefix {
+  assert(incoming_prefix.valid());let owned:const Prefix& =prefixes[incoming_prefix.slot-1].canonical;
+  assert(incoming_prefix .==owned);prefix .=owned;
+ }
+ var entry:const Entry?=null;let incoming_entry .=source.entry;
+ if incoming_entry {
+  assert(incoming_entry.valid());let owned:const Entry& =entries[incoming_entry.slot-1].canonical;
+  assert(incoming_entry .==owned);entry .=owned;
+ }
+ return Borrow{prefix:prefix,entry:entry};
+}
 fn covered(self_:Borrow,units:const Core[:],entry:u32,names:Identity)->i64 {
  let current .= self_.entry;if current && current.matches(units,entry,names) {return units.len;}
  let prefix .= self_.prefix;if prefix {return prefix.prefix(units,entry,names);}return 0;
