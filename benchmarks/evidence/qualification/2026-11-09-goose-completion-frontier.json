@@ -2650,5 +2650,85 @@
     },
     "next_frontier": "scoped13119.679s: recursive buildClosure applyUse(child) changes self_ root (\u00a77.8); source redesign under review, no checker relaxation",
     "pending_source_audit": "Other backend annotation buffer consumers and SIMD output-ref initialization await source freeze end"
+  },
+  "backend_context_family": {
+    "raw_receipt": "2026-11-10-goose-backend-context-family.json.gz",
+    "runtime_receipts": [
+      "2026-11-10-goose-backend-context-laws.json.gz",
+      "2026-11-10-goose-deferred-copy-law.json.gz"
+    ],
+    "changes": [
+      "Two child Generator emission entries save/install/recurse/extract/restore at the same threaded address",
+      "Owned specialization Key constructed fresh from scalar fields and existing evidence run",
+      "Removed redundant Lane.field and Lane wrapper; private transport anchors are scalar bindings",
+      "Dispatch catalog search uses separate lexical catalog arguments, preserving budget/order/cache behavior",
+      "Outlining helperCount reads checked context state; lane resolver uses the actual scoped Generator type",
+      "Deferred-copy holes, owner graph and span buffers publish headers through existing named runs",
+      "Annotation consumers iterate initialized buffer prefixes, and SIMD output references are initialized"
+    ],
+    "independent_review": [
+      "Astra parent/child alias, error and cleanup review plus minimal native language idiom controls",
+      "Sol transport-query field invariance and dispatch lookup/budget/cache semantic equivalence"
+    ],
+    "latest_scoped": {
+      "attempt": 140,
+      "seconds": 30.205,
+      "errors": [],
+      "stop": "batch limit",
+      "passed": false,
+      "partial": true
+    },
+    "whole141": "Completed143.578s noartifacts; raw receipt2026-11-10-goose-whole141.json.gz",
+    "whole_runtime_qualified": false,
+    "next": "Exact constant State/source reborrow: copied GlobalReach trace shows inexact generators class propagated by pairedImporter; no concrete payload retention path. Latest admission header source repair not yet strict-boundary checked.",
+    "affected_checkpoint": {
+      "passed": true,
+      "laws": {
+        "proof_leases": 4.082,
+        "resolved_body": 33.628,
+        "storage_call_cache": 6.221,
+        "footprint_owner": 7.26,
+        "wasm_scope_outline": 4.017
+      },
+      "raw_receipt": "2026-11-10-goose-backend-checkpoint-five.json.gz",
+      "latest_complete30_checkpoint": "f0a602bc",
+      "whole_runtime_qualified": false
+    },
+    "retained_owner_receipt": "2026-11-10-goose-retained-owners-frontier.json.gz",
+    "scratch_authority_receipt": "2026-11-10-goose-query-scratch-authority.json.gz"
+  },
+  "whole_build_141": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 143.578,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole141.json.gz",
+    "errors": [
+      "scoped_backend2224 SIMD lanes uninitialized before for& output loop",
+      "resolved_body60 cached plan may retain payloads owner while grow-shrink payloads assigned"
+    ]
+  },
+  "pending_legacy_copyFields": {
+    "path": "compiler-goose/src/backend/host_cleanup_shapes.goose:22",
+    "qualified": false,
+    "receipt": "2026-11-10-goose-retained-family-partial.json.gz"
   }
 }

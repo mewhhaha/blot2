@@ -4,6 +4,8 @@ import driver.cli;
 import driver.cli_workers;
 import std;
 import backend.storage_global_footprint;
+import backend.host_cleanup_shapes;
+import backend.storage_recursive_admission;
 import backend.scoped_backend;
 import backend.storage_type_arguments;
 import driver.compile_workspace;
@@ -81,7 +83,27 @@ fn typeKeyHeader() {
  output.deinit();key.deinit();
 }
 
+fn transportAnchors() {
+ var owner,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);
+ let bindings,error=owner.copy([blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.local,..},blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.parameter,..},blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.local,..},blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.local,..},blot_check_core::Binding{kind:blot_reuse_principal_interface::Kind.local,..}]);assert(error==blot_error::Error.none);
+ let merges,error=owner.copy([blot_check_core::Merge{result:3,then_binding:1,else_binding:2,..},blot_check_core::Merge{result:4,then_binding:1,else_binding:1,..}]);assert(error==blot_error::Error.none);
+ let units=blot_backend_result_publication::module_runs.alloc_slice(1);units[0]=blot_reuse_dependency_owned_headers::canonical(owner,blot_check_core::Module{unit:1,bindings:bindings,merges:merges,..});
+ var index=blot_backend_storage_transport::Index{module:units[0],owner_id:1,lease:-1,..};blot_support_pooled_map::insert(index.merges,3 as u32,0 as i64,blot_backend_storage_transport::ordinal_slots);blot_support_pooled_map::insert(index.merges,4 as u32,1 as i64,blot_backend_storage_transport::ordinal_slots);
+ for field in ["left","right"] {var query=blot_backend_storage_transport::LaneQuery{..};let changed,error=blot_backend_storage_transport::laneBinding(index,3,field,query,0);assert(error==blot_error::Error.none && !changed.present);let same,error=blot_backend_storage_transport::laneBinding(index,4,field,query,0);assert(error==blot_error::Error.none && same.present && same.value==1);}
+ var query=blot_backend_storage_transport::LaneQuery{iteration:42,anchor:blot_support::some<u32>(1),..};let inherited,error=blot_backend_storage_transport::laneBinding(index,42,"left",query,0);assert(error==blot_error::Error.none && inherited.present && inherited.value==1);
+ blot_support_pooled_map::deinit(index.merges,blot_backend_storage_transport::ordinal_slots);blot_backend_result_publication::module_runs.free_slice(units);owner.deinit();
+}
+fn pooledCleanup() {
+ for cycle in 0..3 {
+  let access=blot_backend_storage_recursive_admission::access_pool.alloc_slice(2);access[0]=blot_backend_storage_recursive_admission::Access{read:true,..};access[1]=blot_backend_storage_recursive_admission::Access{write:true,..};blot_backend_storage_recursive_admission::freeAccess(access);
+  let owners=blot_backend_storage_recursive_admission::owner_pool.alloc_slice(1);owners[0]=blot_support::some<i64>(7);let edges=blot_backend_storage_recursive_admission::edge_pool.alloc_slice(1);edges[0]=blot_backend_storage_recursive_admission::Edge{target:blot_check_core::BindingRef{1,2},owners:owners};blot_backend_storage_recursive_admission::freeEdges(edges);
+  let field=blot_backend_host_cleanup_shapes::owned_fields.alloc_slice(1);field[0]=blot_backend_host_cleanup_shapes::Field{name:"value",child:1};
+  let node=blot_backend_host_cleanup_shapes::Node{id:1,tag:blot_backend_host_cleanup_shapes::Tag.record,children:blot_backend_host_cleanup_shapes::copyChildren([1 as u32,2 as u32]),fields:field,variants:blot_backend_host_cleanup_shapes::copyVariants([blot_backend_host_cleanup_shapes::Variant{tag:3,child:2}]),..};blot_backend_host_cleanup_shapes::deinit(node);
+ }
+}
 fn main() {
+    pooledCleanup();
+    transportAnchors();
     typeKeyHeader();
     goalContexts();
     nameRanges();

@@ -5,9 +5,20 @@ import driver.cli_workers;
 import std;
 import check.parameter_patterns;
 import eval.type_evidence;
+import eval.semantic_evidence_import;
+import driver.compile_workspace_backing;
 import eval.implementation_evidence;
 import support.error;
 
+reusable[] var retained_importers:blot_eval_semantic_evidence_import::RetainedImporter[>..]=[];
+fn publishImporter(target:blot_eval_semantic_evidence_import::RetainedImporter&,destination:blot_eval_type_evidence::Store) {target=blot_eval_semantic_evidence_import::initRetained(destination,128,false);}
+fn retainedEvidence() {
+ var source,error=blot_eval_type_evidence::init();assert(error==blot_error::Error.none);var destination,error=blot_eval_type_evidence::init();assert(error==blot_error::Error.none);
+ let id,error=source.intern(blot_eval_type_evidence::Tag.array,3,0,[]);assert(error==blot_error::Error.none);let retained=retained_importers.alloc_slice(1);publishImporter(retained[0],destination);
+ let key=retained[0].destination;assert(blot_eval_type_evidence::valid(key));blot_compile_workspace::clearBacking();blot_compile_workspace::resetBackingDescriptors();
+ let mapped,error=retained[0].tyWithSource(source.view(),id,0);assert(error==blot_error::Error.none && destination.node(mapped).tag==blot_eval_type_evidence::Tag.array && destination.node(mapped).a==3);
+ destination.deinit();assert(!blot_eval_type_evidence::valid(key));var next,error=blot_eval_type_evidence::init();assert(error==blot_error::Error.none);let fresh=blot_eval_type_evidence::acquireHandle(next);assert(fresh.lease==key.lease && fresh.generation!=key.generation && !blot_eval_type_evidence::valid(key));retained[0].deinit();retained_importers.free_slice(retained);next.deinit();source.deinit();
+}
 fn evidenceLeases() {
     for iteration in 0..32 {
         var store,error=blot_eval_type_evidence::init();
@@ -90,7 +101,7 @@ fn patternLeases() {
         assert(next.lease==view.lease && next.generation!=view.generation && !blot_check_parameter_patterns::valid(view));next.deinit();
     }
 }
-fn main() {
+fn main() {retainedEvidence();
     evidenceLeases();implementationLeases();patternLeases();
     print("proof leases passed: shared headers, owner/generation rejection, release/reuse");
 }

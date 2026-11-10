@@ -1,58 +1,44 @@
 # Finish the Goose compiler experiment
 
-Repair coherent ownership families, build the actual C/header/native compiler,
-then qualify CLI/server, request OOM/retry and retention against Zig.
-**No whole compiler artifact exists yet.**
+Repair coherent ownership families, emit the actual complete C/header/native
+compiler, then qualify CLI/server, request OOM/retry and retention against Zig.
+**No whole compiler artifact exists yet.** Preserve compiler/ as the oracle.
 
-All 30 production helper laws pass together in 221.34s on the copied-argument
-checker. The exact [C/link/runtime receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz)
-qualifies its pinned sources. Whole 115 still has no compiler artifacts.
+All 30 helper laws pass together in 221.34s at map checkpoint `f0a602bc`;
+[the complete receipt](../benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz)
+pins its sources and actual C/link/runtime results. Later repairs have affected
+laws; the final five-law checkpoint passes in 55.21s; full qualification is pending.
 
-The strict `scoped` diagnostic root checks backend bodies in about 19s, using
-invalid empty Core without executing it. Current failure: recursive child
-Generator emission changes the threaded reference root (scoped131). Astra is
-testing same-address context save/restore; no checker weakening.
+Whole141 stops143.58s without artifacts at SIMD initialization/cached-plan
+publication. Source repairs follow. Strict scoped145 takes47.31s, reaching
+recursive-contract publication and retained constant-query state. The contract
+header is now reconstituted through existing access_pool. Remaining failure:
+`resolved_body.deinit` sees payload storage retained by global constant
+state_owners through core_backend.constantLookup. A copied trace identifies an inexact Generator-root class at pairedImporter;
+exact State reborrowing is under test. Do not relax the checker or clear live owners.
 
-Specialization key equality now compares evidence content; copied keys dedupe
-admissions and share candidate chains. Map removal has one explicit owner-pool
-API across all 78 production calls. The new law executes wrapped hash collisions,
-rollback, replacement, scalar fallback and Frame reuse. No new pool/registry.
-Bulk-error experiments remain off-tree without demonstrated production gain.
+The scoped root is check-only with invalid empty Core. Early failures take
+19–21s; broader checks take47–50s. A30s no-diagnostic timeout was incomplete.
+Repair cap120s, final emission180s, whole build300s; stop3s after a diagnostic.
+Regenerate adapters once, then freeze sources before checking. Never overlap
+adapter generation and helper fingerprinting.
 
-Current representation:
+Current family uses same-address child Generator context save/restore, scalar
+transport anchors, lexical dispatch catalogs, exact Control/deferred-copy runs,
+owned plan metadata and checked retained Store handles. QueryScratch uses live
+owner/generation/lease keys, accepting equivalent copied owned headers and
+rejecting stale/mismatched authorities. Layout514→1102B; 10k candidate binds
+measure4.047ms at-O0, no whole-compiler performance claim. Actual generator,
+CLI/server and OOM/retention qualification remain pending.
 
-- Session parents/tables use checked scalar authority. Header, published and
-  worker module sources reborrow exact existing runs; child/grandchild sharing,
-  callbacks, stale keys and cleanup execute in the session law.
-- Value and Root are fully scalar. Spellings use ranges into shared Metadata
-  bytes; two same-arena retention copies are gone. Ordering, equality, encoding
-  and transport consumers still observe spelling bytes.
-- Thirteen maps with local APIs use nominal descriptors; generic-interface maps
-  retain the shared descriptor. No layout or allocator change.
-- Effect evidence moves six buffers and two maps using complete registered views.
-  Nonempty commit, producer cleanup, real Frame, reads and dedupe execute.
-- Inputs/overlays/Patterns/seeds, Checked and Prepared publication, diagnostics,
-  type cursors and query growth keep their pinned executed laws. Existing pools
-  and journals remain; no graph copies or extra registry.
+Known unqualified legacy API: host_cleanup_shapes.copyFields republishes a
+borrowed Field.name. Its failing fixture is recorded; cleanup laws qualify only
+deinit with directly owned input. Do not infer factory success.
 
-The optional `--copied-argument-contents` private layer passes independent review,
-21 focused lifetime controls, 3 executions and both 24-case existing control sets.
-It requires the full `--global-reach-trace` recipe. Exact storage identity,
-reference traversal and recursive conservatism remain intact. Installed Goose
-and qualified678 are unchanged. See [tool evidence](../benchmarks/evidence/qualification/2026-11-10-goose-copied-argument-contents.json.gz).
-The current binary is `build/goose-port/argcopy-experiment-20261110/goose`.
-
-Keep repair stages at 120s, final emission at 180s and whole builds at 300s. Stop 3s
-after an actual diagnostic. Use runtime selection/affected batches during repair;
-an incomplete run is not a pass. Regenerate adapters once at family boundaries,
-then freeze source for verification. Actual builds regenerate source identity.
-
-Preserve ABI 8/session 2 and compiler/ as oracle. Native adapters provide bits,
-byte I/O, clocks, atomics and allocation primitives, never Blot compilation.
-Native OOM supervisor/transport/cache controls use a fake compiler entry; whole
-compiler OOM and retention remain pending. No unavailable live-byte count is zero.
-
-See [the root frontier](../CONTINUE.md) and
+Use `build/goose-port/argcopy-experiment-20261110/goose` and its pinned optional
+copied-argument recipe; installed Goose/qualified678 are unchanged. Preserve ABI8,
+session2 and explicit owner/copy contracts. Native adapters never compile Blot.
+No unavailable live-byte count is zero. Zig source is unchanged and its prior
+full gate remains incomplete; see [the root frontier](../CONTINUE.md) and
 [exact receipts](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
-Unmet language/performance requirements remain in the storage task and migration
-index; source inventory is not fresh Gdev runtime/frame qualification.
+Unmet language/runtime/performance requirements remain in the storage task/RFC.

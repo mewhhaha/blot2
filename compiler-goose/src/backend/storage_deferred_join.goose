@@ -16,6 +16,10 @@ fn deinit(holes: Holes&) { blot_support_pooled_buffer::deinit(holes,hole_runs); 
 struct Lane { first: Local,carrier: blot_support::Option<Local> = blot_support::none<Local>(),holes: Holes = Holes {..} }
 reusable[] var lane_runs: Lane[>..] = [];
 struct Join { entry_locals: i64,edges: i64 = 0,lanes: Lane[:] = default<Lane[:]>() }
+fn registered(join:Join)->Join {
+ if join.lanes.len==0 {return Join{entry_locals:join.entry_locals,edges:join.edges,..};}
+ let lanes=lane_runs.realloc_slice(join.lanes,join.lanes.len);assert(blot_support::same_slice_identity(lanes,join.lanes));return Join{entry_locals:join.entry_locals,edges:join.edges,lanes:lanes};
+}
 fn init<M>(code: blot_backend_runtime_code::Code<M>) -> Join { let module .= code.module; return Join { entry_locals: module.parameters(code.function).len + module.locals(code.function).len , ..}; }
 fn deinit(join: Join&) { for &lane in join.lanes { lane.holes.deinit(); } if join.lanes.len != 0 { lane_runs.free_slice(join.lanes); } join.lanes=default<Lane[:]>(); join.edges = 0; }
 fn materialize<M>(lane: Lane&,code: blot_backend_runtime_code::Code<M>&,context: blot_backend_wasm_scope_outline::Context&) -> Error {
@@ -30,7 +34,7 @@ fn add<M>(join: Join&,code: blot_backend_runtime_code::Code<M>&,context: blot_ba
         let incoming = words[index];
         if join.edges != 0 && (lane.first.id != incoming.id || lane.first.id >= join.entry_locals) { let error = materialize(lane,code,context); if error != blot_error::Error.none { return error; } }
         if lane.carrier.present { let error = code.set(lane.carrier.value,incoming); if error != blot_error::Error.none { return error; } }
-        else { let reserved = lane.holes.reserve(lane.holes.items.len + 1); if reserved != blot_error::Error.none { return reserved; } let position,error = context.reserveCopy(code.function); if error != blot_error::Error.none { return error; } let length = lane.holes.items.len; lane.holes.storage[length] = position; lane.holes.items = lane.holes.storage[..length + 1]; }
+        else { let reserved = lane.holes.reserve(lane.holes.items.len + 1); if reserved != blot_error::Error.none { return reserved; } let position,error = context.reserveCopy(code.function); if error != blot_error::Error.none { return error; } let length = lane.holes.items.len; let slots=hole_runs.realloc_slice(lane.holes.storage,lane.holes.storage.len);slots[length]=position;lane.holes.items=slots[..length+1]; }
     }
     join.edges++; return blot_error::Error.none;
 }

@@ -86,6 +86,7 @@ reusable[] var flag_runs:bool[>..]=[];
 struct Context {module:Module?=null,options:Options=Options{..},slot:u32=0,generation:u64=0}
 fn live(self_:const Context&)->bool {return self_.slot!=0 && self_.slot<=context_states.len && context_states[self_.slot-1].live && context_states[self_.slot-1].generation==self_.generation;}
 fn state(self_:Context)->ContextState& {assert(self_.live());return context_states[self_.slot-1];}
+fn helperCount(self_:const Context&)->i64 {return self_.state().helpers.len;}
 fn target(self_:const Context&)->Module& {assert(self_.live());let module .= self_.module;assert(module);return module;}
 fn init(module:Module&,contract:Contract,options:Options)->Context {let generation=blot_native::fresh_owner_id();let at=context_states.alloc_index(ContextState{generation:generation,live:true,..});return Context{module:module,options:options,slot:(at+1) as u32,generation:generation,..};}
 fn deinit(self_:Context&) {if self_.slot==0 {return;}let state:ContextState& =self_.state();for &root in state.roots.items {root.deinit();}for helper in state.helpers.items {if helper.read_before_def.len!=0 {word_runs.free_slice(helper.read_before_def);}}state.roots.deinit();state.helpers.deinit();let at=self_.slot-1;context_states[at].live=false;context_states.free(at);self_=Context{..};}

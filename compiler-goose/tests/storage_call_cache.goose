@@ -26,6 +26,13 @@ fn cacheLaw(){
  cache.rollbackEntries(0);assert(cache.entry_positions.count==0 && !cache.find(query(2)).present);
  cache.deinit();
 }
+fn completionLaw(){
+ var cache=blot_backend_storage_calls::Cache{..};let first,error=cache.insert(key(9),77,false);assert(error==blot_error::Error.none && first==0);
+ assert(cache.complete(first,false)==blot_error::Error.none && cache.entries.items.len==2 && !cache.entries.items[first].building && !cache.entries.items[first].context_sensitive);
+ var other=query(9);other.context=41;let shared=cache.find(other);assert(shared.present && shared.value==1 && cache.entries.items[shared.value].key.context_free && cache.entries.items[shared.value].function==77);
+ {var candidates=cache.candidates(query(9));assert(candidates.next().value==0 && candidates.next().value==1 && !candidates.next().present);}
+ cache.rollbackEntries(0);assert(cache.entry_positions.count==0);cache.deinit();
+}
 fn collisionLaw(){
  var ids:u32[3]=[0,0,0];var count:i64=0;
  for candidate in 1..1000 {if (key(candidate as u32).hash()&7)==7 {ids[count]=candidate as u32;count++;if count==3 {break;}}}
@@ -44,4 +51,4 @@ fn collisionLaw(){
  blot_support_pooled_map::deinit(map,slots);blot_backend_storage_calls::release(first);blot_backend_storage_calls::release(second);blot_backend_storage_calls::release(third);
 }
 fn scalarLaw(){var map=blot_support_pooled_map::Map<u32,u32>{..};blot_support_pooled_map::insert(map,1 as u32,10 as u32,scalar_slots);blot_support_pooled_map::insert(map,2 as u32,20 as u32,scalar_slots);assert(blot_support_pooled_map::remove(map,2 as u32,scalar_slots));assert(!blot_support_pooled_map::contains(map,2 as u32));assert(blot_support_pooled_map::remove(map,1 as u32,scalar_slots));assert(map.count==0);blot_support_pooled_map::deinit(map,scalar_slots);}
-fn main(){cacheLaw();collisionLaw();scalarLaw();print("cache equality, owner removal, collision wrap and scalar fallback passed");}
+fn main(){cacheLaw();completionLaw();collisionLaw();scalarLaw();print("cache equality, owner removal, collision wrap and scalar fallback passed");}

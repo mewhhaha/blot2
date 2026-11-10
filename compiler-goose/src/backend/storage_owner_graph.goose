@@ -31,7 +31,7 @@ recursive fn resultValue<V,C>(graph: Graph<V>&,context: const C&,value: V,owner_
 }
 fn add<V>(graph: Graph<V>&,owner: i64,owner_count: i64) -> Error {
     if graph.remaining == 0 || owner >= owner_count { return blot_error::Error.declined; } graph.remaining--; if blot_support_pooled_map::contains(graph.ordinals,owner) { return blot_error::Error.none; } if graph.owners.items.len >= 65536 { return blot_error::Error.declined; }
-    let reserved = blot_support_pooled_buffer::ensure(graph.owners,graph.owners.items.len + 1,owner_runs); if reserved != blot_error::Error.none { return reserved; } blot_support_pooled_map::insert(graph.ordinals,owner,graph.owners.items.len,ordinal_slots); let position = graph.owners.items.len; graph.owners.storage[position] = owner; graph.owners.items = graph.owners.storage[..position + 1]; return blot_error::Error.none;
+    let reserved = blot_support_pooled_buffer::ensure(graph.owners,graph.owners.items.len + 1,owner_runs); if reserved != blot_error::Error.none { return reserved; } blot_support_pooled_map::insert(graph.ordinals,owner,graph.owners.items.len,ordinal_slots); let position = graph.owners.items.len; let slots=owner_runs.realloc_slice(graph.owners.storage,graph.owners.storage.len);slots[position]=owner;graph.owners.items=slots[..position+1]; return blot_error::Error.none;
 }
 recursive fn visit<V,C>(graph: Graph<V>&,context: const C&,value: V,owner_count: i64,stored: bool,depth: i64) -> Error {
     if graph.remaining == 0 || depth > 128 || value.host.present { return blot_error::Error.declined; } graph.remaining--;

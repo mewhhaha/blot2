@@ -101,11 +101,11 @@ fn contains(self_: const ExpressionMap&, key: ExpressionKey) -> bool { return bl
 fn insert(self_: ExpressionMap&, key: ExpressionKey, value: const u32[:]) { blot_support_pooled_map::insert(self_.table, key, value, expressionmap_slots); }
 fn deinit(self_: ExpressionMap&) { blot_support_pooled_map::deinit(self_.table, expressionmap_slots); }
 
-struct PlanMap { table: blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> = blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::Plan> {..} }
-reusable[] var planmap_slots: dictionary_slot<u32,blot_reuse_source_value_template::Plan>[>..] = [];
-fn get(self_: const PlanMap&, key: u32) -> blot_reuse_source_value_template::Plan? { return blot_support_pooled_map::get(self_.table, key); }
+struct PlanMap { table: blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::PlanMetadata> = blot_support_pooled_map::Map<u32,blot_reuse_source_value_template::PlanMetadata> {..} }
+reusable[] var planmap_slots: dictionary_slot<u32,blot_reuse_source_value_template::PlanMetadata>[>..] = [];
+fn get(self_: const PlanMap&, key: u32) -> blot_reuse_source_value_template::PlanMetadata? { return blot_support_pooled_map::get(self_.table, key); }
 fn contains(self_: const PlanMap&, key: u32) -> bool { return blot_support_pooled_map::contains(self_.table, key); }
-fn insert(self_: PlanMap&, key: u32, value: blot_reuse_source_value_template::Plan) { blot_support_pooled_map::insert(self_.table, key, value, planmap_slots); }
+fn insert(self_: PlanMap&, key: u32, value: blot_reuse_source_value_template::PlanMetadata) { blot_support_pooled_map::insert(self_.table, key, value, planmap_slots); }
 fn deinit(self_: PlanMap&) { blot_support_pooled_map::deinit(self_.table, planmap_slots); }
 struct TextMap { table: blot_support_pooled_map::Map<const u8[:],u32> = blot_support_pooled_map::Map<const u8[:],u32> {..} }
 reusable[] var textmap_slots: dictionary_slot<const u8[:],u32>[>..] = [];
@@ -821,7 +821,7 @@ fn importClosedEvidence<G>(self_: Importer&, g: G&, id: u32) -> blot_support::Op
     let __old:const Pools& =requiredPools(self_.old); let view = __old.evaluator.evidence.view(); var remaining: i64 = 65536;
     if view.closed(id, 0, remaining) != blot_error::Error.none { return blot_support::none<u32>(), blot_error::Error.none; }
     if !self_.closed_evidence.present {
-        self_.closed_evidence = blot_support::some(blot_eval_semantic_evidence_import::initRetained(blot_eval_type_evidence::canonicalStore(g.evaluator.storage.evidence), depth_limit, false));
+        self_.closed_evidence = blot_support::Option<blot_eval_semantic_evidence_import::RetainedImporter>{true,blot_eval_semantic_evidence_import::initRetained(g.evaluator.storage.evidence, depth_limit, false)};
     }
     let value, failure = self_.closed_evidence.value.tyWithSource(view,id, 0);
     if failure == blot_error::Error.none { self_.semantic.insert(key, value); }
@@ -862,8 +862,9 @@ fn matchStaticKeyInto<G>(self_: Importer&, g: G&, old_id: u32, current_id: u32, 
         if old.variable != current.variable { return false, blot_error::Error.none; }
         { let import_error_3 = temporary.old_roots.push(old.value); if import_error_3 != blot_error::Error.none { return false, convert(import_error_3); } } { let import_error_4 = temporary.current_roots.push(current.value); if import_error_4 != blot_error::Error.none { return false, convert(import_error_4); } }
     }
-    var plan: const blot_reuse_source_value_template::Plan? = self_.static_plans.get(old_id);
-    if plan { self_.census.static_plan_hits++; }
+    var selected = blot_support::none<blot_reuse_source_value_template::Plan>();
+    let cached .= self_.static_plans.get(old_id);
+    if cached { self_.census.static_plan_hits++; selected=blot_support::Option<blot_reuse_source_value_template::Plan>{true,cached.view(requiredPools(self_.old),gate)}; }
     else {
         self_.census.static_plan_inspections++; let __old:const Pools& =requiredPools(self_.old);
         let inspection, import_error_5 = blot_reuse_source_value_template::inspectRootsWithRows(__old, gate, temporary.old_roots.items, blot_reuse_source_value_template::RowPolicy.source_declared); if import_error_5 != blot_error::Error.none { return false, convert(import_error_5); }
@@ -871,11 +872,11 @@ fn matchStaticKeyInto<G>(self_: Importer&, g: G&, old_id: u32, current_id: u32, 
         if !temporary.temporary.present { return false, blot_error::Error.none; }
         if self_.static_plans.table.count < 64 && temporary.temporary.value.order.len <= 65536 - self_.static_plan_nodes {
             self_.static_plan_nodes += temporary.temporary.value.order.len;
-            self_.static_plans.insert(old_id, temporary.temporary.value); temporary.temporary.present = false;
-            plan .= self_.static_plans.get(old_id);
-        } else { plan .= temporary.temporary.value; }
+            self_.static_plans.insert(old_id, blot_reuse_source_value_template::metadata(temporary.temporary.value)); temporary.temporary.present = false;
+            let stored .= self_.static_plans.get(old_id);assert(stored);selected=blot_support::Option<blot_reuse_source_value_template::Plan>{true,stored.view(requiredPools(self_.old),gate)};
+        } else { selected=blot_support::Option<blot_reuse_source_value_template::Plan>{true,temporary.temporary.value}; }
     }
-    assert(plan);
+    assert(selected.present);let plan=selected.value;
     if !self_.static_scratch.present { self_.static_scratch = blot_support::some(blot_reuse_source_value_template::QueryScratch { allocation_owner: g.allocation_owner , ..}); }
     let scratch .= self_.static_scratch.value;
     let anchors, begin_error = scratch.begin(plan, g);

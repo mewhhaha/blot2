@@ -22,9 +22,9 @@ fn copyChildren(source: const u32[:]) -> const u32[:] { if source.len == 0 { ret
 fn copyFields(source: const Field[:]) -> const Field[:] { if source.len == 0 { return default<const Field[:]>(); } let out = owned_fields.alloc_slice(source.len); for field,index in source { out[index] = field; } return out; }
 fn copyVariants(source: const Variant[:]) -> const Variant[:] { if source.len == 0 { return default<const Variant[:]>(); } let out = owned_variants.alloc_slice(source.len); for variant,index in source { out[index] = variant; } return out; }
 fn deinit(node: Node) {
-    if node.children.len != 0 { let first: const u32& = node.children[0]; let start = owned_children.index_of(first); owned_children.free_slice(owned_children[start..start + node.children.len]); }
-    if node.fields.len != 0 { let first: const Field& = node.fields[0]; let start = owned_fields.index_of(first); owned_fields.free_slice(owned_fields[start..start + node.fields.len]); }
-    if node.variants.len != 0 { let first: const Variant& = node.variants[0]; let start = owned_variants.index_of(first); owned_variants.free_slice(owned_variants[start..start + node.variants.len]); }
+    if node.children.len != 0 { let owned=owned_children.realloc_slice(node.children,node.children.len);assert(blot_support::same_slice_identity(owned,node.children));owned_children.free_slice(owned); }
+    if node.fields.len != 0 { let owned=owned_fields.realloc_slice(node.fields,node.fields.len);assert(blot_support::same_slice_identity(owned,node.fields));owned_fields.free_slice(owned); }
+    if node.variants.len != 0 { let owned=owned_variants.realloc_slice(node.variants,node.variants.len);assert(blot_support::same_slice_identity(owned,node.variants));owned_variants.free_slice(owned); }
 }
 struct Builder<C> { context: C, nodes: Node[>..<]&, seen: dictionary<u32,bool>&, remaining: i64 = 65536 }
 fn charge<C>(builder: Builder<C>&) -> Error { if builder.remaining == 0 { return blot_error::Error.layout_limit; } builder.remaining--; return blot_error::Error.none; }

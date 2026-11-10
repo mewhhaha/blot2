@@ -1707,8 +1707,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transpor
 fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::Hypothesis,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::Index)->bool {return equalFields(left,right);}
 fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::Index,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::Lane)->bool {return equalFields(left,right);}
-fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::Lane,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::LaneQuery)->bool {return equalFields(left,right);}
 fn blot_backend_storage_transport::blotStructuralHash<StructuralSink>(value:blot_backend_storage_transport::LaneQuery,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_storage_transport::Position)->bool {return equalFields(left,right);}
@@ -6013,6 +6011,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_source_value_templ
 fn blot_reuse_source_value_template::blotStructuralHash<StructuralSink>(value:blot_reuse_source_value_template::Package,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_source_value_template::Plan)->bool {return equalFields(left,right);}
 fn blot_reuse_source_value_template::blotStructuralHash<StructuralSink>(value:blot_reuse_source_value_template::Plan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_source_value_template::PlanMetadata)->bool {return equalFields(left,right);}
+fn blot_reuse_source_value_template::blotStructuralHash<StructuralSink>(value:blot_reuse_source_value_template::PlanMetadata,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_source_value_template::Probe)->bool {return equalFields(left,right);}
 fn blot_reuse_source_value_template::blotStructuralHash<StructuralSink>(value:blot_reuse_source_value_template::Probe,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_source_value_template::QueryScratch)->bool {return equalFields(left,right);}

@@ -8,6 +8,7 @@ import check.types;
 import check.check;
 import eval.core_eval;
 import eval.eval_values;
+import eval.pool_leases;
 import eval.type_evidence;
 import eval.body_recipe;
 import eval.eval_collection_growth;
@@ -164,25 +165,46 @@ struct ScratchStats {
 }
 struct QueryScratch {
     allocation_owner: u64 = 0, owner_id: u64 = blot_native::fresh_owner_id(), owner: u64 = 0,
-    generator: u64 = 0, session: u64 = 0, pools: const Pools? = null, gate: const Gate? = null,
+    generator: u64 = 0, session: u64 = 0, gate_storage: u32 = 0, gate_generation: u64 = 0,
+    pools_owner: u64 = 0, pools_generation: u64 = 0, leases: blot_eval_pool_leases::Leases = blot_eval_pool_leases::Leases {},
     policy: blot_support::Option<RowPolicy> =blot_support::none<RowPolicy>(), stats: ScratchStats = ScratchStats {..},
     anchors: WordBuffer = WordBuffer {..}, anchor_ids: WordBuffer = WordBuffer {..}, positions: SizeBuffer = SizeBuffer {..},
     candidate: WordBuffer = WordBuffer {..}, inverse: WordBuffer = WordBuffer {..}, inverse_ids: WordBuffer = WordBuffer {..},
     semantic: WordBuffer = WordBuffer {..}, types: MappingBuffer = MappingBuffer {..}, rows: RowBuffer = RowBuffer {..},
     children: WordBuffer = WordBuffer {..}, child_ids: WordBuffer = WordBuffer {..}, append_children: BitBuffer = BitBuffer {..},
 }
-fn deinit(self_: QueryScratch&) { self_.anchors.deinit(); self_.anchor_ids.deinit(); self_.positions.deinit(); self_.candidate.deinit(); self_.inverse.deinit(); self_.inverse_ids.deinit(); self_.semantic.deinit(); self_.types.deinit(); self_.rows.deinit(); self_.children.deinit(); self_.child_ids.deinit(); self_.append_children.deinit(); self_.owner = 0; self_.generator = 0; self_.session = 0; self_.pools .= null; self_.gate .= null; self_.policy = blot_support::none<RowPolicy>(); }
+fn deinit(self_: QueryScratch&) { self_.anchors.deinit(); self_.anchor_ids.deinit(); self_.positions.deinit(); self_.candidate.deinit(); self_.inverse.deinit(); self_.inverse_ids.deinit(); self_.semantic.deinit(); self_.types.deinit(); self_.rows.deinit(); self_.children.deinit(); self_.child_ids.deinit(); self_.append_children.deinit(); self_.owner = 0; self_.generator = 0; self_.session = 0; self_.gate_storage = 0; self_.gate_generation = 0; self_.pools_owner = 0; self_.pools_generation = 0; self_.leases = blot_eval_pool_leases::Leases {}; self_.policy = blot_support::none<RowPolicy>(); }
 fn payloadBytes(self_: const QueryScratch&) -> i64 { return self_.anchors.payloadBytes() + self_.anchor_ids.payloadBytes() + self_.positions.payloadBytes() + self_.candidate.payloadBytes() + self_.inverse.payloadBytes() + self_.inverse_ids.payloadBytes() + self_.semantic.payloadBytes() + self_.types.payloadBytes() + self_.rows.payloadBytes() + self_.children.payloadBytes() + self_.child_ids.payloadBytes() + self_.append_children.payloadBytes(); }
 struct Plan {
     pools: const Pools? = null, gate: const Gate? = null, root: u32 = 0,
     order: const u32[:] = default<const u32[:]>(), stats: Stats = Stats {..}, row_policy: RowPolicy = RowPolicy.empty_only,
 }
+// Retained inspection metadata owns its order, while callers supply live views.
+struct PlanMetadata {root:u32=0,order:const u32[:]=default<const u32[:]>(),stats:Stats=Stats{},row_policy:RowPolicy=RowPolicy.empty_only}
+fn metadata(plan:Plan)->PlanMetadata {return PlanMetadata{plan.root,ownedOrder(plan.order),plan.stats,plan.row_policy};}
+fn ownedOrder(order:const u32[:])->const u32[:] {if order.len==0 {return default<const u32[:]>();}let registered=plan_order.realloc_slice(order,order.len);assert(blot_support::same_slice_identity(registered,order));let start=plan_order.index_of(registered[0]);return plan_order[start..start+order.len];}
+fn view(self_:PlanMetadata,pools:const Pools&,gate:const Gate&)->Plan {return Plan{pools:pools,gate:gate,root:self_.root,order:ownedOrder(self_.order),stats:self_.stats,row_policy:self_.row_policy};}
+fn deinit(self_:PlanMetadata&) {if self_.order.len!=0 {plan_order.free_slice(self_.order);}self_=PlanMetadata{};}
 reusable[] var plan_order: u32[>..] = [];
 fn deinit(self_: Plan&) { if self_.order.len != 0 { plan_order.free_slice(self_.order); } self_ = Plan {..}; }
+// Scratch binds to owned authority, so equivalent copied headers share scratch.
+// Every use rechecks the gate and all nonempty leases; scratch retains no borrow.
 fn bind<G>(self_: QueryScratch&, plan: Plan, g: G&) -> Error {
     if !plan.gate || !plan.pools || self_.allocation_owner == 0 || self_.allocation_owner != g.evaluator.allocation_owner || !blot_reuse_catalog_storage::same(g.evaluator.units, requiredGate(plan.gate).units) { return blot_error::Error.declined; }
-    if self_.owner != 0 { if self_.owner != self_.owner_id || self_.generator != g.owner_id || self_.session != g.evaluator.owner_id || self_.pools .!= plan.pools || self_.gate .!= plan.gate || !self_.policy.present || self_.policy.value != plan.row_policy { return blot_error::Error.declined; } }
-    else { if self_.owner_id == 0 || g.owner_id == 0 || g.evaluator.owner_id == 0 { return blot_error::Error.declined; } self_.owner = self_.owner_id; self_.generator = g.owner_id; self_.session = g.evaluator.owner_id; self_.pools .= plan.pools; self_.gate .= plan.gate; self_.policy = blot_support::some(plan.row_policy); }
+    let gate: const Gate& = requiredGate(plan.gate); let pools: const Pools& = requiredPools(plan.pools);
+    if !gate.live() { return blot_error::Error.declined; }
+    for index in 0..blot_eval_pool_leases::field_count {
+        let lease = pools.leases.values[index];
+        if lease.index != 0 && !blot_eval_pool_leases::valid(lease) { return blot_error::Error.declined; }
+        if self_.owner != 0 && (self_.leases.values[index].index != lease.index || self_.leases.values[index].generation != lease.generation) { return blot_error::Error.declined; }
+    }
+    if self_.owner != 0 {
+        if self_.owner != self_.owner_id || self_.generator != g.owner_id || self_.session != g.evaluator.owner_id || self_.gate_storage != gate.storage || self_.gate_generation != gate.generation || self_.pools_owner != pools.evaluator.owner_id || self_.pools_generation != pools.generation || !self_.policy.present || self_.policy.value != plan.row_policy { return blot_error::Error.declined; }
+    } else {
+        if self_.owner_id == 0 || g.owner_id == 0 || g.evaluator.owner_id == 0 { return blot_error::Error.declined; }
+        self_.owner = self_.owner_id; self_.generator = g.owner_id; self_.session = g.evaluator.owner_id;
+        self_.gate_storage = gate.storage; self_.gate_generation = gate.generation; self_.pools_owner = pools.evaluator.owner_id; self_.pools_generation = pools.generation; self_.leases = pools.leases; self_.policy = blot_support::some(plan.row_policy);
+    }
     return blot_error::Error.none;
 }
 fn grow<B,T>(self_: QueryScratch&, buffer: B&, length: i64, initial: T) -> Error { let before = buffer.items.len; let error = buffer.resize(length, initial); if error != blot_error::Error.none { return error; } if length > before { self_.stats.initialized_slots += length - before; } return blot_error::Error.none; }

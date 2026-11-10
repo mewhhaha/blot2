@@ -1,105 +1,102 @@
 # Continue the Goose compiler experiment
 
-Repair ownership in coherent families, build the **actual native Goose compiler**,
-then qualify CLI/server behavior, retained revisions and recoverable request OOM
-against Zig. **No whole C/header/executable exists yet.** Do not forward to Zig or
-substitute component tests for integrated qualification.
+Finish coherent ownership repairs, build the **actual complete C/header/native
+Goose compiler**, then qualify CLI/server, request OOM/retry and retention against
+Zig. **No whole compiler artifact exists.** Component laws never substitute for
+integrated qualification; do not forward Goose requests to the Zig oracle.
 
-## Current evidence
+## Current frontier and evidence
 
-All **30 production helper laws pass together in 221.34s** on the private
-copied-argument checker. They emit C, link and execute real production code. Exact
-input closures, compiler and native objects are pinned in
-[the complete receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
-These are helper laws, not whole-compiler qualification.
+All **30 production helper laws pass together in 221.34s** at map checkpoint
+`f0a602bc`. Exact sources, toolchains, C, native objects and executions are pinned
+in [the complete receipt](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
+Later backend/owner repairs have affected executed laws; the final five-law
+checkpoint passes in 55.21s (proof leases, resolved bodies, cache, footprint and
+outline), with pinned C/link/runtime evidence in
+[the affected receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-checkpoint-five.json.gz).
+Full qualification remains pending.
 
-Current source uses existing named pools and owner journals:
+Actual whole141 stops after **143.58s**, without artifacts, at SIMD initialization
+and cached-plan publication. Both source families have subsequent repairs. See
+[the pinned whole attempt](benchmarks/evidence/qualification/2026-11-10-goose-whole141.json.gz).
+Broader strict scoped145 finishes in 47.31s and reaches recursive-contract
+publication plus retained constant-query state. The contract header is now
+reconstituted through its existing pool. The remaining retention diagnostic is
+`resolved_body.deinit`: global constant `state_owners` may retain payload storage
+through `core_backend.constantLookup`. A copied diagnostic identifies an inexact Generator-root class propagated
+through pairedImporter, rather than a concrete payload reference. Exact State
+reborrowing is being tested. No checker relaxation or live-owner clearing is
+authorized.
 
-- Inputs, overlays, Pattern stores, retained seeds and SessionTables use checked
-  scalar keys. Shared sessions retain original catalog table authority and
-  explicitly reborrow header, published or worker module runs.
-- Value spellings are ranges into the existing metadata byte arena. Value and
-  Root are fully scalar; two redundant retention name copies are removed.
-- Thirteen maps with local APIs have nominal descriptors. Fifteen maps using the
-  generic interface retain its shared descriptor. Their layouts are unchanged.
-- Effect evidence transfers all six buffers and both bucket maps through exact
-  registered runs. Its nonempty move/source cleanup/Frame/readback law passes.
-- Ordinary and copied-packet Checked publication, Prepared/seed admission,
-  diagnostic ownership, nested type cursors and query-table growth have executed
-  laws. Source retains 49 alias guards; no project graphs are cloned.
+The strict `scoped` diagnostic uses deliberately invalid empty Core. Early
+failures take 19–21s; broader checks take about 47–50s. It is **check-only**, never
+runtime qualification. Scoped140's 30s no-diagnostic timeout remains incomplete.
+Repair stages retain the standard 120s cap; final emission uses at most 180s
+inside a 300s whole-build budget. Stop 3s after an actual diagnostic. Do not lift
+caps to hide unfinished work. Bulk-error experiments remain off-tree without a
+demonstrated production gain.
 
-Whole 115 reaches GoalContext defaults and semantic Outcome publication in
-135.30s without artifacts; both families now have executed controls. Worker and
-archive headers reborrow their existing owner journals. Persisted retains only
-its scalar Frozen owner, removing three duplicate metadata allocations; alias
-prefixes now copy into the same owner as their canonical roots.
+## Current source contracts
 
-Use `check_engines.py --engines scoped` for strict backend discovery: about 19s
-per check. It constructs deliberately invalid empty Core and is **check-only**.
-It does not qualify runtime behavior or omitted frontend/server bodies. Current
-frontier: recursive child Generator emission changes the recursive reference root
-(scoped131, 19.68s). Astra is testing parent/child context save/restore at the same
-address, without weakening the checker.
+- Value/Root spellings and active goals use existing arena ranges; recursive
+  traversals reload flat elements instead of retaining vector views.
+- Both child Generator emission paths save/install/recurse/extract/restore at the
+  same threaded address. Parent aliases are dormant during child emission;
+  restoration precedes error handling and exactly-once cleanup. Minimal native
+  controls pass; actual generator runtime remains pending.
+- Specialization keys compare evidence contents. Cache laws cover deduplication,
+  chains, completion fallback, rollback and wrapped collisions. One owner-aware
+  removal API serves all 78 production calls without extra pools.
+- Worker/archive headers use their existing checked journals. Persisted retains
+  only its scalar Frozen owner; alias prefixes copy into their canonical owner.
+- Query caches retain owned inspection metadata and reconstruct invocation-local
+  Plan views. Retained evidence imports reborrow checked Store handles.
+- QueryScratch retains live Gate, Pools and exact lease keys instead of borrows.
+  Equivalent copied owned headers intentionally compare equal; stale/mismatched
+  authorities reject. Its packed layout grows **514→1102B**. A candidate-only
+  unoptimized probe measures 10,000 binds in 4.047ms; no whole-compiler speed claim.
+- Private transport anchors contain only binding IDs; the query carries field
+  spelling unchanged. Catalog search preserves order, privacy, budgets and cache
+  behavior using separate lexical borrows. Control/deferred-copy publication and
+  cleanup reconstitute existing named runs.
 
-Specialization key lookup now compares evidence contents. An actual native
-witness reproduced lookup failure after copying identical evidence; the new law
-checks admission deduplication, candidate chains, rollback and wrapped hash
-collisions. Map deletion has one owner-aware API; all 78 production call sites
-supply their existing named pool. No extra pool or compatibility overload.
+Known additional unqualified legacy API: `host_cleanup_shapes.copyFields` cannot
+republish borrowed Field.name from its input slice. Its recorded failed fixture
+is preserved; the new cleanup law directly allocates its input in owned_fields
+and qualifies deinit only. Do not claim the shape factory passes.
 
-Whole builds stop 3s after the first diagnostic. Repair checks cap at 120s; final
-emission may use 180s within a 300s build budget. Do not extend caps to hide slow
-or unfinished checks. Off-tree bulk-error experiments remain unpromoted.
-
-Current and historical exact-candidate evidence is in
+Exact family receipts and historical checkpoints remain in
 [the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
-An interrupted inventory is incomplete, even if its completed laws pass.
 
-## Private checker
+## Toolchain and remaining qualification
 
-The optional copied-argument-contents layer preserves incoming by-value record
-contents without making storage identity exact. Independent review, 21 focused
-lifetime controls, 3 executed positives, 24 existing semantic/runtime controls and
-24 empty-holder parity cases pass. Deep/reference reads and recursion remain
-conservative. The installed Goose compiler and qualified678 binary are unchanged.
-
-Recipe: `compiler-goose/tools/build_goose_checker.py --copied-argument-contents`
-requires the complete `--global-reach-trace` recipe. The measured binary is
+Use the pinned private copied-argument checker at
 `build/goose-port/argcopy-experiment-20261110/goose`, SHA256
 `c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632`.
-The tracked patch reproduces its exact 108-file source without another compiler
-build. See [the tooling receipt](benchmarks/evidence/qualification/2026-11-10-goose-copied-argument-contents.json.gz).
-Newer independent Goose releases are not automatically qualified for this port.
+Its optional recipe and 21 lifetime controls are recorded in
+[the private tooling receipt](benchmarks/evidence/qualification/2026-11-10-goose-copied-argument-contents.json.gz).
+Installed Goose and the qualified678 binary remain unchanged. Exact storage
+identity, deep/reference reads and recursive conservatism remain intact.
 
-## Remaining qualification and contracts
+Preserve ABI 8/session 2, named owners, explicit copies and invocation-local
+borrows. Language tasks remain retired; copied-packet host workers remain.
+Current Blot syntax is `func`, explicit `return`, curried `->`, `$Constructor`,
+Boolean primitives and `#[...]` arrays. Preserve compiler/ and sibling assets.
 
-Keep ABI 8, session 2, explicit owners/copies and invocation-local borrows. Language
-tasks remain retired; copied-packet host workers remain. Current syntax is
-`func`, explicit `return`, curried `->`, `$Constructor`, Boolean primitives and
-`#[...]` arrays. Preserve compiler/, the Zig oracle and sibling source/assets.
+`qualify_compiler.ts` has eight matching-language Zig oracle baseline passes,
+but has **not run against Goose**. Native supervisor/transport/cache controls use
+a fake compiler entry; actual compiler OOM/retry/retention remain pending.
+Unavailable live-byte counts are not zero. The required Zig full gate remains
+incomplete: all 2,974 laws compile without LLVM, but the LLVM release phase hit
+120s and cancelled after 94 laws/65 full sweeps. Smoke/harness and zero-finding
+lint pass. Zig source is unchanged; do not repeat that release build per Goose edit.
 
-`qualify_compiler.ts` has eight matching-language Zig oracle baseline passes and
-an exact unsupported ABI 8 recursion witness. It has **not run against Goose**.
-Native request supervisor/transport/cache components pass normal and sanitizer
-controls with a fake compiler entry; actual compiler OOM/retry/retention remain
-pending. Live payload/capacity/scratch counts are unavailable, never invented zero.
-
-The required Zig full gate is incomplete: all 2,974 laws compile without LLVM,
-but the LLVM release phase hit 120s and cancelled execution after 94 native laws
-and 65 full allocation sweeps. Smoke/harness and zero-finding Zig lint pass.
-Zig source is unchanged; do not repeat that expensive release build per Goose edit.
-
-The named-function source migration across std/Ink/Gdev is checkpointed. Its
-[exact source/API qualification](benchmarks/evidence/qualification/2026-11-08-named-source-migration.json)
-does not qualify a fresh Main/frame. Full release, original-export and Gdev Main
-qualification remain pending. Historical Main measured 9,203,613B and 5.523s on
-its pinned older release, with no reliable compile gain; subsecond compilation
-and 1–2MB output remain unmet.
-
-Preserve the remaining language RFC and performance requirements in
+Named-function migration across std/Ink/Gdev is checkpointed; source inventory is
+not fresh Main/frame qualification. Historical Main is 9,203,613B/5.523s on its
+older pinned release, with no reliable compilation gain. Subsecond compilation,
+sub-five-second Main and 1–2MB output remain unmet. Preserve the remaining RFC,
+runtime/export and performance requirements in
 [tasks/STORAGE_REWRITE.md](tasks/STORAGE_REWRITE.md) and
 [docs/language/NEXT_MIGRATION.md](docs/language/NEXT_MIGRATION.md).
-Earlier detailed checkpoints remain in
-[the preceding handoff](https://github.com/mewhhaha/blot2/blob/17eb9d04ad20a9c6caf245b4b1142ee9bafa0b1a/CONTINUE.md).
-Environment publication and upstream issue/comment changes require explicit
-requests. Use Astra for concrete snags; never Terra.
+Environment publication and upstream comments/issues require explicit requests.
+Use Astra for concrete snags; never Terra.
