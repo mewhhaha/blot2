@@ -4310,5 +4310,47 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "scalar_layout_traversals": {
+    "native_receipt": "2026-11-10-goose-owner-traversal-laws.json.gz",
+    "native_passed": true,
+    "native_sum_stage_seconds": 2.897,
+    "coverage": [
+      "hasOwners all eight singlechild tags",
+      "function second child",
+      "state provider third child",
+      "product/nominal/record",
+      "record-name skipping",
+      "shared/self cycles",
+      "invalid root",
+      "4096 versus4097 nodes",
+      "owning node at queue boundary",
+      "wide product preserves breadth-first enqueue failure order"
+    ],
+    "closedType": "Sibling scalar selector checked by backend297, not executed by native law",
+    "partial_backend": {
+      "receipt": "2026-11-10-goose-backend-owner-traversal297.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 79.058,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 894,
+          "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "795b857c1d00bad74025f6130fc342cf479c1982d1afce5ec7c548fd34ff8afd",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "whole_compiler_executable": false
   }
 }

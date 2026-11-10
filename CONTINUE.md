@@ -12,20 +12,20 @@ whole 290, stopped at partial expectation interning in 163.377s with unchanged
 reproduce and advance the relevant frontier in about 75–78s. These are partial,
 check-only probes and never qualify the full compiler.
 
-Backend 296 clears the canonical bridge family: all 38 production conversion
-calls across three files use four Generator helpers and the existing checked
-`bridgeForGenerator` accessor. Generic representations remain for lexical callers.
-The extended real-Frame law passes in 6.322s: lazy binding, exact bridge/layout/
-evidence identity, product and nonempty effect-row roundtrips, four memo tables,
-owner reuse and release.
-[Bridge law](benchmarks/evidence/qualification/2026-11-10-goose-canonical-bridge-laws.json.gz).
+Backend 297 clears scalar selectors in `hasOwners` and `closedType`, after the
+38-call canonical bridge batch. The executed owner-scan law passes in 2.897s:
+all child-selector branches, record-name skipping, shared/cyclic graphs, invalid
+roots and exact 4096-node breadth-first queue behavior. `closedType` is checked
+by the grouped backend but not executed by that native law.
+[Traversal law](benchmarks/evidence/qualification/2026-11-10-goose-owner-traversal-laws.json.gz).
 
-The grouped backend stops in 81.077s, unchanged source, at `layout.goose:114`:
-`hasOwners` rebinds a slice from a local fixed array to caller-owned layout
-children. Replace that mixed-owner slice selector with scalar traversal while
-preserving ordering, record-name skipping and the 4096-node budget. Whole compiler
-and actual CLI/server/OOM/retry/retention still pending.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-canonical-bridge296.json.gz).
+The grouped backend stops in 79.058s, unchanged source, at `backend_emission:894`:
+`prepareMapped` constructs a nested Owner with stored references inside a
+recursive cycle (§7.8). Astra is reviewing implicated fields and scalar authority
+through existing Frame owners before a coherent emission-family rewrite. Do not
+add registries, clone payloads or relax checking to bypass it. Whole compiler and
+actual CLI/server/OOM/retry/retention remain pending.
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-owner-traversal297.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion
@@ -36,7 +36,7 @@ Conversion stacks retain their 128-owner/128-binder limits in fixed backing,
 including overflow rejection and nested-error unwind. No payload clones/new pins.
 
 The last complete component inventory passed 36/36 on its pinned source in
-307.14s summed stages. The current 46-law inventory has not run in full; focused
+307.14s summed stages. The current 47-law inventory has not run in full; focused
 family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
 68 map adapters and all rejected prototypes remain in pinned history and
 [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

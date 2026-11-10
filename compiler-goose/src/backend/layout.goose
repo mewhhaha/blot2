@@ -107,13 +107,17 @@ fn hasOwners(store: const Store&, root: Id) -> bool, blot_error::Error {
         let id = nodes[cursor]; cursor++;
         if id >= store.nodes.len { return false, blot_error::Error.layout_limit; }
         let n = node(store, id); if n.tag == Tag.owning { return true, blot_error::Error.none; }
-        var direct: Id[3] = [n.a, n.b, n.c]; var selected: const Id[:] = direct[..0];
-        if n.tag == Tag.array || n.tag == Tag.list || n.tag == Tag.cursor || n.tag == Tag.resolver || n.tag == Tag.provider || n.tag == Tag.scoped || n.tag == Tag.universal || n.tag == Tag.existential { selected = direct[..1]; }
-        else if n.tag == Tag.function { selected = direct[..2]; }
-        else if n.tag == Tag.state_provider { selected = direct[..]; }
-        else if n.tag == Tag.product || n.tag == Tag.nominal || n.tag == Tag.record { selected = children(store, id); }
-        for child, index in selected {
+        var child_count: i64 = 0; var indirect = false;
+        if n.tag == Tag.array || n.tag == Tag.list || n.tag == Tag.cursor || n.tag == Tag.resolver || n.tag == Tag.provider || n.tag == Tag.scoped || n.tag == Tag.universal || n.tag == Tag.existential { child_count = 1; }
+        else if n.tag == Tag.function { child_count = 2; }
+        else if n.tag == Tag.state_provider { child_count = 3; }
+        else if n.tag == Tag.product || n.tag == Tag.nominal || n.tag == Tag.record { child_count = children(store, id).len; indirect = true; }
+        for index in 0..child_count {
             if n.tag == Tag.record && index % 2 == 0 { continue; }
+            var child = n.a;
+            if indirect { child = children(store, id)[index]; }
+            else if index == 1 { child = n.b; }
+            else if index == 2 { child = n.c; }
             var known = false; for prior in nodes[..count] { if prior == child { known = true; break; } }
             if known { continue; } if count == 4096 { return false, blot_error::Error.layout_limit; } nodes[count] = child; count++;
         }
@@ -307,8 +311,8 @@ recursive fn closedType(module: const blot_check_core::Module&, kinds: u8[:], ty
     else if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.resolver || n.tag == blot_check_types::Tag.usage { closed = closedType(module, kinds, n.a, depth + 1); }
     else if n.tag == blot_check_types::Tag.function { closed = closedType(module, kinds, n.a, depth + 1) && closedType(module, kinds, n.b, depth + 1) && tailClosed(module.types.row(n.c).tail) && module.types.rowLabels(n.c).len == 0; }
     else if n.tag == blot_check_types::Tag.product || n.tag == blot_check_types::Tag.nominal {
-        var fields = module.types.list(blot_check_types::List { start: n.a, len: n.b , ..}); if n.tag == blot_check_types::Tag.nominal { fields = module.types.nominalArguments(n); }
-        closed = true; for child in fields { if !closedType(module, kinds, child, depth + 1) { closed = false; break; } }
+        let range = blot_check_types::List { start: n.a, len: n.b , ..}; var child_count = module.types.list(range).len; if n.tag == blot_check_types::Tag.nominal { child_count = module.types.nominalArguments(n).len; }
+        closed = true; for index in 0..child_count { var child: u32 = 0; if n.tag == blot_check_types::Tag.nominal { child = module.types.nominalArguments(n)[index]; } else { child = module.types.list(range)[index]; } if !closedType(module, kinds, child, depth + 1) { closed = false; break; } }
     } else if n.tag == blot_check_types::Tag.record {
         closed = true; for index in 0..n.b { if !closedType(module, kinds, module.types.recordField(n, index).ty, depth + 1) { closed = false; break; } }
     }
