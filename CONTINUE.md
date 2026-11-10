@@ -12,29 +12,28 @@ whole 290, stopped at partial expectation interning in 163.377s with unchanged
 reproduce and advance the relevant frontier in about 75–78s. These are partial,
 check-only probes and never qualify the full compiler.
 
-The seven-module emission owner rewrite clears its recursive-store frontier in
-backend 298: 76.467s, unchanged source. All 21 Owner constructions, 12 Config
-sites and 348 generator reads now use scalar Frame/read descriptors. Existing
-static-closure buffer leases transfer into plans: two pools/four helpers and the
-duplicate mapping/row copies are removed. No extra payload allocation or registry;
-plans retain spare capacity until release. Nonempty decision snapshots with no
-facts may acquire one existing metadata slot as their lifetime anchor.
+Backend 300 clears evaluator parameter/capture reacquisition and pure field
+lookup in 77.800s, unchanged source. Invocation paths retain scalar counts and
+Body metadata, with per-index Parameter/Capture value reads. Speculative member
+lookup no longer saves/restores a borrowed Diagnostic: pure lookup returns the
+original reason, and the real-error wrapper still creates the original diagnostic.
+The 4.903s native field law covers actual record/nominal values, lookup locations,
+selected failure reasons and diagnostic preservation. The audit marks three of
+six failure branches executed; the others are source-reviewed only.
+[Field law](benchmarks/evidence/qualification/2026-11-10-goose-evaluator-field-laws.json.gz).
 
-Three native laws pass (45.1s summed compiler/link/runtime stages): descriptor
-lifetime/range/transfer/reuse, resolved-body cleanup and real-Frame layout behavior.
-Decision buffers must stay frozen between snapshot and consuming preparation;
-release/reuse is checked. The separate actual prepareMapped probe hit its original
-30s emission cap before C/native output. It is explicit opt-in, outside the
-48 default component laws, and remains unqualified. Do not lift its cap or call it
-a pass. All source was written and adapters regenerated before verification.
-[Owner batch](benchmarks/evidence/qualification/2026-11-10-goose-emission-owner-scalars-laws.json.gz).
+Full invocation emission hit its original 30s cap before C/native execution.
+Like the actual preparation probe, it remains explicit opt-in and unqualified,
+outside the 49 default component laws. Full current inventory has not run. The
+seven-module scalar Owner batch passes its three focused laws and prior backend
+frontier; buffer ownership transfer removes two copy pools without a new registry.
 
-Current backend frontier: `eval/core_eval.goose:885`, parameters borrowed at883
-remain live across typedView, which may shrink code-origin type storage. Replace
-long-lived metadata spans with scalar counts and per-use checked reborrows/value
-snapshots as one evaluator family. Whole compiler and actual CLI/server/OOM/retry/
+Current frontier: `core_eval.goose:614`, indexed edit-plan iteration retains a
+borrow over indexedEdit, which may shrink code-origin type storage. Audit matching
+context-plan loops and use captured scalar counts/per-index metadata values,
+preserving order and visibility. Whole compiler and actual CLI/server/OOM/retry/
 retention remain pending.
-[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-owner-scalars298.json.gz).
+[Latest backend receipt](benchmarks/evidence/qualification/2026-11-10-goose-backend-evaluator-field300.json.gz).
 
 Previous checked families clear Run preparation, startup planning, declaration
 scanning, bridge cleanup/publication, physical interning and fixed conversion
@@ -45,7 +44,7 @@ Conversion stacks retain their 128-owner/128-binder limits in fixed backing,
 including overflow rejection and nested-error unwind. No payload clones/new pins.
 
 The last complete component inventory passed 36/36 on its pinned source in
-307.14s summed stages. The current 48-law inventory has not run in full; focused
+307.14s summed stages. The current 49-law inventory has not run in full; focused
 family receipts qualify only their exact inputs. The cleanup-wrapper retirement,
 68 map adapters and all rejected prototypes remain in pinned history and
 [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).

@@ -4406,5 +4406,80 @@
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     }
+  },
+  "evaluator_metadata_reacquisition": {
+    "partial_parameter_candidate_backend": {
+      "receipt": "2026-11-10-goose-backend-evaluator-parameters299.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 77.779,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 962,
+          "message": "error: references may only be passed down, not stored, inside a recursive cycle (\u00a77.8)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "c5170214d3ba1b31b3a946a9aa6f970aaefbaf470f6c8ab7a3c988bed99eaac8",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "representation": "scalar parameter/capture counts, per-index value snapshots, scalar Body metadata; no whole Module/span snapshots across mutation",
+    "following_family": "pure generic-field probe eliminates recursive borrowed Diagnostic rollback; original real-error wrapper retained",
+    "runtime_qualification": "pending bounded invocation/field witnesses",
+    "whole_compiler_executable": false,
+    "field_native": {
+      "receipt": "2026-11-10-goose-evaluator-field-laws.json.gz",
+      "passed": true,
+      "sum_stage_seconds": 4.903,
+      "covers": [
+        "real record/nominal values",
+        "lookup locations",
+        "unsupported versus missing_field",
+        "pure miss preserves prior diagnostic",
+        "wrapper retains exact codes/span/first diagnostic"
+      ]
+    },
+    "actual_invocation": {
+      "receipt": "2026-11-10-goose-evaluator-invocation-cap.json.gz",
+      "passed": false,
+      "cap_seconds": 30,
+      "seconds": 30.124,
+      "c_emitted": false,
+      "executed": false,
+      "qualification": "pending explicit opt-in probe"
+    },
+    "default_component_laws": 49,
+    "current_default_full_run": false,
+    "combined_backend": {
+      "receipt": "2026-11-10-goose-backend-evaluator-field300.json.gz",
+      "partial": true,
+      "engines": [
+        "compile",
+        "record_artifact",
+        "emit"
+      ],
+      "exit": 1,
+      "seconds": 77.8,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose",
+          "line": 614,
+          "message": "error: cannot call indexedEdit, which shrinks backing_origins_code_module_types: the for loop at /home/jacobt/src/blot2/compiler-goose/src/eval/core_eval.goose:614 iterates requireReference(self_.indexed_region).plan.edits[..requireReference(self_.indexed_region).plan.edit_count], which may refer into backing_origins_code_module_types (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "a01f4b9ca35799709bb6f57509864f1541ca5f9d317c00ed915e45b9e2713ec4",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    }
   }
 }

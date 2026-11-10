@@ -4,19 +4,17 @@ Build the actual complete C/header/native compiler, then qualify CLI/server,
 request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
 No forwarding to compiler/ and no ABI fallback.
 
-Whole 290 remains the latest complete attempt: 163.377s, unchanged 461 inputs,
-no artifact. Partial backend 298 clears the seven-module Owner rewrite in 76.467s,
-unchanged, then stops at core_eval885: parameters borrowed at 883 across typedView
-may refer into shrinking code-origin type storage. Repair evaluator span lifetime
-as a coherent family before another whole attempt.
+Whole 290 remains latest complete attempt: 163.377s, unchanged 461 inputs, no artifact.
+Partial backend 300 clears evaluator metadata reacquisition and pure field lookup
+in 77.8s, then stops at core_eval614 indexed-edit plan array borrow over indexedEdit.
+Preserve captured count/order with scalar metadata reads as a coherent loop family.
 
-21 Owner/12 Config sites and 348 Generator reads now use scalar Frame/read keys.
-StaticClosurePlan takes existing buffer leases, removing two copy pools/four
-helpers without new payload allocation/registry. Three native laws pass in 45.1s summed
-stages. InstanceRead requires decisions frozen; deinit/reuse rejection is checked.
-The actual prepareMapped probe caps emission at 30s, emits no C and is unqualified;
-it is explicit opt-in outside 48 default laws. Whole executable and actual CLI/server/
-OOM/retry/retention still pending.
+Pure field law passes in 4.903s, including real records/nominals, exact lookup/error
+reasons and prior diagnostic preservation. Three of six failure branches executed;
+others source-reviewed. Full invocation hit its 30s emission cap/no C and is explicit opt-in,
+unqualified like prepareMapped. Full run of 49 default laws is pending. Scalar Owner
+batch prior native/backend laws pass. Whole executable and actual CLI/server/OOM/
+retry/retention pending.
 
 Physical Store now keeps scalar publication/effect authority instead of foreign
 Core/effect views. Existing registries/pools supply invocation-local descriptors;
@@ -29,7 +27,7 @@ Three hard-bounded stacks use fixed 128/128/16384 backing and scalar counts. Fiv
 native laws pass 26.09s summed stages, including full bounds, overflow, nested
 failure unwind and repeatedcanonical IDs. Earlier Run/startup/scanner/bridge
 loans cleared by coherent source families. Native runner now seals immutable
-receipts/rawlogs automatically; current full 48-law inventory still pending.
+receipts/rawlogs automatically; current full 49-law inventory still pending.
 
 Private checker:build/goose-port/finite-root-diagnostics/goose. Parent finite
 exact-global copiedcontents precision passes33lifetime/3runtime/24semantic
