@@ -3780,5 +3780,124 @@
       "whole_compiler_executable": false
     },
     "next": "Metadata-only real incoming options root trace; independent local traversal bucket tool-speed candidate, no whole success."
+  },
+  "scalar_source_receipts_and_startup_frames": {
+    "source_receipt_identity": "Existing Prefix/Entry scalar slot+generation; Borrow does not own or deinit; zero/stale/reuse law passes",
+    "whole282": {
+      "receipt": "2026-11-10-goose-scalar-source-receipts-whole282.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 163.362,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "cleared": [
+      "Run prepare/reset copied-options loan",
+      "backend_plan startupDependencies state loan"
+    ],
+    "startup_frame": "Frame-only planner reborrows existing backing_generator_planning after dependency queries, asserts canonical generator identity",
+    "request_family": [
+      "StartupDependencyQuery",
+      "RecheckProof"
+    ],
+    "native": {
+      "passed": true,
+      "tests": [
+        "empty_session",
+        "footprint_owner"
+      ],
+      "sum_stage_seconds": 18.575,
+      "receipt": "2026-11-10-goose-startup-frame-laws.json.gz"
+    },
+    "whole283": {
+      "receipt": "2026-11-10-goose-startup-whole283.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 162.107,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "remaining": "declaration_dependencies.scheme visited dictionary insert; proposed binding-indexed bitset; CLI/server/OOM/retry/retention pending executable"
+  },
+  "declaration_scheme_generation_marks": {
+    "scope": "New executed scanner regression; whole284 pending",
+    "representation": "Fixed u32 marks perbinding and scalar epoch, stable append-only local owners, no hash resize, O(1) normal reset and full clear only on epoch max",
+    "coverage": [
+      "callee cycles/repeats63/64/65",
+      "DFS order",
+      "implicit member selection",
+      "per-body ranges/reset",
+      "zero/upper/far OOB andforeign-unit rejection",
+      "rollback",
+      "forced epoch rollover"
+    ],
+    "native": {
+      "passed": true,
+      "tests": 1,
+      "sum_stage_seconds": 2.626,
+      "receipt": "2026-11-10-goose-declaration-generation-law.json.gz"
+    },
+    "rejected_prototype": "Fixed bitset correct representation but per-body wholeword zeroing is avoidable quadratic work; superseded by generation marks before actualwhole",
+    "actual_compiler_runtime": false,
+    "whole284": {
+      "receipt": "2026-11-10-goose-declaration-whole284.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/finite-root-diagnostics/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 160.003,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "remaining": "Capture.work.pop live alias; convert whole Capture scratch family to stable owners and logical LIFO"
   }
 }

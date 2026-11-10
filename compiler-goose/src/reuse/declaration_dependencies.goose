@@ -1,7 +1,6 @@
 // Structural source dependencies survive metadata erased by execution lowering.
 namespace blot_reuse_declaration_dependencies;
 import std;
-import dictionary;
 import check.core;
 import check.types;
 import check.check;
@@ -18,13 +17,13 @@ struct SchemeFrame { scheme: blot_check_types::Scheme, next: u32 = 0 }
 let scan_limit: i64 = 16777216;
 struct Capture {
     module: const Module&, work: Work[>..<]&, references: BindingRef[>..<]&, locations: u32[>..<]&, members: Member[>..<]&,
-    schemes_seen: dictionary<u32,bool>&, runtime_metadata: u32 = 0, watched_binding: u32 = 0,
+    schemes_seen: u32[:], seen_epoch: u32 = 1, runtime_metadata: u32 = 0, watched_binding: u32 = 0,
     watched_used: bool = false, selection: bool = false, failure: Error = blot_error::Error.none,
 }
 fn withCapture<C,F>(module: const Module&, context: C, selection: bool = false, watched: u32 = 0) {
     var work: Work[>..<] = []; var references: BindingRef[>..<] = []; var locations: u32[>..<] = []; var members: Member[>..<] = [];
-    var schemes: dictionary<u32,bool> = dictionary<u32,bool>{};
-    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: schemes, watched_binding: watched, selection: selection , ..};
+    var schemes: u32[>..] = []; for _ in module.bindings.len {schemes.push(0 as u32);} let scheme_marks=schemes[..];
+    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: scheme_marks, watched_binding: watched, selection: selection , ..};
     return F(scan, context);
 }
 fn node(self_: Capture&, id: u32) { if self_.failure == blot_error::Error.none && id != 0 { self_.work.push(Work.node { id , ..}); } }
@@ -51,7 +50,7 @@ fn scheme(self_: Capture&, value: blot_check_types::Scheme) {
         if obligation.kind == blot_check_types::ObligationKind.callee_use {
             if obligation.identity.unit != 0 && obligation.identity.unit != self_.module.unit { self_.failure = blot_error::Error.core_limit; return; }
             let binding = obligation.identity.decl; if binding == 0 || binding >= self_.module.bindings.len { self_.failure = blot_error::Error.core_limit; return; }
-            if !self_.schemes_seen.contains(binding) { self_.schemes_seen.insert(binding, true); pending.push(SchemeFrame { self_.module.binding(binding).scheme , ..}); } continue;
+            if self_.schemes_seen[binding] != self_.seen_epoch { self_.schemes_seen[binding] = self_.seen_epoch; pending.push(SchemeFrame { self_.module.binding(binding).scheme , ..}); } continue;
         }
         if self_.selection { self_.member(obligation.name, obligation.operator); continue; } if !obligation.explicit { continue; }
         match obligation.kind {
@@ -63,7 +62,7 @@ fn scheme(self_: Capture&, value: blot_check_types::Scheme) {
 }
 fn scan(self_: Capture&, body: blot_check_core::Body) -> Recipe, Error {
     let first_reference = self_.references.len; let first_member = self_.members.len;
-    self_.schemes_seen.clear(); self_.runtime_metadata = 0; self_.scheme(body.scheme); self_.node(body.root); var remaining = scan_limit;
+    if self_.seen_epoch == 0xffffffff { for &mark in self_.schemes_seen { mark = 0; } self_.seen_epoch = 1; } else { self_.seen_epoch++; } self_.runtime_metadata = 0; self_.scheme(body.scheme); self_.node(body.root); var remaining = scan_limit;
     while self_.work.len != 0 {
         if self_.failure != blot_error::Error.none { return Recipe {..}, self_.failure; } if remaining == 0 { return Recipe {..}, blot_error::Error.core_limit; } remaining--;
         let item = self_.work.pop(); match item {
@@ -168,8 +167,8 @@ fn operator(op: blot_check_core::Op) -> blot_support::Option<blot_check_types::O
 }
 fn capture(module: const Module&, declarations: Recipe[>..<]&, references: BindingRef[>..<]&, members: Member[>..<]&) -> Error {
     assert(module.declaration_dependencies.len == 0); assert(declarations.len == 0 && references.len == 0 && members.len == 0);
-    var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: dictionary<u32,bool> = dictionary<u32,bool>{};
-    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen , ..};
+    var work: Work[>..<] = []; var locations: u32[>..<] = []; var seen: u32[>..] = []; for _ in module.bindings.len {seen.push(0 as u32);} let seen_marks=seen[..];
+    var scan = Capture { module: module, work: work, references: references, locations: locations, members: members, schemes_seen: seen_marks , ..};
     for index in module.bodies.len { declarations.push(Recipe {..}); }
     for body, offset in module.bodies[1..] { let recipe, error = scan.scan(body); if error != blot_error::Error.none { declarations.clear(); references.clear(); members.clear(); return error; } declarations[offset + 1] = recipe; }
     return blot_error::Error.none;

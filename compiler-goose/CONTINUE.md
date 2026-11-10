@@ -1,48 +1,42 @@
 # Finish the Goose compiler experiment
 
-Repair ownership, build the actual complete C/header/native compiler, then qualify
-CLI/server, request OOM/retry and retention against Zig. **No whole compiler
-artifact exists.** Preserve compiler/ as the oracle.
+Build the complete Goose C/header/native executable, then qualify CLI/server,
+request OOM/retry and retention against Zig. **No whole compiler artifact exists.**
+Preserve compiler/ as the independent oracle; no forwarding or ABI fallback.
 
-Actual whole280 fails154.05s, unchanged461inputs, no C/header/native. The same
-prepare/reset loan persists after original options use four scalar owner keys,
-canonical identity/digest/order/receipt reborrows and scalar validation receipt.
-Three affected native laws pass48.20s summed stages. Shared journal input spans
-retain exact identity/values after the original owner releases its reference.
+Whole283 clears the Run prepare/reset and startup planner loans, then fails at
+reuse/declaration_dependencies.goose54 visited-dictionary insert.162.11s,
+unchanged461inputs, no artifact. Declaration scans now use fixed u32 generation
+marks with O(1) normal reset over append-only stable local owners. New native
+cycle/order/reset/invalid-target/rollover law passes. Whole284 fails160.00s at Capture.work.pop live alias; the complete scratch
+family is next. No whole artifact.
 
-The metadata-only trace identifies a fresh copied argument class. Millisecond
-controls show two independent safe named-owner views reject, while one passes;
-real payload references still reject. A private finite exact-global-root-set
-prototype passes33lifetime/3runtime/24semantic controls but whole280 still fails.
-No prototype is promoted. Do not make
-more speculative source field changes or repeat expensive whole checks before
-those controls pass.
+Source-completion/validation receipts carry existing scalar identities. Zero,
+stale and reused-generation laws pass. Input identity/digest/order spans reborrow
+the original named journals. Whole282 confirms all5inputroots survive through
+compileAttempt. Startup planning takes Frame and reborrows named planning only
+after dependency queries; two evaluator requests are scalar. Two native laws
+pass18.58s summed stages. These are component laws, not compiler runtime proof.
 
-Complete36/36 native component laws pass on same frozen source, summed stage
-307.14s,30s/stage/600s overall. These never qualify actual compiler/CLI runtime.
-All92fake cleanup wrappers removed (82guarded+10manual),22authoring controls and
-qualified executable original/transformed witnesses pass.14-file publication
-batch covers68adapters/134sites; header/state payload copies and owners unchanged.
-Principal contexts/constant body descriptors are scalar, Frame guards validated.
+Use private experimental build/goose-port/finite-root-diagnostics/goose.
+Finite exact-global contents sets cap64; inexact/local/recursive/unknown and
+larger sets keep conservative behavior. Parent33lifetime/3runtime/24semantic
+controls pass; metadata/traversal build repeats33lifetime/24semantic controls.
+Installed Goose unchanged. Trace:GOOSE_OPTIONS_ROOT_TRACE=1. Nominal buckets halve
+TypeEq calls but single150s/154s pair does not establish robust speedup.
 
-CurrentRun retains options/Frame/flags plus existing timing. Public options use
-existing scalar keys; source owner lifetimes are unchanged. Three Capture getters return actual
-canonical headers; checkpoint key returns a lexical borrowed descriptor. Actual
-whole/CLI/server/OOM/retry/retention remains pending without binary.
+Current source full inventory pending. Earlier36/36 component laws and removal
+of92cleanup wrappers/68map adapters/134publications remain exact historical
+receipts, not whole compiler acceptance. All selected roots are partial,
+check-only and never executable. Repair120s/emission180s/whole300s caps remain.
+No cap lifting, suppressed borrow checks or clearing live owners to hide errors.
 
-All phase probes are check-only with unstaged inputs; NEVER execute. Use smaller
-phase subsets when needed, keeping120s repair cap. Actual CLI/server/OOM/retry
-qualification still requires the real executable. Root frontier links receipts
-and controlled filename/timing provenance evidence.
+Once the real executable exists, run tools/qualify_compiler.ts against it and
+compiler/zig-out-native-fast/bin/blotc. Runner covers CLI/ABI8, project lifecycle,
+cold and retained OOM/retry plus2warmup/6measured edit/restore RSS observations
+under16MiB growth budget. Allocator live bytes unavailable. Static runner checks
+pass; actual Goose runtime checks have not run. No fresh Gdev/Main/frame or
+compile-speed/output-size win. Preserve ABI8/session2, owners, copies and siblings.
 
-Use private checker c2b24 at build/goose-port/argcopy-experiment-20261110/goose.
-Installed Goose/678 and the off-tree origin checker are unchanged. Selected roots
-are partial/check-only; scoped uses invalid Core. Repair cap 120s; emission 180s;
-whole 300s; stop 3s after a reported error. No cap lifting/checker relaxation.
-
-Preserve ABI 8/session 2, explicit owners/copies and sibling assets. Actual Goose
-CLI/server/OOM/retry/retention awaits the real executable. Eight matching Zig
-baseline fixtures pass. Zig source is unchanged; its prior full gate is
-incomplete. See [the root frontier](../CONTINUE.md),
-[the receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
-and the storage/RFC tasks for requirements and remaining coverage.
+See [the root frontier](../CONTINUE.md), [receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
+and [storage task](../tasks/STORAGE_REWRITE.md) for remaining requirements.

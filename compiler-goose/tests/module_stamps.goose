@@ -7,6 +7,7 @@ import reuse.code_artifacts;
 import backend.result_publication;
 import reuse.dependency_payload;
 import reuse.dependency_identity;
+import reuse.source_completion;
 import reuse.dependency_stamp_view;
 var module_text:u8[4]=[117,110,105,116];
 var previous_module:blot_check_core::Module=blot_check_core::Module{unit:1,names:module_text[..],..};
@@ -69,7 +70,26 @@ fn registeredCatalogInputViews() {
  retained.deinit();
 }
 
+fn scalarSourceReceiptBorrow() {
+ assert(blot_reuse_source_completion::prefixValue(null).slot==0 && blot_reuse_source_completion::entryValue(null).slot==0);
+ let p=blot_reuse_source_completion::prefixes.alloc_index(blot_reuse_source_completion::PrefixState{generation:11,live:true,..});
+ blot_reuse_source_completion::prefixes[p].canonical=blot_reuse_source_completion::Prefix{(p+1) as u32,11};
+ let e=blot_reuse_source_completion::entries.alloc_index(blot_reuse_source_completion::EntryState{generation:21,live:true,..});
+ blot_reuse_source_completion::entries[e].canonical=blot_reuse_source_completion::Entry{(e+1) as u32,21};
+ let borrowed=blot_reuse_source_completion::Borrow{prefix:blot_reuse_source_completion::prefixValue(blot_reuse_source_completion::prefixes[p].canonical),entry:blot_reuse_source_completion::entryValue(blot_reuse_source_completion::entries[e].canonical)};
+ assert(borrowed.prefix.valid() && borrowed.entry.valid());
+ blot_reuse_source_completion::prefixes[p].canonical.deinit();blot_reuse_source_completion::entries[e].canonical.deinit();
+ assert(!borrowed.prefix.valid() && !borrowed.entry.valid());
+ let next_p=blot_reuse_source_completion::prefixes.alloc_index(blot_reuse_source_completion::PrefixState{generation:12,live:true,..});
+ blot_reuse_source_completion::prefixes[next_p].canonical=blot_reuse_source_completion::Prefix{(next_p+1) as u32,12};
+ let next_e=blot_reuse_source_completion::entries.alloc_index(blot_reuse_source_completion::EntryState{generation:22,live:true,..});
+ blot_reuse_source_completion::entries[next_e].canonical=blot_reuse_source_completion::Entry{(next_e+1) as u32,22};
+ assert(!borrowed.prefix.valid() && !borrowed.entry.valid());
+ blot_reuse_source_completion::prefixes[next_p].canonical.deinit();blot_reuse_source_completion::entries[next_e].canonical.deinit();
+}
+
 fn main() {
+ scalarSourceReceiptBorrow();
  registeredCatalogInputViews();
  registeredStampLeafViews();
  var catalog,error=blot_reuse_dependency_payload::init();assert(error==blot_error::Error.none);

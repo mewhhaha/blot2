@@ -51,24 +51,19 @@ fn matches(self_:const Entry&,units:const Core[:],entry:u32,names:Identity)->boo
  let saved=state.names.view();if saved.bytes!=names.bytes || saved.symbols.len!=names.symbols.len || saved.owners.len!=names.owners.len {return false;}
  for left,index in saved.symbols {if left!=names.symbols[index] {return false;}}for left,index in saved.owners {if left!=names.owners[index] {return false;}}return true;
 }
-struct Borrow {prefix:const Prefix?=null,entry:const Entry?=null}
-// Receipts keep their original owner; these refs name the live registry slots.
-fn registeredBorrow(source:Borrow)->Borrow {
- var prefix:const Prefix?=null;let incoming_prefix .=source.prefix;
- if incoming_prefix {
-  assert(incoming_prefix.valid());let owned:const Prefix& =prefixes[incoming_prefix.slot-1].canonical;
-  assert(incoming_prefix .==owned);prefix .=owned;
- }
- var entry:const Entry?=null;let incoming_entry .=source.entry;
- if incoming_entry {
-  assert(incoming_entry.valid());let owned:const Entry& =entries[incoming_entry.slot-1].canonical;
-  assert(incoming_entry .==owned);entry .=owned;
- }
- return Borrow{prefix:prefix,entry:entry};
+// Borrowed identities never own or release their registered receipt.
+struct Borrow {prefix:Prefix=Prefix{},entry:Entry=Entry{}}
+fn prefixValue(source:const Prefix?)->Prefix {
+ if !source {return Prefix{};}assert(source.valid());
+ let owned:const Prefix& =prefixes[source.slot-1].canonical;assert(source .==owned);return owned;
+}
+fn entryValue(source:const Entry?)->Entry {
+ if !source {return Entry{};}assert(source.valid());
+ let owned:const Entry& =entries[source.slot-1].canonical;assert(source .==owned);return owned;
 }
 fn covered(self_:Borrow,units:const Core[:],entry:u32,names:Identity)->i64 {
- let current .= self_.entry;if current && current.matches(units,entry,names) {return units.len;}
- let prefix .= self_.prefix;if prefix {return prefix.prefix(units,entry,names);}return 0;
+ if self_.entry.valid() && self_.entry.matches(units,entry,names) {return units.len;}
+ if self_.prefix.valid() {return self_.prefix.prefix(units,entry,names);}return 0;
 }
 struct Population {checked:blot_reuse_project_check::CheckedProject,snapshot:blot_reuse_retained_dependency::Snapshot?=null}
 fn checkAndFreezeDependencies<E>(executor:E&,source:blot_reuse_project::Project&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->Population,Error {

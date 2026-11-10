@@ -1694,7 +1694,7 @@ fn generate(generator: Generator&,entry: u32,unit_order: const u32[:]) -> blot_e
         } }
         if exports == 0 { let __cleanup_result_4_0: blot_error::Error = decline(generator,entry,blot_check_core::Span { 0,0 , ..},blot_check_diagnostic_code::Code.no_entry); { timing.deinit(); } return __cleanup_result_4_0; }
      { timing.deinit(); } }
-    block { let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.startup);  let planned = generator.planning.planRuntime(generator,entry,unit_order); if planned != blot_error::Error.none { let __cleanup_result_5_0: blot_error::Error = planned; { timing.deinit(); } return __cleanup_result_5_0; }  { timing.deinit(); } }
+    block { let timing = generator.work_timing.enter(blot_backend_backend_timing::Phase.startup);  let planned = blot_backend_backend_plan::planRuntime(blot_compile_workspace::frameForGenerator(generator,generator.evaluator),entry,unit_order); if planned != blot_error::Error.none { let __cleanup_result_5_0: blot_error::Error = planned; { timing.deinit(); } return __cleanup_result_5_0; }  { timing.deinit(); } }
     for body in source.bodies[1..] {
         if !body.exported { continue; } let target = blot_check_core::BindingRef { entry,body.binding , ..};
         if body.is_function || source.types.node(source.binding(body.binding).ty).tag == blot_check_types::Tag.function {

@@ -123,7 +123,7 @@ fn emit(self_:const Prepared&,workspace:Workspace&)->Result,Error {return self_.
 fn emitWithOptions(self_:const Prepared&,workspace:Workspace&,options:CompileOptions)->Result,Error {
  let actual=CompileOptions{
   completed_core_validation:options.completed_core_validation,
-  source_completion:blot_reuse_source_completion::registeredBorrow(blot_reuse_source_completion::Borrow{prefix:options.source_completion.prefix,entry:self_.source_completion}),
+  source_completion:blot_reuse_source_completion::Borrow{prefix:options.source_completion.prefix,entry:blot_reuse_source_completion::entryValue(self_.source_completion)},
   storage:options.storage,
   inline_named:options.inline_named,
   explain_allocations:options.explain_allocations,

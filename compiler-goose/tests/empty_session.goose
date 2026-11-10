@@ -13,6 +13,8 @@ import support.native;
 fn inspectWorkspace(frame:blot_compile_workspace::Frame) {
     let workspace .=frame.borrow();assert(workspace!=null);
     assert(workspace.generator.evaluator.units.len==0 && workspace.capture.metadata().validContext());
+    let planning:blot_backend_backend_plan::State& =blot_compile_workspace::planningForFrame(frame);assert(planning .==workspace.generator.planning);
+    planning.runtime_plan_confirmed=true;assert(workspace.generator.planning.runtime_plan_confirmed);planning.runtime_plan_confirmed=false;
     let key=blot_backend_backend_static_data::SerializedKey{1,2};assert(workspace.generator.static_data.cache.insert(key,17)==blot_error::Error.none);let stored=workspace.generator.static_data.cache.get(key);assert(stored && stored==17);
 }
 fn workspaceLifecycle() {

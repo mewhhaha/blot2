@@ -89,6 +89,12 @@ fn frameForGenerator(source:Generator&,session:blot_eval_core_eval::Session&)->F
  let registered_session .=state.session;assert(registered_session && registered_session .== session && generator.evaluator .== session);
  return active;
 }
+// The active Frame borrows the existing named planning header.
+fn planningForFrame(frame:Frame)->blot_backend_backend_plan::State& {
+ let workspace:Workspace& =workspaceForFrame(frame);let generator:Generator& =canonicalGenerator(workspace.generator);
+ let owned:blot_backend_backend_plan::State& =backing_generator_planning;
+ assert(generator.planning .==owned);return owned;
+}
 fn borrow(self_:Frame)->Workspace? {if !self_.valid() {return null;}return frames[self_.slot-1].workspace;}
 fn retain(self_:Frame)->Frame,Error {if !self_.valid() {return Frame{..},blot_error::Error.invalid_artifact;}let state:FrameState& =frames[self_.slot-1];if state.references==0xffffffffffffffff {return Frame{..},blot_error::Error.dependency_limit;}state.references++;return self_,blot_error::Error.none;}
 fn create(allocation_owner:u64)->Frame,Error {

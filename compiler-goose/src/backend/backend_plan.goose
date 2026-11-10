@@ -1,6 +1,7 @@
 // Code identities, immutable source proofs and startup storage for one run.
 namespace blot_backend_backend_plan;
 import dictionary;
+import driver.compile_workspace;
 import check.core;
 import check.numeric_proof_core;
 import .core_backend;
@@ -185,7 +186,8 @@ facts.deinit();
 
     }
 }
-fn planRuntime(state: State&,generator: blot_backend_core_backend::Generator&,entry: u32,supplied_order: const u32[:]) -> Error {
+fn planRuntime(frame:blot_compile_workspace::Frame,entry:u32,supplied_order:const u32[:])->Error {
+    let generator:blot_backend_core_backend::Generator& =blot_compile_workspace::canonicalGenerator(blot_compile_workspace::workspaceForFrame(frame).generator);
     var has_runtime = false; for source in generator.units { for body in source.bodies[1..] { if body.runtime && !body.is_function { has_runtime = true; } } } if !has_runtime { return blot_error::Error.none; }
     var order: u32[>..<] = []; if supplied_order.len == 0 { for index in 0..generator.units.len { order.push((index + 1) as u32); } } else { if supplied_order.len != generator.units.len { return blot_error::Error.invalid_function_reference; } order.append(supplied_order); }
     var selections: blot_backend_startup_graph::Selection[>..<] = []; var processed: dictionary<blot_check_core::BindingRef,bool> = dictionary<blot_check_core::BindingRef,bool>{}; var confirmed = true;
@@ -235,6 +237,7 @@ fn planRuntime(state: State&,generator: blot_backend_core_backend::Generator&,en
         if occurrence.present { plan,plan_error = blot_backend_startup_occurrence_plan::plan(original.value,occurrence.value.edges,reachable.reached); } else { plan,plan_error = declarations.plan(reachable.reached); }
         if plan_error != blot_error::Error.none { if plan_error == blot_error::Error.out_of_memory { let __cleanup_result_29_0: Error = plan_error; { if original.present { original.value.deinit(); } } { if occurrence.present { occurrence.value.deinit(); } } { coverage.deinit(); } { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_29_0; } let __cleanup_result_30_0: Error = blot_error::Error.invalid_function_reference; { if original.present { original.value.deinit(); } } { if occurrence.present { occurrence.value.deinit(); } } { coverage.deinit(); } { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_30_0; }
         if plan.cycle.present { let target = plan.cycle.value; let point = generator.unit(target.unit).runtimeNamePoint(target.binding); let __cleanup_result_31_0: Error = generator.decline(target.unit,blot_check_core::Span { point,point , ..},blot_check_diagnostic_code::Code.initialization_cycle); { plan.deinit(); } { if original.present { original.value.deinit(); } } { if occurrence.present { occurrence.value.deinit(); } } { coverage.deinit(); } { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_31_0; }
+        let state:State& =blot_compile_workspace::planningForFrame(frame);
         state.runtime_plan_confirmed = confirmed || occurrence.present; state.occurrence_plan_active = occurrence.present; state.occurrence_plan_cells = default<const blot_check_core::BindingRef[:]>(); if occurrence.present { state.occurrence_plan_cells = plan.initializers; }
 
         for target in plan.initializers { let global,error = runtimeGlobal(state,generator,target); if error != blot_error::Error.none { let __cleanup_result_32_0: Error = error; { state.runtime_plan_confirmed = false; state.occurrence_plan_active = false; state.occurrence_plan_cells = default<const blot_check_core::BindingRef[:]>(); } { plan.deinit(); } { if original.present { original.value.deinit(); } } { if occurrence.present { occurrence.value.deinit(); } } { coverage.deinit(); } { reachable.deinit(); } { declarations.deinit(); } return __cleanup_result_32_0; } }
