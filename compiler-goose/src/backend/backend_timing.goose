@@ -115,11 +115,11 @@ struct Work {
     clock: Clock, cpu_clock: Clock = Clock { cpu: true , ..}, cpu_nanos: u64[21] = [0; 21], active: Phase = Phase.other,
     regions: Region[8] = [Region {..}; 8], region_callers: RegionCensus, refinements: RefinementCensus, nanos: u64[21] = [0; 21], semantic_job_nanos: u64 = 0,
 }
-struct Scope { owner: Work&, previous: Phase, started: u64 = 0 }
-fn elapsedUs(scope: Scope) -> u64 { if !scope.owner.clock.enabled { return 0; } let current = blot_native::clock_ns(); if current < scope.started { return 0; } return (current - scope.started) / 1000; }
+struct Scope { owner: Work? = null, previous: Phase, started: u64 = 0 }
+fn elapsedUs(scope: Scope) -> u64 { let owner .=scope.owner;assert(owner);if !owner.clock.enabled { return 0; } let current = blot_native::clock_ns(); if current < scope.started { return 0; } return (current - scope.started) / 1000; }
 fn account(work: Work&) { let index = phaseIndex(work.active); work.nanos[index] += lapNanos(work.clock); work.cpu_nanos[index] += lapNanos(work.cpu_clock); }
-fn deinit(scope: Scope) { account(scope.owner); scope.owner.active = scope.previous; }
-fn change(scope: Scope, phase: Phase) { account(scope.owner); scope.owner.active = phase; }
+fn deinit(scope: Scope) { let owner .=scope.owner;assert(owner);account(owner);owner.active=scope.previous; }
+fn change(scope: Scope, phase: Phase) { let owner .=scope.owner;assert(owner);account(owner);owner.active=phase; }
 fn enter(work: Work&, phase: Phase) -> Scope { account(work); let scope = Scope { owner: work, previous: work.active, started: work.clock.previous , ..}; work.active = phase; return scope; }
 fn copyUtf8Prefix(buffer: u8[:], name: const u8[:]) -> bool {
     var length = name.len; if length > buffer.len { length = buffer.len; }

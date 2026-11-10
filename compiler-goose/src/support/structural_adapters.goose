@@ -718,6 +718,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::En
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::EntryDisplay,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::EntryEmission)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::EntryEmission,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::FunctionExit)->bool {return equalFields(left,right);}
+fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::FunctionExit,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::Generator)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::Generator,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::HostPhysical)->bool {return equalFields(left,right);}

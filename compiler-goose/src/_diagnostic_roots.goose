@@ -159,3 +159,11 @@ export "probe_observe" fn observe() {
  let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};var result=blot_backend_core_backend::emptyResult(workspace);
  let error=blot_backend_core_backend::observe(run,result);run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
+
+// Source-interface traversal only; unstaged Core, never execute.
+export "probe_source_interface" fn source_interface() {
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
+ let workspace=frame.borrow();assert(workspace);
+ let header,error=workspace.generator.evaluator.sourceInterface(blot_check_core::BindingRef{1,1});
+ let released=frame.release();assert(released==blot_error::Error.none);
+}

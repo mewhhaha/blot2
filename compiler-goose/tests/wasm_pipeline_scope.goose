@@ -154,7 +154,12 @@ fn cohortOwnership() {
     view.deinit();view.deinit();assert(!view.active && view.owned.items.len==0 && view.original_functions==0 && view.module.functions.len==0 && view.module.instructions.len==0 && view.module.types.len==0);
     assert(frame.release()==blot_error::Error.none);
 }
-fn main() {
+fn timingScopes() {
+ let absent=blot_support::none<blot_backend_backend_timing::Scope>();assert(!absent.present);
+ var work=blot_backend_backend_timing::Work{clock:blot_backend_backend_timing::init(false),..};let previous=work.active;let entered=work.enter(blot_backend_backend_timing::Phase.specialization);var active=blot_support::some(entered);
+ assert(work.active==blot_backend_backend_timing::Phase.specialization && active.value.elapsedUs()==0);active.value.change(blot_backend_backend_timing::Phase.inference);assert(work.active==blot_backend_backend_timing::Phase.inference);active.value.deinit();assert(work.active==previous);
+}
+fn main() {timingScopes();
     for cycle in 0..3 { assembleCase(0); assembleCase(1); assembleCase(2); cohortOwnership(); }
     print("Wasm pipeline scope passed: empty/nonempty assembly, collector rejection cleanup, owned packet round trips, profile digests, detached cohort body ownership, repeated scratch cleanup");
 }

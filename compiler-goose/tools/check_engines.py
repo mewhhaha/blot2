@@ -12,7 +12,7 @@ import subprocess
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
-ENGINES = ['runtime', 'semantic', 'check', 'lower', 'independent', 'server', 'executor', 'metadata', 'scoped', 'prepare', 'compile', 'entry_display', 'assemble', 'record_artifact', 'publish', 'detach_result', 'emit', 'observe']
+ENGINES = ['runtime', 'semantic', 'check', 'lower', 'independent', 'server', 'executor', 'metadata', 'scoped', 'prepare', 'compile', 'entry_display', 'assemble', 'record_artifact', 'publish', 'detach_result', 'emit', 'observe', 'source_interface']
 
 def source_inputs(source, stdlib):
     entries = []

@@ -12,7 +12,14 @@ reusable var image_leases: Lease[>..] = [];
 reusable[] var image_bytes: u8[>..] = [];
 var next_generation: u64 = 1;
 fn live(self_: Image) -> bool { return self_.lease != 0 && self_.lease <= image_leases.len && image_leases[self_.lease - 1].references != 0 && image_leases[self_.lease - 1].generation == self_.generation; }
-fn retain(self_: Image) -> Image, Error { if !self_.live() { return Image {..}, blot_error::Error.invalid_artifact; } if image_leases[self_.lease - 1].references == 0xffffffffffffffff { return Image {..}, blot_error::Error.out_of_memory; } image_leases[self_.lease - 1].references++; return self_, blot_error::Error.none; }
+fn retain(self_: Image) -> Image, Error {
+    if !self_.live() { return Image {..}, blot_error::Error.invalid_artifact; }
+    if image_leases[self_.lease - 1].references == 0xffffffffffffffff { return Image {..}, blot_error::Error.out_of_memory; }
+    var bytes = default<const u8[:]>();
+    if self_.bytes.len != 0 { bytes = image_bytes.realloc_slice(self_.bytes, self_.bytes.len); }
+    image_leases[self_.lease - 1].references++;
+    return Image { bytes: bytes, lease: self_.lease, generation: self_.generation }, blot_error::Error.none;
+}
 fn deinit(self_: Image&) {
     if self_.lease == 0 { assert(self_.bytes.len == 0); return; } assert(self_.live()); let lease = self_.lease - 1; image_leases[lease].references--;
     if image_leases[lease].references == 0 { if self_.bytes.len != 0 { image_bytes.free_slice(self_.bytes); } image_leases.free(lease); }

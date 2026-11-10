@@ -9,6 +9,7 @@ import reuse.dependency_owned_headers;
 import support.error;
 import driver.compile_workspace;
 import support.native;
+import reuse.validation_image;
 type Owner=blot_reuse_dependency_payload::Owner;
 type FrozenModule=blot_reuse_frozen_dependency::Module;
 fn module(seed:u32)->blot_reuse_dependency_payload::Owned<FrozenModule> {
@@ -73,4 +74,15 @@ fn frozenModulePublication() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none);assert(frame.release()==blot_error::Error.none);
  inspect(modules[0]);inspect(modules[1]);root.deinit();
 }
-fn main() {frozenModulePublication();relocatedPublication();for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}
+fn retainedImage() {
+ var remaining:i64=1024;
+ let captured,error=blot_reuse_validation_image::capture(37 as u32,remaining);assert(error==blot_error::Error.none && captured.present);
+ var original=captured.value;
+ var retained,error=original.retain();assert(error==blot_error::Error.none && retained.live());
+ assert(blot_support::same_slice_identity(original.bytes,retained.bytes));original.deinit();
+ var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && frame.release()==blot_error::Error.none);
+ assert(retained.live() && retained.matches(37 as u32) && !retained.matches(38 as u32));
+ retained.deinit();assert(!retained.live());
+ let rejected,error=retained.retain();assert(error==blot_error::Error.invalid_artifact && !rejected.live());
+}
+fn main() {retainedImage();frozenModulePublication();relocatedPublication();for cycle in 0..3 {appended();adopted();}print("dependency ownership passed: owned admission, partition, pins, shared lifetime and cleanup");}

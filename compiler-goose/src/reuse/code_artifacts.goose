@@ -58,6 +58,16 @@ struct PrimitiveKey { unit: u32, catalog: u32, ty: u32, applied: u32 = 0 }
 struct OperationKey { operation: u32, ty: u32, scoped: bool = false }
 struct ConstantKey { target: blot_check_core::BindingRef, ty: u32 }
 struct HostKey { ty: u32, owned: bool = false }
+fn hashCodeArtifactKey<T>(value:T)->u64 {var hash=blot_support_wyhash::init(0);blot_structural::hash(hash,value);return hash.final();}
+fn hash(key:Key)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:CapturedTemplate)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:ClosureKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:CallableKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:ConstructorKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:PrimitiveKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:OperationKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:HostKey)->u64 {return hashCodeArtifactKey(key);}
+fn hash(key:ConstantKey)->u64 {return hashCodeArtifactKey(key);}
 enum Request {
     named { key: Key }, closure { key: ClosureKey }, callable { key: CallableKey },
     constructor { key: ConstructorKey }, primitive { key: PrimitiveKey },
@@ -807,7 +817,7 @@ fn allocateOwned_constants(len: i64) -> blot_reuse_constant_receipt::Record[:] {
 fn copyOwned(source: const blot_reuse_constant_receipt::Record[:]) -> const blot_reuse_constant_receipt::Record[:] {
     if source.len == 0 { return default<const blot_reuse_constant_receipt::Record[:]>(); }
     let out = owned_constants.alloc_slice(source.len);
-    for value, index in source { out[index] = value; } return out;
+    for value, index in source { out[index] = blot_reuse_constant_receipt::canonicalOwned(value); } return out;
 }
 fn releaseOwned(source: const blot_reuse_constant_receipt::Record[:]) {
     if source.len == 0 { return; }
@@ -1228,7 +1238,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         spans: copyOwned(generator.representations.instance_arguments.spans),
      ..};
     candidate.captures = copying.capture_captures(generator.planning.template_catalog.items, old.captures);
-    { let optional_source_7 .= generator.representations.connection; if optional_source_7 { let connection .= optional_source_7; candidate.bridge = blot_support::some(captureBridge(connection));  } }
+    if generator.representations.connection_bound {candidate.bridge=blot_support::some(captureBridge(generator.representations.connection));}
     var locations: FieldLocation[>..<] = [];
     for slot in session.field_locations.slots {
         if slot.tag != 0 { locations.push(FieldLocation { slot.key.family, slot.key.tag, slot.key.name, slot.val.field, slot.val.len , ..}); }
@@ -1321,21 +1331,21 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
         if entry.tag != 0 { globals.push(RuntimeGlobal { entry.key, entry.val.global, entry.val.initializer, entry.val.active , ..}); }
     }
     candidate.runtime_globals = copying.capture_runtime_globals(globals, old.runtime_globals);
-    candidate.runtime_order = copying.capture_runtime_order(generator.planning.runtime_order, old.runtime_order);
+    candidate.runtime_order = copying.capture_runtime_order(generator.planning.runtime_order.items, old.runtime_order);
     candidate.binding_offsets = copying.capture_binding_offsets(session.binding_offsets, old.binding_offsets);
     candidate.node_offsets = copying.capture_node_offsets(session.node_offsets, old.node_offsets);
-    candidate.visited_nodes = copying.capture_visited_nodes(session.visited_nodes, old.visited_nodes);
-    candidate.provider_frames = copying.capture_provider_frames(session.providers.frames, old.provider_frames);
-    candidate.provider_cells = copying.capture_provider_cells(session.providers.cells, old.provider_cells);
-    candidate.break_values = copying.capture_break_values(session.break_values, old.break_values);
+    candidate.visited_nodes = copying.capture_visited_nodes(session.visited_nodes.items, old.visited_nodes);
+    candidate.provider_frames = copying.capture_provider_frames(session.providers.frames.items, old.provider_frames);
+    candidate.provider_cells = copying.capture_provider_cells(session.providers.cells.items, old.provider_cells);
+    candidate.break_values = copying.capture_break_values(session.break_values.items, old.break_values);
     var slots: Slot[>..<] = [];
     for from in session.slots { slots.push(Slot { blot_eval_core_eval::slotStateCode(from.state), from.traced, from.value , ..}); }
     candidate.slots = copying.capture_slots(slots, old.slots);
     var requests: RequestCell[>..<] = [];
-    for from in session.request_cells { requests.push(RequestCell { from.state, from.exit, from.status , ..}); }
+    for from in session.request_cells.items { requests.push(RequestCell { from.state, from.exit, from.status , ..}); }
     candidate.request_cells = copying.capture_request_cells(requests, old.request_cells);
     var handlers: RequestHandler[>..<] = [];
-    for from in session.request_handlers { handlers.push(RequestHandler { from.callback, from.cell, from.outer , ..}); }
+    for from in session.request_handlers.items { handlers.push(RequestHandler { from.callback, from.cell, from.outer , ..}); }
     candidate.request_handlers = copying.capture_request_handlers(handlers, old.request_handlers);
     let arrays = allocateOwned_arrays(generator.planning.array_proofs.count);
     var count: i64 = 0;
@@ -1346,7 +1356,7 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     let discards = allocateOwned_discards(generator.planning.discard_proofs.count);
     count = 0;
     for entry in generator.planning.discard_proofs.slots {
-        if entry.tag != 0 { discards[count] = DiscardProof { entry.key, copyOwned(entry.val.unused) , ..}; count++; }
+        if entry.tag != 0 { discards[count] = DiscardProof { entry.key, copyOwned(blot_backend_discarded_bindings::values(entry.val)) , ..}; count++; }
     }
     candidate.discard_proofs = discards;
     candidate.evaluator_steps = session.steps; candidate.evaluator_demanded = session.demanded;
@@ -1355,10 +1365,12 @@ fn capture<G>(generator: G&, identity: blot_support::Option<blot_backend_runtime
     if copying.failure != blot_error::Error.none {
         let error = copying.failure; candidate.deinit(); return default<Pools>(), error;
     }
-    session.counters.metadata_shared_fields += copying.shared.stats.shared_fields;
-    session.counters.metadata_shared_bytes += copying.shared.stats.shared_bytes;
-    session.counters.metadata_copied_fields += copying.shared.stats.copied_fields;
-    session.counters.metadata_copied_bytes += copying.shared.stats.copied_bytes;
+    assert(copying.shared.stats.shared_fields >= 0 && copying.shared.stats.shared_bytes >= 0);
+    assert(copying.shared.stats.copied_fields >= 0 && copying.shared.stats.copied_bytes >= 0);
+    session.counters.metadata_shared_fields += copying.shared.stats.shared_fields as u64;
+    session.counters.metadata_shared_bytes += copying.shared.stats.shared_bytes as u64;
+    session.counters.metadata_copied_fields += copying.shared.stats.copied_fields as u64;
+    session.counters.metadata_copied_bytes += copying.shared.stats.copied_bytes as u64;
     return candidate, blot_error::Error.none;
 }
 fn capturePools<G>(self_: Context&, generator: G&, identity: blot_support::Option<blot_backend_runtime_identity::View>) -> Error {

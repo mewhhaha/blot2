@@ -3305,7 +3305,7 @@
       "proof_leases": 6.921
     },
     "inventory": 36,
-    "complete_inventory_current_source": true,
+    "complete_inventory_current_source": false,
     "latest_phase232": {
       "partial": true,
       "engines": [
@@ -3381,5 +3381,112 @@
       "each_stage_cap_seconds": 30,
       "outer_cap_seconds": 600
     }
+  },
+  "refinement_emission_and_artifact_adapter_family": {
+    "scope": "Checked component checkpoint; complete compiler remains unavailable",
+    "changes": [
+      "Recursive refinement, named/closure/runtime initializer and replay cleanup become lexical",
+      "Retained capture traversal uses fixed initial counts and scalar cursors",
+      "Refinement hooks use registered Session, results reborrow existing owned runs",
+      "Validation Image retain reborrows its existing named bytes without copy",
+      "Code-artifact nine scalar key hashes, typed capture adapters and signed counter assertions",
+      "Timing optional Scope has inhabitable nullable owner"
+    ],
+    "complete36": {
+      "receipt": "2026-11-10-goose-complete36-refinement-laws.json.gz",
+      "passed": true,
+      "tests": 36,
+      "sum_stage_seconds": 290.534,
+      "source_unchanged": true,
+      "stage_cap_seconds": 30,
+      "outer_cap_seconds": 600,
+      "scope": "Component inventory before whole261 regenerated source identity; no whole/runtime claim"
+    },
+    "focused_receipts": [
+      "2026-11-10-goose-cache-timing-laws.json.gz",
+      "2026-11-10-goose-refinement-owner-laws.json.gz",
+      "2026-11-10-goose-refinement-hook-law.json.gz"
+    ],
+    "partial_phases_receipt": "2026-11-10-goose-refinement-artifact-phases.json.gz",
+    "phase259": {
+      "partial": true,
+      "engines": [
+        "source_interface",
+        "emit",
+        "assemble",
+        "record_artifact",
+        "publish",
+        "detach_result",
+        "observe"
+      ],
+      "exit": 1,
+      "seconds": 53.452,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose",
+          "line": 2071,
+          "message": "error: no matching overload for call to blot_backend_wasm::equal"
+        },
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 1814,
+          "message": "error: call associatedTarget stores a reference rooted at owner through its parameter generator, whose argument may point into generators, which owner does not outlive (\u00a79.2)"
+        },
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/resolved_body.goose",
+          "line": 60,
+          "message": "error: cannot assign payloads: global owned_pins may hold a reference into it, stored at /home/jacobt/src/blot2/compiler-goose/src/reuse/code_artifacts.goose:1167 (\u00a75.1)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "04e9513b28cd653243d6a121b6db54ca2731ddb7709bf1e2e7edab0da4c8e92f",
+      "source_unchanged": true,
+      "goose_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632"
+    },
+    "after259_fixes": [
+      "Replay byte buffer exposes .items and grower explicit slice to equal",
+      "associatedTarget resolves registered Generator"
+    ],
+    "rejected_controls": [
+      "2026-11-10-goose-pin-header-controls.json.gz",
+      "2026-11-10-goose-pin-scalar-controls.json.gz",
+      "2026-11-10-goose-pin-reference-control.json.gz"
+    ],
+    "partial_positive_control": {
+      "receipt": "2026-11-10-goose-pin-leaf-control.json.gz",
+      "scope": "names-only mask; never promotable, full read-only leaf observer still pending"
+    },
+    "limits": [
+      "No complete C/header/native compiler",
+      "Whole261 still finds prepare/retry Result lifetime",
+      "Persistent full ModulePin.header snapshot origin remains unresolved",
+      "No actual CLI/server/OOM/retry/retention execution; new named scratch allocation costs unbenchmarked"
+    ]
+  },
+  "whole_build_261": {
+    "receipt": "2026-11-10-goose-whole261.json.gz",
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 154.614,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false
   }
 }

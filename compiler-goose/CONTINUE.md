@@ -4,18 +4,22 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Latest actual whole212 stops152.92s, unchanged460inputs, no C/header/native.
-Its outer wrapper lifetime is repaired afterward; no newer actual whole yet.
-Preparation211 passes21.48s. Direct seven-phase232 reaches112.76s and reports
-capture sign conversion(nowfixed), recursive rowmapping foreach borrow, and
-inactive substitution-header publication. Those source repairs are now in place; the next phase check is pending.
+Actual whole261 fails154.61s, unchanged460inputs, no C/header/native. Prepare
+still sees a retry Result loan through compileLocals. Next end failed Result
+scopes before constant-receipt/speculative retries; preserve Zig catch semantics.
 
-Executed native Result ownership/detach6.64s, cohort/pipeline ownership9.25s and
-48-field lease/Recorder6.92s pass at their exact pinned source closures. New
-instruction/region/substitution/identity snapshots are unbenchmarked costs.
-Complete36/36 native component inventory passes310.32s on frozen source, with30s
-per stage and600s outer cap. This does not qualify whole compiler/CLI execution.
-Complete32 is historical. Checkpoint this batch, then resume actual whole work.
+Complete36/36 native component inventory passes on frozen source, summed stage
+time290.53s,30s per stage/600s outer cap. Whole261 later regenerates source
+identity. Component laws do not qualify complete compiler/CLI/server execution.
+Refinement/emission/replay cleanup is lexical; emitter mappings/rows use existing
+named descriptors. Hook restoration and retained Image sharing pass native laws.
+New scratch-owner allocation costs remain unbenchmarked.
+
+Phase25953.45s finds replay equal buffer types, associatedTarget origin and full
+ModulePin.header origin. The first two are fixed afterward; next check pending.
+Header/scalar-owner/referenced snapshot controls failed. Names-only typed-leaf
+reborrow clears retention but deliberately omits other fields: never promote it.
+Complete read-only snapshot leaf reconstruction remains the next source lever.
 
 All phase probes are check-only with unstaged inputs; NEVER execute. Use smaller
 phase subsets when needed, keeping120s repair cap. Actual CLI/server/OOM/retry

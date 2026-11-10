@@ -4,6 +4,8 @@ import driver.cli;
 import driver.cli_workers;
 import std;
 import eval.core_eval;
+import reuse.specialization_receipt;
+import reuse.refinement_receipt;
 import eval.worker_packet;
 import driver.compile_workspace;
 import support.error;
@@ -190,7 +192,42 @@ fn sessionCatalogs() {
 fn canonicalAliases() {
  var prefix:u8[>..]=[];prefix.append("owned-prefix");let aliases=[blot_reuse_project::Alias{prefix:prefix[..],root:"/tmp"}];let raw=blot_reuse_project::Options{input_mode:blot_reuse_project::InputMode.project,aliases:aliases[..],..};var canonical,error=blot_reuse_dependency_cli::initCanonical(raw);assert(error==blot_error::Error.none && canonical.aliases.len==1 && canonical.aliases[0].prefix=="owned-prefix" && !blot_support::same_slice_identity(canonical.aliases[0].prefix,prefix[..]));prefix=[];workspaceLifecycle();assert(canonical.aliases[0].prefix=="owned-prefix" && canonical.aliases[0].root=="/tmp");canonical.deinit();
 }
+fn refinementHookRestoration() {
+ let session,error=blot_eval_core_eval::initOwnedEmptySession(blot_native::fresh_owner_id());assert(error==blot_error::Error.none && session);
+ var outer_tape_owner,error=blot_reuse_specialization_receipt::initTapeOwner();assert(error==blot_error::Error.none);
+ var inner_tape_owner,error=blot_reuse_specialization_receipt::initTapeOwner();assert(error==blot_error::Error.none);
+ var outer_observation_owner,error=blot_reuse_refinement_receipt::initObservationOwner();assert(error==blot_error::Error.none);
+ var inner_observation_owner,error=blot_reuse_refinement_receipt::initObservationOwner();assert(error==blot_error::Error.none);
+ let outer_tape=outer_tape_owner.borrow();let inner_tape=inner_tape_owner.borrow();
+ let outer_observation=outer_observation_owner.borrow();let inner_observation=inner_observation_owner.borrow();
+ assert(outer_tape && inner_tape && outer_observation && inner_observation);
+ let canonical:blot_eval_core_eval::Session& =blot_eval_core_eval::canonicalSession(session);
+ assert(canonical.receipt_tape==null && canonical.refinement_observation==null);
+ blot_eval_core_eval::setSccReceiptTape(session,outer_tape);
+ blot_eval_core_eval::setSccRefinementObservation(session,outer_observation);
+ let previous_tape .=canonical.receipt_tape;let previous_observation .=canonical.refinement_observation;
+ assert(previous_tape .== outer_tape && previous_observation .== outer_observation);
+ blot_eval_core_eval::setSccReceiptTape(session,inner_tape);
+ blot_eval_core_eval::setSccRefinementObservation(session,inner_observation);
+ assert(canonical.receipt_tape .== inner_tape && canonical.refinement_observation .== inner_observation);
+ blot_eval_core_eval::setSccReceiptTape(session,previous_tape);
+ blot_eval_core_eval::setSccRefinementObservation(session,previous_observation);
+ assert(canonical.receipt_tape .== outer_tape && canonical.refinement_observation .== outer_observation);
+ blot_eval_core_eval::setSccReceiptTape(session,null);
+ blot_eval_core_eval::setSccRefinementObservation(session,null);
+ assert(canonical.receipt_tape==null && canonical.refinement_observation==null);
+ let no_previous_tape .=canonical.receipt_tape;let no_previous_observation .=canonical.refinement_observation;
+ blot_eval_core_eval::setSccReceiptTape(session,inner_tape);
+ blot_eval_core_eval::setSccRefinementObservation(session,inner_observation);
+ blot_eval_core_eval::setSccReceiptTape(session,no_previous_tape);
+ blot_eval_core_eval::setSccRefinementObservation(session,no_previous_observation);
+ assert(canonical.receipt_tape==null && canonical.refinement_observation==null);
+ blot_eval_core_eval::deinitOwnedSession(session);
+ outer_observation_owner.deinit();inner_observation_owner.deinit();outer_tape_owner.deinit();inner_tape_owner.deinit();
+}
+
 fn main() {
+    refinementHookRestoration();
     canonicalAliases();
     sessionCatalogs();
     var previous:u64=0;

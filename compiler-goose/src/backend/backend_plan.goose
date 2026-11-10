@@ -112,62 +112,53 @@ fn deinit(state: State&) {
 }
 fn runtimeGlobal(state: State&,generator: blot_backend_core_backend::Generator&,target: blot_check_core::BindingRef) -> u32,Error {
     let scope,error = blot_backend_core_backend::enterScope(generator,blot_reuse_code_artifacts::Request.runtime_global { target , ..}); if error != blot_error::Error.none { return 0,error; }
-    recursive fn cleanup_continuation_4() -> u32,Error {
 
-    if state.occurrence_plan_active { var included = false; for cell in state.occurrence_plan_cells { if cell == target { included = true; break; } } if !included { return 0,generator.decline(target.unit,generator.unit(target.unit).binding(target.binding).span,blot_check_diagnostic_code::Code.constant_expression); } }
+
+    if state.occurrence_plan_active { var included = false; for cell in state.occurrence_plan_cells { if cell == target { included = true; break; } } if !included { let __runtime_global_result_0_0: u32 = 0; let __runtime_global_result_0_1: Error = generator.decline(target.unit,generator.unit(target.unit).binding(target.binding).span,blot_check_diagnostic_code::Code.constant_expression); if scope.present { scope.value.deinit(); } return __runtime_global_result_0_0,__runtime_global_result_0_1; } }
     var global = blot_backend_startup_emission_facts::none; var active = true; block { let slot = state.runtime_globals.get(target); if slot { global = slot.global; active = slot.active; } }
-    let event = state.startup_facts.event(blot_backend_startup_emission_facts::Event { kind: blot_backend_startup_emission_facts::EventKind.runtime_global_request,caller: state.startup_facts.active,target: global,unit: target.unit,identity: target.binding,flag: active , ..}); if event != blot_error::Error.none { return 0,event; }
+    let event = state.startup_facts.event(blot_backend_startup_emission_facts::Event { kind: blot_backend_startup_emission_facts::EventKind.runtime_global_request,caller: state.startup_facts.active,target: global,unit: target.unit,identity: target.binding,flag: active , ..}); if event != blot_error::Error.none { let __runtime_global_result_1_0: u32 = 0; let __runtime_global_result_1_1: Error = event; if scope.present { scope.value.deinit(); } return __runtime_global_result_1_0,__runtime_global_result_1_1; }
     block {
         let slot = state.runtime_globals.get(target);
         if slot {
-            if !state.runtime_plan_confirmed && slot.active { return 0,generator.decline(target.unit,generator.unit(target.unit).binding(target.binding).span,blot_check_diagnostic_code::Code.constant_expression); }
-            if scope.present { let hit = scope.value.hitGlobal(slot.global); if hit != blot_error::Error.none { return 0,hit; } } return slot.global,blot_error::Error.none;
+            if !state.runtime_plan_confirmed && slot.active { let __runtime_global_result_2_0: u32 = 0; let __runtime_global_result_2_1: Error = generator.decline(target.unit,generator.unit(target.unit).binding(target.binding).span,blot_check_diagnostic_code::Code.constant_expression); if scope.present { scope.value.deinit(); } return __runtime_global_result_2_0,__runtime_global_result_2_1; }
+            if scope.present { let hit = scope.value.hitGlobal(slot.global); if hit != blot_error::Error.none { let __runtime_global_result_3_0: u32 = 0; let __runtime_global_result_3_1: Error = hit; if scope.present { scope.value.deinit(); } return __runtime_global_result_3_0,__runtime_global_result_3_1; } } let __runtime_global_result_4_0: u32 = slot.global; let __runtime_global_result_4_1: Error = blot_error::Error.none; if scope.present { scope.value.deinit(); } return __runtime_global_result_4_0,__runtime_global_result_4_1;
         }
     }
-    let source .= generator.unit(target.unit); let body .= source.body(target.binding); if body == null { return 0,generator.decline(target.unit,source.binding(target.binding).span,blot_check_diagnostic_code::Code.unsupported); }
-    if !body.runtime || body.is_function { return 0,generator.decline(target.unit,body.span,blot_check_diagnostic_code::Code.unsupported); }
-    let expected,layout_error = generator.codeLayout(target.unit,body.scheme.root,[],body.span); if layout_error != blot_error::Error.none { return 0,layout_error; }
+    let source .= generator.unit(target.unit); let body .= source.body(target.binding); if body == null { let __runtime_global_result_5_0: u32 = 0; let __runtime_global_result_5_1: Error = generator.decline(target.unit,source.binding(target.binding).span,blot_check_diagnostic_code::Code.unsupported); if scope.present { scope.value.deinit(); } return __runtime_global_result_5_0,__runtime_global_result_5_1; }
+    if !body.runtime || body.is_function { let __runtime_global_result_6_0: u32 = 0; let __runtime_global_result_6_1: Error = generator.decline(target.unit,body.span,blot_check_diagnostic_code::Code.unsupported); if scope.present { scope.value.deinit(); } return __runtime_global_result_6_0,__runtime_global_result_6_1; }
+    let expected,layout_error = generator.codeLayout(target.unit,body.scheme.root,[],body.span); if layout_error != blot_error::Error.none { let __runtime_global_result_7_0: u32 = 0; let __runtime_global_result_7_1: Error = layout_error; if scope.present { scope.value.deinit(); } return __runtime_global_result_7_0,__runtime_global_result_7_1; }
     var scalar = blot_backend_runtime_ir::SC_pointer; let primitive = generator.representations.store.scalar(expected); if primitive.present { scalar = primitive.value; }
-    let global_id,global_error = generator.module.addGlobal(scalar,0,true); if global_error != blot_error::Error.none { return 0,global_error; }
-    let initializer,initializer_error = generator.module.addTypedFunction([],blot_backend_runtime_ir::VT_none,blot_backend_runtime_ir::ROLE_scalar); if initializer_error != blot_error::Error.none { return 0,initializer_error; }
+    let global_id,global_error = generator.module.addGlobal(scalar,0,true); if global_error != blot_error::Error.none { let __runtime_global_result_8_0: u32 = 0; let __runtime_global_result_8_1: Error = global_error; if scope.present { scope.value.deinit(); } return __runtime_global_result_8_0,__runtime_global_result_8_1; }
+    let initializer,initializer_error = generator.module.addTypedFunction([],blot_backend_runtime_ir::VT_none,blot_backend_runtime_ir::ROLE_scalar); if initializer_error != blot_error::Error.none { let __runtime_global_result_9_0: u32 = 0; let __runtime_global_result_9_1: Error = initializer_error; if scope.present { scope.value.deinit(); } return __runtime_global_result_9_0,__runtime_global_result_9_1; }
     state.runtime_globals.insert(target,RuntimeSlot { global_id,initializer , ..});
-    let registered = state.startup_facts.event(blot_backend_startup_emission_facts::Event { kind: blot_backend_startup_emission_facts::EventKind.cell_registration,target: global_id,unit: target.unit,identity: target.binding,auxiliary: initializer , ..}); if registered != blot_error::Error.none { return 0,registered; }
-    if !state.runtime_plan_confirmed { let emitted = emitRuntimeInitializer(state,generator,target); if emitted != blot_error::Error.none { return 0,emitted; } }
-    if scope.present { let hit = scope.value.hitGlobal(global_id); if hit != blot_error::Error.none { return 0,hit; } } return global_id,blot_error::Error.none;
+    let registered = state.startup_facts.event(blot_backend_startup_emission_facts::Event { kind: blot_backend_startup_emission_facts::EventKind.cell_registration,target: global_id,unit: target.unit,identity: target.binding,auxiliary: initializer , ..}); if registered != blot_error::Error.none { let __runtime_global_result_10_0: u32 = 0; let __runtime_global_result_10_1: Error = registered; if scope.present { scope.value.deinit(); } return __runtime_global_result_10_0,__runtime_global_result_10_1; }
+    if !state.runtime_plan_confirmed { let emitted = emitRuntimeInitializer(state,generator,target); if emitted != blot_error::Error.none { let __runtime_global_result_11_0: u32 = 0; let __runtime_global_result_11_1: Error = emitted; if scope.present { scope.value.deinit(); } return __runtime_global_result_11_0,__runtime_global_result_11_1; } }
+    if scope.present { let hit = scope.value.hitGlobal(global_id); if hit != blot_error::Error.none { let __runtime_global_result_12_0: u32 = 0; let __runtime_global_result_12_1: Error = hit; if scope.present { scope.value.deinit(); } return __runtime_global_result_12_0,__runtime_global_result_12_1; } } let __runtime_global_result_13_0: u32 = global_id; let __runtime_global_result_13_1: Error = blot_error::Error.none; if scope.present { scope.value.deinit(); } return __runtime_global_result_13_0,__runtime_global_result_13_1;
 
-    }
-    let cleanup_result_4_0,cleanup_result_4_1 = cleanup_continuation_4();
-     if scope.present { scope.value.deinit(); }
-    return cleanup_result_4_0,cleanup_result_4_1;
+
 }
 struct InitializerEmission { root: u32,global: u32 }
 fn emitInitializerOwner(context: InitializerEmission&,emitter: blot_backend_backend_emission::Owner&) -> Error { let body = emitter.bodyExpression(context.root,0,false); if body != blot_error::Error.none { return body; } return emitter.emit(blot_backend_runtime_ir::OP_global_set,context.global); }
 fn emitRuntimeInitializer(state: State&,generator: blot_backend_core_backend::Generator&,target: blot_check_core::BindingRef) -> Error {
     var slot: RuntimeSlot; block { let found = state.runtime_globals.get(target); if found == null { return blot_error::Error.invalid_global_reference; } slot = found; } if !slot.active { return blot_error::Error.none; }
     let scope,scope_error = blot_backend_core_backend::enterScope(generator,blot_reuse_code_artifacts::Request.runtime_global { target , ..}); if scope_error != blot_error::Error.none { return scope_error; }
-    recursive fn cleanup_continuation_3() -> Error {
 
-    let requested = state.startup_facts.request(slot.initializer,blot_backend_startup_emission_facts::Kind.runtime_initializer,target.unit,target.binding,false); if requested != blot_error::Error.none { return requested; }
+
+    let requested = state.startup_facts.request(slot.initializer,blot_backend_startup_emission_facts::Kind.runtime_initializer,target.unit,target.binding,false); if requested != blot_error::Error.none { let __runtime_initializer_final_result_0 = requested; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_0; }
     let caller = state.startup_facts.active; state.startup_facts.active = slot.initializer;
-    recursive fn cleanup_continuation_2() -> Error {
 
-    let source .= generator.unit(target.unit); let body .= source.body(target.binding); if body == null { return blot_error::Error.invalid_global_reference; }
-    var mappings: Mapping[>..<] = []; var rows: RowMapping[>..<] = []; let expected,error = generator.codeLayout(target.unit,body.scheme.root,[],body.span); if error != blot_error::Error.none { return error; }
-    let mapped = generator.mapTypeDepth(target.unit,mappings,rows,source.binding(target.binding).ty,expected,body.span,0); if mapped != blot_error::Error.none { return mapped; }
-    let refined = generator.refineMappings(target.unit,blot_reuse_refinement_receipt::Root.body { target , ..},expected,mappings,rows,body.span); if refined != blot_error::Error.none { return refined; }
-    var context = InitializerEmission { body.root,slot.global , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: target.unit,function_id: slot.initializer,mappings: mappings,row_mappings: rows , ..},context,emitInitializerOwner); if emitted != blot_error::Error.none { return emitted; }
-    block { let found = state.runtime_globals.get(target); assert(found); found.active = false; } state.startup_facts.complete(slot.initializer); let ordered=state.runtime_order.push(slot.initializer);if ordered!=blot_error::Error.none {return ordered;}
-    if scope.present { return scope.value.completeGlobal(slot.global); } return blot_error::Error.none;
 
-    }
-    let cleanup_result_2_0 = cleanup_continuation_2();
-     state.startup_facts.active = caller;
-    return cleanup_result_2_0;
+    let source .= generator.unit(target.unit); let body .= source.body(target.binding); if body == null { let __runtime_initializer_body_result_0 = blot_error::Error.invalid_global_reference; state.startup_facts.active = caller; let __runtime_initializer_final_result_1 = __runtime_initializer_body_result_0; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_1; }
+    var mappings = blot_backend_substitution_buffers::Mappings {..}; var rows = blot_backend_substitution_buffers::Rows {..}; let expected,error = generator.codeLayout(target.unit,body.scheme.root,[],body.span); if error != blot_error::Error.none { let __runtime_initializer_body_result_1 = error; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_2 = __runtime_initializer_body_result_1; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_2; }
+    let mapped = generator.mapTypeDepth(target.unit,mappings,rows,source.binding(target.binding).ty,expected,body.span,0); if mapped != blot_error::Error.none { let __runtime_initializer_body_result_2 = mapped; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_3 = __runtime_initializer_body_result_2; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_3; }
+    let refined = generator.refineMappings(target.unit,blot_reuse_refinement_receipt::Root.body { target , ..},expected,mappings,rows,body.span); if refined != blot_error::Error.none { let __runtime_initializer_body_result_3 = refined; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_4 = __runtime_initializer_body_result_3; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_4; }
+    var context = InitializerEmission { body.root,slot.global , ..}; let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { generator: generator,unit_id: target.unit,function_id: slot.initializer,mappings: mappings.items,row_mappings: rows.items , ..},context,emitInitializerOwner); if emitted != blot_error::Error.none { let __runtime_initializer_body_result_4 = emitted; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_5 = __runtime_initializer_body_result_4; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_5; }
+    block { let found = state.runtime_globals.get(target); assert(found); found.active = false; } state.startup_facts.complete(slot.initializer); let ordered=state.runtime_order.push(slot.initializer);if ordered!=blot_error::Error.none {let __runtime_initializer_body_result_5 = ordered; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_6 = __runtime_initializer_body_result_5; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_6;}
+    if scope.present { let __runtime_initializer_body_result_6 = scope.value.completeGlobal(slot.global); rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_7 = __runtime_initializer_body_result_6; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_7; } let __runtime_initializer_body_result_7 = blot_error::Error.none; rows.deinit(); mappings.deinit(); state.startup_facts.active = caller; let __runtime_initializer_final_result_8 = __runtime_initializer_body_result_7; if scope.present { scope.value.deinit(); } return __runtime_initializer_final_result_8;
 
-    }
-    let cleanup_result_3_0 = cleanup_continuation_3();
-     if scope.present { scope.value.deinit(); }
-    return cleanup_result_3_0;
+
+
+
 }
 fn initializeRuntime(state: State&,generator: blot_backend_core_backend::Generator&) -> Error {
     var pending = false; state.runtime_globals.each() { key,slot => { if slot.active { pending = true; } } } if pending { return blot_error::Error.invalid_global_reference; }

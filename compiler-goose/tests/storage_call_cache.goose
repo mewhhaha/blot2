@@ -2,6 +2,9 @@
 import bootstrap_globals;
 import std;
 import backend.storage_calls;
+import backend.backend_plan;
+import check.core;
+import reuse.code_artifacts;
 import support.pooled_map;
 import driver.compile_workspace;
 type Key=blot_backend_storage_calls::Key;
@@ -51,4 +54,21 @@ fn collisionLaw(){
  blot_support_pooled_map::deinit(map,slots);blot_backend_storage_calls::release(first);blot_backend_storage_calls::release(second);blot_backend_storage_calls::release(third);
 }
 fn scalarLaw(){var map=blot_support_pooled_map::Map<u32,u32>{..};blot_support_pooled_map::insert(map,1 as u32,10 as u32,scalar_slots);blot_support_pooled_map::insert(map,2 as u32,20 as u32,scalar_slots);assert(blot_support_pooled_map::remove(map,2 as u32,scalar_slots));assert(!blot_support_pooled_map::contains(map,2 as u32));assert(blot_support_pooled_map::remove(map,1 as u32,scalar_slots));assert(map.count==0);blot_support_pooled_map::deinit(map,scalar_slots);}
-fn main(){cacheLaw();completionLaw();collisionLaw();scalarLaw();print("cache equality, owner removal, collision wrap and scalar fallback passed");}
+
+fn backendPlanHashLaw(){
+ var cache=blot_backend_backend_plan::KeyCache{..};
+ let first=blot_reuse_code_artifacts::Key{target:blot_check_core::BindingRef{1,2},count:2,parameters:[1,2,1,1,1,1,1,1,1,1,1,1,1,1,1,1],effects:[3,4,0,0,0,0,0,0,0,0,0,0,0,0,0,0],..};
+ var equal=first;
+ assert(blot_backend_backend_plan::insert(cache,first,11));
+ {let found .= blot_backend_backend_plan::get(cache,equal);assert(found && found==11);}
+ assert(!blot_backend_backend_plan::insert(cache,equal,17));
+ {let found .= blot_backend_backend_plan::get(cache,first);assert(found && found==17);}
+ var distinct=first;distinct.target.binding=3;
+ assert(!blot_backend_backend_plan::get(cache,distinct));
+ assert(blot_backend_backend_plan::insert(cache,distinct,23));
+ {let found .= blot_backend_backend_plan::get(cache,distinct);assert(found && found==23);}
+ assert(cache.count==2);
+ blot_support_pooled_map::deinit(cache,blot_backend_backend_plan::slots_KeyCache);
+}
+
+fn main(){cacheLaw();backendPlanHashLaw();completionLaw();collisionLaw();scalarLaw();print("cache equality, owner removal, collision wrap and scalar fallback passed");}
