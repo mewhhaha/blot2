@@ -3010,5 +3010,24 @@
     },
     "current_runtime_qualification": "Cursor-only sourcefamily staticallyaudited; selectedgraph progresses; actualgeneratorexecution pending",
     "whole_compiler_executable": false
+  },
+  "numeric_module_reborrow_family": {
+    "raw_receipt": "2026-11-10-goose-numeric-module-reborrow.json.gz",
+    "changes": [
+      "numericExpression reborrows registeredinputmodule afterunchangedearlyreturns, assertsexactsourceidentity; formalSource onlyusedbyguard",
+      "numericUpdate selectors/path usecounts+leafscalars acrossrecursion"
+    ],
+    "no_new_pools_copies_or_interfaces": true,
+    "latest_scoped": {
+      "attempt": 171,
+      "seconds": 58.349,
+      "partial": true,
+      "source_unchanged": true,
+      "old_module_loan_cleared": true,
+      "errors": [
+        "wasm999 passes=some(initialized) RuntimePipeline.Session publication insideassemblyrecursivecycle (\u00a77.8)"
+      ]
+    },
+    "whole_compiler_executable": false
   }
 }

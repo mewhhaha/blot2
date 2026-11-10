@@ -21,15 +21,15 @@ foreign/whole/depth/unsupported fallbacks, result-owner independence and adopted
 fresh/cloned nested Module payloads across Frame/reclamation. See
 [the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-parameter-frozen-module-laws.json.gz).
 
-Current selected170 takes 57.25s and reaches the outer emit call at 2600: a module
-reference remains live over a possible array shrink (§5.2). A copied identifier
-probe is locating its owner before changing the interface. Nominal/layout and
-admission/pattern cursors clear the preceding nominal argument, paired type-list
-and planValue child-view failures. These are source-only traversal rewrites with
-unchanged count/order/budget sites, no new allocations/copies. See
-[the cursor/probe receipt](benchmarks/evidence/qualification/2026-11-10-goose-layout-admission-cursors.json.gz).
-The earlier Core22/liveness snapshot/footprint native pair passes 13.57s; actual
-complete generator runtime remains pending.
+Current selected171 takes 58.35s and passes the numericExpression module-loan
+boundary. That parameter now reborrows the identical registered module after its
+original early returns; numeric update selectors/path also use scalar cursors.
+The next boundary is `backend/wasm.goose:999`: storing RuntimePipeline.Session
+inside the assembler's recursive attempt (§7.8). Its borrowed Module header is
+being investigated before changing that stage's ownership. See
+[the exact reborrow receipt](benchmarks/evidence/qualification/2026-11-10-goose-numeric-module-reborrow.json.gz).
+Cursor-only families preserve traversal/order/budget and add no pools/copies.
+The earlier Core/liveness native pair passes 13.57s; complete runtime is pending.
 
 Planning requests now contain scalar unit IDs and ranges into existing graph,
 evidence and recursive-access owners, plus the existing rejection slot. They

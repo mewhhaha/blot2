@@ -5,11 +5,11 @@ CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
 Actual whole160 stops in 157.07s with unchanged inputs and no artifacts. Its
-footprint-cache and effect-identity errors have subsequent repairs. Selected170
-finishes in 57.25s, reaching a module reference held across possible array shrink
-at the outer emit call. A copied identifier-only probe is locating that holder.
-The preceding nominal/layout and admission/pattern cursor repairs add no pools,
-allocations or copies and preserve traversal, budgets and cleanup.
+footprint-cache/effect-identity errors have repairs. Selected171 takes 58.35s and
+clears the numeric module-loan failure through a guarded registered reborrow.
+The current frontier is wasm999: recursive assembler Session publication (§7.8).
+Cursor/reborrow families preserve traversal, budgets, ownership and cleanup;
+actual generator/assembler execution remains pending.
 
 Earlier scalar-request/cache/footprint laws pass 17.38s; Core traversal/liveness
 snapshot/footprint laws pass 13.57s. These are affected families, not full runtime
