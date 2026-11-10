@@ -1,32 +1,30 @@
 # Finish the Goose compiler experiment
 
-Repair ownership, emit the actual complete C/header/native compiler, then qualify
+Repair ownership, build the actual complete C/header/native compiler, then qualify
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole160 stops in 157.07s with unchanged inputs and no artifacts. Its
-footprint-cache/effect-identity errors have repairs. Selected171 takes 58.35s and
-clears the numeric module-loan failure through a guarded registered reborrow.
-The current frontier is wasm999: recursive assembler Session publication (§7.8).
-Cursor/reborrow families preserve traversal, budgets, ownership and cleanup;
-actual generator/assembler execution remains pending.
+Actual whole173 stops after 151.03s with 458 unchanged inputs and no artifacts.
+Two errors remain: scoped_backend2604 diagnostic publication inside recursive
+run (§7.8), and process_requests retaining payloads through project_executor61
+(§5.1). Their lexical-factory/exact-packet-owner repairs are prepared off-tree.
 
-Earlier scalar-request/cache/footprint laws pass 17.38s; Core traversal/liveness
-snapshot/footprint laws pass 13.57s. These are affected families, not full runtime
-qualification. Inventory now has 31 laws, not yet executed together. The latest
-complete 30 run remains 221.34s at f0a602bc before these repairs. Exact closures,
-failed experiments and scopes are in [the root frontier](../CONTINUE.md) and
-[the receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+The complete 32-law component inventory passes in 288.97s: actual C emission,
+linking and native execution with unchanged import closures. Stages retain the
+30s cap. The affected assembly trio separately passes in 18.06s. Assembly now
+owns retry scratch lexically, preserving cleanup/error/retry order. The new
+fixture covers success/rejection cleanup, packet source retirement and profile
+hash parity; nonempty names/data, Frame and process scheduling remain pending.
+These laws do not qualify the complete compiler runtime.
 
 Use private checker c2b24 at build/goose-port/argcopy-experiment-20261110/goose.
-Installed Goose/qualified678 are unchanged; the diagnostic-only origin checker
-is not promoted. Selected roots are partial and check-only; scoped uses invalid
-Core. Regenerate adapters once for layouts, await completion, then freeze source.
-Repair cap 120s; final emission 180s; whole 300s; stop 3s after an actual diagnostic.
-No cap lifting, checker relaxation or live-owner clearing.
+Installed Goose/678 and the off-tree origin checker are unchanged. Selected roots
+are partial/check-only; scoped uses invalid Core. Repair cap 120s; emission 180s;
+whole 300s; stop 3s after a reported error. No cap lifting/checker relaxation.
 
 Preserve ABI 8/session 2, explicit owners/copies and sibling assets. Actual Goose
-CLI/server/OOM/retry/retention qualification awaits an executable. Eight matching
-Zig baseline fixtures pass. Zig source is unchanged; its previous full gate is
-incomplete. Remaining requirements are in the storage task/RFC. Known unqualified
-legacy API: host_cleanup_shapes.copyFields.
+CLI/server/OOM/retry/retention awaits the real executable. Eight matching Zig
+baseline fixtures pass. Zig source is unchanged; its prior full gate is
+incomplete. See [the root frontier](../CONTINUE.md),
+[the receipt index](../benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json)
+and the storage/RFC tasks for requirements and remaining coverage.

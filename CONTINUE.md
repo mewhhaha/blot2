@@ -1,116 +1,86 @@
-# Continue the Goose compiler experiment
+# Finish the Goose compiler experiment
 
-Finish ownership repairs, build the actual complete C/header/native compiler,
-then qualify CLI/server, request OOM/retry and retention against Zig.
-**No whole compiler artifact exists.** Helper laws never substitute for
-integration; never forward Goose requests to the Zig oracle.
+Repair ownership, build the actual complete C/header/native compiler, then qualify
+CLI/server, request OOM/retry and retention against Zig. **No whole compiler
+artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to it.
 
 ## Current frontier
 
-Actual whole160 stops after **157.07s**, with unchanged source and no artifacts:
+Actual whole173 checks 458 unchanged build inputs in **151.03s**, then stops:
 
-- `backend/storage_global_footprint.goose:92`: a borrowed slot slice is stored in
-  the completed cache (§9.2).
-- `backend/resolved_body.goose:60`: saved effect identities may retain payloads,
-  published through `eval/purity_type_key.goose:59` (§5.1).
+- `backend/scoped_backend.goose:2604`: publishing the emitted diagnostic inside
+  recursive `run` crosses the recursive-store boundary (§7.8).
+- `backend/resolved_body.goose:60`: `process_requests` may retain payloads through
+  `driver/project_executor.goose:61` (§5.1).
 
-See [the exact whole receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole160.json.gz).
-The preceding visitor and frozen Module publication failures are cleared. Their
-affected laws pass in **17.94s**: parameter traversal order/deduplication,
-foreign/whole/depth/unsupported fallbacks, result-owner independence and adopted
-fresh/cloned nested Module payloads across Frame/reclamation. See
-[the executed pair](benchmarks/evidence/qualification/2026-11-10-goose-parameter-frozen-module-laws.json.gz).
+There are no C/header/native artifacts. The prior whole160 footprint/effect-key
+failures and the assembler Session/Matcher stores are cleared. Exact source and
+raw diagnostics: [whole173](benchmarks/evidence/qualification/2026-11-10-goose-whole173.json.gz).
 
-Current selected171 takes 58.35s and passes the numericExpression module-loan
-boundary. That parameter now reborrows the identical registered module after its
-original early returns; numeric update selectors/path also use scalar cursors.
-The next boundary is `backend/wasm.goose:999`: storing RuntimePipeline.Session
-inside the assembler's recursive attempt (§7.8). Its borrowed Module header is
-being investigated before changing that stage's ownership. See
-[the exact reborrow receipt](benchmarks/evidence/qualification/2026-11-10-goose-numeric-module-reborrow.json.gz).
-Cursor-only families preserve traversal/order/budget and add no pools/copies.
-The earlier Core/liveness native pair passes 13.57s; complete runtime is pending.
+The complete **32-law component inventory passes in 288.97s**, with unchanged
+import closures and actual C emission, linking and native execution. Every stage
+retains its 30s cap. This qualifies the component laws, not the complete compiler.
+See [complete32](benchmarks/evidence/qualification/2026-11-10-goose-complete32.json.gz).
+The affected assembler/outline/worker trio separately passes in **18.06s**:
+[assembly family](benchmarks/evidence/qualification/2026-11-10-goose-assembly-family-laws.json.gz).
 
-Planning requests now contain scalar unit IDs and ranges into existing graph,
-evidence and recursive-access owners, plus the existing rejection slot. They
-retain no module/graph/key headers; observations reborrow unchanged existing
-runs. No new pool, copy or clone. The durable snapshot/cache/footprint trio passes
-**17.38s**. Actual Input<Value> checks through the old request frontier;
-full generator runtime remains pending. Inventory now 31 laws, not yet run together.
-See [the scalar request receipt](benchmarks/evidence/qualification/2026-11-10-goose-scalar-plan-input-family.json.gz)
-and [production trio](benchmarks/evidence/qualification/2026-11-10-goose-scalar-plan-input-laws.json.gz).
+Assembly retries now own their scratch directly. The nested recursive attempt is
+removed; cleanup remains bodies → parallel → matcher → passes → profile, with
+original error/retry order. Worker packets own copied arrays. Profiling and
+collector analysis choose source/detached instruction views lexically. The new
+law executes empty/nonempty assembly, collector rejection cleanup, packet/image
+round trips after Module retirement and type/instruction-buffer reuse, and
+profile hash parity and changed-instruction inequality. It does not exercise nonempty
+names/data retirement, Frame spanning, real process scheduling or full CLI/server.
+Slice-only packet copies stage through a grow array; cost is not benchmarked.
 
-The cache/effect-key pair passes 14.68s; transitive cache/Frame coverage passes 7.56s.
-Footprint cache publication reifies existing slot/node runs. Effect scratch owns
-already-required encodings and scalar text ranges, preserving exact order/bytes
-without more successful text copies/allocations. Encodings stay live through
-sort/emit; scratch headers grow 8B/entry. Exact scopes remain in the receipt index.
+Two next repairs are prepared off-tree and are not part of this checkpoint:
+remove compileScoped's recursive `run`, keeping result construction outside a
+cleanup-only helper; reify exact existing packet allocations before lower/check
+request publication. Review found all scoped diagnostic details are static
+strings, so this path needs no extra text owner. Preserve result-before-cleanup
+order and original cleanup/error priority. Run a strict actual boundary afterward.
 
-Six affected production laws pass together in **67.46s**: proof leases,
-diagnostics, semantic outcomes, worker pins, key cache and resolved bodies.
-A final diagnostic-OOM correction follows; the production diagnostic law then
-passes in **6.55s**, including failed-ensure preservation. These are bounded
-family checks. The latest complete30 helper inventory is **221.34s** at
-`f0a602bc`, before these repairs. Exact closures and native C/link/runtime results:
-[affected six](benchmarks/evidence/qualification/2026-11-10-goose-active-child-six.json.gz),
-[final diagnostic law](benchmarks/evidence/qualification/2026-11-10-goose-diagnostic-restore-final.json.gz),
-[complete30](benchmarks/evidence/qualification/2026-11-10-goose-complete30.json.gz).
+## Contracts and remaining coverage
 
-## Source contracts and qualification limits
+- Preserve ABI 8/session 2, named owners, invocation borrows, explicit copies,
+  sibling sources/assets and the Zig oracle. Language tasks remain retired;
+  copied-packet host workers remain.
+- Planning requests hold scalar unit/range/rejection IDs over existing owners;
+  no new graph/key pool or clone. Core/liveness traversal uses scalar cursors.
+- Active child Generator remains at one address through emission, is cleaned
+  once and restores its parent once. Workspace/query/Recorder publications name
+  existing owners. Diagnostic/tape OOM laws preserve prior messages and errors.
+- Native leaf laws never qualify full generator/probe/tape/CLI/server runtime.
+  Known pending API coverage: artifact_import factory across Frame and
+  host_cleanup_shapes.copyFields.
+- Requirements and rejected experiments remain in
+  [the storage task](tasks/STORAGE_REWRITE.md),
+  [the language migration](docs/language/NEXT_MIGRATION.md) and
+  [the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
 
-- PlanConstruction owns scratch data. The active child stays at one Generator
-  address through all phases, is cleaned up once, and the parent is restored
-  once. Native miniature controls cover phase errors, diagnostics, max_stacks,
-  counters and dormant aliases; actual generator runtime remains pending.
-- Arena traversals retain scalar ranges and reload elements across growth.
-  QueryScratch retains checked owner/generation/lease keys, not invocation borrows.
-- Query replay preserves the destination allocation slot and reconstitutes its
-  owned Judgment. Exact workspace source/catalog accessors check existing owners.
-- Recorder event publication and stable compaction use existing named pools and
-  Query slots. Mixed-event order, coalescing, Frame/readback and cleanup pass.
-- Panic messages use the existing Session diagnostic owner. Speculative probes
-  skip prior diagnostics and discard failed probe messages. Receipt tape backs
-  up text separately from scalar/fixed metadata; fresh owned restoration reserves
-  capacity before mutation and preserves the original operation error priority.
-  Native leaf ownership laws pass; full probe/tape runtime remains pending.
-- Key equality compares evidence contents. Declined caches share storage_calls
-  own/release; duplicate copying and its pool are removed. No compatibility API.
-- Imported gates use their existing copied identity and close before that owner.
-  Producer retirement passes, but the actual factory Frame fixture remains
-  rejected. Known unqualified legacy API: host_cleanup_shapes.copyFields.
+## Tools and next checks
 
-Receipts, historical checkpoints and failed experiments remain indexed in
-[the completion frontier](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
-
-## Tooling and remaining delivery
-
-Use the pinned private checker at
-`build/goose-port/argcopy-experiment-20261110/goose`, SHA256
+Use private checker `build/goose-port/argcopy-experiment-20261110/goose`, SHA256
 `c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632`.
-Its optional copied-argument recipe has 21 lifetime controls; exact storage identity,
-deep reads and recursive conservatism remain intact. Installed Goose and 678 are
-unchanged. The separate store-origin diagnostic binary is off-tree and never
-promoted. Do not relax checks or clear live owners to hide failures.
+Its copied-argument recipe has 21 focused lifetime controls; exact storage
+identity, deep reads and recursion rules remain intact. Installed Goose/678 are
+unchanged; the separate origin-diagnostic checker is not promoted.
 
-Selected roots are partial, check-only paths. Scoped uses invalid empty Core;
-it never qualifies runtime. Regenerate adapters once for layouts, fully await
-completion, then freeze source. Repair cap 120s, final emission 180s, whole 300s;
-stop 3s after an actual diagnostic. Never lift caps to conceal unfinished work.
+Selected roots are partial, check-only; scoped uses invalid empty Core. They do
+not qualify runtime. Regenerate adapters for layouts, await completion, then
+freeze source. Repair cap 120s, final emission 180s, whole 300s; stop 3s after a
+reported error. Never lift caps, relax checks or clear live owners to hide errors.
 
-After an actual executable exists, run `compiler-goose/tools/qualify_compiler.ts`
-with that executable and `compiler/zig-out-native-fast/bin/blotc`. Eight matching
-Zig baseline fixtures pass; Goose CLI/server/OOM/retry/retention have not run.
-Fake entry/component controls do not qualify those paths. Missing live bytes are
-not zero. Preserve compiler/ and sibling assets, ABI 8/session 2 and named owners.
-Language tasks remain retired; copied-packet host workers remain.
+Once the real executable exists, run compiler-goose/tools/qualify_compiler.ts
+against it and compiler/zig-out-native-fast/bin/blotc. Eight matching Zig baseline
+fixtures pass; Goose CLI/server/OOM/retry/retention have not run. Missing retained
+bytes are pending, not zero. No ABI fallback.
 
-Zig source is unchanged. Its prior full gate is incomplete: all 2974 laws compile
-without LLVM, but release compilation hit 120s after 94 laws / 65 full sweeps. Smoke,
-harness and zero-finding lint pass. Do not rebuild that release per Goose edit.
-Named-function source migration is checkpointed, not fresh Main/frame coverage.
-Historical Main 9,203,613B/5.523s belongs to its older release; no reliable compile
-speed gain. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
-Preserve remaining requirements in [the storage task](tasks/STORAGE_REWRITE.md)
-and [the language migration](docs/language/NEXT_MIGRATION.md). Environment
-publication/upstream messages require explicit requests. Astra for concrete
-snags only; never Terra.
+Zig source is unchanged. Its prior full gate remains incomplete: all 2974 laws
+compile without LLVM; release compilation hit its cap. Smoke, harness and zero
+finding lint pass. Do not rebuild that release for each Goose edit. No fresh
+current-port Gdev Main/frame exists. Historical Main 9,203,613B/5.523s belongs to
+its older release; no reliable compile speed gain. Subsecond compilation,
+sub-five-second Main and 1–2MB remain unmet. Environment publication and upstream
+messages require explicit requests. Use Astra for concrete snags only; never Terra.

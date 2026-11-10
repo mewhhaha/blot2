@@ -480,20 +480,20 @@
     }
   },
   "latest_selected_frontier": {
-    "whole_batch": 114,
-    "seconds": 152.361,
+    "whole_batch": 173,
+    "seconds": 151.028,
     "errors": [
-      "Generator.active_goals holds grow-shrink slice reachedthroughself",
-      "worker_packet.pinRuntimeMetadata store broadens pins provenance"
+      "scoped_backend2604: emitted diagnostic publication inside recursive run (\u00a77.8)",
+      "resolved_body60: process_requests may retain payloads via project_executor61 (\u00a75.1)"
     ],
     "artifacts": {},
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
-    "count": 30,
+    "count": 32,
     "single_batch": true,
-    "seconds": 221.34,
-    "raw_receipt": "2026-11-10-goose-complete30.json.gz",
+    "seconds": 288.969,
+    "raw_receipt": "2026-11-10-goose-complete32.json.gz",
     "whole_runtime_qualified": false
   },
   "source_repair_sha256": {
@@ -528,7 +528,7 @@
     "compiler-goose/src/reuse/dispatch_explanation.goose": "88d649bb129cbe432932a81225248cc667063c05afa6ee03fb1232263563a80e",
     "compiler-goose/src/backend/backend_emission.goose": "0aa341ac96118c182ba4433aa13d0856f8381172ae90e147ffde5d3d302a8b45",
     "compiler-goose/src/backend/core_backend.goose": "50c901c2c75d46402989ceba9d0ba853bd987c264e11d883f7174b7b61c27cdc",
-    "compiler-goose/src/backend/scoped_backend.goose": "b8a7acc2d3b6db4aa52929be8da8ca91a8d92858030c505caca724a419df4d31",
+    "compiler-goose/src/backend/scoped_backend.goose": "5a0eeb54836edb309ddcfdb731f27e302f9be8d61d0b7e7b5ba45ad10e6925e4",
     "compiler-goose/src/check/frozen_types.goose": "da4542a805c716156f6d7043a2c174a34c49edc646a764cc0bda3bd62b3e42b9",
     "compiler-goose/src/check/parameter_patterns.goose": "80e54c0df28a360299311ec14bc356770537f6b86a9b374971d3d23e7c16b754",
     "compiler-goose/src/check/types.goose": "501b0302dce71519dde8fe95956c21ca70c081b70cc53ead408cf27b7652662e",
@@ -560,14 +560,14 @@
     "compiler-goose/src/backend/addressed_input_demand.goose": "7e389078ac98a0d6055f6a94e0ca1a873006868c207e804a87b7ae50944eec65",
     "compiler-goose/src/backend/direct_input_demand.goose": "a8ec8a3e300cbf831342ae3b1000f02e2c346c0b931ec38fd7c764ae7d005936",
     "compiler-goose/src/backend/opaque_storage.goose": "f79fc9cff5891201572616255afb90aac3726c0b67173df377ea138e2318fd92",
-    "compiler-goose/src/backend/optimized_bodies.goose": "3bd596134aa50f5cf9c26e2b17d579bb107a47fb1153dfa2bc07781d266553b9",
+    "compiler-goose/src/backend/optimized_bodies.goose": "c234131891ec20ebe396f4938081f021f641d0dde05c1fcc9147747c4ba1f331",
     "compiler-goose/src/backend/packed_input_demand.goose": "400b00971508d6e376d9d1f307ff690359781e2b19bd7094fe486ecc2376c4be",
     "compiler-goose/src/backend/region_candidate.goose": "db4ff6b424a2488388a0ae63a5cba6d84c29dd590a221bd1b4b9780a40c912b9",
     "compiler-goose/src/backend/resolved_call.goose": "4bac249145ffe443019a75bc2c092f0af797e10d1063e8af9597a909e22bebc3",
     "compiler-goose/src/backend/resolved_flow.goose": "3e93c829686b5a17cda97bda8a93d7f67b286793da217812a0d8b8d1aed194c1",
     "compiler-goose/src/backend/runtime_identity.goose": "21752e72bb10a123f39e5d9760b131a78085adaca6f7c6898ae3e576ac4be7f6",
     "compiler-goose/src/backend/runtime_operations.goose": "0fbdc939cbaaf3402862aea11d6bd87d66c4c85d93816e890b2ea14aa6fc0671",
-    "compiler-goose/src/backend/runtime_parallel.goose": "f6f71b2bc05b1286eec96b384273d6c6bb31288efa33911444f2712417f513d4",
+    "compiler-goose/src/backend/runtime_parallel.goose": "32f39430f95ff93f0923db55dff0aecf942862ec9ca1d0291b34fa4d8ae352b4",
     "compiler-goose/src/backend/source_origins.goose": "e8ce17cbe790bd48a30b68b33dedc945e65a51ad9140515ea2bf66513e9e84ec",
     "compiler-goose/src/backend/startup_graph.goose": "66d908386568296c4dd591e7d222177397159682a9eaa61afb7978b892cfa907",
     "compiler-goose/src/backend/startup_occurrence_plan.goose": "6d113c8bffcd5d28cf9171713af23f8dc9c81cc157f9155452f9659adec557b3",
@@ -575,7 +575,7 @@
     "compiler-goose/src/backend/storage_deferred_join.goose": "1d1d895714b9142920e29a71380eb54244a658ab0b2abd62d1bc52e8088a3c51",
     "compiler-goose/src/backend/storage_global_footprint.goose": "e467f96695cdb23182cf88b3461fe2189978a0f0ee5f176f4f62a11a3a7df074",
     "compiler-goose/src/backend/unit_index.goose": "c887940e3a3c9b2736de030a41fb243f4730a904adf2230dd2a470a0284ec5c0",
-    "compiler-goose/src/backend/wasm.goose": "a30b81d8b8612c425f82a5011efa4558cf693aba0a32999e794c60a5e3d001a7",
+    "compiler-goose/src/backend/wasm.goose": "ef596e14d46404b0f6a5372418f16aed8d3b720b78d71f1ecc19ed9288e5cc54",
     "compiler-goose/src/check/core.goose": "83cf5fde517cdefd020914439e4b4fb7eca29330f0213869cfaa24d858765fbc",
     "compiler-goose/src/driver/cli_pipeline.goose": "9c02f342fecb67f6d990ab2f573a674d727aa06c91741a51fd5ba97115eda404",
     "compiler-goose/src/driver/compile_workspace.goose": "71321c983df6474f98a8d0e6e2585a22957ef51f4243acaa28d4b68c4096ff1a",
@@ -653,7 +653,11 @@
     "compiler-goose/src/backend/result_publication.goose": "046409c88b9cb052d8050428c22423bfd9eb400c1ec5a06a87ced68fe29d2a03",
     "compiler-goose/src/reuse/entry_frontend_cutoff.goose": "881e428eacad210c13f84ac25945d6e0236d29485f258da67eac6e2cadfc9ee0",
     "compiler-goose/src/reuse/frontend_binding_relocation.goose": "e088dc3691ab772957cf1db96cea6eb56c67db2f8a105274db777222870c2c6f",
-    "compiler-goose/tests/footprint_owner.goose": "45c33822da78f4bc2112e1dad5eca89daad0e5f6cb504908917dd3f08355a85a"
+    "compiler-goose/tests/footprint_owner.goose": "45c33822da78f4bc2112e1dad5eca89daad0e5f6cb504908917dd3f08355a85a",
+    "compiler-goose/src/backend/collector_contract.goose": "7ed6ec3d8f61d8e920fe1218a481bbcf1ae39fa343705cbc70dd28cd00eb3aa5",
+    "compiler-goose/src/backend/memory_profile.goose": "ce272eb8583805dcf49895ee5629583ca2d59750d7267cf44d8b39b8aceaa015",
+    "compiler-goose/src/backend/runtime_body_relocation.goose": "d880a84d5795bfa071771e817b52279282e326f2904fe70c73e540f970df530e",
+    "compiler-goose/src/backend/runtime_job.goose": "a9363f4b9bf03960d8f4e28dc9d7ce6124f3edd53614f404fe72d92479696fce"
   },
   "unqualified": [
     "whole compiler executable",
@@ -3029,5 +3033,72 @@
       ]
     },
     "whole_compiler_executable": false
+  },
+  "whole_build_173": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 151.028,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole173.json.gz",
+    "errors": [
+      "scoped_backend2604: emitted diagnostic publication inside recursive run (\u00a77.8)",
+      "resolved_body60: process_requests may retain payloads via project_executor61 (\u00a75.1)"
+    ]
+  },
+  "assembler_lexical_ownership_family": {
+    "raw_receipts": [
+      "2026-11-10-goose-assembly-family-laws.json.gz",
+      "2026-11-10-goose-scoped172.json.gz",
+      "2026-11-10-goose-whole173.json.gz"
+    ],
+    "changes": [
+      "Removed recursive assembly attempt: retry scope owns mandatory Session and optional Profile, Matcher, Batch and prepared bodies",
+      "Central cleanup retains bodies, parallel, matcher, passes, profile order; original operation error and retry order retained",
+      "Exact dictionary overloads and fixture-helper optional snapshot fixed",
+      "Worker packet arrays remain owned; slice-only views stage through a temporary grow array before owned copy",
+      "Profile hashing and collector scanning choose source/detached bodies lexically, preserving hash/instruction/budget order",
+      "Named nullable option aliases, byte literal context, source filename lookup and redundant helper removal repair encoder APIs",
+      "MethodSelector and transport cleanup narrow nullable references before deinit"
+    ],
+    "native_laws": {
+      "wasm_pipeline_scope": 6.431,
+      "wasm_scope_outline": 4.03,
+      "worker_runtime_pins": 7.594,
+      "total": 18.056
+    },
+    "coverage": [
+      "Empty/nonempty actual Wasm assembly and repeated scratch cleanup",
+      "Explicit collector rejection after scratch acquisition",
+      "Owned image and encoded packet observation after Module retirement and types/instructions reuse",
+      "Profile source/detached hash parity and changed instruction inequality"
+    ],
+    "limits": [
+      "Packet retirement fixture has empty names/data and no Frame spanning",
+      "Scratch buffer staging copy cost has not been benchmarked",
+      "Actual whole CLI/server/OOM/retry/retention remain pending"
+    ],
+    "inventory_count": 32,
+    "complete_inventory_current_source": true,
+    "whole173_prior160_errors_cleared": true,
+    "whole_compiler_executable": false,
+    "complete_inventory_seconds": 288.969
   }
 }
