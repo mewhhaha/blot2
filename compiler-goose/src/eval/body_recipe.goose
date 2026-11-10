@@ -66,8 +66,8 @@ fn publish(self_:RecipeTable&,visits:const u32[:],captures:bool)->u32,Error {
 }
 fn clear(self_:RecipeTable&) {for id in self_.items {let words=recipe_records[id].value.visits;if words.len!=0 {recipe_visits.free_slice(words);}recipe_records.free(id);}self_.items=self_.storage[..0];self_.len=0;}
 fn release(self_:RecipeTable&) {self_.clear();blot_support_pooled_buffer::deinit(self_,recipe_indexes);}
-type Keys=blot_support_pooled_map::Map<Key,u32>;
-type Declines=blot_support_pooled_map::Map<Key,i64>;
+struct Keys {count:i64=0,slots:dictionary_slot<Key,u32>[:]=default<dictionary_slot<Key,u32>[:]>()}
+struct Declines {count:i64=0,slots:dictionary_slot<Key,i64>[:]=default<dictionary_slot<Key,i64>[:]>()}
 reusable[] var key_slots:dictionary_slot<Key,u32>[>..]=[];
 reusable[] var decline_slots:dictionary_slot<Key,i64>[>..]=[];
 fn get(self_:const Keys&,key:Key)->u32? {return blot_support_pooled_map::get(self_,key);}

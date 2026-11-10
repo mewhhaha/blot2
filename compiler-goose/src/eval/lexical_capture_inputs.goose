@@ -106,7 +106,7 @@ fn ensure(self_:InputBuffer&,minimum:i64)->Error {if self_.failure!=blot_error::
 fn push(self_:InputBuffer&,value:Inputs) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,canonicalOwned(value),input_runs);self_.len=self_.items.len;}
 fn clear(self_:InputBuffer&) {for &input in self_.items {input.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
 fn release(self_:InputBuffer&) {self_.clear();blot_support_pooled_buffer::deinit(self_,input_runs);}
-type Keys=blot_support_pooled_map::Map<const u64[:],u32>;
+struct Keys {count:i64=0,slots:dictionary_slot<const u64[:],u32>[:]=default<dictionary_slot<const u64[:],u32>[:]>()}
 reusable[] var key_slots:dictionary_slot<const u64[:],u32>[>..]=[];
 fn get(self_:const Keys&,key:const u64[:])->u32? {return blot_support_pooled_map::get(self_,key);}
 fn reserveOne(self_:Keys&) {if self_.slots.len==0 {blot_support_pooled_map::grow(self_,8,key_slots);}else if (self_.count+1)*3>self_.slots.len*2 {blot_support_pooled_map::grow(self_,self_.slots.len*2,key_slots);}}

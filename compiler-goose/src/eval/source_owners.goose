@@ -39,7 +39,7 @@ fn build(module: const blot_check_core::Module&,limit: i64) -> Index,Error {
  for binding,id in module.bindings { if binding.kind!=blot_reuse_principal_interface::Kind.local||binding.initializer==0||binding.initializer>=nodes.len { continue; } let owner=nodes[binding.initializer]; if owner!=0 { record(bindings,id as u32,owner); } }
  return retain(nodes,bindings,true),blot_error::Error.none;
 }
-type UnitMap=blot_support_pooled_map::Map<i64,Index>;
+struct UnitMap {count:i64=0,slots:dictionary_slot<i64,Index>[:]=default<dictionary_slot<i64,Index>[:]>()}
 reusable[] var unit_slots:dictionary_slot<i64,Index>[>..]=[];
 fn get(self_:const UnitMap&,key:i64)->Index? {return blot_support_pooled_map::get(self_,key);}
 fn insert(self_:UnitMap&,key:i64,value:Index) {blot_support_pooled_map::insert(self_,key,value,unit_slots);}

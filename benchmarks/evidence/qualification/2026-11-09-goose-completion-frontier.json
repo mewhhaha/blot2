@@ -480,22 +480,22 @@
     }
   },
   "latest_selected_frontier": {
-    "whole_batch": 113,
-    "partial": false,
-    "seconds": 144.86,
+    "whole_batch": 114,
+    "seconds": 152.361,
     "errors": [
-      "IndexSet method lookup",
-      "effect evidence buffer publication"
+      "Generator.active_goals holds grow-shrink slice reachedthroughself",
+      "worker_packet.pinRuntimeMetadata store broadens pins provenance"
     ],
     "artifacts": {},
     "whole_compiler_executable": false
   },
   "latest_executed_laws": {
-    "raw_receipt": "2026-11-10-goose-complete25.json.gz",
+    "raw_receipt": "2026-11-10-goose-complete26.json.gz",
     "passed": true,
-    "count": 25,
-    "seconds": 183.89,
-    "scope": "Complete production helper inventory; C emission/link/runtime on qualified678; not whole compiler/runtime qualification"
+    "count": 26,
+    "seconds": 190.629,
+    "checker_sha256": "c2b24b697acfff54f5e89fb7eeb024fc2e528ff46e7582faf7714662d3067632",
+    "scope": "Complete isolated production helper inventory; actual C/link/runtime, not whole compiler"
   },
   "source_repair_sha256": {
     "compiler-goose/src/backend/wasm_scope_outline.goose": "ae2a4e7c9a002b1c6c0cb20e87b1e8cd9d3706facb0086083b55e2a5ea0fb2d9",
@@ -2542,5 +2542,40 @@
       "effect_evidence.commit buffer move widens state provenance"
     ],
     "whole_compiler_executable": false
+  },
+  "map_effect_family": {
+    "nominal_local_apis": 13,
+    "retained_generic_interface_aliases": 15,
+    "layouts_unchanged": true,
+    "effect_move": "Sixbuffers+twobucketmaps useexactregisteredviews; nonemptycommit/sourcecleanup/Frame/destreads+dedupepass",
+    "full_inventory": "2026-11-10-goose-complete26.json.gz",
+    "affected_raw_receipt": "2026-11-10-goose-map-effect-family.json.gz",
+    "index_method_regression_seconds": 7.454,
+    "rejected_iteration_experiment": "Aggregate26driver emission exceeds30s; noC/link/run; isolated190.629s inventory remainsrequired"
+  },
+  "whole_build_114": {
+    "command": [
+      "python3",
+      "/home/jacobt/src/blot2/compiler-goose/build.py",
+      "--goose",
+      "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+      "--cc",
+      "clang-23",
+      "--stdlib",
+      "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+      "--inference-budget",
+      "1000000",
+      "--stage-timeout",
+      "180",
+      "--total-timeout",
+      "300"
+    ],
+    "exit": 1,
+    "seconds": 152.361,
+    "source_unchanged": true,
+    "changed_inputs": [],
+    "artifacts": {},
+    "whole_compiler_executable": false,
+    "raw_receipt": "2026-11-10-goose-whole114.json.gz"
   }
 }

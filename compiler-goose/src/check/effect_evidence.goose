@@ -146,13 +146,43 @@ fn prepareCommit(source: const Store&,destination: Store&) -> Error { if !valid(
  if source.operation_next.failure!=blot_error::Error.none { return source.operation_next.failure; }
  if source.row_next.failure!=blot_error::Error.none { return source.row_next.failure; }
  return blot_error::Error.none; }
+fn ownedBuffer(value:const OperationBuffer&)->OperationBuffer {
+ assert(value.len>=0 && value.len==value.items.len && value.len<=value.storage.len);
+ assert(blot_support::same_slice_identity(value.items,value.storage[..value.len]));
+ if value.storage.len==0 {return OperationBuffer{failure:value.failure};}
+ let registered=pool_OperationBuffer.realloc_slice(value.storage,value.storage.len);assert(blot_support::same_slice_identity(registered,value.storage));
+ let start=pool_OperationBuffer.index_of(registered[0]);let storage=pool_OperationBuffer[start..start+registered.len];
+ return OperationBuffer{storage:storage,items:storage[..value.len],len:value.len,failure:value.failure};
+}
+fn ownedBuffer(value:const RowBuffer&)->RowBuffer {
+ assert(value.len>=0 && value.len==value.items.len && value.len<=value.storage.len);
+ assert(blot_support::same_slice_identity(value.items,value.storage[..value.len]));
+ if value.storage.len==0 {return RowBuffer{failure:value.failure};}
+ let registered=pool_RowBuffer.realloc_slice(value.storage,value.storage.len);assert(blot_support::same_slice_identity(registered,value.storage));
+ let start=pool_RowBuffer.index_of(registered[0]);let storage=pool_RowBuffer[start..start+registered.len];
+ return RowBuffer{storage:storage,items:storage[..value.len],len:value.len,failure:value.failure};
+}
+fn ownedBuffer(value:const WordBuffer&)->WordBuffer {
+ assert(value.len>=0 && value.len==value.items.len && value.len<=value.storage.len);
+ assert(blot_support::same_slice_identity(value.items,value.storage[..value.len]));
+ if value.storage.len==0 {return WordBuffer{failure:value.failure};}
+ let registered=pool_WordBuffer.realloc_slice(value.storage,value.storage.len);assert(blot_support::same_slice_identity(registered,value.storage));
+ let start=pool_WordBuffer.index_of(registered[0]);let storage=pool_WordBuffer[start..start+registered.len];
+ return WordBuffer{storage:storage,items:storage[..value.len],len:value.len,failure:value.failure};
+}
+fn ownedBuckets(value:const Buckets&)->Buckets {
+ assert(value.count>=0 && value.count<=value.slots.len);
+ if value.slots.len==0 {assert(value.count==0);return Buckets{};}
+ let registered=bucket_slots.realloc_slice(value.slots,value.slots.len);assert(blot_support::same_slice_identity(registered,value.slots));
+ let start=bucket_slots.index_of(registered[0]);return Buckets{count:value.count,slots:bucket_slots[start..start+registered.len]};
+}
 fn commit(source: Store&,destination: Store&) { assert(valid(source)&&valid(destination)&&source.owner_id!=destination.owner_id);
- destination.operations.deinit(); destination.operations=source.operations; source.operations=OperationBuffer {};
- destination.arguments.deinit(); destination.arguments=source.arguments; source.arguments=WordBuffer {};
- destination.rows.deinit(); destination.rows=source.rows; source.rows=RowBuffer {};
- destination.labels.deinit(); destination.labels=source.labels; source.labels=WordBuffer {};
- destination.operation_next.deinit(); destination.operation_next=source.operation_next; source.operation_next=WordBuffer {};
- destination.row_next.deinit(); destination.row_next=source.row_next; source.row_next=WordBuffer {};
- destination.operation_buckets.deinit(); destination.operation_buckets=source.operation_buckets; source.operation_buckets=Buckets {};
- destination.row_buckets.deinit(); destination.row_buckets=source.row_buckets; source.row_buckets=Buckets {};
+ destination.operations.deinit(); destination.operations=ownedBuffer(source.operations); source.operations=OperationBuffer {};
+ destination.arguments.deinit(); destination.arguments=ownedBuffer(source.arguments); source.arguments=WordBuffer {};
+ destination.rows.deinit(); destination.rows=ownedBuffer(source.rows); source.rows=RowBuffer {};
+ destination.labels.deinit(); destination.labels=ownedBuffer(source.labels); source.labels=WordBuffer {};
+ destination.operation_next.deinit(); destination.operation_next=ownedBuffer(source.operation_next); source.operation_next=WordBuffer {};
+ destination.row_next.deinit(); destination.row_next=ownedBuffer(source.row_next); source.row_next=WordBuffer {};
+ destination.operation_buckets.deinit(); destination.operation_buckets=ownedBuckets(source.operation_buckets); source.operation_buckets=Buckets {};
+ destination.row_buckets.deinit(); destination.row_buckets=ownedBuckets(source.row_buckets); source.row_buckets=Buckets {};
  let identity=destination.owner_id; destination.owner_id=source.owner_id; states[destination.lease-1].owner_id=destination.owner_id; source.owner_id=identity; states[source.lease-1].owner_id=source.owner_id; }

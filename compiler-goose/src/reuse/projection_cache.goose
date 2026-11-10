@@ -4,7 +4,7 @@ import support.pooled_map;
 import support.error;
 type Error=blot_error::Error;
 struct Answer { value: u32,visits: u32,height: u16 }
-type Answers=blot_support_pooled_map::Map<u32,Answer>;
+struct Answers {count:i64=0,slots:dictionary_slot<u32,Answer>[:]=default<dictionary_slot<u32,Answer>[:]>()}
 reusable[] var answer_slots: dictionary_slot<u32,Answer>[>..]=[];
 fn get(self_: const Answers&,key: u32) -> Answer? { return blot_support_pooled_map::get(self_,key); }
 fn insert(self_: Answers&,key: u32,value: Answer) { blot_support_pooled_map::insert(self_,key,value,answer_slots); }

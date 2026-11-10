@@ -33,6 +33,7 @@ fn nameRanges() {
  let copied=z;assert(copied.name.start==z.name.start && copied.name.len==z.name.len && bytes.len==4111);
 }
 fn rootRuns() {
+    var regions=blot_backend_scoped_backend::IndexSet{};assert(regions.insert(-7,true)==blot_error::Error.none && regions.contains(-7));regions.clear();assert(!regions.contains(-7));regions.deinit();
     var bytes:u8[>..<]=[];var arena=NameArena{bytes};let spelling=blot_backend_scoped_backend::publishName(arena,"element");
     var layouts=blot_backend_scoped_backend::PlainLayouts{};let shape=default<blot_backend_scoped_backend::Value>();
     assert(blot_backend_scoped_backend::insert(layouts,1 as u64,shape)==blot_error::Error.none);assert(blot_backend_scoped_backend::contains(layouts,1 as u64));layouts.deinit();

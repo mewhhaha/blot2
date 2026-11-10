@@ -321,7 +321,7 @@ fn resize(buffer: BundleSnapshots&,length: i64) { blot_support_pooled_buffer::re
 fn clear(buffer: BundleSnapshots&) { blot_support_pooled_buffer::clear(buffer); }
 fn deinit(buffer: BundleSnapshots&) { blot_support_pooled_buffer::deinit(buffer,BundleSnapshots_runs); }
 
-type WordSet = blot_support_pooled_map::Map<u32,bool>;
+struct WordSet {count:i64=0,slots:dictionary_slot<u32,bool>[:]=default<dictionary_slot<u32,bool>[:]>()}
 reusable[] var WordSet_slots: dictionary_slot<u32,bool>[>..] = [];
 fn get(map: const WordSet&,key: u32) -> bool? { blot_support_pooled_map::get(map,key) }
 fn contains(map: const WordSet&,key: u32) -> bool { return get(map,key) != null; }
@@ -329,7 +329,7 @@ fn insert(map: WordSet&,key: u32,value: bool) -> blot_error::Error { blot_suppor
 fn clear(map: WordSet&) { blot_support_pooled_map::clear(map); }
 fn deinit(map: WordSet&) { blot_support_pooled_map::deinit(map,WordSet_slots); }
 
-type IndexSet = blot_support_pooled_map::Map<i64,bool>;
+struct IndexSet {count:i64=0,slots:dictionary_slot<i64,bool>[:]=default<dictionary_slot<i64,bool>[:]>()}
 reusable[] var IndexSet_slots: dictionary_slot<i64,bool>[>..] = [];
 fn get(map: const IndexSet&,key: i64) -> bool? { blot_support_pooled_map::get(map,key) }
 fn contains(map: const IndexSet&,key: i64) -> bool { return get(map,key) != null; }
@@ -345,7 +345,7 @@ fn insert(map: PlainLayouts&,key: u64,value: Value) -> blot_error::Error { blot_
 fn clear(map: PlainLayouts&) { blot_support_pooled_map::clear(map); }
 fn deinit(map: PlainLayouts&) { blot_support_pooled_map::deinit(map,PlainLayouts_slots); }
 
-type PlanMap = blot_support_pooled_map::Map<u32,u32>;
+struct PlanMap {count:i64=0,slots:dictionary_slot<u32,u32>[:]=default<dictionary_slot<u32,u32>[:]>()}
 reusable[] var PlanMap_slots: dictionary_slot<u32,u32>[>..] = [];
 fn get(map: const PlanMap&,key: u32) -> u32? { blot_support_pooled_map::get(map,key) }
 fn contains(map: const PlanMap&,key: u32) -> bool { return get(map,key) != null; }
@@ -353,7 +353,7 @@ fn insert(map: PlanMap&,key: u32,value: u32) -> blot_error::Error { blot_support
 fn clear(map: PlanMap&) { blot_support_pooled_map::clear(map); }
 fn deinit(map: PlanMap&) { blot_support_pooled_map::deinit(map,PlanMap_slots); }
 
-type TransportMap = blot_support_pooled_map::Map<u32,blot_backend_storage_transport::Index?>;
+struct TransportMap {count:i64=0,slots:dictionary_slot<u32,blot_backend_storage_transport::Index?>[:]=default<dictionary_slot<u32,blot_backend_storage_transport::Index?>[:]>()}
 reusable[] var TransportMap_slots: dictionary_slot<u32,blot_backend_storage_transport::Index?>[>..] = [];
 fn get(map: const TransportMap&,key: u32) -> blot_backend_storage_transport::Index? { let slot = blot_support_pooled_map::probe(map,key); if slot < 0 { return null; } return map.slots[slot].val; }
 fn contains(map: const TransportMap&,key: u32) -> bool { return blot_support_pooled_map::contains(map,key); }
@@ -361,7 +361,7 @@ fn insert(map: TransportMap&,key: u32,value: blot_backend_storage_transport::Ind
 fn clear(map: TransportMap&) { blot_support_pooled_map::clear(map); }
 fn deinit(map: TransportMap&) { blot_support_pooled_map::deinit(map,TransportMap_slots); }
 
-type DeclinedCalls = blot_support_pooled_map::Map<blot_backend_storage_calls::Key,bool>;
+struct DeclinedCalls {count:i64=0,slots:dictionary_slot<blot_backend_storage_calls::Key,bool>[:]=default<dictionary_slot<blot_backend_storage_calls::Key,bool>[:]>()}
 reusable[] var DeclinedCalls_slots: dictionary_slot<blot_backend_storage_calls::Key,bool>[>..] = [];
 fn get(map: const DeclinedCalls&,key: blot_backend_storage_calls::Key) -> bool? { blot_support_pooled_map::get(map,key) }
 fn contains(map: const DeclinedCalls&,key: blot_backend_storage_calls::Key) -> bool { return get(map,key) != null; }
@@ -369,7 +369,7 @@ fn insert(map: DeclinedCalls&,key: blot_backend_storage_calls::Key,value: bool) 
 fn clear(map: DeclinedCalls&) { blot_support_pooled_map::clear(map); }
 fn deinit(map: DeclinedCalls&) { blot_support_pooled_map::deinit(map,DeclinedCalls_slots); }
 
-type Dispatches = blot_support_pooled_map::Map<DispatchKey,blot_support::Option<blot_check_core::BindingRef>>;
+struct Dispatches {count:i64=0,slots:dictionary_slot<DispatchKey,blot_support::Option<blot_check_core::BindingRef>>[:]=default<dictionary_slot<DispatchKey,blot_support::Option<blot_check_core::BindingRef>>[:]>()}
 reusable[] var Dispatches_slots: dictionary_slot<DispatchKey,blot_support::Option<blot_check_core::BindingRef>>[>..] = [];
 fn get(map: const Dispatches&,key: DispatchKey) -> blot_support::Option<blot_check_core::BindingRef>? { blot_support_pooled_map::get(map,key) }
 fn contains(map: const Dispatches&,key: DispatchKey) -> bool { return get(map,key) != null; }
@@ -1289,7 +1289,7 @@ recursive fn readerParameter(self_: Generator&,child: Generator&,input: Value&,a
 }
 struct EnvironmentKey { address: i64,length: i64 }
 fn hash(key: EnvironmentKey) -> u64 { ::hash(key.address) ^ ::hash(key.length) }
-type EnvironmentCopies = blot_support_pooled_map::Map<EnvironmentKey,Range>;
+struct EnvironmentCopies {count:i64=0,slots:dictionary_slot<EnvironmentKey,Range>[:]=default<dictionary_slot<EnvironmentKey,Range>[:]>()}
 reusable[] var environment_copy_slots: dictionary_slot<EnvironmentKey,Range>[>..] = [];
 fn deinit(copies: EnvironmentCopies&) { blot_support_pooled_map::deinit(copies,environment_copy_slots); }
 fn retainEnvironment(self_: Generator&,source: Range,copies: EnvironmentCopies&,depth: i64) -> Range,Error { return retainEnvironmentIn(self_,self_.metadata,source,copies,depth); }

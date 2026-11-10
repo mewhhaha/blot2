@@ -773,7 +773,7 @@ fn resize(self_: PooledRows&,length: i64) { assert(self_.lease!=0||length==0); i
 fn clear(self_: PooledRows&) { if self_.lease!=0 { self_.header.clear(); } }
 fn deinit(self_: PooledRows&) { if self_.lease==0 { return; } let error=activate(self_); assert(error==blot_error::Error.none); self_.header.deinit(); let index=self_.lease-1; row_mapping_headers[index].live=false; row_mapping_headers.free(index); self_=PooledRows {}; }
 fn mappingItems(self_: PooledRows) -> const RowMapping[:] { return self_.items; }
-type MatchMemo=blot_support_pooled_map::Map<u64,bool>;
+struct MatchMemo {count:i64=0,slots:dictionary_slot<u64,bool>[:]=default<dictionary_slot<u64,bool>[:]>()}
 reusable[] var match_memo_slots: dictionary_slot<u64,bool>[>..]=[];
 fn contains(self_: const MatchMemo&,key: u64) -> bool { return blot_support_pooled_map::contains(self_,key); }
 fn insert(self_: MatchMemo&,key: u64,value: bool) { blot_support_pooled_map::insert(self_,key,value,match_memo_slots); }
