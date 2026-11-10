@@ -172,14 +172,18 @@ fn codeCount(state: const State&,static_closures: i64) -> i64 { state.instances.
 fn wrapperCount(state: const State&) -> i64 { state.callables.count + state.constructor_functions.count + state.primitive_functions.count + state.operation_functions.count + state.host_functions.count }
 fn addStartupSelections(generator: blot_backend_core_backend::Generator&,target: blot_check_core::BindingRef,processed: dictionary<blot_check_core::BindingRef,bool>&,selections: blot_backend_startup_graph::Selection[>..<]&,confirmed: bool&) -> Error {
     let facts,error = generator.evaluator.startupDependencies(target); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return generator.evaluationFailure(); }
-    recursive fn cleanup_continuation_1() -> Error {
+    block {
  if !facts.complete { confirmed = false; }
-    for method in facts.selected { selections.push(blot_backend_startup_graph::Selection { target,method , ..}); let prepared = generator.evaluator.prepare(method); if prepared != blot_error::Error.none { if prepared == blot_error::Error.out_of_memory { return prepared; } return generator.evaluationFailure(); } } ::insert(processed,target,true); return blot_error::Error.none;
+    for method in facts.selected { selections.push(blot_backend_startup_graph::Selection { target,method , ..}); let prepared = generator.evaluator.prepare(method); if prepared != blot_error::Error.none { if prepared == blot_error::Error.out_of_memory { let __flat_cleanup_0_0_0: Error = prepared; block {
+facts.deinit();
+} return __flat_cleanup_0_0_0; } let __flat_cleanup_0_1_0: Error = generator.evaluationFailure(); block {
+facts.deinit();
+} return __flat_cleanup_0_1_0; } } ::insert(processed,target,true); let __flat_cleanup_0_2_0: Error = blot_error::Error.none; block {
+facts.deinit();
+} return __flat_cleanup_0_2_0;
+
 
     }
-    let cleanup_result_1_0 = cleanup_continuation_1();
-     facts.deinit();
-    return cleanup_result_1_0;
 }
 fn planRuntime(state: State&,generator: blot_backend_core_backend::Generator&,entry: u32,supplied_order: const u32[:]) -> Error {
     var has_runtime = false; for source in generator.units { for body in source.bodies[1..] { if body.runtime && !body.is_function { has_runtime = true; } } } if !has_runtime { return blot_error::Error.none; }

@@ -79,7 +79,7 @@ export "probe_scoped" fn scoped() {
 export "probe_prepare" fn prepare() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  let error=blot_backend_core_backend::prepare(run);
  if error==blot_error::Error.none {
   var stamp_entries:blot_reuse_code_artifacts::ModuleStampEntry[>..<]=[];var memo=blot_reuse_code_artifacts::ModuleStamps{storage:stamp_entries,..};
@@ -114,7 +114,7 @@ export "probe_entry_display" fn entry_display() {
 export "probe_assemble" fn assemble() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  let compiled,error=blot_backend_core_backend::assemble(run);
  run.deinit();var result=compiled;result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
@@ -126,7 +126,7 @@ fn recordArtifactScope(run:blot_backend_core_backend::CompileRun&,result:blot_ba
 export "probe_record_artifact" fn record_artifact() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  var result=blot_backend_core_backend::emptyResult(workspace);
  let counts,error=recordArtifactScope(run,result);if error==blot_error::Error.none {let finished=blot_backend_core_backend::finishArtifact(run,result,counts);}
 run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
@@ -135,7 +135,7 @@ run.deinit();result.deinit();let released=frame.release();assert(released==blot_
 export "probe_publish" fn publish() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
  let workspace=frame.borrow();assert(workspace);
- var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  var result=blot_backend_core_backend::emptyResult(workspace);
  let error=blot_backend_core_backend::publish(run,result,blot_backend_core_backend::ModuleStamps{..});
  run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
@@ -150,13 +150,13 @@ export "probe_detach_result" fn detach_result() {
 
 export "probe_emit" fn emit() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
- let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
+ let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};
  let emitted,error=blot_backend_core_backend::emit(run);run.deinit();match emitted {diagnostic failure=>{var result=failure.value;result.deinit();},complete=>{}}
 let released=frame.release();assert(released==blot_error::Error.none);
 }
 export "probe_observe" fn observe() {
  var frame,error=blot_compile_workspace::create(blot_native::fresh_owner_id());if error!=blot_error::Error.none {return;}
- let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{workspace:workspace,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};var result=blot_backend_core_backend::emptyResult(workspace);
+ let workspace=frame.borrow();assert(workspace);var run=blot_backend_core_backend::CompileRun{frame:frame,entry:1,options:blot_backend_core_backend::CompileOptions{..},..};var result=blot_backend_core_backend::emptyResult(workspace);
  let error=blot_backend_core_backend::observe(run,result);run.deinit();result.deinit();let released=frame.release();assert(released==blot_error::Error.none);
 }
 

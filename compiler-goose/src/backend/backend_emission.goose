@@ -454,38 +454,68 @@ recursive fn hasErasedType(owner: const Owner&,ty: u32,depth: i64) -> bool {
 fn closeAmbiguousUse(owner: Owner&,ty: u32,mappings: const Mapping[:],rows: const RowMapping[:],span: blot_check_core::Span,ambiguous: Ambiguous&) -> bool,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var variables = TypeVariables { source: source , ..}; if !visit(variables,ty,0) { return false,blot_error::Error.none; }
     let known_types = ambiguous.types.items.len; let known_rows = ambiguous.rows.items.len; var closed = false;
-    recursive fn cleanup_continuation_81() -> bool,Error {
+    block {
 
     for variable in variables.types[..variables.type_count] {
         var present = false; for mapping in mappings { if mapping.variable == variable { present = true; break; } } if present { continue; }
-        let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,false); if error != blot_error::Error.none { return false,error; } if quantified { return false,blot_error::Error.none; } let appended = ambiguous.types.push(Mapping { variable: variable,layout: blot_backend_layout::word , ..}); if appended != blot_error::Error.none { return false,appended; }
+        let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,false); if error != blot_error::Error.none { let __flat_cleanup_66_0_0: bool = false; let __flat_cleanup_66_0_1: Error = error; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_0_0,__flat_cleanup_66_0_1; } if quantified { let __flat_cleanup_66_1_0: bool = false; let __flat_cleanup_66_1_1: Error = blot_error::Error.none; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_1_0,__flat_cleanup_66_1_1; } let appended = ambiguous.types.push(Mapping { variable: variable,layout: blot_backend_layout::word , ..}); if appended != blot_error::Error.none { let __flat_cleanup_66_2_0: bool = false; let __flat_cleanup_66_2_1: Error = appended; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_2_0,__flat_cleanup_66_2_1; }
     }
-    if ambiguous.types.items.len == known_types { return false,blot_error::Error.none; }
+    if ambiguous.types.items.len == known_types { let __flat_cleanup_66_3_0: bool = false; let __flat_cleanup_66_3_1: Error = blot_error::Error.none; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_3_0,__flat_cleanup_66_3_1; }
     for variable in variables.rows[..variables.row_count] {
         var present = false; for mapping in rows { if mapping.variable == variable { present = true; break; } } if present { continue; }
-        let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,true); if error != blot_error::Error.none { return false,error; } if quantified { continue; } let appended = ambiguous.rows.push(RowMapping { variable,0 , ..}); if appended != blot_error::Error.none { return false,appended; }
+        let quantified,error = generator.quantifiedVariable(owner.unit_id,variable,true); if error != blot_error::Error.none { let __flat_cleanup_66_4_0: bool = false; let __flat_cleanup_66_4_1: Error = error; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_4_0,__flat_cleanup_66_4_1; } if quantified { continue; } let appended = ambiguous.rows.push(RowMapping { variable,0 , ..}); if appended != blot_error::Error.none { let __flat_cleanup_66_5_0: bool = false; let __flat_cleanup_66_5_1: Error = appended; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_5_0,__flat_cleanup_66_5_1; }
     }
     var closed_types = MappingBuffer {..};
-    recursive fn cleanup_continuation_80() -> bool,Error {
+    block {
  var closed_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_79() -> bool,Error {
- let types = withFacts(mappings,ambiguous.types.items[known_types..],closed_types); if types != blot_error::Error.none { return false,types; } let row_mappings = withFacts(rows,ambiguous.rows.items[known_rows..],closed_rows); if row_mappings != blot_error::Error.none { return false,row_mappings; }
-    let layout,error = generator.codeLayoutWithRows(owner.unit_id,ty,closed_types.items,closed_rows.items,span); if error != blot_error::Error.none { return false,error; } closed = !hasErasedType(owner,layout,0); return closed,blot_error::Error.none;
+    block {
+ let types = withFacts(mappings,ambiguous.types.items[known_types..],closed_types); if types != blot_error::Error.none { let __flat_cleanup_64_0_0: bool = false; let __flat_cleanup_64_0_1: Error = types; block {
+closed_rows.deinit();
+} let __flat_cleanup_65_0_0: bool = __flat_cleanup_64_0_0; let __flat_cleanup_65_0_1: Error = __flat_cleanup_64_0_1; block {
+closed_types.deinit();
+} let __flat_cleanup_66_6_0: bool = __flat_cleanup_65_0_0; let __flat_cleanup_66_6_1: Error = __flat_cleanup_65_0_1; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_6_0,__flat_cleanup_66_6_1; } let row_mappings = withFacts(rows,ambiguous.rows.items[known_rows..],closed_rows); if row_mappings != blot_error::Error.none { let __flat_cleanup_64_1_0: bool = false; let __flat_cleanup_64_1_1: Error = row_mappings; block {
+closed_rows.deinit();
+} let __flat_cleanup_65_1_0: bool = __flat_cleanup_64_1_0; let __flat_cleanup_65_1_1: Error = __flat_cleanup_64_1_1; block {
+closed_types.deinit();
+} let __flat_cleanup_66_7_0: bool = __flat_cleanup_65_1_0; let __flat_cleanup_66_7_1: Error = __flat_cleanup_65_1_1; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_7_0,__flat_cleanup_66_7_1; }
+    let layout,error = generator.codeLayoutWithRows(owner.unit_id,ty,closed_types.items,closed_rows.items,span); if error != blot_error::Error.none { let __flat_cleanup_64_2_0: bool = false; let __flat_cleanup_64_2_1: Error = error; block {
+closed_rows.deinit();
+} let __flat_cleanup_65_2_0: bool = __flat_cleanup_64_2_0; let __flat_cleanup_65_2_1: Error = __flat_cleanup_64_2_1; block {
+closed_types.deinit();
+} let __flat_cleanup_66_8_0: bool = __flat_cleanup_65_2_0; let __flat_cleanup_66_8_1: Error = __flat_cleanup_65_2_1; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_8_0,__flat_cleanup_66_8_1; } closed = !hasErasedType(owner,layout,0); let __flat_cleanup_64_3_0: bool = closed; let __flat_cleanup_64_3_1: Error = blot_error::Error.none; block {
+closed_rows.deinit();
+} let __flat_cleanup_65_3_0: bool = __flat_cleanup_64_3_0; let __flat_cleanup_65_3_1: Error = __flat_cleanup_64_3_1; block {
+closed_types.deinit();
+} let __flat_cleanup_66_9_0: bool = __flat_cleanup_65_3_0; let __flat_cleanup_66_9_1: Error = __flat_cleanup_65_3_1; block {
+if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
+} return __flat_cleanup_66_9_0,__flat_cleanup_66_9_1;
+
 
     }
-    let cleanup_result_79_0,cleanup_result_79_1 = cleanup_continuation_79();
-     closed_rows.deinit();
-    return cleanup_result_79_0,cleanup_result_79_1;
+
 
     }
-    let cleanup_result_80_0,cleanup_result_80_1 = cleanup_continuation_80();
-     closed_types.deinit();
-    return cleanup_result_80_0,cleanup_result_80_1;
+
 
     }
-    let cleanup_result_81_0,cleanup_result_81_1 = cleanup_continuation_81();
-     if !closed { ambiguous.types.resize(known_types); ambiguous.rows.resize(known_rows); }
-    return cleanup_result_81_0,cleanup_result_81_1;
 }
 struct ProducerScan { source: const blot_check_core::Module&,reads: InstanceReads&,edits: u32[32],edit_count: i64 = 0,remaining: i64 = 256 }
 fn usageNominal(source: const blot_check_core::Module&,ty: u32) -> bool { let contains,error = blot_check_usage_check::containsNominal(source.types,source.nominals,ty); return error != blot_error::Error.none || contains; }
@@ -512,57 +542,187 @@ fn decideInstances(owner: Owner&,statement: u32,previous: const Mapping[:],previ
     for edit in scan.edits[..scan.edit_count] { let owns,error = generator.ownsArrayUpdate(owner.unit_id,edit); if error != blot_error::Error.none { return error; } if owns { return blot_error::Error.none; } }
     let fact_start = decisions.facts.items.len; let row_start = decisions.rows.items.len; var admitted = false;
 
-    recursive fn cleanup_continuation_78() -> Error {
+    block {
 
     var next = MappingBuffer {..};
-    recursive fn cleanup_continuation_77() -> Error {
+    block {
  var next_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_76() -> Error {
+    block {
 
     var closed = MappingBuffer {..};
-    recursive fn cleanup_continuation_75() -> Error {
+    block {
  var closed_rows = RowBuffer {..};
-    recursive fn cleanup_continuation_74() -> Error {
+    block {
 
     let variables = source.types.list(binding.scheme.variables); let row_variables = source.types.list(binding.scheme.row_variables);
     for selected,index in uses {
-        next.clear(); next_rows.clear(); let a = next.append(previous); if a != blot_error::Error.none { return a; } let b = next_rows.append(previous_rows); if b != blot_error::Error.none { return b; }
-        let mapped = generator.mapTypeDepth(owner.unit_id,next,next_rows,binding.ty,selected,span,0); if mapped != blot_error::Error.none { return mapped; }
-        let producer = generator.mapTypeDepth(owner.unit_id,next,next_rows,source.typeOf(n.b),selected,span,0); if producer != blot_error::Error.none { return producer; }
+        next.clear(); next_rows.clear(); let a = next.append(previous); if a != blot_error::Error.none { let __flat_cleanup_59_0_0: Error = a; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_0_0: Error = __flat_cleanup_59_0_0; block {
+closed.deinit();
+} let __flat_cleanup_61_0_0: Error = __flat_cleanup_60_0_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_0_0: Error = __flat_cleanup_61_0_0; block {
+next.deinit();
+} let __flat_cleanup_63_0_0: Error = __flat_cleanup_62_0_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_0_0; } let b = next_rows.append(previous_rows); if b != blot_error::Error.none { let __flat_cleanup_59_1_0: Error = b; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_1_0: Error = __flat_cleanup_59_1_0; block {
+closed.deinit();
+} let __flat_cleanup_61_1_0: Error = __flat_cleanup_60_1_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_1_0: Error = __flat_cleanup_61_1_0; block {
+next.deinit();
+} let __flat_cleanup_63_1_0: Error = __flat_cleanup_62_1_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_1_0; }
+        let mapped = generator.mapTypeDepth(owner.unit_id,next,next_rows,binding.ty,selected,span,0); if mapped != blot_error::Error.none { let __flat_cleanup_59_2_0: Error = mapped; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_2_0: Error = __flat_cleanup_59_2_0; block {
+closed.deinit();
+} let __flat_cleanup_61_2_0: Error = __flat_cleanup_60_2_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_2_0: Error = __flat_cleanup_61_2_0; block {
+next.deinit();
+} let __flat_cleanup_63_2_0: Error = __flat_cleanup_62_2_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_2_0; }
+        let producer = generator.mapTypeDepth(owner.unit_id,next,next_rows,source.typeOf(n.b),selected,span,0); if producer != blot_error::Error.none { let __flat_cleanup_59_3_0: Error = producer; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_3_0: Error = __flat_cleanup_59_3_0; block {
+closed.deinit();
+} let __flat_cleanup_61_3_0: Error = __flat_cleanup_60_3_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_3_0: Error = __flat_cleanup_61_3_0; block {
+next.deinit();
+} let __flat_cleanup_63_3_0: Error = __flat_cleanup_62_3_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_3_0; }
         let first_fact = decisions.facts.items.len;
-        for mapping in next.items { if mapping.layout == mappingAt(previous,mapping.variable) { continue; } if !containsValue(variables,mapping.variable) { return blot_error::Error.none; } let appended = decisions.facts.push(mapping); if appended != blot_error::Error.none { return appended; } }
+        for mapping in next.items { if mapping.layout == mappingAt(previous,mapping.variable) { continue; } if !containsValue(variables,mapping.variable) { let __flat_cleanup_59_4_0: Error = blot_error::Error.none; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_4_0: Error = __flat_cleanup_59_4_0; block {
+closed.deinit();
+} let __flat_cleanup_61_4_0: Error = __flat_cleanup_60_4_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_4_0: Error = __flat_cleanup_61_4_0; block {
+next.deinit();
+} let __flat_cleanup_63_4_0: Error = __flat_cleanup_62_4_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_4_0; } let appended = decisions.facts.push(mapping); if appended != blot_error::Error.none { let __flat_cleanup_59_5_0: Error = appended; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_5_0: Error = __flat_cleanup_59_5_0; block {
+closed.deinit();
+} let __flat_cleanup_61_5_0: Error = __flat_cleanup_60_5_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_5_0: Error = __flat_cleanup_61_5_0; block {
+next.deinit();
+} let __flat_cleanup_63_5_0: Error = __flat_cleanup_62_5_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_5_0; } }
         let first_row = decisions.rows.items.len;
-        for mapping in next_rows.items { let old = rowAt(previous_rows,mapping.variable); if mapping.row == old { continue; } if old != blot_backend_layout::unknown_row && !containsValue(row_variables,mapping.variable) { return blot_error::Error.none; } let appended = decisions.rows.push(mapping); if appended != blot_error::Error.none { return appended; } }
+        for mapping in next_rows.items { let old = rowAt(previous_rows,mapping.variable); if mapping.row == old { continue; } if old != blot_backend_layout::unknown_row && !containsValue(row_variables,mapping.variable) { let __flat_cleanup_59_6_0: Error = blot_error::Error.none; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_6_0: Error = __flat_cleanup_59_6_0; block {
+closed.deinit();
+} let __flat_cleanup_61_6_0: Error = __flat_cleanup_60_6_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_6_0: Error = __flat_cleanup_61_6_0; block {
+next.deinit();
+} let __flat_cleanup_63_6_0: Error = __flat_cleanup_62_6_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_6_0; } let appended = decisions.rows.push(mapping); if appended != blot_error::Error.none { let __flat_cleanup_59_7_0: Error = appended; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_7_0: Error = __flat_cleanup_59_7_0; block {
+closed.deinit();
+} let __flat_cleanup_61_7_0: Error = __flat_cleanup_60_7_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_7_0: Error = __flat_cleanup_61_7_0; block {
+next.deinit();
+} let __flat_cleanup_63_7_0: Error = __flat_cleanup_62_7_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_7_0; } }
         decision.facts[index] = FactRange { first_fact,decisions.facts.items.len - first_fact , ..}; decision.rows[index] = FactRange { first_row,decisions.rows.items.len - first_row , ..}; decision.layouts[index] = selected;
-        closed.clear(); closed_rows.clear(); let facts = withFacts(previous,decisions.factsAt(decision,index),closed); if facts != blot_error::Error.none { return facts; } let rows = withFacts(previous_rows,decisions.rowsAt(decision,index),closed_rows); if rows != blot_error::Error.none { return rows; }
-        let representation,error = generator.codeLayoutWithRows(owner.unit_id,binding.ty,closed.items,closed_rows.items,span); if error != blot_error::Error.none { return error; } if representation != selected { return blot_error::Error.none; }
+        closed.clear(); closed_rows.clear(); let facts = withFacts(previous,decisions.factsAt(decision,index),closed); if facts != blot_error::Error.none { let __flat_cleanup_59_8_0: Error = facts; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_8_0: Error = __flat_cleanup_59_8_0; block {
+closed.deinit();
+} let __flat_cleanup_61_8_0: Error = __flat_cleanup_60_8_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_8_0: Error = __flat_cleanup_61_8_0; block {
+next.deinit();
+} let __flat_cleanup_63_8_0: Error = __flat_cleanup_62_8_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_8_0; } let rows = withFacts(previous_rows,decisions.rowsAt(decision,index),closed_rows); if rows != blot_error::Error.none { let __flat_cleanup_59_9_0: Error = rows; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_9_0: Error = __flat_cleanup_59_9_0; block {
+closed.deinit();
+} let __flat_cleanup_61_9_0: Error = __flat_cleanup_60_9_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_9_0: Error = __flat_cleanup_61_9_0; block {
+next.deinit();
+} let __flat_cleanup_63_9_0: Error = __flat_cleanup_62_9_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_9_0; }
+        let representation,error = generator.codeLayoutWithRows(owner.unit_id,binding.ty,closed.items,closed_rows.items,span); if error != blot_error::Error.none { let __flat_cleanup_59_10_0: Error = error; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_10_0: Error = __flat_cleanup_59_10_0; block {
+closed.deinit();
+} let __flat_cleanup_61_10_0: Error = __flat_cleanup_60_10_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_10_0: Error = __flat_cleanup_61_10_0; block {
+next.deinit();
+} let __flat_cleanup_63_10_0: Error = __flat_cleanup_62_10_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_10_0; } if representation != selected { let __flat_cleanup_59_11_0: Error = blot_error::Error.none; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_11_0: Error = __flat_cleanup_59_11_0; block {
+closed.deinit();
+} let __flat_cleanup_61_11_0: Error = __flat_cleanup_60_11_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_11_0: Error = __flat_cleanup_61_11_0; block {
+next.deinit();
+} let __flat_cleanup_63_11_0: Error = __flat_cleanup_62_11_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_11_0; }
     }
-    let appended = decisions.decisions.push(decision); if appended != blot_error::Error.none { return appended; } admitted = true; return blot_error::Error.none;
+    let appended = decisions.decisions.push(decision); if appended != blot_error::Error.none { let __flat_cleanup_59_12_0: Error = appended; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_12_0: Error = __flat_cleanup_59_12_0; block {
+closed.deinit();
+} let __flat_cleanup_61_12_0: Error = __flat_cleanup_60_12_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_12_0: Error = __flat_cleanup_61_12_0; block {
+next.deinit();
+} let __flat_cleanup_63_12_0: Error = __flat_cleanup_62_12_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_12_0; } admitted = true; let __flat_cleanup_59_13_0: Error = blot_error::Error.none; block {
+closed_rows.deinit();
+} let __flat_cleanup_60_13_0: Error = __flat_cleanup_59_13_0; block {
+closed.deinit();
+} let __flat_cleanup_61_13_0: Error = __flat_cleanup_60_13_0; block {
+next_rows.deinit();
+} let __flat_cleanup_62_13_0: Error = __flat_cleanup_61_13_0; block {
+next.deinit();
+} let __flat_cleanup_63_13_0: Error = __flat_cleanup_62_13_0; block {
+if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
+} return __flat_cleanup_63_13_0;
+
 
     }
-    let cleanup_result_74_0 = cleanup_continuation_74();
-     closed_rows.deinit();
-    return cleanup_result_74_0;
+
 
     }
-    let cleanup_result_75_0 = cleanup_continuation_75();
-     closed.deinit();
-    return cleanup_result_75_0;
+
 
     }
-    let cleanup_result_76_0 = cleanup_continuation_76();
-     next_rows.deinit();
-    return cleanup_result_76_0;
+
 
     }
-    let cleanup_result_77_0 = cleanup_continuation_77();
-     next.deinit();
-    return cleanup_result_77_0;
+
 
     }
-    let cleanup_result_78_0 = cleanup_continuation_78();
-     if !admitted { decisions.facts.resize(fact_start); decisions.rows.resize(row_start); }
-    return cleanup_result_78_0;
 }
 fn withStorageFacts(owner: Owner&,mappings: MappingBuffer&,facts: const Mapping[:],out: MappingBuffer&) -> Error {
     if mappings.items.len != 0 { return withFacts(mappings.items,facts,out); }
@@ -706,40 +866,92 @@ recursive fn prepareBody(owner: Owner&,root: u32,depth: i64,template: bool) -> u
 
 recursive fn prepareMapped(owner: Owner&,root: u32,depth: i64,template: bool,mappings: const Mapping[:],rows: const RowMapping[:],instances: const InstanceDecisions?) -> u32,Error {
     let generator .= owner.generator; let stage = generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.preparation);
-    recursive fn cleanup_continuation_62() -> u32,Error {
+    block {
 
-    if owner.preparation_depth >= 256 { return 0,generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity); }
-    let body,error = blot_backend_resolved_body::create(owner.unit_id,root,mappings,rows); if error != blot_error::Error.none { return 0,error; } var published = false;
-    recursive fn cleanup_continuation_61() -> u32,Error {
+    if owner.preparation_depth >= 256 { let __flat_cleanup_58_0_0: u32 = 0; let __flat_cleanup_58_0_1: Error = generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity); block {
+stage.deinit();
+} return __flat_cleanup_58_0_0,__flat_cleanup_58_0_1; }
+    let body,error = blot_backend_resolved_body::create(owner.unit_id,root,mappings,rows); if error != blot_error::Error.none { let __flat_cleanup_58_1_0: u32 = 0; let __flat_cleanup_58_1_1: Error = error; block {
+stage.deinit();
+} return __flat_cleanup_58_1_0,__flat_cleanup_58_1_1; } var published = false;
+    block {
 
-    let evidence,evidence_error = generator.rowMappingEvidence(rows); if evidence_error != blot_error::Error.none { return 0,evidence_error; } blot_backend_resolved_body::headers[body - 1].rows_evidence = evidence;
-    for mapping in blot_backend_resolved_body::header(body).mappings { let owns,owns_error = generator.representations.store.hasOwners(mapping.layout); if owns_error != blot_error::Error.none { return 0,generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity); } if owns { blot_backend_resolved_body::headers[body - 1].has_owners = true; break; } }
-    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != blot_error::Error.none { return 0,cleanup_error; }
+    let evidence,evidence_error = generator.rowMappingEvidence(rows); if evidence_error != blot_error::Error.none { let __flat_cleanup_57_0_0: u32 = 0; let __flat_cleanup_57_0_1: Error = evidence_error; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_2_0: u32 = __flat_cleanup_57_0_0; let __flat_cleanup_58_2_1: Error = __flat_cleanup_57_0_1; block {
+stage.deinit();
+} return __flat_cleanup_58_2_0,__flat_cleanup_58_2_1; } blot_backend_resolved_body::headers[body - 1].rows_evidence = evidence;
+    for mapping in blot_backend_resolved_body::header(body).mappings { let owns,owns_error = generator.representations.store.hasOwners(mapping.layout); if owns_error != blot_error::Error.none { let __flat_cleanup_57_1_0: u32 = 0; let __flat_cleanup_57_1_1: Error = generator.fail(owner.unit_id,root,blot_check_diagnostic_code::Code.complexity); block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_3_0: u32 = __flat_cleanup_57_1_0; let __flat_cleanup_58_3_1: Error = __flat_cleanup_57_1_1; block {
+stage.deinit();
+} return __flat_cleanup_58_3_0,__flat_cleanup_58_3_1; } if owns { blot_backend_resolved_body::headers[body - 1].has_owners = true; break; } }
+    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != blot_error::Error.none { let __flat_cleanup_57_2_0: u32 = 0; let __flat_cleanup_57_2_1: Error = cleanup_error; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_4_0: u32 = __flat_cleanup_57_2_0; let __flat_cleanup_58_4_1: Error = __flat_cleanup_57_2_1; block {
+stage.deinit();
+} return __flat_cleanup_58_4_0,__flat_cleanup_58_4_1; }
     let header = blot_backend_resolved_body::header(body); var preparer = Owner { staged: owner.staged, preparation_depth: owner.preparation_depth + 1, preparing: true, generator: generator, unit_id: owner.unit_id, function_id: owner.function_id, mappings: header.mappings, row_mappings: header.rows, cleanups: cleanups, factory_template: owner.factory_template, .. };
 
-    recursive fn cleanup_continuation_60() -> u32,Error {
+    block {
  preparer.dictionary_local = owner.dictionary_local; preparer.dictionary_owner = owner.dictionary_owner; preparer.locals = owner.locals.clone(); preparer.templates = owner.templates.clone(); preparer.static_values = owner.static_values.clone(); if instances != null { preparer.local_instances = blot_support::some(instances); }
-    let prepared = prepareNode(preparer,body,root,depth,template); if prepared != blot_error::Error.none { return 0,prepared; }
-    if preparer.has_collection_steps { let cursors = prepareCursorFamilies(preparer,body); if cursors != blot_error::Error.none { return 0,cursors; } }
-    let linear = prepareLinearCursors(preparer,body); if linear != blot_error::Error.none { return 0,linear; } let numeric = prepareNumeric(preparer,body); if numeric != blot_error::Error.none { return 0,numeric; }
-    let uses,uses_error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need {..}); if uses_error != blot_error::Error.none { return 0,uses_error; }
-    let sinks = blot_backend_safe_local_sinking::plan(generator.unit(owner.unit_id),uses,root,body); if sinks != blot_error::Error.none { return 0,sinks; }
-    generator.evaluator.counters.safe_local_sinks += blot_backend_resolved_body::sinkCount(body); generator.evaluator.counters.resolved_bodies++; generator.evaluator.counters.resolved_plan_entries += blot_backend_resolved_body::entryCount(body); published = true; return body,blot_error::Error.none;
+    let prepared = prepareNode(preparer,body,root,depth,template); if prepared != blot_error::Error.none { let __flat_cleanup_56_0_0: u32 = 0; let __flat_cleanup_56_0_1: Error = prepared; block {
+preparer.deinit();
+} let __flat_cleanup_57_3_0: u32 = __flat_cleanup_56_0_0; let __flat_cleanup_57_3_1: Error = __flat_cleanup_56_0_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_5_0: u32 = __flat_cleanup_57_3_0; let __flat_cleanup_58_5_1: Error = __flat_cleanup_57_3_1; block {
+stage.deinit();
+} return __flat_cleanup_58_5_0,__flat_cleanup_58_5_1; }
+    if preparer.has_collection_steps { let cursors = prepareCursorFamilies(preparer,body); if cursors != blot_error::Error.none { let __flat_cleanup_56_1_0: u32 = 0; let __flat_cleanup_56_1_1: Error = cursors; block {
+preparer.deinit();
+} let __flat_cleanup_57_4_0: u32 = __flat_cleanup_56_1_0; let __flat_cleanup_57_4_1: Error = __flat_cleanup_56_1_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_6_0: u32 = __flat_cleanup_57_4_0; let __flat_cleanup_58_6_1: Error = __flat_cleanup_57_4_1; block {
+stage.deinit();
+} return __flat_cleanup_58_6_0,__flat_cleanup_58_6_1; } }
+    let linear = prepareLinearCursors(preparer,body); if linear != blot_error::Error.none { let __flat_cleanup_56_2_0: u32 = 0; let __flat_cleanup_56_2_1: Error = linear; block {
+preparer.deinit();
+} let __flat_cleanup_57_5_0: u32 = __flat_cleanup_56_2_0; let __flat_cleanup_57_5_1: Error = __flat_cleanup_56_2_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_7_0: u32 = __flat_cleanup_57_5_0; let __flat_cleanup_58_7_1: Error = __flat_cleanup_57_5_1; block {
+stage.deinit();
+} return __flat_cleanup_58_7_0,__flat_cleanup_58_7_1; } let numeric = prepareNumeric(preparer,body); if numeric != blot_error::Error.none { let __flat_cleanup_56_3_0: u32 = 0; let __flat_cleanup_56_3_1: Error = numeric; block {
+preparer.deinit();
+} let __flat_cleanup_57_6_0: u32 = __flat_cleanup_56_3_0; let __flat_cleanup_57_6_1: Error = __flat_cleanup_56_3_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_8_0: u32 = __flat_cleanup_57_6_0; let __flat_cleanup_58_8_1: Error = __flat_cleanup_57_6_1; block {
+stage.deinit();
+} return __flat_cleanup_58_8_0,__flat_cleanup_58_8_1; }
+    let uses,uses_error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need {..}); if uses_error != blot_error::Error.none { let __flat_cleanup_56_4_0: u32 = 0; let __flat_cleanup_56_4_1: Error = uses_error; block {
+preparer.deinit();
+} let __flat_cleanup_57_7_0: u32 = __flat_cleanup_56_4_0; let __flat_cleanup_57_7_1: Error = __flat_cleanup_56_4_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_9_0: u32 = __flat_cleanup_57_7_0; let __flat_cleanup_58_9_1: Error = __flat_cleanup_57_7_1; block {
+stage.deinit();
+} return __flat_cleanup_58_9_0,__flat_cleanup_58_9_1; }
+    let sinks = blot_backend_safe_local_sinking::plan(generator.unit(owner.unit_id),uses,root,body); if sinks != blot_error::Error.none { let __flat_cleanup_56_5_0: u32 = 0; let __flat_cleanup_56_5_1: Error = sinks; block {
+preparer.deinit();
+} let __flat_cleanup_57_8_0: u32 = __flat_cleanup_56_5_0; let __flat_cleanup_57_8_1: Error = __flat_cleanup_56_5_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_10_0: u32 = __flat_cleanup_57_8_0; let __flat_cleanup_58_10_1: Error = __flat_cleanup_57_8_1; block {
+stage.deinit();
+} return __flat_cleanup_58_10_0,__flat_cleanup_58_10_1; }
+    generator.evaluator.counters.safe_local_sinks += blot_backend_resolved_body::sinkCount(body); generator.evaluator.counters.resolved_bodies++; generator.evaluator.counters.resolved_plan_entries += blot_backend_resolved_body::entryCount(body); published = true; let __flat_cleanup_56_6_0: u32 = body; let __flat_cleanup_56_6_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_57_9_0: u32 = __flat_cleanup_56_6_0; let __flat_cleanup_57_9_1: Error = __flat_cleanup_56_6_1; block {
+if !published { blot_backend_resolved_body::release(body); }
+} let __flat_cleanup_58_11_0: u32 = __flat_cleanup_57_9_0; let __flat_cleanup_58_11_1: Error = __flat_cleanup_57_9_1; block {
+stage.deinit();
+} return __flat_cleanup_58_11_0,__flat_cleanup_58_11_1;
+
 
     }
-    let cleanup_result_60_0,cleanup_result_60_1 = cleanup_continuation_60();
-     preparer.deinit();
-    return cleanup_result_60_0,cleanup_result_60_1;
+
 
     }
-    let cleanup_result_61_0,cleanup_result_61_1 = cleanup_continuation_61();
-     if !published { blot_backend_resolved_body::release(body); }
-    return cleanup_result_61_0,cleanup_result_61_1;
+
 
     }
-    let cleanup_result_62_0,cleanup_result_62_1 = cleanup_continuation_62();
-     stage.deinit();
-    return cleanup_result_62_0,cleanup_result_62_1;
 }
 fn prepareCursorFamilies(owner: Owner&,body: u32) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let uses,error = generator.unitUses(owner.unit_id,blot_backend_unit_index::Need { flow: true , ..}); if error != blot_error::Error.none { return error; }
@@ -791,82 +1003,122 @@ fn prepareNumeric(owner: Owner&,body: u32) -> Error {
     while cursor != 0 { let slot = blot_backend_resolved_body::slots[cursor - 1]; cursor = slot.next; if source.node(slot.node).tag != blot_check_core::Tag.associated { continue; } match blot_backend_resolved_body::get(body,slot.node) { dispatch d=>{ match d.value { selected invocation=>{ let call = invocation.call; if call.consumed == 0 || call.consumed > 2 || call.extra.len != 2 - call.consumed { continue; } if count == 256 { return blot_error::Error.none; } selected[count] = blot_check_numeric_proof_core::Selected { slot.node,invocation.key.target , ..}; count++; },_=>{}, } },_=>{}, } }
     if count == 0 { return blot_error::Error.none; } var original: const blot_check_core::Body? = null; for &candidate in source.bodies[1..] { if candidate.root == header.root && candidate.is_function { original .= candidate; break; } } if original == null { return blot_error::Error.none; }
     let plan,error = blot_check_numeric_proof_core::analyzePrepared(source,generator.units,original,selected[..count],blot_check_numeric_proof_core::Options {..}); if error != blot_error::Error.none { return error; } var retained = false;
-    recursive fn cleanup_continuation_59() -> Error {
+    block {
 
-    var improves = false; for check,id in plan.checks { if check.seen && check.admitted { let known,known_error = generator.numericCheck(owner.unit_id,id as u32); if known_error != blot_error::Error.none { return known_error; } if !known { improves = true; break; } } }
-    if !improves { return blot_error::Error.none; } blot_backend_resolved_body::headers[body - 1].numeric = blot_support::some(plan); retained = true; if generator.artifacts != null { generator.artifacts.requireFreshCode(); } return blot_error::Error.none;
+    var improves = false; for check,id in plan.checks { if check.seen && check.admitted { let known,known_error = generator.numericCheck(owner.unit_id,id as u32); if known_error != blot_error::Error.none { let __flat_cleanup_55_0_0: Error = known_error; block {
+if !retained { plan.deinit(); }
+} return __flat_cleanup_55_0_0; } if !known { improves = true; break; } } }
+    if !improves { let __flat_cleanup_55_1_0: Error = blot_error::Error.none; block {
+if !retained { plan.deinit(); }
+} return __flat_cleanup_55_1_0; } blot_backend_resolved_body::headers[body - 1].numeric = blot_support::some(plan); retained = true; if generator.artifacts != null { generator.artifacts.requireFreshCode(); } let __flat_cleanup_55_2_0: Error = blot_error::Error.none; block {
+if !retained { plan.deinit(); }
+} return __flat_cleanup_55_2_0;
+
 
     }
-    let cleanup_result_59_0 = cleanup_continuation_59();
-     if !retained { plan.deinit(); }
-    return cleanup_result_59_0;
 }
 fn numericCheck(owner: Owner&,id: u32) -> bool,Error { if owner.body.present { let header = blot_backend_resolved_body::header(owner.body.value); if header.numeric.present && header.numeric.value.admits(id) { return true,blot_error::Error.none; } } return owner.generator.numericCheck(owner.unit_id,id); }
 recursive fn bodyExpression(owner: Owner&,root: u32,depth: i64,template: bool) -> Error { let body,error = prepareBody(owner,root,depth,template); if error != blot_error::Error.none { return error; }
-    recursive fn cleanup_continuation_58() -> Error {
- return preparedExpression(owner,body,root,depth,template);
+    block {
+ let __flat_cleanup_54_0_0: Error = preparedExpression(owner,body,root,depth,template); block {
+blot_backend_resolved_body::release(body);
+} return __flat_cleanup_54_0_0;
+
     }
-    let cleanup_result_58_0 = cleanup_continuation_58();
-     blot_backend_resolved_body::release(body);
-    return cleanup_result_58_0;
 }
 recursive fn preparedExpression(owner: Owner&,body: u32,root: u32,depth: i64,template: bool) -> Error {
     let stage = owner.generator.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.lowering);
-    recursive fn cleanup_continuation_57() -> Error {
+    block {
  let old_context = owner.semantic_context; owner.semantic_context = blot_support::none<SemanticContext>();
-    recursive fn cleanup_continuation_56() -> Error {
+    block {
 
     let previous = owner.body; owner.body = blot_support::some(body);
-    recursive fn cleanup_continuation_55() -> Error {
+    block {
  let header = blot_backend_resolved_body::header(body); let old_mappings = owner.mappings; let old_rows = owner.row_mappings;
     var changed = old_mappings.len != header.mappings.len; if !changed { for old,index in old_mappings { let current = header.mappings[index]; if old.variable != current.variable || old.layout != current.layout { changed = true; break; } } }
     var rows_changed = old_rows.len != header.rows.len; if !rows_changed { for old,index in old_rows { let current = header.rows[index]; if old.variable != current.variable || old.row != current.row { rows_changed = true; break; } } }
     if rows_changed { owner.row_mappings = header.rows; } changed = changed || rows_changed; owner.mappings = header.mappings; if changed { owner.layout_cache = [LayoutEntry {..};32]; }
 
-    recursive fn cleanup_continuation_54() -> Error {
+    block {
 
-    if template { return templateExpression(owner,root,depth); } return expression(owner,root,depth);
+    if template { let __flat_cleanup_50_0_0: Error = templateExpression(owner,root,depth); block {
+owner.mappings = old_mappings; owner.row_mappings = old_rows; if changed { owner.layout_cache = [LayoutEntry {..};32]; }
+} let __flat_cleanup_51_0_0: Error = __flat_cleanup_50_0_0; block {
+owner.body = previous;
+} let __flat_cleanup_52_0_0: Error = __flat_cleanup_51_0_0; block {
+owner.semantic_context = old_context;
+} let __flat_cleanup_53_0_0: Error = __flat_cleanup_52_0_0; block {
+stage.deinit();
+} return __flat_cleanup_53_0_0; } let __flat_cleanup_50_1_0: Error = expression(owner,root,depth); block {
+owner.mappings = old_mappings; owner.row_mappings = old_rows; if changed { owner.layout_cache = [LayoutEntry {..};32]; }
+} let __flat_cleanup_51_1_0: Error = __flat_cleanup_50_1_0; block {
+owner.body = previous;
+} let __flat_cleanup_52_1_0: Error = __flat_cleanup_51_1_0; block {
+owner.semantic_context = old_context;
+} let __flat_cleanup_53_1_0: Error = __flat_cleanup_52_1_0; block {
+stage.deinit();
+} return __flat_cleanup_53_1_0;
+
 
     }
-    let cleanup_result_54_0 = cleanup_continuation_54();
-     owner.mappings = old_mappings; owner.row_mappings = old_rows; if changed { owner.layout_cache = [LayoutEntry {..};32]; }
-    return cleanup_result_54_0;
+
 
     }
-    let cleanup_result_55_0 = cleanup_continuation_55();
-     owner.body = previous;
-    return cleanup_result_55_0;
+
 
     }
-    let cleanup_result_56_0 = cleanup_continuation_56();
-     owner.semantic_context = old_context;
-    return cleanup_result_56_0;
+
 
     }
-    let cleanup_result_57_0 = cleanup_continuation_57();
-     stage.deinit();
-    return cleanup_result_57_0;
 }
 fn stagingConstant(owner: Owner&,id: u32) -> u32,Error {
     let generator .= owner.generator; var mappings = blot_backend_substitution_buffers::EvidenceMappings {..};
-    recursive fn cleanup_continuation_53() -> u32,Error {
+    block {
  var rows = blot_backend_substitution_buffers::EvidenceRows {..};
-    recursive fn cleanup_continuation_52() -> u32,Error {
+    block {
 
-    for mapping in owner.mappings { if mapping.instance.decl != 0 { continue; } let actual,error = generator.representations.toEvidence(generator.evaluator.evidenceStore(),mapping.layout); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } continue; } let appended = mappings.push(blot_eval_type_evidence::Mapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { return 0,appended; } }
-    for mapping in owner.row_mappings { if mapping.row == blot_backend_layout::unknown_row { continue; } let actual,error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(),mapping.row); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return 0,error; } return 0,generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); } let appended = rows.push(blot_eval_type_evidence::RowMapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { return 0,appended; } }
-    let value,error = generator.evaluator.closedNodeSlots(owner.unit_id,id,owner.static_values.table.slots,mappings.items,rows.items); if error == blot_error::Error.none { return value,error; } if error == blot_error::Error.out_of_memory { return 0,error; }
-    if generator.evaluator.diagnostic.present { let code = generator.evaluator.diagnostic.value.code; if code == blot_check_diagnostic_code::Code.unsupported || code == blot_check_diagnostic_code::Code.const_runtime_dependency { generator.evaluator.diagnostic.value.code = blot_check_diagnostic_code::Code.stage_unavailable; } } return 0,generator.evaluationFailure();
+    for mapping in owner.mappings { if mapping.instance.decl != 0 { continue; } let actual,error = generator.representations.toEvidence(generator.evaluator.evidenceStore(),mapping.layout); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let __flat_cleanup_48_0_0: u32 = 0; let __flat_cleanup_48_0_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_49_0_0: u32 = __flat_cleanup_48_0_0; let __flat_cleanup_49_0_1: Error = __flat_cleanup_48_0_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_0_0,__flat_cleanup_49_0_1; } continue; } let appended = mappings.push(blot_eval_type_evidence::Mapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { let __flat_cleanup_48_1_0: u32 = 0; let __flat_cleanup_48_1_1: Error = appended; block {
+rows.deinit();
+} let __flat_cleanup_49_1_0: u32 = __flat_cleanup_48_1_0; let __flat_cleanup_49_1_1: Error = __flat_cleanup_48_1_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_1_0,__flat_cleanup_49_1_1; } }
+    for mapping in owner.row_mappings { if mapping.row == blot_backend_layout::unknown_row { continue; } let actual,error = generator.representations.rowToEvidence(generator.evaluator.evidenceStore(),mapping.row); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let __flat_cleanup_48_2_0: u32 = 0; let __flat_cleanup_48_2_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_49_2_0: u32 = __flat_cleanup_48_2_0; let __flat_cleanup_49_2_1: Error = __flat_cleanup_48_2_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_2_0,__flat_cleanup_49_2_1; } let __flat_cleanup_48_3_0: u32 = 0; let __flat_cleanup_48_3_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); block {
+rows.deinit();
+} let __flat_cleanup_49_3_0: u32 = __flat_cleanup_48_3_0; let __flat_cleanup_49_3_1: Error = __flat_cleanup_48_3_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_3_0,__flat_cleanup_49_3_1; } let appended = rows.push(blot_eval_type_evidence::RowMapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { let __flat_cleanup_48_4_0: u32 = 0; let __flat_cleanup_48_4_1: Error = appended; block {
+rows.deinit();
+} let __flat_cleanup_49_4_0: u32 = __flat_cleanup_48_4_0; let __flat_cleanup_49_4_1: Error = __flat_cleanup_48_4_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_4_0,__flat_cleanup_49_4_1; } }
+    let value,error = generator.evaluator.closedNodeSlots(owner.unit_id,id,owner.static_values.table.slots,mappings.items,rows.items); if error == blot_error::Error.none { let __flat_cleanup_48_5_0: u32 = value; let __flat_cleanup_48_5_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_49_5_0: u32 = __flat_cleanup_48_5_0; let __flat_cleanup_49_5_1: Error = __flat_cleanup_48_5_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_5_0,__flat_cleanup_49_5_1; } if error == blot_error::Error.out_of_memory { let __flat_cleanup_48_6_0: u32 = 0; let __flat_cleanup_48_6_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_49_6_0: u32 = __flat_cleanup_48_6_0; let __flat_cleanup_49_6_1: Error = __flat_cleanup_48_6_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_6_0,__flat_cleanup_49_6_1; }
+    if generator.evaluator.diagnostic.present { let code = generator.evaluator.diagnostic.value.code; if code == blot_check_diagnostic_code::Code.unsupported || code == blot_check_diagnostic_code::Code.const_runtime_dependency { generator.evaluator.diagnostic.value.code = blot_check_diagnostic_code::Code.stage_unavailable; } } let __flat_cleanup_48_7_0: u32 = 0; let __flat_cleanup_48_7_1: Error = generator.evaluationFailure(); block {
+rows.deinit();
+} let __flat_cleanup_49_7_0: u32 = __flat_cleanup_48_7_0; let __flat_cleanup_49_7_1: Error = __flat_cleanup_48_7_1; block {
+mappings.deinit();
+} return __flat_cleanup_49_7_0,__flat_cleanup_49_7_1;
+
 
     }
-    let cleanup_result_52_0,cleanup_result_52_1 = cleanup_continuation_52();
-     rows.deinit();
-    return cleanup_result_52_0,cleanup_result_52_1;
+
 
     }
-    let cleanup_result_53_0,cleanup_result_53_1 = cleanup_continuation_53();
-     mappings.deinit();
-    return cleanup_result_53_0,cleanup_result_53_1;
 }
 fn stagingOp(code: u32) -> blot_check_typed_staging::Op { match code { 0=>{ return blot_check_typed_staging::Op.quote; },1=>{ return blot_check_typed_staging::Op.splice; },2=>{ return blot_check_typed_staging::Op.lift; },3=>{ return blot_check_typed_staging::Op.emit; },4=>{ return blot_check_typed_staging::Op.run; },5=>{ return blot_check_typed_staging::Op.describe; },6=>{ return blot_check_typed_staging::Op.same; },7=>{ return blot_check_typed_staging::Op.fields; },8=>{ return blot_check_typed_staging::Op.evaluate; },_=>{ assert(false); return blot_check_typed_staging::Op.quote; }, } }
 recursive fn prepareStaging(owner: Owner&,id: u32,depth: i64) -> StagingPlan,Error {
@@ -875,41 +1127,93 @@ recursive fn prepareStaging(owner: Owner&,id: u32,depth: i64) -> StagingPlan,Err
     else { if op == blot_check_typed_staging::Op.quote { return StagingPlan { 0 , ..},generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); } var target = id; if op == blot_check_typed_staging::Op.emit { target = node.a; } let evaluated,error = stagingConstant(owner,target); if error != blot_error::Error.none { return StagingPlan { 0 , ..},error; } value = evaluated; }
     if op != blot_check_typed_staging::Op.emit && op != blot_check_typed_staging::Op.splice { return StagingPlan { value , ..},blot_error::Error.none; } let staged = generator.evaluator.stagedInfo(value); if !staged.present { return StagingPlan { 0 , ..},generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.code_shape_mismatch); } let metadata = staged.value;
     let previous_trace = generator.staging_trace;
-    recursive fn cleanup_continuation_51() -> StagingPlan,Error {
+    block {
 
     let traced = blot_check_staging_origins::code(generator.staging_trace,generator.evaluator.units,metadata,blot_check_staging_origins::Source { owner.unit_id,id , ..},blot_check_staging_origins::generator(generator.evaluator.storage.code_origins,value),op == blot_check_typed_staging::Op.splice);
-    if traced != blot_error::Error.none { var issue = blot_check_diagnostic_code::Code.staging_budget; if traced == blot_error::Error.invalid_origin { issue = blot_check_diagnostic_code::Code.code_shape_mismatch; } return StagingPlan { 0 , ..},generator.fail(owner.unit_id,id,issue); }
+    if traced != blot_error::Error.none { var issue = blot_check_diagnostic_code::Code.staging_budget; if traced == blot_error::Error.invalid_origin { issue = blot_check_diagnostic_code::Code.code_shape_mismatch; } let __flat_cleanup_47_0_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_47_0_1: Error = generator.fail(owner.unit_id,id,issue); block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_0_0,__flat_cleanup_47_0_1; }
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_50() -> StagingPlan,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_49() -> StagingPlan,Error {
+    block {
 
-    for mapping in generator.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] { let actual,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return StagingPlan { 0 , ..},error; } return StagingPlan { 0 , ..},generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); } let appended = mappings.push(Mapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { return StagingPlan { 0 , ..},appended; } }
-    for mapping in generator.evaluator.storage.row_mappings.items[metadata.row_mappings.start..metadata.row_mappings.start + metadata.row_mappings.len] { let actual,error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return StagingPlan { 0 , ..},error; } return StagingPlan { 0 , ..},generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); } let appended = rows.push(RowMapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { return StagingPlan { 0 , ..},appended; } }
-    let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != blot_error::Error.none { return StagingPlan { 0 , ..},error; } var future = Owner { staged: blot_support::some(value), preparation_depth: owner.preparation_depth + 1, preparing: true, generator: generator, unit_id: metadata.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, .. };
-    recursive fn cleanup_continuation_48() -> StagingPlan,Error {
+    for mapping in generator.evaluator.storage.type_mappings.items[metadata.mappings.start..metadata.mappings.start + metadata.mappings.len] { let actual,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let __flat_cleanup_45_0_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_0_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_46_0_0: StagingPlan = __flat_cleanup_45_0_0; let __flat_cleanup_46_0_1: Error = __flat_cleanup_45_0_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_1_0: StagingPlan = __flat_cleanup_46_0_0; let __flat_cleanup_47_1_1: Error = __flat_cleanup_46_0_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_1_0,__flat_cleanup_47_1_1; } let __flat_cleanup_45_1_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_1_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); block {
+rows.deinit();
+} let __flat_cleanup_46_1_0: StagingPlan = __flat_cleanup_45_1_0; let __flat_cleanup_46_1_1: Error = __flat_cleanup_45_1_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_2_0: StagingPlan = __flat_cleanup_46_1_0; let __flat_cleanup_47_2_1: Error = __flat_cleanup_46_1_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_2_0,__flat_cleanup_47_2_1; } let appended = mappings.push(Mapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { let __flat_cleanup_45_2_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_2_1: Error = appended; block {
+rows.deinit();
+} let __flat_cleanup_46_2_0: StagingPlan = __flat_cleanup_45_2_0; let __flat_cleanup_46_2_1: Error = __flat_cleanup_45_2_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_3_0: StagingPlan = __flat_cleanup_46_2_0; let __flat_cleanup_47_3_1: Error = __flat_cleanup_46_2_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_3_0,__flat_cleanup_47_3_1; } }
+    for mapping in generator.evaluator.storage.row_mappings.items[metadata.row_mappings.start..metadata.row_mappings.start + metadata.row_mappings.len] { let actual,error = generator.representations.rowFromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let __flat_cleanup_45_3_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_3_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_46_3_0: StagingPlan = __flat_cleanup_45_3_0; let __flat_cleanup_46_3_1: Error = __flat_cleanup_45_3_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_4_0: StagingPlan = __flat_cleanup_46_3_0; let __flat_cleanup_47_4_1: Error = __flat_cleanup_46_3_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_4_0,__flat_cleanup_47_4_1; } let __flat_cleanup_45_4_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_4_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.stage_unavailable); block {
+rows.deinit();
+} let __flat_cleanup_46_4_0: StagingPlan = __flat_cleanup_45_4_0; let __flat_cleanup_46_4_1: Error = __flat_cleanup_45_4_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_5_0: StagingPlan = __flat_cleanup_46_4_0; let __flat_cleanup_47_5_1: Error = __flat_cleanup_46_4_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_5_0,__flat_cleanup_47_5_1; } let appended = rows.push(RowMapping { mapping.variable,actual , ..}); if appended != blot_error::Error.none { let __flat_cleanup_45_5_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_5_1: Error = appended; block {
+rows.deinit();
+} let __flat_cleanup_46_5_0: StagingPlan = __flat_cleanup_45_5_0; let __flat_cleanup_46_5_1: Error = __flat_cleanup_45_5_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_6_0: StagingPlan = __flat_cleanup_46_5_0; let __flat_cleanup_47_6_1: Error = __flat_cleanup_46_5_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_6_0,__flat_cleanup_47_6_1; } }
+    let cleanups,error = blot_runtime_runtime_cleanup::initPooled(); if error != blot_error::Error.none { let __flat_cleanup_45_6_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_45_6_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_46_6_0: StagingPlan = __flat_cleanup_45_6_0; let __flat_cleanup_46_6_1: Error = __flat_cleanup_45_6_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_7_0: StagingPlan = __flat_cleanup_46_6_0; let __flat_cleanup_47_7_1: Error = __flat_cleanup_46_6_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_7_0,__flat_cleanup_47_7_1; } var future = Owner { staged: blot_support::some(value), preparation_depth: owner.preparation_depth + 1, preparing: true, generator: generator, unit_id: metadata.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, .. };
+    block {
 
-    let body,body_error = prepareBody(future,metadata.identity,depth + 1,false); if body_error != blot_error::Error.none { return StagingPlan { 0 , ..},body_error; } return StagingPlan { value,blot_support::some(body) , ..},blot_error::Error.none;
+    let body,body_error = prepareBody(future,metadata.identity,depth + 1,false); if body_error != blot_error::Error.none { let __flat_cleanup_44_0_0: StagingPlan = StagingPlan { 0 , ..}; let __flat_cleanup_44_0_1: Error = body_error; block {
+future.deinit();
+} let __flat_cleanup_45_7_0: StagingPlan = __flat_cleanup_44_0_0; let __flat_cleanup_45_7_1: Error = __flat_cleanup_44_0_1; block {
+rows.deinit();
+} let __flat_cleanup_46_7_0: StagingPlan = __flat_cleanup_45_7_0; let __flat_cleanup_46_7_1: Error = __flat_cleanup_45_7_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_8_0: StagingPlan = __flat_cleanup_46_7_0; let __flat_cleanup_47_8_1: Error = __flat_cleanup_46_7_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_8_0,__flat_cleanup_47_8_1; } let __flat_cleanup_44_1_0: StagingPlan = StagingPlan { value,blot_support::some(body) , ..}; let __flat_cleanup_44_1_1: Error = blot_error::Error.none; block {
+future.deinit();
+} let __flat_cleanup_45_8_0: StagingPlan = __flat_cleanup_44_1_0; let __flat_cleanup_45_8_1: Error = __flat_cleanup_44_1_1; block {
+rows.deinit();
+} let __flat_cleanup_46_8_0: StagingPlan = __flat_cleanup_45_8_0; let __flat_cleanup_46_8_1: Error = __flat_cleanup_45_8_1; block {
+mappings.deinit();
+} let __flat_cleanup_47_9_0: StagingPlan = __flat_cleanup_46_8_0; let __flat_cleanup_47_9_1: Error = __flat_cleanup_46_8_1; block {
+generator.staging_trace = previous_trace;
+} return __flat_cleanup_47_9_0,__flat_cleanup_47_9_1;
+
 
     }
-    let cleanup_result_48_0,cleanup_result_48_1 = cleanup_continuation_48();
-     future.deinit();
-    return cleanup_result_48_0,cleanup_result_48_1;
+
 
     }
-    let cleanup_result_49_0,cleanup_result_49_1 = cleanup_continuation_49();
-     rows.deinit();
-    return cleanup_result_49_0,cleanup_result_49_1;
+
 
     }
-    let cleanup_result_50_0,cleanup_result_50_1 = cleanup_continuation_50();
-     mappings.deinit();
-    return cleanup_result_50_0,cleanup_result_50_1;
+
 
     }
-    let cleanup_result_51_0,cleanup_result_51_1 = cleanup_continuation_51();
-     generator.staging_trace = previous_trace;
-    return cleanup_result_51_0,cleanup_result_51_1;
 }
 recursive fn emitStaging(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; var plan = StagingPlan { 0 , ..}; match resolvedPlan(owner,id) { staging staged=>{ plan = staged.value; },_=>{ assert(false); }, }
@@ -922,31 +1226,49 @@ recursive fn emitStaging(owner: Owner&,id: u32,depth: i64) -> Error {
 }
 recursive fn prepareInstances(owner: Owner&,decisions: const InstanceDecisions&,decision: const InstanceDecision&,depth: i64) -> LocalInstance[:],Error {
     let generator .= owner.generator; let producer = generator.unit(owner.unit_id).node(decision.statement).b; let instances = owned_instances.alloc_slice(decision.count); var prepared: i64 = 0; var published = false;
-    recursive fn cleanup_continuation_47() -> LocalInstance[:],Error {
+    block {
 
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_46() -> LocalInstance[:],Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_45() -> LocalInstance[:],Error {
+    block {
 
-    for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != blot_error::Error.none { return default<LocalInstance[:]>(),facts; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != blot_error::Error.none { return default<LocalInstance[:]>(),row_facts; }
-        let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != blot_error::Error.none { return default<LocalInstance[:]>(),error; } instances[index] = LocalInstance { decision.layouts[index],body , ..}; prepared++;
-    } published = true; return instances,blot_error::Error.none;
+    for index in 0..decision.count { mappings.clear(); rows.clear(); let facts = withFacts(owner.mappings,decisions.factsAt(decision,index),mappings); if facts != blot_error::Error.none { let __flat_cleanup_41_0_0: LocalInstance[:] = default<LocalInstance[:]>(); let __flat_cleanup_41_0_1: Error = facts; block {
+rows.deinit();
+} let __flat_cleanup_42_0_0: LocalInstance[:] = __flat_cleanup_41_0_0; let __flat_cleanup_42_0_1: Error = __flat_cleanup_41_0_1; block {
+mappings.deinit();
+} let __flat_cleanup_43_0_0: LocalInstance[:] = __flat_cleanup_42_0_0; let __flat_cleanup_43_0_1: Error = __flat_cleanup_42_0_1; block {
+if !published { for instance in instances[..prepared] { blot_backend_resolved_body::release(instance.body); } owned_instances.free_slice(instances); }
+} return __flat_cleanup_43_0_0,__flat_cleanup_43_0_1; } let row_facts = withFacts(owner.row_mappings,decisions.rowsAt(decision,index),rows); if row_facts != blot_error::Error.none { let __flat_cleanup_41_1_0: LocalInstance[:] = default<LocalInstance[:]>(); let __flat_cleanup_41_1_1: Error = row_facts; block {
+rows.deinit();
+} let __flat_cleanup_42_1_0: LocalInstance[:] = __flat_cleanup_41_1_0; let __flat_cleanup_42_1_1: Error = __flat_cleanup_41_1_1; block {
+mappings.deinit();
+} let __flat_cleanup_43_1_0: LocalInstance[:] = __flat_cleanup_42_1_0; let __flat_cleanup_43_1_1: Error = __flat_cleanup_42_1_1; block {
+if !published { for instance in instances[..prepared] { blot_backend_resolved_body::release(instance.body); } owned_instances.free_slice(instances); }
+} return __flat_cleanup_43_1_0,__flat_cleanup_43_1_1; }
+        let body,error = prepareMapped(owner,producer,depth + 1,false,mappings.items,rows.items,null); if error != blot_error::Error.none { let __flat_cleanup_41_2_0: LocalInstance[:] = default<LocalInstance[:]>(); let __flat_cleanup_41_2_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_42_2_0: LocalInstance[:] = __flat_cleanup_41_2_0; let __flat_cleanup_42_2_1: Error = __flat_cleanup_41_2_1; block {
+mappings.deinit();
+} let __flat_cleanup_43_2_0: LocalInstance[:] = __flat_cleanup_42_2_0; let __flat_cleanup_43_2_1: Error = __flat_cleanup_42_2_1; block {
+if !published { for instance in instances[..prepared] { blot_backend_resolved_body::release(instance.body); } owned_instances.free_slice(instances); }
+} return __flat_cleanup_43_2_0,__flat_cleanup_43_2_1; } instances[index] = LocalInstance { decision.layouts[index],body , ..}; prepared++;
+    } published = true; let __flat_cleanup_41_3_0: LocalInstance[:] = instances; let __flat_cleanup_41_3_1: Error = blot_error::Error.none; block {
+rows.deinit();
+} let __flat_cleanup_42_3_0: LocalInstance[:] = __flat_cleanup_41_3_0; let __flat_cleanup_42_3_1: Error = __flat_cleanup_41_3_1; block {
+mappings.deinit();
+} let __flat_cleanup_43_3_0: LocalInstance[:] = __flat_cleanup_42_3_0; let __flat_cleanup_43_3_1: Error = __flat_cleanup_42_3_1; block {
+if !published { for instance in instances[..prepared] { blot_backend_resolved_body::release(instance.body); } owned_instances.free_slice(instances); }
+} return __flat_cleanup_43_3_0,__flat_cleanup_43_3_1;
+
 
     }
-    let cleanup_result_45_0,cleanup_result_45_1 = cleanup_continuation_45();
-     rows.deinit();
-    return cleanup_result_45_0,cleanup_result_45_1;
+
 
     }
-    let cleanup_result_46_0,cleanup_result_46_1 = cleanup_continuation_46();
-     mappings.deinit();
-    return cleanup_result_46_0,cleanup_result_46_1;
+
 
     }
-    let cleanup_result_47_0,cleanup_result_47_1 = cleanup_continuation_47();
-     if !published { for instance in instances[..prepared] { blot_backend_resolved_body::release(instance.body); } owned_instances.free_slice(instances); }
-    return cleanup_result_47_0,cleanup_result_47_1;
 }
 recursive fn bindInstances(owner: Owner&,statement: u32,instances: const LocalInstance[:],depth: i64) -> Error {
     let generator .= owner.generator; let n = generator.unit(owner.unit_id).node(statement); var held = InstanceLocals {..};
@@ -993,63 +1315,247 @@ recursive fn prepareFactory(owner: Owner&,body: u32,id: u32) -> blot_support::Op
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let node = source.node(id); let result_type = source.types.node(node.ty);
     if result_type.tag != blot_check_types::Tag.nominal || result_type.a != 4294967295 || result_type.b != 5 { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } if owner.preparation_depth >= 256 { return blot_support::none<FactoryPlan>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); }
     var admitted: bool[16] = [false;16]; var callee: FactoryCallee = FactoryCallee.named { Key {..} , ..}; var unit: u32 = 0; var root: u32 = 0; var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_44() -> blot_support::Option<FactoryPlan>,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_43() -> blot_support::Option<FactoryPlan>,Error {
+    block {
 
-    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),cleanup_error; } var preparer = Owner { preparation_depth: owner.preparation_depth + 1, preparing: true, generator: generator, unit_id: 0, function_id: owner.function_id, mappings:default<const Mapping[:]>(), cleanups: cleanups, factory_template: true, .. };
-    recursive fn cleanup_continuation_42() -> blot_support::Option<FactoryPlan>,Error {
+    let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != blot_error::Error.none { let __flat_cleanup_39_0_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_39_0_1: Error = cleanup_error; block {
+rows.deinit();
+} let __flat_cleanup_40_0_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_0_0; let __flat_cleanup_40_0_1: Error = __flat_cleanup_39_0_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_0_0,__flat_cleanup_40_0_1; } var preparer = Owner { preparation_depth: owner.preparation_depth + 1, preparing: true, generator: generator, unit_id: 0, function_id: owner.function_id, mappings:default<const Mapping[:]>(), cleanups: cleanups, factory_template: true, .. };
+    block {
 
     if node.tag == blot_check_core::Tag.call {
         let call = source.call(id); var key = Key {..}; match blot_backend_resolved_body::get(body,id) { named plan=>{ key = plan.value.call.key; },_=>{ assert(false); }, }
-        if key.count != call.arguments.len || !computationAction(owner,key.result).present { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } let producer .= generator.unit(key.target.unit); let definition .= producer.body(key.target.binding); if definition == null || !definition.is_function || definition.parameters.len != key.count { return blot_support::none<FactoryPlan>(),blot_error::Error.none; }
-        for argument,index in call.arguments { admitted[index] = isCallableTemplate(owner,argument); } if !factoryTemplateResult(owner,key.target.unit,definition.root,producer.bodyParameters(definition),admitted[..key.count],0) { return blot_support::none<FactoryPlan>(),blot_error::Error.none; }
+        if key.count != call.arguments.len || !computationAction(owner,key.result).present { let __flat_cleanup_38_0_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_0_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_1_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_0_0; let __flat_cleanup_39_1_1: Error = __flat_cleanup_38_0_1; block {
+rows.deinit();
+} let __flat_cleanup_40_1_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_1_0; let __flat_cleanup_40_1_1: Error = __flat_cleanup_39_1_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_1_0,__flat_cleanup_40_1_1; } let producer .= generator.unit(key.target.unit); let definition .= producer.body(key.target.binding); if definition == null || !definition.is_function || definition.parameters.len != key.count { let __flat_cleanup_38_1_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_1_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_2_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_1_0; let __flat_cleanup_39_2_1: Error = __flat_cleanup_38_1_1; block {
+rows.deinit();
+} let __flat_cleanup_40_2_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_2_0; let __flat_cleanup_40_2_1: Error = __flat_cleanup_39_2_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_2_0,__flat_cleanup_40_2_1; }
+        for argument,index in call.arguments { admitted[index] = isCallableTemplate(owner,argument); } if !factoryTemplateResult(owner,key.target.unit,definition.root,producer.bodyParameters(definition),admitted[..key.count],0) { let __flat_cleanup_38_2_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_2_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_3_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_2_0; let __flat_cleanup_39_3_1: Error = __flat_cleanup_38_2_1; block {
+rows.deinit();
+} let __flat_cleanup_40_3_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_3_0; let __flat_cleanup_40_3_1: Error = __flat_cleanup_39_3_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_3_0,__flat_cleanup_40_3_1; }
         var entries = blot_backend_substitution_buffers::Entries {..};
         for argument,index in call.arguments { let parameter = producer.bodyParameters(definition)[index]; if admitted[index] {
-            let actual,error = codeLayout(owner,source.typeOf(argument),source.span(argument)); if error != blot_error::Error.none { let __cleanup_result_49_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_49_1: Error = error; { entries.deinit(); } return __cleanup_result_49_0, __cleanup_result_49_1; } let selected,selected_error = sourceArgumentLayout(owner,key.parameters[index],actual,0); if selected_error != blot_error::Error.none { let __cleanup_result_50_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_50_1: Error = selected_error; { entries.deinit(); } return __cleanup_result_50_0, __cleanup_result_50_1; } key.parameters[index] = selected;
-            let metadata,metadata_error = describeCallable(owner,body,argument); if metadata_error != blot_error::Error.none { let __cleanup_result_51_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_51_1: Error = metadata_error; { entries.deinit(); } return __cleanup_result_51_0, __cleanup_result_51_1; } if !metadata.present { let __cleanup_result_52_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_52_1: Error = generator.fail(owner.unit_id,argument,blot_check_diagnostic_code::Code.unresolved_type); { entries.deinit(); } return __cleanup_result_52_0, __cleanup_result_52_1; }
-            let template,template_error = generator.captureTemplate(metadata.value); if template_error != blot_error::Error.none { let __cleanup_result_53_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_53_1: Error = template_error; { entries.deinit(); } return __cleanup_result_53_0, __cleanup_result_53_1; } let appended = entries.push(blot_reuse_substitution_keys::Entry { parameter.binding,template , ..}); if appended != blot_error::Error.none { let __cleanup_result_54_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_54_1: Error = appended; { entries.deinit(); } return __cleanup_result_54_0, __cleanup_result_54_1; } preparer.templates.insert(parameter.binding,metadata.value);
+            let actual,error = codeLayout(owner,source.typeOf(argument),source.span(argument)); if error != blot_error::Error.none { let __cleanup_result_49_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_49_1: Error = error; { entries.deinit(); } let __flat_cleanup_38_3_0: blot_support::Option<FactoryPlan> = __cleanup_result_49_0; let __flat_cleanup_38_3_1: Error = __cleanup_result_49_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_4_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_3_0; let __flat_cleanup_39_4_1: Error = __flat_cleanup_38_3_1; block {
+rows.deinit();
+} let __flat_cleanup_40_4_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_4_0; let __flat_cleanup_40_4_1: Error = __flat_cleanup_39_4_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_4_0,__flat_cleanup_40_4_1; } let selected,selected_error = sourceArgumentLayout(owner,key.parameters[index],actual,0); if selected_error != blot_error::Error.none { let __cleanup_result_50_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_50_1: Error = selected_error; { entries.deinit(); } let __flat_cleanup_38_4_0: blot_support::Option<FactoryPlan> = __cleanup_result_50_0; let __flat_cleanup_38_4_1: Error = __cleanup_result_50_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_5_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_4_0; let __flat_cleanup_39_5_1: Error = __flat_cleanup_38_4_1; block {
+rows.deinit();
+} let __flat_cleanup_40_5_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_5_0; let __flat_cleanup_40_5_1: Error = __flat_cleanup_39_5_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_5_0,__flat_cleanup_40_5_1; } key.parameters[index] = selected;
+            let metadata,metadata_error = describeCallable(owner,body,argument); if metadata_error != blot_error::Error.none { let __cleanup_result_51_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_51_1: Error = metadata_error; { entries.deinit(); } let __flat_cleanup_38_5_0: blot_support::Option<FactoryPlan> = __cleanup_result_51_0; let __flat_cleanup_38_5_1: Error = __cleanup_result_51_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_6_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_5_0; let __flat_cleanup_39_6_1: Error = __flat_cleanup_38_5_1; block {
+rows.deinit();
+} let __flat_cleanup_40_6_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_6_0; let __flat_cleanup_40_6_1: Error = __flat_cleanup_39_6_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_6_0,__flat_cleanup_40_6_1; } if !metadata.present { let __cleanup_result_52_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_52_1: Error = generator.fail(owner.unit_id,argument,blot_check_diagnostic_code::Code.unresolved_type); { entries.deinit(); } let __flat_cleanup_38_6_0: blot_support::Option<FactoryPlan> = __cleanup_result_52_0; let __flat_cleanup_38_6_1: Error = __cleanup_result_52_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_7_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_6_0; let __flat_cleanup_39_7_1: Error = __flat_cleanup_38_6_1; block {
+rows.deinit();
+} let __flat_cleanup_40_7_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_7_0; let __flat_cleanup_40_7_1: Error = __flat_cleanup_39_7_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_7_0,__flat_cleanup_40_7_1; }
+            let template,template_error = generator.captureTemplate(metadata.value); if template_error != blot_error::Error.none { let __cleanup_result_53_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_53_1: Error = template_error; { entries.deinit(); } let __flat_cleanup_38_7_0: blot_support::Option<FactoryPlan> = __cleanup_result_53_0; let __flat_cleanup_38_7_1: Error = __cleanup_result_53_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_8_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_7_0; let __flat_cleanup_39_8_1: Error = __flat_cleanup_38_7_1; block {
+rows.deinit();
+} let __flat_cleanup_40_8_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_8_0; let __flat_cleanup_40_8_1: Error = __flat_cleanup_39_8_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_8_0,__flat_cleanup_40_8_1; } let appended = entries.push(blot_reuse_substitution_keys::Entry { parameter.binding,template , ..}); if appended != blot_error::Error.none { let __cleanup_result_54_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_54_1: Error = appended; { entries.deinit(); } let __flat_cleanup_38_8_0: blot_support::Option<FactoryPlan> = __cleanup_result_54_0; let __flat_cleanup_38_8_1: Error = __cleanup_result_54_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_9_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_8_0; let __flat_cleanup_39_9_1: Error = __flat_cleanup_38_8_1; block {
+rows.deinit();
+} let __flat_cleanup_40_9_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_9_0; let __flat_cleanup_40_9_1: Error = __flat_cleanup_39_9_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_9_0,__flat_cleanup_40_9_1; } preparer.templates.insert(parameter.binding,metadata.value);
         } else if parameter.binding != 0 { preparer.locals.insert(parameter.binding,0); } }
-        let templates,template_error = generator.representations.template_keys.intern(entries.items); if template_error != blot_error::Error.none { if template_error == blot_error::Error.out_of_memory { let __cleanup_result_55_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_55_1: Error = template_error; { entries.deinit(); } return __cleanup_result_55_0, __cleanup_result_55_1; } let __cleanup_result_56_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_56_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); { entries.deinit(); } return __cleanup_result_56_0, __cleanup_result_56_1; } key.templates = templates; key.template_result = true;
-        let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { let __cleanup_result_57_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_57_1: Error = service_error; { entries.deinit(); } return __cleanup_result_57_0, __cleanup_result_57_1; } let resolved,resolved_error = service.named(key,generator.representations.instance_arguments.get(key.instance_arguments),mappings,rows); if resolved_error != blot_error::Error.none { let __cleanup_result_58_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_58_1: Error = generator.specializationFailure(service,resolved_error); { entries.deinit(); } return __cleanup_result_58_0, __cleanup_result_58_1; }
+        let templates,template_error = generator.representations.template_keys.intern(entries.items); if template_error != blot_error::Error.none { if template_error == blot_error::Error.out_of_memory { let __cleanup_result_55_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_55_1: Error = template_error; { entries.deinit(); } let __flat_cleanup_38_9_0: blot_support::Option<FactoryPlan> = __cleanup_result_55_0; let __flat_cleanup_38_9_1: Error = __cleanup_result_55_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_10_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_9_0; let __flat_cleanup_39_10_1: Error = __flat_cleanup_38_9_1; block {
+rows.deinit();
+} let __flat_cleanup_40_10_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_10_0; let __flat_cleanup_40_10_1: Error = __flat_cleanup_39_10_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_10_0,__flat_cleanup_40_10_1; } let __cleanup_result_56_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_56_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); { entries.deinit(); } let __flat_cleanup_38_10_0: blot_support::Option<FactoryPlan> = __cleanup_result_56_0; let __flat_cleanup_38_10_1: Error = __cleanup_result_56_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_11_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_10_0; let __flat_cleanup_39_11_1: Error = __flat_cleanup_38_10_1; block {
+rows.deinit();
+} let __flat_cleanup_40_11_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_11_0; let __flat_cleanup_40_11_1: Error = __flat_cleanup_39_11_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_11_0,__flat_cleanup_40_11_1; } key.templates = templates; key.template_result = true;
+        let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { let __cleanup_result_57_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_57_1: Error = service_error; { entries.deinit(); } let __flat_cleanup_38_11_0: blot_support::Option<FactoryPlan> = __cleanup_result_57_0; let __flat_cleanup_38_11_1: Error = __cleanup_result_57_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_12_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_11_0; let __flat_cleanup_39_12_1: Error = __flat_cleanup_38_11_1; block {
+rows.deinit();
+} let __flat_cleanup_40_12_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_12_0; let __flat_cleanup_40_12_1: Error = __flat_cleanup_39_12_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_12_0,__flat_cleanup_40_12_1; } let resolved,resolved_error = service.named(key,generator.representations.instance_arguments.get(key.instance_arguments),mappings,rows); if resolved_error != blot_error::Error.none { let __cleanup_result_58_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __cleanup_result_58_1: Error = generator.specializationFailure(service,resolved_error); { entries.deinit(); } let __flat_cleanup_38_12_0: blot_support::Option<FactoryPlan> = __cleanup_result_58_0; let __flat_cleanup_38_12_1: Error = __cleanup_result_58_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_13_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_12_0; let __flat_cleanup_39_13_1: Error = __flat_cleanup_38_12_1; block {
+rows.deinit();
+} let __flat_cleanup_40_13_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_13_0; let __flat_cleanup_40_13_1: Error = __flat_cleanup_39_13_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_13_0,__flat_cleanup_40_13_1; }
         callee = FactoryCallee.named { key , ..}; unit = key.target.unit; root = definition.root;
      { entries.deinit(); } } else {
-        if !isCallableTemplate(owner,node.a) { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } let callable,error = describeCallable(owner,body,node.a); if error != blot_error::Error.none || !callable.present { return blot_support::none<FactoryPlan>(),error; } let factory = callable.value; unit = factory.unit; if unit == 0 { unit = owner.unit_id; }
-        let producer .= generator.unit(unit); let factory_node = producer.node(factory.node); if factory_node.tag != blot_check_core::Tag.closure { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } let metadata = producer.closures[factory_node.a]; admitted[0] = isCallableTemplate(owner,node.b);
-        if !factoryTemplateResult(owner,unit,metadata.body,[metadata.parameter],admitted[..1],0) { return blot_support::none<FactoryPlan>(),blot_error::Error.none; } let original,original_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if original_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),original_error; } var ty = original;
-        if admitted[0] { let arrow = generator.representations.store.node(ty); let actual,actual_error = codeLayout(owner,source.typeOf(node.b),source.span(node.b)); if actual_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),actual_error; } let argument,argument_error = sourceArgumentLayout(owner,arrow.a,actual,0); if argument_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),argument_error; } let selected,selected_error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,argument,arrow.b,arrow.c,[]); if selected_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),selected_error; } ty = selected; }
+        if !isCallableTemplate(owner,node.a) { let __flat_cleanup_38_13_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_13_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_14_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_13_0; let __flat_cleanup_39_14_1: Error = __flat_cleanup_38_13_1; block {
+rows.deinit();
+} let __flat_cleanup_40_14_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_14_0; let __flat_cleanup_40_14_1: Error = __flat_cleanup_39_14_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_14_0,__flat_cleanup_40_14_1; } let callable,error = describeCallable(owner,body,node.a); if error != blot_error::Error.none || !callable.present { let __flat_cleanup_38_14_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_14_1: Error = error; block {
+preparer.deinit();
+} let __flat_cleanup_39_15_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_14_0; let __flat_cleanup_39_15_1: Error = __flat_cleanup_38_14_1; block {
+rows.deinit();
+} let __flat_cleanup_40_15_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_15_0; let __flat_cleanup_40_15_1: Error = __flat_cleanup_39_15_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_15_0,__flat_cleanup_40_15_1; } let factory = callable.value; unit = factory.unit; if unit == 0 { unit = owner.unit_id; }
+        let producer .= generator.unit(unit); let factory_node = producer.node(factory.node); if factory_node.tag != blot_check_core::Tag.closure { let __flat_cleanup_38_15_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_15_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_16_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_15_0; let __flat_cleanup_39_16_1: Error = __flat_cleanup_38_15_1; block {
+rows.deinit();
+} let __flat_cleanup_40_16_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_16_0; let __flat_cleanup_40_16_1: Error = __flat_cleanup_39_16_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_16_0,__flat_cleanup_40_16_1; } let metadata = producer.closures[factory_node.a]; admitted[0] = isCallableTemplate(owner,node.b);
+        if !factoryTemplateResult(owner,unit,metadata.body,[metadata.parameter],admitted[..1],0) { let __flat_cleanup_38_16_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_16_1: Error = blot_error::Error.none; block {
+preparer.deinit();
+} let __flat_cleanup_39_17_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_16_0; let __flat_cleanup_39_17_1: Error = __flat_cleanup_38_16_1; block {
+rows.deinit();
+} let __flat_cleanup_40_17_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_17_0; let __flat_cleanup_40_17_1: Error = __flat_cleanup_39_17_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_17_0,__flat_cleanup_40_17_1; } let original,original_error = codeLayout(owner,source.typeOf(node.a),source.span(id)); if original_error != blot_error::Error.none { let __flat_cleanup_38_17_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_17_1: Error = original_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_18_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_17_0; let __flat_cleanup_39_18_1: Error = __flat_cleanup_38_17_1; block {
+rows.deinit();
+} let __flat_cleanup_40_18_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_18_0; let __flat_cleanup_40_18_1: Error = __flat_cleanup_39_18_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_18_0,__flat_cleanup_40_18_1; } var ty = original;
+        if admitted[0] { let arrow = generator.representations.store.node(ty); let actual,actual_error = codeLayout(owner,source.typeOf(node.b),source.span(node.b)); if actual_error != blot_error::Error.none { let __flat_cleanup_38_18_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_18_1: Error = actual_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_19_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_18_0; let __flat_cleanup_39_19_1: Error = __flat_cleanup_38_18_1; block {
+rows.deinit();
+} let __flat_cleanup_40_19_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_19_0; let __flat_cleanup_40_19_1: Error = __flat_cleanup_39_19_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_19_0,__flat_cleanup_40_19_1; } let argument,argument_error = sourceArgumentLayout(owner,arrow.a,actual,0); if argument_error != blot_error::Error.none { let __flat_cleanup_38_19_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_19_1: Error = argument_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_20_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_19_0; let __flat_cleanup_39_20_1: Error = __flat_cleanup_38_19_1; block {
+rows.deinit();
+} let __flat_cleanup_40_20_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_20_0; let __flat_cleanup_40_20_1: Error = __flat_cleanup_39_20_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_20_0,__flat_cleanup_40_20_1; } let selected,selected_error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,argument,arrow.b,arrow.c,[]); if selected_error != blot_error::Error.none { let __flat_cleanup_38_20_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_20_1: Error = selected_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_21_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_20_0; let __flat_cleanup_39_21_1: Error = __flat_cleanup_38_20_1; block {
+rows.deinit();
+} let __flat_cleanup_40_21_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_21_0; let __flat_cleanup_40_21_1: Error = __flat_cleanup_39_21_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_21_0,__flat_cleanup_40_21_1; } ty = selected; }
         var key = blot_reuse_code_artifacts::ClosureKey { scalar_environment: factory.scalar_environment, unit: unit, catalog: factory_node.a, ty: ty, captures: factory.captures, templates: factory.templates, evidence: factory.evidence, rows: factory.rows, template_result: true, .. };
-        if admitted[0] { let argument,argument_error = describeCallable(owner,body,node.b); if argument_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),argument_error; } if !argument.present { return blot_support::none<FactoryPlan>(),generator.fail(owner.unit_id,node.b,blot_check_diagnostic_code::Code.unresolved_type); } let template,template_error = generator.captureTemplate(argument.value); if template_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),template_error; } key.parameter_template = template; preparer.templates.insert(metadata.parameter.binding,argument.value); }
+        if admitted[0] { let argument,argument_error = describeCallable(owner,body,node.b); if argument_error != blot_error::Error.none { let __flat_cleanup_38_21_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_21_1: Error = argument_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_22_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_21_0; let __flat_cleanup_39_22_1: Error = __flat_cleanup_38_21_1; block {
+rows.deinit();
+} let __flat_cleanup_40_22_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_22_0; let __flat_cleanup_40_22_1: Error = __flat_cleanup_39_22_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_22_0,__flat_cleanup_40_22_1; } if !argument.present { let __flat_cleanup_38_22_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_22_1: Error = generator.fail(owner.unit_id,node.b,blot_check_diagnostic_code::Code.unresolved_type); block {
+preparer.deinit();
+} let __flat_cleanup_39_23_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_22_0; let __flat_cleanup_39_23_1: Error = __flat_cleanup_38_22_1; block {
+rows.deinit();
+} let __flat_cleanup_40_23_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_23_0; let __flat_cleanup_40_23_1: Error = __flat_cleanup_39_23_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_23_0,__flat_cleanup_40_23_1; } let template,template_error = generator.captureTemplate(argument.value); if template_error != blot_error::Error.none { let __flat_cleanup_38_23_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_23_1: Error = template_error; block {
+preparer.deinit();
+} let __flat_cleanup_39_24_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_23_0; let __flat_cleanup_39_24_1: Error = __flat_cleanup_38_23_1; block {
+rows.deinit();
+} let __flat_cleanup_40_24_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_24_0; let __flat_cleanup_40_24_1: Error = __flat_cleanup_39_24_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_24_0,__flat_cleanup_40_24_1; } key.parameter_template = template; preparer.templates.insert(metadata.parameter.binding,argument.value); }
         else if metadata.parameter.binding != 0 { preparer.locals.insert(metadata.parameter.binding,0); }
-        let resolved = generator.resolveClosureMappings(key,mappings,rows); if resolved != blot_error::Error.none { return blot_support::none<FactoryPlan>(),resolved; }
+        let resolved = generator.resolveClosureMappings(key,mappings,rows); if resolved != blot_error::Error.none { let __flat_cleanup_38_24_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_24_1: Error = resolved; block {
+preparer.deinit();
+} let __flat_cleanup_39_25_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_24_0; let __flat_cleanup_39_25_1: Error = __flat_cleanup_38_24_1; block {
+rows.deinit();
+} let __flat_cleanup_40_25_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_25_0; let __flat_cleanup_40_25_1: Error = __flat_cleanup_39_25_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_25_0,__flat_cleanup_40_25_1; }
         for binding in producer.extra[metadata.captures.start..metadata.captures.start + metadata.captures.len] { let captured = generator.capturedTemplate(key.templates,binding); if captured.present { preparer.templates.insert(binding,blot_backend_core_backend::templateMetadata(captured.value,0)); } else { preparer.locals.insert(binding,0); } }
         callee = FactoryCallee.closure { key , ..}; root = metadata.body;
     }
-    preparer.unit_id = unit; preparer.mappings = mappings.items; preparer.row_mappings = rows.items; let prepared,error = blot_backend_resolved_body::create(unit,root,mappings.items,rows.items); if error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),error; }
-    recursive fn cleanup_continuation_41() -> blot_support::Option<FactoryPlan>,Error {
+    preparer.unit_id = unit; preparer.mappings = mappings.items; preparer.row_mappings = rows.items; let prepared,error = blot_backend_resolved_body::create(unit,root,mappings.items,rows.items); if error != blot_error::Error.none { let __flat_cleanup_38_25_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_38_25_1: Error = error; block {
+preparer.deinit();
+} let __flat_cleanup_39_26_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_25_0; let __flat_cleanup_39_26_1: Error = __flat_cleanup_38_25_1; block {
+rows.deinit();
+} let __flat_cleanup_40_26_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_26_0; let __flat_cleanup_40_26_1: Error = __flat_cleanup_39_26_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_26_0,__flat_cleanup_40_26_1; }
+    block {
 
-    let generated = prepareNode(preparer,prepared,root,0,true); if generated != blot_error::Error.none { return blot_support::none<FactoryPlan>(),generated; } let described,described_error = describeComputation(preparer,prepared,root,0); if described_error != blot_error::Error.none { return blot_support::none<FactoryPlan>(),described_error; } if !described.present { return blot_support::none<FactoryPlan>(),generator.fail(unit,root,blot_check_diagnostic_code::Code.unresolved_type); }
-    var result = described.value; result.scalar_environment = false; return blot_support::some(FactoryPlan { callee,admitted,result , ..}),blot_error::Error.none;
+    let generated = prepareNode(preparer,prepared,root,0,true); if generated != blot_error::Error.none { let __flat_cleanup_37_0_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_37_0_1: Error = generated; block {
+blot_backend_resolved_body::release(prepared);
+} let __flat_cleanup_38_26_0: blot_support::Option<FactoryPlan> = __flat_cleanup_37_0_0; let __flat_cleanup_38_26_1: Error = __flat_cleanup_37_0_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_27_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_26_0; let __flat_cleanup_39_27_1: Error = __flat_cleanup_38_26_1; block {
+rows.deinit();
+} let __flat_cleanup_40_27_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_27_0; let __flat_cleanup_40_27_1: Error = __flat_cleanup_39_27_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_27_0,__flat_cleanup_40_27_1; } let described,described_error = describeComputation(preparer,prepared,root,0); if described_error != blot_error::Error.none { let __flat_cleanup_37_1_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_37_1_1: Error = described_error; block {
+blot_backend_resolved_body::release(prepared);
+} let __flat_cleanup_38_27_0: blot_support::Option<FactoryPlan> = __flat_cleanup_37_1_0; let __flat_cleanup_38_27_1: Error = __flat_cleanup_37_1_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_28_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_27_0; let __flat_cleanup_39_28_1: Error = __flat_cleanup_38_27_1; block {
+rows.deinit();
+} let __flat_cleanup_40_28_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_28_0; let __flat_cleanup_40_28_1: Error = __flat_cleanup_39_28_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_28_0,__flat_cleanup_40_28_1; } if !described.present { let __flat_cleanup_37_2_0: blot_support::Option<FactoryPlan> = blot_support::none<FactoryPlan>(); let __flat_cleanup_37_2_1: Error = generator.fail(unit,root,blot_check_diagnostic_code::Code.unresolved_type); block {
+blot_backend_resolved_body::release(prepared);
+} let __flat_cleanup_38_28_0: blot_support::Option<FactoryPlan> = __flat_cleanup_37_2_0; let __flat_cleanup_38_28_1: Error = __flat_cleanup_37_2_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_29_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_28_0; let __flat_cleanup_39_29_1: Error = __flat_cleanup_38_28_1; block {
+rows.deinit();
+} let __flat_cleanup_40_29_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_29_0; let __flat_cleanup_40_29_1: Error = __flat_cleanup_39_29_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_29_0,__flat_cleanup_40_29_1; }
+    var result = described.value; result.scalar_environment = false; let __flat_cleanup_37_3_0: blot_support::Option<FactoryPlan> = blot_support::some(FactoryPlan { callee,admitted,result , ..}); let __flat_cleanup_37_3_1: Error = blot_error::Error.none; block {
+blot_backend_resolved_body::release(prepared);
+} let __flat_cleanup_38_29_0: blot_support::Option<FactoryPlan> = __flat_cleanup_37_3_0; let __flat_cleanup_38_29_1: Error = __flat_cleanup_37_3_1; block {
+preparer.deinit();
+} let __flat_cleanup_39_30_0: blot_support::Option<FactoryPlan> = __flat_cleanup_38_29_0; let __flat_cleanup_39_30_1: Error = __flat_cleanup_38_29_1; block {
+rows.deinit();
+} let __flat_cleanup_40_30_0: blot_support::Option<FactoryPlan> = __flat_cleanup_39_30_0; let __flat_cleanup_40_30_1: Error = __flat_cleanup_39_30_1; block {
+mappings.deinit();
+} return __flat_cleanup_40_30_0,__flat_cleanup_40_30_1;
+
 
     }
-    let cleanup_result_41_0,cleanup_result_41_1 = cleanup_continuation_41();
-     blot_backend_resolved_body::release(prepared);
-    return cleanup_result_41_0,cleanup_result_41_1;
+
 
     }
-    let cleanup_result_42_0,cleanup_result_42_1 = cleanup_continuation_42();
-     preparer.deinit();
-    return cleanup_result_42_0,cleanup_result_42_1;
+
 
     }
-    let cleanup_result_43_0,cleanup_result_43_1 = cleanup_continuation_43();
-     rows.deinit();
-    return cleanup_result_43_0,cleanup_result_43_1;
+
 
     }
-    let cleanup_result_44_0,cleanup_result_44_1 = cleanup_continuation_44();
-     mappings.deinit();
-    return cleanup_result_44_0,cleanup_result_44_1;
 }
 recursive fn describeComputation(owner: Owner&,body: u32,id: u32,depth: i64) -> blot_support::Option<Template>,Error {
     if id == 0 { return blot_support::none<Template>(),blot_error::Error.none; } let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if depth >= 1024 { return blot_support::none<Template>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } let node = source.node(id);
@@ -1172,23 +1678,33 @@ recursive fn prepareChildren(owner: Owner&,body: u32,id: u32,depth: i64,template
 }
 recursive fn preparePackageBody(owner: Owner&,body: u32,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let n = source.node(id); let package = prepareNode(owner,body,n.a,depth + 1,false); if package != blot_error::Error.none { return package; } let opening = source.packageOpening(id); var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_40() -> Error {
- let copied = mappings.append(owner.mappings); if copied != blot_error::Error.none { return copied; }
-    for binder,ordinal in source.types.list(opening.binders) { let opened,error = generator.internLayout(blot_backend_layout::Tag.opened,ordinal as u32,0,[]); if error != blot_error::Error.none { return error; } let appended = mappings.push(Mapping { binder,opened , ..}); if appended != blot_error::Error.none { return appended; } }
-    let bound = blot_backend_dictionary_layout::bind(source,generator.representations.store,mappings,source.typeOf(n.a),n.b,opening.binders,false); if bound != blot_error::Error.none { if bound == blot_error::Error.out_of_memory { return bound; } return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); }
+    block {
+ let copied = mappings.append(owner.mappings); if copied != blot_error::Error.none { let __flat_cleanup_36_0_0: Error = copied; block {
+mappings.deinit();
+} return __flat_cleanup_36_0_0; }
+    for binder,ordinal in source.types.list(opening.binders) { let opened,error = generator.internLayout(blot_backend_layout::Tag.opened,ordinal as u32,0,[]); if error != blot_error::Error.none { let __flat_cleanup_36_1_0: Error = error; block {
+mappings.deinit();
+} return __flat_cleanup_36_1_0; } let appended = mappings.push(Mapping { binder,opened , ..}); if appended != blot_error::Error.none { let __flat_cleanup_36_2_0: Error = appended; block {
+mappings.deinit();
+} return __flat_cleanup_36_2_0; } }
+    let bound = blot_backend_dictionary_layout::bind(source,generator.representations.store,mappings,source.typeOf(n.a),n.b,opening.binders,false); if bound != blot_error::Error.none { if bound == blot_error::Error.out_of_memory { let __flat_cleanup_36_3_0: Error = bound; block {
+mappings.deinit();
+} return __flat_cleanup_36_3_0; } let __flat_cleanup_36_4_0: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); block {
+mappings.deinit();
+} return __flat_cleanup_36_4_0; }
     let previous = owner.mappings; owner.mappings = mappings.items;
-    recursive fn cleanup_continuation_39() -> Error {
- return prepareNode(owner,body,opening.body,depth + 1,false);
+    block {
+ let __flat_cleanup_35_0_0: Error = prepareNode(owner,body,opening.body,depth + 1,false); block {
+owner.mappings = previous;
+} let __flat_cleanup_36_5_0: Error = __flat_cleanup_35_0_0; block {
+mappings.deinit();
+} return __flat_cleanup_36_5_0;
+
 
     }
-    let cleanup_result_39_0 = cleanup_continuation_39();
-     owner.mappings = previous;
-    return cleanup_result_39_0;
+
 
     }
-    let cleanup_result_40_0 = cleanup_continuation_40();
-     mappings.deinit();
-    return cleanup_result_40_0;
 }
 recursive fn prepareBindingBody(owner: Owner&,body: u32,id: u32,depth: i64) -> Error {
     let source .= owner.generator.unit(owner.unit_id); let n = source.node(id); let prepared = prepareNode(owner,body,n.b,depth + 1,false); if prepared != blot_error::Error.none { return prepared; } let computation,error = describeComputation(owner,body,n.b,depth + 1); if error != blot_error::Error.none { return error; } if computation.present { owner.templates.insert(n.a,computation.value); return blot_error::Error.none; }
@@ -1249,12 +1765,9 @@ fn prepareNamedInline(owner: Owner&,key: Key,arguments: const u32[:],captured: b
     var emitter = Owner { diagnostic_context: context, generator: generator, unit_id: key.target.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, inline_depth: owner.inline_depth + 1, inline_loop: in_loop, .. }; if small_result.present { emitter.small_result = SmallResult { body.root,small_result.value , ..}; }
     return InlinePreparation.admitted { emitter,facts.borrowed_collections , ..},blot_error::Error.none;
 }
-recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64,small_result: blot_support::Option<u32>) -> bool,Error {
-    let generator .= owner.generator; var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_38() -> bool,Error {
- var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_37() -> bool,Error {
- let preparation,error = prepareNamedInline(owner,key,arguments,captured,small_result,mappings,rows); if error != blot_error::Error.none { return false,error; }
+recursive fn emitNamedInlineValues(owner: Owner&,key: const Key&,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64,small_result: blot_support::Option<u32>,mappings: MappingBuffer&,rows: RowBuffer&) -> bool,Error {
+    let generator .= owner.generator;
+    let preparation,error = prepareNamedInline(owner,key,arguments,captured,small_result,mappings,rows); if error != blot_error::Error.none { return false,error; }
     match preparation { declined=>{ return false,blot_error::Error.none; },admitted prepared=>{
         var emitter = prepared.emitter;  let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); assert(body != null);
         for parameter,index in source.bodyParameters(body) {
@@ -1276,16 +1789,11 @@ recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:
             let signature,signature_error = generator.module.internType([blot_backend_runtime_ir::VT_i32,generator.representations.store.machine(arrow.a),blot_backend_runtime_ir::VT_i32],generator.representations.store.machine(arrow.b)); if signature_error != blot_error::Error.none { let __cleanup_result_89_0: bool = false; let __cleanup_result_89_1: Error = signature_error; { blot_backend_resolved_body::release(prepared_body); } { emitter.deinit(); } return __cleanup_result_89_0, __cleanup_result_89_1; } let called = emit(owner,blot_backend_runtime_ir::OP_call_indirect,signature); if called != blot_error::Error.none { let __cleanup_result_90_0: bool = false; let __cleanup_result_90_1: Error = called; { blot_backend_resolved_body::release(prepared_body); } { emitter.deinit(); } return __cleanup_result_90_0, __cleanup_result_90_1; } ty = arrow.b;
         } let __cleanup_result_91_0: bool = true; let __cleanup_result_91_1: Error = blot_error::Error.none; { blot_backend_resolved_body::release(prepared_body); } { emitter.deinit(); } return __cleanup_result_91_0, __cleanup_result_91_1;
      { blot_backend_resolved_body::release(prepared_body); } { emitter.deinit(); } }, }
-
-    }
-    let cleanup_result_37_0,cleanup_result_37_1 = cleanup_continuation_37();
-     rows.deinit();
-    return cleanup_result_37_0,cleanup_result_37_1;
-
-    }
-    let cleanup_result_38_0,cleanup_result_38_1 = cleanup_continuation_38();
-     mappings.deinit();
-    return cleanup_result_38_0,cleanup_result_38_1;
+}
+recursive fn inlineNamedValuesMode(owner: Owner&,key: Key,arguments: const u32[:],captured: blot_support::Option<const u32[:]>,depth: i64,small_result: blot_support::Option<u32>) -> bool,Error {
+    var mappings = MappingBuffer {..}; var rows = RowBuffer {..};
+    let emitted,error = emitNamedInlineValues(owner,key,arguments,captured,depth,small_result,mappings,rows);
+    rows.deinit(); mappings.deinit(); return emitted,error;
 }
 struct Alias { binding: u32,local: u32 }
 recursive fn emitOpaqueAdapterBody(owner: Owner&,root: u32,depth: i64) -> bool,Error {
@@ -1354,68 +1862,164 @@ fn prepareEvaluatedNamedInner(owner: Owner&,id: u32) -> blot_support::Option<Eva
     let producer .= generator.unit(header.unit); let definition .= producer.body(header.identity); if definition == null || !definition.is_function || definition.parameters.len > 16 || header.applied + count != definition.parameters.len || !blot_backend_inline_body::cost(producer,definition.root).present { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; }
     let capture_count = header.applied as i64; if generator.evaluator.valueInfo(value).len != capture_count { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; } var captured: u32[16] = default<u32[16]>(); for actual,index in generator.evaluator.valueChildren(value) { captured[index] = actual; } var capture_budget: i64 = 65536; for actual in captured[..capture_count] { if !evaluatedCaptureSupported(owner,actual,capture_budget,0) { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; } }
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_36() -> blot_support::Option<EvaluatedNamed>,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_35() -> blot_support::Option<EvaluatedNamed>,Error {
+    block {
 
-    for mapping in generator.evaluator.storage.type_mappings.items[header.mappings.start..header.mappings.start + header.mappings.len] { let concrete,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return blot_support::none<EvaluatedNamed>(),error; } return blot_support::none<EvaluatedNamed>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); } let mapped = generator.mapType(header.unit,mappings,mapping.variable,concrete,definition.span); if mapped != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),mapped; } }
-    let loaded = generator.loadSemanticRows(generator.evaluator.storage.row_mappings.items[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),loaded; } let initial,initial_error = generator.functionRoot(header.unit,producer.binding(header.identity).ty,definition.span); if initial_error != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),initial_error; } var source_type = initial;
-    for parameter,index in producer.bodyParameters(definition)[..capture_count] { let concrete,error = generator.captureTypeLayout(header.unit,parameter.ty,parameter.span,captured[index],mappings,rows); if error != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),error; } let arrow = producer.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { return blot_support::none<EvaluatedNamed>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); } let mapped = generator.mapType(header.unit,mappings,arrow.a,concrete,definition.span); if mapped != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),mapped; } source_type = arrow.b; }
-    let mapped = generator.mapTypeDepth(header.unit,mappings,rows,source_type,selected,definition.span,0); if mapped != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),mapped; } let expected,expected_error = generator.codeLayoutWithRows(header.unit,producer.binding(header.identity).ty,mappings.items,rows.items,definition.span); if expected_error != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),expected_error; }
-    let refined = generator.refineMappings(header.unit,blot_reuse_refinement_receipt::Root.body { blot_check_core::BindingRef { header.unit,header.identity } , ..},expected,mappings,rows,definition.span); if refined != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),refined; } let refined_type,refined_error = generator.codeLayoutWithRows(header.unit,producer.binding(header.identity).ty,mappings.items,rows.items,definition.span); if refined_error != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),refined_error; } var full = refined_type;
+    for mapping in generator.evaluator.storage.type_mappings.items[header.mappings.start..header.mappings.start + header.mappings.len] { let concrete,error = generator.representations.fromEvidence(generator.evaluator.evidenceStore(),mapping.evidence); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let __flat_cleanup_32_0_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_0_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_33_0_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_0_0; let __flat_cleanup_33_0_1: Error = __flat_cleanup_32_0_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_0_0,__flat_cleanup_33_0_1; } let __flat_cleanup_32_1_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_1_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); block {
+rows.deinit();
+} let __flat_cleanup_33_1_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_1_0; let __flat_cleanup_33_1_1: Error = __flat_cleanup_32_1_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_1_0,__flat_cleanup_33_1_1; } let mapped = generator.mapType(header.unit,mappings,mapping.variable,concrete,definition.span); if mapped != blot_error::Error.none { let __flat_cleanup_32_2_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_2_1: Error = mapped; block {
+rows.deinit();
+} let __flat_cleanup_33_2_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_2_0; let __flat_cleanup_33_2_1: Error = __flat_cleanup_32_2_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_2_0,__flat_cleanup_33_2_1; } }
+    let loaded = generator.loadSemanticRows(generator.evaluator.storage.row_mappings.items[header.row_mappings.start..header.row_mappings.start + header.row_mappings.len],rows); if loaded != blot_error::Error.none { let __flat_cleanup_32_3_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_3_1: Error = loaded; block {
+rows.deinit();
+} let __flat_cleanup_33_3_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_3_0; let __flat_cleanup_33_3_1: Error = __flat_cleanup_32_3_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_3_0,__flat_cleanup_33_3_1; } let initial,initial_error = generator.functionRoot(header.unit,producer.binding(header.identity).ty,definition.span); if initial_error != blot_error::Error.none { let __flat_cleanup_32_4_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_4_1: Error = initial_error; block {
+rows.deinit();
+} let __flat_cleanup_33_4_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_4_0; let __flat_cleanup_33_4_1: Error = __flat_cleanup_32_4_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_4_0,__flat_cleanup_33_4_1; } var source_type = initial;
+    for parameter,index in producer.bodyParameters(definition)[..capture_count] { let concrete,error = generator.captureTypeLayout(header.unit,parameter.ty,parameter.span,captured[index],mappings,rows); if error != blot_error::Error.none { let __flat_cleanup_32_5_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_5_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_33_5_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_5_0; let __flat_cleanup_33_5_1: Error = __flat_cleanup_32_5_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_5_0,__flat_cleanup_33_5_1; } let arrow = producer.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { let __flat_cleanup_32_6_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_6_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); block {
+rows.deinit();
+} let __flat_cleanup_33_6_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_6_0; let __flat_cleanup_33_6_1: Error = __flat_cleanup_32_6_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_6_0,__flat_cleanup_33_6_1; } let mapped = generator.mapType(header.unit,mappings,arrow.a,concrete,definition.span); if mapped != blot_error::Error.none { let __flat_cleanup_32_7_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_7_1: Error = mapped; block {
+rows.deinit();
+} let __flat_cleanup_33_7_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_7_0; let __flat_cleanup_33_7_1: Error = __flat_cleanup_32_7_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_7_0,__flat_cleanup_33_7_1; } source_type = arrow.b; }
+    let mapped = generator.mapTypeDepth(header.unit,mappings,rows,source_type,selected,definition.span,0); if mapped != blot_error::Error.none { let __flat_cleanup_32_8_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_8_1: Error = mapped; block {
+rows.deinit();
+} let __flat_cleanup_33_8_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_8_0; let __flat_cleanup_33_8_1: Error = __flat_cleanup_32_8_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_8_0,__flat_cleanup_33_8_1; } let expected,expected_error = generator.codeLayoutWithRows(header.unit,producer.binding(header.identity).ty,mappings.items,rows.items,definition.span); if expected_error != blot_error::Error.none { let __flat_cleanup_32_9_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_9_1: Error = expected_error; block {
+rows.deinit();
+} let __flat_cleanup_33_9_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_9_0; let __flat_cleanup_33_9_1: Error = __flat_cleanup_32_9_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_9_0,__flat_cleanup_33_9_1; }
+    let refined = generator.refineMappings(header.unit,blot_reuse_refinement_receipt::Root.body { blot_check_core::BindingRef { header.unit,header.identity } , ..},expected,mappings,rows,definition.span); if refined != blot_error::Error.none { let __flat_cleanup_32_10_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_10_1: Error = refined; block {
+rows.deinit();
+} let __flat_cleanup_33_10_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_10_0; let __flat_cleanup_33_10_1: Error = __flat_cleanup_32_10_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_10_0,__flat_cleanup_33_10_1; } let refined_type,refined_error = generator.codeLayoutWithRows(header.unit,producer.binding(header.identity).ty,mappings.items,rows.items,definition.span); if refined_error != blot_error::Error.none { let __flat_cleanup_32_11_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_11_1: Error = refined_error; block {
+rows.deinit();
+} let __flat_cleanup_33_11_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_11_0; let __flat_cleanup_33_11_1: Error = __flat_cleanup_32_11_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_11_0,__flat_cleanup_33_11_1; } var full = refined_type;
     var key = Key { target: blot_check_core::BindingRef { header.unit,header.identity , ..},count: definition.parameters.len as u8,result: 0 , ..};
-    for index in 0..key.count { let arrow = generator.representations.store.node(full); if arrow.tag != blot_backend_layout::Tag.function || hasErasedType(owner,arrow.a,0) || generator.representations.store.node(arrow.a).tag == blot_backend_layout::Tag.universal { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; } key.parameters[index] = arrow.a; key.effects[index] = arrow.c;
-        if index >= capture_count { let actual,error = codeLayout(owner,source.typeOf(arguments[index - capture_count]),source.span(id)); if error != blot_error::Error.none { return blot_support::none<EvaluatedNamed>(),error; } if actual != arrow.a { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; } } full = arrow.b;
+    for index in 0..key.count { let arrow = generator.representations.store.node(full); if arrow.tag != blot_backend_layout::Tag.function || hasErasedType(owner,arrow.a,0) || generator.representations.store.node(arrow.a).tag == blot_backend_layout::Tag.universal { let __flat_cleanup_32_12_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_12_1: Error = blot_error::Error.none; block {
+rows.deinit();
+} let __flat_cleanup_33_12_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_12_0; let __flat_cleanup_33_12_1: Error = __flat_cleanup_32_12_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_12_0,__flat_cleanup_33_12_1; } key.parameters[index] = arrow.a; key.effects[index] = arrow.c;
+        if index >= capture_count { let actual,error = codeLayout(owner,source.typeOf(arguments[index - capture_count]),source.span(id)); if error != blot_error::Error.none { let __flat_cleanup_32_13_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_13_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_33_13_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_13_0; let __flat_cleanup_33_13_1: Error = __flat_cleanup_32_13_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_13_0,__flat_cleanup_33_13_1; } if actual != arrow.a { let __flat_cleanup_32_14_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_14_1: Error = blot_error::Error.none; block {
+rows.deinit();
+} let __flat_cleanup_33_14_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_14_0; let __flat_cleanup_33_14_1: Error = __flat_cleanup_32_14_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_14_0,__flat_cleanup_33_14_1; } } full = arrow.b;
     }
-    if hasErasedType(owner,full,0) { return blot_support::none<EvaluatedNamed>(),blot_error::Error.none; } key.result = full; return blot_support::some(EvaluatedNamed { key,arguments,count,captured,capture_count , ..}),blot_error::Error.none;
+    if hasErasedType(owner,full,0) { let __flat_cleanup_32_15_0: blot_support::Option<EvaluatedNamed> = blot_support::none<EvaluatedNamed>(); let __flat_cleanup_32_15_1: Error = blot_error::Error.none; block {
+rows.deinit();
+} let __flat_cleanup_33_15_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_15_0; let __flat_cleanup_33_15_1: Error = __flat_cleanup_32_15_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_15_0,__flat_cleanup_33_15_1; } key.result = full; let __flat_cleanup_32_16_0: blot_support::Option<EvaluatedNamed> = blot_support::some(EvaluatedNamed { key,arguments,count,captured,capture_count , ..}); let __flat_cleanup_32_16_1: Error = blot_error::Error.none; block {
+rows.deinit();
+} let __flat_cleanup_33_16_0: blot_support::Option<EvaluatedNamed> = __flat_cleanup_32_16_0; let __flat_cleanup_33_16_1: Error = __flat_cleanup_32_16_1; block {
+mappings.deinit();
+} return __flat_cleanup_33_16_0,__flat_cleanup_33_16_1;
+
 
     }
-    let cleanup_result_35_0,cleanup_result_35_1 = cleanup_continuation_35();
-     rows.deinit();
-    return cleanup_result_35_0,cleanup_result_35_1;
+
 
     }
-    let cleanup_result_36_0,cleanup_result_36_1 = cleanup_continuation_36();
-     mappings.deinit();
-    return cleanup_result_36_0,cleanup_result_36_1;
 }
 fn reverse(values: u32[:]) { var first: i64 = 0; var last = values.len; while first < last { last--; if first >= last { break; } let previous = values[first]; values[first] = values[last]; values[last] = previous; first++; } }
 recursive fn emitEvaluatedNamed(owner: Owner&,plan: const EvaluatedNamed&,depth: i64) -> bool,Error {
     let generator .= owner.generator; if owner.inline_depth >= 6 || generator.instance_depth >= 256 || generator.module.functions[owner.function_id].instructions.len > 4096 { return false,blot_error::Error.none; } let source .= generator.unit(plan.key.target.unit); let definition .= source.body(plan.key.target.binding); assert(definition != null);
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_34() -> bool,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_33() -> bool,Error {
- let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { return false,service_error; } let resolved,error = service.named(plan.key,[],mappings,rows); if error != blot_error::Error.none { return false,generator.specializationFailure(service,error); }
-    if generator.artifacts != null { if !generator.artifacts.hasStaticValues() { generator.artifacts.requireFreshCode(); } let read = generator.artifacts.readInlineBody(plan.key.target); if read != blot_error::Error.none { return false,read; } }
+    block {
+ let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { let __flat_cleanup_30_0_0: bool = false; let __flat_cleanup_30_0_1: Error = service_error; block {
+rows.deinit();
+} let __flat_cleanup_31_0_0: bool = __flat_cleanup_30_0_0; let __flat_cleanup_31_0_1: Error = __flat_cleanup_30_0_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_0_0,__flat_cleanup_31_0_1; } let resolved,error = service.named(plan.key,[],mappings,rows); if error != blot_error::Error.none { let __flat_cleanup_30_1_0: bool = false; let __flat_cleanup_30_1_1: Error = generator.specializationFailure(service,error); block {
+rows.deinit();
+} let __flat_cleanup_31_1_0: bool = __flat_cleanup_30_1_0; let __flat_cleanup_31_1_1: Error = __flat_cleanup_30_1_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_1_0,__flat_cleanup_31_1_1; }
+    if generator.artifacts != null { if !generator.artifacts.hasStaticValues() { generator.artifacts.requireFreshCode(); } let read = generator.artifacts.readInlineBody(plan.key.target); if read != blot_error::Error.none { let __flat_cleanup_30_2_0: bool = false; let __flat_cleanup_30_2_1: Error = read; block {
+rows.deinit();
+} let __flat_cleanup_31_2_0: bool = __flat_cleanup_30_2_0; let __flat_cleanup_31_2_1: Error = __flat_cleanup_30_2_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_2_0,__flat_cleanup_31_2_1; } }
     generator.instance_depth++;
-    recursive fn cleanup_continuation_32() -> bool,Error {
- let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { return false,cleanup_error; }
+    block {
+ let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { let __flat_cleanup_29_0_0: bool = false; let __flat_cleanup_29_0_1: Error = context_error; block {
+generator.instance_depth--;
+} let __flat_cleanup_30_3_0: bool = __flat_cleanup_29_0_0; let __flat_cleanup_30_3_1: Error = __flat_cleanup_29_0_1; block {
+rows.deinit();
+} let __flat_cleanup_31_3_0: bool = __flat_cleanup_30_3_0; let __flat_cleanup_31_3_1: Error = __flat_cleanup_30_3_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_3_0,__flat_cleanup_31_3_1; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { let __flat_cleanup_29_1_0: bool = false; let __flat_cleanup_29_1_1: Error = cleanup_error; block {
+generator.instance_depth--;
+} let __flat_cleanup_30_4_0: bool = __flat_cleanup_29_1_0; let __flat_cleanup_30_4_1: Error = __flat_cleanup_29_1_1; block {
+rows.deinit();
+} let __flat_cleanup_31_4_0: bool = __flat_cleanup_30_4_0; let __flat_cleanup_31_4_1: Error = __flat_cleanup_30_4_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_4_0,__flat_cleanup_31_4_1; }
     var emitter = Owner { diagnostic_context: context, generator: generator, unit_id: plan.key.target.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, inline_depth: owner.inline_depth + 1, inline_loop: owner.inline_loop || owner.loop_targets.items.len != 0, .. };
-    recursive fn cleanup_continuation_31() -> bool,Error {
+    block {
 
-    let parameters = source.bodyParameters(definition); for parameter,index in parameters[..plan.capture_count] { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,plan.captured[index]); } } for parameter,index in parameters[plan.capture_count..] { let local,local_error = capture(owner,plan.arguments[index],depth); if local_error != blot_error::Error.none { return false,local_error; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } }
-    let emitted = bodyExpression(emitter,resolved.root,depth + 1,false); return emitted == blot_error::Error.none,emitted;
+    let parameters = source.bodyParameters(definition); for parameter,index in parameters[..plan.capture_count] { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,plan.captured[index]); } } for parameter,index in parameters[plan.capture_count..] { let local,local_error = capture(owner,plan.arguments[index],depth); if local_error != blot_error::Error.none { let __flat_cleanup_28_0_0: bool = false; let __flat_cleanup_28_0_1: Error = local_error; block {
+emitter.deinit();
+} let __flat_cleanup_29_2_0: bool = __flat_cleanup_28_0_0; let __flat_cleanup_29_2_1: Error = __flat_cleanup_28_0_1; block {
+generator.instance_depth--;
+} let __flat_cleanup_30_5_0: bool = __flat_cleanup_29_2_0; let __flat_cleanup_30_5_1: Error = __flat_cleanup_29_2_1; block {
+rows.deinit();
+} let __flat_cleanup_31_5_0: bool = __flat_cleanup_30_5_0; let __flat_cleanup_31_5_1: Error = __flat_cleanup_30_5_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_5_0,__flat_cleanup_31_5_1; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } }
+    let emitted = bodyExpression(emitter,resolved.root,depth + 1,false); let __flat_cleanup_28_1_0: bool = emitted == blot_error::Error.none; let __flat_cleanup_28_1_1: Error = emitted; block {
+emitter.deinit();
+} let __flat_cleanup_29_3_0: bool = __flat_cleanup_28_1_0; let __flat_cleanup_29_3_1: Error = __flat_cleanup_28_1_1; block {
+generator.instance_depth--;
+} let __flat_cleanup_30_6_0: bool = __flat_cleanup_29_3_0; let __flat_cleanup_30_6_1: Error = __flat_cleanup_29_3_1; block {
+rows.deinit();
+} let __flat_cleanup_31_6_0: bool = __flat_cleanup_30_6_0; let __flat_cleanup_31_6_1: Error = __flat_cleanup_30_6_1; block {
+mappings.deinit();
+} return __flat_cleanup_31_6_0,__flat_cleanup_31_6_1;
+
 
     }
-    let cleanup_result_31_0,cleanup_result_31_1 = cleanup_continuation_31();
-     emitter.deinit();
-    return cleanup_result_31_0,cleanup_result_31_1;
+
 
     }
-    let cleanup_result_32_0,cleanup_result_32_1 = cleanup_continuation_32();
-     generator.instance_depth--;
-    return cleanup_result_32_0,cleanup_result_32_1;
+
 
     }
-    let cleanup_result_33_0,cleanup_result_33_1 = cleanup_continuation_33();
-     rows.deinit();
-    return cleanup_result_33_0,cleanup_result_33_1;
+
 
     }
-    let cleanup_result_34_0,cleanup_result_34_1 = cleanup_continuation_34();
-     mappings.deinit();
-    return cleanup_result_34_0,cleanup_result_34_1;
 }
 fn staticReference(owner: Owner&,id: u32) -> blot_support::Option<u32>,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if source.node(id).tag != blot_check_core::Tag.reference { return blot_support::none<u32>(),blot_error::Error.none; } let reference = source.reference(id);
@@ -1427,42 +2031,110 @@ recursive fn inlineStaticCall(owner: Owner&,key: Key,arguments: const u32[:],dep
     var values: blot_support::Option<u32>[16] = [blot_support::none<u32>();16]; var retained = false; for argument,index in arguments { if !hasErasedType(owner,key.parameters[index],0) { continue; } let value,error = staticReference(owner,argument); if error != blot_error::Error.none { return false,error; } values[index] = value; retained = retained || value.present; } if !retained { return false,blot_error::Error.none; }
     if generator.artifacts != null { let read = generator.artifacts.readInlineBody(key.target); if read != blot_error::Error.none { return false,read; } if !generator.artifacts.hasStaticValues() { generator.artifacts.requireFreshCode(); } }
     if generator.instance_depth >= 256 { return false,generator.decline(key.target.unit,body.span,blot_check_diagnostic_code::Code.complexity); } generator.instance_depth++;
-    recursive fn cleanup_continuation_30() -> bool,Error {
+    block {
 
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_29() -> bool,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_28() -> bool,Error {
+    block {
  var full = key.result; var index = key.count as i64;
-    while index != 0 { index--; let arrow,error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,key.parameters[index],full,key.effects[index],[]); if error != blot_error::Error.none { return false,error; } full = arrow; }
-    let seeded = generator.seedNamedInstance(key,mappings); if seeded != blot_error::Error.none { return false,seeded; } let initial,initial_error = generator.functionRoot(key.target.unit,source.binding(key.target.binding).ty,body.span); if initial_error != blot_error::Error.none { return false,initial_error; } var source_type = initial;
-    for parameter,index in key.parameters[..key.count] { let arrow = source.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { return false,generator.decline(key.target.unit,body.span,blot_check_diagnostic_code::Code.unresolved_type); } let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,arrow.a,parameter,body.span,0); if mapped != blot_error::Error.none { return false,mapped; } let row = generator.mapRow(key.target.unit,mappings,rows,arrow.c,key.effects[index],body.span,true); if row != blot_error::Error.none { return false,row; } source_type = arrow.b; }
-    let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,source_type,key.result,body.span,0); if mapped != blot_error::Error.none { return false,mapped; } let refined = generator.refineMappings(key.target.unit,blot_reuse_refinement_receipt::Root.body { key.target , ..},full,mappings,rows,body.span); if refined != blot_error::Error.none { return false,refined; }
-    let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { return false,cleanup_error; } var emitter = Owner { diagnostic_context: context, generator: generator, unit_id: key.target.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, .. };
-    recursive fn cleanup_continuation_27() -> bool,Error {
+    while index != 0 { index--; let arrow,error = generator.internLayoutWithEffects(blot_backend_layout::Tag.function,key.parameters[index],full,key.effects[index],[]); if error != blot_error::Error.none { let __flat_cleanup_25_0_0: bool = false; let __flat_cleanup_25_0_1: Error = error; block {
+rows.deinit();
+} let __flat_cleanup_26_0_0: bool = __flat_cleanup_25_0_0; let __flat_cleanup_26_0_1: Error = __flat_cleanup_25_0_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_0_0: bool = __flat_cleanup_26_0_0; let __flat_cleanup_27_0_1: Error = __flat_cleanup_26_0_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_0_0,__flat_cleanup_27_0_1; } full = arrow; }
+    let seeded = generator.seedNamedInstance(key,mappings); if seeded != blot_error::Error.none { let __flat_cleanup_25_1_0: bool = false; let __flat_cleanup_25_1_1: Error = seeded; block {
+rows.deinit();
+} let __flat_cleanup_26_1_0: bool = __flat_cleanup_25_1_0; let __flat_cleanup_26_1_1: Error = __flat_cleanup_25_1_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_1_0: bool = __flat_cleanup_26_1_0; let __flat_cleanup_27_1_1: Error = __flat_cleanup_26_1_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_1_0,__flat_cleanup_27_1_1; } let initial,initial_error = generator.functionRoot(key.target.unit,source.binding(key.target.binding).ty,body.span); if initial_error != blot_error::Error.none { let __flat_cleanup_25_2_0: bool = false; let __flat_cleanup_25_2_1: Error = initial_error; block {
+rows.deinit();
+} let __flat_cleanup_26_2_0: bool = __flat_cleanup_25_2_0; let __flat_cleanup_26_2_1: Error = __flat_cleanup_25_2_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_2_0: bool = __flat_cleanup_26_2_0; let __flat_cleanup_27_2_1: Error = __flat_cleanup_26_2_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_2_0,__flat_cleanup_27_2_1; } var source_type = initial;
+    for parameter,index in key.parameters[..key.count] { let arrow = source.types.node(source_type); if arrow.tag != blot_check_types::Tag.function { let __flat_cleanup_25_3_0: bool = false; let __flat_cleanup_25_3_1: Error = generator.decline(key.target.unit,body.span,blot_check_diagnostic_code::Code.unresolved_type); block {
+rows.deinit();
+} let __flat_cleanup_26_3_0: bool = __flat_cleanup_25_3_0; let __flat_cleanup_26_3_1: Error = __flat_cleanup_25_3_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_3_0: bool = __flat_cleanup_26_3_0; let __flat_cleanup_27_3_1: Error = __flat_cleanup_26_3_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_3_0,__flat_cleanup_27_3_1; } let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,arrow.a,parameter,body.span,0); if mapped != blot_error::Error.none { let __flat_cleanup_25_4_0: bool = false; let __flat_cleanup_25_4_1: Error = mapped; block {
+rows.deinit();
+} let __flat_cleanup_26_4_0: bool = __flat_cleanup_25_4_0; let __flat_cleanup_26_4_1: Error = __flat_cleanup_25_4_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_4_0: bool = __flat_cleanup_26_4_0; let __flat_cleanup_27_4_1: Error = __flat_cleanup_26_4_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_4_0,__flat_cleanup_27_4_1; } let row = generator.mapRow(key.target.unit,mappings,rows,arrow.c,key.effects[index],body.span,true); if row != blot_error::Error.none { let __flat_cleanup_25_5_0: bool = false; let __flat_cleanup_25_5_1: Error = row; block {
+rows.deinit();
+} let __flat_cleanup_26_5_0: bool = __flat_cleanup_25_5_0; let __flat_cleanup_26_5_1: Error = __flat_cleanup_25_5_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_5_0: bool = __flat_cleanup_26_5_0; let __flat_cleanup_27_5_1: Error = __flat_cleanup_26_5_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_5_0,__flat_cleanup_27_5_1; } source_type = arrow.b; }
+    let mapped = generator.mapTypeDepth(key.target.unit,mappings,rows,source_type,key.result,body.span,0); if mapped != blot_error::Error.none { let __flat_cleanup_25_6_0: bool = false; let __flat_cleanup_25_6_1: Error = mapped; block {
+rows.deinit();
+} let __flat_cleanup_26_6_0: bool = __flat_cleanup_25_6_0; let __flat_cleanup_26_6_1: Error = __flat_cleanup_25_6_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_6_0: bool = __flat_cleanup_26_6_0; let __flat_cleanup_27_6_1: Error = __flat_cleanup_26_6_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_6_0,__flat_cleanup_27_6_1; } let refined = generator.refineMappings(key.target.unit,blot_reuse_refinement_receipt::Root.body { key.target , ..},full,mappings,rows,body.span); if refined != blot_error::Error.none { let __flat_cleanup_25_7_0: bool = false; let __flat_cleanup_25_7_1: Error = refined; block {
+rows.deinit();
+} let __flat_cleanup_26_7_0: bool = __flat_cleanup_25_7_0; let __flat_cleanup_26_7_1: Error = __flat_cleanup_25_7_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_7_0: bool = __flat_cleanup_26_7_0; let __flat_cleanup_27_7_1: Error = __flat_cleanup_26_7_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_7_0,__flat_cleanup_27_7_1; }
+    let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { let __flat_cleanup_25_8_0: bool = false; let __flat_cleanup_25_8_1: Error = context_error; block {
+rows.deinit();
+} let __flat_cleanup_26_8_0: bool = __flat_cleanup_25_8_0; let __flat_cleanup_26_8_1: Error = __flat_cleanup_25_8_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_8_0: bool = __flat_cleanup_26_8_0; let __flat_cleanup_27_8_1: Error = __flat_cleanup_26_8_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_8_0,__flat_cleanup_27_8_1; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { let __flat_cleanup_25_9_0: bool = false; let __flat_cleanup_25_9_1: Error = cleanup_error; block {
+rows.deinit();
+} let __flat_cleanup_26_9_0: bool = __flat_cleanup_25_9_0; let __flat_cleanup_26_9_1: Error = __flat_cleanup_25_9_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_9_0: bool = __flat_cleanup_26_9_0; let __flat_cleanup_27_9_1: Error = __flat_cleanup_26_9_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_9_0,__flat_cleanup_27_9_1; } var emitter = Owner { diagnostic_context: context, generator: generator, unit_id: key.target.unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings: mappings.items, row_mappings: rows.items, cleanups: cleanups, labels: owner.labels, .. };
+    block {
 
-    for argument,index in arguments { let parameter = source.bodyParameters(body)[index]; if values[index].present { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,values[index].value); } } else { let local,error = capture(owner,argument,depth); if error != blot_error::Error.none { return false,error; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } } }
-    let emitted = finishStaticCall(emitter,key,arguments.len,depth); return emitted == blot_error::Error.none,emitted;
+    for argument,index in arguments { let parameter = source.bodyParameters(body)[index]; if values[index].present { if parameter.binding != 0 { emitter.static_values.insert(parameter.binding,values[index].value); } } else { let local,error = capture(owner,argument,depth); if error != blot_error::Error.none { let __flat_cleanup_24_0_0: bool = false; let __flat_cleanup_24_0_1: Error = error; block {
+emitter.deinit();
+} let __flat_cleanup_25_10_0: bool = __flat_cleanup_24_0_0; let __flat_cleanup_25_10_1: Error = __flat_cleanup_24_0_1; block {
+rows.deinit();
+} let __flat_cleanup_26_10_0: bool = __flat_cleanup_25_10_0; let __flat_cleanup_26_10_1: Error = __flat_cleanup_25_10_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_10_0: bool = __flat_cleanup_26_10_0; let __flat_cleanup_27_10_1: Error = __flat_cleanup_26_10_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_10_0,__flat_cleanup_27_10_1; } if parameter.binding != 0 { emitter.locals.insert(parameter.binding,local); } } }
+    let emitted = finishStaticCall(emitter,key,arguments.len,depth); let __flat_cleanup_24_1_0: bool = emitted == blot_error::Error.none; let __flat_cleanup_24_1_1: Error = emitted; block {
+emitter.deinit();
+} let __flat_cleanup_25_11_0: bool = __flat_cleanup_24_1_0; let __flat_cleanup_25_11_1: Error = __flat_cleanup_24_1_1; block {
+rows.deinit();
+} let __flat_cleanup_26_11_0: bool = __flat_cleanup_25_11_0; let __flat_cleanup_26_11_1: Error = __flat_cleanup_25_11_1; block {
+mappings.deinit();
+} let __flat_cleanup_27_11_0: bool = __flat_cleanup_26_11_0; let __flat_cleanup_27_11_1: Error = __flat_cleanup_26_11_1; block {
+generator.instance_depth--;
+} return __flat_cleanup_27_11_0,__flat_cleanup_27_11_1;
+
 
     }
-    let cleanup_result_27_0,cleanup_result_27_1 = cleanup_continuation_27();
-     emitter.deinit();
-    return cleanup_result_27_0,cleanup_result_27_1;
+
 
     }
-    let cleanup_result_28_0,cleanup_result_28_1 = cleanup_continuation_28();
-     rows.deinit();
-    return cleanup_result_28_0,cleanup_result_28_1;
+
 
     }
-    let cleanup_result_29_0,cleanup_result_29_1 = cleanup_continuation_29();
-     mappings.deinit();
-    return cleanup_result_29_0,cleanup_result_29_1;
+
 
     }
-    let cleanup_result_30_0,cleanup_result_30_1 = cleanup_continuation_30();
-     generator.instance_depth--;
-    return cleanup_result_30_0,cleanup_result_30_1;
 }
 recursive fn finishStaticCall(owner: Owner&,key: Key,supplied: i64,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(key.target.unit); let body .= source.body(key.target.binding); assert(body != null);
@@ -1471,32 +2143,56 @@ recursive fn finishStaticCall(owner: Owner&,key: Key,supplied: i64,depth: i64) -
     let function,error = generator.module.addTypedFunction([blot_backend_runtime_ir::VT_i32,generator.representations.store.machine(key.parameters[supplied]),blot_backend_runtime_ir::VT_i32],machine,role); if error != blot_error::Error.none { return error; } let described = generator.setParameterRoles(function,generator.closureRoles(key.parameters[supplied]),blot_support::some(2 as u16)); if described != blot_error::Error.none { return described; }
     generator.static_data.closures.push(function); generator.work.fresh_closures++; let requested = generator.planning.startup_facts.request(function,blot_backend_startup_emission_facts::Kind.named,key.target.unit,key.target.binding,false); if requested != blot_error::Error.none { return requested; }
     let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(); if cleanup_error != blot_error::Error.none { return cleanup_error; } var emitter = Owner { generator: generator,unit_id: key.target.unit,function_id: function,provider_local: blot_support::some(2 as u32),mappings: owner.mappings,row_mappings: owner.row_mappings,cleanups: cleanups , ..};
-    recursive fn cleanup_continuation_26() -> Error {
+    block {
 
-    var roles: blot_backend_runtime_ir::Role[16]; for ty,index in key.parameters[..supplied] { roles[index] = generator.layoutRole(ty); } let environment,environment_error = allocate(owner,(supplied * 4) as u32,AllocationRoles { words: roles[..supplied] , ..}); if environment_error != blot_error::Error.none { return environment_error; } let parameters = source.bodyParameters(body);
+    var roles: blot_backend_runtime_ir::Role[16]; for ty,index in key.parameters[..supplied] { roles[index] = generator.layoutRole(ty); } let environment,environment_error = allocate(owner,(supplied * 4) as u32,AllocationRoles { words: roles[..supplied] , ..}); if environment_error != blot_error::Error.none { let __flat_cleanup_23_0_0: Error = environment_error; block {
+emitter.deinit();
+} return __flat_cleanup_23_0_0; } let parameters = source.bodyParameters(body);
     for parameter,index in parameters[..supplied] {
-        let value .= owner.static_values.get(parameter.binding); let target = emit(owner,blot_backend_runtime_ir::OP_local_get,environment); if target != blot_error::Error.none { return target; }
-        if value != null || parameter.binding == 0 { let zero = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); if zero != blot_error::Error.none { return zero; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,(index * 4) as u32); if stored != blot_error::Error.none { return stored; } if value != null { emitter.static_values.insert(parameter.binding,value); } }
+        let value .= owner.static_values.get(parameter.binding); let target = emit(owner,blot_backend_runtime_ir::OP_local_get,environment); if target != blot_error::Error.none { let __flat_cleanup_23_1_0: Error = target; block {
+emitter.deinit();
+} return __flat_cleanup_23_1_0; }
+        if value != null || parameter.binding == 0 { let zero = emit(owner,blot_backend_runtime_ir::OP_i32_const,0); if zero != blot_error::Error.none { let __flat_cleanup_23_2_0: Error = zero; block {
+emitter.deinit();
+} return __flat_cleanup_23_2_0; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,(index * 4) as u32); if stored != blot_error::Error.none { let __flat_cleanup_23_3_0: Error = stored; block {
+emitter.deinit();
+} return __flat_cleanup_23_3_0; } if value != null { emitter.static_values.insert(parameter.binding,value); } }
         else {
-            let local .= owner.locals.get(parameter.binding); assert(local != null); let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,local); if loaded != blot_error::Error.none { return loaded; } let machine = generator.representations.store.machine(key.parameters[index]); var store = blot_backend_runtime_ir::OP_i32_store; var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; load = blot_backend_runtime_ir::OP_f32_load; }
-            let stored = emit(owner,store,(index * 4) as u32); if stored != blot_error::Error.none { return stored; } let captured,captured_error = temporary(emitter,machine); if captured_error != blot_error::Error.none { return captured_error; }
-            let base = emit(emitter,blot_backend_runtime_ir::OP_local_get,0); if base != blot_error::Error.none { return base; } let restored = emit(emitter,load,(index * 4) as u32); if restored != blot_error::Error.none { return restored; } let saved = emit(emitter,blot_backend_runtime_ir::OP_local_set,captured); if saved != blot_error::Error.none { return saved; } emitter.locals.insert(parameter.binding,captured);
+            let local .= owner.locals.get(parameter.binding); assert(local != null); let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,local); if loaded != blot_error::Error.none { let __flat_cleanup_23_4_0: Error = loaded; block {
+emitter.deinit();
+} return __flat_cleanup_23_4_0; } let machine = generator.representations.store.machine(key.parameters[index]); var store = blot_backend_runtime_ir::OP_i32_store; var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; load = blot_backend_runtime_ir::OP_f32_load; }
+            let stored = emit(owner,store,(index * 4) as u32); if stored != blot_error::Error.none { let __flat_cleanup_23_5_0: Error = stored; block {
+emitter.deinit();
+} return __flat_cleanup_23_5_0; } let captured,captured_error = temporary(emitter,machine); if captured_error != blot_error::Error.none { let __flat_cleanup_23_6_0: Error = captured_error; block {
+emitter.deinit();
+} return __flat_cleanup_23_6_0; }
+            let base = emit(emitter,blot_backend_runtime_ir::OP_local_get,0); if base != blot_error::Error.none { let __flat_cleanup_23_7_0: Error = base; block {
+emitter.deinit();
+} return __flat_cleanup_23_7_0; } let restored = emit(emitter,load,(index * 4) as u32); if restored != blot_error::Error.none { let __flat_cleanup_23_8_0: Error = restored; block {
+emitter.deinit();
+} return __flat_cleanup_23_8_0; } let saved = emit(emitter,blot_backend_runtime_ir::OP_local_set,captured); if saved != blot_error::Error.none { let __flat_cleanup_23_9_0: Error = saved; block {
+emitter.deinit();
+} return __flat_cleanup_23_9_0; } emitter.locals.insert(parameter.binding,captured);
         }
     }
     if parameters[supplied].binding != 0 { emitter.locals.insert(parameters[supplied].binding,1); } let caller = generator.planning.startup_facts.active; generator.planning.startup_facts.active = function;
-    recursive fn cleanup_continuation_25() -> Error {
+    block {
 
-    let remaining = finishStaticCall(emitter,key,supplied + 1,depth); if remaining != blot_error::Error.none { return remaining; } generator.planning.startup_facts.complete(function); generator.planning.startup_facts.active = caller; return descriptor(owner,function,environment);
+    let remaining = finishStaticCall(emitter,key,supplied + 1,depth); if remaining != blot_error::Error.none { let __flat_cleanup_22_0_0: Error = remaining; block {
+generator.planning.startup_facts.active = caller;
+} let __flat_cleanup_23_10_0: Error = __flat_cleanup_22_0_0; block {
+emitter.deinit();
+} return __flat_cleanup_23_10_0; } generator.planning.startup_facts.complete(function); generator.planning.startup_facts.active = caller; let __flat_cleanup_22_1_0: Error = descriptor(owner,function,environment); block {
+generator.planning.startup_facts.active = caller;
+} let __flat_cleanup_23_11_0: Error = __flat_cleanup_22_1_0; block {
+emitter.deinit();
+} return __flat_cleanup_23_11_0;
+
 
     }
-    let cleanup_result_25_0 = cleanup_continuation_25();
-     generator.planning.startup_facts.active = caller;
-    return cleanup_result_25_0;
+
 
     }
-    let cleanup_result_26_0 = cleanup_continuation_26();
-     emitter.deinit();
-    return cleanup_result_26_0;
 }
 fn preparePartialStaticCall(owner: Owner&,id: u32) -> blot_support::Option<SourceCall>,Error {
     assert(owner.preparing); let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var arguments: u32[16]; var count: i64 = 0; var root = id;
@@ -1525,84 +2221,200 @@ recursive fn recordMerge(owner: Owner&,id: u32,depth: i64) -> Error {
     let left_fields = generator.representations.store.children(left_type); let right_fields = generator.representations.store.children(right_type); let fields = generator.representations.store.children(result_type);
     if left_fields.len == 0 || right_fields.len == 0 { var selected = left; if left_fields.len == 0 { selected = right; } return emit(owner,blot_backend_runtime_ir::OP_local_get,selected); } if fields.len / 2 > 4294967295 / 4 { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); }
     var roles = RoleBuffer {..};
-    recursive fn cleanup_continuation_24() -> Error {
- for index in 0..fields.len / 2 { let appended = roles.push(generator.layoutRole(fields[index * 2 + 1])); if appended != blot_error::Error.none { return appended; } } let result,error = allocate(owner,(fields.len * 2) as u32,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { return error; }
+    block {
+ for index in 0..fields.len / 2 { let appended = roles.push(generator.layoutRole(fields[index * 2 + 1])); if appended != blot_error::Error.none { let __flat_cleanup_21_0_0: Error = appended; block {
+roles.deinit();
+} return __flat_cleanup_21_0_0; } } let result,error = allocate(owner,(fields.len * 2) as u32,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { let __flat_cleanup_21_1_0: Error = error; block {
+roles.deinit();
+} return __flat_cleanup_21_1_0; }
     var a: i64 = 0; var b: i64 = 0; var out: i64 = 0;
-    while out < fields.len { let from_left = a < left_fields.len && left_fields[a] == fields[out]; let from_right = b < right_fields.len && right_fields[b] == fields[out]; if !from_left && !from_right { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); } var selected = left; var offset = a; if from_right { selected = right; offset = b; }
-        let target = emit(owner,blot_backend_runtime_ir::OP_local_get,result); if target != blot_error::Error.none { return target; } let input = emit(owner,blot_backend_runtime_ir::OP_local_get,selected); if input != blot_error::Error.none { return input; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,(offset * 2) as u32); if loaded != blot_error::Error.none { return loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,(out * 2) as u32); if stored != blot_error::Error.none { return stored; }
+    while out < fields.len { let from_left = a < left_fields.len && left_fields[a] == fields[out]; let from_right = b < right_fields.len && right_fields[b] == fields[out]; if !from_left && !from_right { let __flat_cleanup_21_2_0: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.unresolved_type); block {
+roles.deinit();
+} return __flat_cleanup_21_2_0; } var selected = left; var offset = a; if from_right { selected = right; offset = b; }
+        let target = emit(owner,blot_backend_runtime_ir::OP_local_get,result); if target != blot_error::Error.none { let __flat_cleanup_21_3_0: Error = target; block {
+roles.deinit();
+} return __flat_cleanup_21_3_0; } let input = emit(owner,blot_backend_runtime_ir::OP_local_get,selected); if input != blot_error::Error.none { let __flat_cleanup_21_4_0: Error = input; block {
+roles.deinit();
+} return __flat_cleanup_21_4_0; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,(offset * 2) as u32); if loaded != blot_error::Error.none { let __flat_cleanup_21_5_0: Error = loaded; block {
+roles.deinit();
+} return __flat_cleanup_21_5_0; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,(out * 2) as u32); if stored != blot_error::Error.none { let __flat_cleanup_21_6_0: Error = stored; block {
+roles.deinit();
+} return __flat_cleanup_21_6_0; }
         if from_left { a += 2; } if from_right { b += 2; } out += 2;
-    } return emit(owner,blot_backend_runtime_ir::OP_local_get,result);
+    } let __flat_cleanup_21_7_0: Error = emit(owner,blot_backend_runtime_ir::OP_local_get,result); block {
+roles.deinit();
+} return __flat_cleanup_21_7_0;
+
 
     }
-    let cleanup_result_24_0 = cleanup_continuation_24();
-     roles.deinit();
-    return cleanup_result_24_0;
 }
 fn physicalOrder(owner: Owner&,record: blot_check_types::Node,out: WordBuffer&) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); assert(record.tag == blot_check_types::Tag.record); if record.b < 2 { return blot_error::Error.none; } var ordered = true;
     for index in 1..record.b { if !blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,index - 1).name,source.types.recordField(record,index).name) { ordered = false; break; } } if ordered { return blot_error::Error.none; }
     var sorted = WordBuffer {..};
-    recursive fn cleanup_continuation_23() -> Error {
- for index in 0..record.b { let appended = sorted.push(index as u32); if appended != blot_error::Error.none { return appended; } }
+    block {
+ for index in 0..record.b { let appended = sorted.push(index as u32); if appended != blot_error::Error.none { let __flat_cleanup_20_0_0: Error = appended; block {
+sorted.deinit();
+} return __flat_cleanup_20_0_0; } }
     for index in 1..sorted.items.len { let original = sorted.items[index]; var position = index; while position > 0 && blot_check_record_order::less(generator.representations.store.record_names,generator.representations.store.opaque_sources,source.types.recordField(record,original).name,source.types.recordField(record,sorted.items[position - 1]).name) { sorted.items[position] = sorted.items[position - 1]; position--; } sorted.items[position] = original; }
-    for index in 0..record.b { let appended = out.push(0); if appended != blot_error::Error.none { return appended; } } for original,index in sorted.items { out.items[original] = index as u32; } return blot_error::Error.none;
+    for index in 0..record.b { let appended = out.push(0); if appended != blot_error::Error.none { let __flat_cleanup_20_1_0: Error = appended; block {
+sorted.deinit();
+} return __flat_cleanup_20_1_0; } } for original,index in sorted.items { out.items[original] = index as u32; } let __flat_cleanup_20_2_0: Error = blot_error::Error.none; block {
+sorted.deinit();
+} return __flat_cleanup_20_2_0;
+
 
     }
-    let cleanup_result_23_0 = cleanup_continuation_23();
-     sorted.deinit();
-    return cleanup_result_23_0;
 }
 recursive fn aggregate(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let children = source.children(id); if children.len == 0 { return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); } if children.len > 4294967295 / 4 { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); }
     var locals = WordBuffer {..};
-    recursive fn cleanup_continuation_22() -> Error {
- for child in children { let local,error = capture(owner,child,depth); if error != blot_error::Error.none { return error; } let appended = locals.push(local); if appended != blot_error::Error.none { return appended; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { return blot_error::Error.none; } }
+    block {
+ for child in children { let local,error = capture(owner,child,depth); if error != blot_error::Error.none { let __flat_cleanup_19_0_0: Error = error; block {
+locals.deinit();
+} return __flat_cleanup_19_0_0; } let appended = locals.push(local); if appended != blot_error::Error.none { let __flat_cleanup_19_1_0: Error = appended; block {
+locals.deinit();
+} return __flat_cleanup_19_1_0; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { let __flat_cleanup_19_2_0: Error = blot_error::Error.none; block {
+locals.deinit();
+} return __flat_cleanup_19_2_0; } }
     let record = source.node(id).tag == blot_check_core::Tag.record; let destinations=selectedRecordDestinations(source,id,record); var aggregate_type = source.typeOf(id); if source.types.node(aggregate_type).tag == blot_check_types::Tag.usage { aggregate_type = source.types.node(aggregate_type).a; }
     var physical = WordBuffer {..};
-    recursive fn cleanup_continuation_21() -> Error {
- if record { let order = physicalOrder(owner,source.types.node(aggregate_type),physical); if order != blot_error::Error.none { return order; } } var roles = RoleBuffer {..};
-    recursive fn cleanup_continuation_20() -> Error {
- for child in children { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != blot_error::Error.none { return appended; } }
-    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let concrete,error = codeLayout(owner,source.typeOf(child),source.span(child)); if error != blot_error::Error.none { return error; } roles.items[slot] = generator.layoutRole(concrete); }
-    let address,error = allocate(owner,(children.len * 4) as u32,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { return error; } if containsValue(roles.items,blot_backend_runtime_ir::ROLE_reference) { let concrete,concrete_error = codeLayout(owner,source.typeOf(id),source.span(id)); if concrete_error != blot_error::Error.none { return concrete_error; } let acyclic = markAcyclic(owner,address,concrete); if acyclic != blot_error::Error.none { return acyclic; } }
-    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != blot_error::Error.none { return a; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,locals.items[index]); if b != blot_error::Error.none { return b; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { return scalar_error; } var store = blot_backend_runtime_ir::OP_i32_store; if scalar_type == blot_backend_runtime_ir::SC_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,slot * 4); if stored != blot_error::Error.none { return stored; } }
-    return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+    block {
+ if record { let order = physicalOrder(owner,source.types.node(aggregate_type),physical); if order != blot_error::Error.none { let __flat_cleanup_18_0_0: Error = order; block {
+physical.deinit();
+} let __flat_cleanup_19_3_0: Error = __flat_cleanup_18_0_0; block {
+locals.deinit();
+} return __flat_cleanup_19_3_0; } } var roles = RoleBuffer {..};
+    block {
+ for child in children { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != blot_error::Error.none { let __flat_cleanup_17_0_0: Error = appended; block {
+roles.deinit();
+} let __flat_cleanup_18_1_0: Error = __flat_cleanup_17_0_0; block {
+physical.deinit();
+} let __flat_cleanup_19_4_0: Error = __flat_cleanup_18_1_0; block {
+locals.deinit();
+} return __flat_cleanup_19_4_0; } }
+    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let concrete,error = codeLayout(owner,source.typeOf(child),source.span(child)); if error != blot_error::Error.none { let __flat_cleanup_17_1_0: Error = error; block {
+roles.deinit();
+} let __flat_cleanup_18_2_0: Error = __flat_cleanup_17_1_0; block {
+physical.deinit();
+} let __flat_cleanup_19_5_0: Error = __flat_cleanup_18_2_0; block {
+locals.deinit();
+} return __flat_cleanup_19_5_0; } roles.items[slot] = generator.layoutRole(concrete); }
+    let address,error = allocate(owner,(children.len * 4) as u32,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { let __flat_cleanup_17_2_0: Error = error; block {
+roles.deinit();
+} let __flat_cleanup_18_3_0: Error = __flat_cleanup_17_2_0; block {
+physical.deinit();
+} let __flat_cleanup_19_6_0: Error = __flat_cleanup_18_3_0; block {
+locals.deinit();
+} return __flat_cleanup_19_6_0; } if containsValue(roles.items,blot_backend_runtime_ir::ROLE_reference) { let concrete,concrete_error = codeLayout(owner,source.typeOf(id),source.span(id)); if concrete_error != blot_error::Error.none { let __flat_cleanup_17_3_0: Error = concrete_error; block {
+roles.deinit();
+} let __flat_cleanup_18_4_0: Error = __flat_cleanup_17_3_0; block {
+physical.deinit();
+} let __flat_cleanup_19_7_0: Error = __flat_cleanup_18_4_0; block {
+locals.deinit();
+} return __flat_cleanup_19_7_0; } let acyclic = markAcyclic(owner,address,concrete); if acyclic != blot_error::Error.none { let __flat_cleanup_17_4_0: Error = acyclic; block {
+roles.deinit();
+} let __flat_cleanup_18_5_0: Error = __flat_cleanup_17_4_0; block {
+physical.deinit();
+} let __flat_cleanup_19_8_0: Error = __flat_cleanup_18_5_0; block {
+locals.deinit();
+} return __flat_cleanup_19_8_0; } }
+    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != blot_error::Error.none { let __flat_cleanup_17_5_0: Error = a; block {
+roles.deinit();
+} let __flat_cleanup_18_6_0: Error = __flat_cleanup_17_5_0; block {
+physical.deinit();
+} let __flat_cleanup_19_9_0: Error = __flat_cleanup_18_6_0; block {
+locals.deinit();
+} return __flat_cleanup_19_9_0; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,locals.items[index]); if b != blot_error::Error.none { let __flat_cleanup_17_6_0: Error = b; block {
+roles.deinit();
+} let __flat_cleanup_18_7_0: Error = __flat_cleanup_17_6_0; block {
+physical.deinit();
+} let __flat_cleanup_19_10_0: Error = __flat_cleanup_18_7_0; block {
+locals.deinit();
+} return __flat_cleanup_19_10_0; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { let __flat_cleanup_17_7_0: Error = scalar_error; block {
+roles.deinit();
+} let __flat_cleanup_18_8_0: Error = __flat_cleanup_17_7_0; block {
+physical.deinit();
+} let __flat_cleanup_19_11_0: Error = __flat_cleanup_18_8_0; block {
+locals.deinit();
+} return __flat_cleanup_19_11_0; } var store = blot_backend_runtime_ir::OP_i32_store; if scalar_type == blot_backend_runtime_ir::SC_f32 { store = blot_backend_runtime_ir::OP_f32_store; } let stored = emit(owner,store,slot * 4); if stored != blot_error::Error.none { let __flat_cleanup_17_8_0: Error = stored; block {
+roles.deinit();
+} let __flat_cleanup_18_9_0: Error = __flat_cleanup_17_8_0; block {
+physical.deinit();
+} let __flat_cleanup_19_12_0: Error = __flat_cleanup_18_9_0; block {
+locals.deinit();
+} return __flat_cleanup_19_12_0; } }
+    let __flat_cleanup_17_9_0: Error = emit(owner,blot_backend_runtime_ir::OP_local_get,address); block {
+roles.deinit();
+} let __flat_cleanup_18_10_0: Error = __flat_cleanup_17_9_0; block {
+physical.deinit();
+} let __flat_cleanup_19_13_0: Error = __flat_cleanup_18_10_0; block {
+locals.deinit();
+} return __flat_cleanup_19_13_0;
+
 
     }
-    let cleanup_result_20_0 = cleanup_continuation_20();
-     roles.deinit();
-    return cleanup_result_20_0;
+
 
     }
-    let cleanup_result_21_0 = cleanup_continuation_21();
-     physical.deinit();
-    return cleanup_result_21_0;
+
 
     }
-    let cleanup_result_22_0 = cleanup_continuation_22();
-     locals.deinit();
-    return cleanup_result_22_0;
 }
 fn recordRepresentation(owner: Owner&,record: blot_check_types::Node,value: u32,into_record: bool) -> u32,Error {
     let generator .= owner.generator; var order = WordBuffer {..};
-    recursive fn cleanup_continuation_19() -> u32,Error {
- let selected = physicalOrder(owner,record,order); if selected != blot_error::Error.none { return 0,selected; } if order.items.len == 0 { return value,blot_error::Error.none; } if record.b > 4294967295 / 4 { return 0,generator.decline(owner.unit_id,blot_check_core::Span { 0,0 , ..},blot_check_diagnostic_code::Code.complexity); }
+    block {
+ let selected = physicalOrder(owner,record,order); if selected != blot_error::Error.none { let __flat_cleanup_16_0_0: u32 = 0; let __flat_cleanup_16_0_1: Error = selected; block {
+order.deinit();
+} return __flat_cleanup_16_0_0,__flat_cleanup_16_0_1; } if order.items.len == 0 { let __flat_cleanup_16_1_0: u32 = value; let __flat_cleanup_16_1_1: Error = blot_error::Error.none; block {
+order.deinit();
+} return __flat_cleanup_16_1_0,__flat_cleanup_16_1_1; } if record.b > 4294967295 / 4 { let __flat_cleanup_16_2_0: u32 = 0; let __flat_cleanup_16_2_1: Error = generator.decline(owner.unit_id,blot_check_core::Span { 0,0 , ..},blot_check_diagnostic_code::Code.complexity); block {
+order.deinit();
+} return __flat_cleanup_16_2_0,__flat_cleanup_16_2_1; }
     var roles = RoleBuffer {..};
-    recursive fn cleanup_continuation_18() -> u32,Error {
- for index in 0..record.b { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != blot_error::Error.none { return 0,appended; } }
-    for physical,declared in order.items { let field = generator.unit(owner.unit_id).types.recordField(record,declared as u32); var target = declared as u32; if into_record { target = physical; } let concrete,error = codeLayout(owner,field.ty,blot_check_core::Span { 0,0 , ..}); if error != blot_error::Error.none { return 0,error; } roles.items[target] = generator.layoutRole(concrete); }
-    let address,error = allocate(owner,record.b * 4,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { return 0,error; }
-    for physical,declared in order.items { var source = physical; var target = declared as u32; if into_record { source = declared as u32; target = physical; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != blot_error::Error.none { return 0,a; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if b != blot_error::Error.none { return 0,b; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,source * 4); if loaded != blot_error::Error.none { return 0,loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,target * 4); if stored != blot_error::Error.none { return 0,stored; } } return address,blot_error::Error.none;
+    block {
+ for index in 0..record.b { let appended = roles.push(blot_backend_runtime_ir::ROLE_unknown); if appended != blot_error::Error.none { let __flat_cleanup_15_0_0: u32 = 0; let __flat_cleanup_15_0_1: Error = appended; block {
+roles.deinit();
+} let __flat_cleanup_16_3_0: u32 = __flat_cleanup_15_0_0; let __flat_cleanup_16_3_1: Error = __flat_cleanup_15_0_1; block {
+order.deinit();
+} return __flat_cleanup_16_3_0,__flat_cleanup_16_3_1; } }
+    for physical,declared in order.items { let field = generator.unit(owner.unit_id).types.recordField(record,declared as u32); var target = declared as u32; if into_record { target = physical; } let concrete,error = codeLayout(owner,field.ty,blot_check_core::Span { 0,0 , ..}); if error != blot_error::Error.none { let __flat_cleanup_15_1_0: u32 = 0; let __flat_cleanup_15_1_1: Error = error; block {
+roles.deinit();
+} let __flat_cleanup_16_4_0: u32 = __flat_cleanup_15_1_0; let __flat_cleanup_16_4_1: Error = __flat_cleanup_15_1_1; block {
+order.deinit();
+} return __flat_cleanup_16_4_0,__flat_cleanup_16_4_1; } roles.items[target] = generator.layoutRole(concrete); }
+    let address,error = allocate(owner,record.b * 4,AllocationRoles { words: roles.items , ..}); if error != blot_error::Error.none { let __flat_cleanup_15_2_0: u32 = 0; let __flat_cleanup_15_2_1: Error = error; block {
+roles.deinit();
+} let __flat_cleanup_16_5_0: u32 = __flat_cleanup_15_2_0; let __flat_cleanup_16_5_1: Error = __flat_cleanup_15_2_1; block {
+order.deinit();
+} return __flat_cleanup_16_5_0,__flat_cleanup_16_5_1; }
+    for physical,declared in order.items { var source = physical; var target = declared as u32; if into_record { source = declared as u32; target = physical; } let a = emit(owner,blot_backend_runtime_ir::OP_local_get,address); if a != blot_error::Error.none { let __flat_cleanup_15_3_0: u32 = 0; let __flat_cleanup_15_3_1: Error = a; block {
+roles.deinit();
+} let __flat_cleanup_16_6_0: u32 = __flat_cleanup_15_3_0; let __flat_cleanup_16_6_1: Error = __flat_cleanup_15_3_1; block {
+order.deinit();
+} return __flat_cleanup_16_6_0,__flat_cleanup_16_6_1; } let b = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if b != blot_error::Error.none { let __flat_cleanup_15_4_0: u32 = 0; let __flat_cleanup_15_4_1: Error = b; block {
+roles.deinit();
+} let __flat_cleanup_16_7_0: u32 = __flat_cleanup_15_4_0; let __flat_cleanup_16_7_1: Error = __flat_cleanup_15_4_1; block {
+order.deinit();
+} return __flat_cleanup_16_7_0,__flat_cleanup_16_7_1; } let loaded = emit(owner,blot_backend_runtime_ir::OP_i32_load,source * 4); if loaded != blot_error::Error.none { let __flat_cleanup_15_5_0: u32 = 0; let __flat_cleanup_15_5_1: Error = loaded; block {
+roles.deinit();
+} let __flat_cleanup_16_8_0: u32 = __flat_cleanup_15_5_0; let __flat_cleanup_16_8_1: Error = __flat_cleanup_15_5_1; block {
+order.deinit();
+} return __flat_cleanup_16_8_0,__flat_cleanup_16_8_1; } let stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,target * 4); if stored != blot_error::Error.none { let __flat_cleanup_15_6_0: u32 = 0; let __flat_cleanup_15_6_1: Error = stored; block {
+roles.deinit();
+} let __flat_cleanup_16_9_0: u32 = __flat_cleanup_15_6_0; let __flat_cleanup_16_9_1: Error = __flat_cleanup_15_6_1; block {
+order.deinit();
+} return __flat_cleanup_16_9_0,__flat_cleanup_16_9_1; } } let __flat_cleanup_15_7_0: u32 = address; let __flat_cleanup_15_7_1: Error = blot_error::Error.none; block {
+roles.deinit();
+} let __flat_cleanup_16_10_0: u32 = __flat_cleanup_15_7_0; let __flat_cleanup_16_10_1: Error = __flat_cleanup_15_7_1; block {
+order.deinit();
+} return __flat_cleanup_16_10_0,__flat_cleanup_16_10_1;
+
 
     }
-    let cleanup_result_18_0,cleanup_result_18_1 = cleanup_continuation_18();
-     roles.deinit();
-    return cleanup_result_18_0,cleanup_result_18_1;
+
 
     }
-    let cleanup_result_19_0,cleanup_result_19_1 = cleanup_continuation_19();
-     order.deinit();
-    return cleanup_result_19_0,cleanup_result_19_1;
 }
 fn nullaryConstructor(owner: Owner&,tag: u32) -> Error {
     let address,error = owner.generator.module.dataWords([tag,0]); if error != blot_error::Error.none { return error; } let low = emit(owner,blot_backend_runtime_ir::OP_ownership,blot_backend_runtime_ir::pack(blot_backend_runtime_ir::Ownership { blot_backend_runtime_ir::OWN_words,14,tag & 67108863 , ..})); if low != blot_error::Error.none { return low; }
@@ -1650,41 +2462,63 @@ fn copyRows(values: const RowMapping[:]) -> RowMapping[:] { if values.len == 0 {
 fn copyVariants(values: const blot_check_core::ProjectionVariant[:]) -> blot_check_core::ProjectionVariant[:] { if values.len == 0 { return default<blot_check_core::ProjectionVariant[:]>(); } let copy = owned_variants.alloc_slice(values.len); for value,index in values { copy[index] = value; } return copy; }
 fn prepareField(owner: Owner&,id: u32,index: u32,sizes: bool) -> FieldPlan,Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); var projection = source.projection(index); var variants = VariantBuffer {..};
-    recursive fn cleanup_continuation_17() -> FieldPlan,Error {
+    block {
  var slots = WordBuffer {..};
-    recursive fn cleanup_continuation_16() -> FieldPlan,Error {
+    block {
  let original = source.projectionVariants(index);
-    if projection.field != 0 || original.len == 0 { let resolved,error = resolveProjection(owner,projection,variants,id); if error != blot_error::Error.none { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},error; } projection = resolved; }
-    else { let appended = variants.append(original); if appended != blot_error::Error.none { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},appended; } }
+    if projection.field != 0 || original.len == 0 { let resolved,error = resolveProjection(owner,projection,variants,id); if error != blot_error::Error.none { let __flat_cleanup_13_0_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_0_1: Error = error; block {
+slots.deinit();
+} let __flat_cleanup_14_0_0: FieldPlan = __flat_cleanup_13_0_0; let __flat_cleanup_14_0_1: Error = __flat_cleanup_13_0_1; block {
+variants.deinit();
+} return __flat_cleanup_14_0_0,__flat_cleanup_14_0_1; } projection = resolved; }
+    else { let appended = variants.append(original); if appended != blot_error::Error.none { let __flat_cleanup_13_1_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_1_1: Error = appended; block {
+slots.deinit();
+} let __flat_cleanup_14_1_0: FieldPlan = __flat_cleanup_13_1_0; let __flat_cleanup_14_1_1: Error = __flat_cleanup_13_1_1; block {
+variants.deinit();
+} return __flat_cleanup_14_1_0,__flat_cleanup_14_1_1; } }
     if sizes { for variant in variants.items {
-        var count: u32 = 0; if projection.nominal.decl != 0 { let words,error = payloadSlots(owner,projection,variant.tag,id); if error != blot_error::Error.none { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},error; } count = words; }
-        else { let concrete,error = codeLayout(owner,projection.source_type,source.span(id)); if error != blot_error::Error.none { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},error; } count = generator.representations.store.node(concrete).b; }
-        if count > 4294967295 / 4 { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } let appended = slots.push(count); if appended != blot_error::Error.none { return FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..},appended; }
+        var count: u32 = 0; if projection.nominal.decl != 0 { let words,error = payloadSlots(owner,projection,variant.tag,id); if error != blot_error::Error.none { let __flat_cleanup_13_2_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_2_1: Error = error; block {
+slots.deinit();
+} let __flat_cleanup_14_2_0: FieldPlan = __flat_cleanup_13_2_0; let __flat_cleanup_14_2_1: Error = __flat_cleanup_13_2_1; block {
+variants.deinit();
+} return __flat_cleanup_14_2_0,__flat_cleanup_14_2_1; } count = words; }
+        else { let concrete,error = codeLayout(owner,projection.source_type,source.span(id)); if error != blot_error::Error.none { let __flat_cleanup_13_3_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_3_1: Error = error; block {
+slots.deinit();
+} let __flat_cleanup_14_3_0: FieldPlan = __flat_cleanup_13_3_0; let __flat_cleanup_14_3_1: Error = __flat_cleanup_13_3_1; block {
+variants.deinit();
+} return __flat_cleanup_14_3_0,__flat_cleanup_14_3_1; } count = generator.representations.store.node(concrete).b; }
+        if count > 4294967295 / 4 { let __flat_cleanup_13_4_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_4_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); block {
+slots.deinit();
+} let __flat_cleanup_14_4_0: FieldPlan = __flat_cleanup_13_4_0; let __flat_cleanup_14_4_1: Error = __flat_cleanup_13_4_1; block {
+variants.deinit();
+} return __flat_cleanup_14_4_0,__flat_cleanup_14_4_1; } let appended = slots.push(count); if appended != blot_error::Error.none { let __flat_cleanup_13_5_0: FieldPlan = FieldPlan { index,projection,default<blot_check_core::ProjectionVariant[:]>(),default<u32[:]>() , ..}; let __flat_cleanup_13_5_1: Error = appended; block {
+slots.deinit();
+} let __flat_cleanup_14_5_0: FieldPlan = __flat_cleanup_13_5_0; let __flat_cleanup_14_5_1: Error = __flat_cleanup_13_5_1; block {
+variants.deinit();
+} return __flat_cleanup_14_5_0,__flat_cleanup_14_5_1; }
     } }
-    return FieldPlan { index,projection,copyVariants(variants.items),copyWords(slots.items) , ..},blot_error::Error.none;
+    let __flat_cleanup_13_6_0: FieldPlan = FieldPlan { index,projection,copyVariants(variants.items),copyWords(slots.items) , ..}; let __flat_cleanup_13_6_1: Error = blot_error::Error.none; block {
+slots.deinit();
+} let __flat_cleanup_14_6_0: FieldPlan = __flat_cleanup_13_6_0; let __flat_cleanup_14_6_1: Error = __flat_cleanup_13_6_1; block {
+variants.deinit();
+} return __flat_cleanup_14_6_0,__flat_cleanup_14_6_1;
+
 
     }
-    let cleanup_result_16_0,cleanup_result_16_1 = cleanup_continuation_16();
-     slots.deinit();
-    return cleanup_result_16_0,cleanup_result_16_1;
+
 
     }
-    let cleanup_result_17_0,cleanup_result_17_1 = cleanup_continuation_17();
-     variants.deinit();
-    return cleanup_result_17_0,cleanup_result_17_1;
+}
+fn finishUpdateLocations(fields: FieldBuffer&,published: bool,value: FieldPlan[:],error: Error) -> FieldPlan[:],Error {
+    if !published { for &field in fields.items { field.deinit(); } }
+    fields.deinit(); return value,error;
 }
 fn prepareUpdateLocations(owner: Owner&,id: u32) -> FieldPlan[:],Error {
     assert(owner.preparing); let source .= owner.generator.unit(owner.unit_id); var fields = FieldBuffer {..}; var published = false;
-    recursive fn cleanup_continuation_15() -> FieldPlan[:],Error {
- let selectors = source.updateSelectors(id);
-    if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } }
-    else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != blot_error::Error.none { return default<FieldPlan[:]>(),error; } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); return default<FieldPlan[:]>(),appended; } } } }
-    var output: FieldPlan[:] = default<FieldPlan[:]>(); if fields.items.len != 0 { let owned = owned_fields.alloc_slice(fields.items.len); for field,index in fields.items { owned[index] = field; } output = owned; } published = true; return output,blot_error::Error.none;
-
-    }
-    let cleanup_result_15_0,cleanup_result_15_1 = cleanup_continuation_15();
-     if !published { for &field in fields.items { field.deinit(); } } fields.deinit();
-    return cleanup_result_15_0,cleanup_result_15_1;
+    let selectors = source.updateSelectors(id);
+    if selectors.len == 0 { for index in source.updatePath(id) { let field,error = prepareField(owner,id,index,true); if error != blot_error::Error.none { let __update_locations_0_0: FieldPlan[:] = default<FieldPlan[:]>(); let __update_locations_0_1: Error = error; return finishUpdateLocations(fields,published,__update_locations_0_0,__update_locations_0_1); } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); let __update_locations_1_0: FieldPlan[:] = default<FieldPlan[:]>(); let __update_locations_1_1: Error = appended; return finishUpdateLocations(fields,published,__update_locations_1_0,__update_locations_1_1); } } }
+    else { for selector in selectors { if selector.kind == blot_check_core::UpdateKind.field { let field,error = prepareField(owner,id,selector.projection,true); if error != blot_error::Error.none { let __update_locations_2_0: FieldPlan[:] = default<FieldPlan[:]>(); let __update_locations_2_1: Error = error; return finishUpdateLocations(fields,published,__update_locations_2_0,__update_locations_2_1); } let appended = fields.push(field); if appended != blot_error::Error.none { field.deinit(); let __update_locations_3_0: FieldPlan[:] = default<FieldPlan[:]>(); let __update_locations_3_1: Error = appended; return finishUpdateLocations(fields,published,__update_locations_3_0,__update_locations_3_1); } } } }
+    var output: FieldPlan[:] = default<FieldPlan[:]>(); if fields.items.len != 0 { let owned = owned_fields.alloc_slice(fields.items.len); for field,index in fields.items { owned[index] = field; } output = owned; } published = true; let __update_locations_4_0: FieldPlan[:] = output; let __update_locations_4_1: Error = blot_error::Error.none; return finishUpdateLocations(fields,published,__update_locations_4_0,__update_locations_4_1);
 }
 fn fieldPlan(owner: Owner&,id: u32,index: u32) -> FieldPlan {
     match resolvedPlan(owner,id) { projection selected=>{ assert(selected.value.present); match selected.value.value { field value=>{ return value.value; },_=>{ assert(false); }, } },update_locations selected=>{ for place in selected.value { if place.index == index { return place; } } },_=>{ assert(false); }, }
@@ -1695,22 +2529,44 @@ recursive fn prepareProjection(owner: Owner&,body: u32,id: u32,depth: i64) -> bl
     if source.projectionVariants(node.b).len != 0 { let field,error = prepareField(owner,id,node.b,false); if error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),error; } return blot_support::some<ProjectionPlan>(ProjectionPlan.field{ field , ..}),blot_error::Error.none; }
     let previous = generator.diagnostic; var field = blot_support::none<FieldPlan>(); let prepared,prepared_error = prepareField(owner,id,node.b,false); if prepared_error == blot_error::Error.declined { generator.diagnostic = previous; } else if prepared_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),prepared_error; } else { field = blot_support::some(prepared); }
     var transferred = false;
-    recursive fn cleanup_continuation_14() -> blot_support::Option<ProjectionPlan>,Error {
- let concrete,error = codeLayout(owner,metadata.source_type,source.span(id)); if error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),error; } let method,method_error = memberTarget(owner,id,metadata.field,concrete); if method_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),method_error; }
-    if field.present && method.present { return blot_support::none<ProjectionPlan>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.ambiguous_member); } if field.present { transferred = true; return blot_support::some<ProjectionPlan>(ProjectionPlan.field{ field.value , ..}),blot_error::Error.none; } if !method.present { return blot_support::none<ProjectionPlan>(),generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.missing_member); } let target = method.value;
-    let result,result_error = codeLayout(owner,node.ty,source.span(id)); if result_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),result_error; } let full,full_error = generator.internLayout(blot_backend_layout::Tag.function,concrete,result,[]); if full_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),full_error; } let signature,signature_error = dispatchCallableLayout(owner,id,full); if signature_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),signature_error; }
+    block {
+ let concrete,error = codeLayout(owner,metadata.source_type,source.span(id)); if error != blot_error::Error.none { let __flat_cleanup_12_0_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_0_1: Error = error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_0_0,__flat_cleanup_12_0_1; } let method,method_error = memberTarget(owner,id,metadata.field,concrete); if method_error != blot_error::Error.none { let __flat_cleanup_12_1_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_1_1: Error = method_error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_1_0,__flat_cleanup_12_1_1; }
+    if field.present && method.present { let __flat_cleanup_12_2_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_2_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.ambiguous_member); block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_2_0,__flat_cleanup_12_2_1; } if field.present { transferred = true; let __flat_cleanup_12_3_0: blot_support::Option<ProjectionPlan> = blot_support::some<ProjectionPlan>(ProjectionPlan.field{ field.value , ..}); let __flat_cleanup_12_3_1: Error = blot_error::Error.none; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_3_0,__flat_cleanup_12_3_1; } if !method.present { let __flat_cleanup_12_4_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_4_1: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.missing_member); block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_4_0,__flat_cleanup_12_4_1; } let target = method.value;
+    let result,result_error = codeLayout(owner,node.ty,source.span(id)); if result_error != blot_error::Error.none { let __flat_cleanup_12_5_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_5_1: Error = result_error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_5_0,__flat_cleanup_12_5_1; } let full,full_error = generator.internLayout(blot_backend_layout::Tag.function,concrete,result,[]); if full_error != blot_error::Error.none { let __flat_cleanup_12_6_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_6_1: Error = full_error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_6_0,__flat_cleanup_12_6_1; } let signature,signature_error = dispatchCallableLayout(owner,id,full); if signature_error != blot_error::Error.none { let __flat_cleanup_12_7_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_7_1: Error = signature_error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_7_0,__flat_cleanup_12_7_1; }
     var direct = Key { target: target,count: 1,result: result , ..}; direct.parameters[0] = concrete; direct.effects[0] = generator.representations.store.node(signature).c;
     let producer .= generator.unit(target.unit); let method_body .= producer.body(target.binding); if method_body != null {
         let root = producer.node(method_body.root); if root.tag == blot_check_core::Tag.if_value && producer.node(root.b).tag == blot_check_core::Tag.construct && blot_backend_collection_iteration::cursorNext(producer,target.binding,producer,producer.node(root.b).a) && !producer.nominal(producer.constructor(producer.node(root.b).a).nominal).is_opaque {
-            let prepared = prepareNode(owner,body,node.a,depth + 1,false); if prepared != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),prepared; } let input,input_error = privateCursorConstructor(owner,body,node.a); if input_error != blot_error::Error.none { return blot_support::none<ProjectionPlan>(),input_error; } if input.present && source.node(input.value).tag == blot_check_core::Tag.array && source.children(input.value).len == 0 { if generator.artifacts != null { generator.artifacts.requireFreshCode(); } return blot_support::some<ProjectionPlan>(ProjectionPlan.empty_cursor{ producer.constructor(producer.node(root.c).a).tag , ..}),blot_error::Error.none; }
+            let prepared = prepareNode(owner,body,node.a,depth + 1,false); if prepared != blot_error::Error.none { let __flat_cleanup_12_8_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_8_1: Error = prepared; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_8_0,__flat_cleanup_12_8_1; } let input,input_error = privateCursorConstructor(owner,body,node.a); if input_error != blot_error::Error.none { let __flat_cleanup_12_9_0: blot_support::Option<ProjectionPlan> = blot_support::none<ProjectionPlan>(); let __flat_cleanup_12_9_1: Error = input_error; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_9_0,__flat_cleanup_12_9_1; } if input.present && source.node(input.value).tag == blot_check_core::Tag.array && source.children(input.value).len == 0 { if generator.artifacts != null { generator.artifacts.requireFreshCode(); } let __flat_cleanup_12_10_0: blot_support::Option<ProjectionPlan> = blot_support::some<ProjectionPlan>(ProjectionPlan.empty_cursor{ producer.constructor(producer.node(root.c).a).tag , ..}); let __flat_cleanup_12_10_1: Error = blot_error::Error.none; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_10_0,__flat_cleanup_12_10_1; }
         }
     }
-    return blot_support::some<ProjectionPlan>(ProjectionPlan.member{ direct,blot_reuse_code_artifacts::CallableKey { target: target,ty: signature , ..} , ..}),blot_error::Error.none;
+    let __flat_cleanup_12_11_0: blot_support::Option<ProjectionPlan> = blot_support::some<ProjectionPlan>(ProjectionPlan.member{ direct,blot_reuse_code_artifacts::CallableKey { target: target,ty: signature , ..} , ..}); let __flat_cleanup_12_11_1: Error = blot_error::Error.none; block {
+if !transferred && field.present { field.value.deinit(); }
+} return __flat_cleanup_12_11_0,__flat_cleanup_12_11_1;
+
 
     }
-    let cleanup_result_14_0,cleanup_result_14_1 = cleanup_continuation_14();
-     if !transferred && field.present { field.value.deinit(); }
-    return cleanup_result_14_0,cleanup_result_14_1;
 }
 fn fieldType(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> u32,Error { if projection.nominal.decl != 0 { return payloadLayout(owner,projection,tag,id); } return codeLayout(owner,projection.source_type,owner.generator.unit(owner.unit_id).span(id)); }
 fn fieldMask(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> blot_support::Option<u32>,Error {
@@ -1723,13 +2579,13 @@ fn fieldMask(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: 
 fn fieldShape(owner: Owner&,projection: blot_check_core::Projection,tag: u32,id: u32) -> blot_support::Option<u32>,Error {
     let generator .= owner.generator; let ty,error = fieldType(owner,projection,tag,id); if error != blot_error::Error.none { return blot_support::none<u32>(),error; } let node = generator.representations.store.node(ty); if node.tag != blot_backend_layout::Tag.product && node.tag != blot_backend_layout::Tag.record { return blot_support::none<u32>(),blot_error::Error.none; }
     let fields = generator.representations.store.children(ty); var roles = RoleBuffer {..};
-    recursive fn cleanup_continuation_13() -> blot_support::Option<u32>,Error {
- for word in 0..node.b { var index = word; if node.tag == blot_backend_layout::Tag.record { index = word * 2 + 1; } let appended = roles.push(generator.layoutRole(fields[index])); if appended != blot_error::Error.none { return blot_support::none<u32>(),appended; } } return wideShape(owner,node.b * 4,AllocationRoles { words: roles.items , ..},true);
-
+    for word in 0..node.b {
+        var index = word; if node.tag == blot_backend_layout::Tag.record { index = word * 2 + 1; }
+        let appended = roles.push(generator.layoutRole(fields[index]));
+        if appended != blot_error::Error.none { let result = blot_support::none<u32>(); roles.deinit(); return result,appended; }
     }
-    let cleanup_result_13_0,cleanup_result_13_1 = cleanup_continuation_13();
-     roles.deinit();
-    return cleanup_result_13_0,cleanup_result_13_1;
+    let result,shape_error = wideShape(owner,node.b * 4,AllocationRoles { words: roles.items , ..},true);
+    roles.deinit(); return result,shape_error;
 }
 fn emitInstructions(owner: Owner&,instructions: const blot_backend_runtime_ir::Instruction[:]) -> Error { for instruction in instructions { let error = emit(owner,instruction.op,instruction.operand); if error != blot_error::Error.none { return error; } } return blot_error::Error.none; }
 fn emitConstantLocal(owner: Owner&,value: u32,local: u32) -> Error { let constant = emit(owner,blot_backend_runtime_ir::OP_i32_const,value); if constant != blot_error::Error.none { return constant; } return emit(owner,blot_backend_runtime_ir::OP_local_set,local); }
@@ -1748,25 +2604,57 @@ fn location(owner: Owner&,value_owner: u32,projection_index: u32,id: u32,need_si
     if need_size { for variant in variants { let bits,error = fieldMask(owner,projection,variant.tag,id); if error != blot_error::Error.none { return result,error; } if !bits.present || bits.value != 0 { result.scalar_storage = false; } } }
     if need_size && !result.scalar_storage { var known = true; for variant in variants { let bits,error = fieldMask(owner,projection,variant.tag,id); if error != blot_error::Error.none { return result,error; } if !bits.present { known = false; break; } } if known { let mask,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return result,error; } result.mask = blot_support::some(mask); } }
     var shapes = WordBuffer {..};
-    recursive fn cleanup_continuation_12() -> Location,Error {
+    block {
 
-    if need_size && !result.scalar_storage && !result.mask.present { var known = true; for variant in variants { let address,error = fieldShape(owner,projection,variant.tag,id); if error != blot_error::Error.none { return result,error; } if !address.present { known = false; break; } let appended = shapes.push(address.value); if appended != blot_error::Error.none { return result,appended; } } if known { let shape,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return result,error; } result.shape = blot_support::some(shape); } }
-    if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { return result,loaded; } let payload = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,4); if payload != blot_error::Error.none { return result,payload; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,result.container); if stored != blot_error::Error.none { return result,stored; } }
+    if need_size && !result.scalar_storage && !result.mask.present { var known = true; for variant in variants { let address,error = fieldShape(owner,projection,variant.tag,id); if error != blot_error::Error.none { let __flat_cleanup_11_0_0: Location = result; let __flat_cleanup_11_0_1: Error = error; block {
+shapes.deinit();
+} return __flat_cleanup_11_0_0,__flat_cleanup_11_0_1; } if !address.present { known = false; break; } let appended = shapes.push(address.value); if appended != blot_error::Error.none { let __flat_cleanup_11_1_0: Location = result; let __flat_cleanup_11_1_1: Error = appended; block {
+shapes.deinit();
+} return __flat_cleanup_11_1_0,__flat_cleanup_11_1_1; } } if known { let shape,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { let __flat_cleanup_11_2_0: Location = result; let __flat_cleanup_11_2_1: Error = error; block {
+shapes.deinit();
+} return __flat_cleanup_11_2_0,__flat_cleanup_11_2_1; } result.shape = blot_support::some(shape); } }
+    if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { let __flat_cleanup_11_3_0: Location = result; let __flat_cleanup_11_3_1: Error = loaded; block {
+shapes.deinit();
+} return __flat_cleanup_11_3_0,__flat_cleanup_11_3_1; } let payload = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,4); if payload != blot_error::Error.none { let __flat_cleanup_11_4_0: Location = result; let __flat_cleanup_11_4_1: Error = payload; block {
+shapes.deinit();
+} return __flat_cleanup_11_4_0,__flat_cleanup_11_4_1; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,result.container); if stored != blot_error::Error.none { let __flat_cleanup_11_5_0: Location = result; let __flat_cleanup_11_5_1: Error = stored; block {
+shapes.deinit();
+} return __flat_cleanup_11_5_0,__flat_cleanup_11_5_1; } }
     if variants.len == 1 {
-        if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { return result,loaded; } let tag = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,0); if tag != blot_error::Error.none { return result,tag; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,variants[0].tag),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ne),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != blot_error::Error.none { return result,checked; } }
-        let assigned = setLocationVariant(owner,prepared,0,id,result.offset,result.size,result.mask,result.shape,shapes.items); return result,assigned;
+        if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { let __flat_cleanup_11_6_0: Location = result; let __flat_cleanup_11_6_1: Error = loaded; block {
+shapes.deinit();
+} return __flat_cleanup_11_6_0,__flat_cleanup_11_6_1; } let tag = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,0); if tag != blot_error::Error.none { let __flat_cleanup_11_7_0: Location = result; let __flat_cleanup_11_7_1: Error = tag; block {
+shapes.deinit();
+} return __flat_cleanup_11_7_0,__flat_cleanup_11_7_1; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,variants[0].tag),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ne),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); if checked != blot_error::Error.none { let __flat_cleanup_11_8_0: Location = result; let __flat_cleanup_11_8_1: Error = checked; block {
+shapes.deinit();
+} return __flat_cleanup_11_8_0,__flat_cleanup_11_8_1; } }
+        let assigned = setLocationVariant(owner,prepared,0,id,result.offset,result.size,result.mask,result.shape,shapes.items); let __flat_cleanup_11_9_0: Location = result; let __flat_cleanup_11_9_1: Error = assigned; block {
+shapes.deinit();
+} return __flat_cleanup_11_9_0,__flat_cleanup_11_9_1;
     }
-    let sentinel = emitConstantLocal(owner,4294967295,result.offset); if sentinel != blot_error::Error.none { return result,sentinel; }
+    let sentinel = emitConstantLocal(owner,4294967295,result.offset); if sentinel != blot_error::Error.none { let __flat_cleanup_11_10_0: Location = result; let __flat_cleanup_11_10_1: Error = sentinel; block {
+shapes.deinit();
+} return __flat_cleanup_11_10_0,__flat_cleanup_11_10_1; }
     for variant,index in variants {
-        if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { return result,loaded; } let tag = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,0); if tag != blot_error::Error.none { return result,tag; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,variant.tag),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if checked != blot_error::Error.none { return result,checked; } owner.labels++; }
-        let assigned = setLocationVariant(owner,prepared,index,id,result.offset,result.size,result.mask,result.shape,shapes.items); if assigned != blot_error::Error.none { return result,assigned; } if result.wrapped { owner.labels--; let end = emit(owner,blot_backend_runtime_ir::OP_end); if end != blot_error::Error.none { return result,end; } }
+        if result.wrapped { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value_owner); if loaded != blot_error::Error.none { let __flat_cleanup_11_11_0: Location = result; let __flat_cleanup_11_11_1: Error = loaded; block {
+shapes.deinit();
+} return __flat_cleanup_11_11_0,__flat_cleanup_11_11_1; } let tag = nonzeroLoad(owner,blot_backend_runtime_ir::OP_i32_load,0); if tag != blot_error::Error.none { let __flat_cleanup_11_12_0: Location = result; let __flat_cleanup_11_12_1: Error = tag; block {
+shapes.deinit();
+} return __flat_cleanup_11_12_0,__flat_cleanup_11_12_1; } let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,variant.tag),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_)]); if checked != blot_error::Error.none { let __flat_cleanup_11_13_0: Location = result; let __flat_cleanup_11_13_1: Error = checked; block {
+shapes.deinit();
+} return __flat_cleanup_11_13_0,__flat_cleanup_11_13_1; } owner.labels++; }
+        let assigned = setLocationVariant(owner,prepared,index,id,result.offset,result.size,result.mask,result.shape,shapes.items); if assigned != blot_error::Error.none { let __flat_cleanup_11_14_0: Location = result; let __flat_cleanup_11_14_1: Error = assigned; block {
+shapes.deinit();
+} return __flat_cleanup_11_14_0,__flat_cleanup_11_14_1; } if result.wrapped { owner.labels--; let end = emit(owner,blot_backend_runtime_ir::OP_end); if end != blot_error::Error.none { let __flat_cleanup_11_15_0: Location = result; let __flat_cleanup_11_15_1: Error = end; block {
+shapes.deinit();
+} return __flat_cleanup_11_15_0,__flat_cleanup_11_15_1; } }
     }
-    let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4294967295),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); return result,checked;
+    let checked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,result.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,4294967295),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_eq),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_unreachable_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end)]); let __flat_cleanup_11_16_0: Location = result; let __flat_cleanup_11_16_1: Error = checked; block {
+shapes.deinit();
+} return __flat_cleanup_11_16_0,__flat_cleanup_11_16_1;
+
 
     }
-    let cleanup_result_12_0,cleanup_result_12_1 = cleanup_continuation_12();
-     shapes.deinit();
-    return cleanup_result_12_0,cleanup_result_12_1;
 }
 fn nonzeroLoad(owner: Owner&,op: blot_backend_runtime_ir::Op,offset: u32) -> Error { let marker = owner.generator.module.emit(owner.function_id,blot_backend_runtime_ir::nonzeroRead()); if marker != blot_error::Error.none { return marker; } return emit(owner,op,offset); }
 fn loadLocation(owner: Owner&,place: Location,scalar: blot_backend_runtime_ir::Scalar) -> Error { if place.list_index.present && place.row_words != 0 { return readListRow(owner,place.owner,place.list_index.value,place.row_words,blot_support::none<u32[2]>(),blot_support::none<u32>(),place.row_layout); } let address = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); if address != blot_error::Error.none { return address; } return readElement(owner,blot_backend_runtime_ir::machine(scalar),0,place.row_words,place.row_layout); }
@@ -1817,62 +2705,158 @@ fn indexLocation(owner: Owner&,array: u32,index: u32,collection: u32) -> Locatio
 }
 recursive fn update(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let metadata = source.updateInfo(id); let path = source.updatePath(id); let selectors = source.updateSelectors(id); var places = LocationBuffer {..};
-    recursive fn cleanup_continuation_11() -> Error {
+    block {
 
-    let initial,initial_error = capture(owner,metadata.root,depth); if initial_error != blot_error::Error.none { return initial_error; } var current = initial;
+    let initial,initial_error = capture(owner,metadata.root,depth); if initial_error != blot_error::Error.none { let __flat_cleanup_10_0_0: Error = initial_error; block {
+places.deinit();
+} return __flat_cleanup_10_0_0; } var current = initial;
     if selectors.len != 0 { for selector in selectors {
         var place = Location { owner: current,container: current,offset: 0,size: blot_support::none<u32>(),wrapped: false , ..};
-        if selector.kind == blot_check_core::UpdateKind.field { let selected,error = location(owner,current,selector.projection,id,true); if error != blot_error::Error.none { return error; } place = selected; }
-        else { let index,error = capture(owner,selector.index,depth); if error != blot_error::Error.none { return error; } let collection,collection_error = codeLayout(owner,selector.source_type,source.span(id)); if collection_error != blot_error::Error.none { return collection_error; } let selected,selected_error = indexLocation(owner,current,index,collection); if selected_error != blot_error::Error.none { return selected_error; } place = selected; }
-        let appended = places.push(place); if appended != blot_error::Error.none { return appended; } let scalar_type,error = generator.scalarWithRows(owner.unit_id,selector.result_type,owner.mappings,owner.row_mappings,source.span(id)); if error != blot_error::Error.none { return error; }
-        let local,local_error = temporary(owner,blot_backend_runtime_ir::machine(scalar_type)); if local_error != blot_error::Error.none { return local_error; } current = local; let loaded = loadLocation(owner,place,scalar_type); if loaded != blot_error::Error.none { return loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,current); if stored != blot_error::Error.none { return stored; }
+        if selector.kind == blot_check_core::UpdateKind.field { let selected,error = location(owner,current,selector.projection,id,true); if error != blot_error::Error.none { let __flat_cleanup_10_1_0: Error = error; block {
+places.deinit();
+} return __flat_cleanup_10_1_0; } place = selected; }
+        else { let index,error = capture(owner,selector.index,depth); if error != blot_error::Error.none { let __flat_cleanup_10_2_0: Error = error; block {
+places.deinit();
+} return __flat_cleanup_10_2_0; } let collection,collection_error = codeLayout(owner,selector.source_type,source.span(id)); if collection_error != blot_error::Error.none { let __flat_cleanup_10_3_0: Error = collection_error; block {
+places.deinit();
+} return __flat_cleanup_10_3_0; } let selected,selected_error = indexLocation(owner,current,index,collection); if selected_error != blot_error::Error.none { let __flat_cleanup_10_4_0: Error = selected_error; block {
+places.deinit();
+} return __flat_cleanup_10_4_0; } place = selected; }
+        let appended = places.push(place); if appended != blot_error::Error.none { let __flat_cleanup_10_5_0: Error = appended; block {
+places.deinit();
+} return __flat_cleanup_10_5_0; } let scalar_type,error = generator.scalarWithRows(owner.unit_id,selector.result_type,owner.mappings,owner.row_mappings,source.span(id)); if error != blot_error::Error.none { let __flat_cleanup_10_6_0: Error = error; block {
+places.deinit();
+} return __flat_cleanup_10_6_0; }
+        let local,local_error = temporary(owner,blot_backend_runtime_ir::machine(scalar_type)); if local_error != blot_error::Error.none { let __flat_cleanup_10_7_0: Error = local_error; block {
+places.deinit();
+} return __flat_cleanup_10_7_0; } current = local; let loaded = loadLocation(owner,place,scalar_type); if loaded != blot_error::Error.none { let __flat_cleanup_10_8_0: Error = loaded; block {
+places.deinit();
+} return __flat_cleanup_10_8_0; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,current); if stored != blot_error::Error.none { let __flat_cleanup_10_9_0: Error = stored; block {
+places.deinit();
+} return __flat_cleanup_10_9_0; }
     } } else { for projection in path {
-        let place,error = location(owner,current,projection,id,true); if error != blot_error::Error.none { return error; } let appended = places.push(place); if appended != blot_error::Error.none { return appended; } let scalar_type,scalar_error = generator.scalarWithRows(owner.unit_id,source.projection(projection).result_type,owner.mappings,owner.row_mappings,source.span(id)); if scalar_error != blot_error::Error.none { return scalar_error; }
-        let local,local_error = temporary(owner,blot_backend_runtime_ir::machine(scalar_type)); if local_error != blot_error::Error.none { return local_error; } current = local; let loaded = loadLocation(owner,place,scalar_type); if loaded != blot_error::Error.none { return loaded; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,current); if stored != blot_error::Error.none { return stored; }
+        let place,error = location(owner,current,projection,id,true); if error != blot_error::Error.none { let __flat_cleanup_10_10_0: Error = error; block {
+places.deinit();
+} return __flat_cleanup_10_10_0; } let appended = places.push(place); if appended != blot_error::Error.none { let __flat_cleanup_10_11_0: Error = appended; block {
+places.deinit();
+} return __flat_cleanup_10_11_0; } let scalar_type,scalar_error = generator.scalarWithRows(owner.unit_id,source.projection(projection).result_type,owner.mappings,owner.row_mappings,source.span(id)); if scalar_error != blot_error::Error.none { let __flat_cleanup_10_12_0: Error = scalar_error; block {
+places.deinit();
+} return __flat_cleanup_10_12_0; }
+        let local,local_error = temporary(owner,blot_backend_runtime_ir::machine(scalar_type)); if local_error != blot_error::Error.none { let __flat_cleanup_10_13_0: Error = local_error; block {
+places.deinit();
+} return __flat_cleanup_10_13_0; } current = local; let loaded = loadLocation(owner,place,scalar_type); if loaded != blot_error::Error.none { let __flat_cleanup_10_14_0: Error = loaded; block {
+places.deinit();
+} return __flat_cleanup_10_14_0; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,current); if stored != blot_error::Error.none { let __flat_cleanup_10_15_0: Error = stored; block {
+places.deinit();
+} return __flat_cleanup_10_15_0; }
     } }
-    if metadata.self_binding != 0 { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,current); if loaded != blot_error::Error.none { return loaded; } let saved = save(owner,metadata.self_binding,id); if saved != blot_error::Error.none { return saved; } }
-    let result,result_error = capture(owner,metadata.value,depth); if result_error != blot_error::Error.none { return result_error; } var changed = result; let result_scalar,scalar_error = scalar(owner,metadata.value); if scalar_error != blot_error::Error.none { return scalar_error; } var changed_scalar = result_scalar; var index = places.items.len;
+    if metadata.self_binding != 0 { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,current); if loaded != blot_error::Error.none { let __flat_cleanup_10_16_0: Error = loaded; block {
+places.deinit();
+} return __flat_cleanup_10_16_0; } let saved = save(owner,metadata.self_binding,id); if saved != blot_error::Error.none { let __flat_cleanup_10_17_0: Error = saved; block {
+places.deinit();
+} return __flat_cleanup_10_17_0; } }
+    let result,result_error = capture(owner,metadata.value,depth); if result_error != blot_error::Error.none { let __flat_cleanup_10_18_0: Error = result_error; block {
+places.deinit();
+} return __flat_cleanup_10_18_0; } var changed = result; let result_scalar,scalar_error = scalar(owner,metadata.value); if scalar_error != blot_error::Error.none { let __flat_cleanup_10_19_0: Error = scalar_error; block {
+places.deinit();
+} return __flat_cleanup_10_19_0; } var changed_scalar = result_scalar; var index = places.items.len;
     while index != 0 {
-        index--; let place = places.items[index]; let reuse,reuse_error = generator.ownsArrayUpdate(owner.unit_id,id); if reuse_error != blot_error::Error.none { return reuse_error; }
+        index--; let place = places.items[index]; let reuse,reuse_error = generator.ownsArrayUpdate(owner.unit_id,id); if reuse_error != blot_error::Error.none { let __flat_cleanup_10_20_0: Error = reuse_error; block {
+places.deinit();
+} return __flat_cleanup_10_20_0; }
         if place.list_index.present {
-            let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { return runtime_error; } let container,container_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if container_error != blot_error::Error.none { return container_error; }
-            if place.row_words != 0 { let edited = editListRow(owner,place.owner,place.list_index.value,changed,place.row_words,blot_support::none<bool>(),reuse,place.row_layout); if edited != blot_error::Error.none { return edited; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,container); if stored != blot_error::Error.none { return stored; } changed = container; changed_scalar = blot_backend_runtime_ir::SC_pointer; continue; }
-            let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.owner),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.list_index.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,changed)]); if loaded != blot_error::Error.none { return loaded; }
-            if changed_scalar == blot_backend_runtime_ir::SC_f32 { let reinterpreted = emit(owner,blot_backend_runtime_ir::OP_i32_reinterpret_f32); if reinterpreted != blot_error::Error.none { return reinterpreted; } } var consuming: u32 = 0; if reuse { consuming = 1; }
-            let edited = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,consuming),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.set),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,container)]); if edited != blot_error::Error.none { return edited; } changed = container; changed_scalar = blot_backend_runtime_ir::SC_pointer; continue;
+            let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { let __flat_cleanup_10_21_0: Error = runtime_error; block {
+places.deinit();
+} return __flat_cleanup_10_21_0; } let container,container_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if container_error != blot_error::Error.none { let __flat_cleanup_10_22_0: Error = container_error; block {
+places.deinit();
+} return __flat_cleanup_10_22_0; }
+            if place.row_words != 0 { let edited = editListRow(owner,place.owner,place.list_index.value,changed,place.row_words,blot_support::none<bool>(),reuse,place.row_layout); if edited != blot_error::Error.none { let __flat_cleanup_10_23_0: Error = edited; block {
+places.deinit();
+} return __flat_cleanup_10_23_0; } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,container); if stored != blot_error::Error.none { let __flat_cleanup_10_24_0: Error = stored; block {
+places.deinit();
+} return __flat_cleanup_10_24_0; } changed = container; changed_scalar = blot_backend_runtime_ir::SC_pointer; continue; }
+            let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.owner),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.list_index.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,changed)]); if loaded != blot_error::Error.none { let __flat_cleanup_10_25_0: Error = loaded; block {
+places.deinit();
+} return __flat_cleanup_10_25_0; }
+            if changed_scalar == blot_backend_runtime_ir::SC_f32 { let reinterpreted = emit(owner,blot_backend_runtime_ir::OP_i32_reinterpret_f32); if reinterpreted != blot_error::Error.none { let __flat_cleanup_10_26_0: Error = reinterpreted; block {
+places.deinit();
+} return __flat_cleanup_10_26_0; } } var consuming: u32 = 0; if reuse { consuming = 1; }
+            let edited = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,consuming),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.set),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,container)]); if edited != blot_error::Error.none { let __flat_cleanup_10_27_0: Error = edited; block {
+places.deinit();
+} return __flat_cleanup_10_27_0; } changed = container; changed_scalar = blot_backend_runtime_ir::SC_pointer; continue;
         }
         var container = place.container; if !reuse {
-            let copied,copy_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if copy_error != blot_error::Error.none { return copy_error; } container = copied; let arena,arena_error = generator.module.ensureArena(); if arena_error != blot_error::Error.none { return arena_error; } assert(place.size.present);
-            let size = emit(owner,blot_backend_runtime_ir::OP_local_get,place.size.value); if size != blot_error::Error.none { return size; }
-            if place.array_scalar.present { let allocated = allocateArray(owner,place.array_scalar.value,place.row_layout); if allocated != blot_error::Error.none { return allocated; } }
-            else if place.scalar_storage { let allocated = emit(owner,blot_backend_runtime_ir::OP_call,arena.allocate_scalar); if allocated != blot_error::Error.none { return allocated; } }
-            else if place.mask.present { let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.mask.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.allocate_typed)]); if allocated != blot_error::Error.none { return allocated; } }
-            else if place.shape.present { let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.shape.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.allocate_shaped)]); if allocated != blot_error::Error.none { return allocated; } }
-            else { var allocator = arena.allocate; if place.row_words != 0 { allocator = arena.allocate_scalar; } let allocated = emit(owner,blot_backend_runtime_ir::OP_call,allocator); if allocated != blot_error::Error.none { return allocated; } }
-            let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,container); if stored != blot_error::Error.none { return stored; }
-            if place.acyclic && !place.scalar_storage { let marked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.mark_acyclic)]); if marked != blot_error::Error.none { return marked; } }
-            let counted = place.array_scalar.present || place.mask.present || place.shape.present; if counted { let destination = emit(owner,blot_backend_runtime_ir::OP_local_get,container); if destination != blot_error::Error.none { return destination; } }
-            let inputs = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.size.value)]); if inputs != blot_error::Error.none { return inputs; } var copied_error: Error; if counted { copied_error = emit(owner,blot_backend_runtime_ir::OP_call,arena.copy_words); } else { copied_error = emit(owner,blot_backend_runtime_ir::OP_memory_copy); } if copied_error != blot_error::Error.none { return copied_error; }
+            let copied,copy_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if copy_error != blot_error::Error.none { let __flat_cleanup_10_28_0: Error = copy_error; block {
+places.deinit();
+} return __flat_cleanup_10_28_0; } container = copied; let arena,arena_error = generator.module.ensureArena(); if arena_error != blot_error::Error.none { let __flat_cleanup_10_29_0: Error = arena_error; block {
+places.deinit();
+} return __flat_cleanup_10_29_0; } assert(place.size.present);
+            let size = emit(owner,blot_backend_runtime_ir::OP_local_get,place.size.value); if size != blot_error::Error.none { let __flat_cleanup_10_30_0: Error = size; block {
+places.deinit();
+} return __flat_cleanup_10_30_0; }
+            if place.array_scalar.present { let allocated = allocateArray(owner,place.array_scalar.value,place.row_layout); if allocated != blot_error::Error.none { let __flat_cleanup_10_31_0: Error = allocated; block {
+places.deinit();
+} return __flat_cleanup_10_31_0; } }
+            else if place.scalar_storage { let allocated = emit(owner,blot_backend_runtime_ir::OP_call,arena.allocate_scalar); if allocated != blot_error::Error.none { let __flat_cleanup_10_32_0: Error = allocated; block {
+places.deinit();
+} return __flat_cleanup_10_32_0; } }
+            else if place.mask.present { let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.mask.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.allocate_typed)]); if allocated != blot_error::Error.none { let __flat_cleanup_10_33_0: Error = allocated; block {
+places.deinit();
+} return __flat_cleanup_10_33_0; } }
+            else if place.shape.present { let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.shape.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.allocate_shaped)]); if allocated != blot_error::Error.none { let __flat_cleanup_10_34_0: Error = allocated; block {
+places.deinit();
+} return __flat_cleanup_10_34_0; } }
+            else { var allocator = arena.allocate; if place.row_words != 0 { allocator = arena.allocate_scalar; } let allocated = emit(owner,blot_backend_runtime_ir::OP_call,allocator); if allocated != blot_error::Error.none { let __flat_cleanup_10_35_0: Error = allocated; block {
+places.deinit();
+} return __flat_cleanup_10_35_0; } }
+            let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,container); if stored != blot_error::Error.none { let __flat_cleanup_10_36_0: Error = stored; block {
+places.deinit();
+} return __flat_cleanup_10_36_0; }
+            if place.acyclic && !place.scalar_storage { let marked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,arena.mark_acyclic)]); if marked != blot_error::Error.none { let __flat_cleanup_10_37_0: Error = marked; block {
+places.deinit();
+} return __flat_cleanup_10_37_0; } }
+            let counted = place.array_scalar.present || place.mask.present || place.shape.present; if counted { let destination = emit(owner,blot_backend_runtime_ir::OP_local_get,container); if destination != blot_error::Error.none { let __flat_cleanup_10_38_0: Error = destination; block {
+places.deinit();
+} return __flat_cleanup_10_38_0; } }
+            let inputs = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.size.value)]); if inputs != blot_error::Error.none { let __flat_cleanup_10_39_0: Error = inputs; block {
+places.deinit();
+} return __flat_cleanup_10_39_0; } var copied_error: Error; if counted { copied_error = emit(owner,blot_backend_runtime_ir::OP_call,arena.copy_words); } else { copied_error = emit(owner,blot_backend_runtime_ir::OP_memory_copy); } if copied_error != blot_error::Error.none { let __flat_cleanup_10_40_0: Error = copied_error; block {
+places.deinit();
+} return __flat_cleanup_10_40_0; }
         }
-        let destination = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,changed)]); if destination != blot_error::Error.none { return destination; }
+        let destination = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.offset),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,changed)]); if destination != blot_error::Error.none { let __flat_cleanup_10_41_0: Error = destination; block {
+places.deinit();
+} return __flat_cleanup_10_41_0; }
         let numeric_word = place.array_scalar.present && place.array_scalar.value && !place.mask.present && !place.shape.present && place.row_words == 0;
         var written: Error; if numeric_word { written = storeElement(owner,blot_backend_runtime_ir::machine(changed_scalar),0,0,true,0); }
         else if (place.array_scalar.present || place.mask.present || place.shape.present) && place.row_words == 0 { written = storeCollectionWord(owner,container,false,blot_backend_runtime_ir::machine(changed_scalar),0); }
-        else { written = storeElement(owner,blot_backend_runtime_ir::machine(changed_scalar),0,place.row_words,changed_scalar != blot_backend_runtime_ir::SC_pointer,place.row_layout); } if written != blot_error::Error.none { return written; }
+        else { written = storeElement(owner,blot_backend_runtime_ir::machine(changed_scalar),0,place.row_words,changed_scalar != blot_backend_runtime_ir::SC_pointer,place.row_layout); } if written != blot_error::Error.none { let __flat_cleanup_10_42_0: Error = written; block {
+places.deinit();
+} return __flat_cleanup_10_42_0; }
         if place.wrapped {
-            var wrapper = place.owner; if !reuse { let allocated,allocation_error = allocate(owner,8,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_reference] , ..}); if allocation_error != blot_error::Error.none { return allocation_error; } wrapper = allocated;
-                if place.acyclic { assert(generator.module.arena.present); let marked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,generator.module.arena.value.mark_acyclic)]); if marked != blot_error::Error.none { return marked; } }
-                let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.owner),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,8),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_memory_copy)]); if copied != blot_error::Error.none { return copied; }
+            var wrapper = place.owner; if !reuse { let allocated,allocation_error = allocate(owner,8,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar,blot_backend_runtime_ir::ROLE_reference] , ..}); if allocation_error != blot_error::Error.none { let __flat_cleanup_10_43_0: Error = allocation_error; block {
+places.deinit();
+} return __flat_cleanup_10_43_0; } wrapper = allocated;
+                if place.acyclic { assert(generator.module.arena.present); let marked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,generator.module.arena.value.mark_acyclic)]); if marked != blot_error::Error.none { let __flat_cleanup_10_44_0: Error = marked; block {
+places.deinit();
+} return __flat_cleanup_10_44_0; } }
+                let copied = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,place.owner),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,8),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_memory_copy)]); if copied != blot_error::Error.none { let __flat_cleanup_10_45_0: Error = copied; block {
+places.deinit();
+} return __flat_cleanup_10_45_0; }
             }
-            let replaced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container)]); if replaced != blot_error::Error.none { return replaced; } let stored = storeCollectionWord(owner,wrapper,false,blot_backend_runtime_ir::VT_i32,4); if stored != blot_error::Error.none { return stored; } changed = wrapper;
+            let replaced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,wrapper),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,container)]); if replaced != blot_error::Error.none { let __flat_cleanup_10_46_0: Error = replaced; block {
+places.deinit();
+} return __flat_cleanup_10_46_0; } let stored = storeCollectionWord(owner,wrapper,false,blot_backend_runtime_ir::VT_i32,4); if stored != blot_error::Error.none { let __flat_cleanup_10_47_0: Error = stored; block {
+places.deinit();
+} return __flat_cleanup_10_47_0; } changed = wrapper;
         } else { changed = container; } changed_scalar = blot_backend_runtime_ir::SC_pointer;
     }
-    return emit(owner,blot_backend_runtime_ir::OP_local_get,changed);
+    let __flat_cleanup_10_48_0: Error = emit(owner,blot_backend_runtime_ir::OP_local_get,changed); block {
+places.deinit();
+} return __flat_cleanup_10_48_0;
+
 
     }
-    let cleanup_result_11_0 = cleanup_continuation_11();
-     places.deinit();
-    return cleanup_result_11_0;
 }
 recursive fn prepareCollectionStep(owner: Owner&,body: u32,id: u32,depth: i64) -> blot_support::Option<Plan>,Error {
     if owner.dictionary_owner.present { return blot_support::none<Plan>(),blot_error::Error.none; } let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let initializer = source.node(id).b; let tag = source.node(initializer).tag; if tag != blot_check_core::Tag.project && tag != blot_check_core::Tag.call { return blot_support::none<Plan>(),blot_error::Error.none; }
@@ -1998,27 +2982,77 @@ recursive fn array(owner: Owner&,id: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); if owner.exact_build.present && owner.exact_build.value.plan.initial == id { return emit(owner,blot_backend_runtime_ir::OP_local_get,owner.exact_build.value.storage); }
     if owner.small_result.slot != 0 && owner.small_result.root == id { let result,error = captureSmallCollection(owner,id,depth); if error != blot_error::Error.none { return error; } assert(result.present); assert(small_outputs[owner.small_result.slot - 1].live); small_outputs[owner.small_result.slot - 1].value = result.value; return emit(owner,blot_backend_runtime_ir::OP_i32_const,0); }
     let children = source.children(id); if children.len > 1073741822 { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } var locals = WordBuffer {..};
-    recursive fn cleanup_continuation_10() -> Error {
+    block {
 
-    for child in children { let local,error = capture(owner,child,depth); if error != blot_error::Error.none { return error; } let appended = locals.push(local); if appended != blot_error::Error.none { return appended; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { return blot_error::Error.none; } }
-    let concrete,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != blot_error::Error.none { return error; } var collection = generator.representations.store.node(concrete); if collection.tag == blot_backend_layout::Tag.owning { collection = generator.representations.store.node(collection.a); } let row_words,row_error = generator.rowWords(collection.a); if row_error != blot_error::Error.none { return row_error; } let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present;
+    for child in children { let local,error = capture(owner,child,depth); if error != blot_error::Error.none { let __flat_cleanup_9_0_0: Error = error; block {
+locals.deinit();
+} return __flat_cleanup_9_0_0; } let appended = locals.push(local); if appended != blot_error::Error.none { let __flat_cleanup_9_1_0: Error = appended; block {
+locals.deinit();
+} return __flat_cleanup_9_1_0; } if source.types.node(source.typeOf(child)).tag == blot_check_types::Tag.never { let __flat_cleanup_9_2_0: Error = blot_error::Error.none; block {
+locals.deinit();
+} return __flat_cleanup_9_2_0; } }
+    let concrete,error = codeLayout(owner,source.typeOf(id),source.span(id)); if error != blot_error::Error.none { let __flat_cleanup_9_3_0: Error = error; block {
+locals.deinit();
+} return __flat_cleanup_9_3_0; } var collection = generator.representations.store.node(concrete); if collection.tag == blot_backend_layout::Tag.owning { collection = generator.representations.store.node(collection.a); } let row_words,row_error = generator.rowWords(collection.a); if row_error != blot_error::Error.none { let __flat_cleanup_9_4_0: Error = row_error; block {
+locals.deinit();
+} return __flat_cleanup_9_4_0; } let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present;
     if collection.tag == blot_backend_layout::Tag.list {
-        let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { return runtime_error; } let address,address_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if address_error != blot_error::Error.none { return address_error; } if children.len > 268435456 / max(1,row_words) { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); }
-        let length = emit(owner,blot_backend_runtime_ir::OP_i32_const,(children.len * max(1,row_words)) as u32); if length != blot_error::Error.none { return length; } var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,kind_error = listKind(owner,scalar_words,collection.a); if kind_error != blot_error::Error.none { return kind_error; }
-        let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words))),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.new),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,address)]); if allocated != blot_error::Error.none { return allocated; }
-        for child,index in children { let value = locals.items[index]; if row_words != 0 { let position,position_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if position_error != blot_error::Error.none { return position_error; } let initialized = emitConstantLocal(owner,index as u32,position); if initialized != blot_error::Error.none { return initialized; } let stored = storeListRow(owner,address,position,value,row_words,collection.a); if stored != blot_error::Error.none { return stored; } continue; }
-            let located = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,index as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value)]); if located != blot_error::Error.none { return located; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { return scalar_error; } let machine = blot_backend_runtime_ir::machine(scalar_type); var store = blot_backend_runtime_ir::OP_i32_store; if machine == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } var stored: Error;
-            if scalar_elements { stored = storeScalar(owner,store,0); } else if generator.layoutRole(collection.a) == blot_backend_runtime_ir::ROLE_reference { stored = storeCollectionWord(owner,address,true,machine,0); } else { stored = emit(owner,store,0); } if stored != blot_error::Error.none { return stored; }
-        } return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+        let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { let __flat_cleanup_9_5_0: Error = runtime_error; block {
+locals.deinit();
+} return __flat_cleanup_9_5_0; } let address,address_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if address_error != blot_error::Error.none { let __flat_cleanup_9_6_0: Error = address_error; block {
+locals.deinit();
+} return __flat_cleanup_9_6_0; } if children.len > 268435456 / max(1,row_words) { let __flat_cleanup_9_7_0: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); block {
+locals.deinit();
+} return __flat_cleanup_9_7_0; }
+        let length = emit(owner,blot_backend_runtime_ir::OP_i32_const,(children.len * max(1,row_words)) as u32); if length != blot_error::Error.none { let __flat_cleanup_9_8_0: Error = length; block {
+locals.deinit();
+} return __flat_cleanup_9_8_0; } var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,kind_error = listKind(owner,scalar_words,collection.a); if kind_error != blot_error::Error.none { let __flat_cleanup_9_9_0: Error = kind_error; block {
+locals.deinit();
+} return __flat_cleanup_9_9_0; }
+        let allocated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words))),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.new),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,address)]); if allocated != blot_error::Error.none { let __flat_cleanup_9_10_0: Error = allocated; block {
+locals.deinit();
+} return __flat_cleanup_9_10_0; }
+        for child,index in children { let value = locals.items[index]; if row_words != 0 { let position,position_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if position_error != blot_error::Error.none { let __flat_cleanup_9_11_0: Error = position_error; block {
+locals.deinit();
+} return __flat_cleanup_9_11_0; } let initialized = emitConstantLocal(owner,index as u32,position); if initialized != blot_error::Error.none { let __flat_cleanup_9_12_0: Error = initialized; block {
+locals.deinit();
+} return __flat_cleanup_9_12_0; } let stored = storeListRow(owner,address,position,value,row_words,collection.a); if stored != blot_error::Error.none { let __flat_cleanup_9_13_0: Error = stored; block {
+locals.deinit();
+} return __flat_cleanup_9_13_0; } continue; }
+            let located = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,index as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call,runtime.address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value)]); if located != blot_error::Error.none { let __flat_cleanup_9_14_0: Error = located; block {
+locals.deinit();
+} return __flat_cleanup_9_14_0; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { let __flat_cleanup_9_15_0: Error = scalar_error; block {
+locals.deinit();
+} return __flat_cleanup_9_15_0; } let machine = blot_backend_runtime_ir::machine(scalar_type); var store = blot_backend_runtime_ir::OP_i32_store; if machine == blot_backend_runtime_ir::VT_f32 { store = blot_backend_runtime_ir::OP_f32_store; } var stored: Error;
+            if scalar_elements { stored = storeScalar(owner,store,0); } else if generator.layoutRole(collection.a) == blot_backend_runtime_ir::ROLE_reference { stored = storeCollectionWord(owner,address,true,machine,0); } else { stored = emit(owner,store,0); } if stored != blot_error::Error.none { let __flat_cleanup_9_16_0: Error = stored; block {
+locals.deinit();
+} return __flat_cleanup_9_16_0; }
+        } let __flat_cleanup_9_17_0: Error = emit(owner,blot_backend_runtime_ir::OP_local_get,address); block {
+locals.deinit();
+} return __flat_cleanup_9_17_0;
     }
-    let stride = blot_backend_packed_layout::stride(row_words); if children.len > (4294967295 - 4) / stride { return generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); } let address,address_error = allocateStorage(owner,(children.len * stride + 4) as u32,scalar_elements || row_words != 0,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar],rest: generator.layoutRole(collection.a) , ..}); if address_error != blot_error::Error.none { return address_error; }
-    if !scalar_elements && row_words == 0 && generator.layoutRole(collection.a) == blot_backend_runtime_ir::ROLE_reference { let acyclic = markAcyclic(owner,address,collection.a); if acyclic != blot_error::Error.none { return acyclic; } } let length = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,children.len as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if length != blot_error::Error.none { return length; }
-    for child,index in children { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals.items[index])]); if loaded != blot_error::Error.none { return loaded; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { return scalar_error; } let stored = storeElement(owner,blot_backend_runtime_ir::machine(scalar_type),(index * stride + 4) as u32,row_words,scalar_elements,collection.a); if stored != blot_error::Error.none { return stored; } } return emit(owner,blot_backend_runtime_ir::OP_local_get,address);
+    let stride = blot_backend_packed_layout::stride(row_words); if children.len > (4294967295 - 4) / stride { let __flat_cleanup_9_18_0: Error = generator.fail(owner.unit_id,id,blot_check_diagnostic_code::Code.complexity); block {
+locals.deinit();
+} return __flat_cleanup_9_18_0; } let address,address_error = allocateStorage(owner,(children.len * stride + 4) as u32,scalar_elements || row_words != 0,AllocationRoles { words: [blot_backend_runtime_ir::ROLE_scalar],rest: generator.layoutRole(collection.a) , ..}); if address_error != blot_error::Error.none { let __flat_cleanup_9_19_0: Error = address_error; block {
+locals.deinit();
+} return __flat_cleanup_9_19_0; }
+    if !scalar_elements && row_words == 0 && generator.layoutRole(collection.a) == blot_backend_runtime_ir::ROLE_reference { let acyclic = markAcyclic(owner,address,collection.a); if acyclic != blot_error::Error.none { let __flat_cleanup_9_20_0: Error = acyclic; block {
+locals.deinit();
+} return __flat_cleanup_9_20_0; } } let length = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,children.len as u32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if length != blot_error::Error.none { let __flat_cleanup_9_21_0: Error = length; block {
+locals.deinit();
+} return __flat_cleanup_9_21_0; }
+    for child,index in children { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,address),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,locals.items[index])]); if loaded != blot_error::Error.none { let __flat_cleanup_9_22_0: Error = loaded; block {
+locals.deinit();
+} return __flat_cleanup_9_22_0; } let scalar_type,scalar_error = scalar(owner,child); if scalar_error != blot_error::Error.none { let __flat_cleanup_9_23_0: Error = scalar_error; block {
+locals.deinit();
+} return __flat_cleanup_9_23_0; } let stored = storeElement(owner,blot_backend_runtime_ir::machine(scalar_type),(index * stride + 4) as u32,row_words,scalar_elements,collection.a); if stored != blot_error::Error.none { let __flat_cleanup_9_24_0: Error = stored; block {
+locals.deinit();
+} return __flat_cleanup_9_24_0; } } let __flat_cleanup_9_25_0: Error = emit(owner,blot_backend_runtime_ir::OP_local_get,address); block {
+locals.deinit();
+} return __flat_cleanup_9_25_0;
+
 
     }
-    let cleanup_result_10_0 = cleanup_continuation_10();
-     locals.deinit();
-    return cleanup_result_10_0;
 }
 fn arrayAddress(owner: Owner&,array: u32,index: u32,stride: u32) -> Error { return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,stride),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_mul),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add)]); }
 type NumericPlan = blot_backend_numeric_rows::Plan;
@@ -2136,99 +3170,337 @@ recursive fn packedValue(owner: Owner&,encoding: bool,id: u32,plan: const Numeri
         return packedValue(owner,encoding,node.b,plan,selected,4,fields,depth + 1);
     }
     let children = source.children(id); let record = node.tag == blot_check_core::Tag.record; let destinations=selectedRecordDestinations(source,id,record); var physical = WordBuffer {..};
-    recursive fn cleanup_continuation_9() -> bool,Error {
- if record { let ordered = physicalOrder(owner,source.types.node(source.typeOf(id)),physical); if ordered != blot_error::Error.none { return false,ordered; } }
-    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let admitted,error = packedValue(owner,encoding,child,plan,selected,slot * 4,fields,depth + 1); if error != blot_error::Error.none || !admitted { return false,error; } } return true,blot_error::Error.none;
+    block {
+ if record { let ordered = physicalOrder(owner,source.types.node(source.typeOf(id)),physical); if ordered != blot_error::Error.none { let __flat_cleanup_8_0_0: bool = false; let __flat_cleanup_8_0_1: Error = ordered; block {
+physical.deinit();
+} return __flat_cleanup_8_0_0,__flat_cleanup_8_0_1; } }
+    for child,index in children { var declared = index as u32; if record { declared = destinations[index]; } var slot = declared; if physical.items.len != 0 { slot = physical.items[declared]; } let admitted,error = packedValue(owner,encoding,child,plan,selected,slot * 4,fields,depth + 1); if error != blot_error::Error.none || !admitted { let __flat_cleanup_8_1_0: bool = false; let __flat_cleanup_8_1_1: Error = error; block {
+physical.deinit();
+} return __flat_cleanup_8_1_0,__flat_cleanup_8_1_1; } } let __flat_cleanup_8_2_0: bool = true; let __flat_cleanup_8_2_1: Error = blot_error::Error.none; block {
+physical.deinit();
+} return __flat_cleanup_8_2_0,__flat_cleanup_8_2_1;
+
 
     }
-    let cleanup_result_9_0,cleanup_result_9_1 = cleanup_continuation_9();
-     physical.deinit();
-    return cleanup_result_9_0,cleanup_result_9_1;
 }
 recursive fn generatedPackedRow(owner: Owner&,producer: PackedProducer,index: u32,destination: u32,is_list: bool,plan: const NumericPlan&) -> bool,Error {
     let generator .= owner.generator; if owner.inline_depth >= 6 || producer.template.templates != 0 || producer.template.staged != 0 || producer.template.callable_instances != 0 || owner.dictionary_owner.present { return false,blot_error::Error.none; } var unit = producer.template.unit; if unit == 0 { unit = owner.unit_id; } let source .= generator.unit(unit); let node = source.node(producer.template.node); let arrow = generator.representations.store.node(producer.ty);
     var mappings = MappingBuffer {..};
-    recursive fn cleanup_continuation_8() -> bool,Error {
+    block {
  var rows = RowBuffer {..};
-    recursive fn cleanup_continuation_7() -> bool,Error {
- let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { return false,context_error; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { return false,cleanup_error; }
+    block {
+ let context,context_error = inlineContext(owner); if context_error != blot_error::Error.none { let __flat_cleanup_6_0_0: bool = false; let __flat_cleanup_6_0_1: Error = context_error; block {
+rows.deinit();
+} let __flat_cleanup_7_0_0: bool = __flat_cleanup_6_0_0; let __flat_cleanup_7_0_1: Error = __flat_cleanup_6_0_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_0_0,__flat_cleanup_7_0_1; } let cleanups,cleanup_error = blot_runtime_runtime_cleanup::initPooled(owner.cleanups); if cleanup_error != blot_error::Error.none { let __flat_cleanup_6_1_0: bool = false; let __flat_cleanup_6_1_1: Error = cleanup_error; block {
+rows.deinit();
+} let __flat_cleanup_7_1_0: bool = __flat_cleanup_6_1_0; let __flat_cleanup_7_1_1: Error = __flat_cleanup_6_1_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_1_0,__flat_cleanup_7_1_1; }
     var emitter = Owner { diagnostic_context: context, generator: generator, unit_id: unit, function_id: owner.function_id, provider_local: owner.provider_local, mappings:default<const Mapping[:]>(), cleanups: cleanups, labels: owner.labels, inline_depth: owner.inline_depth + 1, inline_loop: true, .. };
-    recursive fn cleanup_continuation_6() -> bool,Error {
+    block {
  var root: u32 = 0;
     if node.tag == blot_check_core::Tag.reference {
-        let target,error = generator.normalize(unit,source.reference(producer.template.node)); if error != blot_error::Error.none { return false,error; } let target_source .= generator.unit(target.unit); let body .= target_source.body(target.binding); if body == null || body.parameters.len != 1 || !body.is_function { return false,blot_error::Error.none; } let cost = blot_backend_inline_body::cost(target_source,body.root); if !cost.present || cost.value > 64 { return false,blot_error::Error.none; }
-        var key = Key { target: target,count: 1,result: arrow.b , ..}; key.parameters[0] = arrow.a; key.effects[0] = arrow.c; let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { return false,service_error; } let resolved,resolved_error = service.named(key,[],mappings,rows); if resolved_error != blot_error::Error.none { return false,generator.specializationFailure(service,resolved_error); }
-        emitter.unit_id = target.unit; root = body.root; emitter.locals.insert(target_source.bodyParameters(body)[0].binding,index); if generator.artifacts != null { let read = generator.artifacts.readInlineBody(target); if read != blot_error::Error.none { return false,read; } }
+        let target,error = generator.normalize(unit,source.reference(producer.template.node)); if error != blot_error::Error.none { let __flat_cleanup_5_0_0: bool = false; let __flat_cleanup_5_0_1: Error = error; block {
+emitter.deinit();
+} let __flat_cleanup_6_2_0: bool = __flat_cleanup_5_0_0; let __flat_cleanup_6_2_1: Error = __flat_cleanup_5_0_1; block {
+rows.deinit();
+} let __flat_cleanup_7_2_0: bool = __flat_cleanup_6_2_0; let __flat_cleanup_7_2_1: Error = __flat_cleanup_6_2_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_2_0,__flat_cleanup_7_2_1; } let target_source .= generator.unit(target.unit); let body .= target_source.body(target.binding); if body == null || body.parameters.len != 1 || !body.is_function { let __flat_cleanup_5_1_0: bool = false; let __flat_cleanup_5_1_1: Error = blot_error::Error.none; block {
+emitter.deinit();
+} let __flat_cleanup_6_3_0: bool = __flat_cleanup_5_1_0; let __flat_cleanup_6_3_1: Error = __flat_cleanup_5_1_1; block {
+rows.deinit();
+} let __flat_cleanup_7_3_0: bool = __flat_cleanup_6_3_0; let __flat_cleanup_7_3_1: Error = __flat_cleanup_6_3_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_3_0,__flat_cleanup_7_3_1; } let cost = blot_backend_inline_body::cost(target_source,body.root); if !cost.present || cost.value > 64 { let __flat_cleanup_5_2_0: bool = false; let __flat_cleanup_5_2_1: Error = blot_error::Error.none; block {
+emitter.deinit();
+} let __flat_cleanup_6_4_0: bool = __flat_cleanup_5_2_0; let __flat_cleanup_6_4_1: Error = __flat_cleanup_5_2_1; block {
+rows.deinit();
+} let __flat_cleanup_7_4_0: bool = __flat_cleanup_6_4_0; let __flat_cleanup_7_4_1: Error = __flat_cleanup_6_4_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_4_0,__flat_cleanup_7_4_1; }
+        var key = Key { target: target,count: 1,result: arrow.b , ..}; key.parameters[0] = arrow.a; key.effects[0] = arrow.c; let service,service_error = generator.specializer(); if service_error != blot_error::Error.none { let __flat_cleanup_5_3_0: bool = false; let __flat_cleanup_5_3_1: Error = service_error; block {
+emitter.deinit();
+} let __flat_cleanup_6_5_0: bool = __flat_cleanup_5_3_0; let __flat_cleanup_6_5_1: Error = __flat_cleanup_5_3_1; block {
+rows.deinit();
+} let __flat_cleanup_7_5_0: bool = __flat_cleanup_6_5_0; let __flat_cleanup_7_5_1: Error = __flat_cleanup_6_5_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_5_0,__flat_cleanup_7_5_1; } let resolved,resolved_error = service.named(key,[],mappings,rows); if resolved_error != blot_error::Error.none { let __flat_cleanup_5_4_0: bool = false; let __flat_cleanup_5_4_1: Error = generator.specializationFailure(service,resolved_error); block {
+emitter.deinit();
+} let __flat_cleanup_6_6_0: bool = __flat_cleanup_5_4_0; let __flat_cleanup_6_6_1: Error = __flat_cleanup_5_4_1; block {
+rows.deinit();
+} let __flat_cleanup_7_6_0: bool = __flat_cleanup_6_6_0; let __flat_cleanup_7_6_1: Error = __flat_cleanup_6_6_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_6_0,__flat_cleanup_7_6_1; }
+        emitter.unit_id = target.unit; root = body.root; emitter.locals.insert(target_source.bodyParameters(body)[0].binding,index); if generator.artifacts != null { let read = generator.artifacts.readInlineBody(target); if read != blot_error::Error.none { let __flat_cleanup_5_5_0: bool = false; let __flat_cleanup_5_5_1: Error = read; block {
+emitter.deinit();
+} let __flat_cleanup_6_7_0: bool = __flat_cleanup_5_5_0; let __flat_cleanup_6_7_1: Error = __flat_cleanup_5_5_1; block {
+rows.deinit();
+} let __flat_cleanup_7_7_0: bool = __flat_cleanup_6_7_0; let __flat_cleanup_7_7_1: Error = __flat_cleanup_6_7_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_7_0,__flat_cleanup_7_7_1; } }
     } else if node.tag == blot_check_core::Tag.closure {
-        let closure = source.closures[node.a]; let cost = blot_backend_inline_body::cost(source,closure.body); if !cost.present || cost.value > 64 { return false,blot_error::Error.none; } let key = blot_reuse_code_artifacts::ClosureKey { scalar_environment: producer.template.scalar_environment, unit: unit, catalog: node.a, ty: producer.ty, captures: producer.template.captures, evidence: producer.template.evidence, rows: producer.template.rows, .. }; let resolved = generator.resolveClosureMappings(key,mappings,rows); if resolved != blot_error::Error.none { return false,resolved; } root = closure.body; emitter.locals.insert(closure.parameter.binding,index);
-    } else { return false,blot_error::Error.none; }
-    emitter.mappings = mappings.items; emitter.row_mappings = rows.items; let supported,supported_error = packedValue(emitter,false,root,plan,blot_support::none<u8>(),0,[],0); if supported_error != blot_error::Error.none || !supported { return false,supported_error; }
-    if node.tag == blot_check_core::Tag.closure { let closure = source.closures[node.a]; for binding,position in source.extra[closure.captures.start..closure.captures.start + closure.captures.len] { let concrete = generator.representations.store.children(producer.template.captures)[position]; let machine = generator.representations.store.machine(concrete); let local,error = temporary(owner,machine); if error != blot_error::Error.none { return false,error; } assert(producer.template.environment.present); let environment = emit(owner,blot_backend_runtime_ir::OP_local_get,producer.template.environment.value); if environment != blot_error::Error.none { return false,environment; }
-        if !producer.template.scalar_environment { var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let loaded = emit(owner,load,(position * 4) as u32); if loaded != blot_error::Error.none { return false,loaded; } } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,local); if stored != blot_error::Error.none { return false,stored; } emitter.locals.insert(binding,local);
+        let closure = source.closures[node.a]; let cost = blot_backend_inline_body::cost(source,closure.body); if !cost.present || cost.value > 64 { let __flat_cleanup_5_6_0: bool = false; let __flat_cleanup_5_6_1: Error = blot_error::Error.none; block {
+emitter.deinit();
+} let __flat_cleanup_6_8_0: bool = __flat_cleanup_5_6_0; let __flat_cleanup_6_8_1: Error = __flat_cleanup_5_6_1; block {
+rows.deinit();
+} let __flat_cleanup_7_8_0: bool = __flat_cleanup_6_8_0; let __flat_cleanup_7_8_1: Error = __flat_cleanup_6_8_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_8_0,__flat_cleanup_7_8_1; } let key = blot_reuse_code_artifacts::ClosureKey { scalar_environment: producer.template.scalar_environment, unit: unit, catalog: node.a, ty: producer.ty, captures: producer.template.captures, evidence: producer.template.evidence, rows: producer.template.rows, .. }; let resolved = generator.resolveClosureMappings(key,mappings,rows); if resolved != blot_error::Error.none { let __flat_cleanup_5_7_0: bool = false; let __flat_cleanup_5_7_1: Error = resolved; block {
+emitter.deinit();
+} let __flat_cleanup_6_9_0: bool = __flat_cleanup_5_7_0; let __flat_cleanup_6_9_1: Error = __flat_cleanup_5_7_1; block {
+rows.deinit();
+} let __flat_cleanup_7_9_0: bool = __flat_cleanup_6_9_0; let __flat_cleanup_7_9_1: Error = __flat_cleanup_6_9_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_9_0,__flat_cleanup_7_9_1; } root = closure.body; emitter.locals.insert(closure.parameter.binding,index);
+    } else { let __flat_cleanup_5_8_0: bool = false; let __flat_cleanup_5_8_1: Error = blot_error::Error.none; block {
+emitter.deinit();
+} let __flat_cleanup_6_10_0: bool = __flat_cleanup_5_8_0; let __flat_cleanup_6_10_1: Error = __flat_cleanup_5_8_1; block {
+rows.deinit();
+} let __flat_cleanup_7_10_0: bool = __flat_cleanup_6_10_0; let __flat_cleanup_7_10_1: Error = __flat_cleanup_6_10_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_10_0,__flat_cleanup_7_10_1; }
+    emitter.mappings = mappings.items; emitter.row_mappings = rows.items; let supported,supported_error = packedValue(emitter,false,root,plan,blot_support::none<u8>(),0,[],0); if supported_error != blot_error::Error.none || !supported { let __flat_cleanup_5_9_0: bool = false; let __flat_cleanup_5_9_1: Error = supported_error; block {
+emitter.deinit();
+} let __flat_cleanup_6_11_0: bool = __flat_cleanup_5_9_0; let __flat_cleanup_6_11_1: Error = __flat_cleanup_5_9_1; block {
+rows.deinit();
+} let __flat_cleanup_7_11_0: bool = __flat_cleanup_6_11_0; let __flat_cleanup_7_11_1: Error = __flat_cleanup_6_11_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_11_0,__flat_cleanup_7_11_1; }
+    if node.tag == blot_check_core::Tag.closure { let closure = source.closures[node.a]; for binding,position in source.extra[closure.captures.start..closure.captures.start + closure.captures.len] { let concrete = generator.representations.store.children(producer.template.captures)[position]; let machine = generator.representations.store.machine(concrete); let local,error = temporary(owner,machine); if error != blot_error::Error.none { let __flat_cleanup_5_10_0: bool = false; let __flat_cleanup_5_10_1: Error = error; block {
+emitter.deinit();
+} let __flat_cleanup_6_12_0: bool = __flat_cleanup_5_10_0; let __flat_cleanup_6_12_1: Error = __flat_cleanup_5_10_1; block {
+rows.deinit();
+} let __flat_cleanup_7_12_0: bool = __flat_cleanup_6_12_0; let __flat_cleanup_7_12_1: Error = __flat_cleanup_6_12_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_12_0,__flat_cleanup_7_12_1; } assert(producer.template.environment.present); let environment = emit(owner,blot_backend_runtime_ir::OP_local_get,producer.template.environment.value); if environment != blot_error::Error.none { let __flat_cleanup_5_11_0: bool = false; let __flat_cleanup_5_11_1: Error = environment; block {
+emitter.deinit();
+} let __flat_cleanup_6_13_0: bool = __flat_cleanup_5_11_0; let __flat_cleanup_6_13_1: Error = __flat_cleanup_5_11_1; block {
+rows.deinit();
+} let __flat_cleanup_7_13_0: bool = __flat_cleanup_6_13_0; let __flat_cleanup_7_13_1: Error = __flat_cleanup_6_13_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_13_0,__flat_cleanup_7_13_1; }
+        if !producer.template.scalar_environment { var load = blot_backend_runtime_ir::OP_i32_load; if machine == blot_backend_runtime_ir::VT_f32 { load = blot_backend_runtime_ir::OP_f32_load; } let loaded = emit(owner,load,(position * 4) as u32); if loaded != blot_error::Error.none { let __flat_cleanup_5_12_0: bool = false; let __flat_cleanup_5_12_1: Error = loaded; block {
+emitter.deinit();
+} let __flat_cleanup_6_14_0: bool = __flat_cleanup_5_12_0; let __flat_cleanup_6_14_1: Error = __flat_cleanup_5_12_1; block {
+rows.deinit();
+} let __flat_cleanup_7_14_0: bool = __flat_cleanup_6_14_0; let __flat_cleanup_7_14_1: Error = __flat_cleanup_6_14_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_14_0,__flat_cleanup_7_14_1; } } let stored = emit(owner,blot_backend_runtime_ir::OP_local_set,local); if stored != blot_error::Error.none { let __flat_cleanup_5_13_0: bool = false; let __flat_cleanup_5_13_1: Error = stored; block {
+emitter.deinit();
+} let __flat_cleanup_6_15_0: bool = __flat_cleanup_5_13_0; let __flat_cleanup_6_15_1: Error = __flat_cleanup_5_13_1; block {
+rows.deinit();
+} let __flat_cleanup_7_15_0: bool = __flat_cleanup_6_15_0; let __flat_cleanup_7_15_1: Error = __flat_cleanup_6_15_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_15_0,__flat_cleanup_7_15_1; } emitter.locals.insert(binding,local);
     } }
-    let body,body_error = prepareBody(emitter,root,0,false); if body_error != blot_error::Error.none { return false,body_error; }
-    recursive fn cleanup_continuation_5() -> bool,Error {
+    let body,body_error = prepareBody(emitter,root,0,false); if body_error != blot_error::Error.none { let __flat_cleanup_5_14_0: bool = false; let __flat_cleanup_5_14_1: Error = body_error; block {
+emitter.deinit();
+} let __flat_cleanup_6_16_0: bool = __flat_cleanup_5_14_0; let __flat_cleanup_6_16_1: Error = __flat_cleanup_5_14_1; block {
+rows.deinit();
+} let __flat_cleanup_7_16_0: bool = __flat_cleanup_6_16_0; let __flat_cleanup_7_16_1: Error = __flat_cleanup_6_16_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_16_0,__flat_cleanup_7_16_1; }
+    block {
  emitter.body = blot_support::some(body); emitter.analysis_root = root; let header = blot_backend_resolved_body::header(body); emitter.mappings = header.mappings; emitter.row_mappings = header.rows;
-    var fields=default<u32[16]>(); for &field in fields[..plan.word_count] { let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return false,error; } field = local; let initialized = emitConstantLocal(owner,0,field); if initialized != blot_error::Error.none { return false,initialized; } }
-    let packed,packed_error = packedValue(emitter,true,root,plan,blot_support::none<u8>(),0,fields[..plan.word_count],0); if packed_error != blot_error::Error.none { return false,packed_error; } assert(packed); var base: u32 = 0; if is_list { let selected,selected_error = multiplyLocal(owner,index,plan.word_count); if selected_error != blot_error::Error.none { return false,selected_error; } base = selected; }
-    for field,position in fields[..plan.word_count] { var address: Error; if is_list { address = listWordAddress(owner,destination,base,position as u32,false); } else { address = arrayAddress(owner,destination,index,plan.word_count as u32 * 4); } if address != blot_error::Error.none { return false,address; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,field); if loaded != blot_error::Error.none { return false,loaded; } var offset: u32 = 0; if !is_list { offset = 4 + position as u32 * 4; } let stored = storeScalar(owner,blot_backend_runtime_ir::OP_i32_store,offset); if stored != blot_error::Error.none { return false,stored; } } return true,blot_error::Error.none;
+    var fields=default<u32[16]>(); for &field in fields[..plan.word_count] { let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { let __flat_cleanup_4_0_0: bool = false; let __flat_cleanup_4_0_1: Error = error; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_15_0: bool = __flat_cleanup_4_0_0; let __flat_cleanup_5_15_1: Error = __flat_cleanup_4_0_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_17_0: bool = __flat_cleanup_5_15_0; let __flat_cleanup_6_17_1: Error = __flat_cleanup_5_15_1; block {
+rows.deinit();
+} let __flat_cleanup_7_17_0: bool = __flat_cleanup_6_17_0; let __flat_cleanup_7_17_1: Error = __flat_cleanup_6_17_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_17_0,__flat_cleanup_7_17_1; } field = local; let initialized = emitConstantLocal(owner,0,field); if initialized != blot_error::Error.none { let __flat_cleanup_4_1_0: bool = false; let __flat_cleanup_4_1_1: Error = initialized; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_16_0: bool = __flat_cleanup_4_1_0; let __flat_cleanup_5_16_1: Error = __flat_cleanup_4_1_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_18_0: bool = __flat_cleanup_5_16_0; let __flat_cleanup_6_18_1: Error = __flat_cleanup_5_16_1; block {
+rows.deinit();
+} let __flat_cleanup_7_18_0: bool = __flat_cleanup_6_18_0; let __flat_cleanup_7_18_1: Error = __flat_cleanup_6_18_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_18_0,__flat_cleanup_7_18_1; } }
+    let packed,packed_error = packedValue(emitter,true,root,plan,blot_support::none<u8>(),0,fields[..plan.word_count],0); if packed_error != blot_error::Error.none { let __flat_cleanup_4_2_0: bool = false; let __flat_cleanup_4_2_1: Error = packed_error; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_17_0: bool = __flat_cleanup_4_2_0; let __flat_cleanup_5_17_1: Error = __flat_cleanup_4_2_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_19_0: bool = __flat_cleanup_5_17_0; let __flat_cleanup_6_19_1: Error = __flat_cleanup_5_17_1; block {
+rows.deinit();
+} let __flat_cleanup_7_19_0: bool = __flat_cleanup_6_19_0; let __flat_cleanup_7_19_1: Error = __flat_cleanup_6_19_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_19_0,__flat_cleanup_7_19_1; } assert(packed); var base: u32 = 0; if is_list { let selected,selected_error = multiplyLocal(owner,index,plan.word_count); if selected_error != blot_error::Error.none { let __flat_cleanup_4_3_0: bool = false; let __flat_cleanup_4_3_1: Error = selected_error; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_18_0: bool = __flat_cleanup_4_3_0; let __flat_cleanup_5_18_1: Error = __flat_cleanup_4_3_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_20_0: bool = __flat_cleanup_5_18_0; let __flat_cleanup_6_20_1: Error = __flat_cleanup_5_18_1; block {
+rows.deinit();
+} let __flat_cleanup_7_20_0: bool = __flat_cleanup_6_20_0; let __flat_cleanup_7_20_1: Error = __flat_cleanup_6_20_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_20_0,__flat_cleanup_7_20_1; } base = selected; }
+    for field,position in fields[..plan.word_count] { var address: Error; if is_list { address = listWordAddress(owner,destination,base,position as u32,false); } else { address = arrayAddress(owner,destination,index,plan.word_count as u32 * 4); } if address != blot_error::Error.none { let __flat_cleanup_4_4_0: bool = false; let __flat_cleanup_4_4_1: Error = address; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_19_0: bool = __flat_cleanup_4_4_0; let __flat_cleanup_5_19_1: Error = __flat_cleanup_4_4_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_21_0: bool = __flat_cleanup_5_19_0; let __flat_cleanup_6_21_1: Error = __flat_cleanup_5_19_1; block {
+rows.deinit();
+} let __flat_cleanup_7_21_0: bool = __flat_cleanup_6_21_0; let __flat_cleanup_7_21_1: Error = __flat_cleanup_6_21_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_21_0,__flat_cleanup_7_21_1; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,field); if loaded != blot_error::Error.none { let __flat_cleanup_4_5_0: bool = false; let __flat_cleanup_4_5_1: Error = loaded; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_20_0: bool = __flat_cleanup_4_5_0; let __flat_cleanup_5_20_1: Error = __flat_cleanup_4_5_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_22_0: bool = __flat_cleanup_5_20_0; let __flat_cleanup_6_22_1: Error = __flat_cleanup_5_20_1; block {
+rows.deinit();
+} let __flat_cleanup_7_22_0: bool = __flat_cleanup_6_22_0; let __flat_cleanup_7_22_1: Error = __flat_cleanup_6_22_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_22_0,__flat_cleanup_7_22_1; } var offset: u32 = 0; if !is_list { offset = 4 + position as u32 * 4; } let stored = storeScalar(owner,blot_backend_runtime_ir::OP_i32_store,offset); if stored != blot_error::Error.none { let __flat_cleanup_4_6_0: bool = false; let __flat_cleanup_4_6_1: Error = stored; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_21_0: bool = __flat_cleanup_4_6_0; let __flat_cleanup_5_21_1: Error = __flat_cleanup_4_6_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_23_0: bool = __flat_cleanup_5_21_0; let __flat_cleanup_6_23_1: Error = __flat_cleanup_5_21_1; block {
+rows.deinit();
+} let __flat_cleanup_7_23_0: bool = __flat_cleanup_6_23_0; let __flat_cleanup_7_23_1: Error = __flat_cleanup_6_23_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_23_0,__flat_cleanup_7_23_1; } } let __flat_cleanup_4_7_0: bool = true; let __flat_cleanup_4_7_1: Error = blot_error::Error.none; block {
+blot_backend_resolved_body::release(body);
+} let __flat_cleanup_5_22_0: bool = __flat_cleanup_4_7_0; let __flat_cleanup_5_22_1: Error = __flat_cleanup_4_7_1; block {
+emitter.deinit();
+} let __flat_cleanup_6_24_0: bool = __flat_cleanup_5_22_0; let __flat_cleanup_6_24_1: Error = __flat_cleanup_5_22_1; block {
+rows.deinit();
+} let __flat_cleanup_7_24_0: bool = __flat_cleanup_6_24_0; let __flat_cleanup_7_24_1: Error = __flat_cleanup_6_24_1; block {
+mappings.deinit();
+} return __flat_cleanup_7_24_0,__flat_cleanup_7_24_1;
+
 
     }
-    let cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
-     blot_backend_resolved_body::release(body);
-    return cleanup_result_5_0,cleanup_result_5_1;
+
 
     }
-    let cleanup_result_6_0,cleanup_result_6_1 = cleanup_continuation_6();
-     emitter.deinit();
-    return cleanup_result_6_0,cleanup_result_6_1;
+
 
     }
-    let cleanup_result_7_0,cleanup_result_7_1 = cleanup_continuation_7();
-     rows.deinit();
-    return cleanup_result_7_0,cleanup_result_7_1;
+
 
     }
-    let cleanup_result_8_0,cleanup_result_8_1 = cleanup_continuation_8();
-     mappings.deinit();
-    return cleanup_result_8_0,cleanup_result_8_1;
 }
 recursive fn arrayFill(owner: Owner&,count: u32,value: u32,machine: blot_backend_runtime_ir::ValueType,is_generated: bool,is_list: bool,known: blot_support::Option<u32>,element: u32,producer: blot_support::Option<PackedProducer>) -> Error {
     let generator .= owner.generator; let row_words,row_error = generator.rowWords(element); if row_error != blot_error::Error.none { return row_error; } var copied_row_scope = false; if is_generated { let nested,error = generator.nestedRow(element); if error != blot_error::Error.none { return error; } copied_row_scope = nested.present; }
     let iteration_cleanup = owner.cleanups.mark();
-    recursive fn cleanup_continuation_4() -> Error {
+    block {
  let stride = blot_backend_packed_layout::stride(row_words); let scalar_elements = row_words != 0 || generator.representations.store.scalar(element).present;
-    let size,size_error = arraySize(owner,count,stride); if size_error != blot_error::Error.none { return size_error; } let array,array_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if array_error != blot_error::Error.none { return array_error; } let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != blot_error::Error.none { return index_error; } var physical = count;
-    if is_list && row_words > 1 { let words,error = listWordCount(owner,count,row_words); if error != blot_error::Error.none { return error; } physical = words; } var length = size; if is_list { length = physical; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,length); if loaded != blot_error::Error.none { return loaded; }
-    if is_list { var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,error = listKind(owner,scalar_words,element); if error != blot_error::Error.none { return error; } let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words)))]); if prepared != blot_error::Error.none { return prepared; } }
-    var allocated: Error; if is_list { let runtime,error = generator.module.ensureLists(); if error != blot_error::Error.none { return error; } allocated = emit(owner,blot_backend_runtime_ir::OP_call,runtime.new); } else { allocated = allocateArray(owner,scalar_elements,element); } if allocated != blot_error::Error.none { return allocated; }
-    let saved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array)]); if saved != blot_error::Error.none { return saved; } var logical_length = count; if is_list { logical_length = physical; } let counted = emit(owner,blot_backend_runtime_ir::OP_local_get,logical_length); if counted != blot_error::Error.none { return counted; }
-    var stored: Error; if is_list { stored = storeCollectionWord(owner,array,false,blot_backend_runtime_ir::VT_i32,0); } else { stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,0); } if stored != blot_error::Error.none { return stored; }
-    let initialized = emitConstantLocal(owner,0,index); if initialized != blot_error::Error.none { return initialized; } let entered = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_block),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop)]); if entered != blot_error::Error.none { return entered; } owner.labels += 2;
-    let bounded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,1)]); if bounded != blot_error::Error.none { return bounded; }
+    let size,size_error = arraySize(owner,count,stride); if size_error != blot_error::Error.none { let __flat_cleanup_3_0_0: Error = size_error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_0_0; } let array,array_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if array_error != blot_error::Error.none { let __flat_cleanup_3_1_0: Error = array_error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_1_0; } let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != blot_error::Error.none { let __flat_cleanup_3_2_0: Error = index_error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_2_0; } var physical = count;
+    if is_list && row_words > 1 { let words,error = listWordCount(owner,count,row_words); if error != blot_error::Error.none { let __flat_cleanup_3_3_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_3_0; } physical = words; } var length = size; if is_list { length = physical; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,length); if loaded != blot_error::Error.none { let __flat_cleanup_3_4_0: Error = loaded; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_4_0; }
+    if is_list { var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,error = listKind(owner,scalar_words,element); if error != blot_error::Error.none { let __flat_cleanup_3_5_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_5_0; } let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words)))]); if prepared != blot_error::Error.none { let __flat_cleanup_3_6_0: Error = prepared; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_6_0; } }
+    var allocated: Error; if is_list { let runtime,error = generator.module.ensureLists(); if error != blot_error::Error.none { let __flat_cleanup_3_7_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_7_0; } allocated = emit(owner,blot_backend_runtime_ir::OP_call,runtime.new); } else { allocated = allocateArray(owner,scalar_elements,element); } if allocated != blot_error::Error.none { let __flat_cleanup_3_8_0: Error = allocated; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_8_0; }
+    let saved = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array)]); if saved != blot_error::Error.none { let __flat_cleanup_3_9_0: Error = saved; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_9_0; } var logical_length = count; if is_list { logical_length = physical; } let counted = emit(owner,blot_backend_runtime_ir::OP_local_get,logical_length); if counted != blot_error::Error.none { let __flat_cleanup_3_10_0: Error = counted; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_10_0; }
+    var stored: Error; if is_list { stored = storeCollectionWord(owner,array,false,blot_backend_runtime_ir::VT_i32,0); } else { stored = emit(owner,blot_backend_runtime_ir::OP_i32_store,0); } if stored != blot_error::Error.none { let __flat_cleanup_3_11_0: Error = stored; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_11_0; }
+    let initialized = emitConstantLocal(owner,0,index); if initialized != blot_error::Error.none { let __flat_cleanup_3_12_0: Error = initialized; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_12_0; } let entered = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_block),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop)]); if entered != blot_error::Error.none { let __flat_cleanup_3_13_0: Error = entered; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_13_0; } owner.labels += 2;
+    let bounded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_ge_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,1)]); if bounded != blot_error::Error.none { let __flat_cleanup_3_14_0: Error = bounded; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_14_0; }
     var chunk_end = blot_support::none<u32>();
     if copied_row_scope {
-        let rooted = openRootScope(owner); if rooted != blot_error::Error.none { return rooted; } let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return error; } chunk_end = blot_support::some(local);
-        let chunked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,local),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,local),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop)]); if chunked != blot_error::Error.none { return chunked; } owner.labels++;
+        let rooted = openRootScope(owner); if rooted != blot_error::Error.none { let __flat_cleanup_3_15_0: Error = rooted; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_15_0; } let local,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { let __flat_cleanup_3_16_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_16_0; } chunk_end = blot_support::some(local);
+        let chunked = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,32),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_tee,local),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_gt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,local),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_loop)]); if chunked != blot_error::Error.none { let __flat_cleanup_3_17_0: Error = chunked; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_17_0; } owner.labels++;
     }
-    var direct = false; if producer.present { let nested,error = generator.nestedRow(element); if error != blot_error::Error.none { return error; } if nested.present && nested.value.guard_count != 0 { let generated,generated_error = generatedPackedRow(owner,producer.value,index,array,is_list,nested.value); if generated_error != blot_error::Error.none { return generated_error; } direct = generated; } }
+    var direct = false; if producer.present { let nested,error = generator.nestedRow(element); if error != blot_error::Error.none { let __flat_cleanup_3_18_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_18_0; } if nested.present && nested.value.guard_count != 0 { let generated,generated_error = generatedPackedRow(owner,producer.value,index,array,is_list,nested.value); if generated_error != blot_error::Error.none { let __flat_cleanup_3_19_0: Error = generated_error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_19_0; } direct = generated; } }
     if !direct {
-        if is_list && row_words == 0 { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if loaded != blot_error::Error.none { return loaded; } let runtime,error = generator.module.ensureLists(); if error != blot_error::Error.none { return error; } let address = emit(owner,blot_backend_runtime_ir::OP_call,runtime.address); if address != blot_error::Error.none { return address; } }
-        else if !is_list { let address = arrayAddress(owner,array,index,stride); if address != blot_error::Error.none { return address; } }
-        if known.present { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if loaded != blot_error::Error.none { return loaded; } let provider = providerHead(owner); if provider != blot_error::Error.none { return provider; } let called = emit(owner,blot_backend_runtime_ir::OP_call,known.value); if called != blot_error::Error.none { return called; } }
-        else if is_generated { let signature,error = generator.module.internType([blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32],machine); if error != blot_error::Error.none { return error; } let environment = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if environment != blot_error::Error.none { return environment; } let provider = providerHead(owner); if provider != blot_error::Error.none { return provider; } let called = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_indirect,signature)]); if called != blot_error::Error.none { return called; } }
-        else { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if loaded != blot_error::Error.none { return loaded; } }
-        var stored: Error; if is_list && row_words != 0 { let row,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return error; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,row); if saved != blot_error::Error.none { return saved; } stored = storeListRow(owner,array,index,row,row_words,element); }
-        else if is_list { stored = storeCollectionWord(owner,array,true,machine,0); } else if !scalar_elements { stored = storeCollectionWord(owner,array,false,machine,4); } else { stored = storeElement(owner,machine,4,row_words,scalar_elements,element); } if stored != blot_error::Error.none { return stored; }
+        if is_list && row_words == 0 { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if loaded != blot_error::Error.none { let __flat_cleanup_3_20_0: Error = loaded; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_20_0; } let runtime,error = generator.module.ensureLists(); if error != blot_error::Error.none { let __flat_cleanup_3_21_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_21_0; } let address = emit(owner,blot_backend_runtime_ir::OP_call,runtime.address); if address != blot_error::Error.none { let __flat_cleanup_3_22_0: Error = address; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_22_0; } }
+        else if !is_list { let address = arrayAddress(owner,array,index,stride); if address != blot_error::Error.none { let __flat_cleanup_3_23_0: Error = address; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_23_0; } }
+        if known.present { let loaded = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if loaded != blot_error::Error.none { let __flat_cleanup_3_24_0: Error = loaded; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_24_0; } let provider = providerHead(owner); if provider != blot_error::Error.none { let __flat_cleanup_3_25_0: Error = provider; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_25_0; } let called = emit(owner,blot_backend_runtime_ir::OP_call,known.value); if called != blot_error::Error.none { let __flat_cleanup_3_26_0: Error = called; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_26_0; } }
+        else if is_generated { let signature,error = generator.module.internType([blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32,blot_backend_runtime_ir::VT_i32],machine); if error != blot_error::Error.none { let __flat_cleanup_3_27_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_27_0; } let environment = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,4),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index)]); if environment != blot_error::Error.none { let __flat_cleanup_3_28_0: Error = environment; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_28_0; } let provider = providerHead(owner); if provider != blot_error::Error.none { let __flat_cleanup_3_29_0: Error = provider; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_29_0; } let called = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_load,0),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_call_indirect,signature)]); if called != blot_error::Error.none { let __flat_cleanup_3_30_0: Error = called; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_30_0; } }
+        else { let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,value); if loaded != blot_error::Error.none { let __flat_cleanup_3_31_0: Error = loaded; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_31_0; } }
+        var stored: Error; if is_list && row_words != 0 { let row,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { let __flat_cleanup_3_32_0: Error = error; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_32_0; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,row); if saved != blot_error::Error.none { let __flat_cleanup_3_33_0: Error = saved; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_33_0; } stored = storeListRow(owner,array,index,row,row_words,element); }
+        else if is_list { stored = storeCollectionWord(owner,array,true,machine,0); } else if !scalar_elements { stored = storeCollectionWord(owner,array,false,machine,4); } else { stored = storeElement(owner,machine,4,row_words,scalar_elements,element); } if stored != blot_error::Error.none { let __flat_cleanup_3_34_0: Error = stored; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_34_0; }
     }
-    let advanced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index)]); if advanced != blot_error::Error.none { return advanced; }
-    if copied_row_scope { assert(chunk_end.present); let repeated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,chunk_end.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,0)]); if repeated != blot_error::Error.none { return repeated; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != blot_error::Error.none { return ended; } let cleaned = cleanupTo(owner,iteration_cleanup); if cleaned != blot_error::Error.none { return cleaned; } owner.cleanups.restore(iteration_cleanup); }
-    let repeated = emit(owner,blot_backend_runtime_ir::OP_br,0); if repeated != blot_error::Error.none { return repeated; } owner.labels -= 2; return emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array)]);
+    let advanced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index)]); if advanced != blot_error::Error.none { let __flat_cleanup_3_35_0: Error = advanced; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_35_0; }
+    if copied_row_scope { assert(chunk_end.present); let repeated = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,index),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,chunk_end.value),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_lt_u),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_br_if,0)]); if repeated != blot_error::Error.none { let __flat_cleanup_3_36_0: Error = repeated; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_36_0; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != blot_error::Error.none { let __flat_cleanup_3_37_0: Error = ended; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_37_0; } let cleaned = cleanupTo(owner,iteration_cleanup); if cleaned != blot_error::Error.none { let __flat_cleanup_3_38_0: Error = cleaned; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_38_0; } owner.cleanups.restore(iteration_cleanup); }
+    let repeated = emit(owner,blot_backend_runtime_ir::OP_br,0); if repeated != blot_error::Error.none { let __flat_cleanup_3_39_0: Error = repeated; block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_39_0; } owner.labels -= 2; let __flat_cleanup_3_40_0: Error = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_end),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,array)]); block {
+if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
+} return __flat_cleanup_3_40_0;
+
 
     }
-    let cleanup_result_4_0 = cleanup_continuation_4();
-     if copied_row_scope { owner.cleanups.restore(iteration_cleanup); }
-    return cleanup_result_4_0;
 }
 fn advancePrivateCursor(owner: Owner&,fields: SmallCollection,is_list: bool) -> SmallCollection,Error {
     let bounds = privateCursorBounds(owner,fields.values[0],fields.values[1],1); if bounds != blot_error::Error.none { return SmallCollection {..},bounds; } let index,error = temporary(owner,blot_backend_runtime_ir::VT_i32); if error != blot_error::Error.none { return SmallCollection {..},error; } let advanced = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,fields.values[1]),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,1),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_add),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_set,index)]); if advanced != blot_error::Error.none { return SmallCollection {..},advanced; } return cursorFields(owner,fields.values[0],index,is_list,blot_support::some<CursorPrevious>(CursorPrevious.fields{ [fields.values[2],fields.values[3]] , ..}),1);
@@ -2287,21 +3559,53 @@ recursive fn exactBuilder(owner: Owner&,id: u32,plan: blot_backend_exact_builder
 recursive fn fillExactBuilder(owner: Owner&,id: u32,plan: blot_backend_exact_builder::Plan,count: u32,eligible: u32,depth: i64) -> Error {
     let generator .= owner.generator; let source .= generator.unit(owner.unit_id); let concrete,error = codeLayout(owner,source.typeOf(plan.initial),source.span(id)); if error != blot_error::Error.none { return error; } let collection = generator.representations.store.node(concrete); let is_list = plan.conversion == 0; let row_words,row_error = generator.rowWords(collection.a); if row_error != blot_error::Error.none { return row_error; } let stride = blot_backend_packed_layout::stride(row_words);
     let previous_probe = owner.exact_probe; let previous_build = owner.exact_build; owner.exact_probe = true;
-    recursive fn cleanup_continuation_3() -> Error {
+    block {
 
-    let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,eligible),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32)]); if selected != blot_error::Error.none { return selected; } owner.labels++; let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present; var size = count;
-    if is_list { if row_words > 1 { let words,word_error = listWordCount(owner,count,row_words); if word_error != blot_error::Error.none { return word_error; } size = words; } } else { let bytes,byte_error = arraySize(owner,count,stride); if byte_error != blot_error::Error.none { return byte_error; } size = bytes; }
-    let storage,storage_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if storage_error != blot_error::Error.none { return storage_error; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,size); if loaded != blot_error::Error.none { return loaded; }
-    if is_list { var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,kind_error = listKind(owner,scalar_words,collection.a); if kind_error != blot_error::Error.none { return kind_error; } let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words)))]); if prepared != blot_error::Error.none { return prepared; } }
-    var allocated: Error; if is_list { let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { return runtime_error; } allocated = emit(owner,blot_backend_runtime_ir::OP_call,runtime.new); } else { allocated = allocateArray(owner,scalar_elements,collection.a); } if allocated != blot_error::Error.none { return allocated; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,storage); if saved != blot_error::Error.none { return saved; }
-    if !is_list { let counted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,storage),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if counted != blot_error::Error.none { return counted; } }
-    let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != blot_error::Error.none { return index_error; } let initialized = emitConstantLocal(owner,0,index); if initialized != blot_error::Error.none { return initialized; } owner.exact_build = blot_support::some(ExactBuild { plan,storage,index,row_words , ..});
-    let fast = expression(owner,id,depth + 1); if fast != blot_error::Error.none { return fast; } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != blot_error::Error.none { return alternate; } owner.exact_build = previous_build; let ordinary = expression(owner,id,depth + 1); if ordinary != blot_error::Error.none { return ordinary; } owner.labels--; return emit(owner,blot_backend_runtime_ir::OP_end);
+    let selected = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,eligible),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_if_,blot_backend_runtime_ir::VT_i32 as u32)]); if selected != blot_error::Error.none { let __flat_cleanup_2_0_0: Error = selected; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_0_0; } owner.labels++; let scalar_elements = row_words != 0 || generator.representations.store.scalar(collection.a).present; var size = count;
+    if is_list { if row_words > 1 { let words,word_error = listWordCount(owner,count,row_words); if word_error != blot_error::Error.none { let __flat_cleanup_2_1_0: Error = word_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_1_0; } size = words; } } else { let bytes,byte_error = arraySize(owner,count,stride); if byte_error != blot_error::Error.none { let __flat_cleanup_2_2_0: Error = byte_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_2_0; } size = bytes; }
+    let storage,storage_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if storage_error != blot_error::Error.none { let __flat_cleanup_2_3_0: Error = storage_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_3_0; } let loaded = emit(owner,blot_backend_runtime_ir::OP_local_get,size); if loaded != blot_error::Error.none { let __flat_cleanup_2_4_0: Error = loaded; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_4_0; }
+    if is_list { var scalar_words: u32 = 0; if scalar_elements { scalar_words = max(1,row_words); } let kind,kind_error = listKind(owner,scalar_words,collection.a); if kind_error != blot_error::Error.none { let __flat_cleanup_2_5_0: Error = kind_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_5_0; } let prepared = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,kind),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_const,blot_runtime_list_runtime::leafLimit(max(1,row_words)))]); if prepared != blot_error::Error.none { let __flat_cleanup_2_6_0: Error = prepared; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_6_0; } }
+    var allocated: Error; if is_list { let runtime,runtime_error = generator.module.ensureLists(); if runtime_error != blot_error::Error.none { let __flat_cleanup_2_7_0: Error = runtime_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_7_0; } allocated = emit(owner,blot_backend_runtime_ir::OP_call,runtime.new); } else { allocated = allocateArray(owner,scalar_elements,collection.a); } if allocated != blot_error::Error.none { let __flat_cleanup_2_8_0: Error = allocated; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_8_0; } let saved = emit(owner,blot_backend_runtime_ir::OP_local_set,storage); if saved != blot_error::Error.none { let __flat_cleanup_2_9_0: Error = saved; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_9_0; }
+    if !is_list { let counted = emitInstructions(owner,[blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,storage),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_local_get,count),blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_i32_store,0)]); if counted != blot_error::Error.none { let __flat_cleanup_2_10_0: Error = counted; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_10_0; } }
+    let index,index_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if index_error != blot_error::Error.none { let __flat_cleanup_2_11_0: Error = index_error; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_11_0; } let initialized = emitConstantLocal(owner,0,index); if initialized != blot_error::Error.none { let __flat_cleanup_2_12_0: Error = initialized; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_12_0; } owner.exact_build = blot_support::some(ExactBuild { plan,storage,index,row_words , ..});
+    let fast = expression(owner,id,depth + 1); if fast != blot_error::Error.none { let __flat_cleanup_2_13_0: Error = fast; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_13_0; } let alternate = emit(owner,blot_backend_runtime_ir::OP_else_); if alternate != blot_error::Error.none { let __flat_cleanup_2_14_0: Error = alternate; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_14_0; } owner.exact_build = previous_build; let ordinary = expression(owner,id,depth + 1); if ordinary != blot_error::Error.none { let __flat_cleanup_2_15_0: Error = ordinary; block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_15_0; } owner.labels--; let __flat_cleanup_2_16_0: Error = emit(owner,blot_backend_runtime_ir::OP_end); block {
+owner.exact_probe = previous_probe; owner.exact_build = previous_build;
+} return __flat_cleanup_2_16_0;
+
 
     }
-    let cleanup_result_3_0 = cleanup_continuation_3();
-     owner.exact_probe = previous_probe; owner.exact_build = previous_build;
-    return cleanup_result_3_0;
 }
 struct RaggedFacts { generator: blot_backend_core_backend::Generator&,unit: u32,body: u32,templates: TemplateMap }
 fn raggedFacts(owner: const Owner&) -> RaggedFacts { assert(owner.body.present); return RaggedFacts { owner.generator,owner.unit_id,owner.body.value,owner.templates , ..}; }
@@ -2325,23 +3629,35 @@ recursive fn raggedBuilder(owner: Owner&,id: u32,plan: blot_backend_ragged_build
     let count,count_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if count_error != blot_error::Error.none { return count_error; } let eligible,eligible_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if eligible_error != blot_error::Error.none { return eligible_error; } let budget,budget_error = temporary(owner,blot_backend_runtime_ir::VT_i32); if budget_error != blot_error::Error.none { return budget_error; }
     let zero = emitConstantLocal(owner,0,count); if zero != blot_error::Error.none { return zero; } let admitted = emitConstantLocal(owner,1,eligible); if admitted != blot_error::Error.none { return admitted; } let bounded = emitConstantLocal(owner,generator.ragged_probe_limit,budget); if bounded != blot_error::Error.none { return bounded; }
     let previous_probe = owner.exact_probe; let previous_count = owner.ragged_count; owner.exact_probe = true;
-    recursive fn cleanup_continuation_2() -> Error {
+    block {
 
-    let entered = emit(owner,blot_backend_runtime_ir::OP_block); if entered != blot_error::Error.none { return entered; } owner.ragged_count = blot_support::some(RaggedCount { plan: plan,count: count,eligible: eligible,budget: budget,limit: maximum.value,exit: owner.labels,cleanup: owner.cleanups.mark() , ..}); owner.labels++;
-    let probed = expression(owner,id,depth + 1); if probed != blot_error::Error.none { return probed; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != blot_error::Error.none { return dropped; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != blot_error::Error.none { return ended; } owner.ragged_count = previous_count;
+    let entered = emit(owner,blot_backend_runtime_ir::OP_block); if entered != blot_error::Error.none { let __flat_cleanup_1_0_0: Error = entered; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_0_0; } owner.ragged_count = blot_support::some(RaggedCount { plan: plan,count: count,eligible: eligible,budget: budget,limit: maximum.value,exit: owner.labels,cleanup: owner.cleanups.mark() , ..}); owner.labels++;
+    let probed = expression(owner,id,depth + 1); if probed != blot_error::Error.none { let __flat_cleanup_1_1_0: Error = probed; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_1_0; } let dropped = emit(owner,blot_backend_runtime_ir::OP_drop); if dropped != blot_error::Error.none { let __flat_cleanup_1_2_0: Error = dropped; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_2_0; } owner.labels--; let ended = emit(owner,blot_backend_runtime_ir::OP_end); if ended != blot_error::Error.none { let __flat_cleanup_1_3_0: Error = ended; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_3_0; } owner.ragged_count = previous_count;
     let previous_fill = owner.ragged_fill; owner.ragged_fill = true;
-    recursive fn cleanup_continuation_1() -> Error {
- let filled = fillExactBuilder(owner,id,plan.storage,count,eligible,depth); if filled != blot_error::Error.none { return filled; } generator.evaluator.counters.ragged_runtime_regions++; return blot_error::Error.none;
+    block {
+ let filled = fillExactBuilder(owner,id,plan.storage,count,eligible,depth); if filled != blot_error::Error.none { let __flat_cleanup_0_0_0: Error = filled; block {
+owner.ragged_fill = previous_fill;
+} let __flat_cleanup_1_4_0: Error = __flat_cleanup_0_0_0; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_4_0; } generator.evaluator.counters.ragged_runtime_regions++; let __flat_cleanup_0_1_0: Error = blot_error::Error.none; block {
+owner.ragged_fill = previous_fill;
+} let __flat_cleanup_1_5_0: Error = __flat_cleanup_0_1_0; block {
+owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
+} return __flat_cleanup_1_5_0;
+
 
     }
-    let cleanup_result_1_0 = cleanup_continuation_1();
-     owner.ragged_fill = previous_fill;
-    return cleanup_result_1_0;
+
 
     }
-    let cleanup_result_2_0 = cleanup_continuation_2();
-     owner.exact_probe = previous_probe; owner.ragged_count = previous_count;
-    return cleanup_result_2_0;
 }
 recursive fn raggedDependencies(owner: Owner&,id: u32) -> Error {
     let generator .= owner.generator; if id == 0 || generator.artifacts == null { return blot_error::Error.none; } let source .= generator.unit(owner.unit_id); let node = source.node(id); assert(owner.body.present);

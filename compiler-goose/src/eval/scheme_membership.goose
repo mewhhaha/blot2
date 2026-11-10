@@ -3,6 +3,7 @@ import check.types;
 import support.error;
 import support.native;
 import support.pooled_map;
+import support.option;
 import work_counters;
 
 import std;
@@ -17,9 +18,19 @@ fn contains(self_: View,value: u32) -> bool {
 }
 struct EntryMap { count: i64=0,slots: dictionary_slot<Key,List>[:]=default<dictionary_slot<Key,List>[:]>() }
 reusable[] var pool_EntryMap: dictionary_slot<Key,List>[>..]=[];
+fn canonicalEntryMapSlots(source: const dictionary_slot<Key,List>[:]) -> dictionary_slot<Key,List>[:] {
+ if source.len==0 { return default<dictionary_slot<Key,List>[:]>(); }
+ let owned=pool_EntryMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_EntryMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_EntryMap.len-start);
+ return pool_EntryMap[start..start+source.len];
+}
+fn publishEntryMap(self_: EntryMap&,view: blot_support_pooled_map::Map<Key,List>) {
+ self_.count=view.count; self_.slots=canonicalEntryMapSlots(view.slots);
+}
+
 fn get(self_: const EntryMap&,key: Key) -> List? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const EntryMap&,key: Key) -> bool { return self_.get(key)!=null; }
-fn insert(self_: EntryMap&,key: Key,value: List) { var view=blot_support_pooled_map::Map<Key,List> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_EntryMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: EntryMap&,key: Key,value: List) { var view=blot_support_pooled_map::Map<Key,List> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_EntryMap); publishEntryMap(self_,view); }
 fn clear(self_: EntryMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: EntryMap&) { if self_.slots.len!=0 { pool_EntryMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<Key,List>[:]>(); self_.count=0; }
 fn restore(self_: EntryMap&,slots: const dictionary_slot<Key,List>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_EntryMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }

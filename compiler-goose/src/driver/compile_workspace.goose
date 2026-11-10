@@ -42,6 +42,20 @@ fn canonicalWorkspace(source:Workspace&)->Workspace& {
  let owned:Workspace& =workspaces[state.workspace_slot-1];
  assert(source .==owned && registered .==owned);return owned;
 }
+// Compile attempts carry this scalar active-frame authority, never a workspace loan.
+fn frameForWorkspace(source:Workspace&)->Frame {
+ let owned:Workspace& =canonicalWorkspace(source);
+ return active;
+}
+fn workspaceForFrame(frame:Frame)->Workspace& {
+ assert(frame.valid() && frame==active);
+ let state:FrameState& =frames[frame.slot-1];
+ assert(state.workspace_slot!=0 && state.workspace_slot-1<workspaces.len);
+ let registered .=state.workspace;assert(registered);
+ let owned:Workspace& =workspaces[state.workspace_slot-1];
+ assert(registered .==owned);
+ return owned;
+}
 // Results carry only the publication key; the active Frame owns message backing.
 fn resultMessage(owner:blot_backend_result_publication::Owner,epoch:u64,pinned:bool)->const u8[:] {
  assert(blot_backend_result_publication::resultValid(owner,epoch,pinned));

@@ -11,6 +11,7 @@ import support.error;
 import support.native;
 import support.pooled_buffer;
 import support.pooled_map;
+import support.option;
 
 import std;
 import dictionary;
@@ -101,25 +102,55 @@ fn clear(self_: RecordLayoutsBuffer&) { blot_support_pooled_buffer::clear(self_)
 fn deinit(self_: RecordLayoutsBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_RecordLayoutsBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
 struct TypedViewsMap { count: i64=0,slots: dictionary_slot<ViewKey,ValueId>[:]=default<dictionary_slot<ViewKey,ValueId>[:]>() }
 reusable[] var pool_TypedViewsMap: dictionary_slot<ViewKey,ValueId>[>..]=[];
+fn canonicalTypedViewsMapSlots(source: const dictionary_slot<ViewKey,ValueId>[:]) -> dictionary_slot<ViewKey,ValueId>[:] {
+ if source.len==0 { return default<dictionary_slot<ViewKey,ValueId>[:]>(); }
+ let owned=pool_TypedViewsMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_TypedViewsMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_TypedViewsMap.len-start);
+ return pool_TypedViewsMap[start..start+source.len];
+}
+fn publishTypedViewsMap(self_: TypedViewsMap&,view: blot_support_pooled_map::Map<ViewKey,ValueId>) {
+ self_.count=view.count; self_.slots=canonicalTypedViewsMapSlots(view.slots);
+}
+
 fn get(self_: const TypedViewsMap&,key: ViewKey) -> ValueId? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const TypedViewsMap&,key: ViewKey) -> bool { return self_.get(key)!=null; }
-fn insert(self_: TypedViewsMap&,key: ViewKey,value: ValueId) { var view=blot_support_pooled_map::Map<ViewKey,ValueId> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_TypedViewsMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: TypedViewsMap&,key: ViewKey,value: ValueId) { var view=blot_support_pooled_map::Map<ViewKey,ValueId> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_TypedViewsMap); publishTypedViewsMap(self_,view); }
 fn clear(self_: TypedViewsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: TypedViewsMap&) { if self_.slots.len!=0 { pool_TypedViewsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<ViewKey,ValueId>[:]>(); self_.count=0; }
 fn restore(self_: TypedViewsMap&,slots: const dictionary_slot<ViewKey,ValueId>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_TypedViewsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct RecordTypesMap { count: i64=0,slots: dictionary_slot<RecordKey,u32>[:]=default<dictionary_slot<RecordKey,u32>[:]>() }
 reusable[] var pool_RecordTypesMap: dictionary_slot<RecordKey,u32>[>..]=[];
+fn canonicalRecordTypesMapSlots(source: const dictionary_slot<RecordKey,u32>[:]) -> dictionary_slot<RecordKey,u32>[:] {
+ if source.len==0 { return default<dictionary_slot<RecordKey,u32>[:]>(); }
+ let owned=pool_RecordTypesMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_RecordTypesMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_RecordTypesMap.len-start);
+ return pool_RecordTypesMap[start..start+source.len];
+}
+fn publishRecordTypesMap(self_: RecordTypesMap&,view: blot_support_pooled_map::Map<RecordKey,u32>) {
+ self_.count=view.count; self_.slots=canonicalRecordTypesMapSlots(view.slots);
+}
+
 fn get(self_: const RecordTypesMap&,key: RecordKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const RecordTypesMap&,key: RecordKey) -> bool { return self_.get(key)!=null; }
-fn insert(self_: RecordTypesMap&,key: RecordKey,value: u32) { var view=blot_support_pooled_map::Map<RecordKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordTypesMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: RecordTypesMap&,key: RecordKey,value: u32) { var view=blot_support_pooled_map::Map<RecordKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordTypesMap); publishRecordTypesMap(self_,view); }
 fn clear(self_: RecordTypesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RecordTypesMap&) { if self_.slots.len!=0 { pool_RecordTypesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<RecordKey,u32>[:]>(); self_.count=0; }
 fn restore(self_: RecordTypesMap&,slots: const dictionary_slot<RecordKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RecordTypesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct RecordShapesMap { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var pool_RecordShapesMap: dictionary_slot<u64,u32>[>..]=[];
+fn canonicalRecordShapesMapSlots(source: const dictionary_slot<u64,u32>[:]) -> dictionary_slot<u64,u32>[:] {
+ if source.len==0 { return default<dictionary_slot<u64,u32>[:]>(); }
+ let owned=pool_RecordShapesMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_RecordShapesMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_RecordShapesMap.len-start);
+ return pool_RecordShapesMap[start..start+source.len];
+}
+fn publishRecordShapesMap(self_: RecordShapesMap&,view: blot_support_pooled_map::Map<u64,u32>) {
+ self_.count=view.count; self_.slots=canonicalRecordShapesMapSlots(view.slots);
+}
+
 fn get(self_: const RecordShapesMap&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const RecordShapesMap&,key: u64) -> bool { return self_.get(key)!=null; }
-fn insert(self_: RecordShapesMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordShapesMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: RecordShapesMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_RecordShapesMap); publishRecordShapesMap(self_,view); }
 fn clear(self_: RecordShapesMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: RecordShapesMap&) { if self_.slots.len!=0 { pool_RecordShapesMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
 fn restore(self_: RecordShapesMap&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_RecordShapesMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
@@ -165,8 +196,8 @@ fn closureOriginCode(value: ClosureOrigin) -> u8 { match value { named=>0,anonym
 fn deinit(self_: Store&) { if self_.lease==0 { return; } assert(valid(self_)); self_.values.deinit(); self_.children.deinit(); self_.closures.deinit(); self_.code_origins.deinit(); self_.value_evidence.deinit(); self_.type_mappings.deinit(); self_.row_mappings.deinit(); self_.value_records.deinit(); self_.record_layouts.deinit(); self_.field_names.deinit(); self_.record_shape_next.deinit(); release(self_.typed_views); release(self_.specialized_closures); release(self_.record_types); release(self_.record_shapes); self_.evidence.deinit(); self_.collection_buffers.deinit(); let at=self_.lease-1; states[at].live=false; states.free(at); let handle=self_.handle_index; self_=Store {}; if handle>=0 { handles.free(handle); } }
 fn reset(self_: Store) -> Error { assert(valid(self_)); self_.values.clear(); self_.children.clear(); self_.closures.clear(); self_.code_origins.clear(); self_.value_evidence.clear(); self_.type_mappings.clear(); self_.row_mappings.clear(); self_.value_records.clear(); self_.record_layouts.clear(); self_.field_names.clear(); self_.record_shape_next.clear(); self_.typed_views.clear(); self_.specialized_closures.clear(); self_.record_types.clear(); self_.record_shapes.clear(); self_.evidence.deinit(); self_.collection_buffers.buffers.clear(); self_.collection_buffers.owner_id=blot_native::fresh_owner_id(); self_.collection_buffers.mutation_serial=0; let semantic,error=blot_eval_type_evidence::init(); if error!=blot_error::Error.none { return error; } self_.evidence=semantic; self_.owner_id=blot_native::fresh_owner_id(); seedEmpty(self_); return blot_error::Error.none; }
 
-fn reserve(self_: TypedViewsMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<ViewKey,ValueId> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_TypedViewsMap); self_.count=view.count; self_.slots=view.slots; } return blot_error::Error.none; }
+fn reserve(self_: TypedViewsMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<ViewKey,ValueId> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_TypedViewsMap); publishTypedViewsMap(self_,view); } return blot_error::Error.none; }
 
-fn reserve(self_: RecordTypesMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<RecordKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_RecordTypesMap); self_.count=view.count; self_.slots=view.slots; } return blot_error::Error.none; }
+fn reserve(self_: RecordTypesMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<RecordKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_RecordTypesMap); publishRecordTypesMap(self_,view); } return blot_error::Error.none; }
 
-fn reserve(self_: RecordShapesMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_RecordShapesMap); self_.count=view.count; self_.slots=view.slots; } return blot_error::Error.none; }
+fn reserve(self_: RecordShapesMap&,count: i64) -> Error { if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; } var capacity=max(8,self_.slots.len); while count*3>capacity*2 { capacity*=2; } if capacity>self_.slots.len { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::grow(view,capacity,pool_RecordShapesMap); publishRecordShapesMap(self_,view); } return blot_error::Error.none; }

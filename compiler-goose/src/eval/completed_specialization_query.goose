@@ -131,9 +131,19 @@ type Requests=blot_eval_semantic_parallel::Requests;
 type Proofs=blot_eval_semantic_parallel::Records;
 struct PlainMap { count: i64=0,slots: dictionary_slot<u64,bool>[:]=default<dictionary_slot<u64,bool>[:]>() }
 reusable[] var pool_PlainMap: dictionary_slot<u64,bool>[>..]=[];
+fn canonicalPlainMapSlots(source: const dictionary_slot<u64,bool>[:]) -> dictionary_slot<u64,bool>[:] {
+ if source.len==0 { return default<dictionary_slot<u64,bool>[:]>(); }
+ let owned=pool_PlainMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_PlainMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_PlainMap.len-start);
+ return pool_PlainMap[start..start+source.len];
+}
+fn publishPlainMap(self_: PlainMap&,view: blot_support_pooled_map::Map<u64,bool>) {
+ self_.count=view.count; self_.slots=canonicalPlainMapSlots(view.slots);
+}
+
 fn get(self_: const PlainMap&,key: u64) -> bool? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const PlainMap&,key: u64) -> bool { return self_.get(key)!=null; }
-fn insert(self_: PlainMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PlainMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: PlainMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_PlainMap); publishPlainMap(self_,view); }
 fn clear(self_: PlainMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: PlainMap&) { if self_.slots.len!=0 { pool_PlainMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
 fn restore(self_: PlainMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_PlainMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }

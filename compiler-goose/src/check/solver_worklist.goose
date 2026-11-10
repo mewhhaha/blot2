@@ -45,8 +45,16 @@ fn deinit(self_: LinkBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_Li
 struct Heads { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var head_slots: dictionary_slot<u64,u32>[>..]=[];
 fn get(self_: const Heads&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
-fn insert(self_: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self_.count=view.count; self_.slots=view.slots; }
-fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,head_slots); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn canonicalHeadsSlots(source: const dictionary_slot<u64,u32>[:]) -> dictionary_slot<u64,u32>[:] {
+ if source.len==0 {return default<dictionary_slot<u64,u32>[:]>();}
+ let owned=head_slots.realloc_slice(source,source.len);
+ assert(blot_support::same_slice_identity(owned,source));
+ let start=head_slots.index_of(owned[0]);
+ assert(start>=0 && source.len<=head_slots.len-start);
+ return head_slots[start..start+source.len];
+}
+fn insert(self_: Heads&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,head_slots); self_.count=view.count; self_.slots=canonicalHeadsSlots(view.slots); }
+fn remove(self_: Heads&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,head_slots); self_.count=view.count; self_.slots=canonicalHeadsSlots(view.slots); return removed; }
 fn clear(self_: Heads&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: Heads&) { if self_.slots.len!=0 { head_slots.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
 fn restore(self_: Heads&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=head_slots.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }

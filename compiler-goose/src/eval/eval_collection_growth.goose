@@ -3,6 +3,7 @@ import eval.eval_values;
 import support.error;
 import support.native;
 import support.pooled_map;
+import support.option;
 
 import dictionary;
 import std;
@@ -12,9 +13,19 @@ struct BufferEffect { value: u32, frontier: Frontier }
 fn hash(value: Span) -> u64 { return ::hash((value.start as u64)<<32|value.len); }
 struct BufferMap { count: i64=0,slots: dictionary_slot<Span,Span>[:]=default<dictionary_slot<Span,Span>[:]>() }
 reusable[] var pool_BufferMap: dictionary_slot<Span,Span>[>..]=[];
+fn canonicalBufferMapSlots(source: const dictionary_slot<Span,Span>[:]) -> dictionary_slot<Span,Span>[:] {
+ if source.len==0 { return default<dictionary_slot<Span,Span>[:]>(); }
+ let owned=pool_BufferMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_BufferMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_BufferMap.len-start);
+ return pool_BufferMap[start..start+source.len];
+}
+fn publishBufferMap(self_: BufferMap&,view: blot_support_pooled_map::Map<Span,Span>) {
+ self_.count=view.count; self_.slots=canonicalBufferMapSlots(view.slots);
+}
+
 fn get(self_: const BufferMap&,key: Span) -> Span? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const BufferMap&,key: Span) -> bool { return self_.get(key)!=null; }
-fn insert(self_: BufferMap&,key: Span,value: Span) { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BufferMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: BufferMap&,key: Span,value: Span) { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BufferMap); publishBufferMap(self_,view); }
 fn reserve(self_: BufferMap&,count: i64) -> blot_error::Error {
  if count<0||count>0x1555555555555555 { return blot_error::Error.out_of_memory; }
  var capacity=max<i64>(8,self_.slots.len);
@@ -22,7 +33,7 @@ fn reserve(self_: BufferMap&,count: i64) -> blot_error::Error {
  if capacity>self_.slots.len {
   var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots};
   blot_support_pooled_map::grow(view,capacity,pool_BufferMap);
-  self_.count=view.count; self_.slots=view.slots;
+  publishBufferMap(self_,view);
  }
  return blot_error::Error.none;
 }
@@ -55,4 +66,4 @@ fn extend(self_: Store&,children: blot_eval_eval_values::Words&,before: Span,val
  var slot=after.start+before.len; if front { slot=after.start; } children.items[slot]=value; self_.buffers.insert(after,buffer); mutation(self_); return after,blot_error::Error.none;
 }
 
-fn remove(self_: BufferMap&,key: Span) -> bool { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; let result=blot_support_pooled_map::remove(view,key,pool_BufferMap); self_.count=view.count; self_.slots=view.slots; return result; }
+fn remove(self_: BufferMap&,key: Span) -> bool { var view=blot_support_pooled_map::Map<Span,Span> {count:self_.count,slots:self_.slots}; let result=blot_support_pooled_map::remove(view,key,pool_BufferMap); publishBufferMap(self_,view); return result; }

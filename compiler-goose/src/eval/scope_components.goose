@@ -40,7 +40,15 @@ struct KeyMap { count: i64=0,slots: dictionary_slot<u64,bool>[:]=default<diction
 reusable[] var pool_KeyMap: dictionary_slot<u64,bool>[>..]=[];
 fn get(self_: const KeyMap&,key: u64) -> bool? { let view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; let index=blot_support_pooled_map::probe(view,key); if index<0 { return null; } return self_.slots[index].val; }
 fn contains(self_: const KeyMap&,key: u64) -> bool { return self_.get(key)!=null; }
-fn insert(self_: KeyMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_KeyMap); self_.count=view.count; self_.slots=view.slots; }
+fn canonicalKeyMapSlots(source: const dictionary_slot<u64,bool>[:]) -> dictionary_slot<u64,bool>[:] {
+ if source.len==0 {return default<dictionary_slot<u64,bool>[:]>();}
+ let owned=pool_KeyMap.realloc_slice(source,source.len);
+ assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_KeyMap.index_of(owned[0]);
+ assert(start>=0 && source.len<=pool_KeyMap.len-start);
+ return pool_KeyMap[start..start+source.len];
+}
+fn insert(self_: KeyMap&,key: u64,value: bool) { var view=blot_support_pooled_map::Map<u64,bool> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_KeyMap); self_.count=view.count; self_.slots=canonicalKeyMapSlots(view.slots); }
 fn clear(self_: KeyMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: KeyMap&) { if self_.slots.len!=0 { pool_KeyMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,bool>[:]>(); self_.count=0; }
 fn restore(self_: KeyMap&,slots: const dictionary_slot<u64,bool>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_KeyMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }

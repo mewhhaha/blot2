@@ -4,25 +4,21 @@ Repair ownership, build the actual complete C/header/native compiler, then quali
 CLI/server, request OOM/retry and retention against Zig. **No whole compiler
 artifact exists.** Preserve compiler/ as the oracle.
 
-Actual whole261 fails154.61s, unchanged460inputs, no C/header/native. Lexical
-retry Result cleanup clears that original blocker in selected compile262.
-Combined26669.78s now has one principalEvidenceFallback context-shrink error at
-core_eval1069. No newer actual whole yet. Direct diagnostic/unit-use2.67s and
-full recording/replay11.25s copied checks pass; all are check-only/unstaged.
+Actual whole272 fails162.42s, unchanged461inputs, no C/header/native. Same
+prepare/reset loan through Run's first attempt persists in actual whole despite
+selected-root progress. Scalar Frame alone is insufficient.
 
-Seven affected native laws pass after the complete readonly/lifecycle family,
-summed stage74.10s. Complete36/36 (290.53s summed stage) is historical exact-source
-evidence, not current inventory or actual compiler runtime qualification.
+Complete36/36 native component laws pass on same frozen source, summed stage
+307.14s,30s/stage/600s overall. These never qualify actual compiler/CLI runtime.
+All92fake cleanup wrappers removed (82guarded+10manual),22authoring controls and
+qualified executable original/transformed witnesses pass.14-file publication
+batch covers68adapters/134sites; header/state payload copies and owners unchanged.
+Principal contexts/constant body descriptors are scalar, Frame guards validated.
 
-Generated read-only StampView reconstruction covers74fields/65slice leaves/56
-concrete pools, preserving exact identities through full/prefix/interior ranges.
-Valid shared pinned journals work; nonempty leaves require that journal authority.
-No new payload copy/allocation; scan costs unbenchmarked. Memo scope ends before
-replay; scalar stats reach publish, original Core snapshots/tokens/digests remain.
-Retry carriers end before restart; diagnostic text/metadata remain exact; mapping
-selections are lexical. Next fix principal fallback, then actual whole retry.
-A copied fail-closed transformer for92remaining fake cleanup wrappers is only an
-experiment; no broad transformation is promoted.
+Next copied source boundary: Run's9optional Workspace views→flags+Frame getters,
+and4mutable-owner options refs→existing Capture/checkpoint registry keys.
+Public API/retention remain. This is not promoted/qualified yet. Then reattempt
+actual whole build; CLI/server/OOM/retry/retention remain pending without binary.
 
 All phase probes are check-only with unstaged inputs; NEVER execute. Use smaller
 phase subsets when needed, keeping120s repair cap. Actual CLI/server/OOM/retry

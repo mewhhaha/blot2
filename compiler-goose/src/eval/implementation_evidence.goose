@@ -126,17 +126,37 @@ fn clear(self_: ActiveFactsBuffer&) { blot_support_pooled_buffer::clear(self_); 
 fn deinit(self_: ActiveFactsBuffer&) { blot_support_pooled_buffer::deinit(self_,pool_ActiveFactsBuffer); self_.len=0; self_.failure=blot_error::Error.none; }
 struct BucketsMap { count: i64=0,slots: dictionary_slot<u64,u32>[:]=default<dictionary_slot<u64,u32>[:]>() }
 reusable[] var pool_BucketsMap: dictionary_slot<u64,u32>[>..]=[];
+fn canonicalBucketsMapSlots(source: const dictionary_slot<u64,u32>[:]) -> dictionary_slot<u64,u32>[:] {
+ if source.len==0 { return default<dictionary_slot<u64,u32>[:]>(); }
+ let owned=pool_BucketsMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_BucketsMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_BucketsMap.len-start);
+ return pool_BucketsMap[start..start+source.len];
+}
+fn publishBucketsMap(self_: BucketsMap&,view: blot_support_pooled_map::Map<u64,u32>) {
+ self_.count=view.count; self_.slots=canonicalBucketsMapSlots(view.slots);
+}
+
 fn get(self_: const BucketsMap&,key: u64) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const BucketsMap&,key: u64) -> bool { return self_.get(key)!=null; }
-fn insert(self_: BucketsMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BucketsMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: BucketsMap&,key: u64,value: u32) { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_BucketsMap); publishBucketsMap(self_,view); }
 fn clear(self_: BucketsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: BucketsMap&) { if self_.slots.len!=0 { pool_BucketsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<u64,u32>[:]>(); self_.count=0; }
 fn restore(self_: BucketsMap&,slots: const dictionary_slot<u64,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_BucketsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
 struct FactsMap { count: i64=0,slots: dictionary_slot<FactKey,u32>[:]=default<dictionary_slot<FactKey,u32>[:]>() }
 reusable[] var pool_FactsMap: dictionary_slot<FactKey,u32>[>..]=[];
+fn canonicalFactsMapSlots(source: const dictionary_slot<FactKey,u32>[:]) -> dictionary_slot<FactKey,u32>[:] {
+ if source.len==0 { return default<dictionary_slot<FactKey,u32>[:]>(); }
+ let owned=pool_FactsMap.realloc_slice(source,source.len); assert(blot_support::same_slice_identity(owned,source));
+ let start=pool_FactsMap.index_of(owned[0]); assert(start>=0 && source.len<=pool_FactsMap.len-start);
+ return pool_FactsMap[start..start+source.len];
+}
+fn publishFactsMap(self_: FactsMap&,view: blot_support_pooled_map::Map<FactKey,u32>) {
+ self_.count=view.count; self_.slots=canonicalFactsMapSlots(view.slots);
+}
+
 fn get(self_: const FactsMap&,key: FactKey) -> u32? { return blot_support_pooled_map::getSlots(self_.slots,key); }
 fn contains(self_: const FactsMap&,key: FactKey) -> bool { return self_.get(key)!=null; }
-fn insert(self_: FactsMap&,key: FactKey,value: u32) { var view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_FactsMap); self_.count=view.count; self_.slots=view.slots; }
+fn insert(self_: FactsMap&,key: FactKey,value: u32) { var view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; blot_support_pooled_map::insert(view,key,value,pool_FactsMap); publishFactsMap(self_,view); }
 fn clear(self_: FactsMap&) { for &slot in self_.slots { slot.tag=0; } self_.count=0; }
 fn release(self_: FactsMap&) { if self_.slots.len!=0 { pool_FactsMap.free_slice(self_.slots); } self_.slots=default<dictionary_slot<FactKey,u32>[:]>(); self_.count=0; }
 fn restore(self_: FactsMap&,slots: const dictionary_slot<FactKey,u32>[:],count: i64) { release(self_); self_.count=count; if slots.len!=0 { let restored=pool_FactsMap.alloc_slice(slots.len); for slot,index in slots { restored[index]=slot; } self_.slots=restored; } }
@@ -181,8 +201,8 @@ fn reifyStore(handle:Handle)->Store {
  assert(valid(handle)); let state:State& =states[handle.lease-1];
  return Store{proofs:state.proofs,arguments:state.arguments,members:state.members,edges:state.edges,active_arguments:state.active_arguments,active:state.active,active_projections:state.active_projections,provisional_equations:state.provisional_equations,provisional_mappings:state.provisional_mappings,provisional_rows:state.provisional_rows,next:state.next,active_facts:state.active_facts,buckets:state.buckets,facts:state.facts,owner_id:state.owner_id,trace:state.trace,failure:state.failure,candidates:state.candidates,prerequisite_edges:state.prerequisite_edges,hits:state.hits,max_depth:state.max_depth,lease:handle.lease,generation:handle.generation};
 }
-fn remove(self_: BucketsMap&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_BucketsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
-fn remove(self_: FactsMap&,key: FactKey) -> bool { var view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_FactsMap); self_.count=view.count; self_.slots=view.slots; return removed; }
+fn remove(self_: BucketsMap&,key: u64) -> bool { var view=blot_support_pooled_map::Map<u64,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_BucketsMap); publishBucketsMap(self_,view); return removed; }
+fn remove(self_: FactsMap&,key: FactKey) -> bool { var view=blot_support_pooled_map::Map<FactKey,u32> {count:self_.count,slots:self_.slots}; let removed=blot_support_pooled_map::remove(view,key,pool_FactsMap); publishFactsMap(self_,view); return removed; }
 fn view(self_: Store) -> View { return View {self_.owner_id,self_.proofs.items,self_.arguments.items,self_.members.items,self_.edges.items}; }
 struct SnapshotTables { proofs: Proof[>..]&,arguments: u32[>..]&,members: Member[>..]&,edges: u32[>..]& }
 fn copyOwned(self_: Store,target: SnapshotTables) -> Snapshot,Error { let p=target.proofs.len; let a=target.arguments.len; let m=target.members.len; let e=target.edges.len; target.proofs.append(self_.proofs.items); target.arguments.append(self_.arguments.items); target.members.append(self_.members.items); target.edges.append(self_.edges.items); return Snapshot {proofs:target.proofs[p..],arguments:target.arguments[a..],members:target.members[m..],edges:target.edges[e..]},blot_error::Error.none; }

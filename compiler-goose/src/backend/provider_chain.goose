@@ -49,9 +49,17 @@ fn deinit(buffer: Scopes&) { blot_support_pooled_buffer::deinit(buffer,scope_run
 struct FrameOwners { count: i64 = 0,slots: dictionary_slot<Head,Authority>[:] = default<dictionary_slot<Head,Authority>[:]>() }
 reusable[] var frame_owner_slots: dictionary_slot<Head,Authority>[>..] = [];
 fn get(map: const FrameOwners&,key: Head) -> Authority? { return blot_support_pooled_map::getSlots(map.slots,key); }
-fn reserve(map: FrameOwners&,extra: i64) -> blot_error::Error { if extra < 0 || map.count > 1537228672809129301 - extra { return blot_error::Error.out_of_memory; } var capacity = max(8,map.slots.len); while (map.count + extra) * 3 > capacity * 2 { capacity *= 2; } if capacity != map.slots.len { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::grow(view,capacity,frame_owner_slots); map.count = view.count; map.slots = view.slots; } return blot_error::Error.none; }
-fn insert(map: FrameOwners&,key: Head,value: Authority) { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::insert(view,key,value,frame_owner_slots); map.count = view.count; map.slots = view.slots; }
-fn remove(map: FrameOwners&,key: Head) -> bool { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; let removed = blot_support_pooled_map::remove(view,key,frame_owner_slots); map.count = view.count; map.slots = view.slots; return removed; }
+fn canonicalFrameOwnersSlots(source: const dictionary_slot<Head,Authority>[:]) -> dictionary_slot<Head,Authority>[:] {
+ if source.len==0 {return default<dictionary_slot<Head,Authority>[:]>();}
+ let owned=frame_owner_slots.realloc_slice(source,source.len);
+ assert(blot_support::same_slice_identity(owned,source));
+ let start=frame_owner_slots.index_of(owned[0]);
+ assert(start>=0 && source.len<=frame_owner_slots.len-start);
+ return frame_owner_slots[start..start+source.len];
+}
+fn reserve(map: FrameOwners&,extra: i64) -> blot_error::Error { if extra < 0 || map.count > 1537228672809129301 - extra { return blot_error::Error.out_of_memory; } var capacity = max(8,map.slots.len); while (map.count + extra) * 3 > capacity * 2 { capacity *= 2; } if capacity != map.slots.len { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::grow(view,capacity,frame_owner_slots); map.count = view.count; map.slots = canonicalFrameOwnersSlots(view.slots); } return blot_error::Error.none; }
+fn insert(map: FrameOwners&,key: Head,value: Authority) { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; blot_support_pooled_map::insert(view,key,value,frame_owner_slots); map.count = view.count; map.slots = canonicalFrameOwnersSlots(view.slots); }
+fn remove(map: FrameOwners&,key: Head) -> bool { var view = blot_support_pooled_map::Map<Head,Authority> { map.count,map.slots , ..}; let removed = blot_support_pooled_map::remove(view,key,frame_owner_slots); map.count = view.count; map.slots = canonicalFrameOwnersSlots(view.slots); return removed; }
 fn clear(map: FrameOwners&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit(map: FrameOwners&) { if map.slots.len != 0 { frame_owner_slots.free_slice(map.slots); } map.slots = default<dictionary_slot<Head,Authority>[:]>(); map.count = 0; }
 struct Activation { scopes: Scopes }

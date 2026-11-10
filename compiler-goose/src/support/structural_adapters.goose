@@ -3768,6 +3768,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::Principa
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PrincipalQueryKey,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PrincipalQueryStorage)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PrincipalQueryStorage,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PrincipalRegionRequest)->bool {return equalFields(left,right);}
+fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PrincipalRegionRequest,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PrincipalRowImport)->bool {return equalFields(left,right);}
 fn blot_eval_core_eval::blotStructuralHash<StructuralSink>(value:blot_eval_core_eval::PrincipalRowImport,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_eval_core_eval::PrincipalSame)->bool {return equalFields(left,right);}

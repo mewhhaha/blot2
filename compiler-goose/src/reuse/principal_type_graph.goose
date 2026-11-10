@@ -273,37 +273,55 @@ recursive fn row(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     { let optional_source_18 .= self_.rows.get(original); if optional_source_18 { let known = optional_source_18; return known, blot_error::Error.none;  } }
     let charged = self_.charge(); if charged != blot_error::Error.none { return 0, charged; }
     var copied=Words {..};
-    recursive fn cleanup_continuation_6() -> Id, Error {
+    block {
 
 let source = self_.source.row(original);
     let source_visit_1_count=(self_.source.rowLabels(source.labels)).len;for source_visit_1_index in 0..source_visit_1_count {let operation=(self_.source.rowLabels(source.labels))[source_visit_1_index];
-        let value, error = self_.label(operation, depth + 1); if error != blot_error::Error.none { return 0, error; } copied.push(value);if copied.failure!=blot_error::Error.none {return 0,copied.failure;}
+        let value, error = self_.label(operation, depth + 1); if error != blot_error::Error.none { let __flat_cleanup_2_0_0: Id = 0; let __flat_cleanup_2_0_1: Error = error; block {
+copied.deinit();
+} return __flat_cleanup_2_0_0,__flat_cleanup_2_0_1; } copied.push(value);if copied.failure!=blot_error::Error.none {let __flat_cleanup_2_1_0: Id = 0; let __flat_cleanup_2_1_1: Error = copied.failure; block {
+copied.deinit();
+} return __flat_cleanup_2_1_0,__flat_cleanup_2_1_1;}
     }
-    if copied.failure!=blot_error::Error.none {return 0,copied.failure;}
+    if copied.failure!=blot_error::Error.none {let __flat_cleanup_2_2_0: Id = 0; let __flat_cleanup_2_2_1: Error = copied.failure; block {
+copied.deinit();
+} return __flat_cleanup_2_2_0,__flat_cleanup_2_2_1;}
     var result: Id = 0; var failure = blot_error::Error.none;
     match source.tail {
         closed => { let value, error = self_.destination.effects.row(copied.items, blot_check_effects::Tail.closed); result = value; failure = blot_check_types::effectError(error); },
         variable variable => {
-            let replacement, error = self_.rowVariable(variable.value); if error != blot_error::Error.none { return 0, error; }
+            let replacement, error = self_.rowVariable(variable.value); if error != blot_error::Error.none { let __flat_cleanup_2_3_0: Id = 0; let __flat_cleanup_2_3_1: Error = error; block {
+copied.deinit();
+} return __flat_cleanup_2_3_0,__flat_cleanup_2_3_1; }
             if copied.len == 0 { result = replacement; }
             else {
-                let resolved, error = self_.destination.resolveEffects(replacement, 0); if error != blot_error::Error.none { return 0, error; }
+                let resolved, error = self_.destination.resolveEffects(replacement, 0); if error != blot_error::Error.none { let __flat_cleanup_2_4_0: Id = 0; let __flat_cleanup_2_4_1: Error = error; block {
+copied.deinit();
+} return __flat_cleanup_2_4_0,__flat_cleanup_2_4_1; }
                 let row = self_.destination.row(resolved); copied.append(self_.destination.rowLabels(resolved));
-                if copied.failure!=blot_error::Error.none {return 0,copied.failure;}let value, error = self_.destination.effects.rowAt(copied.items, row.tail, row.cursor); result = value; failure = blot_check_types::effectError(error);
+                if copied.failure!=blot_error::Error.none {let __flat_cleanup_2_5_0: Id = 0; let __flat_cleanup_2_5_1: Error = copied.failure; block {
+copied.deinit();
+} return __flat_cleanup_2_5_0,__flat_cleanup_2_5_1;}let value, error = self_.destination.effects.rowAt(copied.items, row.tail, row.cursor); result = value; failure = blot_check_types::effectError(error);
             }
         },
         formal formal => {
-            let ty, error = self_.ty(formal.value, depth + 1); if error != blot_error::Error.none { return 0, error; }
+            let ty, error = self_.ty(formal.value, depth + 1); if error != blot_error::Error.none { let __flat_cleanup_2_6_0: Id = 0; let __flat_cleanup_2_6_1: Error = error; block {
+copied.deinit();
+} return __flat_cleanup_2_6_0,__flat_cleanup_2_6_1; }
             let value, error = self_.destination.effects.row(copied.items, blot_check_effects::Tail.formal { ty , ..}); result = value; failure = blot_check_types::effectError(error);
         },
-        parameter => { return 0, blot_error::Error.type_limit; },
+        parameter => { let __flat_cleanup_2_7_0: Id = 0; let __flat_cleanup_2_7_1: Error = blot_error::Error.type_limit; block {
+copied.deinit();
+} return __flat_cleanup_2_7_0,__flat_cleanup_2_7_1; },
     }
-    if failure != blot_error::Error.none { return 0, failure; } self_.rows.insert(original, result); return result, blot_error::Error.none;
+    if failure != blot_error::Error.none { let __flat_cleanup_2_8_0: Id = 0; let __flat_cleanup_2_8_1: Error = failure; block {
+copied.deinit();
+} return __flat_cleanup_2_8_0,__flat_cleanup_2_8_1; } self_.rows.insert(original, result); let __flat_cleanup_2_9_0: Id = result; let __flat_cleanup_2_9_1: Error = blot_error::Error.none; block {
+copied.deinit();
+} return __flat_cleanup_2_9_0,__flat_cleanup_2_9_1;
+
 
     }
-    let cleanup_result_6_0,cleanup_result_6_1 = cleanup_continuation_6();
-    copied.deinit();
-    return cleanup_result_6_0,cleanup_result_6_1;
 }
 recursive fn label(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     assert(valid(self_));
@@ -311,100 +329,172 @@ recursive fn label(self_: Copier&, original: Id, depth: i64) -> Id, Error {
     { let optional_source_17 .= self_.labels.get(original); if optional_source_17 { let known = optional_source_17; return known, blot_error::Error.none;  } }
     let charged = self_.charge(); if charged != blot_error::Error.none { return 0, charged; }
     let operation = self_.source.operation(original); var arguments=Words {..};
-    recursive fn cleanup_continuation_5() -> Id, Error {
+    block {
 
     let source_visit_2_count=(self_.source.list(operation.arguments)).len;for source_visit_2_index in 0..source_visit_2_count {let old=(self_.source.list(operation.arguments))[source_visit_2_index];
-        let value, error = self_.ty(old, depth + 1); if error != blot_error::Error.none { return 0, error; } arguments.push(value);if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;}
+        let value, error = self_.ty(old, depth + 1); if error != blot_error::Error.none { let __flat_cleanup_1_0_0: Id = 0; let __flat_cleanup_1_0_1: Error = error; block {
+arguments.deinit();
+} return __flat_cleanup_1_0_0,__flat_cleanup_1_0_1; } arguments.push(value);if arguments.failure!=blot_error::Error.none {let __flat_cleanup_1_1_0: Id = 0; let __flat_cleanup_1_1_1: Error = arguments.failure; block {
+arguments.deinit();
+} return __flat_cleanup_1_1_0,__flat_cleanup_1_1_1;}
     }
-    if arguments.failure!=blot_error::Error.none {return 0,arguments.failure;}
+    if arguments.failure!=blot_error::Error.none {let __flat_cleanup_1_2_0: Id = 0; let __flat_cleanup_1_2_1: Error = arguments.failure; block {
+arguments.deinit();
+} return __flat_cleanup_1_2_0,__flat_cleanup_1_2_1;}
     var instance = operation.instance;
     if instance.unit == 0 && instance.decl != 0 {
-        let value, error = self_.ty(instance.decl, depth + 1); if error != blot_error::Error.none { return 0, error; } instance.decl = value;
+        let value, error = self_.ty(instance.decl, depth + 1); if error != blot_error::Error.none { let __flat_cleanup_1_3_0: Id = 0; let __flat_cleanup_1_3_1: Error = error; block {
+arguments.deinit();
+} return __flat_cleanup_1_3_0,__flat_cleanup_1_3_1; } instance.decl = value;
     }
     let result, error = self_.destination.internScopedOperation(operation.identity, instance, arguments.items);
-    if error != blot_error::Error.none { return 0, error; } self_.labels.insert(original, result); return result, blot_error::Error.none;
+    if error != blot_error::Error.none { let __flat_cleanup_1_4_0: Id = 0; let __flat_cleanup_1_4_1: Error = error; block {
+arguments.deinit();
+} return __flat_cleanup_1_4_0,__flat_cleanup_1_4_1; } self_.labels.insert(original, result); let __flat_cleanup_1_5_0: Id = result; let __flat_cleanup_1_5_1: Error = blot_error::Error.none; block {
+arguments.deinit();
+} return __flat_cleanup_1_5_0,__flat_cleanup_1_5_1;
+
 
     }
-    let cleanup_result_5_0,cleanup_result_5_1 = cleanup_continuation_5();
-    arguments.deinit();
-    return cleanup_result_5_0,cleanup_result_5_1;
 }
 
 recursive fn copyQuantified(self_:Copier&,node:blot_check_types::Node,root:u32,depth:i64)->Id,Error {
-
-            var binders=Words {..};
-    recursive fn cleanup_continuation_4() -> Id,Error {
-
-var goals=Goals {..};
-    recursive fn cleanup_continuation_3() -> Id,Error {
-
-            let source_old_count_1=(self_.source.list(blot_check_types::List { node.b, node.c , ..})).len;
-            let source_alias_visit_1_count=((self_.source.list(blot_check_types::List { node.b, node.c , ..}))).len;for source_alias_visit_1_index in 0..source_alias_visit_1_count {let binder_source=((self_.source.list(blot_check_types::List { node.b, node.c , ..})))[source_alias_visit_1_index];
-                let leaf = self_.source.node(binder_source); if leaf.tag != blot_check_types::Tag.bound { return 0, blot_error::Error.type_limit; }
-                let binder, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; }
-                binders.push(binder);if binders.failure!=blot_error::Error.none {return 0,binders.failure;} self_.types.insert(binder_source, binder);
-            }
-            let body, error = self_.ty(node.a, depth + 1); if error != blot_error::Error.none { return 0, error; }
-            
-            if binders.failure!=blot_error::Error.none {return 0,binders.failure;}
-let source_visit_3_count=(self_.source.quantifierGoals(root)).len;for source_visit_3_index in 0..source_visit_3_count {let old_goal=(self_.source.quantifierGoals(root))[source_visit_3_index];
-                var goal = old_goal;
-                let ty, ty_error = self_.ty(goal.ty, depth + 1); if ty_error != blot_error::Error.none { return 0, ty_error; } goal.ty = ty;
-                let other, other_error = self_.ty(goal.other, depth + 1); if other_error != blot_error::Error.none { return 0, other_error; } goal.other = other;
-                let selected, result_error = self_.ty(goal.result, depth + 1); if result_error != blot_error::Error.none { return 0, result_error; } goal.result = selected;
-                let signature, sig_error = self_.ty(goal.signature, depth + 1); if sig_error != blot_error::Error.none { return 0, sig_error; } goal.signature = signature;
-                goal.source = 0; goals.push(goal);if goals.failure!=blot_error::Error.none {return 0,goals.failure;}
-            }
-            if goals.failure!=blot_error::Error.none {return 0,goals.failure;}return self_.destination.quantifiedWithGoals(node.tag,body,binders.items,goals.items);
-        
-
+    var binders=Words {..};
+    var goals=Goals {..};
+    let source_old_count_1=(self_.source.list(blot_check_types::List {node.b,node.c,..})).len;
+    let source_alias_visit_1_count=(self_.source.list(blot_check_types::List {node.b,node.c,..})).len;
+    for source_alias_visit_1_index in 0..source_alias_visit_1_count {
+        let binder_source=(self_.source.list(blot_check_types::List {node.b,node.c,..}))[source_alias_visit_1_index];
+        let leaf=self_.source.node(binder_source);
+        if leaf.tag!=blot_check_types::Tag.bound {
+            let result:Id=0;let error:Error=blot_error::Error.type_limit;
+            goals.deinit();binders.deinit();return result,error;
+        }
+        let binder,error=self_.destination.boundType(leaf.a,leaf.b);
+        if error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=error;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        binders.push(binder);
+        if binders.failure!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=binders.failure;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        self_.types.insert(binder_source,binder);
     }
-    let cleanup_result_3_0,cleanup_result_3_1 = cleanup_continuation_3();
-    goals.deinit();
-    return cleanup_result_3_0,cleanup_result_3_1;
-
+    let body,error=self_.ty(node.a,depth+1);
+    if error!=blot_error::Error.none {
+        let result:Id=0;let failure:Error=error;
+        goals.deinit();binders.deinit();return result,failure;
     }
-    let cleanup_result_4_0,cleanup_result_4_1 = cleanup_continuation_4();
-    binders.deinit();
-    return cleanup_result_4_0,cleanup_result_4_1;
+    if binders.failure!=blot_error::Error.none {
+        let result:Id=0;let failure:Error=binders.failure;
+        goals.deinit();binders.deinit();return result,failure;
+    }
+    let source_visit_3_count=(self_.source.quantifierGoals(root)).len;
+    for source_visit_3_index in 0..source_visit_3_count {
+        let old_goal=(self_.source.quantifierGoals(root))[source_visit_3_index];
+        var goal=old_goal;
+        let ty,ty_error=self_.ty(goal.ty,depth+1);
+        if ty_error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=ty_error;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        goal.ty=ty;
+        let other,other_error=self_.ty(goal.other,depth+1);
+        if other_error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=other_error;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        goal.other=other;
+        let selected,result_error=self_.ty(goal.result,depth+1);
+        if result_error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=result_error;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        goal.result=selected;
+        let signature,sig_error=self_.ty(goal.signature,depth+1);
+        if sig_error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=sig_error;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+        goal.signature=signature;
+        goal.source=0;goals.push(goal);
+        if goals.failure!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=goals.failure;
+            goals.deinit();binders.deinit();return result,failure;
+        }
+    }
+    if goals.failure!=blot_error::Error.none {
+        let result:Id=0;let failure:Error=goals.failure;
+        goals.deinit();binders.deinit();return result,failure;
+    }
+    let value,error=self_.destination.quantifiedWithGoals(node.tag,body,binders.items,goals.items);
+    let result:Id=value;let failure:Error=error;
+    goals.deinit();binders.deinit();return result,failure;
 }
 
 recursive fn copyRecord(self_:Copier&,node:blot_check_types::Node,depth:i64)->Id,Error {
-
-            var fields=Fields {..};
-    recursive fn cleanup_continuation_2() -> Id,Error {
-
-            for index in node.b {
-                let old = self_.source.recordField(node, index); let ty, error = self_.ty(old.ty, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                fields.push(blot_check_types::Field { old.name, ty , ..});if fields.failure!=blot_error::Error.none {return 0,fields.failure;}
-            }
-            if fields.failure!=blot_error::Error.none {return 0,fields.failure;}return self_.destination.record(fields.items);
-        
-
+    var fields=Fields {..};
+    for index in node.b {
+        let old=self_.source.recordField(node,index);
+        let ty,error=self_.ty(old.ty,depth+1);
+        if error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=error;
+            fields.deinit();return result,failure;
+        }
+        fields.push(blot_check_types::Field {old.name,ty,..});
+        if fields.failure!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=fields.failure;
+            fields.deinit();return result,failure;
+        }
     }
-    let cleanup_result_2_0,cleanup_result_2_1 = cleanup_continuation_2();
-    fields.deinit();
-    return cleanup_result_2_0,cleanup_result_2_1;
+    if fields.failure!=blot_error::Error.none {
+        let result:Id=0;let failure:Error=fields.failure;
+        fields.deinit();return result,failure;
+    }
+    let value,error=self_.destination.record(fields.items);
+    let result:Id=value;let failure:Error=error;
+    fields.deinit();return result,failure;
 }
 
 recursive fn copyChildren(self_:Copier&,node:blot_check_types::Node,depth:i64)->Id,Error {
-
-            let children=selectedTypeChildren(self_.source,node);
-            var copied=Words {..};
-    recursive fn cleanup_continuation_1() -> Id,Error {
-
-            for child in children { let value, error = self_.ty(child, depth + 1); if error != blot_error::Error.none { return 0, error; } copied.push(value);if copied.failure!=blot_error::Error.none {return 0,copied.failure;} }
-            if copied.failure!=blot_error::Error.none {return 0,copied.failure;}let identity = blot_check_types::NominalIdentity { node.a, node.b , ..};
-            if node.tag == blot_check_types::Tag.instance_selection { return self_.destination.instanceSelection(identity,copied.items); }
-            else if node.tag == blot_check_types::Tag.projection { return self_.destination.projection(identity,self_.source.projectionMember(node),copied.items); }
-            else if node.tag == blot_check_types::Tag.nominal { return self_.destination.nominal(identity,copied.items); }
-            else { return self_.destination.product(copied.items); }
-        
-
+    let children=selectedTypeChildren(self_.source,node);
+    var copied=Words {..};
+    for child in children {
+        let value,error=self_.ty(child,depth+1);
+        if error!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=error;
+            copied.deinit();return result,failure;
+        }
+        copied.push(value);
+        if copied.failure!=blot_error::Error.none {
+            let result:Id=0;let failure:Error=copied.failure;
+            copied.deinit();return result,failure;
+        }
     }
-    let cleanup_result_1_0,cleanup_result_1_1 = cleanup_continuation_1();
-    copied.deinit();
-    return cleanup_result_1_0,cleanup_result_1_1;
+    if copied.failure!=blot_error::Error.none {
+        let result:Id=0;let failure:Error=copied.failure;
+        copied.deinit();return result,failure;
+    }
+    let identity=blot_check_types::NominalIdentity {node.a,node.b,..};
+    if node.tag==blot_check_types::Tag.instance_selection {
+        let value,error=self_.destination.instanceSelection(identity,copied.items);
+        let result:Id=value;let failure:Error=error;
+        copied.deinit();return result,failure;
+    } else if node.tag==blot_check_types::Tag.projection {
+        let value,error=self_.destination.projection(identity,self_.source.projectionMember(node),copied.items);
+        let result:Id=value;let failure:Error=error;
+        copied.deinit();return result,failure;
+    } else if node.tag==blot_check_types::Tag.nominal {
+        let value,error=self_.destination.nominal(identity,copied.items);
+        let result:Id=value;let failure:Error=error;
+        copied.deinit();return result,failure;
+    } else {
+        let value,error=self_.destination.product(copied.items);
+        let result:Id=value;let failure:Error=error;
+        copied.deinit();return result,failure;
+    }
 }
 recursive fn withCopy<C,F>(source:Source,destination:Store&,max_depth:i64,max_nodes:i64,remaining:i64&,observed:i64&,context:C&)->Error {
  var copier,error=initPooled(source,destination,max_depth,max_nodes,false,remaining,observed);if error!=blot_error::Error.none {return error;}let result=F(context,copier);copier.deinit();return result;
