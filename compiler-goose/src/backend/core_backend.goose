@@ -1846,6 +1846,54 @@ struct CompileOptions {
     identity: blot_support::Option<blot_backend_runtime_identity::View>,identity_owner: blot_support::Option<blot_reuse_dependency_payload::Owner> = blot_support::none<blot_reuse_dependency_payload::Owner>(),diagnostic_source_digests: const u8[32][:] = default<const u8[32][:]>(),compiler_identity: blot_support::Option<u8[32]>,evidence_noise: bool = false,unit_order: const u32[:] = default<const u32[:]>(),diagnostic_source_mode: bool = false,diagnostic_prelude_unit: u32 = 0,
     artifact_replay: bool = false,artifact_dump: bool = false,retain_artifacts: bool = false,previous: const blot_reuse_artifact_capture::Capture&? = null,principal_previous: const blot_reuse_artifact_capture::Capture&? = null,query_previous: const blot_reuse_artifact_capture::Capture&? = null,cached_units: i64 = 0,validate_pins: bool = false,
 }
+// Mutable prior owners are scalar keys across private compile phases.
+struct RunOptions {
+ values:CompileOptions,
+ previous:blot_reuse_artifact_capture::CaptureKey,
+ principal_previous:blot_reuse_artifact_capture::CaptureKey,
+ query_previous:blot_reuse_artifact_capture::CaptureKey,
+ checkpoint:blot_backend_backend_checkpoint::CheckpointKey,
+}
+fn makeRunOptions(source:CompileOptions)->RunOptions {
+ let values=CompileOptions {
+  completed_core_validation:source.completed_core_validation,
+  source_completion:source.source_completion,
+  storage:source.storage,
+  inline_named:source.inline_named,
+  explain_allocations:source.explain_allocations,
+  ragged_builders:source.ragged_builders,
+  constant_receipts:source.constant_receipts,
+  constant_limits:source.constant_limits,
+  ragged_probe_limit:source.ragged_probe_limit,
+  checkpoint:null,
+  io:source.io,
+  profile_backend:source.profile_backend,
+  policy:source.policy,
+  observe_startup:source.observe_startup,
+  identity:source.identity,
+  identity_owner:source.identity_owner,
+  diagnostic_source_digests:source.diagnostic_source_digests,
+  compiler_identity:source.compiler_identity,
+  evidence_noise:source.evidence_noise,
+  unit_order:source.unit_order,
+  diagnostic_source_mode:source.diagnostic_source_mode,
+  diagnostic_prelude_unit:source.diagnostic_prelude_unit,
+  artifact_replay:source.artifact_replay,
+  artifact_dump:source.artifact_dump,
+  retain_artifacts:source.retain_artifacts,
+  previous:null,
+  principal_previous:null,
+  query_previous:null,
+  cached_units:source.cached_units,
+  validate_pins:source.validate_pins,
+ };
+ return RunOptions {values,
+  blot_reuse_artifact_capture::captureKeyFromRef(source.previous),
+  blot_reuse_artifact_capture::captureKeyFromRef(source.principal_previous),
+  blot_reuse_artifact_capture::captureKeyFromRef(source.query_previous),
+  blot_backend_backend_checkpoint::checkpointKeyFromRef(source.checkpoint)};
+}
+
 // Every mutable owner is placed by the driver before provider borrows bind.
 // Successful retained output keeps its own contexts until Result.deinit.
 struct CompileWorkspace {
@@ -1858,10 +1906,11 @@ struct CompileWorkspace {
     bytes: u8[>..<]&,message: u8[>..<]&,replay_module: blot_backend_wasm::Module&,replay_origins: blot_backend_source_origins::View&,replay_candidate: blot_backend_region_candidate::Extension&,replay_vectors: blot_backend_simd_abi::View&,replay_contexts: blot_backend_source_origins::Context[>..<]&,replay_bytes: u8[>..<]&,
 }
 struct CompileRun {
-    frame: blot_compile_workspace::Frame,entry: u32,options: CompileOptions,stamp_sources:blot_reuse_code_artifacts::StampSources=blot_reuse_code_artifacts::StampSources{},clock: blot_backend_backend_timing::Clock,timing: blot_backend_backend_timing::Stats,
+    frame: blot_compile_workspace::Frame,entry: u32,options: CompileOptions,
+    previous_key:blot_reuse_artifact_capture::CaptureKey=blot_reuse_artifact_capture::CaptureKey{..},principal_previous_key:blot_reuse_artifact_capture::CaptureKey=blot_reuse_artifact_capture::CaptureKey{..},query_previous_key:blot_reuse_artifact_capture::CaptureKey=blot_reuse_artifact_capture::CaptureKey{..},checkpoint_key:blot_backend_backend_checkpoint::CheckpointKey=blot_backend_backend_checkpoint::CheckpointKey{..},stamp_sources:blot_reuse_code_artifacts::StampSources=blot_reuse_code_artifacts::StampSources{},clock: blot_backend_backend_timing::Clock,timing: blot_backend_backend_timing::Stats,
     recording: bool = false,speculative_locals: bool = true,journal_alive: bool = false,metadata_alive: bool = false,generator_alive: bool = false,
-    retained: blot_reuse_artifact_fragment::State&? = null,principal_state: blot_reuse_principal_evidence_reuse::State&? = null,persisted_principals: blot_reuse_principal_archive::Reader&? = null,query_state: blot_eval_completed_specialization_query::State&? = null,constant_state: blot_reuse_constant_receipt_reuse::State&? = null,
-    origins: blot_backend_source_origins::View&? = null,candidate: blot_backend_region_candidate::Extension&? = null,vectors: blot_backend_simd_abi::View&? = null,optimized: blot_backend_optimized_bodies::Capture&? = null,
+    retained_enabled: bool = false,principal_state_enabled: bool = false,persisted_principals_enabled: bool = false,query_state_enabled: bool = false,constant_state_enabled: bool = false,
+    origins_enabled: bool = false,candidate_enabled: bool = false,vectors_enabled: bool = false,optimized_enabled: bool = false,
 }
 // None selects runtime Metadata pools; a journal key selects retained input runs.
 fn runIdentity(run:const CompileRun&)->blot_support::Option<blot_backend_runtime_identity::View> {
@@ -1871,6 +1920,61 @@ fn runIdentity(run:const CompileRun&)->blot_support::Option<blot_backend_runtime
     return blot_support::Option<blot_backend_runtime_identity::View>{true,blot_backend_runtime_identity::registeredMetadataView(identity)};
 }
 fn runWorkspace(run:const CompileRun&)->CompileWorkspace& {return blot_compile_workspace::workspaceForFrame(run.frame);}
+fn runPrevious(key:blot_reuse_artifact_capture::CaptureKey)->const blot_reuse_artifact_capture::Capture? {
+ return blot_reuse_artifact_capture::captureRefFromKey(key);
+}
+fn runPrincipalPrevious(key:blot_reuse_artifact_capture::CaptureKey)->const blot_reuse_artifact_capture::Capture? {
+ return blot_reuse_artifact_capture::captureRefFromKey(key);
+}
+fn runQueryPrevious(key:blot_reuse_artifact_capture::CaptureKey)->const blot_reuse_artifact_capture::Capture? {
+ return blot_reuse_artifact_capture::captureRefFromKey(key);
+}
+// Run tracks activation only; workspace-owned views are borrowed on demand.
+fn runRetained(frame:blot_compile_workspace::Frame,enabled:bool)->blot_reuse_artifact_fragment::State? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.retained;
+}
+fn runPrincipalState(frame:blot_compile_workspace::Frame,enabled:bool)->blot_reuse_principal_evidence_reuse::State? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.principal_state;
+}
+fn runPersistedPrincipals(frame:blot_compile_workspace::Frame,enabled:bool)->blot_reuse_principal_archive::Reader? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.persisted_principals;
+}
+fn runQueryState(frame:blot_compile_workspace::Frame,enabled:bool)->blot_eval_completed_specialization_query::State? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.query_state;
+}
+fn runConstantState(frame:blot_compile_workspace::Frame,enabled:bool)->blot_reuse_constant_receipt_reuse::State? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.constant_state;
+}
+fn runOrigins(frame:blot_compile_workspace::Frame,enabled:bool)->blot_backend_source_origins::View? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.origins;
+}
+fn runCandidate(frame:blot_compile_workspace::Frame,enabled:bool)->blot_backend_region_candidate::Extension? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.candidate;
+}
+fn runVectors(frame:blot_compile_workspace::Frame,enabled:bool)->blot_backend_simd_abi::View? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.vectors;
+}
+fn runOptimized(frame:blot_compile_workspace::Frame,enabled:bool)->blot_backend_optimized_bodies::Capture? {
+ if !enabled {return null;}
+ let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
+ return workspace.optimized;
+}
 // The publication owner already retains the exact immutable input headers.
 fn runUnits(run:const CompileRun&)->const blot_check_core::Module[:] {
     let units,error=blot_backend_result_publication::registeredInputUnits(runWorkspace(run).publication_owner);
@@ -1896,8 +2000,8 @@ fn deinit(result: Result&) {
 }
 fn deinit(run: CompileRun&) {
     // The lexical stamp phase ends before this payload cleanup begins.
-    let optimized .=run.optimized; if optimized { optimized.deinit(); } let vectors .=run.vectors; if vectors { vectors.deinit(); } let candidate .=run.candidate; if candidate { candidate.deinit(); } let origins .=run.origins; if origins { origins.deinit(); }
-    let constant_state .=run.constant_state; if constant_state { constant_state.deinit(); } let query_state .=run.query_state; if query_state { query_state.deinit(); } let persisted_principals .=run.persisted_principals; if persisted_principals { persisted_principals.deinit(); } let principal_state .=run.principal_state; if principal_state { principal_state.deinit(); } let retained .=run.retained; if retained { retained.deinit(); }
+    let optimized .=runOptimized(run.frame,run.optimized_enabled); if optimized { optimized.deinit(); } let vectors .=runVectors(run.frame,run.vectors_enabled); if vectors { vectors.deinit(); } let candidate .=runCandidate(run.frame,run.candidate_enabled); if candidate { candidate.deinit(); } let origins .=runOrigins(run.frame,run.origins_enabled); if origins { origins.deinit(); }
+    let constant_state .=runConstantState(run.frame,run.constant_state_enabled); if constant_state { constant_state.deinit(); } let query_state .=runQueryState(run.frame,run.query_state_enabled); if query_state { query_state.deinit(); } let persisted_principals .=runPersistedPrincipals(run.frame,run.persisted_principals_enabled); if persisted_principals { persisted_principals.deinit(); } let principal_state .=runPrincipalState(run.frame,run.principal_state_enabled); if principal_state { principal_state.deinit(); } let retained .=runRetained(run.frame,run.retained_enabled); if retained { retained.deinit(); }
     if run.generator_alive { runWorkspace(run).generator.deinit(); } if run.metadata_alive { runWorkspace(run).metadata.deinit(); } if run.journal_alive { runWorkspace(run).journal.deinit(); }
 }
 fn resetGenerator(source_workspace: CompileWorkspace&,journal: blot_reuse_artifact_emitter::Recorder&?) -> blot_error::Error {
@@ -1919,9 +2023,9 @@ fn prepare(run: CompileRun&) -> blot_error::Error {
         let names = runIdentity(run).value; if names.owners.len != runUnits(run).len { return blot_error::Error.invalid_function_reference; }
         for source,index in runUnits(run) { if source.unit != index + 1 || !names.owner(source.unit).present { return blot_error::Error.invalid_function_reference; } }
     }
-    run.recording = run.options.artifact_replay || run.options.retain_artifacts || run.options.previous != null || run.options.query_previous != null;
-    var query_previous .= run.options.query_previous; if query_previous == null { query_previous .= run.options.previous; }
-    if query_previous == null { let checkpoint .= run.options.checkpoint; if checkpoint { let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
+    run.recording = run.options.artifact_replay || run.options.retain_artifacts || runPrevious(run.previous_key) != null || runQueryPrevious(run.query_previous_key) != null;
+    var query_previous .= runQueryPrevious(run.query_previous_key); if query_previous == null { query_previous .= runPrevious(run.previous_key); }
+    if query_previous == null { let checkpoint_key=run.checkpoint_key; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
     var previous_context:const blot_reuse_code_artifacts::Context?=null;
     if query_previous != null && query_previous.metadata().pools.present { previous_context .=query_previous.metadata(); }
     let sources,stamps_error=blot_reuse_code_artifacts::validateStampSources(workspace.publication_owner,runUnits(run),previous_context);if stamps_error!=blot_error::Error.none {return stamps_error;}run.stamp_sources=sources;
@@ -1951,41 +2055,41 @@ fn finishPreparation(run:CompileRun&,skip_constant_replay:bool,stamps:blot_reuse
 
 fn prepareReuse(run: CompileRun&,skip_constant_replay: bool,memo:blot_reuse_code_artifacts::ModuleStamps&) -> blot_error::Error {
     var stamps:blot_reuse_code_artifacts::ModuleStamps&? = null; if memo.previous_context != 0 { stamps .= memo; }
-    let workspace .= runWorkspace(run); let generator .= workspace.generator; var principal_previous .= run.options.principal_previous; if principal_previous == null { principal_previous .= run.options.previous; }
-    var query_previous .= run.options.query_previous; if query_previous == null { query_previous .= run.options.previous; } if query_previous == null { let checkpoint .= run.options.checkpoint; if checkpoint { let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
-    let previous .=run.options.previous;
+    let workspace .= runWorkspace(run); let generator .= workspace.generator; var principal_previous .= runPrincipalPrevious(run.principal_previous_key); if principal_previous == null { principal_previous .= runPrevious(run.previous_key); }
+    var query_previous .= runQueryPrevious(run.query_previous_key); if query_previous == null { query_previous .= runPrevious(run.previous_key); } if query_previous == null { let checkpoint_key=run.checkpoint_key; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); let semantic .= checkpoint.semantic.value; if semantic { query_previous .= semantic.capture; } } }
+    let previous .=runPrevious(run.previous_key);
     if !run.options.policy.memory_profile && previous {
         if previous.emission.sealed && previous.metadata().pools.present {
             let error = blot_reuse_artifact_fragment::initInto(workspace.retained,previous,runUnits(run),runIdentity(run),run.options.cached_units,stamps,workspace.allocation_owner); if error != blot_error::Error.none { return error; }
-            run.retained .= workspace.retained; generator.retained .= workspace.retained;
+            run.retained_enabled = true; generator.retained .= workspace.retained;
         }
     }
-    let checkpoint .= run.options.checkpoint; if checkpoint { workspace.persisted_principals = blot_reuse_principal_archive::initReader(checkpoint.principalArchive(),runUnits(run),runIdentity(run)); run.persisted_principals .= workspace.persisted_principals; }
-    let retained .=run.retained;let persisted .=run.persisted_principals;
+    let checkpoint_key=run.checkpoint_key; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); workspace.persisted_principals = blot_reuse_principal_archive::initReader(checkpoint.principalArchive(),runUnits(run),runIdentity(run)); run.persisted_principals_enabled = true; }
+    let retained .=runRetained(run.frame,run.retained_enabled);let persisted .=runPersistedPrincipals(run.frame,run.persisted_principals_enabled);
     if run.options.retain_artifacts || previous || checkpoint {
         if persisted { assert(persisted .==workspace.persisted_principals);generator.persisted_principals .=workspace.persisted_principals; }
         if principal_previous != null && principal_previous.emission.sealed && principal_previous.metadata().pools.present {
             var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>();
             if retained { assert(retained .==workspace.retained);let code_gate .=workspace.retained.importer.code_gate; if code_gate.present { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(principal_previous.metadata()),runUnits(run),runIdentity(run),code_gate.value.semantic); } }
             let error = blot_reuse_principal_evidence_reuse::initInto(workspace.principal_state,principal_previous,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
-            run.principal_state .= workspace.principal_state; generator.principal_state .= workspace.principal_state;
+            run.principal_state_enabled = true; generator.principal_state .= workspace.principal_state;
         }
         generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.principal_provider_enabled = true; generator.evaluator.principal_graph_provider_enabled = true;
     }
     generator.evaluator.retain_specialization_receipts = run.recording; generator.evaluator.retain_constant_receipts = run.recording && run.options.constant_receipts;
-    let principal .=run.principal_state;
+    let principal .=runPrincipalState(run.frame,run.principal_state_enabled);
     if query_previous != null && query_previous.metadata().pools.present {
         var admission = blot_support::none<blot_reuse_principal_reuse_gate::Gate>(); if principal { admission = blot_reuse_shared_query_gate::share(workspace.allocation_owner,blot_reuse_code_artifacts::registeredPools(query_previous.metadata()),runUnits(run),runIdentity(run),principal.gate); }
         let shared = admission.present; let error = blot_eval_completed_specialization_query::initInto(workspace.query_state,query_previous,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,admission); if error != blot_error::Error.none { return error; }
-        run.query_state .= workspace.query_state; if shared { workspace.query_state.stats.shared_gates = 1; workspace.query_state.stats.shared_gate_bytes = blot_reuse_shared_query_gate::validationBytes(workspace.query_state.gate); } else { workspace.query_state.stats.gate_fresh = 1; }
+        run.query_state_enabled = true; if shared { workspace.query_state.stats.shared_gates = 1; workspace.query_state.stats.shared_gate_bytes = blot_reuse_shared_query_gate::validationBytes(workspace.query_state.gate); } else { workspace.query_state.stats.gate_fresh = 1; }
         workspace.query_state.parallel_enabled = run.options.io; workspace.query_state.semantic_workers = run.options.policy.semantic_workers; generator.query_state .= workspace.query_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.specialization_provider_enabled = true;
     }
-    let query .=run.query_state;
+    let query .=runQueryState(run.frame,run.query_state_enabled);
     if run.options.constant_receipts && !skip_constant_replay && query {
         let pools .= blot_reuse_code_artifacts::registeredPools(query.old.metadata());
         if blot_reuse_constant_receipt::hasProductiveRecord(pools.constant_records,generator.evaluator.minimum_constant_steps) {
             let error = blot_reuse_constant_receipt_reuse::initInto(workspace.constant_state,pools,runUnits(run),runIdentity(run),stamps,workspace.allocation_owner,query.gate); if error != blot_error::Error.none { return error; }
-            run.constant_state .= workspace.constant_state; generator.constant_state .= workspace.constant_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.constant_provider_enabled = true;
+            run.constant_state_enabled = true; generator.constant_state .= workspace.constant_state; generator.evaluator.generator_frame=blot_compile_workspace::frameForGenerator(generator,generator.evaluator); generator.evaluator.constant_provider_enabled = true;
         }
     }
     return blot_error::Error.none;
@@ -2029,27 +2133,27 @@ fn ownershipRejection(workspace: CompileWorkspace&,location: Diagnostic,rejectio
 }
 struct CandidatePreparation { run: CompileRun&,source: const blot_backend_wasm::Module& }
 fn prepareCandidate(context: CandidatePreparation&,model: blot_backend_activation_model::Model) -> blot_error::Error {
-    let workspace .=runWorkspace(context.run);let present,error=blot_backend_region_candidate::prepareInto(workspace.candidate,context.source,model);if error!=blot_error::Error.none {return error;}if present {context.run.candidate .=workspace.candidate;}return blot_error::Error.none;
+    let workspace .=runWorkspace(context.run);let present,error=blot_backend_region_candidate::prepareInto(workspace.candidate,context.source,model);if error!=blot_error::Error.none {return error;}if present {context.run.candidate_enabled = true;}return blot_error::Error.none;
 }
 fn assemble(run: CompileRun&) -> Result,blot_error::Error {
     let workspace .= runWorkspace(run); let generator .= workspace.generator; var source_module: const blot_backend_wasm::Module& .= generator.module;
     if run.options.policy.memory_profile {
         let error = blot_backend_source_origins::initInto(workspace.origins,source_module,runUnits(run),runIdentity(run),run.options.diagnostic_source_digests,generator.diagnostic_contexts.records); if error != blot_error::Error.none { return emptyResult(workspace),error; }
-        run.origins .= workspace.origins; source_module .= workspace.origins.code.module;
+        run.origins_enabled = true; source_module .= workspace.origins.code.module;
     }
     if blot_backend_cohort_candidate::possible(source_module) {
         var context = CandidatePreparation { run,source_module , ..}; let error = blot_backend_activation_model::withBorrowed(generator,runIdentity(run),context,prepareCandidate); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     }
-    var assembled_module: const blot_backend_wasm::Module& .= source_module; let candidate .=run.candidate;if candidate {assert(candidate .==workspace.candidate);assembled_module .=workspace.candidate.view.module;}
+    var assembled_module: const blot_backend_wasm::Module& .= source_module; let candidate .=runCandidate(run.frame,run.candidate_enabled);if candidate {assert(candidate .==workspace.candidate);assembled_module .=workspace.candidate.view.module;}
     if run.options.policy.codegen_tier == blot_compilation_tier::Tier.optimized {
-        let present,error = blot_backend_simd_abi::prepareInto(workspace.vectors,assembled_module); if error != blot_error::Error.none { return emptyResult(workspace),error; } if present { run.vectors .= workspace.vectors; assembled_module .= workspace.vectors.module; }
+        let present,error = blot_backend_simd_abi::prepareInto(workspace.vectors,assembled_module); if error != blot_error::Error.none { return emptyResult(workspace),error; } if present { run.vectors_enabled = true; assembled_module .= workspace.vectors.module; }
     }
-    if run.options.retain_artifacts { let error = blot_backend_optimized_bodies::initInto(workspace.optimized); if error != blot_error::Error.none { return emptyResult(workspace),error; } run.optimized .= workspace.optimized; }
-    var optimized_previous: const blot_backend_optimized_bodies::Capture&? = null; let previous .= run.options.previous; if previous { let optimized .= previous.optimized; if optimized { optimized_previous .= optimized; } }
-    if optimized_previous == null { let checkpoint .= run.options.checkpoint; if checkpoint { optimized_previous .= checkpoint.optimizer.value; } }
+    if run.options.retain_artifacts { let error = blot_backend_optimized_bodies::initInto(workspace.optimized); if error != blot_error::Error.none { return emptyResult(workspace),error; } run.optimized_enabled = true; }
+    var optimized_previous: const blot_backend_optimized_bodies::Capture&? = null; let previous .= runPrevious(run.previous_key); if previous { let optimized .= previous.optimized; if optimized { optimized_previous .= optimized; } }
+    if optimized_previous == null { let checkpoint_key=run.checkpoint_key; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); optimized_previous .= checkpoint.optimizer.value; } }
     var runtime_optimization = blot_backend_optimized_bodies::Stats {..}; var rejection = blot_backend_wasm::OwnershipFailure {..}; var collector_rejection = blot_backend_collector_contract::Certificate {..};
-    var memory_profile = blot_support::none<const blot_backend_source_origins::Site[:]>(); let origins .= run.origins; if origins { memory_profile = blot_support::some<const blot_backend_source_origins::Site[:]>(origins.sites); }
-    workspace.bytes.clear(); let emitted = assembled_module.assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { require_collector_free: run.options.policy.require_collector_free, collector_rejection: collector_rejection, memory_profile: memory_profile, compiler_identity: run.options.compiler_identity, source_digests: run.options.diagnostic_source_digests, source_names: runIdentity(run), rejection: rejection, io: run.options.io, workers: run.options.policy.codegen_workers, profile: run.options.profile_backend, tier: run.options.policy.codegen_tier, share_machine_code: run.options.policy.share_machine_code, previous: optimized_previous, current: run.optimized, stats: runtime_optimization, ..},workspace.bytes);
+    var memory_profile = blot_support::none<const blot_backend_source_origins::Site[:]>(); let origins .= runOrigins(run.frame,run.origins_enabled); if origins { memory_profile = blot_support::some<const blot_backend_source_origins::Site[:]>(origins.sites); }
+    workspace.bytes.clear(); let emitted = assembled_module.assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { require_collector_free: run.options.policy.require_collector_free, collector_rejection: collector_rejection, memory_profile: memory_profile, compiler_identity: run.options.compiler_identity, source_digests: run.options.diagnostic_source_digests, source_names: runIdentity(run), rejection: rejection, io: run.options.io, workers: run.options.policy.codegen_workers, profile: run.options.profile_backend, tier: run.options.policy.codegen_tier, share_machine_code: run.options.policy.share_machine_code, previous: optimized_previous, current: runOptimized(run.frame,run.optimized_enabled), stats: runtime_optimization, ..},workspace.bytes);
     if emitted != blot_error::Error.none {
         if emitted == blot_error::Error.collector_free_unproven {
             var result = emptyResult(workspace); workspace.message.append("Collector-free proof declined: "); workspace.message.append(blot_backend_collector_contract::reasonName(collector_rejection.reason)); workspace.message.append("; function ");
@@ -2078,9 +2182,9 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
 fn addFields<T>(destination: T&,source: T) { const for <N,A> in fields<T> { destination.A += source.A; } }
 fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
     let workspace .= runWorkspace(run); let generator .= workspace.generator;
-    let retained .= run.retained; if retained { let code_gate = retained.importer.code_gate; if code_gate.present { result.source_validation.observe(code_gate.value.semantic); } }
-    let principal_state .= run.principal_state; if principal_state { result.source_validation.observe(principal_state.gate); }
-    let query_state .= run.query_state; if query_state { result.source_validation.observe(query_state.gate); }
+    let retained .= runRetained(run.frame,run.retained_enabled); if retained { let code_gate = retained.importer.code_gate; if code_gate.present { result.source_validation.observe(code_gate.value.semantic); } }
+    let principal_state .= runPrincipalState(run.frame,run.principal_state_enabled); if principal_state { result.source_validation.observe(principal_state.gate); }
+    let query_state .= runQueryState(run.frame,run.query_state_enabled); if query_state { result.source_validation.observe(query_state.gate); }
     result.emitted_functions -= result.runtime_optimization.shared; run.timing.assemble_us = run.clock.lap(); run.timing.profiled = run.options.profile_backend; if run.options.profile_backend { run.timing.work = generator.work_timing.snapshot(); }
     result.optimization = generator.planning.facts.stats; result.optimization.region_requests = generator.evaluator.regions.region_arena_pool.stats.requested; result.optimization.region_reused = generator.evaluator.regions.region_arena_pool.stats.reused; result.optimization.region_retained_bytes = generator.evaluator.regions.region_arena_pool.stats.retained_bytes; result.optimization.region_arena = generator.evaluator.regions.region_arena_pool.stats;
     result.optimization.evidence_import_requests = generator.evaluator.evidence_import_requests; result.optimization.evidence_import_reused = generator.evaluator.evidence_import_reused; result.optimization.closed_source_imports = generator.evaluator.closed_source_imports; result.optimization.closed_source_reused = generator.evaluator.closed_source_reused; result.optimization.split_attempts = generator.evaluator.split_attempts; result.optimization.split_accepted = generator.evaluator.split_accepted; result.optimization.split_declined = generator.evaluator.split_declined; result.counters = generator.evaluator.counters;
@@ -2090,7 +2194,7 @@ fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
     for record in generator.evaluator.retained.specialization_receipts.items { if record.complete { result.completed_queries.complete_records++; if record.member.present { result.completed_queries.member_recorded++; } } }
     result.reuse = generator.work; if principal_state && principal_state.graphs.present { result.reuse.graph_imports.principals = principal_state.graphs.value.census; }
     if query_state && query_state.semantic.present { result.reuse.graph_imports.queries = query_state.semantic.value.census; } if retained { result.reuse.graph_imports.fragments = retained.importer.census; }
-    result.refinements = generator.refinement_stats; result.query_tables.canonical = generator.evaluator.specializations.canonical_specializations.table.storage(); let persisted_principals .= run.persisted_principals; if persisted_principals { result.query_tables.portable_principal = persisted_principals.storage(); }
+    result.refinements = generator.refinement_stats; result.query_tables.canonical = generator.evaluator.specializations.canonical_specializations.table.storage(); let persisted_principals .= runPersistedPrincipals(run.frame,run.persisted_principals_enabled); if persisted_principals { result.query_tables.portable_principal = persisted_principals.storage(); }
     let principal_storage = generator.evaluator.principalQueryStorage(); result.query_tables.source_description = principal_storage.source_description; result.query_tables.open_residual = principal_storage.open_residual;
     if retained {
         let state .= retained;
@@ -2110,15 +2214,15 @@ fn recordArtifact(run: CompileRun&,result: Result&,memo:blot_reuse_code_artifact
         let remembered,inserted,error = blot_eval_selected_query::remember(metadata.specialization_queries,generator.evaluator.closureInfo(input),cloned); if error != blot_error::Error.none { return ArtifactCounts{..},error; }
     }
     for record in metadata.specialization_queries.records { if record.dependencies.member.present { result.completed_queries.member_payload_bytes += blot_host_layout::selected_query_record + blot_reuse_specialization_receipt::ownedBytes(record.dependencies); } }
-    let query_state .= run.query_state; if query_state && run.options.policy.semantic_workers > 1 { for record in query_state.independent_calls.items { let copied,error = record.clone(); if error != blot_error::Error.none { return ArtifactCounts{..},error; } var cloned=copied;metadata.independent_calls.push(cloned);if metadata.independent_calls.failure!=blot_error::Error.none {cloned.deinit();return ArtifactCounts{..},metadata.independent_calls.failure;} } }
+    let query_state .= runQueryState(run.frame,run.query_state_enabled); if query_state && run.options.policy.semantic_workers > 1 { for record in query_state.independent_calls.items { let copied,error = record.clone(); if error != blot_error::Error.none { return ArtifactCounts{..},error; } var cloned=copied;metadata.independent_calls.push(cloned);if metadata.independent_calls.failure!=blot_error::Error.none {cloned.deinit();return ArtifactCounts{..},metadata.independent_calls.failure;} } }
     result.query_tables.selected = metadata.specialization_queries.storage(); result.query_tables.principal = metadata.principal_queries.storage();
     var stamps: blot_reuse_code_artifacts::ModuleStamps&? = null; if memo.previous_context != 0 || run.options.validate_pins { stamps .= memo; }
     let captured = metadata.capturePoolsWithStamps(workspace.publication_owner,generator,runIdentity(run),stamps); if captured != blot_error::Error.none { return ArtifactCounts{..},captured; } result.counters = generator.evaluator.counters; assert(metadata.pools.present);
-    let principal_state .= run.principal_state;
+    let principal_state .= runPrincipalState(run.frame,run.principal_state_enabled);
     if principal_state {
         let certificate,error = principal_state.gate.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return ArtifactCounts{..},error; } metadata.pools.value.dependency_certificate = certificate;
     } else {
-        let retained .= run.retained;
+        let retained .= runRetained(run.frame,run.retained_enabled);
         if retained { let code_gate = retained.importer.code_gate; if code_gate.present { let certificate,error = code_gate.value.semantic.freezeValidation(metadata.pools.value.modules); if error != blot_error::Error.none { return ArtifactCounts{..},error; } metadata.pools.value.dependency_certificate = certificate; } }
     }
     if metadata.pools.value.dependency_certificate.present { let certificate = metadata.pools.value.dependency_certificate.value; result.source_validation.retained = certificate.storage(); result.source_validation.reused_images = certificate.reused_images; }
@@ -2179,8 +2283,8 @@ fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
 fn publish(run: CompileRun&,result: Result&,stamp_counts:ModuleStamps) -> blot_error::Error {
     let workspace .= runWorkspace(run);
     if run.options.retain_artifacts {
-        workspace.capture.resetHeader(workspace.metadata,workspace.journal,workspace.capture.executable_queries,run.options.cached_units); let optimized .=run.optimized;if optimized {let owned:blot_backend_optimized_bodies::Capture& =blot_compile_workspace::activeOptimized();assert(optimized .==owned && owned .==workspace.optimized);workspace.capture.optimized .=owned;}
-        result.capture .= workspace.capture; run.optimized .= null; run.metadata_alive = false; run.journal_alive = false;
+        workspace.capture.resetHeader(workspace.metadata,workspace.journal,workspace.capture.executable_queries,run.options.cached_units); let optimized .=runOptimized(run.frame,run.optimized_enabled);if optimized {let owned:blot_backend_optimized_bodies::Capture& =blot_compile_workspace::activeOptimized();assert(optimized .==owned && owned .==workspace.optimized);workspace.capture.optimized .=owned;}
+        result.capture .= workspace.capture; run.optimized_enabled = false; run.metadata_alive = false; run.journal_alive = false;
         let sealed = workspace.capture.sealExecutableQueries(); if sealed != blot_error::Error.none { return sealed; } result.query_tables.executable_fragment = workspace.capture.executable_queries.storage();
         let optimized .=workspace.capture.optimized;if optimized {result.query_tables.executable_optimizer=optimized.queries.storage();}
     }
@@ -2214,19 +2318,19 @@ fn completePreparedAttempt(workspace:CompileWorkspace&,run:CompileRun&,skip_cons
     let finished=finishArtifact(run,result,counts);if finished!=blot_error::Error.none {result.deinit();return emptyResult(workspace),finished;}
     let published=publish(run,result,stamp_counts);if published!=blot_error::Error.none {result.deinit();return emptyResult(workspace),published;}return result,blot_error::Error.none;
 }
-fn compileAttempt(frame:blot_compile_workspace::Frame,entry:u32,options:CompileOptions,skip_constant_replay:bool,speculative_locals:bool)->Result,blot_error::Error {
+fn compileAttempt(frame:blot_compile_workspace::Frame,entry:u32,options:RunOptions,skip_constant_replay:bool,speculative_locals:bool)->Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
-    var run=CompileRun{frame:frame,entry:entry,options:options,speculative_locals:speculative_locals,..};
+    var run=CompileRun{frame:frame,entry:entry,options:options.values,previous_key:options.previous,principal_previous_key:options.principal_previous,query_previous_key:options.query_previous,checkpoint_key:options.checkpoint,speculative_locals:speculative_locals,..};
     let prepared=prepare(run);if prepared!=blot_error::Error.none {let result=emptyResult(workspace);run.deinit();return result,prepared;}
     let result,error=completePreparedAttempt(workspace,run,skip_constant_replay);
     run.deinit();return result,error;
 }
-fn compileLocals(frame: blot_compile_workspace::Frame,entry: u32,options: CompileOptions,speculative: bool) -> Result,blot_error::Error {
+fn compileLocals(frame: blot_compile_workspace::Frame,entry: u32,options: RunOptions,speculative: bool) -> Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
     block {
         var first,error = compileAttempt(frame,entry,options,false,speculative);
         if error != blot_error::Error.constant_receipt_retry { return first,error; }
-        assert(options.constant_receipts); first.deinit();
+        assert(options.values.constant_receipts); first.deinit();
     }
     let retried,retry_error = compileAttempt(frame,entry,options,true,speculative); assert(retry_error != blot_error::Error.constant_receipt_retry); if retry_error != blot_error::Error.none { return retried,retry_error; } var result = retried; result.constant_receipts.retries = 1; return result,blot_error::Error.none;
 }
@@ -2246,7 +2350,7 @@ fn finishCompilation(source_workspace:CompileWorkspace&,units:const blot_check_c
     let held,input_error=blot_backend_result_publication::registeredInputUnits(workspace.publication_owner);assert(input_error==blot_error::Error.none && blot_support::same_slice_identity(held,units));
     blot_backend_result_publication::finishCompile(workspace.publication_owner,epoch);result.active=true;result.publication_owner=workspace.publication_owner;result.publication_epoch=epoch;result.publication_units=held;return result,blot_error::Error.none;
 }
-fn compileCounted(frame:blot_compile_workspace::Frame,entry:u32,options:CompileOptions)->Result,blot_error::Error {
+fn compileCounted(frame:blot_compile_workspace::Frame,entry:u32,options:RunOptions)->Result,blot_error::Error {
     let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
     block {
         var first,error=compileLocals(frame,entry,options,true);
@@ -2267,7 +2371,7 @@ fn compileWithOptions(source_workspace:CompileWorkspace&,source_units:const blot
         let result,error=blot_backend_scoped_backend::compileWithOptions(workspace,units,entry,scopedCompileOptions(options));
         trace.restore();return finishCompilation(workspace,units,epoch,result,error);
     }
-    let result,error=compileCounted(frame,entry,options);
+    let result,error=compileCounted(frame,entry,makeRunOptions(options));
     trace.restore();return finishCompilation(workspace,units,epoch,result,error);
 }
 fn compile(workspace: CompileWorkspace&,units: const blot_check_core::Module[:],entry: u32) -> Result,blot_error::Error { return compileWithOptions(workspace,units,entry,CompileOptions { artifact_replay: default_artifact_replay,artifact_dump: default_artifact_replay , ..}); }

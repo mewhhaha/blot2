@@ -126,6 +126,8 @@ reusable var capture_owners:CaptureOwner[>..]=[];
 var capture_tokens:blot_support_pooled_map::Map<u64,u32> =blot_support_pooled_map::Map<u64,u32>{..};
 reusable[] var capture_token_slots:dictionary_slot<u64,u32>[>..]=[];
 struct Factory {allocation_owner:u64=0}
+// Borrowed compile inputs keep registry authority; their caller retains ownership.
+struct CaptureKey {slot:u32=0,token:u64=0}
 fn validCaptureKey(slot:u32,token:u64)->bool {
  return slot!=0&&slot-1<capture_owners.len&&capture_owners[slot-1].live&&capture_owners[slot-1].token==token;
 }
@@ -133,6 +135,18 @@ fn validCapture(self_:const Capture&)->bool {return validCaptureKey(self_.regist
 fn registeredCapture(self_:const Capture&)->const Capture& {
  assert(validCapture(self_));let canonical:const Capture& =capture_owners[self_.registry_slot-1].canonical;
  assert(self_ .== canonical);return canonical;
+}
+fn captureKeyFromRef(source:const Capture?)->CaptureKey {
+ if !source {return CaptureKey{..};}
+ let canonical:const Capture& =registeredCapture(source);
+ return CaptureKey{canonical.registry_slot,canonical.registry_token};
+}
+fn captureRefFromKey(key:CaptureKey)->const Capture? {
+ if key.slot==0 {assert(key.token==0);return null;}
+ assert(validCaptureKey(key.slot,key.token));
+ let canonical:const Capture& =capture_owners[key.slot-1].canonical;
+ assert(canonical.registry_slot==key.slot && canonical.registry_token==key.token);
+ return canonical;
 }
 fn createArchiveCapture(self_:Factory&)->Capture?,u64,Error {
     if capture_owners.len>=0xffffffff {return null,0,blot_error::Error.out_of_memory;}

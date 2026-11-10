@@ -430,6 +430,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_array_cost_expla
 fn blot_backend_array_cost_explanation::blotStructuralHash<StructuralSink>(value:blot_backend_array_cost_explanation::Snapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Checkpoint)->bool {return equalFields(left,right);}
 fn blot_backend_backend_checkpoint::blotStructuralHash<StructuralSink>(value:blot_backend_backend_checkpoint::Checkpoint,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::CheckpointKey)->bool {return equalFields(left,right);}
+fn blot_backend_backend_checkpoint::blotStructuralHash<StructuralSink>(value:blot_backend_backend_checkpoint::CheckpointKey,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::OptimizerSlot)->bool {return equalFields(left,right);}
 fn blot_backend_backend_checkpoint::blotStructuralHash<StructuralSink>(value:blot_backend_backend_checkpoint::OptimizerSlot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_checkpoint::Report)->bool {return equalFields(left,right);}
@@ -742,6 +744,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::Re
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::ResourceAdapterEmission,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::Result)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::Result,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::RunOptions)->bool {return equalFields(left,right);}
+fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::RunOptions,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::TaskMoverEmission)->bool {return equalFields(left,right);}
 fn blot_backend_core_backend::blotStructuralHash<StructuralSink>(value:blot_backend_core_backend::TaskMoverEmission,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_core_backend::WireBridge)->bool {return equalFields(left,right);}
@@ -4820,6 +4824,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_alias_project_pipe
 fn blot_reuse_alias_project_pipeline::blotStructuralHash<StructuralSink>(value:blot_reuse_alias_project_pipeline::OwnedCore,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_artifact_capture::Capture)->bool {return equalFields(left,right);}
 fn blot_reuse_artifact_capture::blotStructuralHash<StructuralSink>(value:blot_reuse_artifact_capture::Capture,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_artifact_capture::CaptureKey)->bool {return equalFields(left,right);}
+fn blot_reuse_artifact_capture::blotStructuralHash<StructuralSink>(value:blot_reuse_artifact_capture::CaptureKey,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_artifact_capture::CaptureOwner)->bool {return equalFields(left,right);}
 fn blot_reuse_artifact_capture::blotStructuralHash<StructuralSink>(value:blot_reuse_artifact_capture::CaptureOwner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_artifact_capture::Factory)->bool {return equalFields(left,right);}

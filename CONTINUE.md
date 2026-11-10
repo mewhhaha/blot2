@@ -6,12 +6,24 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 ## Current frontier
 
-**No complete C/header/native Goose compiler exists.** Actual whole272 fails in
-**162.42s**, unchanged461 inputs, at the same prepare/reset loan through Run's
-first attempt. Scalar Frame removed Run.workspace but later optional views and
-four owner-bearing CompileOptions fields still reach mutable storage. Selected
-root progress did not prove that the actual whole frontier cleared.
-[Whole272 receipt](benchmarks/evidence/qualification/2026-11-10-goose-whole272.json.gz).
+**No complete C/header/native Goose compiler exists.** Actual whole274 fails in
+**158.91s**, unchanged461inputs, at the same prepare/reset loan through Run's
+first attempt. This persists after all nine workspace views became scalar flags
+and all four mutable-option pointers became existing registry keys. No exact
+remaining field/path is established. Stop speculative source subtraction.
+[Whole274/source audit](benchmarks/evidence/qualification/2026-11-10-goose-scalar-run-whole274.json.gz).
+
+Six affected native laws pass (69.94s summed stages), including Capture-key
+roundtrip/reset/invalidation. Public options retain all30fields:26verbatim,
+4mutable references replaced privately; caller ownership/refcounts unchanged.
+[Native receipt](benchmarks/evidence/qualification/2026-11-10-goose-scalar-run-laws.json.gz).
+
+Next obtain exact HolderMayPointInto storeevent provenance. Existing checkers have
+line tables but no locals; selected server debugger hit120s before the event and
+GDB cannot dump StoreEvent. An isolated env-gated metadata-only trace is being
+prepared at the exact hit, with one120s build cap and existing180s actual-emission
+cap. No borrow rules/joins/equality/roots may change. Negative/inconclusive probes
+never identify a remaining field. The binaries are diagnostic-only until parity.
 
 Complete **36/36 native component laws pass** on the same frozen source as the
 whole attempt: summed stage time **307.14s**,30s/stage,600s outer cap. Includes
@@ -41,12 +53,10 @@ with validated registry access. The focused compile advanced to type/effect
 bucket publication before the broad map batch; actual whole still repeats the
 Run loan. [Phase evidence](benchmarks/evidence/qualification/2026-11-10-goose-scalar-frame-frontier.json.gz).
 
-Next coherent boundary is in copied preparation: replace Run's9optional workspace
-views with enabled flags and Frame getters; replace previous/principal/query
-Capture refs and checkpoint ref in its options with existing validated registry
-keys. Public options, actual owner retention and success/error transport stay
-unchanged, with no new registry or copy. Do not promote
-partial descriptor patches or claim whole acceptance without a fresh build.
+Run now retains Frame/registry authority and enabled flags for workspace views.
+The current source removes those reference paths; actual whole still rejects it.
+Timing production labels are statically reconstructed; identity/digest/order are
+immutable input spans. Do not infer a cause without exact store-event evidence.
 
 Complete read-only StampView reconstruction remains74fields/65slice leaves,
 with full-allocation recovery before prefix/interior subspans. Valid shared pinned

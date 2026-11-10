@@ -38,10 +38,28 @@ var inactive:Storage=Storage{..};
 reusable var storage:Storage[>..]=[];
 reusable var optimizer_headers:Optimizer[>..]=[];
 struct Checkpoint {slot:u32=0,generation:u64=0,principal:Principal& =inactive.principal,optimizer:OptimizerSlot& =inactive.optimizer_ref,semantic:SemanticSlot& =inactive.semantic_ref}
+// A key borrows an existing checkpoint; it never retains or releases its storage.
+struct CheckpointKey {slot:u32=0,generation:u64=0}
 fn valid(self_:Checkpoint)->bool {return self_.slot!=0 && self_.slot-1<storage.len && storage[self_.slot-1].live && storage[self_.slot-1].generation==self_.generation;}
 fn principalArchive(self_:Checkpoint)->const Principal& {
  assert(self_.valid());let principal:const Principal& =storage[self_.slot-1].principal;
  assert(self_.principal .==principal);return principal;
+}
+fn checkpointKeyFromRef(source:const Checkpoint?)->CheckpointKey {
+ if !source {return CheckpointKey{..};}
+ assert(source.valid());
+ let state:const Storage& =storage[source.slot-1];
+ assert(source.principal .==state.principal && source.optimizer .==state.optimizer_ref && source.semantic .==state.semantic_ref);
+ return CheckpointKey{source.slot,source.generation};
+}
+// Rebuild only the borrowed descriptor from its actual existing named owners.
+// The original checkpoint owner remains responsible for deinit.
+fn checkpointViewFromKey(key:CheckpointKey)->Checkpoint {
+ if key.slot==0 {assert(key.generation==0);return Checkpoint{..};}
+ assert(key.slot-1<storage.len);
+ let state:Storage& =storage[key.slot-1];
+ assert(state.live && state.generation==key.generation);
+ return Checkpoint{slot:key.slot,generation:key.generation,principal:state.principal,optimizer:state.optimizer_ref,semantic:state.semantic_ref,..};
 }
 fn deinit(self_:Checkpoint&) {if self_.slot==0 {return;}assert(self_.valid());let at=self_.slot-1;let state:Storage& =storage[at];state.principal.deinit();let optimizer .= state.optimizer_ref.value;if optimizer {optimizer.deinit();assert(state.optimizer_header>=0);optimizer_headers.free(state.optimizer_header);}state.optimizer_ref.value .= null;state.optimizer_header=-1;state.semantic.archive.deinit();state.live=false;self_=Checkpoint{..};storage.free(at);}
 fn publishOptimizer(value:Optimizer)->i64 {return optimizer_headers.alloc_index(blot_backend_optimized_bodies::checkedView(value));}

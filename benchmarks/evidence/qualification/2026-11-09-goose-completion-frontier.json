@@ -3618,5 +3618,53 @@
       "Run nine optional views plus four mutable-owner option refs are next scalar descriptor boundary",
       "Subsecond compilation,5sGdev and1-2MB output goals remain unmet"
     ]
+  },
+  "scalar_run_views_and_mutable_options_family": {
+    "scope": "Six affected native component laws; actual whole generation still fails",
+    "run_views": 9,
+    "mutable_options": 4,
+    "option_fields": 30,
+    "unchanged_fields": 26,
+    "changes": [
+      "Run workspace views become enabled flags+validated scalar Frame getters",
+      "Three prior captures and checkpoint become existing registry keys",
+      "Capture keys reborrow canonical header; checkpoint key reifies borrowed lexical descriptor",
+      "Fresh CompileOptions literal preserves26fields and nulls4mutable pointers; public API unchanged",
+      "Actual owners retained/released by original caller, no new allocation/registry/copy/refcount"
+    ],
+    "native": {
+      "receipt": "2026-11-10-goose-scalar-run-laws.json.gz",
+      "passed": true,
+      "tests": 6,
+      "sum_stage_seconds": 69.939,
+      "full_inventory_current_source": false
+    },
+    "whole": {
+      "receipt": "2026-11-10-goose-scalar-run-whole274.json.gz",
+      "command": [
+        "python3",
+        "/home/jacobt/src/blot2/compiler-goose/build.py",
+        "--goose",
+        "/home/jacobt/src/blot2/build/goose-port/argcopy-experiment-20261110/goose",
+        "--cc",
+        "clang-23",
+        "--stdlib",
+        "/home/jacobt/src/goose-to-wasm/build/source/stdlib",
+        "--inference-budget",
+        "1000000",
+        "--stage-timeout",
+        "180",
+        "--total-timeout",
+        "300"
+      ],
+      "exit": 1,
+      "seconds": 158.908,
+      "source_unchanged": true,
+      "changed_inputs": [],
+      "artifacts": {},
+      "whole_compiler_executable": false
+    },
+    "remaining": "Same prepare/reset loan at first compile attempt. No exact remaining Run leaf identified; metadata trace required before more source changes.",
+    "debugger": "Existing binaries line-tables-only: no local variables/StoreEvent types; selected-server120s cap and GDB preflight inconclusive. Isolated env-gated metadata-only tracer being prepared; no checker rules changed."
   }
 }
