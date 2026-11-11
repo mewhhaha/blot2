@@ -94,6 +94,7 @@ fn readRows(key:RowRead)->const RowMapping[:] {assert(valid(key));if key.body!=0
 let max_parameters: i64 = 16;
 let max_local_instances: i64 = 4;
 struct CarrierKey { from: u32,to: u32 }
+fn hash(key: CarrierKey) -> u64 { return ::hash_combine(::hash(key.from),::hash(key.to)); }
 struct Template { scalar_environment: bool = false,callable_instances: u32 = 0,staged: u32 = 0,unit: u32 = 0,node: u32,environment: blot_support::Option<u32> = blot_support::none<u32>(),captures: u32 = 0,templates: u32 = 0,computation: bool = false,evidence: u32 = 0,rows: u32 = 0 }
 struct ReturnTarget { node: u32,label: u32,cleanup: blot_runtime_runtime_cleanup::Mark,template_result: bool = false }
 struct CarryRoot { iteration: u32,outgoing: u32,slot: u32 }

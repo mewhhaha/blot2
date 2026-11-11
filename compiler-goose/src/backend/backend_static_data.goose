@@ -12,6 +12,7 @@ fn hash(key: SerializedKey) -> u64 { ::hash((key.value as u64 << 32) | key.ty) }
 struct Cache {count:i64=0,slots:dictionary_slot<SerializedKey,u32>[:]=default<dictionary_slot<SerializedKey,u32>[:]>()}
 reusable[] var cache_slots: dictionary_slot<SerializedKey,u32>[>..] = [];
 fn get(self_: const Cache&,key: SerializedKey) -> u32? { blot_support_pooled_map::get(self_,key) }
+fn contains(self_: const Cache&,key: SerializedKey) -> bool { return blot_support_pooled_map::contains(self_,key); }
 fn insert(self_: Cache&,key: SerializedKey,value: u32) -> Error { blot_support_pooled_map::insert(self_,key,value,cache_slots); return blot_error::Error.none; }
 fn remove(self_: Cache&,key: SerializedKey) -> bool { blot_support_pooled_map::remove(self_,key,cache_slots) }
 fn clear(self_: Cache&) { blot_support_pooled_map::clear(self_); }
@@ -89,7 +90,7 @@ recursive fn serializeCarrier(self_: State&,g: Generator&,value: ValueId,from: u
     let input = g.representations.store.node(from); let output = g.representations.store.node(to);
     if output.tag == blot_backend_layout::Tag.opened || output.tag == blot_backend_layout::Tag.associated {
         let payload,error = serialize(self_,g,value,from,depth + 1); if error != blot_error::Error.none { return 0,error; }
-        let cell,allocated = g.module.dataWords([0,payload]); if allocated != blot_error::Error.none { return 0,allocated; }
+        let cell,allocated = g.module.dataWords([0 as u32,payload]); if allocated != blot_error::Error.none { return 0,allocated; }
         if g.layoutRole(from) == blot_backend_runtime_ir::ROLE_reference { let marked = dataValueReference(self_,g,cell + 4,value,payload); if marked != blot_error::Error.none { return 0,marked; } }
         return cell,blot_error::Error.none;
     }
@@ -166,7 +167,7 @@ recursive fn serializePackage(self_: State&,g: Generator&,value: ValueId,ty: u32
     var selected_unit: u32 = 0; var selected_quantifier: u32 = 0; var remaining: i64 = 65536;
     for source in g.units {
         var ordinal: u32 = 0;
-        for node in source.types.nodes.items {
+        for node in source.types.nodes {
             if remaining == 0 { return 0,staticFailure(g,source.unit,blot_check_diagnostic_code::Code.complexity); } remaining--;
             if node.tag == blot_check_types::Tag.existential {
                 let semantic,error = g.evaluator.storage.evidence.projectWithRows(source.types,ordinal,[],[]);
@@ -196,7 +197,7 @@ recursive fn serializePackage(self_: State&,g: Generator&,value: ValueId,ty: u32
         let concrete_value,concrete_error = staticOwner(g,selected_unit,blot_backend_backend_emission::bufferMappings(mappings)); if concrete_error != blot_error::Error.none { abstract.deinit(); return 0,concrete_error; } var concrete = concrete_value;
         recursive fn members() -> u32,Error {
             for goal_ordinal in 0..goals.len {
-                let goal = goals[goal_ordinal]; var found = false; var members = blot_check_core::List {..};
+                let goal = goals[goal_ordinal]; var found = false; var members = blot_check_types::List {..};
                 for candidate in source.contracts { if candidate.identity == goal.identity { members = candidate.members; found = true; break; } }
                 if !found { return 0,staticFailure(g,selected_unit,blot_check_diagnostic_code::Code.unresolved_type); }
                 for ordinal in 0..members.len {
@@ -279,7 +280,7 @@ recursive fn serializeProvider(self_: State&,g: Generator&,id: ValueId,ty: u32,d
         let implementation_type,error = representation(g,actual,1); if error != blot_error::Error.none { return 0,error; }
         let operation,operation_error = g.runtimeOperation(info.bits,1,blot_check_core::Span {..}); if operation_error != blot_error::Error.none { return 0,operation_error; }
         let implementation,serialized = serialize(self_,g,child,implementation_type,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; }
-        let allocated,allocation_error = g.module.dataWords([0,implementation]); if allocation_error != blot_error::Error.none { return 0,allocation_error; } address = allocated;
+        let allocated,allocation_error = g.module.dataWords([0 as u32,implementation]); if allocation_error != blot_error::Error.none { return 0,allocation_error; } address = allocated;
         let marked = dataValueReference(self_,g,address + blot_runtime_runtime_layout::Provider_implementation,child,implementation); if marked != blot_error::Error.none { return 0,marked; }
         let bound = g.runtimeDataWord(address + blot_runtime_runtime_layout::Provider_operation,operation); if bound != blot_error::Error.none { return 0,bound; }
     } else {
@@ -287,7 +288,7 @@ recursive fn serializeProvider(self_: State&,g: Generator&,id: ValueId,ty: u32,d
         let read,error = g.runtimeOperation(info.bits,1,blot_check_core::Span {..}); if error != blot_error::Error.none { return 0,error; }
         let write,write_error = g.runtimeOperation(info.nominal as u32,1,blot_check_core::Span {..}); if write_error != blot_error::Error.none { return 0,write_error; }
         let initial,serialized = serialize(self_,g,child,shape.c,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; }
-        let allocated,allocation_error = g.module.dataWords([0,0,initial]); if allocation_error != blot_error::Error.none { return 0,allocation_error; } address = allocated;
+        let allocated,allocation_error = g.module.dataWords([0 as u32,0,initial]); if allocation_error != blot_error::Error.none { return 0,allocation_error; } address = allocated;
         let marked = dataValueReference(self_,g,address + blot_runtime_runtime_layout::StateProvider_initial,child,initial); if marked != blot_error::Error.none { return 0,marked; }
         let read_bound = g.runtimeDataWord(address + blot_runtime_runtime_layout::StateProvider_read,read); if read_bound != blot_error::Error.none { return 0,read_bound; }
         let write_bound = g.runtimeDataWord(address + blot_runtime_runtime_layout::StateProvider_write,write); if write_bound != blot_error::Error.none { return 0,write_bound; }
@@ -450,7 +451,7 @@ recursive fn serializeClosure(self_: State&,g: Generator&,id: ValueId,ty: u32,de
                 else { let mapped = g.mapType(metadata.unit,mappings,source.typeOf(closure.body),function_type.b,source.span(closure.body)); if mapped != blot_error::Error.none { return 0,mapped; } }
                 let captures = source.extra[closure.captures.start..closure.captures.start + closure.captures.len]; if captures.len != child_count { return 0,g.fail(metadata.unit,closure.body,blot_check_diagnostic_code::Code.constant_expression); }
                 for index in 0..captures.len { let child_type,error = g.captureLayout(metadata.unit,captures[index],g.evaluator.valueChildren(id)[index],mappings,rows); if error != blot_error::Error.none { return 0,error; } let added = child_types.push(child_type); if added != blot_error::Error.none { return 0,added; } }
-                for capture_type in child_types.items { var budget: i64 = 1000000; if !g.retainedLayoutConcrete(capture_type,false,0,budget) { return serializeStagedClosure(self_,g,id,ty); } }
+                for capture_type_index in 0..child_types.items.len { let capture_type = child_types.items[capture_type_index]; var budget: i64 = 1000000; if !g.retainedLayoutConcrete(capture_type,false,0,budget) { return serializeStagedClosure(self_,g,id,ty); } }
                 var implementation_type = implementation;
                 if closure.function_type != 0 { let concrete,error = g.codeLayoutWithRows(metadata.unit,closure.function_type,mappings.items,rows.items,source.span(closure.body)); if error != blot_error::Error.none { return 0,error; } implementation_type = concrete; }
                 if g.representations.store.node(ty).tag == blot_backend_layout::Tag.universal { implementation_type = g.representations.store.node(implementation_type).a; }

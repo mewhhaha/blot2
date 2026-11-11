@@ -32,7 +32,7 @@ let tags = [Tag.invalid, Tag.unit, Tag.boolean, Tag.unsigned32, Tag.floating32, 
 fn tagCode(tag: Tag) -> u8 { for value, index in tags { if value == tag { return index as u8; } } abort("invalid layout tag"); }
 fn tagFromCode(code: u8) -> Tag, blot_error::Error { if code >= tags.len { return Tag.invalid, blot_error::Error.type_mismatch; } return tags[code], blot_error::Error.none; }
 struct Node { tag: Tag = Tag.invalid, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
-struct Mapping { variable: blot_check_types::Id, layout: Id, instance: blot_check_types::NominalIdentity }
+struct Mapping { variable: blot_check_types::Id, layout: Id, instance: blot_check_types::NominalIdentity = blot_check_types::NominalIdentity { unit: 0, decl: 0 } }
 struct MappingBuffer { storage: Mapping[:]=default<Mapping[:]>(),items: Mapping[:]=default<Mapping[:]>(),failure: blot_error::Error=blot_error::Error.none }
 reusable[] var pool_MappingBuffer: Mapping[>..]=[];
 fn push(self_:MappingBuffer&,value:Mapping) { if self_.failure==blot_error::Error.none {self_.failure=blot_support_pooled_buffer::push(self_,value,pool_MappingBuffer);} }

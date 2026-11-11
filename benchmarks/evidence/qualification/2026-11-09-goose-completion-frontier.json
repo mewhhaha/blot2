@@ -5249,5 +5249,30 @@
     "all_roots_327": "17 roots partial pass; observe fixed in 328; server exceeds the 120s cap under contention and alone (unqualified)",
     "whole_compiler_executable": false,
     "resolved_body_law": "assertion moved from entries.count to findSlot; emit stage exceeds the 30s cap with installed Goose (exit 124); unqualified, cap not lifted"
+  },
+  "compile_root_static_data_and_recursion": {
+    "receipt": "2026-11-11-goose-compile360.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 97.496,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/eval/specialization.goose",
+          "line": 460,
+          "message": "error: storing a reference that may point into a grow-shrink array, as mappings may: such a reference lives in a variable, is passed down or returned, and is never stored (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "72f4a1eed457ec45ce8c2aaa34c6afad9df08465776201646f59e5a7b477c548",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "diagnosis_checker": "build/goose-port/reach-trace-diagnostics (private, diagnosis only; finite-root-diagnostics source with env-selected global reach trace)",
+    "whole_compiler_executable": false
   }
 }

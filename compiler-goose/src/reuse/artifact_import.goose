@@ -564,7 +564,7 @@ fn matches<G>(self_: Importer&, g: G&, old: blot_reuse_code_artifacts::Request, 
                         var actual = current_closure.key; actual.static_values = 0;
                         let imported, error = self_.request(g, old, false);
                         if error == blot_error::Error.out_of_memory { return false, error; }
-                        if error != blot_error::Error.none || imported != (blot_reuse_code_artifacts::Request.closure { actual , ..}) { return false, blot_error::Error.none; }
+                        let expected: blot_reuse_code_artifacts::Request = blot_reuse_code_artifacts::Request.closure { actual , ..}; if error != blot_error::Error.none || imported != expected { return false, blot_error::Error.none; }
                         return self_.matchStaticKey(g, old_closure.key.static_values, current_closure.key.static_values);
                     }
                 }, _ => {},

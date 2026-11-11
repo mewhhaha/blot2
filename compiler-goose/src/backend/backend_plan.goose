@@ -111,7 +111,7 @@ fn deinit(state: State&) {
     state.array_proofs.each() { key,proof => proof.deinit(); } state.array_proofs.clear(); state.numeric_plans.each() { key,plan => plan.deinit(); } state.numeric_plans.clear(); state.facts.deinit(); state.discard_proofs.clear(); state.discard_flags.clear();
     state.quantified.each() { key,set => set.deinit(); } state.quantified.clear(); state.uses.each() { key,index => { assert(index); index.deinit(); blot_backend_unit_index::release(index); } } state.uses.clear(); state.task_movers.clear(); init(state);
 }
-fn runtimeGlobal(state: State&,generator: blot_backend_core_backend::Generator&,target: blot_check_core::BindingRef) -> u32,Error {
+recursive fn runtimeGlobal(state: State&,generator: blot_backend_core_backend::Generator&,target: blot_check_core::BindingRef) -> u32,Error {
     let scope,error = blot_backend_core_backend::enterScope(generator,blot_reuse_code_artifacts::Request.runtime_global { target , ..}); if error != blot_error::Error.none { return 0,error; }
 
 
