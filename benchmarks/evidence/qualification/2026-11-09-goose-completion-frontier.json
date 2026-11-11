@@ -5424,5 +5424,25 @@
       "goose_sha256": "490e1f8035416cc12bec3de212e4b7d728b05a233d8ff000ac1dfd1fd7f01f9b"
     },
     "whole_compiler_executable": false
+  },
+  "compile_root_pass": {
+    "receipt": "2026-11-11-goose-compile425-pass.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 0,
+      "seconds": 267.363,
+      "stop": "completed",
+      "errors": [],
+      "full_qualification": false,
+      "source_sha256": "7adfb77a543a12b31f6c717b6c3912f0948e034f770c06af3a28da1c99ce64f3",
+      "source_unchanged": true,
+      "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+      "goose_sha256": "490e1f8035416cc12bec3de212e4b7d728b05a233d8ff000ac1dfd1fd7f01f9b"
+    },
+    "note": "Partial check-only: the compile diagnostic root passes; not a whole compiler or runtime qualification. 267.4s of the 300s cap.",
+    "whole_compiler_executable": false
   }
 }

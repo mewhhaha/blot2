@@ -65,10 +65,13 @@ recursive fn release(body: u32) {
     // them enters retained artifacts, whose descriptors contain numeric IDs.
 }
 fn resetIndex() { for bucket in 0..node_buckets { node_heads[bucket] = 0; } }
+// Run teardown releases the plan headers and index but keeps the grow-only payload
+// pool: a returned Result outlives the run, and the next attempt's reset empties it.
 fn deinit() {
     for index in 0..headers.len { if headers[index].active { release((index + 1) as u32); } }
-    for bucket in 0..1024 { sink_heads[bucket] = 0; } sink_count = 0; headers.clear(); resetIndex(); slots=[]; payloads=[];
+    for bucket in 0..1024 { sink_heads[bucket] = 0; } sink_count = 0; headers.clear(); resetIndex(); slots=[];
 }
+fn reset() { deinit(); slots=[]; payloads=[]; }
 
 fn validBodyRead(body:u32,owner_id:u64)->bool {return body!=0 && body<=headers.len && headers[body-1].active && owner_id!=0 && headers[body-1].owner_id==owner_id;}
 fn readMappings(body:u32,owner_id:u64,offset:i64,length:i64)->const blot_backend_layout::Mapping[:] {assert(validBodyRead(body,owner_id));let source=headers[body-1].mappings;assert(offset>=0 && length>=0 && offset<=source.len && length<=source.len-offset);if length==0 {return default<const blot_backend_layout::Mapping[:]>();}let owned=owned_mappings.realloc_slice(source,source.len);assert(blot_support::same_slice_identity(owned,source));let start=owned_mappings.index_of(owned[0]);assert(start>=0 && source.len<=owned_mappings.len-start);return owned_mappings[start+offset..start+offset+length];}

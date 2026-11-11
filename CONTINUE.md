@@ -21,19 +21,19 @@ python3 compiler-goose/tools/seal_probe.py build/goose-port/<name> <date>-goose-
 The checker reports one error per run. These are partial, check-only probes and
 never qualify the full compiler.
 
-Status on 11 November 2026: 17 of the 20 diagnostic roots pass (run them all with
-`--engines <all>`, serially). The `server` root exceeds 14G on the current checker
-and fails at the compile frontier after 200s on the old one, so it stays unqualified. The `compile` root is the frontier;
-on the current checker it takes about 190s of its 300s cap. Receipts run from
+Status on 11 November 2026: the `compile` root passes on the current checker
+([compile 425](benchmarks/evidence/qualification/2026-11-11-goose-compile425-pass.json.gz),
+267.4s of its 300s cap). Receipts run from
 [backend 316](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz)
-to [compile 420](benchmarks/evidence/qualification/2026-11-11-goose-compile420.json.gz).
+to that pass. Before the last repairs 17 of the 20 diagnostic roots passed on the
+old checker; the `server` root exceeds 14G on the current checker, so it stays
+unqualified. Run roots serially with `--engines <all>`.
 
-**Next:** `backend/core_backend.goose:2294`: `run.deinit()` shrinks `payloads`
-while the returned `result` still holds a reference stored into it at line 2293
-(§5.1). The `root_borrows` and assembly-encoding errors before it are cleared
-([compile 420](benchmarks/evidence/qualification/2026-11-11-goose-compile420.json.gz)).
+**Next:** rerun all 20 roots on the current checker after these repairs, then the
+`server` root (memory), then the first whole build. The compile root is close to
+its cap; split it before it grows further.
 
-Repair patterns that cleared the 316–420 errors. Prefer them over one-off rewrites:
+Repair patterns that cleared the 316–425 errors. Prefer them over one-off rewrites:
 
 - **Shrinking indexes → fixed-bucket indexes.** Replace a dictionary or other
   grow-shrink index with a fixed bucket table chained through grow-only records
@@ -54,6 +54,9 @@ Repair patterns that cleared the 316–420 errors. Prefer them over one-off rewr
   Give the struct its storage instead: a `root struct` for several resizable
   fields (`root_borrows.Analysis`), or one final resizable field (`wasm.Wire`).
   Pass plain `T[>..<]&` arguments to helpers rather than wrapper structs.
+- **Results never read back through a local run.** Write snapshots that hold slices
+  straight into the `Result`, and copy only scalars out of `CompileRun`. Run
+  teardown keeps the grow-only plan payload pool; `resetGenerator` empties it.
 - **Callee resets → caller resets.** Callers reset views before they bind module
   references, and functions avoid reassigning whole structs that contain arrays.
 - **Recursion-cycle functions are declared `recursive fn`.** The checker accepts
@@ -69,6 +72,9 @@ Diagnosis aids:
   `GOOSE_DIAGNOSTIC_ROOTS=<namespace>::<fn> <goose> check <file> --stdlib …`.
   See [the example](compiler-goose/tools/narrow_root_example.goose). These only
   reproduce context-free errors, and the file must be removed before full probes.
+- **Return-root trace.** Adding a `GOOSE_RETURN_ROOT_TRACE=<name>` print to the
+  return check in `typecheck_calls.h` (build/goose-port/upstream-d5ae5bb/build-trace)
+  shows which function first returns contents rooted in a parameter.
 - **Reach-trace build.** `build/goose-port/reach-trace-diagnostics/goose` is a
   diagnosis-only rebuild of the pinned checker source. Running it with
   `GOOSE_GLOBAL_REACH_TRACE=1 GOOSE_GLOBAL_REACH_HOLDER=<global> GOOSE_GLOBAL_REACH_ARRAY=<array>`
