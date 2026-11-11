@@ -22,13 +22,13 @@ import reuse.dispatch_explanation;
 fn emit<T>(stream:blot_io::Writer,value:T)->Error {var bytes:u8[>..]=[];let error=blot_json::toBytes(value,bytes);if error!=blot_error::Error.none {return error;}bytes.push('\n');return blot_io::write_all(stream,bytes[..]);}
 struct BasicDiagnostic {kind:const u8[:]="diagnostic",filename:const u8[:],stage:const u8[:],code:const u8[:],start:u32,end:u32,message:const u8[:]}
 fn diagnostic(writer:blot_io::Writer,filename:const u8[:],stage:const u8[:],code:const u8[:],start:u32,end:u32,message:const u8[:])->Error {return emit(writer,BasicDiagnostic{filename:filename,stage:stage,code:code,start:start,end:end,message:message,..});}
-fn enumName<T>(value:T)->const u8[:] {const for <N,V> in variants<T> {if value==V {return N;}}abort("invalid diagnostic enumeration");}
+fn enumName<T>(value:T)->const u8[:] {match value {const for <N,V> in variants<T> {V variant=>{return N;},}}}
 fn frontendDiagnostic<T>(writer:blot_io::Writer,filename:const u8[:],stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,details:T)->Error {
  var issue,error=blot_reuse_dependency_consumer::publishedDiagnostic(0,stage,source,publication,details);if error!=blot_error::Error.none {return error;}var bytes:u8[>..]=[];let error=issue.write(bytes,filename);issue.deinit();if error!=blot_error::Error.none {return error;}return blot_io::write_all(writer,bytes[..]);
 }
 fn frontendOneDiagnostic<T>(writer:blot_io::Writer,filename:const u8[:],stage:const u8[:],source:const u8[:],publication:blot_parse_syntax_diagnostics::Publication,detail:T)->Error {let details:T[1]=[detail];return frontendDiagnostic(writer,filename,stage,source,publication,details[..]);}
 fn namedDiagnostic(writer:blot_io::Writer,filename:const u8[:],stage:const u8[:],code:const u8[:],span:blot_parse_ast::Span,message:const u8[:],pool:const blot_parse_symbols::Pool&,symbol:u32)->Error {
- if symbol==0 {return diagnostic(writer,filename,stage,code,span.start,span.end,message);}var full:u8[>..<]=[];full.append(message);if code=="unknown_intrinsic"||code=="unknown_record_field" {full.push(' ');}else {full.append(": ");}full.append(pool.get(symbol));return diagnostic(writer,filename,stage,code,span.start,span.end,full[..]);
+ if symbol==0 {return diagnostic(writer,filename,stage,code,span.start,span.end,message);}var full:u8[>..]=[];full.append(message);if code=="unknown_intrinsic"||code=="unknown_record_field" {full.push(' ');}else {full.append(": ");}full.append(pool.get(symbol));return diagnostic(writer,filename,stage,code,span.start,span.end,full[..]);
 }
 fn purityDiagnostic(writer:blot_io::Writer,filename:const u8[:],stage:const u8[:],source:const u8[:],code:const u8[:],span:blot_parse_ast::Span,pool:blot_parse_symbols::Pool&,module_name:const u8[:],witness:blot_check_check::PurityWitness)->Error {
  var message:u8[>..]=[];let error=blot_reuse_purity_diagnostics::format(pool,module_name,witness,message);if error!=blot_error::Error.none {return error;}return frontendOneDiagnostic(writer,filename,stage,source,blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:code,span:span,message:message[..],..},witness);
@@ -65,4 +65,11 @@ fn projectDiagnostics(writer:blot_io::Writer,filename:const u8[:],loaded:blot_re
  }return blot_error::Error.none;
 }
 
+fn blot_reuse_dependency_consumer::detailWrite(writer:blot_reuse_dependency_consumer::Writer&,value:blot_cli::HoleDetail)->blot_error::Error {return blot_reuse_dependency_consumer::detailRecord(writer,value);}
+fn blot_reuse_dependency_consumer::detailWrite(writer:blot_reuse_dependency_consumer::Writer&,value:blot_cli::ExplanationDetail)->blot_error::Error {return blot_reuse_dependency_consumer::detailRecord(writer,value);}
+fn blot_reuse_dependency_consumer::detailWrite(writer:blot_reuse_dependency_consumer::Writer&,value:blot_cli::ExplanationContexts)->blot_error::Error {return blot_reuse_dependency_consumer::detailRecord(writer,value);}
+fn blot_reuse_dependency_consumer::detailWrite(writer:blot_reuse_dependency_consumer::Writer&,value:blot_cli::ContextDetails)->blot_error::Error {return blot_reuse_dependency_consumer::detailRecord(writer,value);}
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_cli::HoleDetail)->bool {return true;}
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_cli::ExplanationDetail)->bool {return true;}
+fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_cli::ExplanationContexts)->bool {return true;}
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_cli::ContextDetails)->bool {return true;}
