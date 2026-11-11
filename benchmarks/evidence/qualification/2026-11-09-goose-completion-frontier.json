@@ -5,7 +5,8 @@
   "caps_seconds": {
     "stage": 120,
     "whole_build": 300,
-    "final_candidate_stage": 180
+    "final_candidate_stage": 180,
+    "stage_d5ae5bb_checker": 300
   },
   "builds": [
     {
@@ -5345,6 +5346,82 @@
       "source_sha256": "d7b5eeabc0b65f96b8756b16d3426734f92083774bcab5fd295a5ed8d2110b1d",
       "source_unchanged": true,
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "whole_compiler_executable": false
+  },
+  "upstream_d5ae5bb_checker": {
+    "receipt": "2026-11-11-goose-d5ae5bb-compile416.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 197.803,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/runtime_pipeline.goose",
+          "line": 85,
+          "message": "error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at /home/jacobt/src/blot2/compiler-goose/src/backend/runtime_pipeline.goose:81) is still used: it may refer into backing_origins_code_module_static_fields (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "658479a0f282d258ce02e0dc1636ba474138b02e1356d809893d172945026b3f",
+      "source_unchanged": true,
+      "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+      "goose_sha256": "490e1f8035416cc12bec3de212e4b7d728b05a233d8ff000ac1dfd1fd7f01f9b"
+    },
+    "note": "Same source as compile416 on upstream Goose d5ae5bb + tools/upstream-32a4f44/series 01-17; same first error. Repair cap becomes 300s for this checker.",
+    "whole_compiler_executable": false
+  },
+  "root_borrows_owned_scratch": {
+    "receipt": "2026-11-11-goose-compile418.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 180.568,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/wasm.goose",
+          "line": 1138,
+          "message": "error: cannot call encodeExportSection, which may shrink module while module (bound at /home/jacobt/src/blot2/compiler-goose/src/backend/wasm.goose:1134) is still used: it may refer into module (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "5c0b2045d304fe9f7de6b9ed6d2f0f249898d81e8976eb96ec49c4c8d5984fc7",
+      "source_unchanged": true,
+      "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+      "goose_sha256": "490e1f8035416cc12bec3de212e4b7d728b05a233d8ff000ac1dfd1fd7f01f9b"
+    },
+    "whole_compiler_executable": false
+  },
+  "wasm_owned_wire": {
+    "receipt": "2026-11-11-goose-compile420.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 187.948,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose",
+          "line": 2294,
+          "message": "error: cannot call deinit, which shrinks payloads while result is still used: a reference into it was stored there at /home/jacobt/src/blot2/compiler-goose/src/backend/core_backend.goose:2293 (\u00a75.1)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "452db3499d68c4198dbdd2fb17fb617b349b920075ebd5e6ce677786169540a8",
+      "source_unchanged": true,
+      "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+      "goose_sha256": "490e1f8035416cc12bec3de212e4b7d728b05a233d8ff000ac1dfd1fd7f01f9b"
     },
     "whole_compiler_executable": false
   }

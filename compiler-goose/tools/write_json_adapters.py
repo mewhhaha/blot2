@@ -92,7 +92,7 @@ for path in sorted(ROOT.rglob('*.goose')):
                 if variant:
                     variants[variant[1] or variant[2]] = variant[3].strip()
             native_unions[union[1]] = variants
-    for declaration in re.finditer(r'\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', text):
+    for declaration in re.finditer(r'(?<!root )\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', text):
         name, generic = declaration.groups()
         qualified = ns+'::'+name
         if generic:

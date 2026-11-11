@@ -24,17 +24,16 @@ never qualify the full compiler.
 Status on 11 November 2026: 17 of the 20 diagnostic roots pass (run them all with
 `--engines <all>`, serially). The `server` root exceeds 14G on the current checker
 and fails at the compile frontier after 200s on the old one, so it stays unqualified. The `compile` root is the frontier;
-on the current checker it takes 197.8s of its 300s cap. Receipts run from
+on the current checker it takes about 190s of its 300s cap. Receipts run from
 [backend 316](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz)
-to [compile 416](benchmarks/evidence/qualification/2026-11-11-goose-compile416.json.gz)
-and its [d5ae5bb rerun](benchmarks/evidence/qualification/2026-11-11-goose-d5ae5bb-compile416.json.gz).
+to [compile 420](benchmarks/evidence/qualification/2026-11-11-goose-compile420.json.gz).
 
-**Next:** `backend/runtime_pipeline.goose:85` reports that `root_borrows.run` shrinks
-`backing_origins_code_module_static_fields` while the pipeline `module` is live.
-No visible callee of `run` shrinks module storage. Find the summary's source before
-changing code, using `GOOSE_SHRINK_ORIGINS=*`, the reach-trace build or a narrow root (below).
+**Next:** `backend/core_backend.goose:2294`: `run.deinit()` shrinks `payloads`
+while the returned `result` still holds a reference stored into it at line 2293
+(§5.1). The `root_borrows` and assembly-encoding errors before it are cleared
+([compile 420](benchmarks/evidence/qualification/2026-11-11-goose-compile420.json.gz)).
 
-Repair patterns that cleared the 316–416 errors. Prefer them over one-off rewrites:
+Repair patterns that cleared the 316–420 errors. Prefer them over one-off rewrites:
 
 - **Shrinking indexes → fixed-bucket indexes.** Replace a dictionary or other
   grow-shrink index with a fixed bucket table chained through grow-only records
@@ -49,6 +48,12 @@ Repair patterns that cleared the 316–416 errors. Prefer them over one-off rewr
   `retained_enabled`, `Owner`'s `frame`, and builders that pass `context` beside
   them. Analyses tabulate the module facts they need per body instead of holding
   the module.
+- **References stored in struct fields → owned fields.** The checker loses which
+  array a `T[>..<]&` field refers to and falls back to every same-typed array
+  the caller can reach, so a scratch `clear()` becomes "may shrink module".
+  Give the struct its storage instead: a `root struct` for several resizable
+  fields (`root_borrows.Analysis`), or one final resizable field (`wasm.Wire`).
+  Pass plain `T[>..<]&` arguments to helpers rather than wrapper structs.
 - **Callee resets → caller resets.** Callers reset views before they bind module
   references, and functions avoid reassigning whole structs that contain arrays.
 - **Recursion-cycle functions are declared `recursive fn`.** The checker accepts

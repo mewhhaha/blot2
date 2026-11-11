@@ -1,17 +1,13 @@
-// Wire encoding used by wasm. All mutable bytes belong to the caller.
+// Wire encoding used by wasm. Every function appends to the caller's byte array.
 namespace blot_backend_byte_encoder;
 import std;
 import .runtime_ir;
 import .wasm_simd_ops;
 import support.error;
 
-struct Bytes { buffer: u8[>..<]& }
-fn init(buffer: u8[>..<]&) -> Bytes { Bytes { buffer: buffer } }
-fn items(bytes: Bytes&) -> const u8[:] { bytes.buffer[..] }
-fn clear(bytes: Bytes&) { bytes.buffer.clear(); }
-fn byte(bytes: Bytes&, value: u8) { bytes.buffer.push(value); }
-fn raw(bytes: Bytes&, value: const u8[:]) { bytes.buffer.append(value); }
-fn uleb(bytes: Bytes&, value: u32) {
+fn byte(bytes: u8[>..<]&, value: u8) { bytes.push(value); }
+fn raw(bytes: u8[>..<]&, value: const u8[:]) { bytes.append(value); }
+fn uleb(bytes: u8[>..<]&, value: u32) {
     var remaining = value;
     loop {
         var low = (remaining & 127) as u8; remaining >>= 7;
@@ -19,7 +15,7 @@ fn uleb(bytes: Bytes&, value: u32) {
         byte(bytes, low); if remaining == 0 { return; }
     }
 }
-fn sleb(bytes: Bytes&, value: i32) {
+fn sleb(bytes: u8[>..<]&, value: i32) {
     var remaining = value;
     loop {
         var low = ((remaining as! u32) & 127) as u8; remaining >>= 7;
@@ -28,16 +24,16 @@ fn sleb(bytes: Bytes&, value: i32) {
         byte(bytes, low); if done { return; }
     }
 }
-fn name(bytes: Bytes&, value: const u8[:]) -> blot_error::Error {
+fn name(bytes: u8[>..<]&, value: const u8[:]) -> blot_error::Error {
     if value.len > 4294967295 { return blot_error::Error.module_too_large; }
     uleb(bytes, value.len as u32); raw(bytes, value); return blot_error::Error.none;
 }
-fn section(bytes: Bytes&, id: u8, payload: const u8[:]) -> blot_error::Error {
+fn section(bytes: u8[>..<]&, id: u8, payload: const u8[:]) -> blot_error::Error {
     byte(bytes, id);
     if payload.len > 4294967295 { return blot_error::Error.module_too_large; }
     uleb(bytes, payload.len as u32); raw(bytes, payload); return blot_error::Error.none;
 }
-fn word(bytes: Bytes&, value: u32) {
+fn word(bytes: u8[>..<]&, value: u32) {
     for index in 0..4 { byte(bytes, (value >> (index * 8)) as! u8); }
 }
 
@@ -118,7 +114,7 @@ fn scalarCode(op: blot_backend_runtime_ir::Op) -> u8, bool {
     if op == blot_backend_runtime_ir::OP_i32_trunc_sat_f32_u { return 0xfc, true; }
     return 0, false;
 }
-fn encodeInstruction(bytes: Bytes&, inst: blot_backend_runtime_ir::Instruction, functions: i64, table_slots: i64, globals: i64, signatures: i64, imports: u32) -> blot_error::Error {
+fn encodeInstruction(bytes: u8[>..<]&, inst: blot_backend_runtime_ir::Instruction, functions: i64, table_slots: i64, globals: i64, signatures: i64, imports: u32) -> blot_error::Error {
     if inst.table_reference && (inst.op != blot_backend_runtime_ir::OP_i32_const || inst.operand >= table_slots) { return blot_error::Error.invalid_function_reference; }
     if inst.op == blot_backend_runtime_ir::OP_ownership { return blot_error::Error.none; }
     let simd_, is_simd = blot_backend_wasm_simd_ops::code(inst.op);
@@ -171,7 +167,7 @@ fn encodeInstruction(bytes: Bytes&, inst: blot_backend_runtime_ir::Instruction, 
     else if op == blot_backend_runtime_ir::OP_host_ref_null { byte(bytes, 0x6f); }
     return blot_error::Error.none;
 }
-fn encodeLocals(bytes: Bytes&, locals: const blot_backend_runtime_ir::ValueType[:], observed: u32 = 0) {
+fn encodeLocals(bytes: u8[>..<]&, locals: const blot_backend_runtime_ir::ValueType[:], observed: u32 = 0) {
     var groups: u32 = 0; var previous: blot_backend_runtime_ir::ValueType = 0;
     for local in locals { if previous != local { groups++; } previous = local; }
     if observed != 0 { groups++; }

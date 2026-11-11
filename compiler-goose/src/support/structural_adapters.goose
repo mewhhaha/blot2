@@ -679,8 +679,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_timing::
 fn blot_backend_backend_timing::blotStructuralHash<StructuralSink>(value:blot_backend_backend_timing::Work,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_backend_timing::WorkStats)->bool {return equalFields(left,right);}
 fn blot_backend_backend_timing::blotStructuralHash<StructuralSink>(value:blot_backend_backend_timing::WorkStats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_byte_encoder::Bytes)->bool {return equalFields(left,right);}
-fn blot_backend_byte_encoder::blotStructuralHash<StructuralSink>(value:blot_backend_byte_encoder::Bytes,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_callable_origins::Construction)->bool {return equalFields(left,right);}
 fn blot_backend_callable_origins::blotStructuralHash<StructuralSink>(value:blot_backend_callable_origins::Construction,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_cohort_candidate::Code)->bool {return equalFields(left,right);}
@@ -1207,8 +1205,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_result_publicati
 fn blot_backend_result_publication::blotStructuralHash<StructuralSink>(value:blot_backend_result_publication::Pins,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_result_publication::State)->bool {return equalFields(left,right);}
 fn blot_backend_result_publication::blotStructuralHash<StructuralSink>(value:blot_backend_result_publication::State,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_root_borrows::Analysis)->bool {return equalFields(left,right);}
-fn blot_backend_root_borrows::blotStructuralHash<StructuralSink>(value:blot_backend_root_borrows::Analysis,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_root_borrows::Copy)->bool {return equalFields(left,right);}
 fn blot_backend_root_borrows::blotStructuralHash<StructuralSink>(value:blot_backend_root_borrows::Copy,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_root_lowering::Forward)->bool {return equalFields(left,right);}

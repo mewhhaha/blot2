@@ -60,7 +60,7 @@ for path in sorted(ROOT.rglob('*.goose')):
         continue
     ns = namespace[1]
     module = path.relative_to(ROOT).with_suffix('').as_posix().replace('/', '.')
-    for declaration in re.finditer(r'\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', source):
+    for declaration in re.finditer(r'(?<!root )\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', source):
         name, generic = declaration.groups()
         qualified = ns + '::' + name
         if generic:
