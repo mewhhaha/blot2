@@ -912,8 +912,8 @@
   },
   "goose-to-wasm selfhost": {
    "path": "../goose-to-wasm/build/bin/goose",
-   "sha256": "9a0450a452f6dcc0c6ad698fdeb9af6be599c7e8ffdb2437364a6f360145489d",
-   "snapshot": 58
+   "sha256": "9de72d781519906a3d88a7afc96a7a3d66f0c3408e650d976a2cc783156f3ebb",
+   "note": "installed 10:12:24 by a concurrent goose-to-wasm session (snapshot 59 work, committed 70546b1); replaced snapshot 58 (9a0450a4...) two minutes before this run"
   }
  },
  "recipe": {
@@ -1057,7 +1057,7 @@
   ]
  },
  "selfhost": {
-  "binary": "../goose-to-wasm/build/bin/goose (snapshot 58, Goose-in-Goose)",
+  "binary": "../goose-to-wasm/build/bin/goose sha256 9de72d78... (Goose-in-Goose, snapshot 59 build); import resolver unchanged at goose-to-wasm 70546b1",
   "result": "Cannot load compiler-goose: resolves a non-relative import against the importing file directory, then the stdlib, with lexical path normalization only. compiler-goose uses root-relative imports, so it stops after 897 \"cannot resolve import\" errors in 0.057s (96 MiB) before any type or borrow checking. No GOOSE_DIAGNOSTIC_ROOTS equivalent (no getenv in selfhost/).",
   "patch_correspondence": "Independent 2.4k-line lifetime model; no shared code with the C++ checker or our patches. Its only checker speed commit, db76f45, hash-indexes its containment memo (life_contains), conceptually like our containment CanContain/ReachesThroughRefs caches and the holder/traversal bucket indexes; none of our C++ patches applies to it."
  },
