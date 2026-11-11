@@ -189,21 +189,25 @@ fn retainJournal(state:CaptureState&,owner:InputOwner,index:i64&)->Error {
  if owner.lease==0 {return blot_error::Error.none;}let held,error=owner.retain();if error!=blot_error::Error.none {return error;}state.journals[index]=held;index++;return blot_error::Error.none;
 }
 fn takeCapture(frame:Frame&,result:Result&,units:const Core[:],catalog:InputOwner,unit_owners:const InputOwner[:],seed_owners:const InputOwner[:])->CaptureLease,Error {
- if !frame.valid() {return CaptureLease{..},blot_error::Error.invalid_artifact;}let source:FrameState& =frames[frame.slot-1];if result.capture==null {return CaptureLease{..},blot_error::Error.none;}
- if source.workspace==null||source.capture==null||source.capture_token==0||!(result.capture .== source.capture)||!result.publication_pinned||!result.capture.metadata().pools.present||unit_owners.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
- if !blot_backend_result_publication::resultValid(result.publication_owner,result.publication_epoch,true)||result.publication_owner!=source.workspace.publication_owner||result.publication_units.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
- for module,index in units {let held=result.publication_units[index];if module.owner_id!=held.owner_id||module.unit!=held.unit||!(module.nodes .== held.nodes) {return CaptureLease{..},blot_error::Error.invalid_artifact;}}
+ if !frame.valid() {return CaptureLease{..},blot_error::Error.invalid_artifact;}let source:FrameState& =frames[frame.slot-1];let captured .=result.capture;if !captured {return CaptureLease{..},blot_error::Error.none;}
+ let source_workspace .=source.workspace;if !source_workspace {return CaptureLease{..},blot_error::Error.invalid_artifact;}
+ if source.capture==null||source.capture_token==0||!(captured .== source.capture)||!result.publication_pinned||!captured.metadata().pools.present||unit_owners.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
+ if !blot_backend_result_publication::resultValid(result.publication_owner,result.publication_epoch,true)||result.publication_owner!=source_workspace.publication_owner||result.publication_units.len!=units.len {return CaptureLease{..},blot_error::Error.invalid_artifact;}
+ for module,index in units {let held=result.publication_units[index];if module.owner_id!=held.owner_id||module.unit!=held.unit||!blot_support::same_slice_identity(module.nodes,held.nodes) {return CaptureLease{..},blot_error::Error.invalid_artifact;}}
  if retained_captures.len>=0xffffffff||retained_optimized.len>=0xffffffff {return CaptureLease{..},blot_error::Error.out_of_memory;}
  var count:i64=0;if catalog.lease!=0 {count++;}for owner in unit_owners {if owner.lease!=0 {count++;}}for owner in seed_owners {if owner.lease!=0 {count++;}}
  let generation=blot_native::fresh_owner_id();let at=retained_captures.alloc_index(CaptureState{live:true,generation:generation,factory:source.factory,..});let state:CaptureState& =retained_captures[at];var lease=CaptureLease{(at+1) as u32,generation};
  state.journals=retained_journals.alloc_slice(count);for &owner in state.journals {owner=InputOwner{..};}var next:i64=0;
  let copied=retainCaptureInputs(state,catalog,unit_owners,seed_owners,next);if copied!=blot_error::Error.none {lease.deinit();return CaptureLease{..},copied;}assert(next==count);
- state.units=retained_units.alloc_slice(units.len);for module,index in units {state.units[index]=module;}
- let rebound=blot_reuse_code_artifacts::rebindModuleHeaders(result.capture.metadata().pools.value,state.units);if rebound!=blot_error::Error.none {lease.deinit();return CaptureLease{..},rebound;}
+ // The units are the staged dependency headers: reborrow them through their pool,
+ // as stageInputs does, and copy into an exact retained run.
+ let source_units=blot_reuse_dependency_payload::pool_header_module.realloc_slice(units,units.len);assert(blot_support::same_slice_identity(source_units,units));
+ let owned_units=retained_units.alloc_slice(source_units.len);for module,index in source_units {owned_units[index]=module;}state.units=owned_units;
+ let rebound=blot_reuse_code_artifacts::rebindModuleHeaders(captured.metadata().pools.value,state.units);if rebound!=blot_error::Error.none {lease.deinit();return CaptureLease{..},rebound;}
  // Everything fallible precedes the move. Optimizer payloads and their header
  // move together; no retained capture points back into active compiler backing.
- if result.capture.optimized {
-  assert(result.capture.optimized .== activeOptimized());let header=retained_optimized.alloc_index(activeOptimized());state.optimized_header=(header+1) as u32;result.capture.optimized .= retained_optimized[header];resetOptimized();
+ if captured.optimized {
+  assert(captured.optimized .== activeOptimized());let header=retained_optimized.alloc_index(activeOptimized());state.optimized_header=(header+1) as u32;captured.optimized .= retained_optimized[header];resetOptimized();
  }
  state.token=source.capture_token;state.capture .= source.capture;source.capture_token=0;source.capture .= null;result.capture .= null;return lease,blot_error::Error.none;
 }

@@ -8,7 +8,7 @@ import support.native;
 type Error = blot_error::Error;
 type InputOwner = blot_reuse_dependency_payload::Owner;
 struct Owner { slot: u32 = 0,generation: u64 = 0 }
-struct Pins { journals: InputOwner[:] = default<InputOwner[:]>(),units: blot_check_core::Module[:] = default<blot_check_core::Module[:]>(),headers: blot_check_core::Module[:] = default<blot_check_core::Module[:]>() }
+struct Pins { journals: InputOwner[:] = default<InputOwner[:]>(),units: blot_check_core::Module[:] = default<blot_check_core::Module[:]>() }
 struct State { generation: u64,driver_owner: u64,allocation_owner: u64,live: bool = true,epoch: u64 = 0,compiling: bool = false,result_live: bool = false,published: bool = false,leased: bool = false,inputs_staged: bool = false,pins: Pins }
 reusable var states: State[>..] = [];
 reusable[] var journal_runs: InputOwner[>..] = [];
@@ -26,7 +26,7 @@ fn beginCompile(owner: Owner) -> u64,Error {
 }
 fn finishCompile(owner: Owner,epoch: u64) { if owner.slot == 0 { assert(epoch == 0); return; } assert(valid(owner)); let state: State& = states[owner.slot - 1]; assert(state.compiling && state.epoch == epoch && !state.result_live && !state.leased); state.compiling = false; state.result_live = true; }
 fn resultValid(owner: Owner,epoch: u64,pinned: bool) -> bool { if owner.slot == 0 { return epoch == 0 && !pinned; } if !valid(owner) { return false; } let state = states[owner.slot - 1]; return !state.compiling && state.result_live && state.epoch == epoch && state.leased == pinned; }
-fn deinit(pins: Pins&) { for &owner in pins.journals { owner.release(); } if pins.journals.len != 0 { journal_runs.free_slice(pins.journals); } if pins.units.len != 0 { module_runs.free_slice(pins.units); } if pins.headers.len != 0 { module_runs.free_slice(pins.headers); } pins = Pins {..}; }
+fn deinit(pins: Pins&) { for &owner in pins.journals { owner.release(); } if pins.journals.len != 0 { journal_runs.free_slice(pins.journals); } if pins.units.len != 0 { module_runs.free_slice(pins.units); } pins = Pins {..}; }
 fn inputsMatch(pins: Pins,catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:]) -> bool {
     var at: i64 = 0;
     if catalog.lease != 0 { if at >= pins.journals.len || pins.journals[at] != catalog { return false; } at++; }
@@ -64,15 +64,15 @@ fn registeredInputUnits(owner:Owner)->const blot_check_core::Module[:],Error {
 fn inputUnits(owner: Owner,source: const blot_check_core::Module[:]) -> const blot_check_core::Module[:],Error {
     let held,error=registeredInputUnits(owner);if error!=blot_error::Error.none || !sameUnits(held,source) {return default<const blot_check_core::Module[:]>(),blot_error::Error.invalid_artifact;}return held,blot_error::Error.none;
 }
-fn prepare(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:],module_pins: const blot_reuse_code_artifacts::ModulePin[:]) -> Pins,Error {
-    if !valid(owner) || !resultValid(owner,epoch,false) { return Pins {..},blot_error::Error.invalid_artifact; } let state = states[owner.slot - 1];
-    if !state.inputs_staged || state.published || unit_owners.len != units.len || !sameUnits(state.pins.units,units) || !inputsMatch(state.pins,catalog,unit_owners,seed_owners) { return Pins {..},blot_error::Error.invalid_artifact; }
-    var pins = Pins {..}; pins.headers = module_runs.alloc_slice(module_pins.len);
-    let source = blot_reuse_code_artifacts::owned_pins.realloc_slice(module_pins,module_pins.len);
-    for pin,index in source { pins.headers[index] = pin.module; } return pins,blot_error::Error.none;
+// Validates a result's pins against its staged inputs. Capture module pins are
+// made one per registered unit and rebind to those registered units directly.
+fn checkPins(owner: Owner,epoch: u64,units: const blot_check_core::Module[:],catalog: InputOwner,unit_owners: const InputOwner[:],seed_owners: const InputOwner[:],module_pins: const blot_reuse_code_artifacts::ModulePin[:]) -> Error {
+    if !valid(owner) || !resultValid(owner,epoch,false) { return blot_error::Error.invalid_artifact; } let state = states[owner.slot - 1];
+    if !state.inputs_staged || state.published || unit_owners.len != units.len || !sameUnits(state.pins.units,units) || !inputsMatch(state.pins,catalog,unit_owners,seed_owners) { return blot_error::Error.invalid_artifact; }
+    if module_pins.len != 0 && module_pins.len != state.pins.units.len { return blot_error::Error.invalid_artifact; } return blot_error::Error.none;
 }
-fn commit(owner: Owner,epoch: u64,pins: Pins&) {
-    assert(valid(owner) && resultValid(owner,epoch,false)); let state: State& = states[owner.slot - 1]; assert(state.inputs_staged && !state.published && state.pins.headers.len == 0 && pins.journals.len == 0 && pins.units.len == 0); state.pins.headers = module_runs.realloc_slice(pins.headers,pins.headers.len); pins.headers = default<blot_check_core::Module[:]>(); state.published = true; state.leased = true;
+fn commit(owner: Owner,epoch: u64) {
+    assert(valid(owner) && resultValid(owner,epoch,false)); let state: State& = states[owner.slot - 1]; assert(state.inputs_staged && !state.published); state.published = true; state.leased = true;
 }
 fn units(owner: Owner,epoch: u64) -> const blot_check_core::Module[:] { assert(resultValid(owner,epoch,true));let held,error=registeredInputUnits(owner);assert(error==blot_error::Error.none);return held; }
 fn releaseResult(owner: Owner,epoch: u64,pinned: bool) {
