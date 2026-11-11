@@ -682,7 +682,7 @@ recursive fn namedAlias(generator: Generator&, key: Key, body: const blot_check_
             }
         }
     }
-    var global = blot_support::none<u32>(); if body.runtime { let value, error = generator.planning.runtimeGlobal(generator, key.target); if error != blot_error::Error.none { return 0, error; } global = blot_support::some(value); }
+    var global = blot_support::none<u32>(); if body.runtime { let value, error = blot_backend_backend_plan::runtimeGlobal(generator, key.target); if error != blot_error::Error.none { return 0, error; } global = blot_support::some(value); }
     var constant_value = default<Value>();
     if !global.present { let value, error = constant(generator, key.target, full); if error != blot_error::Error.none { return 0, error; } constant_value = value; }
     let callee, local_error = generator.module.addLocal(function_id, blot_backend_runtime_ir::VT_i32); if local_error != blot_error::Error.none { return 0, local_error; }
@@ -1024,7 +1024,7 @@ recursive fn callableAlias(generator: Generator&, key: blot_reuse_code_artifacts
     let described = setParameterRoles(generator, function_id, closureRoles(generator, arrow.a), blot_support::some(2 as u16)); if described != blot_error::Error.none { return 0, described; }
     let layout = callableLayout(generator, function_id, key.ty); if layout != blot_error::Error.none { return 0, layout; } generator.planning.callables.insert(key, function_id);
     if scope.present { let reserved = scope.value.reserve(function_id); if reserved != blot_error::Error.none { return 0, reserved; } }
-    var global = blot_support::none<u32>(); if body.runtime { let value, error = generator.planning.runtimeGlobal(generator, key.target); if error != blot_error::Error.none { return 0, error; } global = blot_support::some(value); }
+    var global = blot_support::none<u32>(); if body.runtime { let value, error = blot_backend_backend_plan::runtimeGlobal(generator, key.target); if error != blot_error::Error.none { return 0, error; } global = blot_support::some(value); }
     var constant_value = blot_support::none<Value>(); if !global.present { let value, error = constant(generator, key.target, key.ty); if error != blot_error::Error.none { return 0, error; } constant_value = blot_support::some(value); }
     if constant_value.present {
         let value = constant_value.value;
@@ -1746,7 +1746,7 @@ recursive fn generate(generator: Generator&,entry: u32,unit_order: const u32[:])
         } else if body.runtime {
             let concrete,layout_error = typeLayout(generator,entry,body.scheme.root,[],body.span); if layout_error != blot_error::Error.none { return layout_error; }
             let scalar = generator.representations.store.abi(concrete); if !scalar.present || scalar.value == blot_backend_runtime_ir::SC_array_u32 || scalar.value == blot_backend_runtime_ir::SC_array_f32 { return decline(generator,entry,body.span,blot_check_diagnostic_code::Code.entry_type); }
-            let global,error = generator.planning.runtimeGlobal(generator,target); if error != blot_error::Error.none { return error; } let exported = generator.module.exportGlobal(global,source.name(body.export_name)); if exported != blot_error::Error.none { return exported; }
+            let global,error = blot_backend_backend_plan::runtimeGlobal(generator,target); if error != blot_error::Error.none { return error; } let exported = generator.module.exportGlobal(global,source.name(body.export_name)); if exported != blot_error::Error.none { return exported; }
         } else {
             let evaluated,error = generator.evaluator.richValue(target); if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { return error; } return evaluationFailure(generator); }
             let value = generator.evaluator.valueScalar(evaluated); if !value.present { return decline(generator,entry,body.span,blot_check_diagnostic_code::Code.entry_type); }
@@ -2076,7 +2076,7 @@ fn emit(run: CompileRun&) -> EmissionResult,blot_error::Error {
             }
         }
         if run.options.observe_startup { let snapshot,error = generator.planning.startup_facts.capture(generator.module); if error != blot_error::Error.none { result.deinit(); return EmissionResult.complete,error; } workspace.startup_snapshot = snapshot; result.startup_observation .= workspace.startup_snapshot; }
-        result.counters = generator.evaluator.counters; result.principal = principalStats(generator); result.code_instances = generator.planning.codeCount(generator.static_data.closures.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = generator.module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return EmissionResult.diagnostic { result , ..},blot_error::Error.none;
+        result.counters = generator.evaluator.counters; result.principal = principalStats(generator); result.code_instances = generator.planning.codeCount(generator.static_data.closures.items.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = generator.module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return EmissionResult.diagnostic { result , ..},blot_error::Error.none;
     }
     if generator.evaluator.constant_receipt_retry { return EmissionResult.complete,blot_error::Error.constant_receipt_retry; } run.timing.generate_us = run.clock.lap();
     if run.options.policy.memory_profile { let arena,error = generator.module.ensureArena(); if error != blot_error::Error.none { return EmissionResult.complete,error; } }
@@ -2099,25 +2099,29 @@ struct CandidatePreparation { run: CompileRun&,source: const blot_backend_wasm::
 fn prepareCandidate(context: CandidatePreparation&,model: blot_backend_activation_model::Model) -> blot_error::Error {
     let workspace .=runWorkspace(context.run);let present,error=blot_backend_region_candidate::prepareInto(workspace.candidate,context.source,model);if error!=blot_error::Error.none {return error;}if present {context.run.candidate_enabled = true;}return blot_error::Error.none;
 }
+// The assembled module follows the run's enable flags; no reference to it is
+// held across calls that may reset workspace views.
+fn sourceModule(run: const CompileRun&) -> const blot_backend_wasm::Module& { let workspace .= runWorkspace(run); if run.origins_enabled { return workspace.origins.code.module; } return workspace.generator.module; }
+fn assembledModule(run: const CompileRun&) -> const blot_backend_wasm::Module& { let workspace .= runWorkspace(run); if run.vectors_enabled { return workspace.vectors.module; } if run.candidate_enabled { return workspace.candidate.view.module; } return sourceModule(run); }
 fn assemble(run: CompileRun&) -> Result,blot_error::Error {
-    let workspace .= runWorkspace(run); let generator .= workspace.generator; var source_module: const blot_backend_wasm::Module& .= generator.module;
+    let workspace .= runWorkspace(run); if run.options.policy.memory_profile { workspace.origins.deinit(); } blot_backend_region_candidate::deinit(workspace.candidate); blot_backend_cohort_candidate::deinit(workspace.vectors); let generator .= workspace.generator;
     if run.options.policy.memory_profile {
-        let error = blot_backend_source_origins::initInto(workspace.origins,source_module,runUnits(run),runIdentity(run),run.options.diagnostic_source_digests,generator.diagnostic_contexts.records); if error != blot_error::Error.none { return emptyResult(workspace),error; }
-        run.origins_enabled = true; source_module .= workspace.origins.code.module;
+        let error = blot_backend_source_origins::initInto(workspace.origins,generator.module,runUnits(run),runIdentity(run),run.options.diagnostic_source_digests,generator.diagnostic_contexts.records); if error != blot_error::Error.none { return emptyResult(workspace),error; }
+        run.origins_enabled = true;
     }
-    if blot_backend_cohort_candidate::possible(source_module) {
-        var context = CandidatePreparation { run,source_module , ..}; let error = blot_backend_activation_model::withBorrowed(generator,runIdentity(run),context,prepareCandidate); if error != blot_error::Error.none { return emptyResult(workspace),error; }
+    if blot_backend_cohort_candidate::possible(sourceModule(run)) {
+        var context = CandidatePreparation { run,sourceModule(run) , ..}; let error = blot_backend_activation_model::withBorrowed(generator,runIdentity(run),context,prepareCandidate); if error != blot_error::Error.none { return emptyResult(workspace),error; }
     }
-    var assembled_module: const blot_backend_wasm::Module& .= source_module; let candidate .=runCandidate(run.frame,run.candidate_enabled);if candidate {assert(candidate .==workspace.candidate);assembled_module .=workspace.candidate.view.module;}
+    let candidate .=runCandidate(run.frame,run.candidate_enabled);if candidate {assert(candidate .==workspace.candidate);}
     if run.options.policy.codegen_tier == blot_compilation_tier::Tier.optimized {
-        let present,error = blot_backend_simd_abi::prepareInto(workspace.vectors,assembled_module); if error != blot_error::Error.none { return emptyResult(workspace),error; } if present { run.vectors_enabled = true; assembled_module .= workspace.vectors.module; }
+        let present,error = blot_backend_simd_abi::prepareInto(workspace.vectors,assembledModule(run)); if error != blot_error::Error.none { return emptyResult(workspace),error; } if present { run.vectors_enabled = true; }
     }
     if run.options.retain_artifacts { let error = blot_backend_optimized_bodies::initInto(workspace.optimized); if error != blot_error::Error.none { return emptyResult(workspace),error; } run.optimized_enabled = true; }
     var optimized_previous: const blot_backend_optimized_bodies::Capture&? = null; let previous .= blot_reuse_artifact_capture::captureRefFromKey(run.options.previous); if previous { let optimized .= previous.optimized; if optimized { optimized_previous .= optimized; } }
     if optimized_previous == null { let checkpoint_key=run.options.checkpoint; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); optimized_previous .= checkpoint.optimizer.value; } }
     var runtime_optimization = blot_backend_optimized_bodies::Stats {..}; var rejection = blot_backend_wasm::OwnershipFailure {..}; var collector_rejection = blot_backend_collector_contract::Certificate {..};
     var memory_profile = blot_support::none<const blot_backend_source_origins::Site[:]>(); let origins .= runOrigins(run.frame,run.origins_enabled); if origins { memory_profile = blot_support::some<const blot_backend_source_origins::Site[:]>(origins.sites); }
-    workspace.bytes.clear(); let emitted = assembled_module.assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { require_collector_free: run.options.policy.require_collector_free, collector_rejection: collector_rejection, memory_profile: memory_profile, compiler_identity: run.options.compiler_identity, source_digests: run.options.diagnostic_source_digests, source_names: runIdentity(run), rejection: rejection, io: run.options.io, workers: run.options.policy.codegen_workers, profile: run.options.profile_backend, tier: run.options.policy.codegen_tier, share_machine_code: run.options.policy.share_machine_code, previous: optimized_previous, current: runOptimized(run.frame,run.optimized_enabled), stats: runtime_optimization, ..},workspace.bytes);
+    workspace.bytes.clear(); let emitted = assembledModule(run).assembleCheckedWithOptions(blot_backend_wasm::AssembleOptions { require_collector_free: run.options.policy.require_collector_free, collector_rejection: collector_rejection, memory_profile: memory_profile, compiler_identity: run.options.compiler_identity, source_digests: run.options.diagnostic_source_digests, source_names: runIdentity(run), rejection: rejection, io: run.options.io, workers: run.options.policy.codegen_workers, profile: run.options.profile_backend, tier: run.options.policy.codegen_tier, share_machine_code: run.options.policy.share_machine_code, previous: optimized_previous, current: runOptimized(run.frame,run.optimized_enabled), stats: runtime_optimization, ..},workspace.bytes);
     if emitted != blot_error::Error.none {
         if emitted == blot_error::Error.collector_free_unproven {
             var result = emptyResult(workspace); workspace.message.append("Collector-free proof declined: "); workspace.message.append(blot_backend_collector_contract::reasonName(collector_rejection.reason)); workspace.message.append("; function ");
@@ -2125,7 +2129,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
             if collector_rejection.instruction.present { format(workspace.message,collector_rejection.instruction.value); } else { workspace.message.append("null"); }
             workspace.message.append(". Ordinary builds retain collection. The current certificate requires scalar host inputs, direct calls and heap allocations with no owning fields.");
             var location = Diagnostic { unit: run.entry,span: blot_check_core::Span { 0,0 , ..},code: blot_check_diagnostic_code::Code.collector_free_unproved , ..};
-            if collector_rejection.function.present { for site in assembled_module.semantic_sites { if site.function != collector_rejection.function.value || site.unit == 0 || site.unit > runUnits(run).len { continue; } location.unit = site.unit; location.span = runUnits(run)[site.unit - 1].span(site.root); break; } }
+            if collector_rejection.function.present { for site in assembledModule(run).semantic_sites { if site.function != collector_rejection.function.value || site.unit == 0 || site.unit > runUnits(run).len { continue; } location.unit = site.unit; location.span = runUnits(run)[site.unit - 1].span(site.root); break; } }
             let copied=publishResultDiagnostic(result,location,workspace.message[..]);if copied!=blot_error::Error.none {result.deinit();return Result{..},copied;}return result,blot_error::Error.none;
         }
         if emitted == blot_error::Error.incomplete_ownership {
@@ -2141,7 +2145,7 @@ fn assemble(run: CompileRun&) -> Result,blot_error::Error {
         }
         if emitted == blot_error::Error.out_of_memory || emitted == blot_error::Error.module_too_large || emitted == blot_error::Error.invalid_global_reference { return emptyResult(workspace),emitted; } return emptyResult(workspace),blot_error::Error.invalid_function_reference;
     }
-    workspace.message.clear(); var result,result_error = ownedResult(workspace.bytes[..],blot_support::none<blot_backend_allocation_emission::Snapshot>()); if result_error != blot_error::Error.none { return result,result_error; } result.detached = false; result.runtime_optimization = runtime_optimization; result.code_instances = generator.planning.codeCount(generator.static_data.closures.items.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = assembled_module.functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return result,blot_error::Error.none;
+    workspace.message.clear(); var result,result_error = ownedResult(workspace.bytes[..],blot_support::none<blot_backend_allocation_emission::Snapshot>()); if result_error != blot_error::Error.none { return result,result_error; } result.detached = false; result.runtime_optimization = runtime_optimization; result.code_instances = generator.planning.codeCount(generator.static_data.closures.items.len); result.callable_wrappers = generator.planning.wrapperCount(); result.emitted_functions = assembledModule(run).functions.len; result.constant_steps = generator.evaluator.steps; result.constant_receipts = generator.evaluator.constant_stats; return result,blot_error::Error.none;
 }
 fn addFields<T>(destination: T&,source: T) { const for <N,A> in fields<T> { destination.A += source.A; } }
 fn observe(run: CompileRun&,result: Result&) -> blot_error::Error {
@@ -2224,7 +2228,7 @@ fn replayArtifact(run: CompileRun&,result: Result&) -> blot_error::Error {
 
 
     module_alive=true;
-    var source: const blot_backend_wasm::Module& .= workspace.replay_module;
+    if run.options.policy.memory_profile { workspace.replay_origins.deinit(); } blot_backend_region_candidate::deinit(workspace.replay_candidate); blot_backend_cohort_candidate::deinit(workspace.replay_vectors); var source: const blot_backend_wasm::Module& .= workspace.replay_module;
     if run.options.policy.memory_profile {
         let error = blot_backend_source_origins::initInto(workspace.replay_origins,source,runUnits(run),runIdentity(run),run.options.diagnostic_source_digests,workspace.replay_contexts); if error != blot_error::Error.none { return finishReplayArtifact(workspace,error,module_alive,origins_alive,candidate_alive,vectors,bytes_started); }
         origins_alive = true; source .= workspace.replay_origins.code.module;

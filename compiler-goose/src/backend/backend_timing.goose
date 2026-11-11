@@ -167,6 +167,19 @@ fn jsonString(out: u8[>..]&, value: const u8[:]) {
 fn jsonField<T>(out: u8[>..]&, field: const u8[:], value: T, comma: bool = true) {
     if comma { out.push(','); } jsonString(out, field); out.push(':'); format(out, value);
 }
+// Host schema rendering writes into grow-shrink buffers with the same escaping.
+fn jsonString(out: u8[>..<]&, value: const u8[:]) {
+    let hex = "0123456789abcdef"; out.push('"');
+    for byte in value {
+        if byte == '"' || byte == '\\' { out.push('\\'); out.push(byte); }
+        else if byte < 32 { out.append("\\u00"); out.push(hex[byte >> 4]); out.push(hex[byte & 15]); }
+        else { out.push(byte); }
+    }
+    out.push('"');
+}
+fn jsonField<T>(out: u8[>..<]&, field: const u8[:], value: T, comma: bool = true) {
+    if comma { out.push(','); } jsonString(out, field); out.push(':'); format(out, value);
+}
 fn jsonStringify(region: Region, out: u8[>..]&) {
     var length = 0; while length < region.file_utf8.len && region.file_utf8[length] != 0 { length++; }
     out.append("{\"file\":"); jsonString(out, region.file_utf8[..length]);

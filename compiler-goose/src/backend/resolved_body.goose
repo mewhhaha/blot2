@@ -18,12 +18,15 @@ struct Header {
     active: bool = true,numeric: blot_support::Option<blot_check_numeric_proof_core::Plan>,has_associated: bool = false,has_numeric_checks: bool = false,
     unit: u32,root: u32,mappings: const blot_backend_layout::Mapping[:],rows: const blot_backend_layout::RowMapping[:],rows_evidence: u32 = 0,has_owners: bool = false,first: u32 = 0,last: u32 = 0,
 }
-struct SinkKey { body: u32,binding: u32 }
-fn hash(key: SinkKey) -> u64 { ::hash_combine(::hash(key.body),::hash(key.binding)) }
+// Sinks chain through a fixed bucket table over grow-only scalar records.
+struct Sink { body: u32,binding: u32,node: u32,chain: u32 = 0 }
+fn sinkBucket(body: u32,binding: u32) -> i64 { return (::hash_combine(::hash(body),::hash(binding)) % 1024) as i64; }
 var headers: Header[>..<] = [];
 var slots: Slot[>..<] = [];
 var node_heads: u32[4096] = [0;4096];
-var sinks: dictionary<SinkKey,u32> = dictionary<SinkKey,u32>{..};
+var sink_records: Sink[>..] = [];
+var sink_count: i64 = 0; // Records past the count are stale and reused; the run never shrinks.
+var sink_heads: u32[1024] = [0;1024];
 var payloads: Plan..[>..] = [];
 reusable[] var owned_mappings: blot_backend_layout::Mapping[>..] = [];
 reusable[] var owned_rows: blot_backend_layout::RowMapping[>..] = [];
@@ -35,7 +38,7 @@ fn create(unit: u32,root: u32,mappings: const blot_backend_layout::Mapping[:],ro
 }
 fn header(id: u32) -> Header { assert(id != 0 && id <= headers.len && headers[id - 1].active); return headers[id - 1]; }
 fn entryCount(body: u32) -> i64 { var count: i64 = 0; var cursor = headers[body - 1].first; while cursor != 0 { count++; cursor = slots[cursor - 1].next; } return count; }
-fn sinkCount(body: u32) -> i64 { var count: i64 = 0; sinks.each() { key,value=>{ if key.body == body { count++; } } } return count; }
+fn sinkCount(body: u32) -> i64 { var count: i64 = 0; for record in sink_records[..sink_count] { if record.body == body { count++; } } return count; }
 fn put(body: u32,node: u32,entry: Plan) -> blot_error::Error {
     assert(body != 0 && body <= headers.len && headers[body - 1].active); assert(findSlot(body,node) == 0);
     if slots.len >= 4294967295 { return blot_error::Error.module_too_large; }
@@ -47,8 +50,9 @@ fn findSlot(body: u32,node: u32) -> u32 { assert(body != 0); var id = node_heads
 fn getRef(body: u32,node: u32) -> Plan..& { let id = findSlot(body,node); assert(id != 0); return slots[id - 1].payload; }
 fn get(body: u32,node: u32) -> Plan { getRef(body,node) }
 fn contains(body: u32,node: u32) -> bool { findSlot(body,node) != 0 }
-fn sink(body: u32,binding: u32) -> blot_support::Option<u32> { let value = ::get(sinks,SinkKey { body,binding , ..}); if value { return blot_support::some(value); } return blot_support::none<u32>(); }
-fn setSink(body: u32,binding: u32,node: u32) { ::insert(sinks,SinkKey { body,binding , ..},node); }
+fn findSink(body: u32,binding: u32) -> u32 { var id = sink_heads[sinkBucket(body,binding)]; while id != 0 { let record = sink_records[id - 1]; if record.body == body && record.binding == binding { return id; } id = record.chain; } return 0; }
+fn sink(body: u32,binding: u32) -> blot_support::Option<u32> { let id = findSink(body,binding); if id != 0 { return blot_support::some(sink_records[id - 1].node); } return blot_support::none<u32>(); }
+fn setSink(body: u32,binding: u32,node: u32) { let id = findSink(body,binding); if id != 0 { sink_records[id - 1].node = node; return; } let bucket = sinkBucket(body,binding); let record = Sink { body: body,binding: binding,node: node,chain: sink_heads[bucket] }; if sink_count < sink_records.len { sink_records[sink_count] = record; } else { sink_records.push(record); } sink_count++; sink_heads[bucket] = sink_count as u32; }
 recursive fn release(body: u32) {
     assert(body != 0 && body <= headers.len); if !headers[body - 1].active { return; } let snapshot = headers[body - 1]; headers[body - 1].active = false;
     if snapshot.numeric.present { snapshot.numeric.value.deinit(); } var cursor = snapshot.first;
@@ -63,7 +67,7 @@ recursive fn release(body: u32) {
 fn resetIndex() { for bucket in 0..node_buckets { node_heads[bucket] = 0; } }
 fn deinit() {
     for index in 0..headers.len { if headers[index].active { release((index + 1) as u32); } }
-    sinks.clear(); headers.clear(); resetIndex(); slots=[]; payloads=[];
+    for bucket in 0..1024 { sink_heads[bucket] = 0; } sink_count = 0; headers.clear(); resetIndex(); slots=[]; payloads=[];
 }
 
 fn validBodyRead(body:u32,owner_id:u64)->bool {return body!=0 && body<=headers.len && headers[body-1].active && owner_id!=0 && headers[body-1].owner_id==owner_id;}

@@ -5298,5 +5298,30 @@
       "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
     },
     "whole_compiler_executable": false
+  },
+  "assembly_views_and_caller_resets": {
+    "receipt": "2026-11-11-goose-compile408.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 113.799,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/provider_flow.goose",
+          "line": 101,
+          "message": "error: cannot call nonnull: it may shrink an array guards leads to while code is still used, and code may refer into it (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "f9f95bd8de0d03306779736270431f1f8ced84a240a61f0da887411974ee3552",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "probe_time_note": "compile root alone now 111-119s of the 120s repair cap",
+    "whole_compiler_executable": false
   }
 }

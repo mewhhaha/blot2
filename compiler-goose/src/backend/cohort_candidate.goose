@@ -36,18 +36,10 @@ fn own(view: Extension&,id: u32) -> Function?,Error {
 fn mutableInstructions(view: Extension&,id: u32) -> Instruction[:],Error { let body,error = own(view,id); if error != blot_error::Error.none { return default<Instruction[:]>(),error; } assert(body != null); return view.module.instructions[body.instructions.start..body.instructions.start + body.instructions.len],blot_error::Error.none; }
 fn replaceBody(view: Extension&,id: u32,code: const Instruction[:]) -> Error { let body,error = own(view,id); if error != blot_error::Error.none { return error; } assert(body != null); return view.module.publishInstructions(id,code); }
 fn detachedInto(view: Extension&,source: const Module&) -> Error {
-    assert(!(view.module .== source)); deinit(view); let destination .= view.module;
-    destination=Module{
-        memory_model:source.memory_model,artifacts:null,
-        types:destination.types,instructions:destination.instructions,names:destination.names,
-        functions:destination.functions,signatures:destination.signatures,imports:destination.imports,globals:destination.globals,exports:destination.exports,data:destination.data,
-        fixed_memory_bytes:source.fixed_memory_bytes,array_transport:source.array_transport,arena:source.arena,
-        fixture_helpers_present:source.fixture_helpers_present,fixture_helpers:source.fixture_helpers,
-        lists:source.lists,cohorts:source.cohorts,regions:blot_support::none<blot_runtime_region_runtime::Prepared>(),host_references:source.host_references,public_arena:source.public_arena,
-        cleanup_data:source.cleanup_data,defer_cycles:source.defer_cycles,mutable_static:source.mutable_static,
-        static_fields:destination.static_fields,table_functions:destination.table_functions,table_origins:destination.table_origins,semantic_sites:destination.semantic_sites,
-        indirect:source.indirect,start:source.start
-    };
+    // Callers reset the view before binding source, since view.module may name any module.
+    assert(!(view.module .== source) && !view.active); let destination .= view.module;
+    // Field updates leave the destination's reset arrays in place; nothing is reassigned whole.
+    destination.memory_model = source.memory_model; destination.artifacts .= null; destination.fixed_memory_bytes = source.fixed_memory_bytes; destination.array_transport = source.array_transport; destination.arena = source.arena; destination.fixture_helpers_present = source.fixture_helpers_present; destination.fixture_helpers = source.fixture_helpers; destination.lists = source.lists; destination.cohorts = source.cohorts; destination.regions = blot_support::none<blot_runtime_region_runtime::Prepared>(); destination.host_references = source.host_references; destination.public_arena = source.public_arena; destination.cleanup_data = source.cleanup_data; destination.defer_cycles = source.defer_cycles; destination.mutable_static = source.mutable_static; destination.indirect = source.indirect; destination.start = source.start;
     view.active=true;view.original_functions=source.functions.len;view.original_signatures=source.signatures.len;
     if source.regions.present {
         let region=source.regions.value;let members=blot_backend_region_candidate::member_runs.alloc_slice(region.plan.members.len);let scopes=blot_backend_region_candidate::scope_runs.alloc_slice(region.scopes.len);
@@ -62,7 +54,7 @@ fn detachedInto(view: Extension&,source: const Module&) -> Error {
         let original=source.functions[id];var locals=original.locals;var instructions=original.instructions;
         if original.borrowed_body {let body=blot_backend_wasm::publishBody(destination,original.borrowed_locals,original.borrowed_instructions);locals=body.locals;instructions=body.instructions;}
         destination.functions.push(Function{parameters:original.parameters,result:original.result,result_role:original.result_role,entry:original.entry,provider_parameter:original.provider_parameter,callable_layout:original.callable_layout,signature:original.signature,parameter_roles:original.parameter_roles,annotations:original.annotations,locals:locals,instructions:instructions,..});
-        let flag=view.owned.push(true);if flag!=blot_error::Error.none {view.deinit();return flag;}
+        let flag=view.owned.push(true);if flag!=blot_error::Error.none {return flag;} // callers reset the view
     }
     return blot_error::Error.none;
 }

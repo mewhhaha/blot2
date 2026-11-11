@@ -45,9 +45,11 @@ fn filename(names:blot_backend_runtime_identity::Metadata,unit:u32)->const u8[:]
  if name.start>bytes.len || name.len>bytes.len-name.start {return "";}
  return bytes[name.start..name.start+name.len];
 }
+// Callers reset result before each use, including after a failed attempt.
 fn initInto(result: View&,source: const blot_backend_wasm::Module&,units: const blot_check_core::Module[:],names: blot_support::Option<blot_backend_runtime_identity::View>,source_digests: const u8[32][:],contexts: const Context[:]) -> Error {
-    result.deinit(); let detached = blot_backend_cohort_candidate::detachedInto(result.code,source); if detached != blot_error::Error.none { return detached; }
-    if names.present {let owned,error=blot_backend_runtime_identity::copy(names.value);if error!=blot_error::Error.none {result.deinit();return error;}result.identity=owned;}
+    // Callers reset result before binding source; the two never alias.
+    let detached = blot_backend_cohort_candidate::detachedInto(result.code,source); if detached != blot_error::Error.none { return detached; }
+    if names.present {let owned,error=blot_backend_runtime_identity::copy(names.value);if error!=blot_error::Error.none {return error;}result.identity=owned;}
     var indexes = dictionary<Context,u32> {};
     fn populate() -> Error {
         for record in source.semantic_sites {
@@ -61,6 +63,6 @@ fn initInto(result: View&,source: const blot_backend_wasm::Module&,units: const 
         }
         result.sites = result.owned.items; return blot_error::Error.none;
     }
-    let error = populate(); if error != blot_error::Error.none { result.deinit(); } return error;
+    let error = populate(); if error != blot_error::Error.none {  } return error;
 }
 fn same(left: blot_backend_runtime_ir::Instruction,right: blot_backend_runtime_ir::Instruction) -> bool { return left.operand == right.operand && left.op == right.op && left.table_reference == right.table_reference && left.table_kind == right.table_kind; }
