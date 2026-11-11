@@ -20,50 +20,52 @@ python3 compiler-goose/tools/seal_probe.py build/goose-port/<name> <date>-goose-
 The checker reports one error per run. These are partial, check-only probes and
 never qualify the full compiler.
 
-Backend 316 (101.165s, unchanged source) clears all of `backend_emission`'s
-borrowed-Core-slice family:
+Status on 11 November 2026: 17 of the 20 diagnostic roots pass (run them all with
+`--engines <all> --jobs 4`). The `server` root exceeds the 120s cap, both under
+contention and alone, so it stays unqualified. The `compile` root is the frontier;
+it now takes 111–119s of its 120s cap. Receipts run from
+[backend 316](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz)
+to [compile 416](benchmarks/evidence/qualification/2026-11-11-goose-compile416.json.gz).
 
-- Closure captures, static-closure bindings and task-move captures are read per
-  index instead of being held across key interning and emission.
-- Resolved-flow `Join`, `Match`, `Loop`, `RequestLoop` and exits hold Core `List`
-  ranges. Consumers read merges, arms, inputs, carries and break values per index
-  from their unit.
-- Spawn applications build `ModuleRef` views at the call. The oracle's
-  `spawn_units` becomes a `spawn_tasks` flag.
-- Published update-field plans rebase their slices onto their owning pools.
-- 29 scalar fixed scratch arrays are zero-initialized.
+**Next:** `backend/runtime_pipeline.goose:85` reports that `root_borrows.run` shrinks
+`backing_origins_code_module_static_fields` while the pipeline `module` is live.
+No visible callee of `run` shrinks module storage. Find the summary's source before
+changing code, using the reach-trace build or a narrow root (below).
 
-[Receipt](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz).
+Repair patterns that cleared the 316–416 errors. Prefer them over one-off rewrites:
 
-Backend 326 (97.465s, unchanged source) clears the specialization, retention and
-numeric-owner batch:
+- **Shrinking indexes → fixed-bucket indexes.** Replace a dictionary or other
+  grow-shrink index with a fixed bucket table chained through grow-only records
+  that are reused by count. Lookup compares stored keys, and clearing zeroes the
+  heads. Done for numeric terms, plan slots, sinks, runtime operation symbols,
+  substitution keys and provider guard positions.
+- **Held Core/layout/evaluator slices → per-index reads.** Rewrite them as
+  `for i in 0..E.len { let x = E[i]; ... }`, or inline the accessor at each use.
+  Copy small capped runs (call arguments, at most 16) into fixed locals.
+- **`self_` reaches the storage it shrinks (`s == l`) → remove the reachability.**
+  Keep scalar keys or flags instead of references. Examples: `Generator`'s
+  `retained_enabled`, `Owner`'s `frame`, and builders that pass `context` beside
+  them. Analyses tabulate the module facts they need per body instead of holding
+  the module.
+- **Callee resets → caller resets.** Callers reset views before they bind module
+  references, and functions avoid reassigning whole structs that contain arrays.
+- **Recursion-cycle functions are declared `recursive fn`.** The checker accepts
+  unneeded `recursive`.
+- **Generated adapters and backing.** `write_compile_workspace_backing.py` has
+  drifted from its checked-in output (eight owners' reset behaviour). Edit both
+  consistently; don't regenerate blindly.
 
-- `namedSink` copies Body span/root before refinement.
-- Instance argument runs (capped at 16) are copied into a fixed value before
-  `Service.named`.
-- `retainedCapture` keeps only pooled buffer handles across its recursion (§7.8).
-- Stale `Owner.mappings` assignments use `mapping_read`/`row_read` keys.
-- Numeric `intern` inlines its literal-complement self-call, with the same visit
-  charge.
-- `body` re-reads its contract header at each use.
-- `numericCheck` uses the `Module[:]` analyze overload.
+Diagnosis aids:
 
-[Receipt](benchmarks/evidence/qualification/2026-11-11-goose-backend-numeric326.json.gz).
-
-**Next:** `check/numeric_proof_core.goose:327`: "cannot call version, which may
-shrink self_ while self_ (bound at 322) is still used". The same
-`prepareNumeric → analyzePrepared → body` chain passes under a narrow root, so the
-error depends on reaching it inside the recursive emission cycle.
-`GOOSE_SHRINK_ORIGINS` gives no witness. Find what `version` may shrink
-(`Store.intern`'s dictionary insert or `account`) before restructuring.
-Never clear owners or relax checks.
-
-A narrow root is a ~1.5s loop for context-free errors. Write a temporary
-`compiler-goose/src/_numeric_probe.goose` exporting a no-argument function, then
-run `GOOSE_DIAGNOSTIC_ROOTS=<namespace>::<fn> <goose> check <file> --stdlib …`.
-Remove the file before a full probe, because full probes hash every source.
-[A copy](compiler-goose/tools/narrow_root_example.goose)
-of the prepareNumeric root is kept in tools.
+- **Narrow roots.** Write a temporary `_numeric_probe.goose` exporting a
+  no-argument function, then run
+  `GOOSE_DIAGNOSTIC_ROOTS=<namespace>::<fn> <goose> check <file> --stdlib …`.
+  See [the example](compiler-goose/tools/narrow_root_example.goose). These only
+  reproduce context-free errors, and the file must be removed before full probes.
+- **Reach-trace build.** `build/goose-port/reach-trace-diagnostics/goose` is a
+  diagnosis-only rebuild of the pinned checker source. Running it with
+  `GOOSE_GLOBAL_REACH_TRACE=1 GOOSE_GLOBAL_REACH_HOLDER=<global> GOOSE_GLOBAL_REACH_ARRAY=<array>`
+  prints the store chain behind "global X may hold a reference into Y".
 
 The last complete component inventory passed 36/36 on its pinned source in
 307.14s summed stages. The current 49-law inventory has not run in full. Focused

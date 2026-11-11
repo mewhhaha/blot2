@@ -5323,5 +5323,29 @@
     },
     "probe_time_note": "compile root alone now 111-119s of the 120s repair cap",
     "whole_compiler_executable": false
+  },
+  "wasm_pass_analysis_tables": {
+    "receipt": "2026-11-11-goose-compile416.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 116.456,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/runtime_pipeline.goose",
+          "line": 85,
+          "message": "error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at /home/jacobt/src/blot2/compiler-goose/src/backend/runtime_pipeline.goose:81) is still used: it may refer into backing_origins_code_module_static_fields (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "d7b5eeabc0b65f96b8756b16d3426734f92083774bcab5fd295a5ed8d2110b1d",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "whole_compiler_executable": false
   }
 }

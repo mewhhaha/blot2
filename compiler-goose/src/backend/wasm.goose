@@ -151,6 +151,9 @@ fn init(types: ValueType[>..<]&, instructions: Instruction[>..<]&, names: u8[>..
 fn name(module: const Module&, range: Range) -> const u8[:] { module.names[range.start..range.start + range.len] }
 fn parameters(module: const Module&, function: Function) -> const ValueType[:] { module.types[function.parameters.start..function.parameters.start + function.parameters.len] }
 fn locals(module: const Module&, function: Function) -> const ValueType[:] { if function.borrowed_body { return function.borrowed_locals; } return module.types[function.locals.start..function.locals.start + function.locals.len]; }
+// Analyses that hold the module copy a body's instructions into their own run,
+// so their scratch resets can never be read as resets of the module's storage.
+fn copyInstructions(module: const Module&, function: Function, into: Instruction[>..]&) -> const Instruction[:] { into.append(instructions(module, function)); return into[..]; }
 fn instructions(module: const Module&, function: Function) -> const Instruction[:] { if function.borrowed_body { return function.borrowed_instructions; } return module.instructions[function.instructions.start..function.instructions.start + function.instructions.len]; }
 fn signatureParameters(module: const Module&, signature: Signature) -> const ValueType[:] { module.types[signature.parameters.start..signature.parameters.start + signature.parameters.len] }
 fn ownName(module: Module&, value: const u8[:]) -> Range {
