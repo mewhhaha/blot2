@@ -150,7 +150,7 @@ fn destroyContexts(frame:Frame) {
  let generator_ref .=state.generator;
  if generator_ref {
   let generator:Generator& =generator_ref;
-  generator.module.artifacts .= null;generator.artifacts .= null;generator.retained .= null;generator.principal_state .= null;generator.persisted_principals .= null;generator.query_state .= null;generator.constant_state .= null;generator.refinement_owner .= null;
+  generator.module.artifacts .= null;generator.artifacts .= null;generator.retained_enabled = false;generator.principal_state .= null;generator.persisted_principals .= null;generator.query_state .= null;generator.constant_state .= null;generator.refinement_owner .= null;
   // Generator cleanup owns attempt tables; canonical Session ownership belongs
   // to this Frame and is released exactly once below.
   generator.deinit();generator.units=default<const blot_check_core::Module[:]>();generator.spawn_tasks=false;

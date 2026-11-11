@@ -27,7 +27,7 @@ fn get(store: Store&,units: const blot_check_core::Module[:],target: blot_check_
         if node.tag == blot_check_core::Tag.reference { for parameter,index in parameters { if index < 16 && local(module,body.root,parameter.binding) { facts.length = Length.parameter { index as u8 , ..}; } } }
         for parameter,index in parameters { if index >= 16 { break; } let ty = module.types.node(parameter.ty).tag; if ty != blot_check_types::Tag.array && ty != blot_check_types::Tag.list { continue; } if privateBinding(module,body.root,parameter.binding) { facts.borrowed_collections |= (1 as u16) << index as u32; } }
     }
-    ::insert(store.entries,target,facts); store.stats.analyzed++; return facts,blot_error::Error.none;
+    store.stats.analyzed++; ::insert(store.entries,target,facts); return facts,blot_error::Error.none;
 }
 fn local(module: const blot_check_core::Module&,id: u32,binding: u32) -> bool { if module.node(id).tag != blot_check_core::Tag.reference { return false; } let reference = module.reference(id); return (reference.unit == 0 || reference.unit == module.unit) && reference.binding == binding; }
 recursive fn borrowed(module: const blot_check_core::Module&,id: u32,binding: u32,allow: bool,budget: i64&) -> bool {

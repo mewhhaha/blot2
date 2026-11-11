@@ -51,12 +51,24 @@ fn mapping(self_: PhysicalProjection&, solver: blot_check_types::Store&, variabl
     for &entry in mappingItems(self_.mappings) { if entry.variable == variable { entry.layout = concrete; return blot_error::Error.none; } }
     return appendSink(self_.mappings, Mapping { variable: variable, layout: concrete , ..});
 }
-struct OwnedProjection { unit: u32,mappings: MappingSink,physical: PhysicalProjection }
+// An owned projection names a snapshot of the instance-carrying mappings, like the
+// oracle's mappings.items, in a pool run identified by scalars.
+struct InstanceEntry { variable: blot_check_types::Id, instance: blot_check_types::NominalIdentity }
+reusable[] var projection_instances: InstanceEntry[>..] = [];
+struct InstanceRun { start: i64 = 0, len: i64 = 0 }
+fn snapshotInstances(mappings: MappingSink) -> InstanceRun {
+    var count: i64 = 0; for entry in mappingItems(mappings) { if entry.instance.unit != 0 { count++; } } if count == 0 { return InstanceRun {..}; }
+    let run = projection_instances.alloc_slice(count); var at: i64 = 0;
+    for entry in mappingItems(mappings) { if entry.instance.unit != 0 { run[at] = InstanceEntry { variable: entry.variable, instance: entry.instance }; at++; } }
+    return InstanceRun { start: projection_instances.index_of(run[0]), len: count };
+}
+fn releaseInstances(run: InstanceRun) { if run.len != 0 { projection_instances.free_slice(projection_instances[run.start..run.start + run.len]); } }
+struct OwnedProjection { unit: u32,instances: InstanceRun,physical: PhysicalProjection }
 fn mappingTarget(projection: blot_eval_core_eval::CodeProjection) -> PhysicalProjection { match projection { inactive=>{ abort("inactive code projection"); },physical p=>{ return p.value; },static_code p=>{ return p.value; },owned p=>{ return p.value.physical; }, } }
 fn mapping(self_: OwnedProjection&, solver: blot_check_types::Store&, variable: blot_check_types::Id, root: blot_check_types::Id) -> Error { self_.physical.mapping(solver, variable, root) }
 fn instance(self_: OwnedProjection&, unit: u32, variable: blot_check_types::Id) -> blot_support::Option<blot_check_types::NominalIdentity> {
     if unit != self_.unit { return blot_support::none<blot_check_types::NominalIdentity>(); }
-    for entry in mappingItems(self_.mappings) { if entry.variable == variable && entry.instance.unit != 0 { return blot_support::some(entry.instance); } }
+    for entry in projection_instances[self_.instances.start..self_.instances.start + self_.instances.len] { if entry.variable == variable { return blot_support::some(entry.instance); } }
     return blot_support::none<blot_check_types::NominalIdentity>();
 }
 struct Service {
@@ -83,10 +95,9 @@ fn internFunction(self_: Service&, argument: u32, result: u32, row: u32) -> u32,
     if error != blot_error::Error.none { return 0, representationError(self_, error, 1, blot_check_core::Span { 0, 0 , ..}, FailureCode.complexity); } return value, blot_error::Error.none;
 }
 // Outputs borrow the caller's lexical owners, allowing all mapping counts.
-fn named(self_: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: Mapping[>..<]&,rows: RowMapping[>..<]&) -> ResolvedBody,Error { return namedSink(self_,key,instances,MappingSink.lexical { mappings , ..},RowSink.lexical { rows , ..}); }
-fn named(self_: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&) -> ResolvedBody,Error { let selected,error = mappingSink(mappings); if error != blot_error::Error.none { return default<ResolvedBody>(),error; } let selected_rows,row_error = rowSink(rows); if row_error != blot_error::Error.none { return default<ResolvedBody>(),row_error; } return namedSink(self_,key,instances,selected,selected_rows); }
+fn named(self_: Service&,key: blot_reuse_code_artifacts::Key,instances: const blot_check_types::NominalIdentity[:],mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&) -> ResolvedBody,Error { mappings.clear(); rows.clear(); let selected,error = mappingSink(mappings); if error != blot_error::Error.none { return default<ResolvedBody>(),error; } let selected_rows,row_error = rowSink(rows); if row_error != blot_error::Error.none { return default<ResolvedBody>(),row_error; } return namedSink(self_,key,instances,selected,selected_rows); }
 fn namedSink(self_: Service&, key: blot_reuse_code_artifacts::Key, instances: const blot_check_types::NominalIdentity[:], mappings: MappingSink, rows: RowSink) -> ResolvedBody, Error {
-    clearSink(mappings); clearSink(rows); let unit_id = key.target.unit; let source .= unit(self_, unit_id); let body .= source.body(key.target.binding); assert(body); let body_span = body.span; let body_root = body.root;
+    assert(mappingItems(mappings).len == 0); let unit_id = key.target.unit; let source .= unit(self_, unit_id); let body .= source.body(key.target.binding); assert(body); let body_span = body.span; let body_root = body.root;
     let previous = self_.dictionary_unit; self_.dictionary_unit = 0;
     block {
 
@@ -447,63 +458,63 @@ fn refineFresh(self_: Service&, call: RefinementCall) -> blot_eval_core_eval::So
 fn refineMappingsCaptures(self_: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: Mapping[>..<]&,rows: RowMapping[>..<]&,span: blot_check_core::Span,captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error { return refineMappingsCapturesSink(self_,unit_id,root,expected,MappingSink.lexical { mappings , ..},RowSink.lexical { rows , ..},span,captures); }
 fn refineMappingsCaptures(self_: Service&,unit_id: u32,root: EvidenceRoot,expected: u32,mappings: blot_backend_substitution_buffers::Mappings&,rows: blot_backend_substitution_buffers::Rows&,span: blot_check_core::Span,captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error { let selected,error = mappingSink(mappings); if error != blot_error::Error.none { return error; } let selected_rows,row_error = rowSink(rows); if row_error != blot_error::Error.none { return row_error; } return refineMappingsCapturesSink(self_,unit_id,root,expected,selected,selected_rows,span,captures); }
 // Terminal cleanup only: callback construction remains in its lexical caller.
-fn finishRefinement(error:Error,solved:blot_eval_core_eval::SolvedEvidence&,solved_ready:bool,row_seeds:blot_backend_substitution_buffers::EvidenceRows&,seeds:blot_backend_substitution_buffers::EvidenceMappings&,timing:blot_support::Option<blot_backend_backend_timing::Scope>&,shapes:blot_backend_substitution_buffers::Mappings&,inference_stage:blot_eval_core_eval::StageScope&)->Error {
+fn finishRefinement(instances:InstanceRun,error:Error,solved:blot_eval_core_eval::SolvedEvidence&,solved_ready:bool,row_seeds:blot_backend_substitution_buffers::EvidenceRows&,seeds:blot_backend_substitution_buffers::EvidenceMappings&,timing:blot_support::Option<blot_backend_backend_timing::Scope>&,shapes:blot_backend_substitution_buffers::Mappings&,inference_stage:blot_eval_core_eval::StageScope&)->Error {releaseInstances(instances);
     if solved_ready {solved.deinit();}row_seeds.deinit();seeds.deinit();if timing.present {timing.value.deinit();}shapes.deinit();inference_stage.deinit();return error;
 }
 fn refineMappingsCapturesSink(self_: Service&, unit_id: u32, root: EvidenceRoot, expected: u32, mappings: MappingSink, rows: RowSink, span: blot_check_core::Span, captures: const blot_eval_core_eval::RetainedCapture[:]) -> Error {
     let inference_stage = self_.evaluator.enterInferenceStage(blot_work_counters::InferenceStage.specialization);
     var shapes=blot_backend_substitution_buffers::Mappings{..};var seeds=blot_backend_substitution_buffers::EvidenceMappings{..};var row_seeds=blot_backend_substitution_buffers::EvidenceRows{..};
-    var timing=blot_support::none<blot_backend_backend_timing::Scope>();var solved=blot_eval_core_eval::SolvedEvidence{..};var solved_ready=false;
+    var timing=blot_support::none<blot_backend_backend_timing::Scope>();var solved=blot_eval_core_eval::SolvedEvidence{..};var solved_ready=false;var instance_run=InstanceRun{..};
 
- let partial,projection_error = physicalProjection(self_.layouts,shapes); if projection_error != blot_error::Error.none { return finishRefinement(projection_error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+ let partial,projection_error = physicalProjection(self_.layouts,shapes); if projection_error != blot_error::Error.none { return finishRefinement(instance_run,projection_error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
     var physical = partial; if self_.code_projection.present { physical = mappingTarget(self_.code_projection.value); }
-    var owned_projection = OwnedProjection { unit: unit_id, mappings: mappings, physical: physical , ..}; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection , ..};
+    instance_run = snapshotInstances(mappings); var owned_projection = OwnedProjection { unit: unit_id, instances: instance_run, physical: physical , ..}; let projection = blot_eval_core_eval::CodeProjection.owned { owned_projection , ..};
     let timing_work .= self_.timing; if timing_work != null { timing = blot_support::some(timing_work.enter(blot_backend_backend_timing::Phase.specialization)); }
 
     self_.refinement_stats.requests++;
 
     let mapping_count=mappingItems(mappings).len;for mapping_index in 0..mapping_count {let entry=mappingItems(mappings)[mapping_index];
         if entry.instance.decl != 0 { continue; } let evidence, error = toEvidence(self_, entry.layout);
-        if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } return finishRefinement(representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
-        let appended = seeds.push(blot_eval_type_evidence::Mapping { variable: entry.variable,evidence: evidence , ..}); if appended != blot_error::Error.none { return finishRefinement(appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } return finishRefinement(instance_run,representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        let appended = seeds.push(blot_eval_type_evidence::Mapping { variable: entry.variable,evidence: evidence , ..}); if appended != blot_error::Error.none { return finishRefinement(instance_run,appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
     }
     let row_count=rowItems(rows).len;for row_index in 0..row_count {let entry=rowItems(rows)[row_index];
         if entry.row == blot_backend_layout::unknown_row { continue; } let actual, error = rowToEvidence(self_, entry.row);
-        if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } return finishRefinement(representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
-        let appended = row_seeds.push(blot_eval_type_evidence::RowMapping { variable: entry.variable,evidence: actual , ..}); if appended != blot_error::Error.none { return finishRefinement(appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        if error != blot_error::Error.none { if error == blot_error::Error.unresolved_type { continue; } return finishRefinement(instance_run,representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        let appended = row_seeds.push(blot_eval_type_evidence::RowMapping { variable: entry.variable,evidence: actual , ..}); if appended != blot_error::Error.none { return finishRefinement(instance_run,appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
     }
-    let result, result_error = self_.bridge.toCodeExpectation(expected); if result_error != blot_error::Error.none { return finishRefinement(representationError(self_, result_error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+    let result, result_error = self_.bridge.toCodeExpectation(expected); if result_error != blot_error::Error.none { return finishRefinement(instance_run,representationError(self_, result_error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
     var has_instances = false; for entry in mappingItems(mappings) { has_instances = has_instances || entry.instance.decl != 0; }
     let enabled = !has_instances && self_.cache != null && captures.len == 0 && !self_.code_projection.present && self_.evaluator.receipt_tape == null;
     var profiling = false; let profiling_work .= self_.timing; if profiling_work != null { profiling = profiling_work.clock.enabled; }
     var before_reasons: i64[9] = [0; 9]; if profiling { before_reasons = self_.refinement_stats.reasons; }
     var cached = blot_support::none<blot_eval_core_eval::SolvedEvidence>();
-    if enabled { let cache .= self_.cache; assert(cache); let value, error = cache.lookupRefinement(root, self_.bridge.partialView(), result, seeds.items, row_seeds.items); if error != blot_error::Error.none { return finishRefinement(error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } cached = value; }
+    if enabled { let cache .= self_.cache; assert(cache); let value, error = cache.lookupRefinement(root, self_.bridge.partialView(), result, seeds.items, row_seeds.items); if error != blot_error::Error.none { return finishRefinement(instance_run,error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } cached = value; }
     var rejected_candidates: u16 = 0;
     if profiling { for before, index in before_reasons { if self_.refinement_stats.reasons[index] != before { rejected_candidates |= (1 as u16) << index as u32; } } }
     if cached.present { solved = cached.value; } else {
         let value, error = refineFresh(self_, RefinementCall { unit: unit_id, root: root, expected: result, span: span, seeds: seeds.items, rows: row_seeds.items, captures: captures, shapes: MappingSink.pooled { shapes , ..}, projection: projection, enabled: enabled, profiling: profiling, has_instances: has_instances, rejected_candidates: rejected_candidates , ..});
-        if error != blot_error::Error.none { return finishRefinement(error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } solved = value;
+        if error != blot_error::Error.none { return finishRefinement(instance_run,error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } solved = value;
     }
 
     solved_ready=true;
 
     let solved_type_count=solved.types.len;for type_index in 0..solved_type_count {let entry=solved.types[type_index];
         var retained = false; for seed in seeds.items { if seed.variable == entry.variable && seed.evidence == entry.evidence { retained = true; break; } } if retained { continue; }
-        let concrete, error = fromEvidence(self_, entry.evidence); if error != blot_error::Error.none { return finishRefinement(representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
-        let mapped = mapTypeDepthSink(self_, unit_id, mappings, rows, entry.variable, concrete, span, 0); if mapped != blot_error::Error.none { return finishRefinement(mapped,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        let concrete, error = fromEvidence(self_, entry.evidence); if error != blot_error::Error.none { return finishRefinement(instance_run,representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        let mapped = mapTypeDepthSink(self_, unit_id, mappings, rows, entry.variable, concrete, span, 0); if mapped != blot_error::Error.none { return finishRefinement(instance_run,mapped,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
     }
     let solved_row_count=solved.rows.len;for solved_row_index in 0..solved_row_count {let entry=solved.rows[solved_row_index];
-        let concrete, error = rowFromEvidence(self_, entry.evidence); if error != blot_error::Error.none { return finishRefinement(representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+        let concrete, error = rowFromEvidence(self_, entry.evidence); if error != blot_error::Error.none { return finishRefinement(instance_run,representationError(self_, error, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
         var found = false;
         let prior_count=rowItems(rows).len;for prior_index in 0..prior_count {let prior=rowItems(rows)[prior_index];
-            if prior.variable != entry.variable { continue; } let actual, e = rowToEvidence(self_, prior.row); if e != blot_error::Error.none { return finishRefinement(representationError(self_, e, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
-            if actual != entry.evidence { return finishRefinement(decline(self_, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } found = true; break;
+            if prior.variable != entry.variable { continue; } let actual, e = rowToEvidence(self_, prior.row); if e != blot_error::Error.none { return finishRefinement(instance_run,representationError(self_, e, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); }
+            if actual != entry.evidence { return finishRefinement(instance_run,decline(self_, unit_id, span, FailureCode.unresolved_type),solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } found = true; break;
         }
-        if !found { let appended = appendSink(rows,RowMapping { entry.variable,concrete , ..}); if appended != blot_error::Error.none { return finishRefinement(appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } }
+        if !found { let appended = appendSink(rows,RowMapping { entry.variable,concrete , ..}); if appended != blot_error::Error.none { return finishRefinement(instance_run,appended,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } }
     }
-    let shape_count=shapes.items.len;for shape_index in 0..shape_count {let shape=shapes.items[shape_index];let error = mapTypeDepthSink(self_, unit_id, mappings, rows, shape.variable, shape.layout, span, 0); if error != blot_error::Error.none { return finishRefinement(error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } }
-    return finishRefinement(blot_error::Error.none,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage);
+    let shape_count=shapes.items.len;for shape_index in 0..shape_count {let shape=shapes.items[shape_index];let error = mapTypeDepthSink(self_, unit_id, mappings, rows, shape.variable, shape.layout, span, 0); if error != blot_error::Error.none { return finishRefinement(instance_run,error,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage); } }
+    return finishRefinement(instance_run,blot_error::Error.none,solved,solved_ready,row_seeds,seeds,timing,shapes,inference_stage);
 }
 
 fn selectedTypeChildren<S>(source:const S&,node:blot_check_types::Node)->const u32[:] {if node.tag==blot_check_types::Tag.product {return source.list(blot_check_types::List{node.a,node.b});}return source.nominalArguments(node);}

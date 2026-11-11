@@ -134,11 +134,17 @@ recursive fn ty(encoder: Encoder&, id: u32, depth: i64) -> blot_error::Error {
     return blot_error::Error.none;
 }
 struct Store {
-    identity: blot_support::Option<blot_backend_runtime_identity::View>, entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&,
+    identity: blot_support::Option<blot_backend_runtime_identity::View>, entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: OperationIndex&,
     relocations: Relocation[>..<]&, finalized: bool = false, artifacts: blot_reuse_artifact_emitter::Recorder&? = null,
 }
-fn init(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&) -> Store { Store { identity: blot_support::none<blot_backend_runtime_identity::View>(), entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations , ..} }
-fn initProject(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: dictionary<u64, Id>&, relocations: Relocation[>..<]&, names: blot_backend_runtime_identity::View) -> Store { var store = init(entries, key_bytes, keys, relocations); store.identity = blot_support::some(names); return store; }
+// Operation symbols chain through a fixed bucket table; lookup compares key
+// bytes, and nothing shrinks while emission holds views of other tables.
+let operation_buckets: i64 = 1024;
+struct OperationIndex { heads: Id[1024] = [0;1024] }
+fn operationBucket(fingerprint: u64) -> i64 { return (fingerprint % (operation_buckets as u64)) as i64; }
+fn clear(index: OperationIndex&) { for bucket in 0..operation_buckets { index.heads[bucket] = 0; } }
+fn init(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: OperationIndex&, relocations: Relocation[>..<]&) -> Store { Store { identity: blot_support::none<blot_backend_runtime_identity::View>(), entries: entries, key_bytes: key_bytes, keys: keys, relocations: relocations , ..} }
+fn initProject(entries: Entry[>..<]&, key_bytes: blot_backend_optimizer_buffers::Bytes&, keys: OperationIndex&, relocations: Relocation[>..<]&, names: blot_backend_runtime_identity::View) -> Store { var store = init(entries, key_bytes, keys, relocations); store.identity = blot_support::some(names); return store; }
 fn key(store: Store&, entry: Entry) -> const u8[:] { store.key_bytes.items[entry.key.start..entry.key.start + entry.key.len] }
 fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_effect_evidence::Label) -> Id, blot_error::Error {
     if store.finalized { return 0, blot_error::Error.invalid_operation; }
@@ -154,7 +160,7 @@ fn intern(store: Store&, view: blot_eval_type_evidence::View, label: blot_check_
 fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_error::Error {
     var domain: u8 = 'S'; if store.identity.present { domain = 'P'; }
     if store.finalized || bytes.len < 2 || bytes[0] != 1 || bytes[1] != domain { return 0, blot_error::Error.invalid_operation; }
-    let fingerprint = ::hash(bytes); var candidate: Id = 0; block { let found = store.keys.get(fingerprint); if found { candidate = found; } }
+    let fingerprint = ::hash(bytes); let bucket = operationBucket(fingerprint); var candidate: Id = store.keys.heads[bucket];
     while candidate != 0 {
         let entry = store.entries[candidate - 1];
         if blot_backend_runtime_identity::equalBytes(key(store, entry), bytes) {
@@ -173,8 +179,8 @@ fn internSymbol(store: Store&, bytes: const u8[:], foreign: bool) -> Id, blot_er
         error = blot_reuse_artifact_emitter::recordDemand(active, blot_reuse_artifact_emitter::ResourceKind.operation, id, false); if error != blot_error::Error.none { return 0, error; }
     }
     let range = blot_backend_runtime_ir::Range { start: store.key_bytes.len, len: bytes.len , ..}; let appended=store.key_bytes.append(bytes);if appended!=blot_error::Error.none {return 0,appended;}
-    var previous: Id = 0; block { let found = store.keys.get(fingerprint); if found { previous = found; } }
-    store.entries.push(Entry { key: range, foreign: foreign, next: previous , ..}); store.keys.insert(fingerprint, id); return id, blot_error::Error.none;
+    let previous = store.keys.heads[bucket];
+    store.entries.push(Entry { key: range, foreign: foreign, next: previous , ..}); store.keys.heads[bucket] = id; return id, blot_error::Error.none;
 }
 fn emit(store: Store&, module: blot_backend_wasm::Module&, function: u32, operation: Id) -> blot_error::Error {
     if store.finalized || operation == 0 || operation > store.entries.len || function >= module.functions.len { return blot_error::Error.invalid_operation; }
@@ -213,4 +219,4 @@ fn finish(store: Store&, module: blot_backend_wasm::Module&) -> blot_error::Erro
 }
 fn projectKey(store: Store&, operation: Id) -> blot_support::Option<const u8[:]> { if !store.identity.present || operation == 0 || operation > store.entries.len { return blot_support::none<const u8[:]>(); } return blot_support::some<const u8[:]>(key(store, store.entries[operation - 1])); }
 fn runtimeId(store: Store&, operation: Id) -> blot_support::Option<u32> { if !store.finalized || operation == 0 || operation > store.entries.len { return blot_support::none<u32>(); } return blot_support::some(store.entries[operation - 1].runtime); }
-fn deinit(store: Store&) { store.entries.clear(); store.key_bytes.clear(); store.keys.clear(); store.relocations.clear(); store.finalized = false; }
+fn deinit(store: Store&) { store.finalized = false; let keys .= store.keys; let key_bytes .= store.key_bytes; let relocations .= store.relocations; let entries .= store.entries; keys.clear(); key_bytes.clear(); relocations.clear(); entries.clear(); }

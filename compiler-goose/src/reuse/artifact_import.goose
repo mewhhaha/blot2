@@ -915,7 +915,7 @@ fn indexOperationLabels(self_: const Importer&, labels: u32[:], symbols: TextMap
     }
     if !__old.identity.present { return blot_error::Error.declined; }
     var entries: blot_backend_runtime_operations::Entry[>..<] = []; var bytes=blot_backend_optimizer_buffers::Bytes{};
-    var keys: dictionary<u64,u32> = dictionary<u64,u32>{}; var relocations: blot_backend_runtime_operations::Relocation[>..<] = [];
+    var keys = blot_backend_runtime_operations::OperationIndex {..}; var relocations: blot_backend_runtime_operations::Relocation[>..<] = [];
     var scratch = blot_backend_runtime_operations::initProject(entries, bytes, keys, relocations, __old.identity.value.view());
     let view = __old.evaluator.evidence.view(); var failure = blot_error::Error.none;
     for label in 1..view.effects.operations.len {

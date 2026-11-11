@@ -258,14 +258,14 @@ recursive fn serialize(self_: State&,g: Generator&,id: ValueId,ty: u32,depth: i6
 }
 recursive fn serializeDecision(self_: State&,g: Generator&,id: ValueId,ty: u32,depth: i64,info: ValueInfo,key: SerializedKey) -> u32,Error {
     let shape = g.representations.store.node(ty); if shape.tag != blot_backend_layout::Tag.nominal || shape.a != 4294967295 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
-    let arguments = g.representations.store.children(ty); let children = g.evaluator.valueChildren(id);
+    
     if info.kind == blot_eval_eval_values::ValueKind.computation {
-        if shape.b != 5 || arguments.len != 1 || children.len != 1 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
-        let address,error = serialize(self_,g,children[0],arguments[0],depth + 1); if error != blot_error::Error.none { return 0,error; } let cached = self_.cache.insert(key,address); return address,cached;
+        if shape.b != 5 || g.representations.store.children(ty).len != 1 || g.evaluator.valueChildren(id).len != 1 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
+        let address,error = serialize(self_,g,g.evaluator.valueChildren(id)[0],g.representations.store.children(ty)[0],depth + 1); if error != blot_error::Error.none { return 0,error; } let cached = self_.cache.insert(key,address); return address,cached;
     }
-    if shape.b != 6 || arguments.len != 3 || children.len != 2 || info.bits > blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.break_) { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
-    var payload_type: u32 = 1; if info.bits == blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.reply) { payload_type = arguments[0]; } else if info.bits == blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.cancel) { payload_type = arguments[2]; }
-    let state_type = arguments[1]; let payload = children[0]; let state = children[1];
+    if shape.b != 6 || g.representations.store.children(ty).len != 3 || g.evaluator.valueChildren(id).len != 2 || info.bits > blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.break_) { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
+    var payload_type: u32 = 1; if info.bits == blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.reply) { payload_type = g.representations.store.children(ty)[0]; } else if info.bits == blot_check_core::requestDecisionKindCode(blot_check_core::RequestDecisionKind.cancel) { payload_type = g.representations.store.children(ty)[2]; }
+    let state_type = g.representations.store.children(ty)[1]; let payload = g.evaluator.valueChildren(id)[0]; let state = g.evaluator.valueChildren(id)[1];
     let payload_bits,error = serialize(self_,g,payload,payload_type,depth + 1); if error != blot_error::Error.none { return 0,error; }
     let state_bits,state_error = serialize(self_,g,state,state_type,depth + 1); if state_error != blot_error::Error.none { return 0,state_error; }
     let address,allocated = g.module.dataWords([info.bits,payload_bits,state_bits]); if allocated != blot_error::Error.none { return 0,allocated; }
@@ -316,14 +316,14 @@ recursive fn serializeClosureValue(self_: State&,g: Generator&,id: ValueId,ty: u
     let address,serialized = serializeClosure(self_,g,specialized,selected,depth); if serialized != blot_error::Error.none { return 0,serialized; } let cached = self_.cache.insert(key,address); return address,cached;
 }
 fn numericChild(g: Generator&,value: ValueId,ty: u32,offset: u32) -> ValueId,Error {
-    let node = g.representations.store.node(ty); let values = g.evaluator.valueChildren(value);
-    if node.tag == blot_backend_layout::Tag.nominal { if offset != 4 || values.len != 1 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } return values[0],blot_error::Error.none; }
+    let node = g.representations.store.node(ty); 
+    if node.tag == blot_backend_layout::Tag.nominal { if offset != 4 || g.evaluator.valueChildren(value).len != 1 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } return g.evaluator.valueChildren(value)[0],blot_error::Error.none; }
     let index = offset / 4;
     if node.tag == blot_backend_layout::Tag.record {
-        let fields = g.representations.store.children(ty); if index >= fields.len / 2 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } let name = fields[index * 2]; var slot: i64 = 0;
-        for field in g.evaluator.recordFieldNames(value) { if field == name && slot < values.len { return values[slot],blot_error::Error.none; } slot++; } return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type);
+        if index >= g.representations.store.children(ty).len / 2 { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } let name = g.representations.store.children(ty)[index * 2]; var slot: i64 = 0;
+        for field in g.evaluator.recordFieldNames(value) { if field == name && slot < g.evaluator.valueChildren(value).len { return g.evaluator.valueChildren(value)[slot],blot_error::Error.none; } slot++; } return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type);
     }
-    if node.tag != blot_backend_layout::Tag.product || index >= values.len { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } return values[index],blot_error::Error.none;
+    if node.tag != blot_backend_layout::Tag.product || index >= g.evaluator.valueChildren(value).len { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } return g.evaluator.valueChildren(value)[index],blot_error::Error.none;
 }
 recursive fn numericGuard(g: Generator&,plan: const blot_backend_numeric_rows::Plan&,guard_: blot_support::Option<u8>,values: const ValueId[:]) -> bool {
     if !guard_.present { return true; } let condition = plan.guards[guard_.value]; return numericGuard(g,plan,condition.parent,values) && g.evaluator.valueInfo(values[condition.owner]).bits == condition.tag;
@@ -353,18 +353,18 @@ recursive fn serializePackedCollection(self_: State&,g: Generator&,id: ValueId,t
     var words = Words {..}; var leaves = Words {..};
     recursive fn build() -> u32,Error {
         if info.kind == blot_eval_eval_values::ValueKind.array { let added = words.push(info.len); if added != blot_error::Error.none { return 0,added; } }
-        let element = g.representations.store.node(ty).a; let row_tag = g.representations.store.node(element).tag; let fields = g.representations.store.children(element);
+        let element = g.representations.store.node(ty).a; let row_tag = g.representations.store.node(element).tag; 
         let nested,error = g.nestedRow(element); if error != blot_error::Error.none { return 0,error; }
         for row in g.evaluator.valueChildren(id) {
             if nested.present { let serialized = serializeNumericRow(self_,g,row,nested.value,depth,words); if serialized != blot_error::Error.none { return 0,serialized; } continue; }
-            let values = g.evaluator.valueChildren(row); if values.len != row_words { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
+            if g.evaluator.valueChildren(row).len != row_words { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); }
             for index in 0..row_words {
                 var slot = index as i64; var field_index = index as i64;
                 if row_tag == blot_backend_layout::Tag.record {
-                    var found = false; var ordinal: i64 = 0; for name in g.evaluator.recordFieldNames(row) { if name == fields[index * 2] { slot = ordinal; found = true; break; } ordinal++; }
+                    var found = false; var ordinal: i64 = 0; for name in g.evaluator.recordFieldNames(row) { if name == g.representations.store.children(element)[index * 2] { slot = ordinal; found = true; break; } ordinal++; }
                     if !found { return 0,staticFailure(g,1,blot_check_diagnostic_code::Code.unresolved_type); } field_index = index * 2 + 1;
                 }
-                let child_type = fields[field_index]; let bits,serialized = serialize(self_,g,values[slot],child_type,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; } let added = words.push(bits); if added != blot_error::Error.none { return 0,added; }
+                let child_type = g.representations.store.children(element)[field_index]; let bits,serialized = serialize(self_,g,g.evaluator.valueChildren(row)[slot],child_type,depth + 1); if serialized != blot_error::Error.none { return 0,serialized; } let added = words.push(bits); if added != blot_error::Error.none { return 0,added; }
             }
         }
         var address: u32 = 0;

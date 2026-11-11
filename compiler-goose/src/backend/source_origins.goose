@@ -19,7 +19,7 @@ fn hash(context: Context) -> u64 { ::hash_combine(::hash_combine(::hash(context.
 struct ContextPool { records: Context[>..<]&,ids: dictionary<Context,u32>& }
 fn init(records: Context[>..<]&,ids: dictionary<Context,u32>&) -> ContextPool { ContextPool { records,ids } }
 fn deinit(pool: ContextPool&) { pool.records.clear(); pool.ids.clear(); }
-fn intern(pool: ContextPool&,value: Context) -> u32,Error { { let id .= pool.ids.get(value); if id != null { return id,blot_error::Error.none; } } if pool.records.len == max_sites { return 0,blot_error::Error.module_too_large; } let id = (pool.records.len + 1) as u32; pool.ids.insert(value,id); pool.records.push(value); return id,blot_error::Error.none; }
+fn intern(pool: ContextPool&,value: Context) -> u32,Error { { let id .= pool.ids.get(value); if id != null { return id,blot_error::Error.none; } } if pool.records.len == max_sites { return 0,blot_error::Error.module_too_large; } let id = (pool.records.len + 1) as u32; pool.records.push(value); pool.ids.insert(value,id); return id,blot_error::Error.none; }
 struct Frame { unit: u32 = 0,node: u32 = 0,start: u32 = 0,end: u32 = 0,filename: const u8[:] = "" }
 struct Site {
     unit: u32,node: u32,start: u32,end: u32,filename: const u8[:],operation: const u8[:] = "",source_type: const u8[:] = "",source_blake3: blot_support::Option<u8[32]>,

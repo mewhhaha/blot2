@@ -96,6 +96,7 @@ import support.native;
 import phase_profile;
 import support.option;
 import support.pooled_buffer;
+import support.pooled_map;
 import support.error;
 import support.path;
 import support.host_layout;
@@ -140,7 +141,7 @@ struct Generator {
     allocation_owner: u64 = 0,
     inline_named: bool = true, speculative_locals: bool = true, speculated: bool = false, ragged_probe_limit: u32 = blot_backend_ragged_builder::probe_limit,
     work_timing: blot_backend_backend_timing::Work, units: const blot_check_core::Module[:], spawn_tasks: bool = false,
-    artifacts: blot_reuse_code_artifacts::Context&? = null, retained: blot_reuse_artifact_fragment::State&? = null,
+    artifacts: blot_reuse_code_artifacts::Context&? = null, retained_enabled: bool = false,
     principal_state: blot_reuse_principal_evidence_reuse::State&? = null, persisted_principals: blot_reuse_principal_archive::Reader&? = null,
     principal_stats: blot_reuse_principal_evidence_reuse::Stats, query_state: blot_eval_completed_specialization_query::State&? = null,
     constant_state: blot_reuse_constant_receipt_reuse::State&? = null, refinement_owner: blot_reuse_code_artifacts::Context&? = null,
@@ -682,7 +683,7 @@ recursive fn namedAlias(generator: Generator&, key: Key, body: const blot_check_
         }
     }
     var global = blot_support::none<u32>(); if body.runtime { let value, error = generator.planning.runtimeGlobal(generator, key.target); if error != blot_error::Error.none { return 0, error; } global = blot_support::some(value); }
-    var constant_value: Value;
+    var constant_value = default<Value>();
     if !global.present { let value, error = constant(generator, key.target, full); if error != blot_error::Error.none { return 0, error; } constant_value = value; }
     let callee, local_error = generator.module.addLocal(function_id, blot_backend_runtime_ir::VT_i32); if local_error != blot_error::Error.none { return 0, local_error; }
     if global.present { let error = generator.module.emit(function_id, blot_backend_runtime_ir::instruction(blot_backend_runtime_ir::OP_global_get, global.value)); if error != blot_error::Error.none { return 0, error; } }
@@ -734,7 +735,7 @@ recursive fn function(generator: Generator&, key: Key) -> u32, blot_error::Error
             if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = hit; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); } } let exit_id: u32 = existing; let exit_error = blot_error::Error.none; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error);
         }
     }
-    { let retained .=generator.retained; if retained {
+    { let retained .=retainedState(generator); if retained {
         let job, error = findRetained(generator, retained, blot_reuse_code_artifacts::Request.named { key , ..}); if error != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = error; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
         if job.present {
             var actor: blot_reuse_code_artifacts::Scope&? = null; if scope.present { actor .= scope.value; }
@@ -777,7 +778,7 @@ recursive fn function(generator: Generator&, key: Key) -> u32, blot_error::Error
         let error = blot_backend_dictionary_layout::bindOwner(source, generator.representations.store, mappings, owner.value, 0, owner.value.formals(source), false);
         if error != blot_error::Error.none { if error == blot_error::Error.out_of_memory { let exit_id: u32 = 0; let exit_error = error; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); } let exit_id: u32 = 0; let exit_error = fail(generator, unit_id, body.root, blot_check_diagnostic_code::Code.unresolved_type); return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
     }
-    var context = NamedEmission { key, body, parameter_locals, runtime_count, resolved.root , ..};
+    var context = NamedEmission { key, body, parameter_locals, runtime_count, resolved.root.id , ..};
     let emitted = blot_backend_backend_emission::withOwner(blot_backend_backend_emission::Config { frame: blot_compile_workspace::frameForGenerator(generator,generator.evaluator), unit_id: unit_id, function_id: function_id, provider_local: blot_support::some(runtime_count), mapping_read: blot_backend_backend_emission::bufferMappings(mappings), row_read: blot_backend_backend_emission::bufferRows(rows), factory_template: key.template_result , ..}, context, emitNamedOwner);
     if emitted != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = emitted; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
     if scope.present {
@@ -787,7 +788,7 @@ recursive fn function(generator: Generator&, key: Key) -> u32, blot_error::Error
     generator.planning.startup_facts.complete(function_id); let exit_id: u32 = function_id; let exit_error = blot_error::Error.none; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error);
 }
 
-fn lookupValue<K,V>(map: const dictionary<K,V>&, key: K) -> blot_support::Option<V> { let value = map.get(key); if value { return blot_support::some(value); } return blot_support::none<V>(); }
+fn lookupValue<M,K>(map: const M&, key: K) -> blot_support::Option<u32> { let value = blot_support_pooled_map::getSlots(map.slots, key); if value { return blot_support::some(value); } return blot_support::none<u32>(); }
 recursive fn captureTemplate(generator: Generator&, template: blot_backend_backend_emission::Template) -> u32, blot_error::Error {
     let retained = CapturedTemplate { scalar_environment: template.scalar_environment, callable_instances: template.callable_instances, staged: template.staged, unit: template.unit, node: template.node, captures: template.captures, templates: template.templates, has_environment: template.environment.present, computation: template.computation, evidence: template.evidence, rows: template.rows, .. };
     block { let existing = generator.planning.template_instances.get(retained); if existing { return existing, blot_error::Error.none; } }
@@ -920,7 +921,7 @@ recursive fn closureFunction(generator: Generator&, key: blot_reuse_code_artifac
         let existing = generator.planning.closures.get(key);
         if existing { let error = generator.planning.startup_facts.request(existing, blot_backend_startup_emission_facts::Kind.anonymous, key.unit, key.catalog, true); if error != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = error; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); } if scope.present { let hit = scope.value.hit(existing); if hit != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = hit; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); } } let exit_id: u32 = existing; let exit_error = blot_error::Error.none; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
     }
-    if key.staged == 0 { let retained .=generator.retained; if retained {
+    if key.staged == 0 { let retained .=retainedState(generator); if retained {
         let job, error = findRetained(generator, retained, blot_reuse_code_artifacts::Request.closure { key , ..}); if error != blot_error::Error.none { let exit_id: u32 = 0; let exit_error = error; return finishFunction(generator, scope, exit, mappings, rows, exit_id, exit_error); }
         if job.present {
             var actor: blot_reuse_code_artifacts::Scope&? = null; if scope.present { actor .= scope.value; }
@@ -1159,9 +1160,9 @@ fn emitPrimitiveOwner(context: PrimitiveEmission&, emitter: blot_backend_backend
             if generator.representations.store.node(parameters[0]).tag == blot_backend_layout::Tag.product {
                 if blot_backend_simd_intrinsics::literalLanes(metadata.op) { return fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.simd_lane_literal); }
                 var operands: u32[3] = [0;3]; operands[0] = locals[0]; var count: i64 = 1;
-                if metadata.arity == 2 && blot_backend_simd_intrinsics::pairs(metadata.op) { let paired = emitter.simdPairLocals(locals[1], operands[1..3]); if paired != blot_error::Error.none { return paired; } count = 3; }
+                if metadata.arity == 2 && blot_backend_simd_intrinsics::pairs(metadata.op) { var pair_locals: u32[2] = [0;2]; let paired = emitter.simdPairLocals(locals[1], pair_locals); if paired != blot_error::Error.none { return paired; } operands[1] = pair_locals[0]; operands[2] = pair_locals[1]; count = 3; }
                 else if metadata.arity == 2 { operands[1] = locals[1]; count = 2; }
-                return emitter.simdLocals(metadata.op, operands[..count], blot_support::none<u32>(), parameters[0], context.result);
+                return emitter.simdLocals(metadata.op, operands[..count], blot_support::none<u8[4]>(), parameters[0], context.result);
             }
             let scalar_type = generator.representations.store.scalar(parameters[0]); if !scalar_type.present { return fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.unsupported); }
             let opcode = blot_backend_scalar_ops::opcode(metadata.op, scalar_type.value); if !opcode.present { return fail(generator, key.unit, 0, blot_check_diagnostic_code::Code.unsupported); }
@@ -1891,6 +1892,8 @@ fn runIdentity(run:const CompileRun&)->blot_support::Option<blot_backend_runtime
 }
 fn runWorkspace(run:const CompileRun&)->CompileWorkspace& {return blot_compile_workspace::workspaceForFrame(run.frame);}
 // Run tracks activation only; workspace-owned views are borrowed on demand.
+// The generator holds only a flag, so its storage never reaches the fragment state.
+fn retainedState(generator: Generator&) -> blot_reuse_artifact_fragment::State? { return runRetained(blot_compile_workspace::frameForGenerator(generator,generator.evaluator),generator.retained_enabled); }
 fn runRetained(frame:blot_compile_workspace::Frame,enabled:bool)->blot_reuse_artifact_fragment::State? {
  if !enabled {return null;}
  let workspace:CompileWorkspace& =blot_compile_workspace::workspaceForFrame(frame);
@@ -1973,7 +1976,7 @@ fn resetGenerator(source_workspace: CompileWorkspace&,journal: blot_reuse_artifa
     let evaluator_error = generator.evaluator.reset(workspace.session_tables,units); if evaluator_error != blot_error::Error.none { return evaluator_error; }
     let representation_error = generator.representations.init(units,workspace.publication_owner); if representation_error != blot_error::Error.none { return representation_error; }
     generator.allocation_owner = workspace.allocation_owner; generator.inline_named = true; generator.speculative_locals = true; generator.speculated = false; generator.ragged_probe_limit = blot_backend_ragged_builder::probe_limit; generator.work_timing = blot_backend_backend_timing::Work {..}; generator.units = units; generator.spawn_tasks=false;
-    generator.artifacts .= null; generator.retained .= null; generator.principal_state .= null; generator.persisted_principals .= null; generator.query_state .= null; generator.constant_state .= null; generator.refinement_owner .= null;
+    generator.artifacts .= null; generator.retained_enabled = false; generator.principal_state .= null; generator.persisted_principals .= null; generator.query_state .= null; generator.constant_state .= null; generator.refinement_owner .= null;
     generator.principal_stats = blot_reuse_principal_evidence_reuse::Stats {..}; generator.refinement_stats = blot_reuse_refinement_receipt::Stats {..}; generator.work = blot_reuse_artifact_fragment::Stats {..}; generator.persistent_outputs = false; generator.memory_profile = false;
     generator.public_owners = blot_support::none<blot_runtime_public_owners::Runtime>(); generator.task_context = blot_support::none<blot_runtime_task_context::Functions>(); generator.request_owner = blot_support::none<u32>(); generator.scoped_effects = false; generator.diagnostic = blot_support::none<Diagnostic>(); generator.staging_trace = blot_check_staging_origins::Trace {..}; generator.instance_depth = 0;
     generator.planning.runtime_operations.identity = blot_support::none<blot_backend_runtime_identity::View>(); generator.planning.runtime_operations.artifacts .= null; generator.planning.init(); return init(generator,journal);
@@ -2022,7 +2025,7 @@ fn prepareReuse(run: CompileRun&,skip_constant_replay: bool,memo:blot_reuse_code
     if !run.options.policy.memory_profile && previous {
         if previous.emission.sealed && previous.metadata().pools.present {
             let error = blot_reuse_artifact_fragment::initInto(workspace.retained,previous,runUnits(run),runIdentity(run),run.options.cached_units,stamps,workspace.allocation_owner); if error != blot_error::Error.none { return error; }
-            run.retained_enabled = true; generator.retained .= workspace.retained;
+            run.retained_enabled = true; generator.retained_enabled = true;
         }
     }
     let checkpoint_key=run.options.checkpoint; if checkpoint_key.slot!=0 { let checkpoint=blot_backend_backend_checkpoint::checkpointViewFromKey(checkpoint_key); workspace.persisted_principals = blot_reuse_principal_archive::initReader(checkpoint.principalArchive(),runUnits(run),runIdentity(run)); run.persisted_principals_enabled = true; }

@@ -111,15 +111,11 @@ fn emitActions(actions: const Action[:], module: Module&, function: u32, checkpo
     }
     return blot_error::Error.none;
 }
-fn emitAll(receiver: const Stack&, module: Module&, function: u32) -> Error {
-    var current: const Stack? = receiver;
-    while current {
-        let error = emitTo(current, module, function, 0); if error != blot_error::Error.none { return error; }
-        match current.actions {
-            pooled backing => { return emitParents(frame(backing.key).parent, module, function); },
-            _ => { current .= current.parent; },
-        }
-    }
+// Each lexical stack names its parent; recursion keeps every reference rooted where it was read.
+recursive fn emitAll(receiver: const Stack&, module: Module&, function: u32) -> Error {
+    let error = emitTo(receiver, module, function, 0); if error != blot_error::Error.none { return error; }
+    match receiver.actions { pooled backing => { return emitParents(frame(backing.key).parent, module, function); }, _ => {}, }
+    let parent .= receiver.parent; if parent { return emitAll(parent, module, function); }
     return blot_error::Error.none;
 }
 fn emitParents(first: FrameKey, module: Module&, function: u32) -> Error {

@@ -5274,5 +5274,29 @@
     },
     "diagnosis_checker": "build/goose-port/reach-trace-diagnostics (private, diagnosis only; finite-root-diagnostics source with env-selected global reach trace)",
     "whole_compiler_executable": false
+  },
+  "bucket_indexes_projection_snapshots_and_retained_flag": {
+    "receipt": "2026-11-11-goose-compile386.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 108.571,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/backend/backend_emission.goose",
+          "line": 1812,
+          "message": "error: cannot call saturatedAssociated: it may shrink arguments while extra is still used, and extra may refer into arguments (\u00a75.2)"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "c9adf1b7240909cc3d08c3d6606504a7efb826e1dc5079bd86e5460643d176de",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "whole_compiler_executable": false
   }
 }
