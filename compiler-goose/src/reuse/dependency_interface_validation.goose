@@ -249,7 +249,7 @@ fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
  if owner.has_numeric_proofs {{ let propagated_error = blot_check_numeric_proof_core::dataTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.graph.nodes); if propagated_error != blot_error::Error.none { return propagated_error; } }}
  { let propagated_error = require(owner.has_numeric_proofs||owner.proof_contracts.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }
  // All growing owners below stay outside the recursive proof/checker cycles.
- var terms:blot_check_numeric_proof_terms::Term[>..]=[];var term_index:dictionary<blot_check_numeric_proof_terms::Term,u32> =dictionary<blot_check_numeric_proof_terms::Term,u32> {};
+ var terms:blot_check_numeric_proof_terms::Term[>..]=[];var term_index = blot_check_numeric_proof_terms::TermIndex {..};
  var proof_budget=blot_check_numeric_proof_terms::init(terms,term_index);proof_budget.limits.visits=min(remaining,proof_budget.limits.visits);
  var proof_bindings:dictionary<u32,bool> =dictionary<u32,bool> {};
  for value in owner.proof_contracts {

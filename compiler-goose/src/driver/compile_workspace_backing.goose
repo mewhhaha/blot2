@@ -266,7 +266,7 @@ fn makeGenerator(allocation_owner:u64,session:blot_eval_core_eval::Session&)->bl
 fn makeWorkspace(allocation_owner:u64,generator:blot_backend_core_backend::Generator&,tables:blot_eval_core_eval::SessionTables,capture:blot_reuse_artifact_capture::Capture&,optimized:blot_backend_optimized_bodies::Capture&)->blot_backend_core_backend::CompileWorkspace {return blot_backend_core_backend::CompileWorkspace{publication_owner:blot_backend_result_publication::Owner{..},allocation_owner:allocation_owner,generator:generator,session_tables:tables,journal:capture.emission,metadata:capture.metadata(),retained:backing_retained,principal_state:backing_principal_state,persisted_principals:backing_persisted_principals,query_state:backing_query_state,constant_state:backing_constant_state,origins:backing_origins,candidate:backing_candidate,vectors:backing_vectors,optimized:optimized,capture:capture,allocation_snapshot:backing_allocation_snapshot,startup_snapshot:backing_startup_snapshot,explanation:backing_explanation,bytes:backing_bytes,message:backing_message,replay_module:backing_replay_module,replay_origins:backing_replay_origins,replay_candidate:backing_replay_candidate,replay_vectors:backing_replay_vectors,replay_contexts:backing_replay_contexts,replay_bytes:backing_replay_bytes,..};}
 fn resetBackingDescriptors() {
  assert(blot_backend_resolved_body::payloads.len==0);
- blot_backend_resolved_body::entries=dictionary<blot_backend_resolved_body::NodeKey,blot_backend_resolved_body::Plan..&?>{..};
+ blot_backend_resolved_body::resetIndex();
  blot_backend_resolved_body::slots=[];
  blot_backend_resolved_body::payloads=[];
  backing_retained = blot_reuse_artifact_fragment::State{..};
@@ -343,7 +343,7 @@ fn resetBackingDescriptors() {
 }
 fn clearBacking() {
  blot_backend_resolved_body::deinit();
- blot_backend_resolved_body::entries=dictionary<blot_backend_resolved_body::NodeKey,blot_backend_resolved_body::Plan..&?>{..};
+ blot_backend_resolved_body::resetIndex();
  blot_backend_resolved_body::slots=[];
  blot_backend_resolved_body::payloads=[];
  backing_origins_code_module_types.clear();

@@ -44,5 +44,6 @@ fn remove<M,K,V>(map:M&,key:K,pool:dictionary_slot<K,V>[>..]&)->bool {
 fn eraseSlot<K,V>(slot:dictionary_slot<K,V>&) {slot=default<dictionary_slot<K,V>>();}
 fn clear<M>(map: M&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit<M,K,V>(map: M&,pool: dictionary_slot<K,V>[>..]&) { release(map.slots,pool); map.slots = default<dictionary_slot<K,V>[:]>(); map.count = 0; }
-fn clone<M,K,V>(map: const M&,pool: dictionary_slot<K,V>[>..]&) -> M { var copy = copy(map); if map.slots.len != 0 { let source = pool.realloc_slice(map.slots,map.slots.len); let slots = pool.alloc_slice(source.len); for slot,index in source { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
+// A clone starts empty, so it never carries the source map's slots.
+fn clone<M,K,V>(map: const M&,pool: dictionary_slot<K,V>[>..]&) -> M { var copy = default<M>(); if map.slots.len != 0 { let source = pool.realloc_slice(map.slots,map.slots.len); let slots = pool.alloc_slice(source.len); for slot,index in source { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<M,F>(map: M&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }

@@ -8,9 +8,11 @@ import check.numeric_proof_core;
 import support.error;
 import support.native;
 import support.option;
-struct NodeKey { body: u32,node: u32 }
-fn hash(key: NodeKey) -> u64 { ::hash_combine(::hash(key.body),::hash(key.node)) }
-struct Slot { node: u32,payload: Plan..&,next: u32 = 0 }
+// Plan lookup chains slots through a fixed bucket table; released slots keep
+// their place with body 0, so no index storage shrinks during preparation.
+let node_buckets: i64 = 4096;
+fn nodeBucket(body: u32,node: u32) -> i64 { return (::hash_combine(::hash(body),::hash(node)) % (node_buckets as u64)) as i64; }
+struct Slot { node: u32,payload: Plan..&,next: u32 = 0,body: u32 = 0,chain: u32 = 0 }
 struct Header {
     owner_id:u64=0,
     active: bool = true,numeric: blot_support::Option<blot_check_numeric_proof_core::Plan>,has_associated: bool = false,has_numeric_checks: bool = false,
@@ -20,7 +22,7 @@ struct SinkKey { body: u32,binding: u32 }
 fn hash(key: SinkKey) -> u64 { ::hash_combine(::hash(key.body),::hash(key.binding)) }
 var headers: Header[>..<] = [];
 var slots: Slot[>..<] = [];
-var entries: dictionary<NodeKey,Plan..&?> = dictionary<NodeKey,Plan..&?>{..};
+var node_heads: u32[4096] = [0;4096];
 var sinks: dictionary<SinkKey,u32> = dictionary<SinkKey,u32>{..};
 var payloads: Plan..[>..] = [];
 reusable[] var owned_mappings: blot_backend_layout::Mapping[>..] = [];
@@ -35,31 +37,33 @@ fn header(id: u32) -> Header { assert(id != 0 && id <= headers.len && headers[id
 fn entryCount(body: u32) -> i64 { var count: i64 = 0; var cursor = headers[body - 1].first; while cursor != 0 { count++; cursor = slots[cursor - 1].next; } return count; }
 fn sinkCount(body: u32) -> i64 { var count: i64 = 0; sinks.each() { key,value=>{ if key.body == body { count++; } } } return count; }
 fn put(body: u32,node: u32,entry: Plan) -> blot_error::Error {
-    assert(body != 0 && body <= headers.len && headers[body - 1].active); let key = NodeKey { body,node , ..}; assert(!::contains(entries,key));
+    assert(body != 0 && body <= headers.len && headers[body - 1].active); assert(findSlot(body,node) == 0);
     if slots.len >= 4294967295 { return blot_error::Error.module_too_large; }
-    let payload .= payloads.push(entry); let next = (slots.len + 1) as u32; slots.push(Slot { node,payload , ..});
+    let payload .= payloads.push(entry); let next = (slots.len + 1) as u32; let bucket = nodeBucket(body,node); slots.push(Slot { node: node,payload: payload,body: body,chain: node_heads[bucket] , ..}); node_heads[bucket] = next;
     let previous = headers[body - 1].last; if previous != 0 { slots[previous - 1].next = next; } else { headers[body - 1].first = next; }
-    headers[body - 1].last = next; ::insert(entries,key,payload); return blot_error::Error.none;
+    headers[body - 1].last = next; return blot_error::Error.none;
 }
-fn getRef(body: u32,node: u32) -> Plan..& { let found = ::get(entries,NodeKey { body,node , ..}); assert(found); return found; }
+fn findSlot(body: u32,node: u32) -> u32 { assert(body != 0); var id = node_heads[nodeBucket(body,node)]; while id != 0 { let slot = slots[id - 1]; if slot.body == body && slot.node == node { return id; } id = slot.chain; } return 0; }
+fn getRef(body: u32,node: u32) -> Plan..& { let id = findSlot(body,node); assert(id != 0); return slots[id - 1].payload; }
 fn get(body: u32,node: u32) -> Plan { getRef(body,node) }
-fn contains(body: u32,node: u32) -> bool { ::contains(entries,NodeKey { body,node , ..}) }
+fn contains(body: u32,node: u32) -> bool { findSlot(body,node) != 0 }
 fn sink(body: u32,binding: u32) -> blot_support::Option<u32> { let value = ::get(sinks,SinkKey { body,binding , ..}); if value { return blot_support::some(value); } return blot_support::none<u32>(); }
 fn setSink(body: u32,binding: u32,node: u32) { ::insert(sinks,SinkKey { body,binding , ..},node); }
 recursive fn release(body: u32) {
     assert(body != 0 && body <= headers.len); if !headers[body - 1].active { return; } let snapshot = headers[body - 1]; headers[body - 1].active = false;
     if snapshot.numeric.present { snapshot.numeric.value.deinit(); } var cursor = snapshot.first;
     while cursor != 0 {
-        let slot = slots[cursor - 1]; var entry: Plan = slot.payload; entry.deinit(); ::remove(entries,NodeKey { body,slot.node , ..}); cursor = slot.next;
+        let slot = slots[cursor - 1]; var entry: Plan = slot.payload; entry.deinit(); slots[cursor - 1].body = 0; cursor = slot.next;
     }
     if snapshot.mappings.len != 0 { owned_mappings.free_slice(snapshot.mappings); }
     if snapshot.rows.len != 0 { owned_rows.free_slice(snapshot.rows); }
     // Payload bytes are released together after every attempt. No reference to
     // them enters retained artifacts, whose descriptors contain numeric IDs.
 }
+fn resetIndex() { for bucket in 0..node_buckets { node_heads[bucket] = 0; } }
 fn deinit() {
     for index in 0..headers.len { if headers[index].active { release((index + 1) as u32); } }
-    sinks.clear(); headers.clear(); entries=dictionary<NodeKey,Plan..&?>{..}; slots=[]; payloads=[];
+    sinks.clear(); headers.clear(); resetIndex(); slots=[]; payloads=[];
 }
 
 fn validBodyRead(body:u32,owner_id:u64)->bool {return body!=0 && body<=headers.len && headers[body-1].active && owner_id!=0 && headers[body-1].owner_id==owner_id;}

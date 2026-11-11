@@ -111,7 +111,7 @@ fn proposition(self_: Builder&, id: blot_parse_ast::Id) -> blot_support::Option<
     return blot_support::Option<Proposition> { validity == blot_error::Error.none, result , ..}, validity;
 }
 fn contains(tree: const blot_parse_ast::Tree&, pool: const blot_parse_symbols::Pool&, annotation: blot_parse_ast::Id, limits: Limits) -> bool, Error {
-    var terms: Term[>..] = []; var index = dictionary<Term, u32> {}; var store = blot_check_numeric_proof_terms::init(terms, index); store.limits = limits;
+    var terms: Term[>..] = []; var index = blot_check_numeric_proof_terms::TermIndex {..}; var store = blot_check_numeric_proof_terms::init(terms, index); store.limits = limits;
     var bindings: Binding[>..] = []; var kinds: Kind[>..] = []; var values: u32[>..] = []; var proofs: u32[>..] = []; var requirements: Requirement[>..] = [];
     var builder = Builder { tree, pool, store, bindings, kinds, values, proofs, requirements , ..}; return contains(builder, annotation, 0);
 }
@@ -123,7 +123,7 @@ fn proofRelation(tree: const blot_parse_ast::Tree&, pool: const blot_parse_symbo
 }
 fn lower(tree: const blot_parse_ast::Tree&, pool: const blot_parse_symbols::Pool&, annotation: blot_parse_ast::Id,
           input_kinds: const blot_support::Option<Kind>[:], limits: Limits, destination: OwnedTables) -> blot_support::Option<Owned>, Error {
-    var terms: Term[>..] = []; var index = dictionary<Term, u32> {}; var store = blot_check_numeric_proof_terms::init(terms, index); store.limits = limits;
+    var terms: Term[>..] = []; var index = blot_check_numeric_proof_terms::TermIndex {..}; var store = blot_check_numeric_proof_terms::init(terms, index); store.limits = limits;
     var bindings: Binding[>..] = []; var kinds: Kind[>..] = []; var values: u32[>..] = []; var proofs: u32[>..] = []; var requirements: Requirement[>..] = [];
     var builder = Builder { tree, pool, store, bindings, kinds, values, proofs, requirements , ..};
     let present, error = contains(builder, annotation, 0); if error != blot_error::Error.none || !present { return blot_support::Option<Owned> { false, default<Owned>() , ..}, error; }

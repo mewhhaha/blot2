@@ -161,7 +161,7 @@ var proof_body_introductions:blot_check_numeric_proof_bodies::Introduction[>..<]
 var proof_body_expressions:dictionary<u32,u32> = dictionary<u32,u32>{};
 var proof_body_parameters:blot_check_numeric_proof_bodies::Parameter[>..<]=[];
 var proof_body_uses:blot_check_numeric_proof_bodies::Use[>..<]=[];
-var proof_terms:blot_check_numeric_proof_terms::Term[>..]=[];var proof_index:dictionary<blot_check_numeric_proof_terms::Term,u32> = dictionary<blot_check_numeric_proof_terms::Term,u32>{};
+var proof_terms:blot_check_numeric_proof_terms::Term[>..]=[];var proof_index:blot_check_numeric_proof_terms::TermIndex = blot_check_numeric_proof_terms::TermIndex {..};
 let initialized_types,error=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true, ..});if error!=blot_error::Error.none {return default<Checked>(),error;}var types=initialized_types;
 let patterns,error=blot_check_parameter_patterns::initPooled();if error!=blot_error::Error.none {types.deinit();return default<Checked>(),error;}
 let capabilities,error=blot_check_capability_contracts::initPooled();if error!=blot_error::Error.none {types.deinit();var patterns=patterns;patterns.deinit();return default<Checked>(),error;}

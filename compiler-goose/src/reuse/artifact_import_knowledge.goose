@@ -2,6 +2,7 @@
 namespace blot_reuse_artifact_import;
 import reuse.artifact_import;
 import backend.layout;
+import check.effect_evidence;
 import support.error;
 import support.option;
 import support.pooled_buffer;
@@ -25,7 +26,7 @@ fn deinit(self_: Knowledge&) { self_.layouts.deinit(); self_.rows.deinit(); self
 fn table(self_: Knowledge&, kind: KnowledgeKind) -> ByteBuffer& { if kind == knowledge_layout { return self_.layouts; } return self_.rows; }
 fn absent(store: const blot_backend_layout::Store&, kind: KnowledgeKind, id: u32) -> blot_support::Option<i16> {
     if kind == knowledge_layout { if id == 0 || id >= store.nodes.len { return blot_support::some(-1 as i16); } }
-    else if id == blot_backend_layout::unknown_row || id >= store.effects.rows.len { return blot_support::some(-1 as i16); }
+    else if id == blot_backend_layout::unknown_row || id >= blot_check_effect_evidence::view(store.effects).rows.len { return blot_support::some(-1 as i16); }
     return blot_support::none<i16>();
 }
 fn knownLayout(self_: Knowledge&, store: const blot_backend_layout::Store&, id: u32) -> bool, Error { let value, error = self_.ceiling(store, knowledge_layout, id); return value >= 0, error; }
@@ -33,7 +34,7 @@ fn knownRow(self_: Knowledge&, store: const blot_backend_layout::Store&, id: u32
 fn ceiling(self_: Knowledge&, store: const blot_backend_layout::Store&, kind: KnowledgeKind, id: u32) -> i16, Error {
     if self_.store .!= store { self_.layouts.clear(); self_.rows.clear(); self_.store .= store; }
     let missing = absent(store, kind, id); if missing.present { return missing.value, blot_error::Error.none; }
-    let first = self_.layouts.resize(store.nodes.len); if first != blot_error::Error.none { return -1, first; } let second = self_.rows.resize(store.effects.rows.len); if second != blot_error::Error.none { return -1, second; }
+    let first = self_.layouts.resize(store.nodes.len); if first != blot_error::Error.none { return -1, first; } let second = self_.rows.resize(blot_check_effect_evidence::view(store.effects).rows.len); if second != blot_error::Error.none { return -1, second; }
     if self_.table(kind).items[id] >= 2 { return self_.table(kind).items[id] as i16 - 3, blot_error::Error.none; } assert(self_.frames.items.len == 0);
     let appended = self_.frames.push(KnowledgeFrame { kind, id , ..}); if appended != blot_error::Error.none { return -1, appended; } self_.table(kind).items[id] = 1;
     let error = self_.completeCeilings(store);

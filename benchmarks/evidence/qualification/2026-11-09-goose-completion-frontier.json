@@ -5223,5 +5223,31 @@
       "narrow_root": "prepareNumeric root passes in 1.4s after numericCheck fix"
     },
     "whole_compiler_executable": false
+  },
+  "term_index_plan_index_and_per_index_core_reads": {
+    "receipt": "2026-11-11-goose-compile345.json.gz",
+    "partial_compile": {
+      "partial": true,
+      "engines": [
+        "compile"
+      ],
+      "exit": 1,
+      "seconds": 98.274,
+      "stop": "completed",
+      "errors": [
+        {
+          "file": "/home/jacobt/src/blot2/compiler-goose/src/reuse/artifact_import.goose",
+          "line": 567,
+          "message": "error: == requires operands of the same type, got blot_reuse_code_artifacts::Request and blot_reuse_code_artifacts::Request.closure"
+        }
+      ],
+      "full_qualification": false,
+      "source_sha256": "670451dd8dd82ffd3e2bf9ab6867465cd82a0d0c2f12306f6a553de070414ba2",
+      "source_unchanged": true,
+      "goose_sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94"
+    },
+    "all_roots_327": "17 roots partial pass; observe fixed in 328; server exceeds the 120s cap under contention and alone (unqualified)",
+    "whole_compiler_executable": false,
+    "resolved_body_law": "assertion moved from entries.count to findSlot; emit stage exceeds the 30s cap with installed Goose (exit 124); unqualified, cap not lifted"
   }
 }

@@ -366,6 +366,11 @@ fn addGlobal(module: Module&, scalar: Scalar, bits: u32, mutable: bool) -> u32, 
     let error = demandResource(module, blot_reuse_artifact_emitter::ResourceKind.global, id, false); if error != blot_error::Error.none { return 0, error; }
     module.globals.push(Global { scalar: scalar, bits: bits, mutable: mutable , ..}); return id, blot_error::Error.none;
 }
+fn setGlobalBits(module: Module&, id: u32, bits: u32) -> blot_error::Error {
+    assert((id as i64) < module.globals.len);
+    let artifact_recorder .= module.artifacts; if artifact_recorder { let error = blot_reuse_artifact_emitter::recordGlobalBits(artifact_recorder, id, blot_reuse_artifact_emitter::Operand { value: bits , ..}); if error != blot_error::Error.none { return error; } }
+    module.globals[id].bits = bits; return blot_error::Error.none;
+}
 fn writeDataWord(module: Module&, address: i64, value: u32) {
     for index in 0..4 { module.data[address + index] = (value >> (index * 8)) as! u8; }
 }

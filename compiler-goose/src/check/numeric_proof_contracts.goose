@@ -83,7 +83,7 @@ fn validateMeasured(self_: Contract, limits: Limits) -> Stats, Error {
     let source = blot_check_numeric_proof_terms::View { self_.operands , ..};
     let validity = source.validate(blot_check_numeric_proof_terms::Boundary { self_.values , ..}, limits); if validity != blot_error::Error.none { return Stats {..}, validity; }
     if self_.requirements.len == 0 && !self_.result.present { return Stats { terms: self_.operands.len, visits: self_.operands.len , ..}, blot_error::Error.none; }
-    var terms: Term[>..] = []; var index = dictionary<Term, Id> {}; var owned = blot_check_numeric_proof_terms::init(terms, index);
+    var terms: Term[>..] = []; var index = blot_check_numeric_proof_terms::TermIndex {..}; var owned = blot_check_numeric_proof_terms::init(terms, index);
     owned.limits = limits; owned.visits = self_.operands.len; var mapping: Id[>..] = [];
     for input in self_.operands {
         var term = input; if term.tag == blot_check_numeric_proof_terms::Tag.length || term.tag == blot_check_numeric_proof_terms::Tag.complement { term.a = mapping[term.a - 1]; }

@@ -22,7 +22,7 @@ fn cycle() {
     assert(blot_backend_resolved_body::put(parent,5,blot_backend_backend_emission::Plan.instances{value:instances})==blot_error::Error.none);
     blot_backend_resolved_body::setSink(parent,7,9);assert(blot_backend_resolved_body::entryCount(parent)==1 && blot_backend_resolved_body::sinkCount(parent)==1 && blot_backend_resolved_body::sink(parent,7).value==9);
     blot_backend_resolved_body::release(parent);assert(!blot_backend_resolved_body::headers[parent-1].active && !blot_backend_resolved_body::headers[child-1].active && !blot_backend_resolved_body::contains(child,3) && !blot_backend_resolved_body::contains(parent,5));
-    blot_backend_resolved_body::deinit();assert(blot_backend_resolved_body::headers.len==0 && blot_backend_resolved_body::slots.len==0 && blot_backend_resolved_body::entries.count==0 && blot_backend_resolved_body::payloads.len==0);
+    blot_backend_resolved_body::deinit();assert(blot_backend_resolved_body::headers.len==0 && blot_backend_resolved_body::slots.len==0 && blot_backend_resolved_body::findSlot(child,3)==0 && blot_backend_resolved_body::findSlot(parent,5)==0 && blot_backend_resolved_body::payloads.len==0);
     blot_compile_workspace::clearBacking();blot_compile_workspace::resetBackingDescriptors();
 }
 fn publishInspection(target:blot_eval_completed_specialization_query::CachedPlan&) {

@@ -50,11 +50,11 @@ fn capture(sites: Site[>..<]&, units: const blot_check_core::Module[:], names: b
                 }
             }
             if found { continue; } if sites.len == max_sites { omitted++; continue; }
-            var site = Site { unit: record.unit, span: span, kind: kind, requested_bytes: bytes , ..}; var path: const u8[:] = "";
-            if names.present { let value = blot_backend_runtime_identity::owner(names.value, record.unit); if value.present { path = value.value; } }
-            var length = path.len; if length > 160 { length = 160; }
-            while length != 0 && length < path.len && (path[length] & 192) == 128 { length--; }
-            for index in 0..length { site.filename[index] = path[index]; } site.filename_len = length as u8; site.filename_truncated = length != path.len; sites.push(site);
+            var site = Site { unit: record.unit, span: span, kind: kind, requested_bytes: bytes , ..}; var length: i64 = 0; var total: i64 = 0;
+            if names.present { let value = blot_backend_runtime_identity::owner(names.value, record.unit); if value.present { let path = value.value; total = path.len; length = total; if length > 160 { length = 160; }
+                while length != 0 && length < total && (path[length] & 192) == 128 { length--; }
+                for index in 0..length { site.filename[index] = path[index]; } } }
+            site.filename_len = length as u8; site.filename_truncated = length != total; sites.push(site);
         }
     }
     let owned = owned_sites.alloc_slice(sites.len); for site,index in sites { owned[index] = site; } return Snapshot { sites: owned,omitted: omitted,..},blot_error::Error.none;

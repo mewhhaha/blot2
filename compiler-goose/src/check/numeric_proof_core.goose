@@ -331,13 +331,13 @@ fn body(self_: Checker&, body: const blot_check_core::Body&) -> Error {
 struct BodyContext { module: const Module&, units: const ModuleRef[:], body: const blot_check_core::Body&, selected: const Selected[:] = default<const Selected[:]>(), plan: Plan? = null, limits: Options, visits: i64 = 0 }
 fn checkBody(context: BodyContext&)->Error {var environment:Entries=Entries{..};var returns:Returns=Returns{..};var facts:Facts=Facts{..};let error=checkBodyValue(context,environment,returns,facts);blot_support_pooled_buffer::deinit(facts,fact_scratch);blot_support_pooled_buffer::deinit(returns,return_scratch);blot_support_pooled_buffer::deinit(environment,entry_scratch);return error;}
 fn checkBodyValue(context: BodyContext&,environment:Entries&,returns:Returns&,facts:Facts&)->Error {
-    var terms: Term[>..]=[]; var index: dictionary<Term,u32> =dictionary<Term,u32>{}; var conditions: Condition[>..<]=[];
+    var terms: Term[>..]=[]; var index = blot_check_numeric_proof_terms::TermIndex {..}; var conditions: Condition[>..<]=[];
     var result = blot_error::Error.none;
     {
         var checker = Checker { selected: context.selected, module: context.module, units: context.units, values: blot_check_numeric_proof_terms::init(terms, index), environment: environment, returns: returns, plan: context.plan, facts: facts, conditions: conditions , ..}; checker.values.limits = context.limits;
         result = checker.body(context.body); context.visits = checker.values.visits;
     }
-    terms.clear(); ::clear(index); return result;
+    terms.clear(); blot_check_numeric_proof_terms::clearTerms(index); return result;
 }
 fn analyze(module: const Module&, units: const ModuleRef[:], limits: Options) -> Plan, Error {
     var result = plan(module); var candidate = module.has_numeric_proofs; if !candidate { for node, id in module.nodes { if node.tag == blot_check_core::Tag.array_op && (module.arrayOperation(id as u32) == blot_backend_collection_ops::Op.get || module.arrayOperation(id as u32) == blot_backend_collection_ops::Op.set) { candidate = true; break; } } } if !candidate { return result, blot_error::Error.none; }
@@ -350,14 +350,14 @@ fn analyzePrepared(module: const Module&, units: const ModuleRef[:], body: const
 fn validate(module: const Module&, units: const ModuleRef[:], remaining: i64&)->Error {var environment:Entries=Entries{..};var returns:Returns=Returns{..};var facts:Facts=Facts{..};let error=validateValue(module,units,remaining,environment,returns,facts);blot_support_pooled_buffer::deinit(facts,fact_scratch);blot_support_pooled_buffer::deinit(returns,return_scratch);blot_support_pooled_buffer::deinit(environment,entry_scratch);return error;}
 fn validateValue(module: const Module&, units: const ModuleRef[:], remaining: i64&,environment:Entries&,returns:Returns&,facts:Facts&)->Error {
     if !module.has_numeric_proofs { return blot_error::Error.none; } let err = dataTypes(module.types, module.types.nodes); if err != blot_error::Error.none { return err; }
-    var terms: Term[>..]=[]; var index: dictionary<Term,u32> =dictionary<Term,u32>{}; var conditions: Condition[>..<]=[];
+    var terms: Term[>..]=[]; var index = blot_check_numeric_proof_terms::TermIndex {..}; var conditions: Condition[>..<]=[];
     {
     var metadata = Checker { module: module, units: units, values: blot_check_numeric_proof_terms::init(terms,index), environment: environment, returns: returns, facts: facts, conditions: conditions , ..}; metadata.values.limits.visits = min(remaining, metadata.values.limits.visits); var seen: dictionary<u32,bool> =dictionary<u32,bool>{};
     for value in module.proof_contracts { if ::contains(seen,value.binding) { return blot_error::Error.invalid_artifact; } ::insert(seen,value.binding, true); let err = signatureTypes(module.types, module.bindings[value.binding].ty, value.header); if err != blot_error::Error.none { return err; } let err = value.header.signature().validateInto(metadata.values); if err != blot_error::Error.none { if err == blot_error::Error.out_of_memory { return err; } return blot_error::Error.invalid_artifact; }
         if module.bindings[value.binding].kind == blot_reuse_principal_interface::Kind.external { let selected, err = metadata.target(blot_check_core::BindingRef { binding: value.binding , ..}); if err != blot_error::Error.none { return err; } let producer .= contract(selected.module, selected.binding); if !producer || !blot_check_numeric_proof_headers::equal(value.header, producer) { return blot_error::Error.invalid_artifact; } } else if module.body(value.binding) == null { return blot_error::Error.invalid_artifact; }
     } remaining -= min(remaining, metadata.values.visits);
     }
-    terms.clear(); ::clear(index);
+    terms.clear(); blot_check_numeric_proof_terms::clearTerms(index);
     for body in module.bodies[1..] { var limits = Options {..}; limits.visits = min(remaining, limits.visits); var context = BodyContext { module: module, units: units, body: body, limits: limits , ..}; let err = checkBody(context); if err != blot_error::Error.none { if err == blot_error::Error.out_of_memory { return err; } return blot_error::Error.invalid_artifact; } remaining -= min(remaining, context.visits); } return blot_error::Error.none;
 }
 // Contiguous immutable module catalogs use the same admission algorithm.

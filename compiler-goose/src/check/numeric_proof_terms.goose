@@ -68,14 +68,37 @@ struct Owned { terms: const Term[:], owner_id: u64 }
 fn view(self_: Owned) -> View { return View { self_.terms, self_.owner_id , ..}; }
 fn deinit(self_: Owned&) { self_.terms = default<const blot_check_numeric_proof_terms::Term[:]>(); self_.owner_id = 0; }
 struct Substitution { formals: const Id[:] = default<const Id[:]>(), captures: const Id[:] = default<const Id[:]>(), versions: const Id[:] = default<const Id[:]>() }
+// Term ids are positions in the terms run. The chained index keeps its bucket
+// heads and per-id links in one grow-only run, so interning never shrinks storage.
+let term_buckets: i64 = 256;
+struct TermIndex { count: i64 = 0, cells: u32[>..] = [] }
+fn bucketOf(term: Term) -> i64 { return (hash(term) % (term_buckets as u64)) as i64; }
+fn lookupTerm(index: const TermIndex&, terms: const Term[:], term: Term) -> Id {
+    if index.cells.len == 0 { return 0; } var id = index.cells[bucketOf(term)];
+    while id != 0 { let saved = terms[id - 1]; if saved.tag == term.tag && saved.kind == term.kind && saved.a == term.a && saved.b == term.b { return id; } id = index.cells[term_buckets + (id as i64) - 1]; }
+    return 0;
+}
+fn recordTerm(index: TermIndex&, term: Term, id: Id) {
+    if index.cells.len == 0 { for bucket in 0..term_buckets { index.cells.push(0); } }
+    assert((id as i64) == index.count + 1); let bucket = bucketOf(term); let link = term_buckets + index.count;
+    if link < index.cells.len { index.cells[link] = index.cells[bucket]; } else { assert(link == index.cells.len); index.cells.push(index.cells[bucket]); }
+    index.cells[bucket] = id; index.count++;
+}
+// Rollback removes the newest id, which heads its bucket; its stale link slot is reused.
+fn popTerm(index: TermIndex&, term: Term) {
+    assert(index.count > 0); let bucket = bucketOf(term); assert((index.cells[bucket] as i64) == index.count);
+    index.cells[bucket] = index.cells[term_buckets + index.count - 1]; index.count--;
+}
+// Clearing empties every bucket and keeps the run for reuse; nothing shrinks.
+fn clearTerms(index: TermIndex&) { if index.cells.len != 0 { for bucket in 0..term_buckets { index.cells[bucket] = 0; } } index.count = 0; }
 struct Store {
-    terms: Term[>..]&, index: dictionary<Term, Id>&,
+    terms: Term[>..]&, index: TermIndex&,
     limits: Limits = Limits {..}, visits: i64 = 0, account: i64? = null, owner_id: u64,
 }
-fn init(terms: Term[>..]&, index: dictionary<Term, Id>&) -> Store {
+fn init(terms: Term[>..]&, index: TermIndex&) -> Store {
     return Store { terms: terms, index: index, owner_id: blot_native::fresh_owner_id() , ..};
 }
-fn deinit(self_: Store&) { ::clear(self_.index); self_.owner_id = 0; }
+fn deinit(self_: Store&) { self_.owner_id = 0; clearTerms(self_.index); }
 fn view(self_: const Store&) -> View { return termView(self_.terms,self_.index.count,self_.owner_id); }
 // The index owns the live prefix; failed imports retain reusable backing capacity.
 fn activeTerms(terms:Term[>..]&,count:i64)->const Term[:] {return terms[..count];}
@@ -109,13 +132,13 @@ fn intern(self_: Store&, term: Term) -> Id, blot_error::Error {
             if child.tag == Tag.complement { return child.a, blot_error::Error.none; }
         },
     }
-    block { let saved = ::get(self_.index,selected); if saved { return saved, blot_error::Error.none; } }
+    { let saved = lookupTerm(self_.index,activeTerms(self_.terms,self_.index.count),selected); if saved != 0 { return saved, blot_error::Error.none; } }
     if self_.index.count >= min(self_.limits.terms, 0xffffffff) { return 0, blot_error::Error.proof_analysis_limit; }
     let position=self_.index.count;
     if position<self_.terms.len {self_.terms[position]=selected;}
     else {self_.terms.push(selected);}
     let id = (position+1) as u32;
-    ::insert(self_.index,selected,id);
+    recordTerm(self_.index,selected,id);
     return id, blot_error::Error.none;
 }
 fn copyOwned(self_: const Store&, destination: Term[>..]&) -> Owned, blot_error::Error {
@@ -158,7 +181,7 @@ fn importInto(self_: Store&, source: View, proofs: const Proposition[:], results
     var context = Context { self_, source, map, substitution , ..};
     let error = importResults(context, proofs, results);
     if error != blot_error::Error.none {
-        while self_.index.count > initial { let removed = self_.terms[self_.index.count-1]; assert(::remove(self_.index,removed)); }
+        while self_.index.count > initial { let removed = self_.terms[self_.index.count-1]; popTerm(self_.index,removed); }
     }
     return error;
 }
