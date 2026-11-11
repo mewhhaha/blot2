@@ -17,14 +17,18 @@ Smoke: on examples/scalar.blot, lex/parse/check reports match the Zig oracle apa
 the unavailable allocator counters, and scalar.wasm is byte-identical. Four other examples are
 rejected with the oracle's first diagnostic.
 
-[Qualification 1](benchmarks/evidence/qualification/2026-11-12-goose-qualify1.json.gz)
+[Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz)
 (`deno run -A compiler-goose/tools/qualify_compiler.ts --goose-compiler compiler-goose/build/blotc-goose
---zig-oracle compiler/zig-out-native-fast/bin/blotc --output DIR --overall-ms 900000`): Goose 15 pass,
-6 fail. **Next:**
-- wasm:aggregates aborts at the Goose assertion backend/wasm.goose:1071.
-- wasm:recursion differs from the oracle's unsupported ABI 8 rejection.
-- project:request-oom and retained-request-oom do not reject the injected allocation failure.
-- the two parity steps follow from the first two.
+--zig-oracle compiler/zig-out-native-fast/bin/blotc --output DIR --overall-ms 900000`) passes its scoped
+functional checks: Goose 20 pass, recursion unsupported exactly as the oracle (ABI 8 recursive
+selected calls). That covers CLI, executed ABI 8, the project lifecycle, request OOM/retry and
+the 16 MiB revision-retention budget. It used the checker built with series 01-19 (patch 19 ports
+the runtime allocation observer the OOM injection needs); full runtime qualification is still
+pending.
+
+**Next:** broaden parity beyond the fixtures (Ink/Gdev/Pen builds and Gdev frames against the
+Zig oracle), measure compile speed and size against the oracle, rerun the 20 diagnostic roots on
+the current checker, and split the compile root, which is near its 300s cap.
 
 Narrow roots (`GOOSE_DIAGNOSTIC_ROOTS=blot_numeric_probe::probe`) type-check one path in seconds to
 minutes; the whole build reports the first full-program error in about 6 minutes.

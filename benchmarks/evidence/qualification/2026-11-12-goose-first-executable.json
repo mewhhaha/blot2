@@ -57,5 +57,46 @@
   "examples/scalar.blot": "lex/parse/check reports equal to the oracle apart from timings and unavailable allocator memory counters; build output scalar.wasm byte-identical (2575 B)",
   "examples/records.blot, tags.blot": "both reject with the identical first diagnostic (unknown_operator +)",
   "examples/arrays.blot, lists.blot": "both reject with the identical module_loader_required diagnostic"
+ },
+ "qualified_build": {
+  "checker": "build/goose-port/upstream-d5ae5bb/build-observer/goose",
+  "checker_sha256": "c947f3045908e74dd784c70a3bce90cbd625b34b09cb61045f51b6c613d5f341",
+  "recipe": "upstream d5ae5bb + series 01-19",
+  "build": {
+   "command": [
+    "python3",
+    "compiler-goose/build.py",
+    "--goose",
+    "build/goose-port/upstream-d5ae5bb/build-observer/goose",
+    "--cc",
+    "clang-23",
+    "--stdlib",
+    "build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+    "--inference-budget",
+    "1000000",
+    "--stage-timeout",
+    "900",
+    "--total-timeout",
+    "1200"
+   ],
+   "exit": 0,
+   "seconds": 545.595,
+   "max_rss_mib": 8660
+  },
+  "executable_sha256": "330ebcbc42d2fa239fa1c8dc599061ca959bb812e13bbe3f2a6712054b94d8b6",
+  "executable_bytes": 80161544,
+  "qualification": {
+   "receipt": "2026-11-12-goose-qualify3.json.gz",
+   "scoped_functional_pass": true,
+   "goose_steps": {
+    "pass": 20,
+    "unsupported": 1
+   },
+   "oracle_steps": {
+    "pass": 8,
+    "unsupported": 1
+   },
+   "full_runtime_qualification": "pending"
+  }
  }
 }

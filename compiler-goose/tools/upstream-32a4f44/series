@@ -3,7 +3,7 @@
 # Apply in order with: patch -p1 --fuzz=0 -d <goose-source> -i <file>.
 # Build with upstream CMake (Release, clang 23.1.4) and
 #   CMAKE_CXX_FLAGS="-gline-tables-only -DGOOSE_EXPANSION_NODE_LIMIT=1000000 -DGOOSE_REACHABLE_PROGRAM=1".
-# new-patched = 01-11 (diagnostics, speed, partial roots). new-precision = 01-18.
+# new-patched = 01-11 (diagnostics, speed, partial roots). new-precision = 01-19.
 01-goose-containment.patch
 02-goose-diagnostic-roots.patch
 03-goose-reachable-program.patch
@@ -24,3 +24,5 @@
 17-goose-contents-static-known.patch
 # Memory: share unchanged body-event chunks between function records.
 18-goose-shared-body-snapshots.patch
+# Runtime: allocation observer hooks for request OOM injection (includes the regenerated runtime_inline.h).
+19-goose-runtime-observer.patch

@@ -221,3 +221,145 @@ diff --color -ru source-precision/src/runtime/runtime_impl.h source-observer/src
      return p;
  }
  
+diff --color -ru source-precision/src/runtime_inline.h source-observer/src/runtime_inline.h
+--- a/src/runtime_inline.h	2026-11-11 18:19:47.419433487 +0100
++++ b/src/runtime_inline.h	2026-11-12 00:43:39.321932688 +0100
+@@ -200,6 +200,25 @@
+ #endif
+ 
+ )GSRT"
++R"GSRT(/* Private observation ABI. Callbacks must allocate nothing; a refusal callback
++   must terminate the candidate rather than resume a half-mutated pool. */
++enum {
++    GS_OBS_POOL_ALLOC = 1, GS_OBS_POOL_REALLOC = 2, GS_OBS_POOL_FREE = 3,
++    GS_OBS_REGION_RESERVE = 4, GS_OBS_REGISTRY_ALLOC = 5,
++    GS_OBS_STACK_REQUEST = 6, GS_OBS_REGION_RELEASE = 7,
++    GS_OBS_POOL_CAPACITY_GROW = 8, GS_OBS_POOL_REUSE = 9
++};
++typedef void (*gs_observer_event_fn)(int, uint64_t, uint64_t, uint64_t, uint64_t);
++typedef int (*gs_observer_try_fn)(int, uint64_t, uint64_t);
++typedef void (*gs_observer_oom_fn)(int, uint64_t);
++GS_API void gs_runtime_observer_install(gs_observer_event_fn event,
++    gs_observer_try_fn attempt, gs_observer_oom_fn oom);
++GS_API void gs_observer_attempt(int kind, uint64_t owner, uint64_t bytes);
++GS_API void gs_observer_pool_commit(int kind, uint64_t owner, uint64_t old_bytes,
++    uint64_t new_bytes, uint64_t before, uint64_t after);
++GS_API void gs_observer_stack_request(const void *stack, const uint8_t *at, uint64_t n);
++
++)GSRT"
+ R"GSRT(#define GS_CAT_(a, b) a##b
+ #define GS_CAT(a, b) GS_CAT_(a, b)
+ #ifdef GS_RUNTIME_VERSION
+@@ -1427,6 +1446,40 @@
+ }
+ 
+ )GSRT"
++R"GSRT(static gs_observer_event_fn gs_observer_event;
++static gs_observer_try_fn gs_observer_try;
++static gs_observer_oom_fn gs_observer_refusal;
++
++)GSRT"
++R"GSRT(GS_API void gs_runtime_observer_install(gs_observer_event_fn event,
++    gs_observer_try_fn attempt, gs_observer_oom_fn oom) {
++    gs_observer_event = event;
++    gs_observer_try = attempt;
++    gs_observer_refusal = oom;
++}
++
++)GSRT"
++R"GSRT(/* Only explicit allocator refusals or selected synthetic mutation failpoints
++   reach this path. Generic panic, invalid sizes and signals never do. */
++static GS_NORETURN void gs_observer_oom(int kind, uint64_t bytes) {
++    if (gs_observer_refusal) gs_observer_refusal(kind, bytes);
++    gs_panic("out of memory at observed allocation");
++}
++GS_API void gs_observer_attempt(int kind, uint64_t owner, uint64_t bytes) {
++    if (gs_observer_try && gs_observer_try(kind, owner, bytes))
++        gs_observer_oom(kind, bytes);
++}
++GS_API void gs_observer_pool_commit(int kind, uint64_t owner, uint64_t old_bytes,
++    uint64_t new_bytes, uint64_t before, uint64_t after) {
++    if (!gs_observer_event) return;
++    gs_observer_event(kind, owner, old_bytes, new_bytes, after);
++    if (after > before)
++        gs_observer_event(GS_OBS_POOL_CAPACITY_GROW, owner, before, after, 0);
++    else if (new_bytes > old_bytes)
++        gs_observer_event(GS_OBS_POOL_REUSE, owner, 0, new_bytes - old_bytes, 0);
++}
++
++)GSRT"
+ R"GSRT(/* Where an abort in a contained worker returns to (gs_run_contained), and
+    the message it leaves there for thread_wait; NULL on every other thread. */
+ typedef struct {
+@@ -1607,6 +1660,27 @@
+ static GS_TLS long gs_regions_cap;
+ 
+ )GSRT"
++R"GSRT(/* Explicit requests are observed even on native mmap-backed data stacks.
++   This is requested capacity, not committed physical pages or scratch liveness.
++   The checks classify malformed sizes as runtime bugs, never as OOM. */
++GS_API void gs_observer_stack_request(const void *stack, const uint8_t *at, uint64_t n) {
++    if (!gs_observer_try && !gs_observer_event) return;
++    for (long i = 0; i < gs_nregions; i++) {
++        const gs_region *r = &gs_regions[i];
++        if (r->stack != stack) continue;
++        uintptr_t offset = (uintptr_t)at - (uintptr_t)r->base;
++        if (offset > r->usable || n > r->usable - offset)
++            gs_panic("data stack overflow: observed capacity request outside region");
++        if (n) gs_observer_attempt(GS_OBS_STACK_REQUEST, (uint64_t)(uintptr_t)stack, n);
++        if (gs_observer_event)
++            gs_observer_event(GS_OBS_STACK_REQUEST, (uint64_t)(uintptr_t)stack,
++                offset, n, r->usable);
++        return;
++    }
++    gs_panic("observed capacity request uses an unregistered stack");
++}
++
++)GSRT"
+ R"GSRT(/* Text without stdio, which a fault handler may not call (nor malloc):
+    decimal digits, a size in the largest unit that holds it exactly, and a
+    string. Each returns the end of what it wrote. */
+@@ -1680,8 +1754,12 @@
+ R"GSRT(/* The calling thread program's registry, empty, as it starts. */
+ static void gs_regions_begin(int64_t capacity) {
+     gs_regions_cap = (long)capacity;
++    size_t bytes = (size_t)(capacity > 0 ? capacity : 1) * sizeof(gs_region);
++    gs_observer_attempt(GS_OBS_REGISTRY_ALLOC, 0, bytes);
+     gs_regions = (gs_region *)calloc((size_t)(capacity > 0 ? capacity : 1), sizeof(gs_region));
+-    if (!gs_regions) gs_panic("out of memory allocating the data stack registry");
++    if (!gs_regions) gs_observer_oom(GS_OBS_REGISTRY_ALLOC, bytes);
++    if (gs_observer_event)
++        gs_observer_event(GS_OBS_REGISTRY_ALLOC, (uint64_t)(uintptr_t)gs_regions, 0, bytes, 0);
+     gs_nregions = 0;
+ }
+ 
+@@ -1698,6 +1776,8 @@
+         gs_nregions = i;
+         gs_regions[i].base = NULL;
+         gs_release_region(&r);
++        if (gs_observer_event)
++            gs_observer_event(GS_OBS_REGION_RELEASE, (uint64_t)(uintptr_t)r.base, r.usable, 0, r.size);
+     }
+     free(gs_regions);
+     gs_regions = NULL;
+@@ -2073,9 +2153,10 @@
+     size_t usable = gs_region_usable;
+     uint8_t *p;
+     for (;;) {
++        gs_observer_attempt(GS_OBS_REGION_RESERVE, (uint64_t)(uintptr_t)stack, usable + gs_region_gap);
+         p = gs_os_reserve(usable, usable + gs_region_gap);
+         if (p) break;
+-        if (usable <= GS_REGION_MIN) gs_panic("cannot reserve data stack address space");
++        if (usable <= GS_REGION_MIN) gs_observer_oom(GS_OBS_REGION_RESERVE, usable + gs_region_gap);
+         usable /= 2;
+         usable -= usable % gs_region_page;
+         gs_region_usable = usable;
+@@ -2087,6 +2168,8 @@
+     gs_regions[i].stack = stack;
+     gs_regions[i].committed = p;
+     gs_nregions = i + 1;  /* Publish only the initialized entry. */
++    if (gs_observer_event)
++        gs_observer_event(GS_OBS_REGION_RESERVE, (uint64_t)(uintptr_t)p, 0, usable, usable + gs_region_gap);
+     return p;
+ }
+ 
