@@ -8,12 +8,13 @@ artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to
 
 The latest complete build, whole 290, stopped at partial expectation interning in
 163.377s with 461 unchanged inputs and no artifact. Repairs advance through the
-grouped backend probe, which takes about 85–100s:
+compile root on the current checker (upstream Goose d5ae5bb plus our patch series),
+which takes about 200s of its 300s cap:
 
 ```sh
+sh compiler-goose/tools/upstream-32a4f44/build.sh   # once, under the heavy lock
 flock /var/tmp/blot2-heavy.lock systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=2G \
-  python3 compiler-goose/tools/check_engines.py --goose build/goose-port/finite-root-diagnostics/goose \
-  --engines compile record_artifact emit --jobs 1 --timeout 120 --output build/goose-port/<name>
+  python3 compiler-goose/tools/check_engines.py --engines compile --output build/goose-port/<name>
 python3 compiler-goose/tools/seal_probe.py build/goose-port/<name> <date>-goose-<name> --audit "..."
 ```
 
@@ -21,16 +22,17 @@ The checker reports one error per run. These are partial, check-only probes and
 never qualify the full compiler.
 
 Status on 11 November 2026: 17 of the 20 diagnostic roots pass (run them all with
-`--engines <all> --jobs 4`). The `server` root exceeds the 120s cap, both under
-contention and alone, so it stays unqualified. The `compile` root is the frontier;
-it now takes 111–119s of its 120s cap. Receipts run from
+`--engines <all>`, serially). The `server` root exceeds 14G on the current checker
+and fails at the compile frontier after 200s on the old one, so it stays unqualified. The `compile` root is the frontier;
+on the current checker it takes 197.8s of its 300s cap. Receipts run from
 [backend 316](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz)
-to [compile 416](benchmarks/evidence/qualification/2026-11-11-goose-compile416.json.gz).
+to [compile 416](benchmarks/evidence/qualification/2026-11-11-goose-compile416.json.gz)
+and its [d5ae5bb rerun](benchmarks/evidence/qualification/2026-11-11-goose-d5ae5bb-compile416.json.gz).
 
 **Next:** `backend/runtime_pipeline.goose:85` reports that `root_borrows.run` shrinks
 `backing_origins_code_module_static_fields` while the pipeline `module` is live.
 No visible callee of `run` shrinks module storage. Find the summary's source before
-changing code, using the reach-trace build or a narrow root (below).
+changing code, using `GOOSE_SHRINK_ORIGINS=*`, the reach-trace build or a narrow root (below).
 
 Repair patterns that cleared the 316–416 errors. Prefer them over one-off rewrites:
 
@@ -98,14 +100,16 @@ families stay in pinned history and
 
 ## Tools and next checks
 
-Private experimental checker: build/goose-port/finite-root-diagnostics/goose
-(sha256 689721da…). Binary/source hashes and recipes are in
-[the controls](benchmarks/evidence/qualification/2026-11-10-goose-options-roots-and-traversal.json.gz):
-33 lifetime/3 runtime/24 semantic controls. Unknown/inexact/local/recursive/
-over-64-root paths keep the conservative behavior. `GOOSE_OPTIONS_ROOT_TRACE=1`
-enables metadata-only options tracing. Installed Goose is unchanged.
+Current checker: upstream Goose d5ae5bb (one stdlib-only commit past 32a4f44)
+plus [the ported series](compiler-goose/tools/upstream-32a4f44/series) 01-17, built
+by its `build.sh` into build/goose-port/upstream-d5ae5bb/build-precision/goose
+(sha256 490e1f80…). It reports the same first errors as the old 2e2bedef checker
+on 19/20 roots, runs about 1.5x slower and needs over 14G for the server root
+([comparison](benchmarks/evidence/qualification/2026-11-11-goose-upstream-32a4f44.json)).
+Run roots one at a time; three in parallel exceed 14G. `GOOSE_SHRINK_ORIGINS=<callee or *>`
+adds the original shrink witness to an error. Installed Goose is unchanged.
 
-Caps: repair 120s, final emission 180s, whole 300s; stop 3s after a reported
+Caps: repair 300s on the current checker, final emission 180s, whole 300s; stop 3s after a reported
 error. Never lift caps, relax checks or clear live owners to hide errors.
 
 Once the real executable exists, run compiler-goose/tools/qualify_compiler.ts

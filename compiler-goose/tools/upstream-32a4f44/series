@@ -1,4 +1,5 @@
-# Private checker patches ported to upstream Goose 32a4f445d8a94b22874a28469f95f69ba3ac31dd.
+# Private checker patches ported to upstream Goose 32a4f445d8a94b22874a28469f95f69ba3ac31dd;
+# they apply unchanged to d5ae5bb (stdlib-only change). build.sh builds the default checker.
 # Apply in order with: patch -p1 --fuzz=0 -d <goose-source> -i <file>.
 # Build with upstream CMake (Release, clang 23.1.4) and
 #   CMAKE_CXX_FLAGS="-gline-tables-only -DGOOSE_EXPANSION_NODE_LIMIT=1000000 -DGOOSE_REACHABLE_PROGRAM=1".

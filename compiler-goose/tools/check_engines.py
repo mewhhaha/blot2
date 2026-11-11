@@ -25,18 +25,19 @@ def source_inputs(source, stdlib):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--goose', type=Path, default=ROOT / 'build/goose-port/selected-roots-build/goose')
+    parser.add_argument('--goose', type=Path, default=ROOT / 'build/goose-port/upstream-d5ae5bb/build-precision/goose',
+                        help='upstream d5ae5bb + tools/upstream-32a4f44/series 01-17')
     parser.add_argument('--engines', nargs='+', choices=ENGINES, default=ENGINES)
-    parser.add_argument('--timeout', type=float, default=120)
-    parser.add_argument('--jobs', type=int, default=5)
+    parser.add_argument('--timeout', type=float, default=300)
+    parser.add_argument('--jobs', type=int, default=1)
     parser.add_argument('--source', type=Path, default=ROOT / 'compiler-goose/src/_diagnostic_roots.goose')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/goose-port/engine-checks')
-    parser.add_argument('--stdlib', type=Path, default=ROOT.parent / 'goose-to-wasm/build/source/stdlib',
-                        help='standard library matching --goose (default: the pinned 2e2bedef copy)')
+    parser.add_argument('--stdlib', type=Path, default=ROOT / 'build/goose-port/upstream-d5ae5bb/source-precision/stdlib',
+                        help='standard library matching --goose')
     args = parser.parse_args()
     if not args.goose.is_file():
         parser.error('--goose must name an existing checker; build it explicitly '
-                     'with compiler-goose/tools/build_goose_checker.py')
+                     'with compiler-goose/tools/upstream-32a4f44/build.sh')
     if b'PARTIAL selected-root diagnostics' not in args.goose.read_bytes():
         parser.error('--goose must be the diagnostic-roots build')
     if args.jobs > 1 and len(args.engines) > 1:
