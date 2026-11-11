@@ -31,6 +31,8 @@ def main():
     parser.add_argument('--jobs', type=int, default=5)
     parser.add_argument('--source', type=Path, default=ROOT / 'compiler-goose/src/_diagnostic_roots.goose')
     parser.add_argument('--output', type=Path, default=ROOT / 'build/goose-port/engine-checks')
+    parser.add_argument('--stdlib', type=Path, default=ROOT.parent / 'goose-to-wasm/build/source/stdlib',
+                        help='standard library matching --goose (default: the pinned 2e2bedef copy)')
     args = parser.parse_args()
     if not args.goose.is_file():
         parser.error('--goose must name an existing checker; build it explicitly '
@@ -44,7 +46,7 @@ def main():
             output = args.output / key
             command = ['python3', str(Path(__file__).resolve()), '--goose', str(args.goose.resolve()),
                        '--engines', key, '--jobs', '1', '--timeout', str(args.timeout), '--output', str(output),
-                       '--source', str(args.source.resolve())]
+                       '--source', str(args.source.resolve()), '--stdlib', str(args.stdlib.resolve())]
             checked = subprocess.run(command, capture_output=True, text=True)
             result = output / 'result.json'
             if result.exists():
@@ -69,11 +71,10 @@ def main():
         return 0
     args.output.mkdir(parents=True, exist_ok=True)
     log_path = args.output / 'diagnostics.log'
-    stdlib = ROOT.parent / 'goose-to-wasm/build/source/stdlib'
+    stdlib = args.stdlib.resolve()
     entries, source_digest = source_inputs(args.source, stdlib)
     (args.output / 'inputs.json').write_text(json.dumps(entries, indent=2) + '\n')
-    command = [str(args.goose.resolve()), 'check', str(args.source.resolve()),
-               '--stdlib', str(ROOT.parent / 'goose-to-wasm/build/source/stdlib')]
+    command = [str(args.goose.resolve()), 'check', str(args.source.resolve()), '--stdlib', str(stdlib)]
     environment = dict(os.environ)
     environment['GOOSE_DIAGNOSTIC_ROOTS'] = ','.join('blot_diagnostic_roots::' + key for key in args.engines)
     started = time.monotonic()
@@ -111,7 +112,7 @@ def main():
     report = {'partial': True, 'engines': args.engines, 'exit': child.returncode,
               'seconds': round(time.monotonic() - started, 3), 'stop': reason,
               'errors': errors, 'full_qualification': False,
-              'source_sha256': source_digest, 'source_unchanged': unchanged,
+              'source_sha256': source_digest, 'source_unchanged': unchanged, 'stdlib': str(stdlib),
               'goose_sha256': hashlib.sha256(args.goose.read_bytes()).hexdigest()}
     if not unchanged:
         report['exit'] = 1

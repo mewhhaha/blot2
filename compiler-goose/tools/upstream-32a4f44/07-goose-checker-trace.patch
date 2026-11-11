@@ -1,0 +1,247 @@
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 3e2f359..02b43dc 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -103,6 +103,43 @@ inline bool IsBranchConstruct(const Node *n) {
+ 
+ struct TypeCheck {
+     Ast &ast;
++    CheckerTrace trace;
++    void TraceEngine(CheckerEngine engine, TypeExpr *a = nullptr, TypeExpr *b = nullptr) {
++        if (!trace.Tick(engine)) return;
++        static const char *names[] = {"TypeEq", "ReachedThroughRefs", "ReachesThroughRefs",
++                                     "RootCandidates", "ShrinkTargets", "SaveFlow", "ArrayElemsReached"};
++        trace.Report("sample", names[(size_t)engine]);
++        auto type = [&](const char *input, TypeExpr *t) {
++            auto original = t;
++            int wrappers = 0, kind = -1, validated = 0, failed = 0;
++            if (t) kind = (int)t->kind;
++            // Bounded shallow identity only; no TypeStr, TypeEq, LoadType or instantiation.
++            while (t && wrappers < 4) {
++                if (t->kind == TY_REF) t = t->ref->sub;
++                else if (t->kind == TY_SLICE) t = t->sub;
++                else if (t->kind == TY_ARRAY) t = t->arr->sub;
++                else break;
++                ++wrappers;
++            }
++            string_view name = "-";
++            const void *definition = nullptr, *instance = nullptr;
++            size_t fields = 0, actual = 0;
++            if (t && t->kind == TY_STRUCT && t->struc->st) {
++                auto st = t->struc->st; auto inst = t->struc->inst;
++                name = st->qname; definition = st; instance = inst; fields = st->fields.size();
++                if (inst) { actual = inst->ftypes.size(); validated = inst->validated; failed = inst->failed; }
++            } else if (t && t->kind == TY_ENUM && t->enu->en) {
++                name = t->enu->en->qname; definition = t->enu->en; instance = t->enu->inst;
++            }
++            auto length = std::min(name.size(), size_t(128));
++            fprintf(stderr, "GOOSE_CHECKER_TRACE input=%s type=%p kind=%d wrappers=%d nominal=%.*s def=%p inst=%p fields=%zu actual=%zu validated=%d failed=%d\n",
++                    input, (void *)original, kind, wrappers, (int)length, name.data(),
++                    definition, instance, fields, actual, validated, failed);
++        };
++        type("a", a);
++        if (b) type("b", b);
++    }
++
+     StableTypeGraph stabletypes;
+     StableCanContainGraph stablecontainment;
+     StableReachesGraph stablereaches;
+@@ -972,6 +1009,7 @@ struct TypeCheck {
+     // Type equality on concrete (post-substitution) types.
+ 
+     bool TypeEq(TypeExpr *a, TypeExpr *b) {
++        TraceEngine(CheckerEngine::TypeEq, a, b);
+         if (a == b) return true;
+         if (a->kind != b->kind || a->cq != b->cq) return false;
+         switch (a->kind) {
+@@ -3171,6 +3209,9 @@ struct TypeCheck {
+     void CheckRoots() {
+         CheckerRootProfile profile;
+         for (auto g : ast.globals) {
++            string_view name = "<initializer>";
++            if (!g->defs.empty()) name = g->defs.front()->name;
++            CheckerTraceRoot progress(trace, "global", name);
+             if (CheckRoot([&] { CheckVarDecl(g, true); })) {
+                 for (auto d : g->defs) d->assigned = d->maybeassigned = true;
+             } else {
+@@ -3220,6 +3261,7 @@ struct TypeCheck {
+         if (!mainsf && !library && !(nomain && !ast.DeclaresMain()))
+             throw CompileError { "program needs exactly one global fn main()" };
+         if (mainsf && !mainsf->brokensig) {
++            CheckerTraceRoot progress(trace, "main", mainsf->qname);
+             CheckRoot([&] {
+                 if (!mainsf->params.empty() || mainsf->has_rets || !mainsf->generics.empty() ||
+                     mainsf->isthread)
+@@ -3235,7 +3277,10 @@ struct TypeCheck {
+         // that no spawn reached.
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+             auto sf = ast.functions[i];
+-            if (sf->isthread) CheckRoot([&] { EnsureThreadSpec(sf, sf->line); });
++            if (sf->isthread) {
++                CheckerTraceRoot progress(trace, "thread", sf->qname);
++                CheckRoot([&] { EnsureThreadSpec(sf, sf->line); });
++            }
+         }
+         // Thread programs may not touch globals: that would be shared mutable
+         // memory between programs (§11.2).
+@@ -3256,7 +3301,10 @@ struct TypeCheck {
+         // specialize their callees without the export's caller facts.
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+             auto sf = ast.functions[i];
+-            if (sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
++            if (sf->isexport) {
++                CheckerTraceRoot progress(trace, "export-body", sf->qname);
++                CheckRoot([&] { CheckUnreached(sf); });
++            }
+         }
+         profile.Mark("roots.export_bodies");
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+@@ -3282,6 +3330,7 @@ struct TypeCheck {
+         for (auto sf : ast.functions) {
+             if (!sf->isexport) continue;
+             exportcount++;
++            CheckerTraceRoot progress(trace, "export-abi", sf->qname);
+             CheckRoot([&] { CheckExport(sf); });
+         }
+         if (library && !exportcount)
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index 484e55a..1cc5e67 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2902,6 +2902,7 @@ inline bool TypeCheck::SamePath(Node *a, Node *b) {
+ inline vector<TypeCheck::ShrinkTarget> TypeCheck::ShrinkTargets(const Roots &roots,
+                                                                  TypeExpr *arr, bool slots,
+                                                                  bool classbound) {
++    TraceEngine(CheckerEngine::Shrink, arr);
+     vector<ShrinkTarget> out;
+     auto add = [&](VarDef *r, bool bound, bool viaclass) {
+         for (auto &t : out)
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index 6669880..1277e5e 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -2997,6 +2997,7 @@ inline bool TypeCheck::SameRecord(const FnRecord &a, const FnRecord &b, const Fn
+ 
+ inline void TypeCheck::CheckSpecBodyOnce(FnSpec *spec, vector<Val> *argvals, Line callline,
+                                          Call *call) {
++    CheckerTraceBody progress(trace, spec->sf->qname, spec);
+     // In progress from here, so that an error before the body's check, an
+     // extern's included, leaves it failed (Checkpoint).
+     spec->inprogress = true;
+diff --git a/src/typecheck_flow.h b/src/typecheck_flow.h
+index 44cedd3..0944f53 100644
+--- a/src/typecheck_flow.h
++++ b/src/typecheck_flow.h
+@@ -941,6 +941,7 @@ inline small_vector<int, 8> TypeCheck::NamedFrames(int fi, FnSpec *spec) {
+ }
+ 
+ inline TypeCheck::FlowState TypeCheck::SaveFlow() {
++    TraceEngine(CheckerEngine::Flow);
+     FlowState f;
+     EachNamedVar((int)frames.size() - 1, CurRealFrame().spec, [&](int i) {
+         auto v = vars[i];
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index a6a3e45..1fe5f57 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1306,6 +1306,7 @@ inline bool TypeCheck::StaticCanContain(TypeExpr *of) {
+ // The types of the storage a value of type t leads to through the plain
+ // references and slices it holds, at any remove, each once.
+ inline void TypeCheck::ReachedThroughRefs(TypeExpr *t, vector<TypeExpr *> &out) {
++    TraceEngine(CheckerEngine::Reached, t);
+     vector<TypeExpr *> work;
+     RefPointees(t, work);
+     while (!work.empty()) {
+@@ -1332,6 +1333,7 @@ inline bool TypeCheck::ReachesThroughRefs(TypeExpr *t, TypeExpr *of) {
+         return matches(reached);
+     };
+     pair key { t, of };
++    TraceEngine(CheckerEngine::Reaches, t, of);
+     if (auto known = reachesthrough.find(key)) {
+         assert(*known == walk());
+         return *known;
+@@ -1398,6 +1400,7 @@ inline void TypeCheck::BoundReach(VarDef *r, vector<TypeExpr *> &out) {
+ // so that root stands in for it, as a bound.
+ inline Roots TypeCheck::RootCandidates(TypeExpr *of, int d, bool globalsonly, bool writable,
+                                        bool slots) {
++    TraceEngine(CheckerEngine::Candidates, of);
+     Roots out;
+     auto beyond = [&](VarDef *v, TypeExpr *t, int rd) {
+         if (!v->isparam || !v->refrootknown || !ReachesThroughRefs(t, of)) return;
+@@ -1712,6 +1715,7 @@ inline bool TypeCheck::OneArrayOf(VarDef *r, TypeExpr *elem) {
+ // (RootArg::onearray).
+ inline void TypeCheck::ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out,
+                                          ArrayReachVisited &open) {
++    TraceEngine(CheckerEngine::Array, t);
+     auto &bucket = open.Bucket(t);
+     for (auto o : bucket)
+         if (TypeEq(o, t)) return;
+diff --git a/src/utils.h b/src/utils.h
+index 3ba31c3..8a50447 100644
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -18,6 +18,64 @@ inline void CheckerPhase(const char *name, chrono::steady_clock::time_point from
+     auto ns = chrono::duration_cast<chrono::nanoseconds>(to - from).count();
+     fprintf(stderr, "GOOSE_CHECKER_PROFILE phase=%s ns=%lld\n", name, (long long)ns);
+ }
++// Explicit low-frequency progress; never formats type graphs or reads a clock
++// in a query. The clock belongs only to coarse named root boundaries.
++enum class CheckerEngine { TypeEq, Reached, Reaches, Candidates, Shrink, Flow, Array, Count };
++struct CheckerTrace {
++    bool enabled = [] { auto value = getenv("GOOSE_CHECKER_TRACE"); return value && *value; }();
++    const char *stage = "none";
++    string_view root = "-", body = "-";
++    const void *spec = nullptr;
++    array<uint64_t, (size_t)CheckerEngine::Count> calls {};
++    bool Tick(CheckerEngine engine) {
++        if (!enabled) return false;
++        auto i = (size_t)engine;
++        unsigned shift = 14;
++        if (engine == CheckerEngine::TypeEq) shift = 20;
++        if (engine == CheckerEngine::Candidates || engine == CheckerEngine::Shrink ||
++            engine == CheckerEngine::Flow) shift = 12;
++        return (++calls[i] & ((UINT64_C(1) << shift) - 1)) == 0;
++    }
++    void Report(const char *event, const char *engine = "-", int64_t ns = 0) const {
++        if (!enabled) return;
++        fprintf(stderr, "GOOSE_CHECKER_TRACE event=%s stage=%s root=%.*s body=%.*s spec=%p engine=%s ns=%lld type_eq=%llu reached=%llu reaches=%llu candidates=%llu shrink=%llu flow=%llu array=%llu\n",
++                event, stage, (int)root.size(), root.data(), (int)body.size(), body.data(), spec,
++                engine, (long long)ns, (unsigned long long)calls[0], (unsigned long long)calls[1],
++                (unsigned long long)calls[2], (unsigned long long)calls[3],
++                (unsigned long long)calls[4], (unsigned long long)calls[5],
++                (unsigned long long)calls[6]);
++    }
++};
++struct CheckerTraceRoot {
++    CheckerTrace &trace;
++    const char *stage;
++    string_view root;
++    chrono::steady_clock::time_point from;
++    CheckerTraceRoot(CheckerTrace &t, const char *s, string_view name)
++        : trace(t), stage(t.stage), root(t.root) {
++        if (!trace.enabled) return;
++        trace.stage = s; trace.root = name;
++        from = chrono::steady_clock::now();
++        trace.Report("begin");
++    }
++    ~CheckerTraceRoot() {
++        if (!trace.enabled) return;
++        auto ns = chrono::duration_cast<chrono::nanoseconds>(chrono::steady_clock::now() - from).count();
++        trace.Report("end", "-", ns);
++        trace.stage = stage; trace.root = root;
++    }
++};
++struct CheckerTraceBody {
++    CheckerTrace &trace;
++    string_view body;
++    const void *spec;
++    CheckerTraceBody(CheckerTrace &t, string_view name, const void *s)
++        : trace(t), body(t.body), spec(t.spec) {
++        if (trace.enabled) { trace.body = name; trace.spec = s; }
++    }
++    ~CheckerTraceBody() { if (trace.enabled) { trace.body = body; trace.spec = spec; } }
++};
++
+ struct CheckerRootProfile {
+     bool enabled = CheckerProfileEnabled();
+     chrono::steady_clock::time_point from;

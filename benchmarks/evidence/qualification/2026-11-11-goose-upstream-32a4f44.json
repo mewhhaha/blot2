@@ -1,0 +1,1071 @@
+{
+ "date": "2026-11-11",
+ "scope": "Partial check-only comparison of Goose checkers on compiler-goose. An error ends its root, so a time is time-to-first-error unless the root passed. Shared machine; no full compiler qualification.",
+ "compiler_goose_source_sha256": "d7b5eeabc0b65f96b8756b16d3426734f92083774bcab5fd295a5ed8d2110b1d",
+ "compile_root_cap300": {
+  "old": {
+   "seconds": 128.891,
+   "stop": "completed",
+   "first_error": "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru",
+   "process": {
+    "wall_seconds": 129.01,
+    "max_rss_mib": 6348,
+    "cgroup_peak_mib": 6374
+   }
+  },
+  "new-patched-v1": {
+   "seconds": 81.944,
+   "stop": "completed",
+   "first_error": "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)",
+   "process": {
+    "wall_seconds": 82.078,
+    "max_rss_mib": 3988,
+    "cgroup_peak_mib": 4011
+   }
+  },
+  "new-precision-v1": {
+   "seconds": 300.725,
+   "stop": "batch limit",
+   "first_error": null,
+   "process": {
+    "wall_seconds": 300.867,
+    "max_rss_mib": 8379,
+    "cgroup_peak_mib": 8401
+   }
+  },
+  "new-patched-v2": {
+   "seconds": 39.133,
+   "stop": "completed",
+   "first_error": "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)",
+   "process": {
+    "wall_seconds": 39.309,
+    "max_rss_mib": 3980,
+    "cgroup_peak_mib": 4008
+   }
+  },
+  "new-precision-v2": {
+   "seconds": 203.675,
+   "stop": "completed",
+   "first_error": "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru",
+   "process": {
+    "wall_seconds": 203.903,
+    "max_rss_mib": 9057,
+    "cgroup_peak_mib": 9082
+   }
+  }
+ },
+ "all_roots_serial_cap300": {
+  "old": {
+   "batch_seconds": 752.35,
+   "serial": true,
+   "process": {
+    "wall_seconds": 751.663,
+    "max_rss_mib": 9254,
+    "cgroup_peak_mib": 9309
+   },
+   "passed": 17,
+   "roots": {
+    "runtime": [
+     2.054,
+     "pass",
+     null
+    ],
+    "semantic": [
+     47.035,
+     "pass",
+     null
+    ],
+    "check": [
+     78.175,
+     "pass",
+     null
+    ],
+    "lower": [
+     3.759,
+     "pass",
+     null
+    ],
+    "independent": [
+     47.314,
+     "pass",
+     null
+    ],
+    "server": [
+     199.926,
+     "error",
+     "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru"
+    ],
+    "executor": [
+     4.261,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.256,
+     "pass",
+     null
+    ],
+    "scoped": [
+     69.719,
+     "pass",
+     null
+    ],
+    "prepare": [
+     24.384,
+     "pass",
+     null
+    ],
+    "compile": [
+     129.423,
+     "error",
+     "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru"
+    ],
+    "entry_display": [
+     2.736,
+     "pass",
+     null
+    ],
+    "assemble": [
+     10.065,
+     "pass",
+     null
+    ],
+    "record_artifact": [
+     12.667,
+     "pass",
+     null
+    ],
+    "publish": [
+     2.954,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     2.956,
+     "pass",
+     null
+    ],
+    "emit": [
+     52.015,
+     "error",
+     "eval/core_eval.goose:1278: error: cannot call withRegion, which shrinks backing_origins_code_module_types while body (bound at eval/core_eval.goose:1278) is still used"
+    ],
+    "observe": [
+     2.954,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     52.62,
+     "pass",
+     null
+    ],
+    "generator_diagnostic": [
+     3.158,
+     "pass",
+     null
+    ]
+   }
+  },
+  "new-patched-v1": {
+   "batch_seconds": 744.294,
+   "serial": true,
+   "process": {
+    "wall_seconds": 743.393,
+    "max_rss_mib": 4379,
+    "cgroup_peak_mib": 4446
+   },
+   "passed": 9,
+   "roots": {
+    "runtime": [
+     1.634,
+     "pass",
+     null
+    ],
+    "semantic": [
+     82.13,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "check": [
+     81.192,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "lower": [
+     3.05,
+     "pass",
+     null
+    ],
+    "independent": [
+     74.742,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "server": [
+     79.446,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "executor": [
+     4.256,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.454,
+     "pass",
+     null
+    ],
+    "scoped": [
+     82.63,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "prepare": [
+     79.343,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global state_owners may hold a reference into it, stored at backend/core_backend.goose:2027 (\u00a75.1)"
+    ],
+    "compile": [
+     80.751,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "entry_display": [
+     2.754,
+     "pass",
+     null
+    ],
+    "assemble": [
+     8.364,
+     "error",
+     "_diagnostic_roots.goose:119: error: cannot call deinit: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+    ],
+    "record_artifact": [
+     10.262,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global site_runs may hold a reference into it, stored at backend/source_origins.goose:32 (\u00a75.1)"
+    ],
+    "publish": [
+     2.954,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     2.851,
+     "pass",
+     null
+    ],
+    "emit": [
+     68.937,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "observe": [
+     2.756,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     68.315,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "generator_diagnostic": [
+     3.055,
+     "pass",
+     null
+    ]
+   }
+  },
+  "new-precision-v1": {
+   "batch_seconds": 1864.913,
+   "serial": true,
+   "process": {
+    "wall_seconds": 1864.173,
+    "max_rss_mib": 10833,
+    "cgroup_peak_mib": 10875
+   },
+   "passed": 17,
+   "roots": {
+    "runtime": [
+     1.655,
+     "pass",
+     null
+    ],
+    "semantic": [
+     158.755,
+     "pass",
+     null
+    ],
+    "check": [
+     210.12,
+     "pass",
+     null
+    ],
+    "lower": [
+     3.034,
+     "pass",
+     null
+    ],
+    "independent": [
+     161.672,
+     "pass",
+     null
+    ],
+    "server": [
+     300.996,
+     "cap",
+     null
+    ],
+    "executor": [
+     4.16,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.331,
+     "pass",
+     null
+    ],
+    "scoped": [
+     221.135,
+     "pass",
+     null
+    ],
+    "prepare": [
+     77.893,
+     "pass",
+     null
+    ],
+    "compile": [
+     300.815,
+     "cap",
+     null
+    ],
+    "entry_display": [
+     2.734,
+     "pass",
+     null
+    ],
+    "assemble": [
+     8.561,
+     "pass",
+     null
+    ],
+    "record_artifact": [
+     10.662,
+     "pass",
+     null
+    ],
+    "publish": [
+     2.854,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     2.856,
+     "pass",
+     null
+    ],
+    "emit": [
+     195.316,
+     "error",
+     "eval/core_eval.goose:1278: error: cannot call withRegion, which shrinks backing_origins_code_module_types while body (bound at eval/core_eval.goose:1278) is still used"
+    ],
+    "observe": [
+     2.553,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     191.355,
+     "pass",
+     null
+    ],
+    "generator_diagnostic": [
+     2.532,
+     "pass",
+     null
+    ]
+   }
+  },
+  "new-patched-v2": {
+   "batch_seconds": 350.201,
+   "serial": true,
+   "process": {
+    "wall_seconds": 349.798,
+    "max_rss_mib": 4375,
+    "cgroup_peak_mib": 4401
+   },
+   "passed": 9,
+   "roots": {
+    "runtime": [
+     1.552,
+     "pass",
+     null
+    ],
+    "semantic": [
+     34.702,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "check": [
+     36.738,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "lower": [
+     2.753,
+     "pass",
+     null
+    ],
+    "independent": [
+     32.389,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "server": [
+     37.925,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "executor": [
+     3.756,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.231,
+     "pass",
+     null
+    ],
+    "scoped": [
+     36.101,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "prepare": [
+     33.967,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global state_owners may hold a reference into it, stored at backend/core_backend.goose:2027 (\u00a75.1)"
+    ],
+    "compile": [
+     36.189,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "entry_display": [
+     2.432,
+     "pass",
+     null
+    ],
+    "assemble": [
+     5.963,
+     "error",
+     "_diagnostic_roots.goose:119: error: cannot call deinit: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+    ],
+    "record_artifact": [
+     7.96,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global site_runs may hold a reference into it, stored at backend/source_origins.goose:32 (\u00a75.1)"
+    ],
+    "publish": [
+     2.554,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     2.433,
+     "pass",
+     null
+    ],
+    "emit": [
+     31.392,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "observe": [
+     2.553,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     32.083,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "generator_diagnostic": [
+     2.438,
+     "pass",
+     null
+    ]
+   }
+  },
+  "new-precision-v2": {
+   "batch_seconds": 821.627,
+   "serial": true,
+   "process": {
+    "wall_seconds": 531.189,
+    "max_rss_mib": 10782,
+    "cgroup_peak_mib": 10814
+   },
+   "passed": 17,
+   "roots": {
+    "runtime": [
+     1.551,
+     "pass",
+     null
+    ],
+    "semantic": [
+     84.511,
+     "pass",
+     null
+    ],
+    "check": [
+     120.252,
+     "pass",
+     null
+    ],
+    "lower": [
+     2.959,
+     "pass",
+     null
+    ],
+    "independent": [
+     83.1,
+     "pass",
+     null
+    ],
+    "server": [
+     null,
+     "oom",
+     null
+    ],
+    "executor": [
+     3.658,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.251,
+     "pass",
+     null
+    ],
+    "scoped": [
+     103.432,
+     "pass",
+     null
+    ],
+    "prepare": [
+     33.53,
+     "pass",
+     null
+    ],
+    "compile": [
+     184.17,
+     "error",
+     "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru"
+    ],
+    "entry_display": [
+     2.332,
+     "pass",
+     null
+    ],
+    "assemble": [
+     5.859,
+     "pass",
+     null
+    ],
+    "record_artifact": [
+     7.638,
+     "pass",
+     null
+    ],
+    "publish": [
+     2.453,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     2.452,
+     "pass",
+     null
+    ],
+    "emit": [
+     89.564,
+     "error",
+     "eval/core_eval.goose:1278: error: cannot call withRegion, which shrinks backing_origins_code_module_types while body (bound at eval/core_eval.goose:1278) is still used"
+    ],
+    "observe": [
+     2.554,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     88.03,
+     "pass",
+     null
+    ],
+    "generator_diagnostic": [
+     2.331,
+     "pass",
+     null
+    ]
+   }
+  }
+ },
+ "equal_work_roots_vs_old": {
+  "new-precision-v1": {
+   "roots": 17,
+   "old_seconds": 368.1,
+   "new_precision_seconds": 1063.9,
+   "ratio": 2.89
+  },
+  "new-precision-v2": {
+   "roots": 17,
+   "old_seconds": 368.1,
+   "new_seconds": 547.9,
+   "ratio": 1.49
+  }
+ },
+ "attribution_new_patched_v2_plus_static_known": {
+  "batch_seconds": 303.833,
+  "serial": true,
+  "process": {
+   "wall_seconds": 303.472,
+   "max_rss_mib": 8673,
+   "cgroup_peak_mib": 8696
+  },
+  "passed": 1,
+  "roots": {
+   "check": [
+    114.861,
+    "pass",
+    null
+   ],
+   "compile": [
+    188.242,
+    "error",
+    "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru"
+   ]
+  }
+ },
+ "all_roots_jobs3_cap300": {
+  "new-patched": {
+   "batch_seconds": 274.458,
+   "serial": false,
+   "process": {
+    "wall_seconds": 274.568,
+    "max_rss_mib": 4334,
+    "cgroup_peak_mib": 11244
+   },
+   "passed": 9,
+   "roots": {
+    "runtime": [
+     1.739,
+     "pass",
+     null
+    ],
+    "semantic": [
+     87.046,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "check": [
+     86.156,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "lower": [
+     3.451,
+     "pass",
+     null
+    ],
+    "independent": [
+     80.078,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "server": [
+     82.846,
+     "error",
+     "check/frozen_types.goose:36: error: returning a reference rooted in s, which dies with this function (\u00a79.2)"
+    ],
+    "executor": [
+     4.759,
+     "pass",
+     null
+    ],
+    "metadata": [
+     1.537,
+     "pass",
+     null
+    ],
+    "scoped": [
+     87.561,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "prepare": [
+     84.538,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global state_owners may hold a reference into it, stored at backend/core_backend.goose:2027 (\u00a75.1)"
+    ],
+    "compile": [
+     88.985,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "entry_display": [
+     3.257,
+     "pass",
+     null
+    ],
+    "assemble": [
+     10.452,
+     "error",
+     "_diagnostic_roots.goose:119: error: cannot call deinit: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+    ],
+    "record_artifact": [
+     12.854,
+     "error",
+     "backend/resolved_body.goose:70: error: cannot assign payloads: global site_runs may hold a reference into it, stored at backend/source_origins.goose:32 (\u00a75.1)"
+    ],
+    "publish": [
+     3.75,
+     "pass",
+     null
+    ],
+    "detach_result": [
+     3.437,
+     "pass",
+     null
+    ],
+    "emit": [
+     76.628,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "observe": [
+     3.356,
+     "pass",
+     null
+    ],
+    "source_interface": [
+     76.325,
+     "error",
+     "reuse/code_expectation.goose:40: error: returning a reference rooted in n, which dies with this function (\u00a79.2)"
+    ],
+    "generator_diagnostic": [
+     3.157,
+     "pass",
+     null
+    ]
+   }
+  },
+  "new-precision": "scope OOM-killed at the 14G cap after 119s (three heavy roots in parallel)",
+  "old": "scope OOM-killed at the 14G cap after 295s; rerun serially"
+ },
+ "attribution_upstream_plus_roots_only": {
+  "batch_seconds": 1697.089,
+  "serial": true,
+  "process": {
+   "wall_seconds": 1696.935,
+   "max_rss_mib": 1506,
+   "cgroup_peak_mib": 1527
+  },
+  "passed": 0,
+  "roots": {
+   "compile": [
+    300.142,
+    "cap",
+    null
+   ],
+   "check": [
+    300.145,
+    "cap",
+    null
+   ],
+   "assemble": [
+    222.51,
+    "error",
+    "_diagnostic_roots.goose:119: error: cannot call deinit: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+   ],
+   "prepare": [
+    300.302,
+    "cap",
+    null
+   ],
+   "record_artifact": [
+    272.911,
+    "error",
+    "backend/resolved_body.goose:70: error: cannot assign payloads: global site_runs may hold a reference into it, stored at backend/source_origins.goose:32 (\u00a75.1)"
+   ],
+   "semantic": [
+    300.15,
+    "cap",
+    null
+   ]
+  }
+ },
+ "attribution_old_without_precision": {
+  "batch_seconds": 311.143,
+  "serial": true,
+  "process": {
+   "wall_seconds": 310.307,
+   "max_rss_mib": 6206,
+   "cgroup_peak_mib": 6245
+  },
+  "passed": 1,
+  "roots": {
+   "check": [
+    98.869,
+    "pass",
+    null
+   ],
+   "compile": [
+    175.906,
+    "error",
+    "backend/runtime_pipeline.goose:85: error: cannot call blot_backend_root_borrows::run, which shrinks backing_origins_code_module_static_fields while module (bound at backend/ru"
+   ],
+   "assemble": [
+    10.262,
+    "error",
+    "_diagnostic_roots.goose:119: error: cannot call deinit: it shrinks payloads while run is still used, and run may refer into payloads (\u00a75.1)"
+   ],
+   "prepare": [
+    24.383,
+    "error",
+    "backend/resolved_body.goose:70: error: cannot assign payloads: global state_owners may hold a reference into it, stored at backend/core_backend.goose:2027 (\u00a75.1)"
+   ]
+  }
+ },
+ "whole_program_cap600": {
+  "upstream-unpatched": {
+   "wall_seconds": 600.029,
+   "max_rss_mib": 2154,
+   "cgroup_peak_mib": 2167,
+   "exit": 124,
+   "first_error": null,
+   "error_lines": 0,
+   "warnings": [
+    "backend/wasm_lifetimes.goose:275: warning: redundant &: own binds by reference here without it (\u00a74.1)",
+    "backend/wasm_lifetimes.goose:293: warning: redundant &: own binds by reference here without it (\u00a74.1)"
+   ],
+   "log_sha256": "f4973565b99d368a978c5a07714db209ef75f2f64451afcfe83a962485bdce82"
+  },
+  "goose-to-wasm-selfhost": {
+   "wall_seconds": 0.057,
+   "max_rss_mib": 92,
+   "cgroup_peak_mib": 95,
+   "exit": 1,
+   "first_error": "driver/cli.goose:8:8: error: cannot resolve import; pass --stdlib or set GOOSE_STDLIB",
+   "error_lines": 897,
+   "warnings": [],
+   "log_sha256": "3ee7dd3dd65fa76c64ad517191906d96e22d95ee633a67be78475b6e8e5b0333"
+  }
+ },
+ "upstream": {
+  "pinned": "2e2bedef5b980bf013cac5aaa0095bfea64e5569",
+  "latest": "32a4f445d8a94b22874a28469f95f69ba3ac31dd",
+  "commits_between": 231
+ },
+ "old_checker": {
+  "path": "build/goose-port/finite-root-diagnostics/goose",
+  "sha256": "689721dad915bb3a71150892adfc357a2ce920e85e37a557dc042e45ac8c9f94",
+  "reconstruction": "goose-to-wasm build/source (2e2bedef plus its wasm-target patches, inert for goose check) + 13 tool patches in recipe order without goose-shrink-origins + unpublished finite-copied-globals and traversal-buckets residuals + options-roots-trace; reproduces finite-root source/src exactly except generated runtime_inline.h"
+ },
+ "binaries": {
+  "upstream": {
+   "path": "build/goose-port/upstream-32a4f44/build-upstream/goose",
+   "sha256": "93159a89a0defa48e858bf5dc0ddc12c35a080bf3305e269b539bedacf2a2d9d"
+  },
+  "upstream+diagnostic-roots": {
+   "path": "build/goose-port/upstream-32a4f44/build-upstream-roots/goose",
+   "sha256": "e268a5734e109dd09a82216a56950ef3fef946888ca889ae49317de0482f5c41"
+  },
+  "new-patched-v1": {
+   "path": "build/goose-port/upstream-32a4f44/build-new-patched/goose",
+   "sha256": "69ea52c8e08f9954d27c8e1aa3f582990bb3afcf7e0312bb7a124521aeeea120"
+  },
+  "new-precision-v1": {
+   "path": "build/goose-port/upstream-32a4f44/build-new-precision/goose",
+   "sha256": "94014bec68864db14f8f0037b574aa5105a3751d4e2e5e89fb6a45cf32c68aa9"
+  },
+  "new-patched-v2": {
+   "path": "build/goose-port/upstream-32a4f44/build-new-patched-v2/goose",
+   "sha256": "aa28a30422e8c1c728d28be2e73da157403097e65b149bd3433707984788170a"
+  },
+  "new-precision-v2": {
+   "path": "build/goose-port/upstream-32a4f44/build-new-precision-v2/goose",
+   "sha256": "c896334f7f098dfd100ddd3c6a58ee244674212861a5315f94faffb90dc67313"
+  },
+  "new-patched-v2+17": {
+   "path": "build/goose-port/upstream-32a4f44/build-new-patched-v2-static/goose",
+   "sha256": "4fcd68343d99719d91bd4c4e3a2d54ea7271e1d05657094133568db7a2694022"
+  },
+  "old-patched (2e2bedef, no precision layers)": {
+   "path": "build/goose-port/upstream-32a4f44/old-patched/goose",
+   "sha256": "d983bddc404f92ef175554cf03da2a105c6a26cf34e250aae0b4ae95a5663eb2"
+  },
+  "goose-to-wasm selfhost": {
+   "path": "../goose-to-wasm/build/bin/goose",
+   "sha256": "9a0450a452f6dcc0c6ad698fdeb9af6be599c7e8ffdb2437364a6f360145489d",
+   "snapshot": 58
+  }
+ },
+ "recipe": {
+  "source": "git archive 32a4f445 of https://github.com/aardappel/goose into build/goose-port/upstream-32a4f44/source-<variant>, then patch -p1 --fuzz=0 with compiler-goose/tools/upstream-32a4f44/series (new-patched: 01-11, new-precision: 01-17)",
+  "build": "sh build/goose-port/upstream-32a4f44/build.sh <variant> \"-DCMAKE_CXX_FLAGS=-gline-tables-only -DGOOSE_EXPANSION_NODE_LIMIT=1000000 -DGOOSE_REACHABLE_PROGRAM=1\": cmake -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=/usr/bin/clang -DCMAKE_CXX_COMPILER=/usr/bin/clang++ (clang 23.1.4) -DGOOSE_VERSION=32a4f44-<variant>; ninja goose; unpatched upstream used CMAKE_CXX_FLAGS=-gline-tables-only only",
+  "wrapper": "flock /var/tmp/blot2-heavy.lock systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=2G",
+  "stdlib": "each new build uses its own source-<variant>/stdlib (upstream 32a4f44 stdlib); old uses ../goose-to-wasm/build/source/stdlib"
+ },
+ "patches": [
+  {
+   "file": "01-goose-containment.patch",
+   "sha256": "9cc053751d8a81757811a5246b1791bbb8207cac63d62b4462d38259e236d260",
+   "group": "speed",
+   "disposition": "ported with changes",
+   "note": "StableCanContain/Reaches caches, global-root filter (root owners kept live: upstream components appear lazily), why-pointer TryMatch, bucketed ArrayReachVisited, export roots first, GOOSE_EXPANSION_NODE_LIMIT. Dropped its ApplyCalleeStores store-event key index: upstream cd988c4 remaps every body event afresh per call and drops caller-dependent sources, so \"unrelated events are unchanged\" no longer holds. ContentsReadBack static-only hunk moved to 17 (precision)."
+  },
+  {
+   "file": "02-goose-diagnostic-roots.patch",
+   "sha256": "64b9adac1e0999a32c2eb72054190f25471f3d72c31a09b8fbe230c00229bf2b",
+   "group": "partial",
+   "disposition": "ported",
+   "note": "partial path also runs upstream CheckDefers"
+  },
+  {
+   "file": "03-goose-reachable-program.patch",
+   "sha256": "9ab92a346064209c2412aaac6e46415da220996f8ee010edbb3de052145a6ab1",
+   "group": "partial/speed",
+   "disposition": "ported",
+   "note": "driver phase clocks re-added (upstream removed them)"
+  },
+  {
+   "file": "04-goose-stable-closures.patch",
+   "sha256": "083e0fc453f359e6a300fbab6f140273bfdec7cd470708115e69c9a103be02ae",
+   "group": "speed",
+   "disposition": "ported clean",
+   "note": ""
+  },
+  {
+   "file": "05-goose-array-reach-gate.patch",
+   "sha256": "df245f23c423a7264076bb06817a4ecb75846aa1018b7f3f42b1a4b681cfeb1c",
+   "group": "diagnostic/speed",
+   "disposition": "ported clean",
+   "note": ""
+  },
+  {
+   "file": "06-goose-reference-closures.patch",
+   "sha256": "e34627da7952c0636349e78db65aa889dc48deb8ab2a82973153a2d4bb29e93b",
+   "group": "speed",
+   "disposition": "ported clean",
+   "note": ""
+  },
+  {
+   "file": "07-goose-checker-trace.patch",
+   "sha256": "d477d2ff8a0f229228a04ce7cef9a83963d8e221ea9bd99ede929677f9780a92",
+   "group": "diagnostic",
+   "disposition": "ported",
+   "note": "CheckSpecBodyOnce gained Call* upstream"
+  },
+  {
+   "file": "08-goose-holder-event-index.patch",
+   "sha256": "e0f563851152903555536ea2a6623c8b3672b49ae2ee98de27b50e2c04896a85",
+   "group": "speed",
+   "disposition": "ported with fix",
+   "note": "IndexStoreEvent feeds only the holder index; v2 re-indexes a replaced event only when its container changes (upstream remaps every body event per call; re-recording each one cost ~48% of v1 time)"
+  },
+  {
+   "file": "09-goose-global-reach-trace.patch",
+   "sha256": "32b4bcd94f337e4b6c2705005686adec2ca956556b28cf795c5b1da74660815d",
+   "group": "diagnostic",
+   "disposition": "ported clean",
+   "note": ""
+  },
+  {
+   "file": "10-goose-traversal-buckets.patch",
+   "sha256": "8868d9540f9c21a06629e3b1afcd2bb71f681bf95d4c0753f325ddba0e81b0a7",
+   "group": "speed",
+   "disposition": "ported clean",
+   "note": "was an unpublished finite-root residual"
+  },
+  {
+   "file": "11-goose-shrink-origins.patch",
+   "sha256": "d1d0c4df51dca4b25c6950bb66f9d19a7f6f7ce3f8a1f949a65d01f789963f83",
+   "group": "diagnostic",
+   "disposition": "ported",
+   "note": "absent from the finite-root build; adapted to upstream MapClass shrinkexternals"
+  },
+  {
+   "file": "12-goose-used-after-frame-skip.patch",
+   "sha256": "84926da678fdbdee49b55b8fe2580ca1ce948c2b0e2b84f72ac717aa4c0d6800",
+   "group": "precision",
+   "disposition": "ported clean, still needed",
+   "note": "upstream UsedAfter still lacks the frame skip"
+  },
+  {
+   "file": "13-goose-global-empty-facts.patch",
+   "sha256": "d240eb94f6b692813cf98e3083e0b0ef6bfb132d3e76c9cef1f465c52417f437",
+   "group": "precision",
+   "disposition": "ported clean, still needed",
+   "note": "upstream NoteKill still skips globals (0357b1c covers locals only); controls 24/24"
+  },
+  {
+   "file": "14-goose-copied-argument-contents.patch",
+   "sha256": "2406c65251db51188f82861345423120953d203e8cb1b7b472e346af04766e78",
+   "group": "precision",
+   "disposition": "ported with changes, still needed",
+   "note": "argcopy kept in upstream FnRecord::BodyEvent and threaded through holds(); RootAlt positional init fixed for upstream projected; controls 20/20"
+  },
+  {
+   "file": "15-goose-finite-copied-globals.patch",
+   "sha256": "286486cb7d8b25d193a604c582cba4bfd51c6f2c2f363a2afde6e831069f0aab",
+   "group": "precision",
+   "disposition": "ported",
+   "note": "unpublished finite-root residual"
+  },
+  {
+   "file": "16-goose-options-roots-trace.patch",
+   "sha256": "ac5acc26742e0d5c757ad3f5c47a46176b7264517ec3fa7bd6fb01d4b15337a4",
+   "group": "diagnostic",
+   "disposition": "ported into new-precision only",
+   "note": "reports finite-copied-globals selection"
+  },
+  {
+   "file": "17-goose-contents-static-known.patch",
+   "sha256": "4ff9d8d6447975ec50f46045a085b5dda35979595f6803f073ee9ec85f2ffd16",
+   "group": "precision",
+   "disposition": "split out of old containment",
+   "note": "ContentsReadBack treats static-only contents as known"
+  }
+ ],
+ "not_ported": [
+  {
+   "patch": "goose-runtime-observer.patch",
+   "reason": "built on goose-to-wasm checked-stack runtime (GS_CHECKED_STACKS, gs_stack_require) absent upstream; instruments generated programs only, never goose check"
+  }
+ ],
+ "upstream_covered": [],
+ "stdlib_drift": {
+  "summary": "No breakage. Imported stdlib modules: dictionary (unchanged), std, json, math. Signatures used keep their names; upstream marks small std/math/vec helpers checkfree, adds f32 math overloads and slice_pool/slot_pool modules, and moves json float helpers. The 451-file import closure parses, resolves and checks with the 32a4f44 stdlib.",
+  "new_warnings": [
+   "backend/wasm_lifetimes.goose:275 and :293: warning: redundant &: own binds by reference here without it (section 4.1)"
+  ]
+ },
+ "selfhost": {
+  "binary": "../goose-to-wasm/build/bin/goose (snapshot 58, Goose-in-Goose)",
+  "result": "Cannot load compiler-goose: resolves a non-relative import against the importing file directory, then the stdlib, with lexical path normalization only. compiler-goose uses root-relative imports, so it stops after 897 \"cannot resolve import\" errors in 0.057s (96 MiB) before any type or borrow checking. No GOOSE_DIAGNOSTIC_ROOTS equivalent (no getenv in selfhost/).",
+  "patch_correspondence": "Independent 2.4k-line lifetime model; no shared code with the C++ checker or our patches. Its only checker speed commit, db76f45, hash-indexes its containment memo (life_contains), conceptually like our containment CanContain/ReachesThroughRefs caches and the holder/traversal bucket indexes; none of our C++ patches applies to it."
+ },
+ "findings": {
+  "speed": "On the 17 roots that pass under both, new-precision-v2 takes 547.9s vs old 368.1s (1.49x); v1 took 1063.9s (2.89x). Pure upstream plus root selection is ~35x slower than new-patched-v2 on equal-error roots (assemble 222.5s vs 6.0s, record_artifact 272.9s vs 8.0s) and exceeds 300s on compile/check/prepare/semantic.",
+  "memory": "new-precision-v2 compile root peaks 8.84 GiB (old 6.20 GiB); the server root exceeds the 14G scope (goose anon RSS 14.6 GB about 180s in), where old fails at runtime_pipeline.goose:85 after 200s. Three heavy roots in parallel (--jobs 3) exceed 14G for old and new-precision; new-patched peaks 4.3 GiB per root.",
+  "errors": "new-precision-v2 first errors equal old on every root except server: compile runtime_pipeline.goose:85, emit core_eval.goose:1278; 17/20 pass. new-patched (no precision layers) adds code_expectation.goose:40, frozen_types.goose:36 (fixed by 17 contents-static-known, which the old containment patch carried silently), resolved_body.goose:70 and _diagnostic_roots.goose:119 (also reported by pure upstream and by old 2e2bedef without precision layers). No error is new to upstream 32a4f44.",
+  "profiles": "gdb sampling of the semantic root (profile/*.gdb.log): v1 spent 80% in ApplyCalleeStores and 48% re-recording the holder index for every remapped event (fixed in v2 08). v2 still spends 60% in ApplyCalleeStores; leaves ClassParam 12% and the remap loop 12%: upstream cd988c4 remaps every body event at every call, which the old containment key index skipped. Old spends its largest leaf in SaveFlow (17%), which upstream 7f421e9 narrows."
+ },
+ "recommendation": "Standardize on new-precision-v2 (upstream 32a4f44 + series 01-17) for diagnostics: identical first errors to the old checker on 19/20 roots, current upstream semantics, and a 2x improvement over the first port. It is still 1.5x slower and uses more memory than the old checker, and the server root needs more than 14G, so keep finite-root-diagnostics for server and time-critical repair loops until a cd988c4-compatible ApplyCalleeStores filter (remap only class-rooted events and callee-owned sources) and a per-call ClassParam memo recover the gap. That speed work belongs in our private patch series, not in goose-to-wasm: its self-hosted checker cannot load compiler-goose."
+}

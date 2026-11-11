@@ -1,0 +1,23 @@
+# Private checker patches ported to upstream Goose 32a4f445d8a94b22874a28469f95f69ba3ac31dd.
+# Apply in order with: patch -p1 --fuzz=0 -d <goose-source> -i <file>.
+# Build with upstream CMake (Release, clang 23.1.4) and
+#   CMAKE_CXX_FLAGS="-gline-tables-only -DGOOSE_EXPANSION_NODE_LIMIT=1000000 -DGOOSE_REACHABLE_PROGRAM=1".
+# new-patched = 01-11 (diagnostics, speed, partial roots). new-precision = 01-17.
+01-goose-containment.patch
+02-goose-diagnostic-roots.patch
+03-goose-reachable-program.patch
+04-goose-stable-closures.patch
+05-goose-array-reach-gate.patch
+06-goose-reference-closures.patch
+07-goose-checker-trace.patch
+08-goose-holder-event-index.patch
+09-goose-global-reach-trace.patch
+10-goose-traversal-buckets.patch
+11-goose-shrink-origins.patch
+# Precision: accepts code upstream rejects.
+12-goose-used-after-frame-skip.patch
+13-goose-global-empty-facts.patch
+14-goose-copied-argument-contents.patch
+15-goose-finite-copied-globals.patch
+16-goose-options-roots-trace.patch
+17-goose-contents-static-known.patch

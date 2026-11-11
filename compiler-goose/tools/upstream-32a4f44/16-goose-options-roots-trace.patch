@@ -1,0 +1,53 @@
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index a093948..0c97464 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -1520,6 +1520,48 @@ inline FnSpec *TypeCheck::GetOrCreateSpec(MatchInfo &mi, vector<Val> &argvals, N
+             ra.copiedglobals.erase(unique(ra.copiedglobals.begin(), ra.copiedglobals.end()),
+                                    ra.copiedglobals.end());
+         }
++        // Diagnostic only: inspect the original alternative set before classify.
++        auto trace_type_name = [](TypeExpr *t) -> string_view {
++            if (t && t->kind == TY_STRUCT && t->struc && t->struc->st) return t->struc->st->qname;
++            if (t && t->kind == TY_ENUM && t->enu && t->enu->en) return t->enu->en->qname;
++            return "";
++        };
++        auto trace_type = trace_type_name(pt);
++        if (trace_type == "blot_backend_core_backend::CompileOptions" ||
++            sf->qname == "blot_backend_core_backend::compileAttempt" ||
++            sf->qname == "blot_backend_core_backend::compileCounted" ||
++            sf->qname == "blot_backend_core_backend::compileLocals" ||
++            sf->qname == "blot_reuse_partial_dependency::emitWithOptions") {
++            auto enabled = getenv("GOOSE_OPTIONS_ROOT_TRACE");
++            if (enabled && string_view(enabled) == "1") {
++                static size_t bytes = 0, sequence = 0;
++                auto emit = [&](const char *format, auto... args) {
++                    if (bytes >= 1048576) return;
++                    char line[4096]; int n = snprintf(line, sizeof(line), format, args...);
++                    if (n <= 0) return;
++                    size_t count = min(size_t(n), sizeof(line)-1);
++                    if (bytes + count > 1048544) {fputs("GOOSE_OPTIONS_TRACE_LIMIT\n", stderr);bytes=1048576;return;}
++                    fwrite(line, 1, count, stderr);bytes += count;
++                };
++                auto seq = ++sequence;
++                int kind=-1;if (pt) kind=int(pt->kind);
++                auto where=callnode->line;
++                emit("GOOSE_OPTIONS_CALL seq=%zu function=%.*s param=%zu type=%p kind=%d named=%.*s holder=%d rec=%d unknown=%d alts=%zu copiedglobals=%zu heldexact=%d holderfrom=%p reached=%p value_pointee=%d file=%d line=%d col=%d\n",seq,(int)sf->qname.size(),sf->qname.data(),i,(void *)pt,kind,(int)trace_type.size(),trace_type.data(),holder,sf->isrec,ar.unknown,ar.alts.size(),ra.copiedglobals.size(),ra.heldexact,(void *)argvals[i].holderfrom,(void *)argvals[i].reached,argvals[i].pointee,where.fileidx,where.line,where.col);
++                auto variable = [&](const char *role, VarDef *v) {
++                    for (int chain=0; v && chain<16; chain++,v=v->classfrom) {
++                        string_view fn="<none>";if(v->ownerspec && v->ownerspec->sf)fn=v->ownerspec->sf->qname;
++                        int vk=-1;if(v->type)vk=int(v->type->kind);auto tn=trace_type_name(v->type);
++                        emit("GOOSE_OPTIONS_VAR seq=%zu role=%s chain=%d ptr=%p name=%.*s function=%.*s depth=%d global=%d param=%d type=%p kind=%d named=%.*s classfrom=%p classpool=%p contents=%zu unknown=%d file=%d line=%d col=%d\n",seq,role,chain,(void *)v,(int)v->name.size(),v->name.data(),(int)fn.size(),fn.data(),v->depth,v->isglobal,v->isparam,(void *)v->type,vk,(int)tn.size(),tn.data(),(void *)v->classfrom,(void *)v->classpool,v->contents.alts.size(),v->contents.unknown,v->line.fileidx,v->line.line,v->line.col);
++                    }
++                };
++                for (size_t ai=0;ai<ar.alts.size();ai++) {const auto &a=ar.alts[ai];
++                    emit("GOOSE_OPTIONS_ALT seq=%zu index=%zu root=%p from=%p exact=%d classread=%d slotread=%d argcopy=%d\n",seq,ai,(void *)a.root,(void *)a.from,a.exact,a.classread,a.slotread,a.argcopy);
++                    variable("root",a.root);variable("from",a.from);
++                }
++                for(size_t gi=0;gi<ra.copiedglobals.size();gi++)emit("GOOSE_OPTIONS_SELECTED seq=%zu index=%zu root=%p\n",seq,gi,(void *)ra.copiedglobals[gi]);
++                variable("holderfrom",argvals[i].holderfrom);
++            }
++        }
+         // Any root the argument may have that holds a grow-shrink array, or
+         // for a reference to a slice one that slice may point into. A root
+         // that only bounds a reference or slice argument stands for what it

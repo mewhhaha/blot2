@@ -1,0 +1,87 @@
+diff --git a/src/main.cpp b/src/main.cpp
+index 7d9ca36..0597b80 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -1655,7 +1655,17 @@ int Main(int argc, char **argv) {
+             if (stats) fprintf(msgs, "roundtrip ok: %d bytes of dump\n", (int)dumped.size());
+         }
+         if (parseonly) return 0;
++        auto diagnostic_roots = getenv("GOOSE_DIAGNOSTIC_ROOTS");
++        auto partial_diagnostics = diagnostic_roots && *diagnostic_roots;
++        if (partial_diagnostics && !nocgen)
++            throw CompileError { "GOOSE_DIAGNOSTIC_ROOTS requires check mode; no output is emitted" };
++        if (partial_diagnostics)
++            fprintf(msgs, "PARTIAL selected-root diagnostics; full-program qualification pending\n");
+         TypeCheckProgram(ast, library, nocgen);
++        if (partial_diagnostics) {
++            if (!ast.errors.empty()) return 1;
++            return 0;
++        }
+         // The checker reported the errors it went on past, root by root.
+         if (!ast.errors.empty()) return 1;
+         Optimizer opt(ast, optlevel);
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 5d35203..6ee23f3 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -3158,6 +3158,35 @@ struct TypeCheck {
+             if (t->kind == TY_REF && t->ref->pool && !HasGenerics(t->ref->sub)) ValidatePool(t);
+             if (IsIndexT(t)) ValidateIndexType(t);
+         }
++        // Explicitly partial development diagnostics: only concrete probe roots.
++        // Globals and declaration validation above still run; no code is emitted.
++        if (auto selected = getenv("GOOSE_DIAGNOSTIC_ROOTS"); selected && *selected) {
++            if (!nomain) throw CompileError { "GOOSE_DIAGNOSTIC_ROOTS requires check mode" };
++            unordered_set<string> pending;
++            string names(selected);
++            for (size_t begin = 0; begin < names.size();) {
++                auto end = names.find(',', begin);
++                if (end == string::npos) end = names.size();
++                if (end == begin) throw CompileError { "empty diagnostic root" };
++                pending.insert(names.substr(begin, end - begin));
++                begin = end + 1;
++            }
++            vector<SFunction *> roots;
++            for (auto sf : ast.functions) {
++                if (!pending.erase(string(sf->qname))) continue;
++                if (!sf->params.empty() || !sf->generics.empty() || sf->isthread)
++                    throw CompileError { cat("diagnostic root needs a concrete no-argument wrapper: ", sf->qname) };
++                roots.push_back(sf);
++            }
++            if (!pending.empty()) throw CompileError { cat("unknown diagnostic root: ", *pending.begin()) };
++            for (auto sf : roots) CheckRoot([&] { CheckUnreached(sf); });
++            CheckRoot([&] { CheckGlobalShrinks(); });
++            CheckRoot([&] { SettleParamRootExactness(); });
++            CheckRoot([&] { ResolveGrowConflicts(); });
++            CheckRoot([&] { VerifyLiterals(); });
++            CheckRoot([&] { CheckDefers(); });
++            return;
++        }
+         auto mainsf = ast.MainFunction();
+         if (!mainsf && !library && !(nomain && !ast.DeclaresMain()))
+             throw CompileError { "program needs exactly one global fn main()" };
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index b2e2021..484e55a 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2064,14 +2064,18 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+                 if ((widen || (cyclecall && !cyclelocal(a.root))) &&
+                     Depth(a.root) > Depth(t.root)) {
+                     auto rname = a.root ? a.root->name : string_view("static data");
+-                    Error(at, cat("call ", spec->sf->name, " stores a reference rooted at ",
++                    auto chain = Chain(at->expansiontrace.empty() ? ActiveExpansionTrace() : at->expansiontrace);
++                    chain.insert(chain.begin(), { LocOf(e.at),
++                                                  cat("reference stored at ", Where(e.at)) });
++                    ErrorIn(LocOf(at), cat("call ", spec->sf->name, " stores a reference rooted at ",
+                                   rname,
+                                   e.bound ? cat(" into what its parameter ", pname,
+                                                 " leads to, which may be ")
+                                           : cat(" through its parameter ", pname,
+                                                 ", whose argument ",
+                                                 cr.Exact() ? "points" : "may point", " into "),
+-                                  TargetStr(t), ", which ", rname, " does not outlive (§9.2)"));
++                                  TargetStr(t), ", which ", rname, " does not outlive (§9.2)"),
++                            std::move(chain));
+                 }
+                 if (once(t.root, a.root))
+                     push(t.root, a, e.pointee, src, classread, e.byteview, e.reached, t.bound,

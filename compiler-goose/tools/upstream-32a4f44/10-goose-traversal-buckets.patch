@@ -1,0 +1,25 @@
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index 1fe5f57..a334bdb 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1307,15 +1307,19 @@ inline bool TypeCheck::StaticCanContain(TypeExpr *of) {
+ // references and slices it holds, at any remove, each once.
+ inline void TypeCheck::ReachedThroughRefs(TypeExpr *t, vector<TypeExpr *> &out) {
+     TraceEngine(CheckerEngine::Reached, t);
++    ArrayReachVisited visited;
++    for (auto s : out) visited.Bucket(s).push_back(s);
+     vector<TypeExpr *> work;
+     RefPointees(t, work);
+     while (!work.empty()) {
+         auto p = work.back();
+         work.pop_back();
++        auto &bucket = visited.Bucket(p);
+         auto again = false;
+-        for (auto s : out) again = again || TypeEq(s, p);
++        for (auto s : bucket) again = again || TypeEq(s, p);
+         if (again) continue;
+         out.push_back(p);
++        bucket.push_back(p);
+         RefPointees(p, work);
+     }
+ }

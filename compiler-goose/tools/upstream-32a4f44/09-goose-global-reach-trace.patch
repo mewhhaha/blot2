@@ -1,0 +1,158 @@
+diff --git a/src/typecheck.h b/src/typecheck.h
+index e576f17..f17c7a5 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2793,6 +2793,10 @@ struct TypeCheck {
+         const map<VarDef *, vector<size_t>> &bycontainer;
+         set<VarDef *> held;
+         set<pair<VarDef *, bool>> rooted;
++        bool trace = false;
++        void Trace(string_view kind, VarDef *holder = nullptr, VarDef *root = nullptr,
++                   bool exact = false, VarDef *src = nullptr, TypeExpr *pointee = nullptr,
++                   bool byteview = false, Line at = {});
+         bool Fits(TypeExpr *pointee, bool byteview);
+         bool Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee, bool byteview);
+         bool Class(VarDef *cr, bool exact, TypeExpr *pointee, bool byteview);
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index ac71663..48170b5 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2345,8 +2345,13 @@ inline void TypeCheck::CheckGlobalShrinks() {
+                                     " may hold a reference into ",
+                                     gs.bound ? string(arr->name) : string("it"));
+                     GlobalReach reach { *this, arr, arrtype, bycontainer, {}, {} };
++                    if (gd->name == "live_sessions" && arr->name == "payloads") {
++                        auto enabled = std::getenv("GOOSE_GLOBAL_REACH_TRACE");
++                        reach.trace = enabled && string_view(enabled) == "1";
++                    }
+                     Line where;
+                     if (!reach.Holds(gd, &where)) continue;
++                    reach.Trace("failure", gd, arr, true, nullptr, nullptr, false, gs.at);
+                     ErrorIn(LocOf(gs.at), cat(into, ", stored at ", Where(where), " (§5.1)"),
+                             gs.chain);
+                 }
+@@ -2357,6 +2362,28 @@ inline void TypeCheck::CheckGlobalShrinks() {
+ 
+ // Whether a reference to a pointee of this type, or a byte view, can point
+ // into the array.
++// Optional private diagnostics only: no TypeStr/type queries or changed traversal.
++inline void TypeCheck::GlobalReach::Trace(string_view kind, VarDef *holder, VarDef *root,
++                                         bool exact, VarDef *src, TypeExpr *pointee,
++                                         bool byteview, Line at) {
++    if (!trace) return;
++    static size_t lines = 0;
++    if (lines >= 160) return;
++    lines++;
++    auto name = [&](VarDef *v) {
++        if (!v) return string("<none>");
++        auto result = cat(v->name, "@", tc.Where(v->line));
++        auto owner = v->ownerspec ? v->ownerspec : v->classfrom ? v->classfrom->ownerspec : nullptr;
++        if (owner && owner->sf) result += cat("[", owner->sf->qname, "]");
++        return result;
++    };
++    fprintf(stderr, "GOOSE_GLOBAL_REACH kind=%.*s holder=%s root=%s exact=%d src=%s pointee_kind=%d byteview=%d at=%s\n",
++            (int)kind.size(), kind.data(), name(holder).c_str(), name(root).c_str(), (int)exact,
++            name(src).c_str(), pointee ? (int)pointee->kind : -1, (int)byteview,
++            tc.Where(at).c_str());
++    if (lines == 160) fprintf(stderr, "GOOSE_GLOBAL_REACH limit=160\n");
++}
++
+ inline bool TypeCheck::GlobalReach::Fits(TypeExpr *pointee, bool byteview) {
+     if (byteview) return tc.Viewable(arrtype);
+     return !pointee || tc.CanContain(arrtype, pointee);
+@@ -2369,10 +2396,24 @@ inline bool TypeCheck::GlobalReach::Fits(TypeExpr *pointee, bool byteview) {
+ // fits it: nothing outlives a global.
+ inline bool TypeCheck::GlobalReach::Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee,
+                                          bool byteview) {
+-    if (tc.IsClassRoot(r)) return Class(r, exact, pointee, byteview);
+-    if (exact) return r == arr;
+-    if (from && !IsTemp(from)) return Holds(from);
+-    return Fits(pointee, byteview);
++    if (tc.IsClassRoot(r)) {
++        auto hit = Class(r, exact, pointee, byteview);
++        if (hit) Trace("root-class", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    if (exact) {
++        auto hit = r == arr;
++        if (hit) Trace("root-exact", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    if (from && !IsTemp(from)) {
++        auto hit = Holds(from);
++        if (hit) Trace("root-source", nullptr, r, exact, from, pointee, byteview);
++        return hit;
++    }
++    auto hit = Fits(pointee, byteview);
++    if (hit) Trace("root-bound", nullptr, r, exact, from, pointee, byteview);
++    return hit;
+ }
+ 
+ // A reference rooted at a parameter's class: where the argument of each call
+@@ -2385,11 +2426,17 @@ inline bool TypeCheck::GlobalReach::Class(VarDef *cr, bool exact, TypeExpr *poin
+     auto it = tc.classuses.find(cr);
+     if (it == tc.classuses.end()) return false;
+     for (auto &u : it->second) {
+-        if (u.src && Holds(u.src)) return true;
++        if (u.src && Holds(u.src)) {
++            Trace("class-source", cr, nullptr, exact, u.src, pointee, byteview || u.byteview);
++            return true;
++        }
+         for (auto &a : u.roots.alts) {
+             if (u.src && Covered(u.src, a.root, a.exact)) continue;
+-            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview))
++            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview)) {
++                Trace("class-root", cr, a.root, a.exact && exact, u.src ? u.src : a.from,
++                      pointee, byteview || u.byteview);
+                 return true;
++            }
+         }
+     }
+     return false;
+@@ -2409,13 +2456,18 @@ inline bool TypeCheck::GlobalReach::Holds(VarDef *x, Line *where) {
+         if (it == tc.classuses.end()) return false;
+         for (auto &u : it->second)
+             for (auto &a : u.roots.alts)
+-                if (!a.exact || (a.root && Holds(a.root))) return true;
++                if (!a.exact || (a.root && Holds(a.root))) {
++                    Trace(a.exact ? "held-class-root" : "held-class-bound", x, a.root,
++                          a.exact, u.src ? u.src : a.from, nullptr, u.byteview);
++                    return true;
++                }
+         return false;
+     }
+     if (auto it = bycontainer.find(x); it != bycontainer.end()) {
+         for (auto i : it->second) {
+             auto &e = tc.madestores[i];
+             if (!Event(e)) continue;
++            Trace("holder-store", x, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
+             if (where) *where = e.at;
+             return true;
+         }
+@@ -2423,6 +2475,8 @@ inline bool TypeCheck::GlobalReach::Holds(VarDef *x, Line *where) {
+     if (x->type && IsRefOrSlice(x->type) && x->refrootknown) {
+         for (auto &a : x->ref.alts) {
+             if (!Root(a.root, a.exact, a.from, tc.PointeeOf(x->type), x->ref.byteview)) continue;
++            Trace("holder-binding", x, a.root, a.exact, a.from, tc.PointeeOf(x->type),
++                  x->ref.byteview, x->line);
+             if (where) *where = x->line;
+             return true;
+         }
+@@ -2434,10 +2488,15 @@ inline bool TypeCheck::GlobalReach::Holds(VarDef *x, Line *where) {
+ // does; its own roots add only what is not among those (Covered).
+ inline bool TypeCheck::GlobalReach::Event(const StoreEvent &e) {
+     if (e.src) {
+-        if (Holds(e.src)) return true;
++        if (Holds(e.src)) {
++            Trace("event-source", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
++            return true;
++        }
+         if (Covered(e.src, e.root, e.exact)) return false;
+     }
+-    return Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    if (hit) Trace("event-root", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
++    return hit;
+ }
+ 
+ // Whether a root a copy of src's contents carries is judged by following

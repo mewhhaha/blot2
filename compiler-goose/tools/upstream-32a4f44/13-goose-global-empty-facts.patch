@@ -1,0 +1,157 @@
+diff --git a/src/ast.h b/src/ast.h
+index 8824c39..5ec0fa3 100644
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -2301,6 +2301,8 @@ struct FnRecord {
+         TypeExpr *bound = nullptr;
+         size_t before = 0;
+         vector<pair<int, string>> kills;
++        // Exact whole-global empties, valid only while judging this ordered shrink.
++        vector<VarDef *> emptyglobals;
+     };
+     vector<ShrinkOrder> shrinkorders;
+     size_t eventstart = 0;         // storeevents.size() when the body's check began.
+diff --git a/src/typecheck.h b/src/typecheck.h
+index cf9e91f..07ad3cb 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2798,6 +2798,7 @@ struct TypeCheck {
+         Line at;
+         string prefix;
+         vector<Diagnostic::Related> chain;
++        vector<VarDef *> emptyglobals;
+     };
+     vector<GlobalShrink> globalshrinks;
+     void NoteGlobalShrink(Node *at, const string &prefix, VarDef *vd, TypeExpr *bound);
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index c4757c8..d297d54 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1321,10 +1321,16 @@ inline void TypeCheck::NoteKill(Node *lval, const Roots &loc, TypeExpr *target,
+     auto held = ContentsOf(v);
+     if (!held.OnlyStatic() || held.unknown || !loc.Exact()) return;
+     auto container = loc.Root();
+-    if (!container || container->isglobal || IsTemp(container)) return;
++    if (!container || IsTemp(container)) return;
+     VarDef *base = nullptr;
+     string path;
+-    if (!KillPath(lval, base, path)) return;
++    if (container->isglobal) {
++        // Optional precision for a direct whole-global assignment only.
++        // Keep KillPath and reference-parameter paths conservative for globals.
++        auto id = Is<Ident>(lval);
++        if (!id || id->vdef != container || IsRefOrSlice(container->type)) return;
++        base = container;
++    } else if (!KillPath(lval, base, path)) return;
+     if (!IsRefOrSlice(base->type) && base != container) return;
+     erase_if(cur.kills, [&](const Kill &k) {
+         return k.container == container && k.base == base && k.path == path;
+@@ -1708,6 +1714,10 @@ inline void TypeCheck::RecordStore(VarDef *container, const Roots &roots, bool b
+                                     TypeExpr *pointee, VarDef *src, TypeExpr *reached,
+                                     bool bound, bool slot, bool sliceref) {
+     if (!container) return;
++    // A later reference-bearing store may alias any global whose empty
++    // contents we knew. Proven-empty stores do not repopulate those globals.
++    if (src || roots.Unknown() || !roots.None())
++        erase_if(cur.kills, [](const Kill &k) { return k.container->isglobal; });
+     // Putting a container's own read-back contents back into it adds no
+     // incoming lifetime. Keep this distinction before discarding src. It
+     // may put them into a part a kill emptied, though, as may a store of a
+@@ -2297,9 +2307,22 @@ inline void TypeCheck::ThreadIndexError(Node *at, TypeExpr *t) {
+ // same array, which differ in nothing that judgement asks.
+ inline void TypeCheck::NoteGlobalShrink(Node *at, const string &prefix, VarDef *vd,
+                                         TypeExpr *bound) {
+-    for (auto &gs : globalshrinks)
+-        if (gs.arr == vd && !gs.bound == !bound && (!bound || TypeEq(gs.bound, bound))) return;
+-    globalshrinks.push_back({ vd, bound, at->line, prefix, Chain({}) });
++    GlobalShrink gs { vd, bound, at->line, prefix, Chain({}) };
++    if (!bound)
++        for (auto &k : cur.kills)
++            if (k.container->isglobal && k.base == k.container && k.path.empty())
++                gs.emptyglobals.push_back(k.container);
++    // The same proof set has the same deferred judgement against global
++    // history. Distinct sets stay separate: a safe shrink cannot hide an
++    // unsafe occurrence of the same array.
++    std::sort(gs.emptyglobals.begin(), gs.emptyglobals.end(), std::less<VarDef *>{});
++    gs.emptyglobals.erase(std::unique(gs.emptyglobals.begin(), gs.emptyglobals.end()),
++                          gs.emptyglobals.end());
++    for (auto &prior : globalshrinks)
++        if (prior.arr == vd && !prior.bound == !bound &&
++            (!bound || TypeEq(prior.bound, bound)) && prior.emptyglobals == gs.emptyglobals)
++            return;
++    globalshrinks.push_back(std::move(gs));
+ }
+ 
+ // A global may hold a reference into a global array only where a store, or
+@@ -2333,6 +2356,10 @@ inline void TypeCheck::CheckGlobalShrinks() {
+             for (auto g : ast.globals) {
+                 for (auto gd : g->defs) {
+                     if (gd == arr || !gd->type || !HoldsPlainRef(gd->type)) continue;
++                    if (find(gs.emptyglobals.begin(), gs.emptyglobals.end(), gd) !=
++                        gs.emptyglobals.end()) continue;
++                    // Only this exact top-level holder is empty: GlobalReach
++                    // still follows other globals' historical copies of it.
+                     // A reference to nothing the array's storage can hold,
+                     // nor a u8 that may be a byte view of it, is no concern.
+                     vector<TypeExpr *> ps;
+@@ -2883,6 +2910,10 @@ inline void TypeCheck::NoteShrinkOrder(VarDef *root, TypeExpr *bound) {
+                 if (k.base == s->params[p] && k.container == RefRootOf(s->params[p]))
+                     o.kills.push_back({ (int)p, k.path });
+         }
++        if (known && external && external->isglobal && !bound)
++            for (auto &k : cur.kills)
++                if (k.container->isglobal && k.base == k.container && k.path.empty())
++                    o.emptyglobals.push_back(k.container);
+         for (auto &e : s->record.shrinkorders) {
+             if (e.param != param || e.external != external || !e.bound != !bound ||
+                 (bound && !TypeEq(e.bound, bound)))
+@@ -2891,6 +2922,9 @@ inline void TypeCheck::NoteShrinkOrder(VarDef *root, TypeExpr *bound) {
+             erase_if(e.kills, [&](const pair<int, string> &k) {
+                 return find(o.kills.begin(), o.kills.end(), k) == o.kills.end();
+             });
++            erase_if(e.emptyglobals, [&](VarDef *g) {
++                return find(o.emptyglobals.begin(), o.emptyglobals.end(), g) == o.emptyglobals.end();
++            });
+             return;
+         }
+         s->record.shrinkorders.push_back(o);
+@@ -3595,7 +3629,11 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+     // re-applied in place), so a kill of the caller's outlasts a call only
+     // where the callee cannot write into the part it emptied; its recorded
+     // stores elsewhere in the container come after the kill.
+-    erase_if(cur.kills, [&](const Kill &k) { return CallMayWrite(spec, argvals, k); });
++    erase_if(cur.kills, [&](const Kill &k) {
++        // Globals are deliberately narrower than local holder precision:
++        // every call invalidates them, including a call with no arguments.
++        return k.container->isglobal || CallMayWrite(spec, argvals, k);
++    });
+     // A shrink of an array the call may free: a grow-only array takes the
+     // §5.1 scan (variables and recorded stores), a grow-shrink one the §5.2
+     // scan (variables only) and the pairs its callers judge (NoteLiveViews),
+@@ -3663,7 +3701,12 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+             if (h.order) {
+                 callorder = { storesbase, &origins, h.order->before, &classorigins, classbase };
+                 for (auto &[p, path] : h.order->kills) argkill(p, path);
++                if (h.root->isglobal && !h.bound)
++                    for (auto g : h.order->emptyglobals)
++                        cur.kills.push_back({ g, g, "", storesbase });
+             }
++            // These facts judge only this already-ordered shrink. Restore
++            // removes them; the call does not promise any post-call emptiness.
+             GrowOnlyShrinkAt(at, what, h.root, string(h.root->name), h.bound, h.arr,
+                              h.viaclass);
+         } else if (judged == SB_UNBALANCED) {
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index 1277e5e..b6162f8 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -546,6 +546,9 @@ inline void TypeCheck::CheckWaitingArg(Call *c, Node *a, bool entryreach) {
+ // call returns where any of them may -- one whose record is not read yet,
+ // a back edge's in its cycle's first round, may.
+ inline void TypeCheck::CalleesReturn(Call *c, const vector<FnSpec *> &specs, bool argsreach) {
++    // Phase-2 argument/default checking may recreate pre-call facts after
++    // ApplyCalleeShrinks. No direct-global empty fact outlives the call.
++    erase_if(cur.kills, [](const Kill &k) { return k.container->isglobal; });
+     auto mayreturn = false;
+     for (auto sp : specs) {
+         CheckfreeCallee(c, sp->sf);

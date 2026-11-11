@@ -1,0 +1,167 @@
+diff --git a/src/type_queries.h b/src/type_queries.h
+index 6605fbb..fd2b18d 100644
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -5,6 +5,75 @@ namespace goose {
+ 
+ // Optional per-compilation observations. Count-based samples survive a bounded
+ // failing prefix without adding per-query clock reads or retaining AST facts.
++// Historical container membership only. Event contents/classification remain live.
++// Append/replace are the only membership mutations; replaced IDs stay on old
++// postings too, with the query's original live-container guard removing them.
++struct HolderStoreIndex {
++    using Id = uint32_t;
++    unordered_map<const void *, vector<Id>> postings;
++    const vector<Id> empty;
++    size_t capacity = 0, count = 0;
++    size_t max_capacity = size_t(1) << 25, max_holders = size_t(1) << 18;
++    bool active = true;
++    const char *fallback_reason = "none";
++    bool profile = [] {
++        auto trace = getenv("GOOSE_CHECKER_TRACE"), full = getenv("GOOSE_CHECKER_PROFILE");
++        return (trace && *trace) || (full && *full);
++    }();
++    uint64_t queries = 0, hits = 0, misses = 0, visits = 0, fallbacks = 0, inserted = 0;
++    void Report() const {
++        if (!profile) return;
++        fprintf(stderr, "GOOSE_CHECKER_PROFILE holder_events active=%d queries=%llu hits=%llu misses=%llu visits=%llu fallbacks=%llu holders=%zu ids=%zu capacity=%zu inserted=%llu reason=%s max_holders=%zu max_capacity=%zu\n",
++                active, (unsigned long long)queries, (unsigned long long)hits,
++                (unsigned long long)misses, (unsigned long long)visits,
++                (unsigned long long)fallbacks, postings.size(), count, capacity,
++                (unsigned long long)inserted, fallback_reason, max_holders, max_capacity);
++    }
++    void Disable(const char *reason) {
++        active = false; fallback_reason = reason;
++        decltype(postings){}.swap(postings);
++        capacity = count = 0;
++        Report();
++    }
++    void Record(const void *holder, size_t id) {
++        if (!active) return;
++        if (id > UINT32_MAX) { Disable("id-range"); return; }
++        auto found = postings.find(holder);
++        if (found == postings.end()) {
++            if (postings.size() >= max_holders) { Disable("holders"); return; }
++            found = postings.try_emplace(holder).first;
++        }
++        auto &ids = found->second;
++        auto at = lower_bound(ids.begin(), ids.end(), (Id)id);
++        if (at != ids.end() && *at == id) return;
++        auto offset = (size_t)(at - ids.begin());
++        if (ids.size() == ids.capacity()) {
++            if (capacity >= max_capacity) { Disable("capacity"); return; }
++            auto old = ids.capacity();
++            auto wanted = std::max(size_t(1), old * 2);
++            wanted = std::min(wanted, old + max_capacity - capacity);
++            ids.reserve(wanted);
++            auto growth = ids.capacity() - old;
++            if (growth > max_capacity - capacity) { Disable("capacity"); return; }
++            capacity += growth;
++        }
++        ids.insert(ids.begin() + offset, (Id)id);
++        ++count; ++inserted;
++        if (profile && (inserted & ((UINT64_C(1) << 20) - 1)) == 0) Report();
++    }
++    const vector<Id> *Find(const void *holder) {
++        const vector<Id> *result = nullptr;
++        if (active) {
++            auto found = postings.find(holder);
++            if (found == postings.end()) { result = &empty; if (profile) ++misses; }
++            else { result = &found->second; if (profile) ++hits; }
++        } else if (profile) ++fallbacks;
++        if (profile && (++queries & ((UINT64_C(1) << 14) - 1)) == 0) Report();
++        return result;
++    }
++    ~HolderStoreIndex() { Report(); }
++};
++
+ struct StableQueryProfile {
+     const char *name;
+     bool enabled = [] { auto value = getenv("GOOSE_CHECKER_PROFILE"); return value && *value; }();
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 02b43dc..e576f17 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2665,19 +2665,51 @@ struct TypeCheck {
+     // (ast.h StoreEvent), program-wide: a function value's body stores into
+     // its lexical function's containers while being checked in another frame.
+     vector<StoreEvent> storeevents;
+-    // Every append or in-place replacement goes through these, so an index
+-    // of events can follow them. (The upstream-32a4f44 port drops the
++    HolderStoreIndex holderstoreindex;
++    // Every append or in-place replacement goes through these, so the holder
++    // index follows them. (The upstream-32a4f44 port drops the containment
+     // ApplyCalleeStores key index: upstream remaps every body event afresh
+     // at each call and drops caller-dependent sources, cd988c4.)
+-    void IndexStoreEvent(size_t) {}
++    void IndexStoreEvent(size_t id) {
++        holderstoreindex.Record(storeevents[id].container, id);
++    }
+     void AppendStoreEventLog(const StoreEvent &e) {
+         auto id = storeevents.size();
+         storeevents.push_back(e);
+         IndexStoreEvent(id);
+     }
++    // ApplyCalleeStores remaps every body event at each call, keeping its
++    // container, and Record is idempotent per container and ID: only an
++    // event moved to another container needs indexing again.
+     void ReplaceStoreEventLog(size_t id, const StoreEvent &e) {
++        auto moved = storeevents[id].container != e.container;
+         storeevents[id] = e;
+-        IndexStoreEvent(id);
++        if (moved) IndexStoreEvent(id);
++    }
++    // HolderMayPointInto and its recursive/lazy type queries cannot mutate
++    // events or postings. No borrowed iterator survives a mutating checker call.
++    template<typename F> bool AnyHolderStoreEvent(VarDef *holder, size_t from, F visit) {
++        if (auto ids = holderstoreindex.Find(holder)) {
++            auto begin = lower_bound(ids->begin(), ids->end(), from);
++#ifndef NDEBUG
++            vector<size_t> expected, actual;
++            for (auto i = from; i < storeevents.size(); ++i)
++                if (storeevents[i].container == holder) expected.push_back(i);
++            for (auto at = begin; at != ids->end(); ++at) {
++                assert(*at < storeevents.size());
++                if (storeevents[*at].container == holder) actual.push_back(*at);
++            }
++            assert(actual == expected);
++#endif
++            for (auto at = begin; at != ids->end(); ++at) {
++                if (holderstoreindex.profile) ++holderstoreindex.visits;
++                if (visit(*at)) return true;
++            }
++            return false;
++        }
++        for (auto i = from; i < storeevents.size(); ++i)
++            if (visit(i)) return true;
++        return false;
+     }
+     Node *fitnode = nullptr;         // The node MustFit is fitting, for RecordStore.
+     // The deepest root among the references a literal under construction
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index 1cc5e67..ac71663 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2540,18 +2540,18 @@ inline bool TypeCheck::HolderMayPointInto(VarDef *holder, VarDef *arr, TypeExpr
+     // one to the storage itself would: its own stores, followed above, and
+     // for a slice's slot, which may be a slice variable, anything the class
+     // outlives.
+-    for (auto i = from; i < storeevents.size(); i++) {
++    return AnyHolderStoreEvent(holder, from, [&](size_t i) {
+         auto &e = storeevents[i];
+         if (e.container != holder || (e.src && (e.src->type || e.src->isglobal)) ||
+             StoredLater(i))
+-            continue;
++            return false;
+         auto through = e.src ? StoredSlotMayPointInto(holder, e.pointee, e.sliceref, e.src,
+                                                       e.classread, arr, arrtype, where, seen)
+                              : StoredSlotMayPointInto(holder, e.pointee, e.sliceref, e.root,
+                                                       e.exact, arr, arrtype, where, seen);
+         if (through) return found(i, through);
+-    }
+-    return false;
++        return false;
++    });
+ }
+ 
+ // Whether a reference stored into `holder`, rooted at r (exactly, or only

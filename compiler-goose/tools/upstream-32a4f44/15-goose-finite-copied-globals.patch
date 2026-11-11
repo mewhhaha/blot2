@@ -1,0 +1,60 @@
+diff --git a/src/ast.h b/src/ast.h
+index d92cf30..ea652d4 100644
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -2046,6 +2046,10 @@ struct RootArg {
+     // deepest of them. Never set for a recursive function, whose back edges
+     // reuse its body whatever they pass (§7.8).
+     bool heldexact = false;
++    // A by-value holder with several proven exact global roots retains that
++    // complete incoming set. Part of the key: no other call's globals may
++    // reuse its body. Inexact/unknown/local roots keep the class bound.
++    vector<VarDef *> copiedglobals;
+     // The argument is a different array from every other concrete argument at
+     // its call site: a global or a function's variable with no class of a
+     // parameter beside it, a variable created inside the activation whose
+@@ -2084,7 +2088,7 @@ struct RootArg {
+                writable == o.writable && reusable == o.reusable &&
+                growshrink == o.growshrink && gsvia == o.gsvia && slotread == o.slotread &&
+                byteview == o.byteview && pool == o.pool && heldexact == o.heldexact &&
+-               unknown == o.unknown;
++               unknown == o.unknown && copiedglobals == o.copiedglobals;
+     }
+ };
+ 
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index 3938743..a093948 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -1510,6 +1510,16 @@ inline FnSpec *TypeCheck::GetOrCreateSpec(MatchInfo &mi, vector<Val> &argvals, N
+         ra.reusable = CarriesPool(pt) ? argvals[i].reusable : 0;
+         ra.exact = ar.Exact();
+         ra.heldexact = holder && ra.exact && !sf->isrec;
++        if (holder && !sf->isrec && !ar.unknown && ar.alts.size() > 1 && ar.alts.size() <= 64 &&
++            ar.All([](const RootAlt &a) {
++                return a.exact && !a.classread && !a.slotread &&
++                       (!a.root || (a.root->isglobal && a.root->type));
++            })) {
++            for (auto &a : ar.alts) ra.copiedglobals.push_back(a.root);
++            sort(ra.copiedglobals.begin(), ra.copiedglobals.end(), std::less<VarDef *>{});
++            ra.copiedglobals.erase(unique(ra.copiedglobals.begin(), ra.copiedglobals.end()),
++                                   ra.copiedglobals.end());
++        }
+         // Any root the argument may have that holds a grow-shrink array, or
+         // for a reference to a slice one that slice may point into. A root
+         // that only bounds a reference or slice argument stands for what it
+@@ -3181,8 +3191,12 @@ inline void TypeCheck::CheckSpecBodyOnce(FnSpec *spec, vector<Val> *argvals, Lin
+             // Its contents are whatever the call site's value pointed at:
+             // bounded by the class root, as an event of its own.
+             Roots held;
+-            held.Set(cr, ra.heldexact, nullptr, ra.slotread);
+-            held.alts[0].argcopy = cr && !sf->isrec && !spec->incycle;
++            if (!ra.copiedglobals.empty() && !sf->isrec && !spec->incycle) {
++                for (auto global : ra.copiedglobals) held.Add({ global, true });
++            } else {
++                held.Set(cr, ra.heldexact, nullptr, ra.slotread);
++                held.alts[0].argcopy = cr && !sf->isrec && !spec->incycle;
++            }
+             auto stored = vd->storedinto;
+             auto first = storeevents.size();
+             RecordStore(vd, held, ra.byteview, nullptr);

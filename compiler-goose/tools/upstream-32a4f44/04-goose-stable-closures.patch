@@ -1,0 +1,158 @@
+diff --git a/src/type_queries.h b/src/type_queries.h
+index aa50583..1e665e4 100644
+--- a/src/type_queries.h
++++ b/src/type_queries.h
+@@ -3,20 +3,50 @@
+ 
+ namespace goose {
+ 
++// Optional per-compilation observations. Count-based samples survive a bounded
++// failing prefix without adding per-query clock reads or retaining AST facts.
++struct StableQueryProfile {
++    const char *name;
++    bool enabled = [] { auto value = getenv("GOOSE_CHECKER_PROFILE"); return value && *value; }();
++    uint64_t hits = 0, misses = 0, rejected = 0, building = 0, unstable = 0, events = 0;
++    void Report() const {
++        if (!enabled) return;
++        fprintf(stderr, "GOOSE_CHECKER_PROFILE cache=%s hits=%llu misses=%llu rejected=%llu building=%llu unstable=%llu\n",
++                name, (unsigned long long)hits, (unsigned long long)misses,
++                (unsigned long long)rejected, (unsigned long long)building,
++                (unsigned long long)unstable);
++    }
++    void Tick() { if ((++events & ((UINT64_C(1) << 20) - 1)) == 0) Report(); }
++    void Hit() { if (enabled) { ++hits; Tick(); } }
++    void Miss() { if (enabled) { ++misses; Tick(); } }
++    void Reject() { if (enabled) { ++rejected; Tick(); } }
++    void Slow(bool typesbuilding) {
++        if (!enabled) return;
++        ++rejected;
++        if (typesbuilding) ++building;
++        else ++unstable;
++        Tick();
++    }
++    ~StableQueryProfile() { Report(); }
++};
++
+ // The checker owns this for one compilation. Construction/qualification of
+ // fresh nodes precedes queries. The later mutations of published types are
+ // pending-array inference, size evaluation, pool resolution and instance
+ // completion; all are excluded here. This walk never instantiates a type.
+ struct StableTypeGraph {
++    StableQueryProfile profile { "stable.type" };
+     unordered_set<TypeExpr *> known;
+ 
+     bool Ready(TypeExpr *t) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
+         vector<TypeExpr *> seen;
+-        if (!Visit(t, seen)) return false;
+-        // Cache only the root after the WHOLE graph succeeded. A descendant
+-        // in a cycle may have depended on an ancestor that later fails.
++        if (!Visit(t, seen)) { profile.Reject(); return false; }
++        // Every visited node is stable only after the WHOLE closure succeeds.
++        // A cycle may depend on an ancestor whose later field rejects it.
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+         return true;
+     }
+@@ -60,23 +90,29 @@ private:
+ // fields. This gate is deliberately separate from full reachability queries.
+ // As in StableTypeGraph, no walk constructs, resolves or validates a type.
+ struct StableCanContainGraph {
++    StableQueryProfile profile { "stable.contain" };
+     unordered_set<TypeExpr *> known;
+     unordered_set<TypeExpr *> identities;
++    StableQueryProfile identityprofile { "stable.identity" };
+ 
+     bool Identity(TypeExpr *t) {
+-        if (!t) return false;
+-        if (identities.count(t)) return true;
++        if (!t) { identityprofile.Miss(); identityprofile.Reject(); return false; }
++        if (identities.count(t)) { identityprofile.Hit(); return true; }
++        identityprofile.Miss();
+         vector<TypeExpr *> seen;
+-        if (!IdentityVisit(t, seen)) return false;
++        if (!IdentityVisit(t, seen)) { identityprofile.Reject(); return false; }
++        identities.insert(seen.begin(), seen.end());
+         identities.insert(t);
+         return true;
+     }
+ 
+     bool Ready(TypeExpr *t) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
+         vector<TypeExpr *> seen;
+-        if (!Visit(t, seen)) return false;
++        if (!Visit(t, seen)) { profile.Reject(); return false; }
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+         return true;
+     }
+@@ -153,15 +189,18 @@ private:
+ // follows every field and referent. Include relative referents too: loading
+ // a relative reference through a plain reference makes it plain.
+ struct StableReachesGraph {
++    StableQueryProfile profile { "stable.reaches" };
+     unordered_set<TypeExpr *> known;
+ 
+     bool Ready(TypeExpr *t, StableCanContainGraph &identity) {
+-        if (!t) return false;
+-        if (known.count(t)) return true;
++        if (!t) { profile.Miss(); profile.Reject(); return false; }
++        if (known.count(t)) { profile.Hit(); return true; }
++        profile.Miss();
+         vector<TypeExpr *> seen;
+-        if (!Visit(t, seen, identity)) return false;
+-        // A cycle can depend on an ancestor that fails later. Publish only
+-        // the root after the entire reachable closure succeeds.
++        if (!Visit(t, seen, identity)) { profile.Reject(); return false; }
++        // Publish the closure only after every ancestor and later field
++        // succeeded; a failed cyclic walk must publish no partial proof.
++        known.insert(seen.begin(), seen.end());
+         known.insert(t);
+         return true;
+     }
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 6adf8d9..0de58a3 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -107,6 +107,7 @@ struct TypeCheck {
+     StableCanContainGraph stablecontainment;
+     StableReachesGraph stablereaches;
+     unordered_map<const void *, vector<TypeExpr *>> arrayelements;
++    StableQueryProfile arrayprofile { "array.elements" };
+     // CanContain's and ReachesThroughRefs' answers for complete type graphs:
+     // RootCandidates asks them of every variable in scope and every global,
+     // at each store and shrink it judges.
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index bb38de3..4c603c4 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1705,6 +1705,7 @@ inline void TypeCheck::ArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out,
+ // in first-appearance order; merging preserves the specialization key's order.
+ inline void TypeCheck::AppendArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &out) {
+     if (typesbuilding || !stabletypes.Ready(t)) {
++        arrayprofile.Slow(typesbuilding != 0);
+         ArrayReachVisited open;
+         ArrayElemsReached(t, out, open);
+         return;
+@@ -1718,11 +1719,12 @@ inline void TypeCheck::AppendArrayElemsReached(TypeExpr *t, vector<TypeExpr *> &
+     auto key = root->kind == TY_STRUCT ? (const void *)root->struc->inst : t;
+     auto it = arrayelements.find(key);
+     if (it == arrayelements.end()) {
++        arrayprofile.Miss();
+         vector<TypeExpr *> elems;
+         ArrayReachVisited open;
+         ArrayElemsReached(t, elems, open);
+         it = arrayelements.emplace(key, std::move(elems)).first;
+-    }
++    } else arrayprofile.Hit();
+ #ifndef NDEBUG
+     // Assertion builds continuously compare cached answers with the original
+     // algorithm, including order and const/storage distinctions.
