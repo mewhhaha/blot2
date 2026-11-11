@@ -1,47 +1,35 @@
 # Finish the Goose compiler experiment
 
 Repair ownership, build the actual complete C/header/native compiler, then qualify
-CLI/server, request OOM/retry and retention against Zig. **No whole compiler
-artifact exists.** Keep compiler/ as the oracle; never forward Goose requests to it.
+CLI/server, request OOM/retry and retention against Zig. A whole compiler executable now builds
+([first executable](benchmarks/evidence/qualification/2026-11-12-goose-first-executable.json)); it is not qualified yet. Keep compiler/ as the oracle; never forward Goose requests to it.
 
 ## Current frontier
 
-The latest complete build, whole 290, stopped at partial expectation interning in
-163.377s with 461 unchanged inputs and no artifact. Repairs advance through the
-compile root on the current checker (upstream Goose d5ae5bb plus our patch series),
-which takes about 200s of its 300s cap:
+`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose
+--cc clang-23 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 900
+--total-timeout 1200` (under the heavy lock) checks the full program, emits 224 MB of C and links
+`compiler-goose/build/blotc-goose` (79 MB) in about 555s at 9 GiB peak. The checker is upstream
+Goose d5ae5bb plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-18; patch 18 shares
+unchanged body-event chunks and took the server root from the 14G cap to about 7.4G.
 
-```sh
-sh compiler-goose/tools/upstream-32a4f44/build.sh   # once, under the heavy lock
-flock /var/tmp/blot2-heavy.lock systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=2G \
-  python3 compiler-goose/tools/check_engines.py --engines compile --output build/goose-port/<name>
-python3 compiler-goose/tools/seal_probe.py build/goose-port/<name> <date>-goose-<name> --audit "..."
-```
+Smoke: on examples/scalar.blot, lex/parse/check reports match the Zig oracle apart from timings and
+the unavailable allocator counters, and scalar.wasm is byte-identical. Four other examples are
+rejected with the oracle's first diagnostic.
 
-The checker reports one error per run. These are partial, check-only probes and
-never qualify the full compiler.
+[Qualification 1](benchmarks/evidence/qualification/2026-11-12-goose-qualify1.json.gz)
+(`deno run -A compiler-goose/tools/qualify_compiler.ts --goose-compiler compiler-goose/build/blotc-goose
+--zig-oracle compiler/zig-out-native-fast/bin/blotc --output DIR --overall-ms 900000`): Goose 15 pass,
+6 fail. **Next:**
+- wasm:aggregates aborts at the Goose assertion backend/wasm.goose:1071.
+- wasm:recursion differs from the oracle's unsupported ABI 8 rejection.
+- project:request-oom and retained-request-oom do not reject the injected allocation failure.
+- the two parity steps follow from the first two.
 
-Status on 11 November 2026: the `compile` root passes on the current checker
-([compile 425](benchmarks/evidence/qualification/2026-11-11-goose-compile425-pass.json.gz),
-267.4s of its 300s cap). Receipts run from
-[backend 316](benchmarks/evidence/qualification/2026-11-11-goose-backend-flow316.json.gz)
-to that pass. Before the last repairs 17 of the 20 diagnostic roots passed on the
-old checker; the `server` root exceeds 14G on the current checker, so it stays
-unqualified. Run roots serially with `--engines <all>`.
+Narrow roots (`GOOSE_DIAGNOSTIC_ROOTS=blot_numeric_probe::probe`) type-check one path in seconds to
+minutes; the whole build reports the first full-program error in about 6 minutes.
 
-The `emit` root also passes ([emit 426](benchmarks/evidence/qualification/2026-11-11-goose-emit426-pass.json.gz)).
-
-**Next: the whole build is blocked on checker memory.** `build.py` with the current
-checker (`--stage-timeout 900 --total-timeout 1200`) was OOM-killed at the 14G cap
-about 10 minutes into "emit program" (the full-program check); keep the cap. The
-server root shows the same steady growth: RSS reaches 14.2G after about 25 minutes.
-Program-wide `storeevents` reaches only 8.4M events × 72 B (≈600 MB), so it is not
-the main consumer. Next, attribute the remaining heap (an LD_PRELOAD sampling
-allocator; no perf/heaptrack here) and add a bounded patch, likely in the
-containment caches or per-call ApplyCalleeStores state. The old 2e2bede checker
-cannot parse `root struct`, so it is not a fallback.
-
-Repair patterns that cleared the 316–425 errors. Prefer them over one-off rewrites:
+Repair patterns that cleared the 316–445 errors. Prefer them over one-off rewrites:
 
 - **Shrinking indexes → fixed-bucket indexes.** Replace a dictionary or other
   grow-shrink index with a fixed bucket table chained through grow-only records
@@ -65,6 +53,10 @@ Repair patterns that cleared the 316–425 errors. Prefer them over one-off rewr
 - **Results never read back through a local run.** Write snapshots that hold slices
   straight into the `Result`, and copy only scalars out of `CompileRun`. Run
   teardown keeps the grow-only plan payload pool; `resetGenerator` empties it.
+- **Never shrink a pool other code may view.** Reuse records by count (plans, sinks)
+  instead of `pool=[]`; the checker otherwise matches every live view by element type.
+- **Store grow-only copies.** A slice of a `T[>..<]` local may not be stored (§5.2);
+  copy canonical paths and messages into `T[>..]` buffers before storing them.
 - **Callee resets → caller resets.** Callers reset views before they bind module
   references, and functions avoid reassigning whole structs that contain arrays.
 - **Recursion-cycle functions are declared `recursive fn`.** The checker accepts

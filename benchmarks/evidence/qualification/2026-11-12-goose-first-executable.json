@@ -1,0 +1,61 @@
+{
+ "date": "2026-11-12",
+ "scope": "First complete Goose compiler build and a scoped smoke comparison; not a full compiler qualification.",
+ "build": {
+  "command": [
+   "python3",
+   "compiler-goose/build.py",
+   "--goose",
+   "build/goose-port/upstream-d5ae5bb/build-precision/goose",
+   "--cc",
+   "clang-23",
+   "--stdlib",
+   "build/goose-port/upstream-d5ae5bb/source-precision/stdlib",
+   "--inference-budget",
+   "1000000",
+   "--stage-timeout",
+   "900",
+   "--total-timeout",
+   "1200"
+  ],
+  "exit": 0,
+  "seconds": 552.529,
+  "max_rss_mib": 9032
+ },
+ "stages": {
+  "emit-program": {
+   "seconds": 494.638,
+   "exit": 0,
+   "stop": "completed"
+  },
+  "compile-and-link-program": {
+   "seconds": 57.067,
+   "exit": 0,
+   "stop": "completed"
+  },
+  "emit-runtime": {
+   "seconds": 0.133,
+   "exit": 0,
+   "stop": "completed"
+  }
+ },
+ "checker": {
+  "path": "build/goose-port/upstream-d5ae5bb/build-precision/goose",
+  "sha256": "c0f0cb7c682ba2af20e21e31b4e0afa3c01751a6a94f8c445a0c6ce9ac23e738",
+  "recipe": "upstream d5ae5bb + compiler-goose/tools/upstream-32a4f44/series 01-18"
+ },
+ "executable": {
+  "path": "compiler-goose/build/blotc-goose",
+  "sha256": "ae207f00a90737f5d43ddc96a856473f433e94316dcb5bb3e7f34c3840cc5cb5",
+  "bytes": 78835056
+ },
+ "emitted_c_bytes": 223563180,
+ "source_identity": "2637c5ac694b9059cdb687610c88dd43d3505941765aa032bd6ee7f26eab9ab2",
+ "smoke": {
+  "oracle": "compiler/zig-out-native-fast/bin/blotc",
+  "oracle_sha256": "945b20501860ed5b85d4f27fbac8a4624398fe22dbc48f98be9003c6ea05dd05",
+  "examples/scalar.blot": "lex/parse/check reports equal to the oracle apart from timings and unavailable allocator memory counters; build output scalar.wasm byte-identical (2575 B)",
+  "examples/records.blot, tags.blot": "both reject with the identical first diagnostic (unknown_operator +)",
+  "examples/arrays.blot, lists.blot": "both reject with the identical module_loader_required diagnostic"
+ }
+}
