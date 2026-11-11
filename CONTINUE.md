@@ -29,9 +29,17 @@ to that pass. Before the last repairs 17 of the 20 diagnostic roots passed on th
 old checker; the `server` root exceeds 14G on the current checker, so it stays
 unqualified. Run roots serially with `--engines <all>`.
 
-**Next:** rerun all 20 roots on the current checker after these repairs, then the
-`server` root (memory), then the first whole build. The compile root is close to
-its cap; split it before it grows further.
+The `emit` root also passes ([emit 426](benchmarks/evidence/qualification/2026-11-11-goose-emit426-pass.json.gz)).
+
+**Next: the whole build is blocked on checker memory.** `build.py` with the current
+checker (`--stage-timeout 900 --total-timeout 1200`) was OOM-killed at the 14G cap
+about 10 minutes into "emit program" (the full-program check); keep the cap. The
+server root shows the same steady growth: RSS reaches 14.2G after about 25 minutes.
+Program-wide `storeevents` reaches only 8.4M events × 72 B (≈600 MB), so it is not
+the main consumer. Next, attribute the remaining heap (an LD_PRELOAD sampling
+allocator; no perf/heaptrack here) and add a bounded patch, likely in the
+containment caches or per-call ApplyCalleeStores state. The old 2e2bede checker
+cannot parse `root struct`, so it is not a fallback.
 
 Repair patterns that cleared the 316–425 errors. Prefer them over one-off rewrites:
 
