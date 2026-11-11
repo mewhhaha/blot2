@@ -1,0 +1,102 @@
+diff --color -ru source-precision/src/ast.h source-shared/src/ast.h
+--- a/src/ast.h	2026-11-11 14:42:46.454021008 +0100
++++ b/src/ast.h	2026-11-11 18:11:19.568408588 +0100
+@@ -2326,8 +2326,26 @@
+     struct BodyEvent {
+         VarDef *container, *root, *src;
+         bool exact, classread, argcopy;
++        bool operator==(const BodyEvent &) const = default;
+     };
+-    vector<BodyEvent> bodyevents;
++    // The body's events as its check left them, read through immutable
++    // fixed-size chunks of the program-wide log. A chunk no event changed in
++    // since another record copied it is shared, not copied again: nested
++    // first checks would otherwise copy every callee's events once per
++    // enclosing body.
++    static constexpr size_t BodyChunkEvents = 64;
++    struct BodyChunk { BodyEvent events[BodyChunkEvents]; };
++    struct BodySnapshot {
++        size_t start = 0, count = 0;
++        vector<shared_ptr<const BodyChunk>> chunks;
++        size_t size() const { return count; }
++        const BodyEvent &operator[](size_t k) const {
++            auto i = start + k;
++            return chunks[i / BodyChunkEvents - start / BodyChunkEvents]->events[i % BodyChunkEvents];
++        }
++        void clear() { start = count = 0; chunks.clear(); }
++    };
++    BodySnapshot bodyevents;
+ };
+ 
+ // One monomorphic specialization of a function: the unit of typechecking and
+diff --color -ru source-precision/src/typecheck_calls.h source-shared/src/typecheck_calls.h
+--- a/src/typecheck_calls.h	2026-11-11 14:42:46.459858332 +0100
++++ b/src/typecheck_calls.h	2026-11-11 18:11:19.577810021 +0100
+@@ -3487,12 +3487,7 @@
+     RecordEnvExits(spec);
+     spec->inprogress = false;
+     spec->record.eventend = storeevents.size();
+-    spec->record.bodyevents.clear();
+-    for (auto i = spec->record.eventstart; i < storeevents.size(); i++) {
+-        auto &e = storeevents[i];
+-        spec->record.bodyevents.push_back({ e.container, e.root, e.src, e.exact, e.classread,
+-                                            e.argcopy });
+-    }
++    SnapshotBody(spec->record, spec->record.eventstart, storeevents.size());
+     spec->rounds++;
+ }
+ 
+diff --color -ru source-precision/src/typecheck.h source-shared/src/typecheck.h
+--- a/src/typecheck.h	2026-11-11 14:42:46.444233692 +0100
++++ b/src/typecheck.h	2026-11-11 18:11:19.573134819 +0100
+@@ -2697,12 +2697,50 @@
+         auto id = storeevents.size();
+         storeevents.push_back(e);
+         IndexStoreEvent(id);
++        MarkBodyChunk(id);
++    }
++    // Immutable copies of the log's chunks as last snapshotted, and whether a
++    // snapshotted field changed since (FnRecord::BodySnapshot).
++    vector<shared_ptr<const FnRecord::BodyChunk>> bodychunks;
++    vector<char> bodychunkdirty;
++    static FnRecord::BodyEvent BodyEventOf(const StoreEvent &e) {
++        return { e.container, e.root, e.src, e.exact, e.classread, e.argcopy };
++    }
++    void MarkBodyChunk(size_t id) {
++        auto c = id / FnRecord::BodyChunkEvents;
++        if (c >= bodychunkdirty.size()) {
++            bodychunkdirty.resize(c + 1, 1);
++            bodychunks.resize(c + 1);
++        }
++        bodychunkdirty[c] = 1;
++    }
++    void SnapshotBody(FnRecord &rec, size_t start, size_t end) {
++        rec.bodyevents.clear();
++        rec.bodyevents.start = start;
++        rec.bodyevents.count = end - start;
++        if (start >= end) return;
++        constexpr auto n = FnRecord::BodyChunkEvents;
++        for (auto c = start / n; c <= (end - 1) / n; c++) {
++            if (c >= bodychunkdirty.size()) {
++                bodychunkdirty.resize(c + 1, 1);
++                bodychunks.resize(c + 1);
++            }
++            if (bodychunkdirty[c] || !bodychunks[c]) {
++                auto chunk = make_shared<FnRecord::BodyChunk>();
++                auto lo = c * n, hi = std::min(lo + n, storeevents.size());
++                for (auto i = lo; i < hi; i++) chunk->events[i - lo] = BodyEventOf(storeevents[i]);
++                bodychunks[c] = std::move(chunk);
++                bodychunkdirty[c] = 0;
++            }
++            rec.bodyevents.chunks.push_back(bodychunks[c]);
++        }
+     }
+     // ApplyCalleeStores remaps every body event at each call, keeping its
+     // container, and Record is idempotent per container and ID: only an
+     // event moved to another container needs indexing again.
+     void ReplaceStoreEventLog(size_t id, const StoreEvent &e) {
+         auto moved = storeevents[id].container != e.container;
++        if (!(BodyEventOf(storeevents[id]) == BodyEventOf(e))) MarkBodyChunk(id);
+         storeevents[id] = e;
+         if (moved) IndexStoreEvent(id);
+     }

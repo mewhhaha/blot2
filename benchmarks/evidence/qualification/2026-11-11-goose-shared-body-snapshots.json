@@ -1,0 +1,43 @@
+{
+ "date": "2026-11-11",
+ "scope": "Checker memory diagnosis and a value-preserving patch; partial check-only evidence, no compiler qualification.",
+ "patch": {
+  "file": "compiler-goose/tools/upstream-32a4f44/18-goose-shared-body-snapshots.patch",
+  "sha256": "b531458299cf719e7c73b2cbd2b220e58442fbcfd04071b0e3b63bcb093790e0",
+  "what": "FnRecord::bodyevents becomes a snapshot of immutable 64-event chunks of the store-event log; a chunk whose snapshotted fields (container, root, src, exact, classread, argcopy) did not change since its last copy is shared. Values read are identical."
+ },
+ "heap_attribution": {
+  "method": "LD_PRELOAD sampling allocator (build/goose-port/memsample, 1 MiB sampling, live tracking), server root on the 01-17 checker, last dump before the 14G OOM kill at 392s",
+  "live_sampled_bytes": 17380816983,
+  "top": [
+   [
+    "CheckSpecBodyOnce typecheck_calls.h:3493 (FnRecord::bodyevents copy of the whole event range per record)",
+    71.2
+   ],
+   [
+    "AddStoreEvent typecheck_builtins.h:1620",
+    8.8
+   ],
+   [
+    "AppendStoreEventLog typecheck.h:2698 (storeevents)",
+    8.8
+   ]
+  ],
+  "cause": "Every record copied its whole event range, which contains the ranges of all callees first checked inside it: events x nesting depth copies."
+ },
+ "server_root": {
+  "before": "OOM-killed at the 14G cap (392s under the sampler; RSS 14.2G after ~25 min under check_engines)",
+  "after": {
+   "seconds": 360.821,
+   "peak_rss_mib_sampled": 7416,
+   "first_error": "backend/result_publication.goose:72 storing a reference rooted at units (\u00a79.2)"
+  }
+ },
+ "differential": {
+  "programs": 2876,
+  "tests": "upstream d5ae5bb test/**/*.goose, goose check --diagnostics json, exit code and output compared",
+  "differences": 3,
+  "explanation": "errors_tc/recovery/imports.goose, imported/helper.goose and lsp/broken_decls.goose list each binary's own built-in stdlib directory in \"looked for\" paths; no checking difference."
+ },
+ "binary_sha256_default_after": "c0f0cb7c682ba2af20e21e31b4e0afa3c01751a6a94f8c445a0c6ce9ac23e738"
+}
