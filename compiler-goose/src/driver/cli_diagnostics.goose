@@ -54,7 +54,7 @@ fn checkDiagnostics(writer:blot_io::Writer,filename:const u8[:],source:const u8[
  }return blot_error::Error.none;
 }
 fn projectDiagnostics(writer:blot_io::Writer,filename:const u8[:],loaded:blot_reuse_project::Project&,checked:const blot_reuse_project_check::CheckedProject&)->Error {
- for item in checked.diagnostics {var path=filename;if item.unit!=0 {path=loaded.filename(item.unit);}let contexts=item.contexts[..item.context_len];let publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:item.codeName(),span:item.span,message:item.message(),..};var error=blot_error::Error.none;
+ for item in checked.diagnostics {let path=if item.unit!=0 {loaded.filename(item.unit)}else {filename};let contexts=item.contexts[..item.context_len];let publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:item.codeName(),span:item.span,message:item.message(),..};var error=blot_error::Error.none;
   if item.semantic.present&&item.semantic.value==blot_check_check::Code.module_loader_required {let unit .= loaded.unit(item.unit);let detail=blot_check_check::sourceImportDiagnostic(unit.tree);assert(detail.present);error=frontendOneDiagnostic(writer,path,"check-project",unit.source,publication,detail.value);}
   else if item.hole.present {error=frontendDiagnostic(writer,path,"check-project",loaded.unit(item.unit).source,publication,HoleDetail{item.hole.value});}
   else if item.explanation.present {error=frontendDiagnostic(writer,path,"check-project",loaded.unit(item.unit).source,publication,ExplanationContexts{item.explanation.value,contexts});}

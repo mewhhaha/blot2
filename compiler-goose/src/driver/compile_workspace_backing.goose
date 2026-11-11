@@ -265,10 +265,10 @@ var backing_generator_diagnostic_contexts: blot_backend_source_origins::ContextP
 fn makeGenerator(allocation_owner:u64,session:blot_eval_core_eval::Session&)->blot_backend_core_backend::Generator {return blot_backend_core_backend::Generator{allocation_owner:allocation_owner,units:default<const blot_check_core::Module[:]>(),module:backing_generator_module,planning:backing_generator_planning,evaluator:session,representations:backing_generator_representations,static_data:backing_generator_static_data,numeric_rows:backing_generator_numeric_rows,diagnostic_contexts:backing_generator_diagnostic_contexts,..};}
 fn makeWorkspace(allocation_owner:u64,generator:blot_backend_core_backend::Generator&,tables:blot_eval_core_eval::SessionTables,capture:blot_reuse_artifact_capture::Capture&,optimized:blot_backend_optimized_bodies::Capture&)->blot_backend_core_backend::CompileWorkspace {return blot_backend_core_backend::CompileWorkspace{publication_owner:blot_backend_result_publication::Owner{..},allocation_owner:allocation_owner,generator:generator,session_tables:tables,journal:capture.emission,metadata:capture.metadata(),retained:backing_retained,principal_state:backing_principal_state,persisted_principals:backing_persisted_principals,query_state:backing_query_state,constant_state:backing_constant_state,origins:backing_origins,candidate:backing_candidate,vectors:backing_vectors,optimized:optimized,capture:capture,allocation_snapshot:backing_allocation_snapshot,startup_snapshot:backing_startup_snapshot,explanation:backing_explanation,bytes:backing_bytes,message:backing_message,replay_module:backing_replay_module,replay_origins:backing_replay_origins,replay_candidate:backing_replay_candidate,replay_vectors:backing_replay_vectors,replay_contexts:backing_replay_contexts,replay_bytes:backing_replay_bytes,..};}
 fn resetBackingDescriptors() {
- assert(blot_backend_resolved_body::payloads.len==0);
+ assert(blot_backend_resolved_body::payload_count==0);
  blot_backend_resolved_body::resetIndex();
  blot_backend_resolved_body::slots=[];
- blot_backend_resolved_body::payloads=[];
+ blot_backend_resolved_body::payload_count=0;
  backing_retained = blot_reuse_artifact_fragment::State{..};
  backing_principal_state = blot_reuse_principal_evidence_reuse::State{..};
  backing_persisted_principals = blot_reuse_principal_archive::Reader{..};
@@ -345,7 +345,7 @@ fn clearBacking() {
  blot_backend_resolved_body::deinit();
  blot_backend_resolved_body::resetIndex();
  blot_backend_resolved_body::slots=[];
- blot_backend_resolved_body::payloads=[];
+ blot_backend_resolved_body::payload_count=0;
  backing_origins_code_module_types.clear();
  backing_origins_code_module_instructions.clear();
  backing_origins_code_module_names.clear();

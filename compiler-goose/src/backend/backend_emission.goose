@@ -1024,7 +1024,7 @@ fn prepareLinearCursors(owner: Owner&,body: u32) -> Error {
             let uses,uses_error .= generator.unitUses(owner.unit_id,blot_backend_unit_index::Need { parents: true,flow: true , ..}); if uses_error != blot_error::Error.none { return uses_error; } let linear = blot_backend_linear_cursor::check(source,uses,blot_backend_resolved_body::header(body).root,slot.node); if !linear.present { continue; }
             if !blot_backend_resolved_body::contains(body,linear.value.advance) || !blot_backend_resolved_body::contains(body,linear.value.loop_) { continue; } var advance_ok = false; match blot_backend_resolved_body::get(body,linear.value.advance) { private_cursor p=>{ advance_ok = true; },_=>{}, } if !advance_ok { continue; }
             var loop_ok = false; match blot_backend_resolved_body::get(body,linear.value.loop_) { loop_ p=>{ loop_ok = !p.value.collection.present; },_=>{}, } if !loop_ok { continue; }
-            let payload .= blot_backend_resolved_body::getRef(body,slot.node); match payload { private_cursor &p=>{ p.linear = linear; },_=>{ assert(false); }, }
+            let plan = blot_backend_resolved_body::get(body,slot.node); match plan { private_cursor p=>{ blot_backend_resolved_body::set(body,slot.node,Plan.private_cursor { input: p.input,linear: linear }); },_=>{ assert(false); }, }
         },_=>{}, }
     } return blot_error::Error.none;
 }
@@ -1679,7 +1679,7 @@ recursive fn prepareNode(owner: Owner&,body: u32,id: u32,depth: i64,template: bo
     }
     if entry.present { let stored = blot_backend_resolved_body::put(body,id,entry.value); if stored != blot_error::Error.none { entry.value.deinit(); return stored; } } if n.tag == blot_check_core::Tag.associated { blot_backend_resolved_body::headers[body - 1].has_associated = true; }
     let children = prepareChildren(owner,body,id,depth,template); if children != blot_error::Error.none { return children; }
-    if n.tag == blot_check_core::Tag.call || n.tag == blot_check_core::Tag.apply { let factory,error = prepareFactory(owner,body,id); if error != blot_error::Error.none { return error; } let payload .= blot_backend_resolved_body::getRef(body,id); match payload { named &call=>{ call.value.factory = factory; },application &application=>{ application.value.factory = factory; },_=>{ assert(false); }, } } return blot_error::Error.none;
+    if n.tag == blot_check_core::Tag.call || n.tag == blot_check_core::Tag.apply { let factory,error = prepareFactory(owner,body,id); if error != blot_error::Error.none { return error; } let plan = blot_backend_resolved_body::get(body,id); match plan { named call=>{ var value = call.value; value.factory = factory; blot_backend_resolved_body::set(body,id,Plan.named { value: value }); },application application=>{ var value = application.value; value.factory = factory; blot_backend_resolved_body::set(body,id,Plan.application { value: value }); },_=>{ assert(false); }, } } return blot_error::Error.none;
 }
 recursive fn prepareChildren(owner: Owner&,body: u32,id: u32,depth: i64,template: bool) -> Error {
     let source .= owner.generator().unit(owner.unit_id); let n = source.node(id);
