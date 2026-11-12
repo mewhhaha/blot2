@@ -136,5 +136,20 @@
       "next-improvements",
       "six-more-physics"
     ]
+  },
+  "gdev_frame": {
+    "runner": "scripts/integration/run_pen.py --launch --hardware --compiled-main <main.wasm> --expected-wasm-sha256 <sha>",
+    "adapter": "hardware GPU (no software lavapipe adapter is installed on this machine)",
+    "zig_main_sha256": "c08570f8a290e8fe58bd14e26eb9a6c076060943003a7148142f7fc55473accf",
+    "goose_main_sha256": "b351f7c92ae5a01b0e7c3d02507a7869c24ebb6282d8dd0b0ad6fd3c61989339",
+    "frame_png_sha256": {
+      "zig": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "goose": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8"
+    },
+    "frames_trace_sha256": {
+      "zig": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+      "goose": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+    },
+    "inspected": "640x480 first frame: the split-flap title board with two lines of text, fully rendered; identical bytes from both compilers"
   }
 }

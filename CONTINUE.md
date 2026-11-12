@@ -31,6 +31,8 @@ allocation, coalescing or declaration order). Getting here also fixed `wasm.appe
 recopied a body to the shared array's tail on every switch between functions and overflowed a 2 GB
 data stack; moves now reserve geometric filler. `scripts/integration/build_gdev.ts --compiler X
 --timeout-ms 3600000` runs it.
+That Goose main.wasm renders Gdev's first frame through Pen identically to the oracle's (same PNG and
+frame trace; `run_pen.py --launch --hardware --compiled-main`, since no software adapter is installed).
 
 [Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz) (scoped
 functional checks: CLI, executed ABI 8, project lifecycle, request OOM/retry, 16 MiB retention) passed
@@ -39,7 +41,8 @@ on the older binary against the stale oracle; rerun it on the current pair.
 Diagnostic roots, each alone: all 20 pass on 44ee94f4 source; compile takes 235s and server 374s (over the
 300s cap). Checking all 20 in one process gives one cross-probe error (assemble), not production.
 
-**Next:** find the Gdev local-order divergence, then a Gdev frame through Pen;
+**Next:** find the Gdev local-order divergence (loop-carried locals: Zig numbers a group of six before a
+group of three, Goose the reverse);
 rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
 optimized (`--release`) Goose build's compile speed and size against the oracle.
 
