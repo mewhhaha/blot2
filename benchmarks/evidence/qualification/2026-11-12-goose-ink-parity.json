@@ -18,35 +18,123 @@
     "build": "compiler-goose/build.py (whole451): full-program check, -O0 C, 224 MB emitted C"
   },
   "hosts": {
-    "pen": {"commit": "4dedcf886b40c8ca3b66292195dd8b1d7d6392ff", "pen_sha256": "98c1d0bcc68044f78da028e86ee425b11ccc1ce0ba52637c9a2322514ee3b8ea", "blot_plugin_sha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601", "note": "release pen and plugins/ rebuilt from source; the 2026-11-03 pen and 2026-10-16 plugin rejected the tests setting"},
-    "ink": {"commit": "7c80dff19cd78275de1bebccc654a3205030bae8", "harness": "copies of ../ink with pen.json naming the compiler and absolute std paths; pen test-blot --project COPY"},
-    "gdev": {"commit": "9f4358c3bcd315f43c4a5a621b6bff96ac1666c2"}
+    "pen": {
+      "commit": "4dedcf886b40c8ca3b66292195dd8b1d7d6392ff",
+      "pen_sha256": "98c1d0bcc68044f78da028e86ee425b11ccc1ce0ba52637c9a2322514ee3b8ea",
+      "blot_plugin_sha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+      "note": "release pen and plugins/ rebuilt from source; the 2026-11-03 pen and 2026-10-16 plugin rejected the tests setting"
+    },
+    "ink": {
+      "commit": "7c80dff19cd78275de1bebccc654a3205030bae8",
+      "harness": "copies of ../ink with pen.json naming the compiler and absolute std paths; pen test-blot --project COPY"
+    },
+    "gdev": {
+      "commit": "9f4358c3bcd315f43c4a5a621b6bff96ac1666c2"
+    }
   },
   "ink": {
-    "zig": {"passed": 243, "failed": 1, "not_compiled": 9, "modules": 73, "seconds": 121.5, "jobs": 4},
-    "goose": {"passed": 243, "failed": 1, "not_compiled": 9, "modules": 73, "seconds": 328.3, "jobs": 2},
-    "per_module": {"identical": 73, "different": 0, "compared": "compile diagnostics (paths normalized) and every test outcome"},
+    "zig": {
+      "passed": 243,
+      "failed": 1,
+      "not_compiled": 9,
+      "modules": 73,
+      "seconds": 121.5,
+      "jobs": 4
+    },
+    "goose": {
+      "passed": 243,
+      "failed": 1,
+      "not_compiled": 9,
+      "modules": 73,
+      "seconds": 328.3,
+      "jobs": 2
+    },
+    "per_module": {
+      "identical": 73,
+      "different": 0,
+      "compared": "compile diagnostics (paths normalized) and every test outcome"
+    },
     "oracle_failures": "keyed test_complete_keys_and_restore fails and 9 modules are rejected by the scoped-storage backend on both compilers",
     "history": [
-      {"binary": "330ebcbc (qualification 3)", "identical": 64, "different": 9, "cause": "InvalidArtifact from partial_dependency.rebindFrozenPrefix: the entry interned 2 symbols beyond the 1848 in its frozen seed"},
-      {"binary": "66589a5f (rebind + unbounded request)", "identical": 70, "different": 3, "cause": "data stack overflow: runtime_parallel.request_runs held one full module image per function job"},
-      {"binary": "fcf28acb (chunked runtime jobs)", "identical": 73, "different": 0}
+      {
+        "binary": "330ebcbc (qualification 3)",
+        "identical": 64,
+        "different": 9,
+        "cause": "InvalidArtifact from partial_dependency.rebindFrozenPrefix: the entry interned 2 symbols beyond the 1848 in its frozen seed"
+      },
+      {
+        "binary": "66589a5f (rebind + unbounded request)",
+        "identical": 70,
+        "different": 3,
+        "cause": "data stack overflow: runtime_parallel.request_runs held one full module image per function job"
+      },
+      {
+        "binary": "fcf28acb (chunked runtime jobs)",
+        "identical": 73,
+        "different": 0
+      }
     ]
   },
   "single_module_cli": {
-    "app-words": {"wasm_sha256": "81ccfe05860cced9f60b246ef14222f1131ad1419b3db33780a0a3bc61e5852b", "identical": true, "goose_total_us": 10142093, "zig_total_us": 847508},
-    "next-improvements": {"wasm_bytes": 585541, "identical": true, "goose_seconds": 25, "zig_seconds": 3}
+    "app-words": {
+      "wasm_sha256": "81ccfe05860cced9f60b246ef14222f1131ad1419b3db33780a0a3bc61e5852b",
+      "identical": true,
+      "goose_total_us": 10142093,
+      "zig_total_us": 847508
+    },
+    "next-improvements": {
+      "wasm_bytes": 585541,
+      "identical": true,
+      "goose_seconds": 25,
+      "zig_seconds": 3
+    }
   },
   "gdev_main": {
-    "zig": {"build_ms": 109889, "wasm_bytes": 9203613, "wasm_sha256": "c08570f8a290e8fe58bd14e26eb9a6c076060943003a7148142f7fc55473accf", "codegen_workers": 1, "frontend_workers": 4},
-    "goose": "pending"
+    "zig": {
+      "build_ms": 109889,
+      "wasm_bytes": 9203613,
+      "wasm_sha256": "c08570f8a290e8fe58bd14e26eb9a6c076060943003a7148142f7fc55473accf",
+      "codegen_workers": 1,
+      "frontend_workers": 4
+    },
+    "goose": {
+      "binary_sha256": "252ea91bcdc89805b5db9ec247be14d3cf743d95d5168a409d7c303b51d1baf8",
+      "success": true,
+      "build_ms": 1197107,
+      "wasm_bytes": 9203613,
+      "wasm_sha256": "b351f7c92ae5a01b0e7c3d02507a7869c24ebb6282d8dd0b0ad6fd3c61989339",
+      "identical": false,
+      "difference": "36 bytes in one function (code-section function index 5077, 476-byte body at offset 4382104): locals 70-78 are numbered in a different order (Zig 76,77,78,70,71,72,73 where Goose has 70..76); every other byte matches",
+      "history": [
+        "330ebcbc/66589a5f: killed at the 120 s request limit (Io)",
+        "fcf28acb: 2 GB data-stack overflow in wasm.appendInstruction (each switch between functions recopied a body to the tail)"
+      ]
+    }
   },
   "diagnostic_roots": {
     "alone_300s": "18 of 20 pass; compile and server reached the 300 s cap with no errors (checker c947f304, source before 44ee94f4)",
-    "compile_after_fixes": {"seconds": 235.084, "errors": 0},
-    "server_after_fixes": "pending",
-    "one_process_union": "checking all 20 roots in one process reports one error in optimized_bodies.findRelocations through the assemble probe; assemble alone passes in 15.5 s, so it is a cross-probe context, not production"
+    "compile_after_fixes": {
+      "seconds": 235.084,
+      "errors": 0
+    },
+    "server_after_fixes": {
+      "seconds": 374.092,
+      "errors": 0,
+      "note": "over the 300 s cap but clean"
+    },
+    "one_process_union": "checking all 20 roots in one process reports one error in optimized_bodies.findRelocations through the assemble probe; assemble alone passes in 15.5 s, so it is a cross-probe context, not production",
+    "summary": "all 20 roots pass alone on 44ee94f4 source (compile 235 s, server 374 s)"
   },
   "diagnosis_method": "Pen's serve-project stream was captured and replayed. Origins were found with diagnosis-only builds of the emitted C: a same-line trace at every invalid_artifact creation site, a probe printing every rebindFrozenPrefix operand, and a runtime guard-page handler that prints a backtrace. None of these builds is a product.",
-  "full_qualification": false
+  "full_qualification": false,
+  "goose_compiler_after_relocation_fix": {
+    "binary_sha256": "252ea91bcdc89805b5db9ec247be14d3cf743d95d5168a409d7c303b51d1baf8",
+    "build_seconds": 511.6,
+    "ink_identical_modules": 73,
+    "cli_identical": [
+      "app-words",
+      "next-improvements",
+      "six-more-physics"
+    ]
+  }
 }

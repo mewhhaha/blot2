@@ -260,13 +260,23 @@ fn appendType(module: Module&, range: Range, ty: ValueType) -> Range {
     }
     module.types.push(ty); result.len++; return result;
 }
+// Every function's code shares module.instructions. A body that must move to
+// the tail moves with as many filler slots again (at least 8), so emission that
+// alternates between functions copies each body amortized O(1) times instead
+// of on every switch. Filler lies outside every range, like the copy a move
+// leaves behind, and only the body it follows claims it in place.
+fn isFiller(inst: Instruction) -> bool { return inst.op == 255 && inst.operand == 0xffffffff && inst.origin == 0xffffffff; }
 fn appendInstruction(module: Module&, range: Range, inst: Instruction) -> Range {
     var result = range;
     if result.len == 0 { result.start = module.instructions.len; }
     else if result.start + result.len != module.instructions.len {
+        let next = result.start + result.len;
+        if isFiller(module.instructions[next]) { module.instructions[next] = inst; result.len++; return result; }
         let start = module.instructions.len; let count = result.len;
         for index in 0..count { let value = module.instructions[result.start + index]; module.instructions.push(value); }
-        result.start = start;
+        let filler = Instruction { operand: 0xffffffff, op: 255, origin: 0xffffffff, ..};
+        for index in 0..max(count,8) { module.instructions.push(filler); }
+        module.instructions[start + count] = inst; result.start = start; result.len++; return result;
     }
     module.instructions.push(inst); result.len++; return result;
 }

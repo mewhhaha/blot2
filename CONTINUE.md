@@ -24,19 +24,22 @@ the same diagnostics), 328s at 2 jobs against 121.5s at 4. Getting there fixed t
 parallel codegen sending the module image with every job. Run it with copies of ../ink whose pen.json
 names the compiler (build/goose-parity/ink-zig, ink-goose) and Pen/plugin rebuilt from ../pen source.
 
-Gdev Main: the oracle builds it in 110s (9,203,613 B, sha c08570f8…). Goose Gdev is the current
-blocker: at codegen 1/frontend 4 workers it aborted with a 2 GB data-stack overflow after the
-request-limit fix; the runtime-job chunking may not cover it (frontend workers copy packets too).
-`scripts/integration/build_gdev.ts --compiler X --timeout-ms 3600000` runs it.
+Gdev Main compiles on Goose (1197s against the oracle's 110s) to the same 9,203,613 bytes except 36:
+one function (code-section index 5077) numbers locals 70-78 in a different order. That local-order
+divergence is the open parity bug; the remap in wasm_stackify matches Zig, so look earlier (local
+allocation, coalescing or declaration order). Getting here also fixed `wasm.appendInstruction`, which
+recopied a body to the shared array's tail on every switch between functions and overflowed a 2 GB
+data stack; moves now reserve geometric filler. `scripts/integration/build_gdev.ts --compiler X
+--timeout-ms 3600000` runs it.
 
 [Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz) (scoped
 functional checks: CLI, executed ABI 8, project lifecycle, request OOM/retry, 16 MiB retention) passed
 on the older binary against the stale oracle; rerun it on the current pair.
 
-Diagnostic roots, each alone: 18 of 20 pass under 300s; compile passes in 235s after 44ee94f4 and server
-needs over 300s. Checking all 20 in one process gives one cross-probe error (assemble), not production.
+Diagnostic roots, each alone: all 20 pass on 44ee94f4 source; compile takes 235s and server 374s (over the
+300s cap). Checking all 20 in one process gives one cross-probe error (assemble), not production.
 
-**Next:** fix the Gdev data-stack overflow and compare Gdev Main bytes, then a Gdev frame through Pen;
+**Next:** find the Gdev local-order divergence, then a Gdev frame through Pen;
 rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
 optimized (`--release`) Goose build's compile speed and size against the oracle.
 
