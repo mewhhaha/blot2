@@ -1,0 +1,91 @@
+Speed: RootCandidates joins candidates by root through an index once there
+are 16 or more (Roots::Add was linear per add); Roots::Join is Add's join.
+
+diff --git a/src/ast.h b/src/ast.h
+index 0ce2b94..97c0f31 100644
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -590,20 +590,22 @@ struct Roots {
+     // alternative was read out of a container only where every value joined
+     // at its root was read out of that one (RootAlt::from).
+     bool Add(const RootAlt &a) {
+-        for (auto &b : alts) {
+-            if (b.root != a.root) continue;
+-            auto before = b;
+-            b.exact = b.exact && a.exact;
+-            b.slotread = b.slotread && a.slotread;
+-            b.classread = b.classread && a.classread;
+-            b.projected = b.projected && a.projected;
+-            b.argcopy = b.argcopy && a.argcopy;
+-            if (b.from != a.from) b.from = nullptr;
+-            return b != before;
+-        }
++        for (auto &b : alts)
++            if (b.root == a.root) return Join(b, a);
+         alts.push_back(a);
+         return true;
+     }
++    // Add's join of a into b, the alternative with a's root.
++    static bool Join(RootAlt &b, const RootAlt &a) {
++        auto before = b;
++        b.exact = b.exact && a.exact;
++        b.slotread = b.slotread && a.slotread;
++        b.classread = b.classread && a.classread;
++        b.projected = b.projected && a.projected;
++        b.argcopy = b.argcopy && a.argcopy;
++        if (b.from != a.from) b.from = nullptr;
++        return b != before;
++    }
+     bool Add(const Roots &o) {
+         auto changed = !unknown && o.unknown;
+         unknown = unknown || o.unknown;
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index 6c74482..d2d288c 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1406,10 +1406,25 @@ inline Roots TypeCheck::RootCandidates(TypeExpr *of, int d, bool globalsonly, bo
+                                        bool slots) {
+     TraceEngine(CheckerEngine::Candidates, of);
+     Roots out;
++    // out.Add, finding an alternative by its root through an index once
++    // there are many: every variable in scope and every global is asked.
++    unordered_map<VarDef *, size_t> byroot;
++    auto add = [&](const RootAlt &a) {
++        if (byroot.empty()) {
++            if (out.alts.size() < 16) {
++                out.Add(a);
++                return;
++            }
++            for (size_t i = 0; i < out.alts.size(); i++) byroot.emplace(out.alts[i].root, i);
++        }
++        auto [at, fresh] = byroot.try_emplace(a.root, out.alts.size());
++        if (fresh) out.alts.push_back(a);
++        else Roots::Join(out.alts[at->second], a);
++    };
+     auto beyond = [&](VarDef *v, TypeExpr *t, int rd) {
+         if (!v->isparam || !v->refrootknown || !ReachesThroughRefs(t, of)) return;
+         for (auto &a : v->ref.alts)
+-            if (Depth(a.root) <= rd) out.Add({ a.root, false });
++            if (Depth(a.root) <= rd) add({ a.root, false });
+     };
+     auto consider = [&](VarDef *v, int rd) {
+         if (!v->type) return;
+@@ -1417,15 +1432,15 @@ inline Roots TypeCheck::RootCandidates(TypeExpr *of, int d, bool globalsonly, bo
+             if (!v->refrootknown) return;   // No commitment yet; nothing stored from it.
+             if (slots && SliceVarOf(v) && (v->slotref || v->isglobal) && Depth(v) <= rd &&
+                 CanContain(v->type, of))
+-                out.Add({ v, true });
++                add({ v, true });
+             auto pt = PointeeOf(v->type);
+             if (!pt) return;
+             if (CanContain(pt, of))
+                 for (auto &a : v->ref.alts)
+-                    if (Depth(a.root) <= rd) out.Add({ a.root, a.exact, a.from });
++                    if (Depth(a.root) <= rd) add({ a.root, a.exact, a.from });
+             beyond(v, pt, rd);
+         } else {
+-            if (Depth(v) <= rd && CanContain(v->type, of)) out.Add({ v, true });
++            if (Depth(v) <= rd && CanContain(v->type, of)) add({ v, true });
+             // A holder parameter's contents: its class root (CheckSpecBody).
+             beyond(v, v->type, rd);
+         }

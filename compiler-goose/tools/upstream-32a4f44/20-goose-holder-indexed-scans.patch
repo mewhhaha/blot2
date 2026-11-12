@@ -1,0 +1,89 @@
+Speed: HolderMayPointInto's direct-store scan and EachHolderRoot's walk read a
+holder's own store events through the holder index (patch 08) instead of
+scanning the whole program-wide log from `from` for every variable at every
+shrink. Same events, same order; debug builds assert a visit appends nothing.
+
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 56eb254..174a06a 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2761,7 +2761,15 @@ struct TypeCheck {
+ #endif
+             for (auto at = begin; at != ids->end(); ++at) {
+                 if (holderstoreindex.profile) ++holderstoreindex.visits;
+-                if (visit(*at)) return true;
++#ifndef NDEBUG
++                auto events = storeevents.size();
++                auto postings = ids->size();
++#endif
++                auto stop = visit(*at);
++                // A visit reads the log; it neither appends nor re-indexes
++                // (the scan it replaces would see a new event).
++                assert(storeevents.size() == events && ids->size() == postings);
++                if (stop) return true;
+             }
+             return false;
+         }
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index 97403d8..b8f920e 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -2592,9 +2592,11 @@ inline bool TypeCheck::HolderMayPointInto(VarDef *holder, VarDef *arr, TypeExpr
+         if (incoming && e.incoming && !through) *incoming = holder;
+         return true;
+     };
+-    for (auto i = from; i < storeevents.size(); i++) {
++    // The holder's own events, in log order: the holder index visits the
++    // same events the whole log's scan from `from` would, and only those.
++    if (AnyHolderStoreEvent(holder, from, [&](size_t i) {
+         auto &e = storeevents[i];
+-        if (e.container != holder || StoredLater(i)) continue;
++        if (e.container != holder || StoredLater(i)) return false;
+         auto hit = false;
+         if (e.src && e.src->isglobal) {
+             // A global's stores may come from functions not checked yet, so
+@@ -2626,8 +2628,9 @@ inline bool TypeCheck::HolderMayPointInto(VarDef *holder, VarDef *arr, TypeExpr
+         } else if (e.root) {
+             hit = WithinDepth(arr, e.root) && (!e.pointee || contains(e.pointee));
+         }
+-        if (hit) return found(i, nullptr);
+-    }
++        return hit && found(i, nullptr);
++    }))
++        return true;
+     // What was stored may also be a reference to a slot holding references,
+     // a slice's or a holder's, rooted where the event says or bounded by the
+     // class it was read out of; a copy of another container's contents was
+@@ -3359,17 +3362,18 @@ template<typename F> void TypeCheck::EachHolderRoot(VarDef *holder, size_t from,
+         if (!seen.insert(h).second) return;
+         if (h->type && ClassOf(h->type) == SC_ROOT)
+             for (auto c : h->components) if (c) walk(c, start);
+-        for (auto i = start; i < storeevents.size(); i++) {
++        // h's own events, in log order, through the holder index.
++        AnyHolderStoreEvent(h, start, [&](size_t i) {
+             auto e = storeevents[i];
+-            if (e.container != h || StoredLater(i)) continue;
++            if (e.container != h || StoredLater(i)) return false;
+             if (e.src && !e.src->isglobal && e.src->type) {
+                 walk(e.src, 0);
+-                continue;
++                return false;
+             }
+             if (e.classread) {
+                 walk(e.src, 0);
+                 f(e);
+-                continue;
++                return false;
+             }
+             // A copy out of a global or a parameter's class is bounded by
+             // it: a global's stores may come from functions not checked yet,
+@@ -3381,7 +3385,8 @@ template<typename F> void TypeCheck::EachHolderRoot(VarDef *holder, size_t from,
+                 if (e.src->isglobal) e.pointee = nullptr;
+             }
+             if (e.root) f(e);
+-        }
++            return false;
++        });
+     };
+     walk(holder, from);
+ }

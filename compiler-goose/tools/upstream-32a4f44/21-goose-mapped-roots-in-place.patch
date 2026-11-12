@@ -1,0 +1,19 @@
+Speed: ApplyCalleeStores' `mapped` returns its Roots through one named
+result, so the per-event copy of a class-mapped root set is elided.
+
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index b8f920e..ea887ae 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1862,7 +1862,10 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+         }
+         auto copied = argcopy && !spec->inprogress && !spec->incycle && !spec->sf->isrec &&
+                       !IsRefOrSlice(spec->argtypes[(size_t)parameter]);
+-        return exact || copied ? r : Bounds(r);
++        // Every return names r, which is then built in place: the replay
++        // maps each body event through here.
++        if (!exact && !copied) r = Bounds(r);
++        return r;
+     };
+     // A container the caller can name: its own variables and its lexical
+     // parents', a class root, a global. Anything else is the callee's own.

@@ -1,0 +1,67 @@
+Speed: a cycle's rounds compare a count of broken threaded classes instead
+of summing the flag over the whole threadedclasses map before and after
+every round. Classes are only ever broken, never mended or erased; debug
+builds assert the count equals the sum.
+
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 174a06a..40b213f 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -2499,6 +2499,7 @@ struct TypeCheck {
+     };
+     unordered_map<VarDef *, ThreadedClass> threadedclasses;
+     size_t threadbounds = 0;   // Classes BoundThread bounded, for a cycle's rounds to settle.
++    size_t threadbroken = 0;   // Classes broken (ThreadedClass::broken), likewise.
+     void ValidateThreadArgs(FnSpec *spec, vector<Val> &argvals, Node *callnode);
+     bool PointsOutside(VarDef *pr, const Roots &v, vector<VarDef *> &through);
+     void BoundThread(VarDef *cls, const string &why);
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index c7681d1..d46bbaf 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -2581,6 +2581,7 @@ inline void TypeCheck::NoteThreadedClass(VarDef *cls) {
+     if (!parent) return;
+     tc.bounded = parent->bounded;
+     if (parent->broken) {
++        threadbroken += !tc.broken;
+         tc.broken = true;
+         tc.why = parent->why;
+     } else {
+@@ -2608,6 +2609,7 @@ inline void TypeCheck::Unthread(VarDef *cls, const string &why) {
+     if (it == threadedclasses.end() || it->second.broken) return;
+     auto &tc = it->second;
+     tc.broken = true;
++    threadbroken++;
+     tc.why = why;
+     for (size_t k = 0; k < tc.heirs.size(); k++) Unthread(tc.heirs[k], why);
+ }
+@@ -2946,8 +2948,11 @@ inline void TypeCheck::CheckSpecBody(FnSpec *spec, vector<Val> *argvals, Line ca
+         if (spec->rounds >= 8)
+             Error(callline, cat("the recursive cycle through ", spec->sf->name,
+                                 " does not settle (internal limit of 8 rounds)"));
+-        auto broken = 0;
+-        for (auto &[cls, tc] : threadedclasses) broken += tc.broken;
++        // Classes are only ever broken, never mended or dropped: the count
++        // says whether the round broke one.
++        auto broken = threadbroken;
++        assert(broken == (size_t)count_if(threadedclasses.begin(), threadedclasses.end(),
++                                          [](const auto &c) { return c.second.broken; }));
+         auto bounds = threadbounds;
+         auto members = spec->cyclemembers;
+         if (getenv("GOOSE_ROUNDS"))
+@@ -2959,12 +2964,13 @@ inline void TypeCheck::CheckSpecBody(FnSpec *spec, vector<Val> *argvals, Line ca
+         }
+         cyclerounds.back().changed = false;
+         CheckSpecBodyOnce(spec, argvals, callline, call);
+-        for (auto &[cls, tc] : threadedclasses) broken -= tc.broken;
+         auto outer = cyclerounds.back().changed;
+         if (outer && getenv("GOOSE_ROUNDS"))
+             fprintf(stderr, "round %d of %.*s: a variable outside it changed\n", spec->rounds,
+                     (int)spec->sf->name.size(), spec->sf->name.data());
+-        auto settled = broken == 0 && bounds == threadbounds && !outer;
++        assert(threadbroken == (size_t)count_if(threadedclasses.begin(), threadedclasses.end(),
++                                                [](const auto &c) { return c.second.broken; }));
++        auto settled = broken == threadbroken && bounds == threadbounds && !outer;
+         for (auto m : members)
+             if (!m->stale) settled = settled && SameRecord(m->record, *m->prev, m);
+         for (auto m : members) m->prev = nullptr;

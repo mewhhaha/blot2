@@ -1,0 +1,50 @@
+Speed: MentionsName and EscapingContinue (UsedAfter's syntactic walks) pass
+Children a callback capturing one reference, which std::function keeps in
+place instead of allocating per visited node.
+
+diff --git a/src/typecheck_exprs.h b/src/typecheck_exprs.h
+index 0b0ae2c..28652e7 100644
+--- a/src/typecheck_exprs.h
++++ b/src/typecheck_exprs.h
+@@ -3260,9 +3260,18 @@ inline bool TypeCheck::MentionsName(Node *n, string_view name, set<SFunction *>
+                     return true;
+         }
+     }
+-    auto hit = false;
+-    n->Children([&](Node *ch) { hit = hit || MentionsName(ch, name, seen); });
+-    return hit;
++    // The callback captures one reference, which std::function keeps in
++    // place: a use check walks every node of the rest of its body.
++    struct {
++        TypeCheck *tc;
++        string_view name;
++        set<SFunction *> *seen;
++        bool hit;
++    } walk { this, name, &seen, false };
++    n->Children([&walk](Node *ch) {
++        walk.hit = walk.hit || walk.tc->MentionsName(ch, walk.name, *walk.seen);
++    });
++    return walk.hit;
+ }
+ 
+ // Whether the code under n has a `continue` that leaves it: one that is not
+@@ -3275,9 +3284,16 @@ inline bool TypeCheck::EscapingContinue(Node *n) {
+     if (auto w = Is<While>(n)) body = w->body;
+     else if (auto l = Is<LoopExpr>(n)) body = l->body;
+     else if (auto fl = Is<ForLoop>(n)) body = fl->body;
+-    auto hit = false;
+-    n->Children([&](Node *ch) { hit = hit || (ch != body && EscapingContinue(ch)); });
+-    return hit;
++    // One reference captured, kept in place by std::function (MentionsName).
++    struct {
++        TypeCheck *tc;
++        Node *body;
++        bool hit;
++    } walk { this, body, false };
++    n->Children([&walk](Node *ch) {
++        walk.hit = walk.hit || (ch != walk.body && walk.tc->EscapingContinue(ch));
++    });
++    return walk.hit;
+ }
+ 
+ // Whether the rest of the statement being checked (LaterOperands) may take a
