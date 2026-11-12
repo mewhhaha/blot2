@@ -5444,5 +5444,10 @@
     },
     "note": "Partial check-only: the compile diagnostic root passes; not a whole compiler or runtime qualification. 267.4s of the 300s cap.",
     "whole_compiler_executable": false
+  },
+  "ink_project_server_parity": {
+    "receipt": "benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json",
+    "commit": "44ee94f4",
+    "summary": "Ink Pen suite matches the Zig oracle on 73/73 modules through serve-project after fixing the 120 s request limit, the entry seed-prefix rebind and per-job module images in parallel codegen; Gdev Main pending."
   }
 }

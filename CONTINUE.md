@@ -6,29 +6,44 @@ CLI/server, request OOM/retry and retention against Zig. A whole compiler execut
 
 ## Current frontier
 
-`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose
---cc clang-23 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 900
---total-timeout 1200` (under the heavy lock) checks the full program, emits 224 MB of C and links
-`compiler-goose/build/blotc-goose` (79 MB) in about 555s at 9 GiB peak. The checker is upstream
-Goose d5ae5bb plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-18; patch 18 shares
-unchanged body-event chunks and took the server root from the 14G cap to about 7.4G.
+`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-observer/goose
+--cc clang-23 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --inference-budget 1000000
+--stage-timeout 900 --total-timeout 1200` (under the heavy lock; wrapper build/goose-port/whole451/run.py)
+checks the full program, emits 224 MB of -O0 C and links `compiler-goose/build/blotc-goose` in about 560s
+at 8.8 GiB peak (emit ~500s, clang ~55s). The checker is upstream Goose d5ae5bb, still upstream HEAD,
+plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-19 (18 shares body-event chunks;
+19 ports the runtime allocation observer the OOM injection needs).
 
-Smoke: on examples/scalar.blot, lex/parse/check reports match the Zig oracle apart from timings and
-the unavailable allocator counters, and scalar.wasm is byte-identical. Four other examples are
-rejected with the oracle's first diagnostic.
+The oracle is compiler/zig-out-native-fast/bin/blotc rebuilt from current source (sha 71ae7ab9…); the
+2026-11-08 binary kept beside it predates `type X is opaque` and cannot read the current std.
 
-[Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz)
-(`deno run -A compiler-goose/tools/qualify_compiler.ts --goose-compiler compiler-goose/build/blotc-goose
---zig-oracle compiler/zig-out-native-fast/bin/blotc --output DIR --overall-ms 900000`) passes its scoped
-functional checks: Goose 20 pass, recursion unsupported exactly as the oracle (ABI 8 recursive
-selected calls). That covers CLI, executed ABI 8, the project lifecycle, request OOM/retry and
-the 16 MiB revision-retention budget. It used the checker built with series 01-19 (patch 19 ports
-the runtime allocation observer the OOM injection needs); full runtime qualification is still
-pending.
+[Ink parity](benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json): Ink's Pen test suite
+through the project server matches the oracle on all 73 modules (243 passed, 1 failed, 9 rejected with
+the same diagnostics), 328s at 2 jobs against 121.5s at 4. Getting there fixed three server faults
+(44ee94f4): a 120s request limit, a seed-prefix rebind that rejected entries interning new symbols, and
+parallel codegen sending the module image with every job. Run it with copies of ../ink whose pen.json
+names the compiler (build/goose-parity/ink-zig, ink-goose) and Pen/plugin rebuilt from ../pen source.
 
-**Next:** broaden parity beyond the fixtures (Ink/Gdev/Pen builds and Gdev frames against the
-Zig oracle), measure compile speed and size against the oracle, rerun the 20 diagnostic roots on
-the current checker, and split the compile root, which is near its 300s cap.
+Gdev Main: the oracle builds it in 110s (9,203,613 B, sha c08570f8…). Goose Gdev is the current
+blocker: at codegen 1/frontend 4 workers it aborted with a 2 GB data-stack overflow after the
+request-limit fix; the runtime-job chunking may not cover it (frontend workers copy packets too).
+`scripts/integration/build_gdev.ts --compiler X --timeout-ms 3600000` runs it.
+
+[Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz) (scoped
+functional checks: CLI, executed ABI 8, project lifecycle, request OOM/retry, 16 MiB retention) passed
+on the older binary against the stale oracle; rerun it on the current pair.
+
+Diagnostic roots, each alone: 18 of 20 pass under 300s; compile passes in 235s after 44ee94f4 and server
+needs over 300s. Checking all 20 in one process gives one cross-probe error (assemble), not production.
+
+**Next:** fix the Gdev data-stack overflow and compare Gdev Main bytes, then a Gdev frame through Pen;
+rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
+optimized (`--release`) Goose build's compile speed and size against the oracle.
+
+To find a server fault: capture Pen's serve-project stream with a tee wrapper, replay it
+(build/goose-parity/repro/replay.py), and build a diagnosis-only binary from the emitted C
+(same-line traces at error creation sites, or a runtime fault handler that prints a backtrace;
+build/goose-parity/debug). gdb loses the request supervisor's fork/vfork chain.
 
 Narrow roots (`GOOSE_DIAGNOSTIC_ROOTS=blot_numeric_probe::probe`) type-check one path in seconds to
 minutes; the whole build reports the first full-program error in about 6 minutes.
@@ -115,14 +130,11 @@ families stay in pinned history and
 
 ## Tools and next checks
 
-Current checker: upstream Goose d5ae5bb (one stdlib-only commit past 32a4f44)
-plus [the ported series](compiler-goose/tools/upstream-32a4f44/series) 01-17, built
-by its `build.sh` into build/goose-port/upstream-d5ae5bb/build-precision/goose
-(sha256 490e1f80…). It reports the same first errors as the old 2e2bedef checker
-on 19/20 roots, runs about 1.5x slower and needs over 14G for the server root
-([comparison](benchmarks/evidence/qualification/2026-11-11-goose-upstream-32a4f44.json)).
-Run roots one at a time; three in parallel exceed 14G. `GOOSE_SHRINK_ORIGINS=<callee or *>`
-adds the original shrink witness to an error. Installed Goose is unchanged.
+Current checker: upstream Goose d5ae5bb plus the series 01-19, built by
+compiler-goose/tools/upstream-32a4f44/build.sh (build-observer/goose, sha256 c947f304…). Peak
+memory is about 9 GiB for the whole program; run heavy jobs one at a time under the heavy lock.
+`GOOSE_SHRINK_ORIGINS=<callee or *>` adds the original shrink witness to an error. Installed Goose is
+unchanged.
 
 Caps: repair 300s on the current checker, final emission 180s, whole 300s; stop 3s after a reported
 error. Never lift caps, relax checks or clear live owners to hide errors.
