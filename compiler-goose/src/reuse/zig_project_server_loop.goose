@@ -36,8 +36,10 @@ fn runWithPolicy<E>(executor:E&,reader:blot_io::Reader,writer:blot_io::Writer,co
     var identity:u8[64]=[0;64];let digits="0123456789abcdef";for byte,index in compiler {identity[index*2]=digits[byte>>4];identity[index*2+1]=digits[byte&15];}let capabilities=["project-build","utf8_bytes","abort-disposes-process","source-overlays","backend-checkpoints","native-assets-v1","editor-completion-v1","allocation-explanations-v1"];let error=reply(writer,Hello{compilerIdentity:identity[..],capabilities:capabilities[..],..},[]);if error!=blot_error::Error.none {return error;}
     // Fork before reading each request; the supervisor publishes only complete
     // replies after candidate cleanup and adoption. The previous heap stays idle.
+    // Like the Zig server, a build has no server-side deadline; the host bounds
+    // it by disposing of the process. Supervisor control steps stay bounded.
     var opened=blot_support::none<OpenProject>();var last_id:u32=0;
-    let role=blot_native::request_start(blot_reuse_zig_project_frames::max_frame_bytes as u64,blot_reuse_zig_project_frames::max_frame_bytes as u64,120000);
+    let role=blot_native::request_start(blot_reuse_zig_project_frames::max_frame_bytes as u64,blot_reuse_zig_project_frames::max_frame_bytes as u64,0);
     if role<0 {return blot_error::Error.io;}
     if role==0 {
         if blot_native::request_transport_run(reader.fd,writer.fd)<0 {return blot_error::Error.io;}

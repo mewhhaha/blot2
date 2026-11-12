@@ -125,7 +125,7 @@ fn preparedOfferValue()->Preparation {
  blot_reuse_source_completion::prefixes[at].canonical=blot_reuse_source_completion::Prefix{(at+1) as u32,generation};seed.source_completion .= blot_reuse_source_completion::prefixes[at].canonical;
  var pin,error=seed.pinInputs();assert(error==blot_error::Error.none && pin.owners().len==1);
  assert(value.attachSeedPin(pin)==blot_error::Error.none && pin.len==0);
- assert(value.rebindFrozenPrefix(seed.value)==blot_error::Error.none);
+ assert(value.rebindFrozenPrefix(seed.value,true)==blot_error::Error.none);
  assert(blot_reuse_source_completion::mintEntry(value,seed)==blot_error::Error.none && value.source_completion);
  let completion=value.source_completion;let pin_start=value.seed_pin.start;
  value=blot_reuse_partial_dependency::publishPrepared(value);

@@ -83,7 +83,7 @@ fn prepareEntry<E,P>(executor:E&,entry_path:const u8[:],output_identity:blot_sup
  match prepared {ready bound=>{var payload=bound;
  let value,error=owner.pinInputs();if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}var pin=value;
  let error=payload.value.attachSeedPin(pin);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {pin.deinit();prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
- let error=payload.value.rebindFrozenPrefix(owner.value);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
+ let error=payload.value.rebindFrozenPrefix(owner.value,true);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}
  if !previous.present {let error=mintEntry(payload.value,owner);prepared=blot_reuse_partial_dependency::Preparation.ready{payload.value};if error!=blot_error::Error.none {prepared.deinit();return default<blot_reuse_partial_dependency::Preparation>(),error;}}
  prepared=blot_reuse_partial_dependency::Preparation.ready{blot_reuse_partial_dependency::publishPrepared(payload.value)};
  },_=>{}}

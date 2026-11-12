@@ -103,9 +103,13 @@ fn takeCore(self_:Prepared&,index:i64)->OwnedCore,Error {
  let receipt .= self_.source_completion;if receipt {receipt.deinit();}self_.source_completion .=null;
  let units=self_.catalog_owner.mutable(self_.units);let owners=core_owners.realloc_slice(self_.unit_owners,self_.unit_owners.len);assert(blot_support::same_slice_identity(owners,self_.unit_owners));let value=OwnedCore{units[index],owners[index]};owners[index]=Owner{};let unit=value.value.unit;units[index]=default<Core>();units[index].unit=unit;return value,blot_error::Error.none;
 }
-fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&)->Error {
+// A fresh preparation shares the seed's whole symbol table. An entry prepared
+// against an existing seed may intern names after it (entry_symbols); seed ids
+// must still resolve to the same text, which the loop below verifies.
+fn rebindFrozenPrefix(self_:Prepared&,seed:const Frozen&,entry_symbols:bool)->Error {
  let names=self_.identity.view();
- if !self_.catalog_owner.unique() || self_.source_mode || self_.units.len==0 || self_.units.len>0xffffffff || self_.entry!=self_.units.len || seed.modules.len!=self_.units.len-1 || self_.paths.len!=self_.units.len || names.owners.len!=self_.units.len || names.symbols.len!=seed.symbols.len || seed.symbols.len==0 {return blot_error::Error.invalid_artifact;}
+ var symbols_match=names.symbols.len==seed.symbols.len;if entry_symbols {symbols_match=names.symbols.len>=seed.symbols.len;}
+ if !self_.catalog_owner.unique() || self_.source_mode || self_.units.len==0 || self_.units.len>0xffffffff || self_.entry!=self_.units.len || seed.modules.len!=self_.units.len-1 || self_.paths.len!=self_.units.len || names.owners.len!=self_.units.len || !symbols_match || seed.symbols.len==0 {return blot_error::Error.invalid_artifact;}
  if self_.borrowed.len!=0 && self_.borrowed.len!=self_.units.len {return blot_error::Error.invalid_artifact;}if self_.isBorrowed(self_.entry-1) {return blot_error::Error.invalid_artifact;}
  for symbol,id in seed.symbols {if id==0 {if symbol.text.len!=0 {return blot_error::Error.invalid_artifact;}}else {let name=names.symbol(id as u32);if !name.present || name.value!=symbol.text {return blot_error::Error.invalid_artifact;}}}
  for module,index in seed.modules {let id=(index+1) as u32;let owner=names.owner(id);if module.core.unit!=id || module.interface.unit!=id || self_.units[index].unit!=id || module.core.diagnostics.len!=0 || self_.paths[index]!=module.identity.normalized_path || !owner.present || owner.value!=module.identity.normalized_path {return blot_error::Error.invalid_artifact;}}
