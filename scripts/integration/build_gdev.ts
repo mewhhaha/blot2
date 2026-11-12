@@ -35,8 +35,8 @@ if (positionals.length > 1) {
   throw new Error("Expected at most one output directory");
 }
 const timeoutMs = Number(values["timeout-ms"]);
-if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
-  throw new Error("--timeout-ms must be an integer from 100 to 30000");
+if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 3_600_000) {
+  throw new Error("--timeout-ms must be an integer from 100 to 3600000");
 }
 
 const parent = resolve(parentArg);

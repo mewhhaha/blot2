@@ -21,7 +21,8 @@ void blot_request_adopt_hook(void (*hook)(void));
 /* Optional parent-only validation of immutable complete reply before adoption. */
 void blot_request_reply_validator(int32_t (*validate)(int32_t fd, uint64_t length, uint64_t token));
 /* Call once before compiler state is created; returns role or negative errno.
- * The supervisor owns the external input/output. Worker stdout is discarded. */
+ * The supervisor owns the external input/output. Worker stdout is discarded.
+ * timeout_ms bounds each request's computation; zero leaves it unbounded. */
 int32_t blot_request_start(uint64_t max_request, uint64_t max_reply, uint32_t timeout_ms);
 /* Supervisor: borrowed regular/spool FD, exact length, increasing nonzero token.
  * The caller writes reply bytes externally only after ACCEPTED. Input errors

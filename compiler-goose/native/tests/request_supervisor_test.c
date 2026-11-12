@@ -10,11 +10,12 @@
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 /* Exercises the production module with a retained native heap value, rather
  * than modelling rollback in a separate implementation. */
-enum { SET, GET, MARKED_OOM, ABORT, EXIT, KILL, SHORT_REPLY, WRONG_TOKEN, TIMEOUT };
+enum { SET, GET, MARKED_OOM, ABORT, EXIT, KILL, SHORT_REPLY, WRONG_TOKEN, TIMEOUT, SLOW };
 struct request { int op, value; };
 extern void blot_platform_entry_init(int argc, char **argv);
 extern int64_t blot_worker_spawn(uint32_t slot);
@@ -78,6 +79,7 @@ static void worker_loop(void) {
         if (request.op == KILL) raise(SIGKILL);
         if (request.op == WRONG_TOKEN) blot_request_fail_oom(token + 1);
         if (request.op == TIMEOUT) { for (;;) pause(); }
+        if (request.op == SLOW) { struct timespec pause_for = { 0, 600000000 }; while (nanosleep(&pause_for, &pause_for)) {} }
         int fd = spool_bytes(counter, sizeof *counter);
         uint64_t length = sizeof *counter;
         if (request.op == SHORT_REPLY) length++;
@@ -188,8 +190,20 @@ int main(int argc, char **argv) {
     assert(waitpid(candidate, &status, 0) == candidate && WIFSIGNALED(status));
     assert(waitpid(-1, &status, WNOHANG) == -1 && errno == ECHILD);
     assert(fd_count() == initial_fds);
+    /* A zero limit leaves computation unbounded: a request slower than the
+     * 250 ms limit above is still adopted. */
+    pid_t unbounded = fork(); assert(unbounded >= 0);
+    if (!unbounded) {
+        expected_supervisor = getpid();
+        int unbounded_role = blot_request_start(1024, 1024, 0); assert(unbounded_role >= 0);
+        if (unbounded_role == BLOT_REQUEST_WORKER) worker_loop();
+        receive_pid(event_pipe[0]);
+        assert(submit(SLOW, 5) == BLOT_REQUEST_ACCEPTED); expect_value(5);
+        blot_request_stop(); _exit(0);
+    }
+    assert(waitpid(unbounded, &status, 0) == unbounded && WIFEXITED(status) && !WEXITSTATUS(status));
     char byte; assert(read(capture[0], &byte, 1) == -1 && errno == EAGAIN);
     assert(dup2(stdout_copy, STDOUT_FILENO) >= 0);
     close(stdout_copy); close(capture[0]); close(event_pipe[0]); close(event_pipe[1]); close(publication);
-    puts("request supervisor: retained heap, classified failures, immutable spools, stdout/FD/child cleanup pass");
+    puts("request supervisor: retained heap, classified failures, unbounded computation, immutable spools, stdout/FD/child cleanup pass");
 }

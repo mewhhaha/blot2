@@ -28,7 +28,10 @@ static int channel = -1, input = -1, reply = -1, worker = -1, role = -1;
 static int stage_sender = -1, stage_child;
 extern int32_t blot_worker_quiesce(void) __attribute__((weak));
 static uint64_t request_bound, reply_bound, active_token, input_length, reply_length;
+/* Zero leaves request computation unbounded, like the Zig oracle: the host
+ * bounds a build by disposing of the process. Control steps stay bounded. */
 static uint32_t limit_ms;
+enum { STEP_MS = 120000 };
 static pid_t supervisor_pid;
 static void (*fork_hook)(void);
 static void (*adopt_hook)(void);
@@ -45,6 +48,7 @@ static int64_t milliseconds(void) {
     if (clock_gettime(CLOCK_MONOTONIC, &now)) return 0;
     return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000;
 }
+static int64_t step_deadline(void) { return milliseconds() + (limit_ms ? limit_ms : STEP_MS); }
 static int send_record(int fd, int kind, uint64_t token, uint64_t length, int pid, int pass) {
     struct record r = { magic, token, length, kind, pid };
     struct iovec io = { &r, sizeof r };
@@ -119,10 +123,13 @@ static int receive_candidate(int fd, int *cap, uint64_t token,
                              struct record *r, int *received, int64_t deadline) {
     *received = -1;
     while (*cap >= 0) {
-        int64_t remaining = deadline - milliseconds();
-        if (remaining <= 0) return -ETIMEDOUT;
-        int timeout = INT_MAX;
-        if (remaining < INT_MAX) timeout = (int)remaining;
+        int timeout = -1;
+        if (deadline) {
+            int64_t remaining = deadline - milliseconds();
+            if (remaining <= 0) return -ETIMEDOUT;
+            timeout = INT_MAX;
+            if (remaining < INT_MAX) timeout = (int)remaining;
+        }
         struct pollfd ready[2] = { { .fd = *cap, .events = POLLIN },
                                    { .fd = fd, .events = POLLIN } };
         int count = poll(ready, 2, timeout);
@@ -223,7 +230,7 @@ static void reap_group(int pid) {
     }
 }
 int32_t blot_request_start(uint64_t max_request, uint64_t max_reply, uint32_t timeout_ms) {
-    if (role >= 0 || !max_request || !max_reply || !timeout_ms ||
+    if (role >= 0 || !max_request || !max_reply ||
         max_request > INT64_MAX || max_reply > INT64_MAX) return -EINVAL;
     if (prctl(PR_SET_CHILD_SUBREAPER, 1)) return -errno;
     int pair[2];
@@ -356,10 +363,11 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
         int error = errno; close(stage[0]); close(stage[1]); close(request); return -error;
     }
     close_fd(&reply); reply_length = 0; active_token = token;
-    int64_t deadline = milliseconds() + limit_ms;
+    int64_t deadline = 0;
+    if (limit_ms) deadline = milliseconds() + limit_ms;
     int error = send_record(channel, BEGIN, token, 0, 0, -1);
     struct record r; int candidate_channel = -1, candidate = -1;
-    if (!error) error = receive(channel, &r, &candidate_channel, deadline);
+    if (!error) error = receive(channel, &r, &candidate_channel, step_deadline());
     if (!error && r.kind == FAILED && r.token == token && candidate_channel < 0) {
         close(request); close(stage[0]); close(stage[1]); return BLOT_REQUEST_FAILED;
     }
@@ -399,7 +407,7 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
             close_fd(&channel); channel = candidate_channel; worker = candidate;
             reply = returned; reply_length = complete_length;
             error = send_record(channel, COMMIT, token, 0, 0, -1);
-            if (!error) error = receive(channel, &r, &extra, milliseconds() + limit_ms);
+            if (!error) error = receive(channel, &r, &extra, step_deadline());
             int invalid_fd = extra >= 0;
             close_fd(&extra);
             if (error || r.kind != QUIESCENT || r.token != token || invalid_fd) {
@@ -414,7 +422,7 @@ int32_t blot_request_submit(int32_t request_fd, uint64_t length, uint64_t token)
     kill_group(candidate);
     error = send_record(channel, KEEP, token, 0, 0, -1);
     int extra = -1;
-    if (!error) error = receive(channel, &r, &extra, milliseconds() + limit_ms);
+    if (!error) error = receive(channel, &r, &extra, step_deadline());
     close_fd(&extra); reap_group(candidate);
     if (error || r.kind != IDLE || r.token != token) { blot_request_stop(); return -EPIPE; }
     return result;
