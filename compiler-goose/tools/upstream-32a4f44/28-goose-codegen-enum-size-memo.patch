@@ -1,0 +1,33 @@
+Speed: CodeGen::FixedSize of a fixed-mode enum is remembered per instance
+instead of looking up every variant's layout on each query.
+
+diff --git a/src/codegen.h b/src/codegen.h
+index 2c90226..9ea44e6 100644
+--- a/src/codegen.h
++++ b/src/codegen.h
+@@ -353,6 +353,7 @@ struct CodeGen {
+         int64_t size = 0;
+     };
+     map<pair<const void *, int>, Layout> layouts;   // StructInst / (EnumInst, variant).
++    unordered_map<EnumInst *, int64_t> enumsizes;    // FixedSize of a fixed-mode enum.
+ 
+     int64_t PadAlign(TypeExpr *t);
+     Layout LayoutFields(const vector<Field> &fields, const vector<TypeExpr *> &ftypes);
+diff --git a/src/codegen_types.h b/src/codegen_types.h
+index fa7ab10..34de04a 100644
+--- a/src/codegen_types.h
++++ b/src/codegen_types.h
+@@ -317,10 +317,12 @@ inline int64_t CodeGen::FixedSize(TypeExpr *t) {
+         case TY_ENUM: {
+             assert(!t->enu->varmode);
+             auto ei = EIOf(t);
++            // Once per instance: the size asks every variant's layout.
++            if (auto it = enumsizes.find(ei); it != enumsizes.end()) return it->second;
+             int64_t maxp = 0;
+             for (size_t vi = 0; vi < ei->en->variants.size(); vi++)
+                 maxp = std::max(maxp, VariantLayout(ei, (int)vi).size);
+-            return TagSize(ei->en) + maxp;
++            return enumsizes[ei] = TagSize(ei->en) + maxp;
+         }
+         case TY_VARIANT: {
+             auto ei = EIVar(t);

@@ -1,0 +1,30 @@
+Speed: BCE seeds each body's ge0 from gge0 with end hints (both are ordered
+by pointer) and stops looking for a live candidate once one is found.
+
+diff --git a/src/bce.h b/src/bce.h
+index f928aa7..bc4f0cb 100644
+--- a/src/bce.h
++++ b/src/bce.h
+@@ -3304,7 +3304,8 @@ struct BCE {
+     void RunSpec(FnSpec *sp) {
+         if (!sp->body) return;   // An extern fn (§7.10).
+         SetupSpec(sp);
+-        for (auto &[v, ok] : gge0) if (ok) ge0.insert(v);
++        // In key order, as gge0 keeps them: the end is where to look first.
++        for (auto &[v, ok] : gge0) if (ok) ge0.insert(ge0.end(), v);
+         // Whole-body kill summary: which places and variables any path can
+         // invalidate or re-bind.
+         set<int> bumped, shrunk;
+@@ -3523,7 +3524,11 @@ struct BCE {
+                 // none of the live candidates has nothing to check.
+                 auto &writes = effects[sp].intvars;
+                 auto here = false;
+-                for (auto &[v, ok] : gge0) here = here || (ok && writes.count(v));
++                for (auto &[v, ok] : gge0)
++                    if (ok && writes.count(v)) {
++                        here = true;
++                        break;
++                    }
+                 if (!here) continue;
+                 SetupSpec(sp);
+                 dropped = check(sp->body) || dropped;

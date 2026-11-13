@@ -1,0 +1,103 @@
+{
+  "date": "2026-11-12",
+  "scope": "Speed of the private Goose checker on the whole compiler-goose emit; output must be unchanged. Not a compiler qualification.",
+  "workload": "goose -o blot_goose.c --header blot_goose.h -O0 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib <frozen compiler-goose 2d1f0836>/src/main.goose",
+  "checkers": {
+    "base": "upstream d5ae5bb + series 01-19 (build-observer, sha256 c947f304...)",
+    "patched": "base + 20-29",
+    "pgo": "base + 20-29, clang -fprofile-instr-use trained on the same emit (build.sh GOOSE_PGO=1)"
+  },
+  "runs_seconds": {
+    "note": "each under the heavy lock on a shared machine (load 3-16, partly swapped); medians are the fair comparison",
+    "base": {
+      "wall": [
+        522.86,
+        448.09,
+        559.85
+      ],
+      "user": [
+        497.79,
+        431.73,
+        537.18
+      ],
+      "median_user": 497.79
+    },
+    "patched": {
+      "wall": [
+        281.32,
+        370.44,
+        275.65
+      ],
+      "user": [
+        270.24,
+        343.74,
+        262.56
+      ],
+      "median_user": 270.24
+    },
+    "pgo": {
+      "wall": [
+        219.89,
+        229.99
+      ],
+      "user": [
+        205.04,
+        214.2
+      ],
+      "median_user": 209.62
+    }
+  },
+  "speedup_user": {
+    "patched": 1.84,
+    "pgo": 2.37
+  },
+  "peak_rss_plus_swap_gib": {
+    "base": [
+      10.24,
+      10.28
+    ],
+    "patched": [
+      10.3,
+      10.37
+    ],
+    "pgo": [
+      10.31,
+      9.92
+    ]
+  },
+  "gates": {
+    "emitted_c_identical": {
+      "runs": 19,
+      "blot_goose_c_sha256": "b47872c26741b7a9fddc8709633858e6affc7e53fcda2d2853679ec63d2a3bfc",
+      "blot_goose_h_sha256": "0ff2249c251e34c56e385aa49fe46f81860163b700206284ac3991573ad3a685"
+    },
+    "diff_checkers_2876_programs": {
+      "base_vs_patched_same_source_path": 0,
+      "patched_vs_pgo": 0,
+      "note": "3 known differences against the observer binary come from the stdlib path compiled into each binary, not from the patches"
+    },
+    "assert_build": "patched at -O2 without NDEBUG: full emit identical and all 2876 programs pass, exercising each patch's debug assertions"
+  },
+  "profile_before": {
+    "HolderMayPointInto_inclusive_pct": 20.9,
+    "ShrinkScanVars_pct": 27.9,
+    "ApplyCalleeStores_pct": 37.8
+  },
+  "profile_after": {
+    "HolderMayPointInto_inclusive_pct": 0,
+    "ShrinkScanVars_pct": 6.7,
+    "ApplyCalleeStores_pct": 52,
+    "note": "ApplyCalleeStores replays each callee's events at every call; reducing that is a semantic redesign"
+  },
+  "rejected": [
+    "tcmalloc preload: no speedup, 11.58 GiB peak",
+    "memoizing AST walks: the checker rewrites statements in place",
+    "caching RootCandidates/ShrinkTargets across a call: their inputs change during the call"
+  ],
+  "build_script_check": {
+    "command": "GOOSE_PGO=1 sh compiler-goose/tools/upstream-32a4f44/build.sh (isolated root, same upstream source)",
+    "build_seconds_including_training": 489,
+    "checker_sha256": "f3bd100ef7d6f282224aca1f01cc3293a0de40ac895d9e9fc7379c52940fedf8",
+    "emit": "blot_goose.h identical (0ff2249c...); blot_goose.c identical to the gate output after normalizing the absolute source-path prefix embedded in file-name strings"
+  }
+}

@@ -3,7 +3,7 @@
 # Apply in order with: patch -p1 --fuzz=0 -d <goose-source> -i <file>.
 # Build with upstream CMake (Release, clang 23.1.4) and
 #   CMAKE_CXX_FLAGS="-gline-tables-only -DGOOSE_EXPANSION_NODE_LIMIT=1000000 -DGOOSE_REACHABLE_PROGRAM=1".
-# new-patched = 01-11 (diagnostics, speed, partial roots). new-precision = 01-19.
+# new-patched = 01-11 (diagnostics, speed, partial roots). new-precision = 01-29.
 01-goose-containment.patch
 02-goose-diagnostic-roots.patch
 03-goose-reachable-program.patch
@@ -26,3 +26,14 @@
 18-goose-shared-body-snapshots.patch
 # Runtime: allocation observer hooks for request OOM injection (includes the regenerated runtime_inline.h).
 19-goose-runtime-observer.patch
+# Speed: same emitted C and diagnostics, about 1.8x less checker time on compiler-goose.
+20-goose-holder-indexed-scans.patch
+21-goose-mapped-roots-in-place.patch
+22-goose-codegen-fat-ref-memo.patch
+23-goose-root-candidates-index.patch
+24-goose-broken-thread-count.patch
+25-goose-walk-callbacks-in-place.patch
+26-goose-bce-global-facts.patch
+27-goose-tabled-class-params.patch
+28-goose-codegen-enum-size-memo.patch
+29-goose-read-back-candidates.patch
