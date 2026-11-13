@@ -49,7 +49,13 @@ fn executeProjectJob(parent:Engine&,unit:u32,job:ParallelJob&)->Error {
  let modules=moduleSlots(worker.result);let produced=modules[unit-1];if produced.present {job.module=blot_support::Option<Module>{true,canonicalModule(produced.value)};}else {job.module=blot_support::none<Module>();}modules[unit-1]=blot_support::none<Module>();if worker.result.body_caches.len!=0 {job.cache=worker.result.body_caches[unit-1];worker.result.body_caches[unit-1]=blot_reuse_body_check_cache::Cache{..};}
  job.diagnostics=copyDiagnostics(worker.diagnostics);worker.diagnostics.items=worker.diagnostics.storage[..0];discardWorker(worker);return blot_error::Error.none;
 }
+// Worker processes receive the checker state as copied packets; on Gdev Main four
+// of them made checking ~3x slower than one in-process pass, while Zig's
+// shared-memory threads save ~10%. Frontend checks stay in-process until workers
+// can share the state (forked copy-on-write or a mapped snapshot).
+let process_workers=false;
 fn checkParallel<E>(self_:Engine&,executor:E&,deferrable:bool)->bool,Error {
+ if !process_workers {return false,blot_error::Error.none;}
  let requested=self_.source.checking.workers;var editor=false;match self_.editor {query=>{editor=true;},_=>{}}
  if requested<=1 || !self_.source.checking.io || self_.source_validation || editor || self_.execution.observe!=null || self_.execution.stats!=null || self_.source.input_mode!=blot_reuse_project::InputMode.project {return false,blot_error::Error.none;}
  var nodes:i64=0;var remaining:i64=0;for unit in self_.source.order.items {if deferrable && unit==self_.source.entry {continue;}let count=self_.source.unit(unit).tree.nodes.len;nodes+=min(0x7fffffffffffffff-nodes,count);remaining+=1;}if remaining<2 || nodes<self_.execution.parallel_min_nodes {return false,blot_error::Error.none;}
