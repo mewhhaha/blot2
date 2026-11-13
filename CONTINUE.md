@@ -21,8 +21,10 @@ The oracle is compiler/zig-out-native-fast/bin/blotc rebuilt from current source
 through the project server matches the oracle on all 73 modules (243 passed, 1 failed, 9 rejected with
 the same diagnostics), 328s at 2 jobs against 121.5s at 4. Getting there fixed three server faults
 (44ee94f4): a 120s request limit, a seed-prefix rebind that rejected entries interning new symbols, and
-parallel codegen sending the module image with every job. Run it with copies of ../ink whose pen.json
-names the compiler (build/goose-parity/ink-zig, ink-goose) and Pen/plugin rebuilt from ../pen source.
+parallel codegen sending the module image with every job. To rerun, copy ../ink (without .git/.cache/.pen)
+once per compiler, set pen.json's `plugins.blot.run.blotc` to that compiler and its std paths to absolute
+ones, rebuild Pen and plugins/ from ../pen source, and run `pen test-blot --project COPY`; compare each
+module's diagnostics and test outcomes.
 
 Gdev Main compiles on Goose (1197s against the oracle's 110s) to the same 9,203,613 bytes except 36:
 one function (code-section index 5077) numbers locals 70-78 in a different order. That local-order
@@ -46,10 +48,11 @@ group of three, Goose the reverse);
 rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
 optimized (`--release`) Goose build's compile speed and size against the oracle.
 
-To find a server fault: capture Pen's serve-project stream with a tee wrapper, replay it
-(build/goose-parity/repro/replay.py), and build a diagnosis-only binary from the emitted C
-(same-line traces at error creation sites, or a runtime fault handler that prints a backtrace;
-build/goose-parity/debug). gdb loses the request supervisor's fork/vfork chain.
+To find a server fault: capture Pen's serve-project stream with a tee wrapper (frames are u32 metadata
+length, u32 payload length, JSON metadata, payload), replay it into `serve-project`, and build a
+diagnosis-only binary from compiler-goose/build/blot_goose.c (same-line traces at error creation
+sites, or a runtime fault handler that prints a backtrace). gdb loses the request supervisor's
+fork/vfork chain.
 
 Narrow roots (`GOOSE_DIAGNOSTIC_ROOTS=blot_numeric_probe::probe`) type-check one path in seconds to
 minutes; the whole build reports the first full-program error in about 6 minutes.

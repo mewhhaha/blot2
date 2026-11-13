@@ -147,7 +147,7 @@ recursive fn valueBody<Units>(self_: Shapes<Units>&, id: u32, expected: u32, dep
 }
 struct Context<Units> { units: Units, snapshot: const Snapshot& }
 fn withShapes<Units>(context: Context<Units>&, store: blot_eval_type_evidence::Store&) -> Error {
-    let snapshot .= context.snapshot; var imported: u32[>..]=[]; imported.resize(snapshot.evidence.nodes.len); for &value in imported { value = 0; }
+    let snapshot .= context.snapshot; var imported: u32[>..]=[]; imported.resize(snapshot.evidence.nodes.len, 0);
     var shapes = Shapes { units: context.units, snapshot: snapshot, store: store, imported: imported , ..}; let evidence = snapshot.evidence.view();
     for value, id in snapshot.values {
         if value.kind == blot_eval_eval_values::ValueKind.descriptor { if value.nominal == 0 || value.nominal >= evidence.nodes.len || value.len != 0 || value.bits != 0 { return blot_error::Error.invalid_artifact; } if snapshot.value_evidence[id] != 0 { let ty = evidence.node(snapshot.value_evidence[id]); if ty.tag != blot_eval_type_evidence::Tag.nominal || ty.a != blot_check_typed_staging::descriptor_identity.unit || ty.b != blot_check_typed_staging::descriptor_identity.decl { return blot_error::Error.invalid_artifact; } let args = evidence.children(snapshot.value_evidence[id]); if args.len != 1 || args[0] != value.nominal { return blot_error::Error.invalid_artifact; } } let imported, err = shapes.evidence(value.nominal as u32, 0); if err != blot_error::Error.none { return err; } }
