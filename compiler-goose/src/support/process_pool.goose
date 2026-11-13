@@ -5,7 +5,6 @@ import std;
 import support.error;
 import support.native;
 import support.io;
-import support.blake3;
 type Error=blot_error::Error;
 enum Kind {runtime,semantic,check,lower,independent}
 let kinds=[Kind.runtime,Kind.semantic,Kind.check,Kind.lower,Kind.independent];
@@ -36,12 +35,15 @@ fn errorCode(error:Error)->u32 {var index:u32=0;const for <N,V> in variants<Erro
 fn fromError(code:u32)->Error,bool {var index:u32=0;const for <N,V> in variants<Error> {if code==index {return V,true;}index++;}return blot_error::Error.invalid_artifact,false;}
 fn put(bytes:u8[:],at:i64,value:u64,width:i64) {for index in width {bytes[at+index]=(value>>(index*8)) as! u8;}}
 fn get(bytes:const u8[:],at:i64,width:i64)->u64 {var result:u64=0;for index in width {result|=bytes[at+index] as u64<<(index*8);}return result;}
+// Frames cross local pipes between processes of one executable; a payload digest
+// guarded nothing a pipe can corrupt and cost a third of a parallel build. Header
+// bytes 48..80 stay reserved as zero.
 fn writeFrame(writer:blot_io::Writer,kind:Kind,id:u64,bytes:const u8[:],failure:Error)->Error {
-    if bytes.len>packet_limit {return blot_error::Error.artifact_limit;}var header:u8[80]=[0;80];for byte,index in magic {header[index]=byte;}put(header,8,version,4);put(header,12,kindCode(kind),4);put(header,16,id,8);put(header,24,bytes.len as u64,8);put(header,32,errorCode(failure),4);put(header,36,0,4);put(header,40,inference_budget,8);let digest=blot_support_blake3::hash(bytes);for byte,index in digest {header[48+index]=byte;}let error=blot_io::write_all(writer,header);if error!=blot_error::Error.none {return error;}return blot_io::write_all(writer,bytes);
+    if bytes.len>packet_limit {return blot_error::Error.artifact_limit;}var header:u8[80]=[0;80];for byte,index in magic {header[index]=byte;}put(header,8,version,4);put(header,12,kindCode(kind),4);put(header,16,id,8);put(header,24,bytes.len as u64,8);put(header,32,errorCode(failure),4);put(header,36,0,4);put(header,40,inference_budget,8);let error=blot_io::write_all(writer,header);if error!=blot_error::Error.none {return error;}return blot_io::write_all(writer,bytes);
 }
 fn readFrame(reader:blot_io::Reader)->Frame,Error {
     var header:u8[80]=[0;80];let used,error=blot_io::read_short(reader,header);if error!=blot_error::Error.none {return Frame{..},error;}if used==0 {return Frame{..},blot_error::Error.end_of_stream;}if used!=header_size || header[..8]!=magic || get(header,8,4)!=version || get(header,36,4)!=0 {return Frame{..},blot_error::Error.invalid_artifact;}
-    let kind,valid=fromKind(get(header,12,4) as u32);if !valid {return Frame{..},blot_error::Error.invalid_artifact;}let failure,valid=fromError(get(header,32,4) as u32);if !valid {return Frame{..},blot_error::Error.invalid_artifact;}let length=get(header,24,8);if length>packet_limit as u64 {return Frame{..},blot_error::Error.artifact_limit;}let payload=payload_runs.alloc_slice(length as i64);let error=blot_io::read_all(reader,payload);if error!=blot_error::Error.none {release(payload);return Frame{..},error;}if blot_support_blake3::hash(payload)!=header[48..80] {release(payload);return Frame{..},blot_error::Error.invalid_artifact;}return Frame{kind:kind,id:get(header,16,8),inference_budget:get(header,40,8),bytes:payload,failure:failure,..},blot_error::Error.none;
+    let kind,valid=fromKind(get(header,12,4) as u32);if !valid {return Frame{..},blot_error::Error.invalid_artifact;}let failure,valid=fromError(get(header,32,4) as u32);if !valid {return Frame{..},blot_error::Error.invalid_artifact;}let length=get(header,24,8);if length>packet_limit as u64 {return Frame{..},blot_error::Error.artifact_limit;}let payload=payload_runs.alloc_slice(length as i64);let error=blot_io::read_all(reader,payload);if error!=blot_error::Error.none {release(payload);return Frame{..},error;}for byte in header[48..80] {if byte!=0 {release(payload);return Frame{..},blot_error::Error.invalid_artifact;}}return Frame{kind:kind,id:get(header,16,8),inference_budget:get(header,40,8),bytes:payload,failure:failure,..},blot_error::Error.none;
 }
 // Candidate-only: copied handles do not own the baseline worker processes.
 fn detachInherited() {blot_native::worker_detach();alive=[false;16];busy=false;}
