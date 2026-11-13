@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-13",
+  "scope": "Build time of the compiler and Blot compile speed: Goose port (dev -O0 and release -O2) against the Zig compiler (native backend -Dllvm=false and LLVM release). Single runs on a shared 16-core machine (load 7-17 from other sessions' jobs); ratios between runs taken back to back are more reliable than absolute times.",
+  "source": "main at 27b3777c (merge of PR #47)",
+  "building_the_compiler": {
+    "goose_checker_once": {"what": "upstream d5ae5bb + series 01-29, GOOSE_PGO=1 build.sh (includes a training emit)", "seconds": 506.9, "sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774"},
+    "goose_dev": {"command": "compiler-goose/build.py (Goose -O0, C -O0)", "seconds": 426.3, "goose_emit_seconds": 344.2, "clang_seconds": 81.4, "peak_rss_mib": 8765, "binary_bytes": 80174200, "text_bytes": 74531153},
+    "goose_release": {"command": "compiler-goose/build.py --release (Goose -O2, C -O2)", "seconds": 1286.7, "goose_emit_seconds": 384.6, "clang_seconds": 898.8, "peak_rss_mib": 8669, "binary_bytes": 30198656, "text_bytes": 27725706},
+    "zig_native_cold": {"command": "zig build install -Doptimize=fast -Dllvm=false with fresh ZIG_LOCAL_CACHE_DIR and ZIG_GLOBAL_CACHE_DIR", "seconds": 110.0, "peak_rss_mib": 950, "text_bytes": 41973219},
+    "zig_llvm_release": {"binary": "compiler/zig-out/bin/blotc (2026-11-11, sha 7499f3a0...)", "text_bytes": 11252857, "build_time": "not measured"},
+    "note": "The Goose checker emit was ~490 s before PR #47 and is 344 s here under heavier load."
+  },
+  "compiling_blot": {
+    "method": "Ink test modules through build-project (CLI); Gdev Main through scripts/integration/build_gdev.ts (project server, codegen 1 / frontend 4 workers). Every compiler produced byte-identical Wasm for every input.",
+    "seconds": {
+      "ink app-words":         {"zig_llvm": 0.1, "zig_native": 0.9,  "goose_release": 1.4,   "goose_dev": 9.5},
+      "ink next-improvements": {"zig_llvm": 0.5, "zig_native": 3.5,  "goose_release": 4.1,   "goose_dev": 26.3},
+      "ink six-more-physics":  {"zig_llvm": 5.4, "zig_native": 34.2, "goose_release": 16.2,  "goose_dev": 74.9},
+      "gdev Main":             {"zig_llvm": 6.9, "zig_native": 54.3, "goose_release": 204.0, "goose_dev": "1197-1666 (earlier runs, heavier load)"}
+    },
+    "wasm_sha256": {"app-words": "81ccfe05860c...", "next-improvements": "d99247ee1d66...", "six-more-physics": "3a89d6811252...", "gdev Main": "c08570f8a290e8fe..."}
+  }
+}

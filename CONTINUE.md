@@ -6,13 +6,18 @@ CLI/server, request OOM/retry and retention against Zig. A whole compiler execut
 
 ## Current frontier
 
-`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-observer/goose
+`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose
 --cc clang-23 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --inference-budget 1000000
---stage-timeout 900 --total-timeout 1200` (under the heavy lock; wrapper build/goose-port/whole451/run.py)
-checks the full program, emits 224 MB of -O0 C and links `compiler-goose/build/blotc-goose` in about 560s
-at 8.8 GiB peak (emit ~500s, clang ~55s). The checker is upstream Goose d5ae5bb, still upstream HEAD,
-plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-19 (18 shares body-event chunks;
-19 ports the runtime allocation observer the OOM injection needs).
+--stage-timeout 900 --total-timeout 1200` (under the heavy lock) checks the full program, emits 224 MB of C
+and links `compiler-goose/build/blotc-goose`: about 430s at 8.8 GiB (emit ~345s, clang -O0 ~80s); `--release`
+(Goose and C -O2) takes about 1290s, mostly clang. The checker is upstream Goose d5ae5bb, still upstream
+HEAD, plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-29, built by
+`GOOSE_PGO=1 sh compiler-goose/tools/upstream-32a4f44/build.sh` (about 510s once).
+
+[Compile speed](benchmarks/evidence/measurements/2026-11-13-goose-compile-speed.json): the release Goose
+compiler builds Gdev Main in about 204s against 54s (Zig native backend) and 7s (Zig LLVM release),
+and small Ink modules at roughly the Zig native backend's speed; the -O0 build is 5-10x slower again.
+A cold Zig native build of the compiler takes about 110s.
 
 The oracle is compiler/zig-out-native-fast/bin/blotc rebuilt from current source (sha 71ae7ab9…); the
 2026-11-08 binary kept beside it predates `type X is opaque` and cannot read the current std.
@@ -40,8 +45,9 @@ on the older binary against the stale oracle; rerun it on the current pair.
 Diagnostic roots, each alone: all 20 pass on 44ee94f4 source; compile takes 235s and server 374s (over the
 300s cap). Checking all 20 in one process gives one cross-probe error (assemble), not production.
 
-**Next:** rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
-optimized (`--release`) Goose build's compile speed and size against the oracle.
+**Next:** rerun qualification on the current oracle; profile the release Goose compiler on Gdev Main
+(project-server workers and request isolation are the likely gap to the Zig native backend).
+
 
 To find a server fault: capture Pen's serve-project stream with a tee wrapper (frames are u32 metadata
 length, u32 payload length, JSON metadata, payload), replay it into `serve-project`, and build a
@@ -134,11 +140,11 @@ families stay in pinned history and
 
 ## Tools and next checks
 
-Current checker: upstream Goose d5ae5bb plus the series 01-19, built by
-compiler-goose/tools/upstream-32a4f44/build.sh (build-observer/goose, sha256 c947f304…). Peak
-memory is about 9 GiB for the whole program; run heavy jobs one at a time under the heavy lock.
-`GOOSE_SHRINK_ORIGINS=<callee or *>` adds the original shrink witness to an error. Installed Goose is
-unchanged.
+Current checker: upstream Goose d5ae5bb plus the series 01-29 (20-29 are result-preserving speed
+patches), built with PGO by compiler-goose/tools/upstream-32a4f44/build.sh into
+build-precision/goose (sha256 640138a5…). Peak memory is about 9 GiB for the whole program; run heavy
+jobs one at a time under the heavy lock. `GOOSE_SHRINK_ORIGINS=<callee or *>` adds the original shrink
+witness to an error. Installed Goose is unchanged.
 
 Caps: repair 300s on the current checker, final emission 180s, whole 300s; stop 3s after a reported
 error. Never lift caps, relax checks or clear live owners to hide errors.
