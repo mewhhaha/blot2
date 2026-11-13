@@ -26,15 +26,12 @@ once per compiler, set pen.json's `plugins.blot.run.blotc` to that compiler and 
 ones, rebuild Pen and plugins/ from ../pen source, and run `pen test-blot --project COPY`; compare each
 module's diagnostics and test outcomes.
 
-Gdev Main compiles on Goose (1197s against the oracle's 110s) to the same 9,203,613 bytes except 36:
-one function (code-section index 5077) numbers locals 70-78 in a different order. That local-order
-divergence is the open parity bug; the remap in wasm_stackify matches Zig, so look earlier (local
-allocation, coalescing or declaration order). Getting here also fixed `wasm.appendInstruction`, which
-recopied a body to the shared array's tail on every switch between functions and overflowed a 2 GB
-data stack; moves now reserve geometric filler. `scripts/integration/build_gdev.ts --compiler X
---timeout-ms 3600000` runs it.
-That Goose main.wasm renders Gdev's first frame through Pen identically to the oracle's (same PNG and
-frame trace; `run_pen.py --launch --hardware --compiled-main`, since no software adapter is installed).
+Gdev Main compiles on Goose to bytes identical to the oracle's (9,203,613 B, sha c08570f8…; 1666s
+against 110s), and its first frame through Pen is identical too (`run_pen.py --launch --hardware
+--compiled-main`, since no software adapter is installed). Getting there fixed `wasm.appendInstruction`
+(each switch between functions recopied a body to the shared array's tail and overflowed a 2 GB data
+stack) and the match/if deferred joins, which took their entry boundary before snapshotting inputs.
+`scripts/integration/build_gdev.ts --compiler X --timeout-ms 3600000` runs it.
 
 [Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz) (scoped
 functional checks: CLI, executed ABI 8, project lifecycle, request OOM/retry, 16 MiB retention) passed
@@ -43,9 +40,7 @@ on the older binary against the stale oracle; rerun it on the current pair.
 Diagnostic roots, each alone: all 20 pass on 44ee94f4 source; compile takes 235s and server 374s (over the
 300s cap). Checking all 20 in one process gives one cross-probe error (assemble), not production.
 
-**Next:** find the Gdev local-order divergence (loop-carried locals: Zig numbers a group of six before a
-group of three, Goose the reverse);
-rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
+**Next:** rerun qualification on the current oracle; land the checker speed patches (separate PR); measure an
 optimized (`--release`) Goose build's compile speed and size against the oracle.
 
 To find a server fault: capture Pen's serve-project stream with a tee wrapper (frames are u32 metadata

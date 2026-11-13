@@ -21,6 +21,10 @@ fn registered(join:Join)->Join {
  let lanes=lane_runs.realloc_slice(join.lanes,join.lanes.len);assert(blot_support::same_slice_identity(lanes,join.lanes));return Join{entry_locals:join.entry_locals,edges:join.edges,lanes:lanes};
 }
 fn init<M>(code: blot_backend_runtime_code::Code<M>) -> Join { let module .= code.module; return Join { entry_locals: module.parameters(code.function).len + module.locals(code.function).len , ..}; }
+// Locals that exist when the Zig backend creates the join dominate every edge.
+// A join created earlier (for cleanup) re-reads that boundary there, so the
+// value's earlier locals are not mistaken for branch locals.
+fn rebase<M>(join: Join&,code: blot_backend_runtime_code::Code<M>) { assert(join.edges == 0 && join.lanes.len == 0); let module .= code.module; join.entry_locals = module.parameters(code.function).len + module.locals(code.function).len; }
 fn deinit(join: Join&) { for &lane in join.lanes { lane.holes.deinit(); } if join.lanes.len != 0 { lane_runs.free_slice(join.lanes); } join.lanes=default<Lane[:]>(); join.edges = 0; }
 fn materialize<M>(lane: Lane&,code: blot_backend_runtime_code::Code<M>&,context: blot_backend_wasm_scope_outline::Context&) -> Error {
     if lane.carrier.present { return blot_error::Error.none; } let carrier,error = code.temp(); if error != blot_error::Error.none { return error; }

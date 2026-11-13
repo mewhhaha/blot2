@@ -98,16 +98,16 @@
       "frontend_workers": 4
     },
     "goose": {
-      "binary_sha256": "252ea91bcdc89805b5db9ec247be14d3cf743d95d5168a409d7c303b51d1baf8",
+      "binary_sha256": "de558abeb724558d84e0cbeeecca9b7b6e92a40ffc1b27a2ad9420a57e2cdf63",
       "success": true,
-      "build_ms": 1197107,
+      "build_ms": 1665655,
       "wasm_bytes": 9203613,
-      "wasm_sha256": "b351f7c92ae5a01b0e7c3d02507a7869c24ebb6282d8dd0b0ad6fd3c61989339",
-      "identical": false,
-      "difference": "36 bytes in one function (code-section function index 5077, 476-byte body at offset 4382104): locals 70-78 are numbered in a different order (Zig 76,77,78,70,71,72,73 where Goose has 70..76); every other byte matches",
+      "wasm_sha256": "c08570f8a290e8fe58bd14e26eb9a6c076060943003a7148142f7fc55473accf",
+      "identical": true,
       "history": [
         "330ebcbc/66589a5f: killed at the 120 s request limit (Io)",
-        "fcf28acb: 2 GB data-stack overflow in wasm.appendInstruction (each switch between functions recopied a body to the tail)"
+        "fcf28acb: 2 GB data-stack overflow in wasm.appendInstruction (each switch between functions recopied a body to the tail)",
+        "252ea91b: 36 bytes differed in member_of (wasm function 5077): match and if created their deferred join before snapshotting inputs, so input-snapshot locals counted as branch locals and took carriers one edge early; joins now take their entry boundary where the Zig backend creates them"
       ]
     }
   },
@@ -151,5 +151,16 @@
       "goose": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
     },
     "inspected": "640x480 first frame: the split-flap title board with two lines of text, fully rendered; identical bytes from both compilers"
+  },
+  "ink_after_join_fix": {
+    "binary_sha256": "de558abeb724558d84e0cbeeecca9b7b6e92a40ffc1b27a2ad9420a57e2cdf63",
+    "identical_modules": 73,
+    "zig_seconds": 115.8,
+    "goose_seconds": 272.3,
+    "cli_identical": [
+      "app-words",
+      "next-improvements",
+      "six-more-physics"
+    ]
   }
 }
