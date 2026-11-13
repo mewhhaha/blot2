@@ -250,13 +250,19 @@ fn importFunction(module: Module&, namespace_name: const u8[:], imported_name: c
     let owned_module = ownName(module, namespace_name); let owned_name = ownName(module, imported_name);
     module.imports.push(Import { module: owned_module, name: owned_name, signature: signature , ..}); return index, blot_error::Error.none;
 }
+// Local types share module.types like code shares module.instructions: a moved
+// range takes as many filler slots again (at least 8), claimed in place later.
+// No value type is 0, so filler is never a real type.
 fn appendType(module: Module&, range: Range, ty: ValueType) -> Range {
     var result = range;
     if result.len == 0 { result.start = module.types.len; }
     else if result.start + result.len != module.types.len {
+        let next = result.start + result.len;
+        if module.types[next] == 0 { module.types[next] = ty; result.len++; return result; }
         let start = module.types.len; let count = result.len;
         for index in 0..count { let value = module.types[result.start + index]; module.types.push(value); }
-        result.start = start;
+        for index in 0..max(count,8) { module.types.push(0); }
+        module.types[start + count] = ty; result.start = start; result.len++; return result;
     }
     module.types.push(ty); result.len++; return result;
 }
