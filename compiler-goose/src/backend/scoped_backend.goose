@@ -239,8 +239,8 @@ fn publishWords(metadata: Metadata&,values: const u32[:]) -> Range { let result 
 fn publishFlags(metadata: Metadata&,values: const bool[:]) -> Range { let result = Range { start: metadata.flags.len,len: values.len , ..}; metadata.flags.append(values); return result; }
 
 fn deinit(metadata: Metadata&) { metadata.bytes.clear(); metadata.references.clear(); metadata.values.clear(); metadata.words.clear(); metadata.indexes.clear(); metadata.flags.clear(); metadata.locals.clear(); metadata.types.clear(); metadata.evidence.clear(); metadata.callables.clear(); metadata.goals.clear(); metadata.plans.clear(); metadata.returned.clear(); metadata.accesses.clear(); metadata.events.clear(); metadata.regions.clear(); metadata.bundles.clear(); metadata.sharing.clear(); metadata.reads.clear(); metadata.traces.clear(); }
-recursive fn hasRoot(metadata: const Metadata&,value: Value,root_id: i64) -> bool { if value.root.present && value.root.value == root_id { return true; } for root in otherRoots(metadata,value) { if root == root_id { return true; } } for field in fields(metadata,value) { if hasRoot(metadata,field,root_id) { return true; } } return false; }
-recursive fn borrows(metadata: const Metadata&,value: Value,owner: Value) -> bool { if value.tag == ValueTag.ref || value.tag == ValueTag.view || value.tag == ValueTag.link { if value.root.present && hasRoot(metadata,owner,value.root.value) { return true; } for root in otherRoots(metadata,value) { if hasRoot(metadata,owner,root) { return true; } } } for field in fields(metadata,value) { if borrows(metadata,field,owner) { return true; } } return false; }
+recursive fn hasRoot(metadata: const Metadata&,value: const Value&,root_id: i64) -> bool { if value.root.present && value.root.value == root_id { return true; } for root in otherRoots(metadata,value) { if root == root_id { return true; } } for field in fields(metadata,value) { if hasRoot(metadata,field,root_id) { return true; } } return false; }
+recursive fn borrows(metadata: const Metadata&,value: const Value&,owner: const Value&) -> bool { if value.tag == ValueTag.ref || value.tag == ValueTag.view || value.tag == ValueTag.link { if value.root.present && hasRoot(metadata,owner,value.root.value) { return true; } for root in otherRoots(metadata,value) { if hasRoot(metadata,owner,root) { return true; } } } for field in fields(metadata,value) { if borrows(metadata,field,owner) { return true; } } return false; }
 
 struct AppendRegion { unit: u32,plan: blot_backend_private_append_region::Plan }
 
@@ -480,7 +480,9 @@ fn rewindUnescaped(self_: Generator&,first: i64,mark: FrameMark,keep: Value) -> 
     var error = self_.c.value(self_.fixed_region); if error != blot_error::Error.none { return error; } error = self_.c.value(mark.word); if error != blot_error::Error.none { return error; } return self_.c.op(blot_backend_runtime_ir::OP_call,self_.runtime.functions.rewind);
 }
 fn root(self_: Generator&,module: const blot_check_core::Module&,id: u32,value: Value) -> Root?,blot_error::Error { if !value.root.present { return null,unsupported(self_,module,id); } return self_.roots.items[value.root.value],blot_error::Error.none; }
-fn borrowed(self_: Generator&,owner: Value) -> bool { for binding in self_.bindings.items { if binding.remaining != 0 && borrows(self_.metadata,binding.value,owner) { return true; } } for value in self_.protected.items { if borrows(self_.metadata,value,owner) { return true; } } for root in self_.roots.items { if root.live && borrows(self_.metadata,root.element,owner) { return true; } } return false; }
+// Reference loops: each Binding and Root embeds whole Values, which a by-value
+// loop variable copied on every step.
+fn borrowed(self_: Generator&,owner: const Value&) -> bool { for &binding in self_.bindings.items { if binding.remaining != 0 && borrows(self_.metadata,binding.value,owner) { return true; } } for &value in self_.protected.items { if borrows(self_.metadata,value,owner) { return true; } } for &root in self_.roots.items { if root.live && borrows(self_.metadata,root.element,owner) { return true; } } return false; }
 fn restoreTypes(self_: Generator&,environment: Range) -> blot_error::Error {
     for index in 0..environment.len { let argument = self_.metadata.types[environment.start + index]; var present = false; let known = self_.type_arguments.latestAny(argument.unit,argument.parameter); if known.present { present = self_.type_arguments.at(known.value) == argument; } if !present { let error = self_.type_arguments.append(argument); if error != blot_error::Error.none { return error; } } } return blot_error::Error.none;
 }
@@ -579,11 +581,17 @@ recursive fn shapeUncached(self_: Generator&,module: const blot_check_core::Modu
 fn children(metadata: const Metadata&,value: Value) -> const Value[:] { fields(metadata,value) }
 fn width(metadata: const Metadata&,value: Value) -> u32,blot_error::Error { let bytes,error = blot_backend_storage_layout::bytes(metadata,value); if error != blot_error::Error.none { return 0,blot_error::Error.declined; } return bytes,blot_error::Error.none; }
 fn writableFields(self_: Generator&,value: Value&) -> Range,blot_error::Error { let original = value.fields; let destination = allocateFields(self_.metadata,value,original.len); for index in 0..original.len { self_.metadata.values[destination.start + index] = self_.metadata.values[original.start + index]; } return destination,blot_error::Error.none; }
-fn directRoot(metadata: const Metadata&,value: Value,owner: i64) -> bool { if value.root.present && value.root.value == owner { return true; } for other in otherRoots(metadata,value) { if other == owner { return true; } } return false; }
+fn directRoot(metadata: const Metadata&,value: const Value&,owner: i64) -> bool { if value.root.present && value.root.value == owner { return true; } for other in otherRoots(metadata,value) { if other == owner { return true; } } return false; }
 fn unionRoots(self_: Generator&,target: Value&,value: Value) -> blot_error::Error {
     if !target.root.present && !value.root.present && target.other_roots.len == 0 && value.other_roots.len == 0 { target.depth = max(target.depth,value.depth); return blot_error::Error.none; }
+    // Like Zig's unionRootMetadata: gather both values' own roots, then sort and
+    // deduplicate, instead of testing every live owner against both values.
+    let owner_count = self_.roots.items.len; var roots: i64[>..<] = [];
+    if target.root.present && target.root.value < owner_count { roots.push(target.root.value); } if value.root.present && value.root.value < owner_count { roots.push(value.root.value); }
+    for owner in otherRoots(self_.metadata,target) { if owner < owner_count { roots.push(owner); } } for owner in otherRoots(self_.metadata,value) { if owner < owner_count { roots.push(owner); } }
+    for index in 1..roots.len { let item = roots[index]; var at = index; while at > 0 && roots[at - 1] > item { roots[at] = roots[at - 1]; at--; } roots[at] = item; }
     let first = self_.metadata.indexes.len;
-    for owner in 0..self_.roots.items.len { if directRoot(self_.metadata,target,owner) || directRoot(self_.metadata,value,owner) { self_.metadata.indexes.push(owner); } }
+    for index in 0..roots.len { if index != 0 && roots[index] == roots[index - 1] { continue; } self_.metadata.indexes.push(roots[index]); }
     let count = self_.metadata.indexes.len - first; if count != 0 { target.root = blot_support::some(self_.metadata.indexes[first]); target.other_roots = Range { start: first + 1,len: count - 1 , ..}; } target.depth = max(target.depth,value.depth); return blot_error::Error.none;
 }
 fn sameNominal(left: blot_support::Option<blot_check_types::NominalIdentity>,right: blot_support::Option<blot_check_types::NominalIdentity>) -> bool { if left.present != right.present { return false; } if !left.present { return true; } return left.value == right.value; }

@@ -60,7 +60,9 @@ struct ModuleCatalog {references:const ModuleRef[:]=default<const ModuleRef[:]>(
 fn len(self_:ModuleCatalog)->i64 {if self_.modules.len!=0 {return self_.modules.len;}return self_.references.len;}
 fn at(self_:ModuleCatalog,index:i64)->const Module& {if self_.modules.len!=0 {return self_.modules[index];}return self_.references[index].value;}
 fn sameModule(left:const Module&,right:const Module&)->bool {return left.owner_id!=0 && left.owner_id==right.owner_id;}
-fn sameHeader(left:const Module&,right:const Module&)->bool {return sameModule(left,right) && left==right;}
+// Identity first, as the Zig cache compares module pointers; the structural
+// comparison remains for distinct objects with the same owner.
+fn sameHeader(left:const Module&,right:const Module&)->bool {return sameModule(left,right) && (left .== right || left==right);}
 struct TargetKey {unit:u32,target_unit:u32,target_binding:u32}
 struct FactKey {unit:u32,root:u32}
 struct HeaderKey {producer:blot_check_core::BindingRef,kind:blot_check_types::ObligationKind,name:u32,operator:blot_check_types::Operator,identity:blot_check_types::NominalIdentity}
