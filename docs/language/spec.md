@@ -38,6 +38,10 @@ memory as possible." The store statement `place = value`, `Cell` and
 `is root` are gone, and section 10.3 states the reuse rules. The memory model
 file predates this decision, and here this document is the newer one.
 
+The same revision restores `use`, which the first approvals had dropped. The
+owner: "I would differentiate effects with `use x <- my_effect ()` so that we
+can organize it easier and optimize it." Section 10.10 has the rule.
+
 Terms:
 
 - **Error**: the compiler rejects the module and produces no output.
@@ -66,6 +70,9 @@ A change to the language must keep these.
    implicit numeric conversion.
 6. **One meaning per program.** A program behaves the same in every build
    mode. Checks that trap are part of the meaning.
+7. **Effects are visible.** A call with effects is written with `use`.
+   Every other expression is pure: it gives the same value wherever and
+   however often it is evaluated.
 
 ## 3. Notation
 
@@ -131,7 +138,8 @@ Reserved everywhere:
 
 ```
 and  as  break  case  const  continue  data  effect  else  ever  false  for
-func  if  import  in  is  let  not  of  or  return  then  true  type  with
+func  if  import  in  is  let  not  of  or  return  then  true  type  use
+with
 ```
 
 `not` and `with` are **(approved)**.
@@ -141,8 +149,8 @@ elsewhere: `opaque` and `trait` after `is`; `private`, `entry` and `export`
 at the start of a module item; `from` in an import; `where` after a
 signature; `self` on the right of `:=`; `own` before a parameter's type.
 
-These words stop being keywords **(approved)**: `do`, `use`, `yield`,
-`complete`, `infix`, `infixl`, `infixr`, `contract`, `impl`.
+These words stop being keywords **(approved)**: `do`, `yield`, `complete`,
+`infix`, `infixl`, `infixr`, `contract`, `impl`.
 
 ### 4.6 Literals
 
@@ -175,7 +183,7 @@ Each mark has one role in each of the three grammars.
 | `:=` | rebinding | | |
 | `->` | parameter separator | function type | |
 | `=>` | body | | arm body |
-| `<-` | generator | | |
+| `<-` | generator; result of a `use` | | |
 | `$` | constructor | | constructor |
 | `&` | reference to a place; bitwise and | read-only reference | |
 | `^` | link to an element; bitwise xor | link | match an existing name |
@@ -364,13 +372,13 @@ type Log is effect = { write: Text -> Unit }
 type State a is effect = { get: Unit -> a, set: a -> Unit }
 
 func report (count: U32): Unit ! {Log} =>
-  Log.write "started"
+  use Log.write "started"
 
 const quiet: Log = { write: func text => () }
 
 entry func main (): Unit =>
   with quiet:
-    report 3
+    use report 3
 ```
 
 - An effect is a nominal record type whose fields are functions, called its
@@ -400,8 +408,9 @@ State.read:   (a -> b) -> b ! {State a}
 func count (items: Array Item): U32 =>
   let total = 0
   with State.new 0:
-    visit items
-    total := State.get U32 ()
+    use visit items
+    use seen <- State.get U32 ()
+    total := seen
   return total
 ```
 
@@ -524,6 +533,9 @@ Expression = Lambda | IfExpr | CaseExpr | RunExpr | Operators
 An expression never contains statements, except in the body of a lambda
 **(approved)**. A value that takes several statements to compute is computed
 by a function.
+
+An expression is pure. The one place a call with effects may appear is a
+`use` statement (section 10.10).
 
 ### 9.1 Operators
 
@@ -715,7 +727,8 @@ expected there and the locals in scope.
 ## 10. Statements
 
 ```
-Statement = LetStmt | Rebind | IfStmt | CaseExpr | ForStmt | WithStmt
+Statement = LetStmt | UseStmt | Rebind | IfStmt | CaseExpr | ForStmt
+          | WithStmt
           | "return" Expression
           | "break"
           | "continue"
@@ -732,7 +745,8 @@ LetStmt = "let" Pattern (":" Type)? "=" Expression ("else" ":" Suite)?
 - With `else`, a failed match runs the suite, which must leave: by `return`,
   `break`, `continue` or a trap.
 - The names are in scope for the rest of the enclosing suite.
-- Any call may be bound with `let`, whatever its effects **(approved)**.
+- The expression of a `let` is pure. A call with effects is bound with
+  `use` (section 10.10) **(approved)**.
 - **Value restriction (approved).** A `let` binding is generic only when its
   expression is itself a `func`. A constructor application, a call or a
   partial application gives the local one type.
@@ -897,6 +911,35 @@ WithStmt = "with" Expression,+ ":" Suite
 - A `return` in the suite leaves the function.
 - An exported function must provide every effect except `Foreign`.
 
+### 10.10 Effects: `use`
+
+**(approved)**
+
+```
+UseStmt = "use" (Pattern (":" Type)? "<-")? Expression
+```
+
+```blot
+use line <- read_line ()
+use Log.write line
+```
+
+- A call has effects when the function it calls has an effect row: an
+  operation, a host callback, or a function whose type has `! {…}`.
+- `use pattern <- call` makes the call and binds its result. The pattern
+  must match every value of the result's type.
+- `use call` makes the call and discards its result.
+- A call with effects anywhere else is an error: in a `let`, on the right of
+  `:=`, as an argument, in a condition, or as a bare statement **(open** for
+  `return call` and a one-expression body**)**.
+- `use` on an expression that has no effects is an error. This also rejects
+  a call that is missing an argument.
+- `use` statements run in the order written. Between them, everything is
+  pure, so the compiler may reorder, share or skip that work when the result
+  and any trap stay the same.
+- A function that contains a `use` has the called effects in its row, less
+  those a surrounding `with` provides.
+
 ## 11. Compile-time evaluation
 
 ```
@@ -953,7 +996,7 @@ with this revision.
 | `Ref a`, `View a`, `Link a`, `for let x in` | `&a`, `&[a]`, `^a`, `for x in` | E8 |
 | `infix`, `infixl`, `infixr`, symbolic operators | named functions | E9 |
 | Record, tuple and curried type parameters | one name or a list | E10 |
-| `use x <- call`, `use call` | `let x = call`, `call` | B2 |
+| A call with effects outside `use` | `use x <- call`, `use call` | round 3 |
 | `@computation`, `@requests`, `effect` and `complete` clauses, `yield` | none | B3 |
 | `do (monad M):`, `iterate` | `let … else` | B3 |
 | `@effect.of`, `has`, `count`, `same`, `descriptor`, `scope`; rows such as `{state.get}` | none | B3 |
@@ -1015,6 +1058,10 @@ unnecessary.
     `#type` can read them.
 11. **`Cell` and `is root`.** Both existed to share writes, so this revision
     removes them. A group of arrays is a data type with field defaults.
+12. **How strict `use` is.** Section 10.10 allows a call with effects only
+    in a `use`. That makes `return call ()` and `=> call ()` errors for a
+    call with effects; allowing those two would save a line each. `use call`
+    discards a result of any type, as it does today.
 
 ## Annex C. Considered and declined
 
