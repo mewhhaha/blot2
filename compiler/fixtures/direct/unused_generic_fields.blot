@@ -1,0 +1,7 @@
+type Pack [unused, selected] is data = $Pack { unused: unused, selected: selected }
+const packed = $Pack { unused: func v => return v, selected: func (value: U32) => return value + 1 }
+const invoke = func callback => return callback 1
+const run = func packed => return func (value: U32) => return do:
+  let $Pack { selected } = packed
+  break selected value
+entry const partial = func (value: U32) : U32 => return invoke (run packed)

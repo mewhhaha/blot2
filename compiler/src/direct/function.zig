@@ -271,6 +271,9 @@ pub const Fn = struct {
                     try self.bindings.put(self.a(), n.a, grown);
                     break :blk unitVal();
                 }
+                // A generalized local value is computed once: its uses decide
+                // the one type it is computed at.
+                if (self.m.binding(n.a).scheme.variables.len != 0) try self.typeByUses(n.a, n.b);
                 const value = try self.stmt(n.b);
                 if (value.ty != types.never) try self.refine(self.m.binding(n.a).ty, value.ty);
                 try self.bindings.put(self.a(), n.a, value);
@@ -375,10 +378,27 @@ pub const Fn = struct {
         const unused = holed and try self.holesUnused(self.m.typeOf(id), 0);
         if (holed and self.tagOf(ty) == .function) {
             // A function stored as a field of a literal record can go unused
-            // at a type no use fixes; otherwise its holes must be unused.
-            if (!self.field_value and !unused) return self.g.typeFailure(self.m, id);
-            return self.trapClosure(ty, id);
+            // at a type no use fixes.
+            if (self.field_value) return self.trapClosure(ty, id);
+            if (!unused) return self.g.typeFailure(self.m, id);
+            // A function with requirements on its type (fields, operators)
+            // is never called at a type no use fixes: a call's arguments
+            // would fix it. One without requirements may be called with
+            // arguments whose open parts are never inspected: those take Unit.
+            if (requirements(tm, target.binding)) return self.trapClosure(ty, id);
+            try self.defaultUnused(self.m.typeOf(id), 0);
+            const defaulted = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+                error.Unsupported => return self.g.typeFailure(self.m, id),
+                else => return err,
+            };
+            return self.bindingValue(target, defaulted, false, id);
         }
+        return self.bindingValue(target, ty, unused, id);
+    }
+    /// The value of named binding `target` at concrete type `ty`.
+    fn bindingValue(self: *Fn, target: core.BindingRef, ty: Ty, unused: bool, id: core.Id) Error!Val {
+        const tm = self.g.unitModule(target.unit);
+        const binding = tm.binding(target.binding);
         if (primitiveAlias(tm, target.binding) != null) return self.partial(.primitive, target, ty, &.{}, id);
         if (tm.body(target.binding)) |body| {
             if (body.is_function) return self.partial(.partial, target, ty, &.{}, id);
@@ -2241,6 +2261,25 @@ pub const Fn = struct {
         try self.writeFlat(address, 0, value, id);
         return .{ .ty = list.ty, .words = list.words };
     }
+    /// Binds the scheme variables of generalized local `binding` to the one
+    /// concrete type its references in this unit give it. References at
+    /// different types cannot share one computed value.
+    fn typeByUses(self: *Fn, binding: core.BindingId, id: core.Id) Error!void {
+        var chosen: ?Ty = null;
+        for (self.m.nodes, 0..) |node, index| {
+            if (node.tag != .reference) continue;
+            const target = self.m.references[node.a];
+            if ((target.unit != 0 and target.unit != self.m.unit) or target.binding != binding) continue;
+            const ty = self.g.types.lower(self.m, self.m.typeOf(@intCast(index)), self.env) catch |err| switch (err) {
+                error.Unsupported => continue,
+                else => return err,
+            };
+            if (chosen) |previous| {
+                if (previous != ty) return self.g.fail(self.m, id, "a local value is used at different types; give it an annotation", .{});
+            } else chosen = ty;
+        }
+        if (chosen) |ty| try self.refine(self.m.binding(binding).ty, ty);
+    }
     /// References to local `binding` in this unit, counted once. A loop
     /// exit (`break_`) carrying a version is on a path exclusive with any
     /// later rebinding of it, so it does not count.
@@ -3555,6 +3594,12 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     try f.op(.end);
     try finish(g, function, &f);
     return exportEntry(g, m, body, abi, function, callback, parameter_abi, result_abi, packets);
+}
+/// Whether named binding `binding` places obligations on its type variables.
+fn requirements(tm: *const core.Module, binding: core.BindingId) bool {
+    if (tm.binding(binding).scheme.obligations.len != 0) return true;
+    const body = tm.body(binding) orelse return false;
+    return body.scheme.obligations.len != 0;
 }
 /// Exports `function` under the body's name and writes its ABI entry.
 fn exportEntry(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes, function: u32, callback: ?[2]Abi, parameter_abi: Abi, result_abi: Abi, packets: bool) Error!void {

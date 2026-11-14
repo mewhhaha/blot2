@@ -61,6 +61,8 @@ const cases: Record<string, Call[]> = {
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
   "shared_fields.blot": [["first", 5, 314]],
+  "generalized_values.blot": [["generalized", 41, 41]],
+  "unused_generic_fields.blot": [["partial", 41, 2]],
   "miscompiles.blot": [
     ["lazy_and", false, false],
     ["lazy_or", true, true],

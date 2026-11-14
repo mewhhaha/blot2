@@ -1,0 +1,10 @@
+type B [w, s] is data = $B { initial: w, s: w -> s }
+const base: w -> (Unit -> a) -> (w, a) = func world => return func action => return (world, action ())
+const empty: Unit -> B [Unit, (Unit -> a) -> (Unit, a)] = func () => return $B { initial: (), s: base }
+const run: B [w, (Unit -> a) -> r] -> (Unit -> a) -> r = func b => return func action => return do:
+  let $B { initial, s } = b
+  break s initial action
+entry const generalized: U32 -> U32 = func (x: U32) => return do:
+  let b = empty ()
+  let (_, result) = run b (func () => return x)
+  break result
