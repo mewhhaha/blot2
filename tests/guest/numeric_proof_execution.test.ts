@@ -5,8 +5,8 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`selected numeric result operands preserve exact bodies imports edits and restart (${codegenTier})`, async () => {
+{
+  Deno.test(`selected numeric result operands preserve exact bodies imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-proof-operands-",
     });
@@ -33,7 +33,6 @@ entry const lookup = func (index: U32) => return do:
       executable,
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
@@ -125,8 +124,8 @@ entry const lookup = func (index: U32) => return do:
   });
 }
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`prepared associated numeric operands preserve exact methods imports edits and restart (${codegenTier})`, async () => {
+{
+  Deno.test(`prepared associated numeric operands preserve exact methods imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-associated-proof-",
     });
@@ -157,7 +156,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       executable,
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
@@ -268,8 +266,8 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   });
 }
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`selected arithmetic identities preserve boundaries exact methods imports edits and restart (${codegenTier})`, async () => {
+{
+  Deno.test(`selected arithmetic identities preserve boundaries exact methods imports edits and restart`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-identity-proof-",
     });
@@ -303,7 +301,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       executable,
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
@@ -421,8 +418,8 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
   });
 }
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`conditional numeric identities preserve condition traps and invalidate edited branches (${codegenTier})`, async () => {
+{
+  Deno.test(`conditional numeric identities preserve condition traps and invalidate edited branches`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-conditional-proof-",
     });
@@ -442,7 +439,6 @@ entry const lookup = func (index: U32) => return do:
       executable,
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: `${directory}/cache`,
     };
     const compiler = await createZigProjectCompiler(options);

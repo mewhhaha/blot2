@@ -6,7 +6,7 @@ const symbols = @import("../parse/symbols.zig");
 const check = @import("check.zig");
 const core = @import("core.zig");
 const types = @import("types.zig");
-const memory = @import("../runtime/memory.zig");
+const memory = @import("../memory.zig");
 const a = std.testing.allocator;
 
 fn effectFixture() !Fixture {

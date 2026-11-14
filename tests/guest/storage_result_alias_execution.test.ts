@@ -37,53 +37,50 @@ entry const answer = func (input: U32): Array U32 => return do:
     current := carry current (@u32.rem input 2) effects
   return #[first.${first}, first.${last}, second.${last}, current.${last}, effects[0]]
 `;
-  for (const codegenTier of ["development", "optimized"] as const) {
-    Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots (${codegenTier})`, async () => {
-      const directory = await Deno.makeTempDir({
-        prefix: "blot-result-alias-",
-      });
-      const entry = `${directory}/main.blot`;
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        prelude: null,
-        cacheDirectory: false,
-        codegenTier,
-      });
-      try {
-        const built = await compiler.build({
-          sources: { [entry]: source },
-          signal: AbortSignal.timeout(10_000),
-        });
-        assert(built.success, JSON.stringify(built));
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(built.bytes, { asynchronous });
-          try {
-            for (const input of [0, 1, 8, 17, 0xffff_fffe, 0xffff_ffff, 0]) {
-              let final = input + width - 1;
-              if (width === 8 && input % 2 !== 0) final = input + 1000;
-              let changed = input + width - 1;
-              if (width === 8) changed = input + 1000;
-              const expected = new Uint32Array([
-                input,
-                input + width - 1,
-                changed,
-                final,
-                5,
-              ]);
-              let actual: unknown;
-              if (asynchronous) actual = await guest.callAsync("answer", input);
-              else actual = guest.call("answer", input);
-              assert.deepEqual(actual, expected);
-            }
-          } finally {
-            guest.dispose();
-          }
-        }
-      } finally {
-        await compiler.dispose();
-        await Deno.remove(directory, { recursive: true });
-      }
+  Deno.test(`result input aliases preserve ${width} word calls effects and loop snapshots`, async () => {
+    const directory = await Deno.makeTempDir({
+      prefix: "blot-result-alias-",
     });
-  }
+    const entry = `${directory}/main.blot`;
+    const compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      prelude: null,
+      cacheDirectory: false,
+    });
+    try {
+      const built = await compiler.build({
+        sources: { [entry]: source },
+        signal: AbortSignal.timeout(10_000),
+      });
+      assert(built.success, JSON.stringify(built));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(built.bytes, { asynchronous });
+        try {
+          for (const input of [0, 1, 8, 17, 0xffff_fffe, 0xffff_ffff, 0]) {
+            let final = input + width - 1;
+            if (width === 8 && input % 2 !== 0) final = input + 1000;
+            let changed = input + width - 1;
+            if (width === 8) changed = input + 1000;
+            const expected = new Uint32Array([
+              input,
+              input + width - 1,
+              changed,
+              final,
+              5,
+            ]);
+            let actual: unknown;
+            if (asynchronous) actual = await guest.callAsync("answer", input);
+            else actual = guest.call("answer", input);
+            assert.deepEqual(actual, expected);
+          }
+        } finally {
+          guest.dispose();
+        }
+      }
+    } finally {
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

@@ -56,7 +56,7 @@ async function project(directory: string, bumps: number[]) {
   return sources;
 }
 
-Deno.test("frontend lowering and codegen workers emit identical Wasm and diagnostics for every worker count", async () => {
+Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for every worker count", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-workers-" });
   const base = {
     executable,
@@ -76,16 +76,11 @@ Deno.test("frontend lowering and codegen workers emit identical Wasm and diagnos
     broken[`${directory}/m5.blot`] += "const other: U32 = func value => return value\n";
     const results: Uint8Array[][] = [];
     const rejections: unknown[] = [];
-    const counts = [[1, 1, 1], [2, 1, 1], [4, 1, 1], [1, 4, 1], [4, 4, 1], [
-      1,
-      1,
-      4,
-    ], [4, 4, 4]];
-    for (const [semanticWorkers, codegenWorkers, frontendWorkers] of counts) {
+    const counts = [[1, 1], [2, 1], [4, 1], [1, 4], [4, 4]];
+    for (const [semanticWorkers, frontendWorkers] of counts) {
       const compiler = await createZigProjectCompiler({
         ...base,
         semanticWorkers,
-        codegenWorkers,
         frontendWorkers,
         profileBackend: true,
       });

@@ -31,47 +31,44 @@ entry const floating = func (input: F32) => return do:
   let rows: Array {value: F32} = #[{value: marker[0]}]
   return read {${values}, zrows: rows, zvalues: #[2.5], zmeter: $Meter 1}
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`imported planner closures retain their own field obligations (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-planner-context-",
-    });
-    const entry = `${directory}/main.blot`;
-    const helperFile = `${directory}/helper.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${directory}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      await Deno.writeTextFile(helperFile, helper);
-      await Deno.writeTextFile(`${directory}/prelude.blot`, prelude);
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          const call = (name: string, input: number) =>
-            asynchronous
-              ? guest.callAsync(name, input)
-              : guest.call(name, input);
-          for (const input of [0, 1, 2, 100]) {
-            assert.equal(await call("integer", input), input === 2);
-          }
-          for (const input of [-0, 1.25, 2.5, 100]) {
-            assert.equal(await call("floating", input), input === 2.5);
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`imported planner closures retain their own field obligations`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-planner-context-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const helperFile = `${directory}/helper.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${directory}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    await Deno.writeTextFile(helperFile, helper);
+    await Deno.writeTextFile(`${directory}/prelude.blot`, prelude);
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        const call = (name: string, input: number) =>
+          asynchronous
+            ? guest.callAsync(name, input)
+            : guest.call(name, input);
+        for (const input of [0, 1, 2, 100]) {
+          assert.equal(await call("integer", input), input === 2);
+        }
+        for (const input of [-0, 1.25, 2.5, 100]) {
+          assert.equal(await call("floating", input), input === 2.5);
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

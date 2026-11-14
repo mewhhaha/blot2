@@ -104,158 +104,155 @@ entry const reads_after_loop = func (bounds: Array U32): U32 => return do:
   return loop_read rows bounds[0] bounds[1] bounds[2]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`bulk fixed scalar loops preserve ranges aliases bits and prefix traps (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-bulk-loops-" });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          const call = async (name: string, input: unknown = null) => {
-            if (asynchronous) return await guest.callAsync(name, input);
-            return guest.call(name, input);
-          };
-          for (
-            const [first, end] of [
-              [0, 0],
-              [48, 0],
-              [0xffffffff, 0],
-              [0, 1],
-              [2, 17],
-              [2, 18],
-              [0, 48],
-              [7, 48],
-            ]
-          ) {
-            const bounds = new Uint32Array([first, end]);
-            assert.deepEqual(
-              await call("copied", bounds),
-              Uint32Array.from(
-                { length: 48 },
-                (_, i) => {
-                  if (i >= first && i < end) return i + 100;
-                  return 9;
-                },
-              ),
-            );
-            assert.deepEqual(
-              await call("filled", bounds),
-              Uint32Array.from(
-                { length: 48 },
-                (_, i) => {
-                  if (i >= first && i < end) return 0x12345678;
-                  return 9;
-                },
-              ),
-            );
-          }
-          assert.deepEqual(await call("zeroed", 48), new Uint32Array(48));
+Deno.test(`bulk fixed scalar loops preserve ranges aliases bits and prefix traps`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-bulk-loops-" });
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        const call = async (name: string, input: unknown = null) => {
+          if (asynchronous) return await guest.callAsync(name, input);
+          return guest.call(name, input);
+        };
+        for (
+          const [first, end] of [
+            [0, 0],
+            [48, 0],
+            [0xffffffff, 0],
+            [0, 1],
+            [2, 17],
+            [2, 18],
+            [0, 48],
+            [7, 48],
+          ]
+        ) {
+          const bounds = new Uint32Array([first, end]);
           assert.deepEqual(
-            await call("alias", 48),
-            Uint32Array.from({ length: 48 }, (_, i) => i),
-          );
-          const floats = await call("floating", 48) as Float32Array;
-          assert(Object.is(floats[0], -0));
-          const bits = new Uint32Array(
-            floats.buffer,
-            floats.byteOffset,
-            floats.length,
-          );
-          assert.equal(bits[1], 0x7fc01234);
-          assert.deepEqual(floats.slice(2), new Float32Array(46).fill(1.25));
-          assert.deepEqual(
-            await call("float_fill", 48),
-            new Float32Array(48).fill(1.5),
-          );
-          assert.equal(await call("bool_fill", 48), true);
-          assert.deepEqual(await call("shifted", 48), new Uint32Array(48));
-          await assert.rejects(
-            () => call("trap_source"),
-            WebAssembly.RuntimeError,
+            await call("copied", bounds),
+            Uint32Array.from(
+              { length: 48 },
+              (_, i) => {
+                if (i >= first && i < end) return i + 100;
+                return 9;
+              },
+            ),
           );
           assert.deepEqual(
-            await call("read"),
-            Uint32Array.from({ length: 48 }, (_, i) => {
-              if (i < 24) return 7;
-              return 9;
-            }),
+            await call("filled", bounds),
+            Uint32Array.from(
+              { length: 48 },
+              (_, i) => {
+                if (i >= first && i < end) return 0x12345678;
+                return 9;
+              },
+            ),
           );
-          await call("reset");
-          await assert.rejects(
-            () => call("trap_target"),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(await call("read"), new Uint32Array(48).fill(7));
-          await assert.rejects(
-            () => call("ordered", 49),
-            WebAssembly.RuntimeError,
-          );
-          assert.equal(await call("effect_count"), 48);
-          for (
-            const [first, end, readIndex, expected] of [
-              [0, 48, 47, 14],
-              [0, 0, 47, 18],
-              [2, 3, 2, 16],
-              [48, 0, 47, 18],
-            ]
-          ) {
-            assert.equal(
-              await call(
-                "reads_after_fill",
-                new Uint32Array([first, end, readIndex]),
-              ),
-              expected,
-            );
-          }
+        }
+        assert.deepEqual(await call("zeroed", 48), new Uint32Array(48));
+        assert.deepEqual(
+          await call("alias", 48),
+          Uint32Array.from({ length: 48 }, (_, i) => i),
+        );
+        const floats = await call("floating", 48) as Float32Array;
+        assert(Object.is(floats[0], -0));
+        const bits = new Uint32Array(
+          floats.buffer,
+          floats.byteOffset,
+          floats.length,
+        );
+        assert.equal(bits[1], 0x7fc01234);
+        assert.deepEqual(floats.slice(2), new Float32Array(46).fill(1.25));
+        assert.deepEqual(
+          await call("float_fill", 48),
+          new Float32Array(48).fill(1.5),
+        );
+        assert.equal(await call("bool_fill", 48), true);
+        assert.deepEqual(await call("shifted", 48), new Uint32Array(48));
+        await assert.rejects(
+          () => call("trap_source"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(
+          await call("read"),
+          Uint32Array.from({ length: 48 }, (_, i) => {
+            if (i < 24) return 7;
+            return 9;
+          }),
+        );
+        await call("reset");
+        await assert.rejects(
+          () => call("trap_target"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(await call("read"), new Uint32Array(48).fill(7));
+        await assert.rejects(
+          () => call("ordered", 49),
+          WebAssembly.RuntimeError,
+        );
+        assert.equal(await call("effect_count"), 48);
+        for (
+          const [first, end, readIndex, expected] of [
+            [0, 48, 47, 14],
+            [0, 0, 47, 18],
+            [2, 3, 2, 16],
+            [48, 0, 47, 18],
+          ]
+        ) {
           assert.equal(
             await call(
-              "conditional_reads",
-              new Uint32Array([0, 0xffffffff, 3]),
+              "reads_after_fill",
+              new Uint32Array([first, end, readIndex]),
             ),
-            103,
+            expected,
           );
-          assert.equal(
-            await call("conditional_reads", new Uint32Array([1, 2, 3])),
-            205,
-          );
-          await assert.rejects(
-            () =>
-              call("conditional_reads", new Uint32Array([1, 0xffffffff, 3])),
-            WebAssembly.RuntimeError,
-          );
-          for (
-            const [first, end, expected] of [
-              [49, 49, 103],
-              [0xffffffff, 0xffffffff, 103],
-              [0xffffffff, 0, 103],
-              [0, 1, 203],
-              [0, 48, 6031],
-            ]
-          ) {
-            assert.equal(
-              await call("reads_after_loop", new Uint32Array([first, end, 3])),
-              expected,
-            );
-          }
-        } finally {
-          guest.dispose();
         }
+        assert.equal(
+          await call(
+            "conditional_reads",
+            new Uint32Array([0, 0xffffffff, 3]),
+          ),
+          103,
+        );
+        assert.equal(
+          await call("conditional_reads", new Uint32Array([1, 2, 3])),
+          205,
+        );
+        await assert.rejects(
+          () =>
+            call("conditional_reads", new Uint32Array([1, 0xffffffff, 3])),
+          WebAssembly.RuntimeError,
+        );
+        for (
+          const [first, end, expected] of [
+            [49, 49, 103],
+            [0xffffffff, 0xffffffff, 103],
+            [0xffffffff, 0, 103],
+            [0, 1, 203],
+            [0, 48, 6031],
+          ]
+        ) {
+          assert.equal(
+            await call("reads_after_loop", new Uint32Array([first, end, 3])),
+            expected,
+          );
+        }
+      } finally {
+        guest.dispose();
       }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

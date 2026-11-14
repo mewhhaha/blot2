@@ -27,93 +27,90 @@ entry const integers = func (values: Array U32): Array U32 => return do:
   return #[a, b, c, d, e, f, g, h, i, j, k, l]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`scoped standard SIMD wrappers retain exact lane bits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
-    const entry = `${directory}/main.blot`;
-    await Deno.writeTextFile(entry, source);
-    const compiler = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      stdRoot: new URL("../../std/", import.meta.url).pathname,
-      codegenTier,
-      cacheDirectory: false,
-    });
-    try {
-      const result = await compiler.build();
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = (
-          name: string,
-          values: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
-        ) =>
-          asynchronous
-            ? guest.callAsync(name, values)
-            : guest.call(name, values);
-        try {
-          for (
-            const bits of [
-              [
-                0x80000000,
-                0x7FC01234,
-                0x3F800000,
-                0xFF800000,
-                0,
-                0xFFC05678,
-                0x7F800000,
-                0x40800000,
-              ],
-              [0, 0x80000000, 1, 0xFFFFFFFF, 7, 8, 9, 10],
-            ]
-          ) {
-            const words = Uint32Array.from(bits);
-            const floating = new Float32Array(words.buffer);
-            assert.deepEqual(
-              await call("floating", floating),
-              Uint32Array.from([
-                bits[0],
-                bits[5],
-                bits[2],
-                bits[7],
-                bits[4],
-                bits[1],
-                bits[6],
-                bits[3],
-                bits[3],
-                bits[2],
-                bits[1],
-                bits[0],
-                ...Array(4).fill(bits[0]),
-                ...Array(4).fill(bits[3]),
-              ]),
-            );
-            assert.deepEqual(
-              await call("integers", words),
-              Uint32Array.from([
-                bits[7],
-                bits[0],
-                bits[5],
-                bits[2],
-                bits[3],
-                bits[2],
-                bits[1],
-                bits[0],
-                ...Array(4).fill(bits[3]),
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`scoped standard SIMD wrappers retain exact lane bits`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
+  const entry = `${directory}/main.blot`;
+  await Deno.writeTextFile(entry, source);
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    cacheDirectory: false,
   });
-}
+  try {
+    const result = await compiler.build();
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = (
+        name: string,
+        values: Float32Array<ArrayBuffer> | Uint32Array<ArrayBuffer>,
+      ) =>
+        asynchronous
+          ? guest.callAsync(name, values)
+          : guest.call(name, values);
+      try {
+        for (
+          const bits of [
+            [
+              0x80000000,
+              0x7FC01234,
+              0x3F800000,
+              0xFF800000,
+              0,
+              0xFFC05678,
+              0x7F800000,
+              0x40800000,
+            ],
+            [0, 0x80000000, 1, 0xFFFFFFFF, 7, 8, 9, 10],
+          ]
+        ) {
+          const words = Uint32Array.from(bits);
+          const floating = new Float32Array(words.buffer);
+          assert.deepEqual(
+            await call("floating", floating),
+            Uint32Array.from([
+              bits[0],
+              bits[5],
+              bits[2],
+              bits[7],
+              bits[4],
+              bits[1],
+              bits[6],
+              bits[3],
+              bits[3],
+              bits[2],
+              bits[1],
+              bits[0],
+              ...Array(4).fill(bits[0]),
+              ...Array(4).fill(bits[3]),
+            ]),
+          );
+          assert.deepEqual(
+            await call("integers", words),
+            Uint32Array.from([
+              bits[7],
+              bits[0],
+              bits[5],
+              bits[2],
+              bits[3],
+              bits[2],
+              bits[1],
+              bits[0],
+              ...Array(4).fill(bits[3]),
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 // Pending the owner's decision on literal SIMD lane selectors (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("scoped standard SIMD wrappers require literal in-range selectors", async () => {

@@ -114,7 +114,7 @@ test "principal scheme substitution creates independent uses" {
 }
 
 test "unchanged aggregate resolution and empty substitution allocate no copies" {
-    const Memory = @import("../runtime/memory.zig");
+    const Memory = @import("../memory.zig");
     var tracked: Memory.TrackedAllocator = .{ .backing = std.testing.allocator };
     var store = try Store.init(tracked.allocator());
     defer store.deinit();

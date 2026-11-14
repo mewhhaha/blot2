@@ -31,8 +31,8 @@ entry const run = func (count: U32): Array U32 => return do:
   return #[number editor[0].mode, editor[0].counter, number editor[0].nested.mode, alias[0].counter]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`generic indexed fields retain invariant element types and source proof equations (${codegenTier})`, async () => {
+{
+  Deno.test(`generic indexed fields retain invariant element types and source proof equations`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-indexed-field-" });
     const entry = `${directory}/main.blot`;
     await Deno.writeTextFile(entry, source);
@@ -46,7 +46,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
       executable,
       entry,
       prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      codegenTier,
       cacheDirectory: false,
     });
     try {

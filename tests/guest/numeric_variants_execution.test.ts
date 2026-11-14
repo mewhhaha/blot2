@@ -72,74 +72,71 @@ entry const floating = func (seed: F32) => return do:
       $Float n => n
   break result
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`numeric variants preserve active arms lists static values and snapshots (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-numeric-variants-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url),
-      cacheDirectory: false,
-      codegenTier,
-    });
+Deno.test(`numeric variants preserve active arms lists static values and snapshots`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-numeric-variants-",
+  });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
+    const read = (i: number) =>
+      i % 3 === 0 ? 0 : i % 3 === 1 ? i : i * 2 + 10;
     try {
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      const read = (i: number) =>
-        i % 3 === 0 ? 0 : i % 3 === 1 ? i : i * 2 + 10;
-      try {
-        for (
-          const count of [0, 1, 2, 3, 80, 81, 82, 243, 244, 245, 513, 2000]
-        ) {
-          assert.equal(
-            guest.call("mixed", count),
-            Array.from({ length: count }, (_, i) => read(i)).reduce(
-              (a, b) => a + b,
-              0,
-            ),
-          );
-        }
-        for (const i of [0, 1, 2, 80, 81, 82, 243, 244, 245, 512]) {
-          assert.equal(guest.call("list", i), read(i));
-          // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
-          assert.equal(guest.call("saved", i), 600);
-          assert.equal(guest.call("conversions", i), read(i + 80));
-          assert.equal(guest.call("callback", i), read(i));
-        }
-        for (const seed of [0, 1, 73]) {
-          assert.equal(guest.call("anonymous", seed), seed * 1000);
-        }
-        assert.equal(guest.call("absent_escape", 2000), 2000);
-        for (const count of [0, 1, 2, 3, 32, 513]) {
-          assert.equal(
-            guest.call("nested", count),
-            Array.from({ length: count }, (_, i) => i % 4 === 0 ? 0 : i).reduce(
-              (a, b) => a + b,
-              0,
-            ),
-          );
-        }
-        for (const seed of [-0, 0, 1.5, Infinity, -Infinity, NaN]) {
-          const actual = guest.call("floating", seed) as Float32Array;
-          const expected = Float32Array.of(seed, 0, seed);
-          assert.deepEqual(
-            new Uint32Array(actual.buffer, actual.byteOffset, actual.length),
-            new Uint32Array(expected.buffer),
-          );
-        }
-        for (const [i, expected] of [0, 7, 5].entries()) {
-          assert.equal(guest.call("static_values", i), expected);
-        }
-      } finally {
-        guest.dispose();
+      for (
+        const count of [0, 1, 2, 3, 80, 81, 82, 243, 244, 245, 513, 2000]
+      ) {
+        assert.equal(
+          guest.call("mixed", count),
+          Array.from({ length: count }, (_, i) => read(i)).reduce(
+            (a, b) => a + b,
+            0,
+          ),
+        );
+      }
+      for (const i of [0, 1, 2, 80, 81, 82, 243, 244, 245, 512]) {
+        assert.equal(guest.call("list", i), read(i));
+        // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
+        assert.equal(guest.call("saved", i), 600);
+        assert.equal(guest.call("conversions", i), read(i + 80));
+        assert.equal(guest.call("callback", i), read(i));
+      }
+      for (const seed of [0, 1, 73]) {
+        assert.equal(guest.call("anonymous", seed), seed * 1000);
+      }
+      assert.equal(guest.call("absent_escape", 2000), 2000);
+      for (const count of [0, 1, 2, 3, 32, 513]) {
+        assert.equal(
+          guest.call("nested", count),
+          Array.from({ length: count }, (_, i) => i % 4 === 0 ? 0 : i).reduce(
+            (a, b) => a + b,
+            0,
+          ),
+        );
+      }
+      for (const seed of [-0, 0, 1.5, Infinity, -Infinity, NaN]) {
+        const actual = guest.call("floating", seed) as Float32Array;
+        const expected = Float32Array.of(seed, 0, seed);
+        assert.deepEqual(
+          new Uint32Array(actual.buffer, actual.byteOffset, actual.length),
+          new Uint32Array(expected.buffer),
+        );
+      }
+      for (const [i, expected] of [0, 7, 5].entries()) {
+        assert.equal(guest.call("static_values", i), expected);
       }
     } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      guest.dispose();
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

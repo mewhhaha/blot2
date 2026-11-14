@@ -1276,7 +1276,7 @@ test "numeric finite nested helper checks distinguish exact identity changed ope
 fn finitePlanMeasurement(allocator: std.mem.Allocator, label: []const u8, input: []const u8, limits: terms.Limits, expected: bool, prepared: bool) !void {
     var module = try lowerSource(allocator, input);
     defer module.deinit(allocator);
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = allocator };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = allocator };
     const measured = tracked.allocator();
     var visits: usize = 0;
     {
@@ -1337,7 +1337,7 @@ test "numeric finite work stays bounded and inactive no feature bodies allocate 
     for (&operands, 0..) |*operand, index| operand.* = .{ .tag = .formal, .a = @intCast(index) };
     for (&requirements, 0..) |*requirement, index| requirement.* = .{ .before = @intCast(index + 2), .proposition = .{ .relation = .le, .left = @intCast(index + 1), .right = @intCast(index + 2) } };
     const contract: @import("numeric_proof_contracts.zig").Contract = .{ .values = &kinds, .operands = &operands, .requirements = &requirements };
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = allocator };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = allocator };
     const stats = try contract.validateMeasured(tracked.allocator(), .{});
     try std.testing.expect(stats.visits < 5000);
     try std.testing.expectEqual(0, tracked.counts.live_bytes);

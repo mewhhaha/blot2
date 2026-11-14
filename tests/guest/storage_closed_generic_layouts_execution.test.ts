@@ -25,43 +25,40 @@ entry const answer = func (input: F32) => return do:
   return #[unbox (-1.0) first.box, U32.to_f32 (unbox 0 second.box), unbox (-5.0) third.box,
     U32.to_f32 first_id, first_amount, U32.to_f32 third_id, third_amount]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`closed generic layout witnesses survive mixed caller contexts (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-closed-generics-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (const input of [-0, 1.25, -10.5, 99]) {
-            const value = asynchronous
-              ? await guest.callAsync("answer", input)
-              : guest.call("answer", input);
-            assert.deepEqual(
-              value,
-              new Float32Array([input, 13, -5, 7, input + 1, 8, input + 10]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`closed generic layout witnesses survive mixed caller contexts`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-closed-generics-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (const input of [-0, 1.25, -10.5, 99]) {
+          const value = asynchronous
+            ? await guest.callAsync("answer", input)
+            : guest.call("answer", input);
+          assert.deepEqual(
+            value,
+            new Float32Array([input, 13, -5, 7, input + 1, 8, input + 10]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

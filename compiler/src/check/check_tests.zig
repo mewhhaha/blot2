@@ -235,7 +235,7 @@ test "source admits only F32 prefix negation and authoritative primitive names" 
 }
 
 test "owned checker tables grow with declarations and uses without rechecking shared bodies" {
-    const Memory = @import("../runtime/memory.zig");
+    const Memory = @import("../memory.zig");
     for ([_]usize{ 16, 64, 256 }) |count| {
         for (0..3) |shape| {
             var fixture = try Fixture.init();
@@ -282,7 +282,7 @@ test "owned checker tables grow with declarations and uses without rechecking sh
 }
 
 test "wide scalar let bindings avoid quadratic generalization allocations" {
-    const Memory = @import("../runtime/memory.zig");
+    const Memory = @import("../memory.zig");
     for ([_]usize{ 32, 128, 512, 1024 }) |count| {
         var fixture = try Fixture.init();
         defer fixture.deinit();

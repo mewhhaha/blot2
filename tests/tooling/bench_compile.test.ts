@@ -208,7 +208,6 @@ Deno.test("bench: frozen pen settings preserve budget, standard library and expl
             imports: { "ink/": "../ink/lib/" },
             std: "../blot2/std",
             inferenceBudget: 200000000,
-            codegenTier: "development",
             nativeAssets: {
               roots: ["src"],
               imports: [{
@@ -224,7 +223,6 @@ Deno.test("bench: frozen pen settings preserve budget, standard library and expl
     const [game] = await gdevWorkloads("/unused-live-repository", root);
     const options = sessionOptions("/compiler", game);
     assert.equal(options.inferenceBudget, 200000000);
-    assert.equal(options.codegenTier, "development");
     assert.equal(options.prelude, `${root}/std/prelude.blot`);
     assert.deepEqual(options.nativeAssets?.imports, [{
       module: `${root}/src/names.json.blot`,

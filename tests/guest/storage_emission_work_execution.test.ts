@@ -22,54 +22,51 @@ ${
       .join("")
   }  return @u32.add total marker[0]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`finite large owned emission retains ordered Foreign calls (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-emission-work-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-      inferenceBudget: 20000000,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          const observed: number[] = [];
-          const host = guest.capability({
-            parameter: "Array U32",
-            result: "Array U32",
-            call: (values) => {
-              assert(values instanceof Uint32Array);
-              observed.push(values[0]);
-              return new Uint32Array([values[0], values[1]]);
-            },
-          });
-          const actual = asynchronous
-            ? await guest.callAsync("answer", host)
-            : guest.call("answer", host);
-          assert.equal(actual, calls * (calls - 1));
-          assert.deepEqual(
-            observed,
-            Array.from({ length: calls }, (_, index) => index),
-          );
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`finite large owned emission retains ordered Foreign calls`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-emission-work-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+    inferenceBudget: 20000000,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        const observed: number[] = [];
+        const host = guest.capability({
+          parameter: "Array U32",
+          result: "Array U32",
+          call: (values) => {
+            assert(values instanceof Uint32Array);
+            observed.push(values[0]);
+            return new Uint32Array([values[0], values[1]]);
+          },
+        });
+        const actual = asynchronous
+          ? await guest.callAsync("answer", host)
+          : guest.call("answer", host);
+        assert.equal(actual, calls * (calls - 1));
+        assert.deepEqual(
+          observed,
+          Array.from({ length: calls }, (_, index) => index),
+        );
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

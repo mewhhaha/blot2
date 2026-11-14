@@ -48,85 +48,82 @@ entry const floats = func (input: F32) => return do:
   let third = selected ($Some ($Payload {right: 1.5, left: live[0]})) first
   return #[first.left, second.right, third.left, first.right, second.left, sum first, sum second, sum third]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`loaded nominal fields retain checked dispatch across generic contexts (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-nominal-fields-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-      startupTimeoutMs: 5_000,
-    });
-    try {
-      await Deno.writeTextFile(`${directory}/shapes.blot`, shapes);
-      const result = await compiler.build({
-        sources: { [entry]: source },
-        signal: AbortSignal.timeout(5_000),
-      });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (const input of [-0, 1.25, 100]) {
-            const value = asynchronous
-              ? await guest.callAsync("answer", input)
-              : guest.call("answer", input);
-            assert.deepEqual(
-              value,
-              new Float32Array([7, input + 1, input, input + 11]),
-            );
-          }
-          for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
-            let value;
-            if (asynchronous) value = await guest.callAsync("integers", input);
-            else value = guest.call("integers", input);
-            assert.deepEqual(
-              value,
-              new Uint32Array([
-                input,
-                3,
-                7,
-                input,
-                input + 3,
-                input + 7,
-                input + 24,
-                input + 1,
-                input + 2,
-              ]),
-            );
-          }
-          for (const input of [0, -0, 1.25, -10.5, 3, -0]) {
-            let value;
-            if (asynchronous) value = await guest.callAsync("floats", input);
-            else value = guest.call("floats", input);
-            assert.deepEqual(
-              value,
-              new Float32Array([
-                input,
-                input,
-                input,
-                2.5,
-                7.25,
-                input + 2.5,
-                input + 7.25,
-                input + 1.5,
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`loaded nominal fields retain checked dispatch across generic contexts`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-nominal-fields-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+    startupTimeoutMs: 5_000,
+  });
+  try {
+    await Deno.writeTextFile(`${directory}/shapes.blot`, shapes);
+    const result = await compiler.build({
+      sources: { [entry]: source },
+      signal: AbortSignal.timeout(5_000),
+    });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (const input of [-0, 1.25, 100]) {
+          const value = asynchronous
+            ? await guest.callAsync("answer", input)
+            : guest.call("answer", input);
+          assert.deepEqual(
+            value,
+            new Float32Array([7, input + 1, input, input + 11]),
+          );
+        }
+        for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
+          let value;
+          if (asynchronous) value = await guest.callAsync("integers", input);
+          else value = guest.call("integers", input);
+          assert.deepEqual(
+            value,
+            new Uint32Array([
+              input,
+              3,
+              7,
+              input,
+              input + 3,
+              input + 7,
+              input + 24,
+              input + 1,
+              input + 2,
+            ]),
+          );
+        }
+        for (const input of [0, -0, 1.25, -10.5, 3, -0]) {
+          let value;
+          if (asynchronous) value = await guest.callAsync("floats", input);
+          else value = guest.call("floats", input);
+          assert.deepEqual(
+            value,
+            new Float32Array([
+              input,
+              input,
+              input,
+              2.5,
+              7.25,
+              input + 2.5,
+              input + 7.25,
+              input + 1.5,
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

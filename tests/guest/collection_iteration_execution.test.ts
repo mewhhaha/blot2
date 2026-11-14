@@ -54,12 +54,11 @@ async function session(
 ) {
   const directory = await Deno.makeTempDir();
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const entry = `${directory}/main.blot`;
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        codegenTier,
         prelude: preludePath,
         cacheDirectory: false,
       });
@@ -106,11 +105,10 @@ Deno.test("resolved collection iteration rechecks exact cursor producers through
   const entry = `${directory}/main.blot`;
   const original = await Deno.readTextFile(preludePath);
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable,
         entry,
-        codegenTier,
         prelude: preludePath,
         cacheDirectory: false as const,
       };

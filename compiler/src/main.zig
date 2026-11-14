@@ -8,18 +8,17 @@ const checker = @import("check/check.zig");
 const core = @import("check/core.zig");
 const core_builder = @import("check/core_builder.zig");
 const parallel_lowering = @import("check/parallel_lowering.zig");
-const backend = @import("backend/core_backend.zig");
-const array_cost_explanation = @import("backend/array_cost_explanation.zig");
-const memory = @import("runtime/memory.zig");
+const backend = @import("compile.zig");
+const memory = @import("memory.zig");
 const project = @import("reuse/project.zig");
 const project_check = @import("reuse/project_check.zig");
 const phase_profile = @import("phase_profile.zig");
 const Io = std.Io;
 const Policy = @import("execution_policy.zig").Policy;
-fn semanticPolicy(value: []const u8) ?Policy {
+fn workerCount(value: []const u8) ?u8 {
     const workers = std.fmt.parseInt(u8, value, 10) catch return null;
     if (workers == 0 or workers > 16) return null;
-    return .{ .semantic_workers = workers, .semantic_components = true };
+    return workers;
 }
 const usage =
     \\Usage: blotc lex|parse|check SOURCE [SOURCE...]
@@ -31,14 +30,10 @@ const usage =
     \\       blotc serve-project (owned project-build byte protocol)
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
-    \\       --profile (build, build-project) adds detailed backend clocks to the stats record.
-    \\       --profile-memory instruments executed allocation, copy, RC and cycle costs.
-    \\       --require-collector-free rejects modules without a whole-arena certificate.
-    \\       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.
+    \\       --profile (build, build-project) adds phase clocks to the stats record.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
-    \\       --backend scoped|direct (build, build-project, serve-project) selects the code generator (default: scoped).
     \\       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.
-    \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
+    \\       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.
     \\
     \\Handwritten Zig source compiler. JSON-lines diagnostics and stage metrics
     \\are written to stdout. Parse coverage and executable coverage are distinct.
@@ -46,28 +41,8 @@ const usage =
 ;
 const dependency_cli = @import("reuse/dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
-/// The backend a build without --backend uses.
-fn defaultPolicy() Policy {
-    return .{ .backend = .direct };
-}
-const restart_cache = @import("reuse/restart_cache.zig");
-/// A cache that was not saved says why: `over_limit` and
-/// `semantic_over_limit` report growth past the cache's limits.
-const CacheMetrics = struct {
-    loaded: bool = false,
-    saved: bool = false,
-    bytes: usize = 0,
-    over_limit: bool = false,
-    semantic_over_limit: bool = false,
-    fn record(self: *CacheMetrics, saved: bool, report: restart_cache.Report) void {
-        self.saved = saved;
-        self.bytes = report.checkpoint_bytes;
-        self.over_limit = report.over_limit;
-        self.semantic_over_limit = report.semantic_over_limit;
-    }
-};
 /// Immutable executable defaults; individual compiler invocations own options.
-pub const compiler_defaults = .{ .artifact_replay = compiler_identity.artifact_replay, .inference_budget = compiler_identity.inference_budget };
+pub const compiler_defaults = .{ .inference_budget = compiler_identity.inference_budget };
 var configured_inference_budget: usize = compiler_identity.inference_budget;
 var configured_identity: [32]u8 = compiler_identity.digest;
 pub fn inferenceBudget() usize {
@@ -91,12 +66,6 @@ fn configureInferenceBudget(value: []const u8) !void {
 
 const Command = enum { lex, parse, check, build, dependencies, parse_project, check_project, build_project };
 const Stats = struct {
-    backend_timing: @import("backend/backend_timing.zig").Stats = .{},
-    work_counters: @import("work_counters.zig").Counters = .{},
-    optimization: @import("backend/function_facts.zig").Stats = .{},
-    runtime_optimization: @import("backend/optimized_bodies.zig").Stats = .{},
-    principals: @import("reuse/principal_evidence_reuse.zig").Stats = .{},
-    restart_cache: CacheMetrics = .{},
     source_bytes: usize = 0,
     tokens: usize = 0,
     syntax_nodes: usize = 0,
@@ -108,12 +77,9 @@ const Stats = struct {
     bindings: usize = 0,
     body_elaborations: usize = 0,
     wasm_bytes: usize = 0,
-    code_instances: usize = 0,
-    callable_wrappers: usize = 0,
     emitted_functions: usize = 0,
     core_nodes: usize = 0,
     body_lowerings: usize = 0,
-    constant_steps: usize = 0,
     lex_us: i64 = 0,
     parse_us: i64 = 0,
     check_us: i64 = 0,
@@ -132,11 +98,8 @@ fn diagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, code:
     try std.json.Stringify.value(.{ .kind = "diagnostic", .filename = filename, .stage = stage, .code = code, .start = start, .end = end, .message = message }, .{}, writer);
     try writer.writeByte('\n');
 }
-fn emitDiagnostic(writer: *Io.Writer, filename: []const u8, related_filename: []const u8, item: backend.Diagnostic, explanation: ?@import("reuse/dispatch_explanation.zig").Explanation, origins: []const @import("check/diagnostic_location.zig").Origin) !void {
-    const related = if (item.related) |location| @import("check/diagnostic_location.zig").Location.init(related_filename, location.span) else null;
-    const payload = .{ .kind = "diagnostic", .filename = filename, .stage = "emit", .code = @tagName(item.code), .start = item.span.start, .end = item.span.end, .message = item.message(), .related = related, .details = if (explanation) |value| .{ .explanation = value } else null };
-    try std.json.Stringify.value(@import("check/diagnostic_location.zig").WithOrigins(@TypeOf(payload)){ .payload = payload, .origins = origins }, .{}, writer);
-    try writer.writeByte('\n');
+fn emitDiagnostic(writer: *Io.Writer, filename: []const u8, item: backend.Diagnostic) !void {
+    return diagnostic(writer, filename, "emit", @tagName(item.code), item.span.start, item.span.end, item.message());
 }
 fn frontendDiagnostic(writer: *Io.Writer, filename: []const u8, stage: []const u8, source: []const u8, publication: syntax_diagnostics.Publication, details: anytype) !void {
     try std.json.Stringify.value(.{
@@ -178,7 +141,7 @@ fn namedDiagnostic(allocator: std.mem.Allocator, writer: *Io.Writer, filename: [
     try diagnostic(writer, filename, stage, code, span.start, span.end, full);
 }
 
-fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, output_path: ?[]const u8, cache_root: ?[]const u8) !bool {
+fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, output_path: ?[]const u8) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     var stats: Stats = .{};
@@ -255,21 +218,6 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         stats.body_lowerings = lowered.body_lowerings;
         for (lowered.diagnostics) |item| try diagnostic(writer, filename, "lower", @tagName(item.code), item.span.start, item.span.end, item.message());
         if (lowered.diagnostics.len != 0) break :compilation false;
-        var cache_file: ?restart_cache.File = null;
-        defer if (cache_file) |*file| file.deinit();
-        var identity: ?@import("backend/runtime_identity.zig").Metadata = null;
-        defer if (identity) |*owned| owned.deinit(allocator);
-        if (cache_root) |root| {
-            const absolute_entry = Io.Dir.cwd().realPathFileAlloc(io, filename, allocator) catch null;
-            defer if (absolute_entry) |path| allocator.free(path);
-            if (absolute_entry) |path| {
-                identity = @import("backend/runtime_identity.zig").Metadata.capture(allocator, &names, &.{.{ .unit = 1, .path = path }}, 1) catch null;
-                if (identity != null) cache_file = restart_cache.File.init(allocator, root, configured_identity, path) catch null;
-            }
-        }
-        var checkpoint = if (cache_file) |*file| file.load(io) else null;
-        defer if (checkpoint) |*candidate| candidate.deinit();
-        stats.restart_cache.loaded = checkpoint != null;
         checked.deinit(allocator);
         checked_live = false;
         tree.deinit(allocator);
@@ -277,33 +225,16 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         allocator.free(source);
         source_live = false;
         const emit_start = now(io);
-        var compiled = try backend.compileWithOptions(allocator, &.{lowered}, 1, .{ .policy = defaultPolicy(), .identity = if (identity) |*owned| owned.view() else null, .diagnostic_source_mode = true, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null, .artifact_replay = compiler_defaults.artifact_replay, .artifact_dump = compiler_defaults.artifact_replay });
+        var compiled = try backend.compile(allocator, &.{lowered}, 1);
         defer compiled.deinit(allocator);
         stats.emit_us = elapsed(emit_start, io);
-        // A declined backend still owns measured work. Preserve it before
-        // reporting the diagnostic and leaving compilation.
-        stats.code_instances = compiled.code_instances;
-        stats.optimization = compiled.optimization;
-        stats.runtime_optimization = compiled.runtime_optimization;
-        stats.backend_timing = compiled.timing;
-        stats.work_counters = compiled.counters;
-        stats.callable_wrappers = compiled.callable_wrappers;
         stats.emitted_functions = compiled.emitted_functions;
-        stats.constant_steps = compiled.constant_steps;
-        stats.principals = compiled.principal;
         if (compiled.diagnostic) |item| {
-            const origins = try allocator.alloc(@import("check/diagnostic_location.zig").Origin, item.origins.len);
-            defer allocator.free(origins);
-            for (item.origins.items(), 0..) |origin, index| origins[index] = @import("check/diagnostic_location.zig").Origin.init(origin.kind, filename, origin.location.span);
-            try emitDiagnostic(writer, filename, filename, item, compiled.explanation, origins);
+            try emitDiagnostic(writer, filename, item);
             break :compilation false;
         }
         stats.wasm_bytes = compiled.bytes.len;
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
-        if (cache_file) |*file| if (compiled.capture) |*capture| {
-            var report: restart_cache.Report = .{};
-            stats.restart_cache.record(file.capture(io, capture, &report), report);
-        };
         break :compilation true;
     };
     // All compiler/source/result owners have been destroyed before reporting.
@@ -322,7 +253,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
     return ok;
 }
 
-fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, explain_allocations: bool, output_path: ?[]const u8, cache_root: ?[]const u8, policy: Policy) !bool {
+fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Command, filename: []const u8, options: project.Options, profile_requested: bool, output_path: ?[]const u8, policy: Policy) !bool {
     // --profile clocks every phase of this compilation until its record and
     // counts its allocations per phase below the requested-bytes tracker.
     var profile: ?phase_profile.Profile = if (profile_requested) .init(io) else null;
@@ -330,7 +261,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     if (profile) |*owner| counting.attach(owner);
     // Worker jobs allocate through this meter directly when it is shared; a
     // profiled build counts below it, so its workers keep their lock.
-    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing, .sharing = if (policy.semantic_workers > 1 or policy.codegen_workers > 1 or policy.frontend_workers > 1) .shared else .single };
+    var tracked: memory.TrackedAllocator = .{ .backing = if (profile != null) counting.allocator() else backing, .sharing = if (policy.semantic_workers > 1 or policy.frontend_workers > 1) .shared else .single };
     const allocator = tracked.allocator();
     const start = now(io);
     const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
@@ -349,18 +280,8 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
     var checker_counters: checker.Counters = .{};
     var core_nodes: usize = 0;
     var body_lowerings: usize = 0;
-    var code_instances: usize = 0;
-    var optimization: @import("backend/function_facts.zig").Stats = .{};
-    var runtime_optimization: @import("backend/optimized_bodies.zig").Stats = .{};
-    var backend_timing: @import("backend/backend_timing.zig").Stats = .{};
-    var counters: @import("work_counters.zig").Counters = .{};
-    var callable_wrappers: usize = 0;
     var emitted_functions: usize = 0;
     var wasm_bytes: usize = 0;
-    var constant_steps: usize = 0;
-    var cache_metrics: CacheMetrics = .{};
-    var principals: @import("reuse/principal_evidence_reuse.zig").Stats = .{};
-    var selected_queries: @import("eval/completed_specialization_query.zig").Stats = .{};
     var load_us: i64 = 0;
     var check_us: i64 = 0;
     var lower_us: i64 = 0;
@@ -474,14 +395,6 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
             lower_us = elapsed(lower_start, io);
             if (units[index].diagnostics.len != 0) break :compilation false;
         }
-        const emission_owners = try allocator.alloc(@import("backend/runtime_identity.zig").Owner, units.len);
-        defer allocator.free(emission_owners);
-        for (emission_owners, 0..) |*owner, index| owner.* = .{ .unit = @intCast(index + 1), .path = loaded.filename(@intCast(index + 1)) };
-        var emission_identity = try @import("backend/runtime_identity.zig").Metadata.capture(allocator, &loaded.symbols, emission_owners, units.len);
-        defer emission_identity.deinit(allocator);
-        const source_digests = try allocator.alloc([32]u8, if (policy.memory_profile or policy.require_collector_free) units.len else 0);
-        defer allocator.free(source_digests);
-        for (source_digests, 1..) |*digest, unit| std.crypto.hash.Blake3.hash(loaded.unit(@intCast(unit)).source, digest, .{});
         const release_start = now(io);
         checked.deinit(allocator);
         checked_live = false;
@@ -494,60 +407,26 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         }
         teardown_us += elapsed(release_start, io);
         const emit_start = now(io);
-        var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(allocator, root, configured_identity, loaded.filename(loaded.entry)) catch null else null;
-        defer if (cache_file) |*file| file.deinit();
-        var checkpoint = if (cache_file) |*file| file.load(io) else null;
-        defer if (checkpoint) |*candidate| candidate.deinit();
-        cache_metrics.loaded = checkpoint != null;
         var compiled = emitted: {
             const timing = phase_profile.enter(.backend);
             defer timing.exit();
-            break :emitted try backend.compileWithOptions(allocator, units, loaded.entry, .{ .compiler_identity = configured_identity, .diagnostic_source_digests = source_digests, .io = io, .policy = policy, .profile_backend = profile_requested, .explain_allocations = explain_allocations, .identity = emission_identity.view(), .unit_order = loaded.order.items, .diagnostic_source_mode = loaded.input_mode == .source, .diagnostic_prelude_unit = loaded.prelude_unit, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null });
+            break :emitted try backend.compile(allocator, units, loaded.entry);
         };
         defer {
             const result_release_start = now(io);
             compiled.deinit(allocator);
             teardown_us += elapsed(result_release_start, io);
         }
-        code_instances = compiled.code_instances;
-        optimization = compiled.optimization;
-        runtime_optimization = compiled.runtime_optimization;
-        backend_timing = compiled.timing;
-        counters = compiled.counters;
-        callable_wrappers = compiled.callable_wrappers;
         emitted_functions = compiled.emitted_functions;
-        constant_steps = compiled.constant_steps;
-        principals = compiled.principal;
-        selected_queries = compiled.completed_queries;
         if (compiled.diagnostic) |item| {
-            const origins = try allocator.alloc(@import("check/diagnostic_location.zig").Origin, item.origins.len);
-            defer allocator.free(origins);
-            for (item.origins.items(), 0..) |origin, index| origins[index] = @import("check/diagnostic_location.zig").Origin.init(origin.kind, loaded.filename(origin.location.unit), origin.location.span);
-            try emitDiagnostic(writer, loaded.filename(item.unit), if (item.related) |location| loaded.filename(location.unit) else "", item, compiled.explanation, origins);
+            try emitDiagnostic(writer, loaded.filename(item.unit), item);
             emit_us = elapsed(emit_start, io);
             break :compilation false;
-        }
-        if (compiled.allocation_emission) |snapshot| {
-            try std.json.Stringify.value(.{ .kind = "allocation_sites", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
-            try writer.writeByte('\n');
-        }
-        if (explain_allocations) {
-            const filenames = try allocator.alloc([]const u8, units.len);
-            defer allocator.free(filenames);
-            for (filenames, 1..) |*path, id| path.* = loaded.filename(@intCast(id));
-            var snapshot = try array_cost_explanation.analyze(allocator, units, filenames, loaded.entry, loaded.prelude_unit);
-            defer snapshot.deinit(allocator);
-            try std.json.Stringify.value(.{ .kind = "array_costs", .sites = snapshot.sites, .omitted = snapshot.omitted }, .{}, writer);
-            try writer.writeByte('\n');
         }
         wasm_bytes = compiled.bytes.len;
         emit_us = elapsed(emit_start, io);
         const write_start = now(io);
         try Io.Dir.cwd().writeFile(io, .{ .sub_path = output_path.?, .data = compiled.bytes });
-        if (cache_file) |*file| if (compiled.capture) |*capture| {
-            var report: restart_cache.Report = .{};
-            cache_metrics.record(file.capture(io, capture, &report), report);
-        };
         write_us = elapsed(write_start, io);
         break :compilation true;
     };
@@ -576,17 +455,7 @@ fn processProject(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, comman
         .checker = checker_counters,
         .core_nodes = core_nodes,
         .body_lowerings = body_lowerings,
-        .code_instances = code_instances,
-        .optimization = optimization,
-        .runtime_optimization = runtime_optimization,
-        .backend_timing = backend_timing,
-        .work_counters = counters,
-        .callable_wrappers = callable_wrappers,
         .emitted_functions = emitted_functions,
-        .constant_steps = constant_steps,
-        .principals = principals,
-        .selected_queries = selected_queries,
-        .restart_cache = cache_metrics,
         .wasm_bytes = wasm_bytes,
         .load_us = load_us,
         .check_us = check_us,
@@ -606,27 +475,23 @@ fn run(init: std.process.Init) !bool {
     // Zig 0.17 defaults safe Init.gpa to a validating allocator.
     // Keep compiler checks, but use the standard production heap in releases.
     const backing = if (builtin.mode == .debug) init.gpa else std.heap.smp_allocator;
-    const cache_root = restart_cache.root(init.arena.allocator(), init.environ_map) catch null;
+    const cache_root = @import("reuse/restart_cache.zig").root(init.arena.allocator(), init.environ_map) catch null;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     if (args.len == 1 or std.mem.eql(u8, args[1], "--help")) {
         try Io.File.stdout().writeStreamingAll(init.io, usage);
         return true;
     }
     if (std.mem.eql(u8, args[1], "serve-project")) {
-        var policy: Policy = defaultPolicy();
+        var policy: Policy = .{ .backend = .direct };
         var at: usize = 2;
         while (at < args.len) : (at += 2) {
             if (at + 1 >= args.len) return error.InvalidServeArguments;
             if (std.mem.eql(u8, args[at], "--semantic-workers")) {
-                const selected = semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments;
-                policy.semantic_workers = selected.semantic_workers;
-                policy.semantic_components = true;
+                policy.semantic_workers = workerCount(args[at + 1]) orelse return error.InvalidServeArguments;
             } else if (std.mem.eql(u8, args[at], "--frontend-workers")) {
-                policy.frontend_workers = (semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments).semantic_workers;
+                policy.frontend_workers = workerCount(args[at + 1]) orelse return error.InvalidServeArguments;
             } else if (std.mem.eql(u8, args[at], "--inference-budget")) {
                 try configureInferenceBudget(args[at + 1]);
-            } else if (std.mem.eql(u8, args[at], "--backend")) {
-                policy.backend = std.meta.stringToEnum(@import("execution_policy.zig").Backend, args[at + 1]) orelse return error.InvalidServeArguments;
             } else return error.InvalidServeArguments;
         }
         var input_buffer: [4096]u8 = undefined;
@@ -667,32 +532,14 @@ fn run(init: std.process.Init) !bool {
         var options: project.Options = .{};
         var dependency_path: ?[]const u8 = null;
         var profile = false;
-        var explain_allocations = false;
-        var policy: Policy = defaultPolicy();
+        var semantic_workers = false;
+        var policy: Policy = .{ .backend = .direct };
         var at = first_option;
         while (at < args.len) {
-            // Profiling and explanation flags take no value.
-            if (std.mem.eql(u8, args[at], "--require-collector-free")) {
-                if (command != .build and command != .build_project) return false;
-                policy.require_collector_free = true;
-                at += 1;
-                continue;
-            }
-            if (std.mem.eql(u8, args[at], "--profile-memory")) {
-                if (command != .build and command != .build_project) return false;
-                policy.memory_profile = true;
-                at += 1;
-                continue;
-            }
+            // The profiling flag takes no value.
             if (std.mem.eql(u8, args[at], "--profile")) {
                 if (command != .build and command != .build_project) return false;
                 profile = true;
-                at += 1;
-                continue;
-            }
-            if (std.mem.eql(u8, args[at], "--explain-allocations")) {
-                if (command != .build and command != .build_project) return false;
-                explain_allocations = true;
                 at += 1;
                 continue;
             }
@@ -700,17 +547,13 @@ fn run(init: std.process.Init) !bool {
             defer at += 2;
             if (std.mem.eql(u8, args[at], "--semantic-workers")) {
                 if (command != .build and command != .build_project) return false;
-                const selected = semanticPolicy(args[at + 1]) orelse return false;
-                policy.semantic_workers = selected.semantic_workers;
-                policy.semantic_components = true;
+                policy.semantic_workers = workerCount(args[at + 1]) orelse return false;
+                semantic_workers = true;
             } else if (std.mem.eql(u8, args[at], "--frontend-workers")) {
                 if (command != .build and command != .build_project) return false;
-                policy.frontend_workers = (semanticPolicy(args[at + 1]) orelse return false).semantic_workers;
+                policy.frontend_workers = workerCount(args[at + 1]) orelse return false;
             } else if (std.mem.eql(u8, args[at], "--inference-budget")) {
                 try configureInferenceBudget(args[at + 1]);
-            } else if (std.mem.eql(u8, args[at], "--backend")) {
-                if (command != .build and command != .build_project) return false;
-                policy.backend = std.meta.stringToEnum(@import("execution_policy.zig").Backend, args[at + 1]) orelse return false;
             } else if (std.mem.eql(u8, args[at], "--std-root")) {
                 options.std_root = args[at + 1];
             } else if (std.mem.eql(u8, args[at], "--alias")) {
@@ -727,7 +570,7 @@ fn run(init: std.process.Init) !bool {
         }
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
-            if (profile or policy.semantic_components or explain_allocations) return false;
+            if (profile or semantic_workers) return false;
             const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity, .{ .compiler_identity = configured_identity, .policy = policy });
             try output.interface.flush();
             return success;
@@ -741,7 +584,7 @@ fn run(init: std.process.Init) !bool {
         const inputs = if (selected == .build_project or project_command) args[2..3] else args[2..first_option];
         var success = true;
         for (inputs) |filename| {
-            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, explain_allocations, if (selected == .build_project) args[3] else null, cache_root, policy) catch |err| {
+            const ok = processProject(init.io, backing, &output.interface, selected, filename, options, profile, if (selected == .build_project) args[3] else null, policy) catch |err| {
                 const stage = switch (selected) {
                     .parse_project => "parse-project",
                     .check_project => "check-project",
@@ -759,7 +602,7 @@ fn run(init: std.process.Init) !bool {
     var success = true;
     const inputs = if (command == .build) args[2..3] else args[2..];
     for (inputs) |filename| {
-        const ok = process(init.io, backing, &output.interface, command, filename, if (command == .build) args[3] else null, cache_root) catch |err| {
+        const ok = process(init.io, backing, &output.interface, command, filename, if (command == .build) args[3] else null) catch |err| {
             try diagnostic(&output.interface, filename, @tagName(command), @errorName(err), 0, 0, "Compiler operation failed");
             success = false;
             continue;

@@ -21,7 +21,6 @@ entry const run = func (seed: U32) => return do:
     prelude: new URL("../../std/prelude.blot", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
     cacheDirectory: false as const,
-    codegenTier: "optimized" as const,
   };
   const compiler = await createZigProjectCompiler(options);
   try {

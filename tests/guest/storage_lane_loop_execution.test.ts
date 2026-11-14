@@ -75,95 +75,92 @@ function expected(
   return Uint32Array.from(state);
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-lane-loops-" });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({
-        sources: { [entry]: source + dynamicSource },
-      });
-      assert(result.success, JSON.stringify(result));
-      const rows = Array.from(
-        { length: 96 },
-        (_, index) => (Math.imul(index, 123456789) + 0xf0000000) >>> 0,
-      );
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = async (name: string, input: unknown = null) => {
-          if (asynchronous) return await guest.callAsync(name, input);
-          return guest.call(name, input);
-        };
-        try {
-          for (const first of [0, 1, 7, 8, 16, 88]) {
-            for (const count of [0, 1, 7, 8, 15, 16, 17, 23, 24, 31, 32]) {
-              const end = Math.min(first + count, rows.length);
-              assert.deepEqual(
-                await call("run", new Uint32Array([first, end])),
-                expected(initial.slice(), rows, first, end),
-                `range ${first}..${end}`,
-              );
-            }
-          }
-          for (const end of [0, 1, 15, 16, 17, 31, 32, 47]) {
-            const state = initial.slice();
-            for (let index = 0; index < end; index++) {
-              const slot = index % 8;
-              state[slot] = ((state[slot] << rows[index]) ^ state[slot]) >>> 0;
-            }
-            assert.deepEqual(
-              await call("dynamic", end),
-              Uint32Array.from(state),
-            );
-          }
-          for (const [first, end] of [[0, 96], [8, 96], [0, 16], [1, 32]]) {
-            const aliases = rows.slice();
-            assert.deepEqual(
-              await call("alias", new Uint32Array([first, end])),
-              expected(aliases, aliases, first, end),
-            );
-          }
-          for (const [first, end] of [[0, 0], [8, 0], [0xffffffff, 1]]) {
-            assert.deepEqual(
-              await call("empty", new Uint32Array([first, end])),
-              new Uint32Array(),
-            );
-          }
-          await assert.rejects(
-            () => call("trap_input"),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(
-            await call("read"),
-            expected(initial.slice(), rows.slice(0, 19), 0, 40),
-          );
-          await assert.rejects(
-            () => call("trap_state"),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(
-            await call("read_short"),
-            expected(initial.slice(0, 4), rows, 0, 40),
-          );
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-lane-loops-" });
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
   });
-}
+  try {
+    const result = await compiler.build({
+      sources: { [entry]: source + dynamicSource },
+    });
+    assert(result.success, JSON.stringify(result));
+    const rows = Array.from(
+      { length: 96 },
+      (_, index) => (Math.imul(index, 123456789) + 0xf0000000) >>> 0,
+    );
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = async (name: string, input: unknown = null) => {
+        if (asynchronous) return await guest.callAsync(name, input);
+        return guest.call(name, input);
+      };
+      try {
+        for (const first of [0, 1, 7, 8, 16, 88]) {
+          for (const count of [0, 1, 7, 8, 15, 16, 17, 23, 24, 31, 32]) {
+            const end = Math.min(first + count, rows.length);
+            assert.deepEqual(
+              await call("run", new Uint32Array([first, end])),
+              expected(initial.slice(), rows, first, end),
+              `range ${first}..${end}`,
+            );
+          }
+        }
+        for (const end of [0, 1, 15, 16, 17, 31, 32, 47]) {
+          const state = initial.slice();
+          for (let index = 0; index < end; index++) {
+            const slot = index % 8;
+            state[slot] = ((state[slot] << rows[index]) ^ state[slot]) >>> 0;
+          }
+          assert.deepEqual(
+            await call("dynamic", end),
+            Uint32Array.from(state),
+          );
+        }
+        for (const [first, end] of [[0, 96], [8, 96], [0, 16], [1, 32]]) {
+          const aliases = rows.slice();
+          assert.deepEqual(
+            await call("alias", new Uint32Array([first, end])),
+            expected(aliases, aliases, first, end),
+          );
+        }
+        for (const [first, end] of [[0, 0], [8, 0], [0xffffffff, 1]]) {
+          assert.deepEqual(
+            await call("empty", new Uint32Array([first, end])),
+            new Uint32Array(),
+          );
+        }
+        await assert.rejects(
+          () => call("trap_input"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(
+          await call("read"),
+          expected(initial.slice(), rows.slice(0, 19), 0, 40),
+        );
+        await assert.rejects(
+          () => call("trap_state"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(
+          await call("read_short"),
+          expected(initial.slice(0, 4), rows, 0, 40),
+        );
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 // Direct backend gap: a primitive operator ignores the prelude's member, so U32 `+` does not call a custom `U32.add` (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("cyclic lanes call the prelude's U32.add", async () => {

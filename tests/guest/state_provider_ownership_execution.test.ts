@@ -43,108 +43,102 @@ Deno.test("State provider reads keep replaced fields alive across owner destruct
   const directory = await Deno.makeTempDir({ prefix: "blot-state-owner-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
-      for (const shareMachineCode of [false, true]) {
-        const compiler = await createZigProjectCompiler({
-          executable,
-          entry,
-          prelude: new URL("../../std/prelude.blot", import.meta.url),
-          cacheDirectory: false,
-          codegenTier,
-          shareMachineCode,
-        });
-        try {
-          for (const text of [source, source + callback, source]) {
-            const built = await compiler.build({ sources: { [entry]: text } });
-            assert(built.success, JSON.stringify(built));
-            const fresh = await createZigProjectCompiler({
-              executable,
-              entry,
-              prelude: new URL("../../std/prelude.blot", import.meta.url),
-              cacheDirectory: false,
-              codegenTier,
-              shareMachineCode,
+    {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: new URL("../../std/prelude.blot", import.meta.url),
+        cacheDirectory: false,
+      });
+      try {
+        for (const text of [source, source + callback, source]) {
+          const built = await compiler.build({ sources: { [entry]: text } });
+          assert(built.success, JSON.stringify(built));
+          const fresh = await createZigProjectCompiler({
+            executable,
+            entry,
+            prelude: new URL("../../std/prelude.blot", import.meta.url),
+            cacheDirectory: false,
+          });
+          try {
+            const rebuilt = await fresh.build({ sources: { [entry]: text } });
+            assert(rebuilt.success, JSON.stringify(rebuilt));
+            assert.deepEqual(built.bytes, rebuilt.bytes);
+          } finally {
+            await fresh.dispose();
+          }
+          for (const asynchronous of [false, true]) {
+            const guest = await instantiateGuest(built.bytes, {
+              asynchronous,
             });
             try {
-              const rebuilt = await fresh.build({ sources: { [entry]: text } });
-              assert(rebuilt.success, JSON.stringify(rebuilt));
-              assert.deepEqual(built.bytes, rebuilt.bytes);
-            } finally {
-              await fresh.dispose();
-            }
-            for (const asynchronous of [false, true]) {
-              const guest = await instantiateGuest(built.bytes, {
-                asynchronous,
-              });
-              try {
-                let warmed = 0;
-                for (const count of [8, 200, 8]) {
-                  let result;
-                  if (asynchronous) {
-                    result = await guest.callAsync("run", count);
-                  } else result = guest.call("run", count);
-                  assert.deepEqual(result, Uint32Array.of(7, 42));
-                  if (warmed) assert(guest.memoryBytes() <= warmed + 65536);
-                  else warmed = guest.memoryBytes();
-                }
-                let floating;
+              let warmed = 0;
+              for (const count of [8, 200, 8]) {
+                let result;
                 if (asynchronous) {
-                  floating = await guest.callAsync("floating", null);
-                } else floating = guest.call("floating", null);
-                assert(Object.is(floating, -0));
-                if (text !== source) {
-                  let result;
-                  if (asynchronous) {
-                    result = await guest.callAsync("alternate", 9);
-                  } else result = guest.call("alternate", 9);
-                  assert.deepEqual(result, Uint32Array.of(10, 42));
-                }
-                const cause = new Error("State field callback canceled");
-                const check = (values: Uint32Array): never => {
-                  assert.deepEqual(values, Uint32Array.of(7, 42));
-                  throw cause;
-                };
-                if (asynchronous) {
-                  const host = guest.capabilityAsync({
-                    parameter: "Array U32",
-                    result: "Unit",
-                    call: async (values) => {
-                      await Promise.resolve();
-                      return check(values);
-                    },
-                  });
-                  await assert.rejects(
-                    guest.callAsync("failed", host),
-                    (error) =>
-                      error instanceof Error &&
-                      (error === cause || error.cause === cause),
-                  );
-                  assert.deepEqual(
-                    await guest.callAsync("run", 8),
-                    Uint32Array.of(7, 42),
-                  );
-                } else {
-                  const host = guest.capability({
-                    parameter: "Array U32",
-                    result: "Unit",
-                    call: check,
-                  });
-                  assert.throws(
-                    () => guest.call("failed", host),
-                    (error) =>
-                      error instanceof Error &&
-                      (error === cause || error.cause === cause),
-                  );
-                  assert.deepEqual(guest.call("run", 8), Uint32Array.of(7, 42));
-                }
-              } finally {
-                guest.dispose();
+                  result = await guest.callAsync("run", count);
+                } else result = guest.call("run", count);
+                assert.deepEqual(result, Uint32Array.of(7, 42));
+                if (warmed) assert(guest.memoryBytes() <= warmed + 65536);
+                else warmed = guest.memoryBytes();
               }
+              let floating;
+              if (asynchronous) {
+                floating = await guest.callAsync("floating", null);
+              } else floating = guest.call("floating", null);
+              assert(Object.is(floating, -0));
+              if (text !== source) {
+                let result;
+                if (asynchronous) {
+                  result = await guest.callAsync("alternate", 9);
+                } else result = guest.call("alternate", 9);
+                assert.deepEqual(result, Uint32Array.of(10, 42));
+              }
+              const cause = new Error("State field callback canceled");
+              const check = (values: Uint32Array): never => {
+                assert.deepEqual(values, Uint32Array.of(7, 42));
+                throw cause;
+              };
+              if (asynchronous) {
+                const host = guest.capabilityAsync({
+                  parameter: "Array U32",
+                  result: "Unit",
+                  call: async (values) => {
+                    await Promise.resolve();
+                    return check(values);
+                  },
+                });
+                await assert.rejects(
+                  guest.callAsync("failed", host),
+                  (error) =>
+                    error instanceof Error &&
+                    (error === cause || error.cause === cause),
+                );
+                assert.deepEqual(
+                  await guest.callAsync("run", 8),
+                  Uint32Array.of(7, 42),
+                );
+              } else {
+                const host = guest.capability({
+                  parameter: "Array U32",
+                  result: "Unit",
+                  call: check,
+                });
+                assert.throws(
+                  () => guest.call("failed", host),
+                  (error) =>
+                    error instanceof Error &&
+                    (error === cause || error.cause === cause),
+                );
+                assert.deepEqual(guest.call("run", 8), Uint32Array.of(7, 42));
+              }
+            } finally {
+              guest.dispose();
             }
           }
-        } finally {
-          await compiler.dispose();
         }
+      } finally {
+        await compiler.dispose();
       }
     }
   } finally {

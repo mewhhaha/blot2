@@ -1,5 +1,5 @@
-// The direct backend (tasks/FAST_COMPILE.md) must run each fixture's entries
-// to the same results as the scoped backend.
+// Each fixture in compiler/fixtures/direct/ runs its entries to the expected
+// results (tasks/FAST_COMPILE.md).
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
@@ -100,7 +100,7 @@ const cases: Record<string, Call[]> = {
   ],
 };
 
-async function build(fixture: string, backend: "direct" | "scoped") {
+async function build(fixture: string) {
   const entry = new URL(`../../compiler/fixtures/direct/${fixture}`, import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
@@ -108,7 +108,6 @@ async function build(fixture: string, backend: "direct" | "scoped") {
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     stdRoot: new URL("../../std", import.meta.url).pathname,
     cacheDirectory: false,
-    backend,
   });
   try {
     const built = await compiler.build({ signal: AbortSignal.timeout(20000) });
@@ -119,60 +118,45 @@ async function build(fixture: string, backend: "direct" | "scoped") {
   }
 }
 
-for (const backend of ["direct", "scoped"] as const) {
-  Deno.test(`global array pools persist across calls on the ${backend} backend`, async () => {
-    const guest = await build("pools.blot", backend);
-    assert.equal(guest.call("append", 5), 2);
-    assert.equal(guest.call("append", 6), 3);
-    assert.equal(guest.call("read", 0), 41);
-    assert.equal(guest.call("read", 2), 6);
-    assert.deepEqual(Array.from(guest.call("doubled", Uint32Array.of(1, 2, 3)) as Uint32Array), [2, 4, 6]);
-    assert.equal(guest.call("scaled", Float32Array.of(0.5, 1.5, 2)), 4);
+Deno.test(`global array pools persist across calls`, async () => {
+  const guest = await build("pools.blot");
+  assert.equal(guest.call("append", 5), 2);
+  assert.equal(guest.call("append", 6), 3);
+  assert.equal(guest.call("read", 0), 41);
+  assert.equal(guest.call("read", 2), 6);
+  assert.deepEqual(Array.from(guest.call("doubled", Uint32Array.of(1, 2, 3)) as Uint32Array), [2, 4, 6]);
+  assert.equal(guest.call("scaled", Float32Array.of(0.5, 1.5, 2)), 4);
+});
+Deno.test(`exported constants`, async () => {
+  const guest = await build("constants.blot");
+  assert.equal(guest.read("answer"), 42);
+  assert.equal(guest.read("unit_match"), 7);
+  assert.equal(guest.read("flag"), true);
+  assert.equal(guest.read("half"), 3);
+  assert.equal(guest.call("add", 2), 42);
+});
+Deno.test(`Foreign callbacks exchange packets`, async () => {
+  const guest = await build("host.blot");
+  let calls = 0;
+  const host = guest.capability({
+    parameter: "Array F32",
+    result: "Array F32",
+    call: (packet: Float32Array) => {
+      calls++;
+      return Float32Array.from(packet, (value) => value * 2);
+    },
   });
-  Deno.test(`exported constants on the ${backend} backend`, async () => {
-    const guest = await build("constants.blot", backend);
-    assert.equal(guest.read("answer"), 42);
-    assert.equal(guest.read("unit_match"), 7);
-    assert.equal(guest.read("flag"), true);
-    assert.equal(guest.read("half"), 3);
-    assert.equal(guest.call("add", 2), 42);
-  });
-  Deno.test(`Foreign callbacks exchange packets on the ${backend} backend`, async () => {
-    const guest = await build("host.blot", backend);
-    let calls = 0;
-    const host = guest.capability({
-      parameter: "Array F32",
-      result: "Array F32",
-      call: (packet: Float32Array) => {
-        calls++;
-        return Float32Array.from(packet, (value) => value * 2);
-      },
-    });
-    assert.deepEqual(Array.from(guest.call("main", host) as Float32Array), [9.5, 3, 10]);
-    assert.equal(calls, 2);
-    const counter = guest.capability({ parameter: "U32", result: "U32", call: (value: number) => value + 1 });
-    assert.equal(guest.call("scalar_host", counter), 43);
-  });
-}
+  assert.deepEqual(Array.from(guest.call("main", host) as Float32Array), [9.5, 3, 10]);
+  assert.equal(calls, 2);
+  const counter = guest.capability({ parameter: "U32", result: "U32", call: (value: number) => value + 1 });
+  assert.equal(guest.call("scalar_host", counter), 43);
+});
 
-// The scoped backend rejects these: generic function values every use
-// leaves open, and array elements whose layout only an instance fixes.
-const directOnly = new Set([
-  "open_codec.blot",
-  "policy_record.blot",
-  "generic_comprehensions.blot",
-  "generated_from_filter.blot",
-  "carried_owners.blot",
-  "nested_updates_indexed.blot",
-]);
 for (const [fixture, calls] of Object.entries(cases)) {
-  for (const backend of ["direct", "scoped"] as const) {
-    if (backend === "scoped" && directOnly.has(fixture)) continue;
-    Deno.test(`${fixture} entries run on the ${backend} backend`, async () => {
-      const guest = await build(fixture, backend);
-      for (const [name, argument, expected] of calls) {
-        assert.equal(guest.call(name, argument), expected, `${name} ${argument}`);
-      }
-    });
-  }
+  Deno.test(`${fixture} entries run`, async () => {
+    const guest = await build(fixture);
+    for (const [name, argument, expected] of calls) {
+      assert.equal(guest.call(name, argument), expected, `${name} ${argument}`);
+    }
+  });
 }

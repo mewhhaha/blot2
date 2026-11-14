@@ -117,22 +117,9 @@ export interface ZigProjectCompilerOptions {
   profileBackend?: boolean;
   /** Stream bounded phase, module and region progress records over stderr. */
   profileTrace?: boolean;
-  /** Collect bounded allocation sites and array ownership decisions. */
-  explainAllocations?: boolean;
-  /** Development skips optional scalar/vector passes; checking and cleanup remain. */
-  codegenTier?: "optimized" | "development";
-  /** The scoped backend (default) or the modular direct backend. */
-  backend?: "scoped" | "direct";
   /** Bounded data stacks; byte budgets are positive multiples of 16. */
   storage?: Readonly<StorageBudgets>;
-  /** Prototype: share identical internal machine bodies while keeping table slots. */
-  shareMachineCode?: boolean;
-  /** Instrument executed guest memory work; not for release timing. */
-  profileMemory?: boolean;
-  requireCollectorFree?: boolean;
-  /** Upper bound for coarse optimizer workers (1..16; default 4). */
-  codegenWorkers?: number;
-  /** Opt-in private semantic components with 1..16 workers; default stays serial. */
+  /** Lowers modules on 1..16 workers; default stays serial. */
   semanticWorkers?: number;
   /** Independent frontend module workers (1..16; default 4). */
   frontendWorkers?: number;
@@ -955,14 +942,6 @@ class ProjectProcess implements ZigProjectCompiler {
               "Compiler does not support native assets",
             );
           }
-          if (
-            open.explainAllocations === true &&
-            !capabilities.includes("allocation-explanations-v1")
-          ) {
-            throw new ZigProjectProtocolError(
-              "Compiler does not support allocation explanations",
-            );
-          }
           if (checkpoint && !this.#checkpoints) {
             throw new ZigProjectProtocolError(
               "Compiler does not support checkpoints",
@@ -1501,14 +1480,7 @@ export async function createZigProjectCompiler(
     "dependencies",
     "profileBackend",
     "profileTrace",
-    "explainAllocations",
-    "codegenTier",
-    "backend",
     "storage",
-    "shareMachineCode",
-    "profileMemory",
-    "requireCollectorFree",
-    "codegenWorkers",
     "semanticWorkers",
     "frontendWorkers",
     "inferenceBudget",
@@ -1579,47 +1551,6 @@ export async function createZigProjectCompiler(
     throw new TypeError("profileTrace must be a boolean");
   }
   if (
-    options.explainAllocations !== undefined &&
-    typeof options.explainAllocations !== "boolean"
-  ) {
-    throw new TypeError("explainAllocations must be a boolean");
-  }
-  if (
-    options.codegenTier !== undefined &&
-    options.codegenTier !== "optimized" && options.codegenTier !== "development"
-  ) {
-    throw new TypeError("codegenTier must be optimized or development");
-  }
-  if (
-    options.backend !== undefined &&
-    options.backend !== "scoped" && options.backend !== "direct"
-  ) {
-    throw new TypeError("backend must be scoped or direct");
-  }
-  if (
-    options.requireCollectorFree !== undefined &&
-    typeof options.requireCollectorFree !== "boolean"
-  ) throw new TypeError("requireCollectorFree must be a boolean");
-  if (
-    options.profileMemory !== undefined &&
-    typeof options.profileMemory !== "boolean"
-  ) {
-    throw new TypeError("profileMemory must be a boolean");
-  }
-  if (
-    options.shareMachineCode !== undefined &&
-    typeof options.shareMachineCode !== "boolean"
-  ) {
-    throw new TypeError("shareMachineCode must be a boolean");
-  }
-  if (
-    options.codegenWorkers !== undefined &&
-    (!Number.isInteger(options.codegenWorkers) || options.codegenWorkers < 1 ||
-      options.codegenWorkers > 16)
-  ) {
-    throw new RangeError("codegenWorkers must be an integer in 1..16");
-  }
-  if (
     options.semanticWorkers !== undefined &&
     (!Number.isInteger(options.semanticWorkers) ||
       options.semanticWorkers < 1 || options.semanticWorkers > 16)
@@ -1655,16 +1586,7 @@ export async function createZigProjectCompiler(
     ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
     ...(options.profileTrace ? { profileTrace: true } : {}),
-    ...(options.explainAllocations ? { explainAllocations: true } : {}),
-    ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
-    ...(options.backend ? { backend: options.backend } : {}),
     ...(storage ? { storage } : {}),
-    ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
-    ...(options.profileMemory ? { profileMemory: true } : {}),
-    ...(options.requireCollectorFree ? { requireCollectorFree: true } : {}),
-    ...(options.codegenWorkers
-      ? { codegenWorkers: options.codegenWorkers }
-      : {}),
   };
   if (nativeAssets !== undefined) open.nativeAssets = nativeAssets;
   const timeout = options.startupTimeoutMs ?? 30_000;

@@ -7,7 +7,7 @@ const core = @import("../check/core.zig");
 const backend = @import("../backend/core_backend.zig");
 const identity = @import("../backend/runtime_identity.zig");
 const pool_leases = @import("../eval/pool_leases.zig");
-const memory = @import("../runtime/memory.zig");
+const memory = @import("../memory.zig");
 const a = std.testing.allocator;
 
 const source =

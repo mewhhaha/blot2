@@ -7,14 +7,13 @@ const executable = Deno.args[0] ??
 const entry =
   new URL("../../compiler/fixtures/scoped-loop-cleanup.blot", import.meta.url).pathname;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`loop cleanup preserves temporary owners and conditional returns (${codegenTier})`, async () => {
+{
+  Deno.test(`loop cleanup preserves temporary owners and conditional returns`, async () => {
     const compiler = await createZigProjectCompiler({
       executable,
       entry,
       prelude: null,
       cacheDirectory: false,
-      codegenTier,
       storage: {
         temporaryBytes: 1024,
         growerBytes: 256,

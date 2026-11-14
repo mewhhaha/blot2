@@ -33,7 +33,6 @@ export interface Workload {
   readonly nativeAssetRoots: readonly string[] | null;
   readonly nativeAssetImports?: readonly NativeAssetImport[];
   readonly inferenceBudget?: number;
-  readonly codegenTier?: "optimized" | "development";
   /** Retained scenarios; an empty list measures population and no-op only. */
   readonly scenarios: readonly Scenario[];
 }
@@ -50,7 +49,6 @@ export function sessionOptions(
     ...(workload.stdRoot ? { stdRoot: workload.stdRoot } : {}),
     imports: workload.imports,
     inferenceBudget: workload.inferenceBudget,
-    codegenTier: workload.codegenTier,
     ...(workload.nativeAssetRoots
       ? {
         nativeAssets: {
@@ -100,7 +98,6 @@ interface PenSettings {
   readonly nativeAssetImports: NativeAssetImport[];
   readonly stdRoot?: string;
   readonly inferenceBudget?: number;
-  readonly codegenTier?: "optimized" | "development";
 }
 async function penSettings(snapshotRoot: string): Promise<PenSettings> {
   const pen = JSON.parse(await Deno.readTextFile(`${snapshotRoot}/pen.json`));
@@ -147,7 +144,6 @@ async function penSettings(snapshotRoot: string): Promise<PenSettings> {
     nativeAssetImports,
     stdRoot,
     inferenceBudget: settings.inferenceBudget,
-    codegenTier: settings.codegenTier,
   };
 }
 
@@ -260,7 +256,6 @@ export async function gdevWorkloads(
     nativeAssetRoots: settings.nativeAssetRoots,
     nativeAssetImports: settings.nativeAssetImports,
     inferenceBudget: settings.inferenceBudget,
-    codegenTier: settings.codegenTier,
     scenarios,
   });
   return [

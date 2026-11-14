@@ -21,43 +21,40 @@ ${
     `  total := @u32.add total selected.f${index}\n`).join("")
 }  return total
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`wide fields use scoped indexes or forward complete result words (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-refinement-index-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (const input of [0, 1, 12345, 0xffffffff]) {
-            const actual = asynchronous
-              ? await guest.callAsync("answer", input)
-              : guest.call("answer", input);
-            assert.equal(
-              actual,
-              (fields * input + fields * (fields - 1) / 2) >>> 0,
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`wide fields use scoped indexes or forward complete result words`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-refinement-index-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (const input of [0, 1, 12345, 0xffffffff]) {
+          const actual = asynchronous
+            ? await guest.callAsync("answer", input)
+            : guest.call("answer", input);
+          assert.equal(
+            actual,
+            (fields * input + fields * (fields - 1) / 2) >>> 0,
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

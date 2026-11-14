@@ -60,100 +60,97 @@ function expected(rows: Uint32Array, bounds: number[], stride = 2) {
   return new Uint32Array([cursor, last, count]);
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`strided reductions preserve matches wrapping counters exits and checked fallbacks (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-stride-reduce-" });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = async (name: string, input: unknown = null) => {
-          if (asynchronous) return await guest.callAsync(name, input);
-          return guest.call(name, input);
-        };
-        try {
-          for (const kind of [0, 1, 2]) {
-            const rows = Uint32Array.from({ length: 96 }, (_, index) => {
-              if (kind === 0) return 0;
-              if (kind === 1 || index % 5 === 0) return 1;
-              return 0;
-            });
-            for (
-              const bounds of [
-                [0, 95, 7, 0],
-                [3, 95, 0xffffffff, 0xfffffffe],
-                [3, 17, 7, 4],
-                [3, 15, 7, 4],
-                [95, 95, 7, 4],
-                [96, 95, 7, 4],
-                [0xffffffff, 1, 7, 4],
-                [0, 100, 7, 4],
-                [94, 0xffffffff, 7, 4],
-                [0xffffffff, 0xffffffff, 7, 4],
-              ]
-            ) {
-              const scalar = expected(rows, bounds);
-              const run = () =>
-                call("local", new Uint32Array([...bounds, kind]));
-              if (scalar === null) {
-                await assert.rejects(run, WebAssembly.RuntimeError);
-              } else assert.deepEqual(await run(), scalar);
-            }
-          }
-          const persisted = Uint32Array.from({ length: 96 }, (_, i) => i % 2);
+Deno.test(`strided reductions preserve matches wrapping counters exits and checked fallbacks`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-stride-reduce-" });
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = async (name: string, input: unknown = null) => {
+        if (asynchronous) return await guest.callAsync(name, input);
+        return guest.call(name, input);
+      };
+      try {
+        for (const kind of [0, 1, 2]) {
+          const rows = Uint32Array.from({ length: 96 }, (_, index) => {
+            if (kind === 0) return 0;
+            if (kind === 1 || index % 5 === 0) return 1;
+            return 0;
+          });
           for (
-            const bounds of [[1, 95, 2, 1], [0, 100, 2, 1], [96, 95, 2, 1]]
+            const bounds of [
+              [0, 95, 7, 0],
+              [3, 95, 0xffffffff, 0xfffffffe],
+              [3, 17, 7, 4],
+              [3, 15, 7, 4],
+              [95, 95, 7, 4],
+              [96, 95, 7, 4],
+              [0xffffffff, 1, 7, 4],
+              [0, 100, 7, 4],
+              [94, 0xffffffff, 7, 4],
+              [0xffffffff, 0xffffffff, 7, 4],
+            ]
           ) {
-            const scalar = expected(persisted, bounds);
-            const run = () => call("globals", new Uint32Array(bounds));
+            const scalar = expected(rows, bounds);
+            const run = () =>
+              call("local", new Uint32Array([...bounds, kind]));
             if (scalar === null) {
               await assert.rejects(run, WebAssembly.RuntimeError);
             } else assert.deepEqual(await run(), scalar);
-            assert.deepEqual(await call("read"), persisted);
           }
-          const input = new Uint32Array([
-            4,
-            31,
-            7,
-            0xffffffff,
-            ...Array(28).fill(1),
-          ]);
-          assert.deepEqual(
-            await call("public", input),
-            expected(input, [...input]),
-          );
-          for (const bounds of [[2, 20, 7, 0xfffffffe], [96, 95, 7, 1]]) {
-            assert.deepEqual(
-              await call("wrapped", new Uint32Array(bounds)),
-              expected(new Uint32Array(96).fill(1), bounds, 0xffffffff),
-            );
-          }
-          assert.deepEqual(
-            await call("zeroed", new Uint32Array([96, 95, 7, 1])),
-            new Uint32Array([96, 7, 1]),
-          );
-          await assert.rejects(
-            () => call("zeroed", new Uint32Array([96, 100, 7, 1])),
-            WebAssembly.RuntimeError,
-          );
-        } finally {
-          guest.dispose();
         }
+        const persisted = Uint32Array.from({ length: 96 }, (_, i) => i % 2);
+        for (
+          const bounds of [[1, 95, 2, 1], [0, 100, 2, 1], [96, 95, 2, 1]]
+        ) {
+          const scalar = expected(persisted, bounds);
+          const run = () => call("globals", new Uint32Array(bounds));
+          if (scalar === null) {
+            await assert.rejects(run, WebAssembly.RuntimeError);
+          } else assert.deepEqual(await run(), scalar);
+          assert.deepEqual(await call("read"), persisted);
+        }
+        const input = new Uint32Array([
+          4,
+          31,
+          7,
+          0xffffffff,
+          ...Array(28).fill(1),
+        ]);
+        assert.deepEqual(
+          await call("public", input),
+          expected(input, [...input]),
+        );
+        for (const bounds of [[2, 20, 7, 0xfffffffe], [96, 95, 7, 1]]) {
+          assert.deepEqual(
+            await call("wrapped", new Uint32Array(bounds)),
+            expected(new Uint32Array(96).fill(1), bounds, 0xffffffff),
+          );
+        }
+        assert.deepEqual(
+          await call("zeroed", new Uint32Array([96, 95, 7, 1])),
+          new Uint32Array([96, 7, 1]),
+        );
+        await assert.rejects(
+          () => call("zeroed", new Uint32Array([96, 100, 7, 1])),
+          WebAssembly.RuntimeError,
+        );
+      } finally {
+        guest.dispose();
       }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

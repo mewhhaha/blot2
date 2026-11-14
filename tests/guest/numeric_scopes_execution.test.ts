@@ -33,77 +33,74 @@ entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
   break values
 `;
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`numeric helpers with private scopes keep tails, aliased writes and scalar fallbacks (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-numeric-scopes-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: null,
-      codegenTier,
-      cacheDirectory: false,
-    });
-    try {
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        for (
-          const count of [0, 1, 2, 3, 4, 5, 7, 8, 9, 31, 63, 65, 257, 4099]
-        ) {
-          assert.deepEqual(
-            guest.call("integers", count),
-            Uint32Array.from(
-              { length: count },
-              (_, index) => (-(index + 17) + 1) >>> 0,
-            ),
-          );
-          assert.deepEqual(
-            guest.call("floats", count),
-            Float32Array.from({ length: count }, (_, index) =>
-              Math.fround(
-                Math.fround(Math.fround(index * 16777216) + 1) -
-                  Math.fround(index * 16777216),
-              )),
-          );
-          if (count !== 0) {
-            // `saved` aliases `original`, so it reads the write of 99
-            // (tasks/LANGUAGE_COHERENCE.md A7).
-            const last = count === 1 ? 99 : (-(count + 16) + 1) >>> 0;
-            assert.deepEqual(
-              guest.call("shared", count),
-              Uint32Array.of(99, 99, last),
-            );
-          }
-        }
-        assert.deepEqual(guest.call("divide", 4), Uint32Array.of(3, 4, 6, 12));
-        assert.throws(() => guest.call("divide", 5), WebAssembly.RuntimeError);
-        const seen: number[] = [];
-        const host = guest.capability({
-          parameter: "U32",
-          result: "U32",
-          call(value) {
-            seen.push(value);
-            return value;
-          },
-        });
-        assert.deepEqual(
-          guest.call("effectful", host),
-          Uint32Array.from({ length: 9 }, (_, index) => index + 1),
-        );
-        assert.deepEqual(seen, Array.from({ length: 9 }, (_, index) => index));
-      } finally {
-        guest.dispose();
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`numeric helpers with private scopes keep tails, aliased writes and scalar fallbacks`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-numeric-scopes-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
+    try {
+      for (
+        const count of [0, 1, 2, 3, 4, 5, 7, 8, 9, 31, 63, 65, 257, 4099]
+      ) {
+        assert.deepEqual(
+          guest.call("integers", count),
+          Uint32Array.from(
+            { length: count },
+            (_, index) => (-(index + 17) + 1) >>> 0,
+          ),
+        );
+        assert.deepEqual(
+          guest.call("floats", count),
+          Float32Array.from({ length: count }, (_, index) =>
+            Math.fround(
+              Math.fround(Math.fround(index * 16777216) + 1) -
+                Math.fround(index * 16777216),
+            )),
+        );
+        if (count !== 0) {
+          // `saved` aliases `original`, so it reads the write of 99
+          // (tasks/LANGUAGE_COHERENCE.md A7).
+          const last = count === 1 ? 99 : (-(count + 16) + 1) >>> 0;
+          assert.deepEqual(
+            guest.call("shared", count),
+            Uint32Array.of(99, 99, last),
+          );
+        }
+      }
+      assert.deepEqual(guest.call("divide", 4), Uint32Array.of(3, 4, 6, 12));
+      assert.throws(() => guest.call("divide", 5), WebAssembly.RuntimeError);
+      const seen: number[] = [];
+      const host = guest.capability({
+        parameter: "U32",
+        result: "U32",
+        call(value) {
+          seen.push(value);
+          return value;
+        },
+      });
+      assert.deepEqual(
+        guest.call("effectful", host),
+        Uint32Array.from({ length: 9 }, (_, index) => index + 1),
+      );
+      assert.deepEqual(seen, Array.from({ length: 9 }, (_, index) => index));
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 Deno.test("numeric helper admission revalidates retained edits", async () => {
   const directory = await Deno.makeTempDir({

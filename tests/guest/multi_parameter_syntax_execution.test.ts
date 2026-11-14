@@ -70,13 +70,13 @@ Deno.test("record-style named calls reject duplicate and unknown argument names 
   });
 });
 
-Deno.test("parameter-list sugar and explicit currying have the same generated size and results in both tiers", async () => {
+Deno.test("parameter-list sugar and explicit currying have the same generated size and results", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-curried-parity-" });
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ??
     new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const outputs: Uint8Array<ArrayBuffer>[] = [];
       for (
         const declaration of [
@@ -91,7 +91,6 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
           entry,
           prelude: null,
           cacheDirectory: false,
-          codegenTier,
         });
         try {
           const result = await compiler.build({ sources: { [entry]: source } });
@@ -105,7 +104,7 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
           await compiler.dispose();
         }
       }
-      assert.equal(outputs[0].length, outputs[1].length, codegenTier);
+      assert.equal(outputs[0].length, outputs[1].length);
     }
   } finally {
     await Deno.remove(directory, { recursive: true });
@@ -126,25 +125,22 @@ entry const answer = func (input: U32) => return calculate { d: 4, c: 3, b: 2, a
 `,
   ];
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
-      for (const source of declarations) {
-        const compiler = await createZigProjectCompiler({
-          executable,
-          entry,
-          prelude: null,
-          cacheDirectory: false,
-          codegenTier,
-        });
-        try {
-          const result = await compiler.build({ sources: { [entry]: source } });
-          assert(result.success, JSON.stringify(result));
-          const exports =
-            new WebAssembly.Instance(new WebAssembly.Module(result.bytes))
-              .exports;
-          assert.equal((exports.answer as CallableFunction)(5), 22, codegenTier);
-        } finally {
-          await compiler.dispose();
-        }
+    for (const source of declarations) {
+      const compiler = await createZigProjectCompiler({
+        executable,
+        entry,
+        prelude: null,
+        cacheDirectory: false,
+      });
+      try {
+        const result = await compiler.build({ sources: { [entry]: source } });
+        assert(result.success, JSON.stringify(result));
+        const exports =
+          new WebAssembly.Instance(new WebAssembly.Module(result.bytes))
+            .exports;
+        assert.equal((exports.answer as CallableFunction)(5), 22);
+      } finally {
+        await compiler.dispose();
       }
     }
   } finally {

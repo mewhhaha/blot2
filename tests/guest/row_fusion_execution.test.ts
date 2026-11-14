@@ -296,58 +296,55 @@ const consume = func row => return @u32.add row.a row.b
   }
 });
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`named packed row consumers preserve widths slices saved rows and F32 order (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-row-fusion-" });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: null,
-      codegenTier,
-      cacheDirectory: false,
-    });
-    try {
-      const { source, cases } = pipelineSources();
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        for (
-          const input of [
-            Float32Array.of(16777216, 0.125, -16777216, -0.25, 3.5, -0),
-            Float32Array.of(Infinity, -Infinity, 1),
-            Float32Array.of(1e-45, -1e-45, -0, 0),
-          ]
-        ) {
-          for (const { name, width } of cases) {
-            const row = (index: number) => {
-              let result = input[index % input.length];
-              for (let field = 1; field < width; field++) {
-                result = Math.fround(
-                  result + input[(index + field) % input.length],
-                );
-              }
-              return result;
-            };
-            let expected = 0;
-            for (let index = 123; index < 380; index++) {
-              expected = Math.fround(expected + row(index));
-            }
-            expected = Math.fround(expected + row(0));
-            assert.equal(guest.call(name, input), expected, name);
-          }
-        }
-        assert.throws(
-          () => guest.call("list_record_16", new Float32Array()),
-          WebAssembly.RuntimeError,
-        );
-      } finally {
-        guest.dispose();
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`named packed row consumers preserve widths slices saved rows and F32 order`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-row-fusion-" });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false,
   });
-}
+  try {
+    const { source, cases } = pipelineSources();
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
+    try {
+      for (
+        const input of [
+          Float32Array.of(16777216, 0.125, -16777216, -0.25, 3.5, -0),
+          Float32Array.of(Infinity, -Infinity, 1),
+          Float32Array.of(1e-45, -1e-45, -0, 0),
+        ]
+      ) {
+        for (const { name, width } of cases) {
+          const row = (index: number) => {
+            let result = input[index % input.length];
+            for (let field = 1; field < width; field++) {
+              result = Math.fround(
+                result + input[(index + field) % input.length],
+              );
+            }
+            return result;
+          };
+          let expected = 0;
+          for (let index = 123; index < 380; index++) {
+            expected = Math.fround(expected + row(index));
+          }
+          expected = Math.fround(expected + row(0));
+          assert.equal(guest.call(name, input), expected, name);
+        }
+      }
+      assert.throws(
+        () => guest.call("list_record_16", new Float32Array()),
+        WebAssembly.RuntimeError,
+      );
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

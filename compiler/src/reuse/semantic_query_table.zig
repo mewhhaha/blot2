@@ -368,7 +368,7 @@ test "owned query builder cannot publish unknown observations and saturation rem
 }
 
 test "owned query capacity is measured and bounded and preparation binds one candidate" {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = std.testing.allocator };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = std.testing.allocator };
     const a = tracked.allocator();
     {
         var table: TestTable = .{ .limits = .{ .retained_capacity = 1 } };

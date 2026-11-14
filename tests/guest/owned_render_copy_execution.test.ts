@@ -8,8 +8,8 @@ import {
 } from "./owned_render_copy_fixture.ts";
 
 for (const operation of ["owned", "emit"] as const) {
-  for (const tier of ["development", "optimized"] as const) {
-    Deno.test(`original Ink render copies preserve full streams aliases and prefix borrows (${operation}/${tier})`, async () => {
+  {
+    Deno.test(`original Ink render copies preserve full streams aliases and prefix borrows (${operation})`, async () => {
       const root = resolve(new URL("../..", import.meta.url).pathname);
       const directory = await Deno.makeTempDir();
       let compiler;
@@ -23,7 +23,6 @@ for (const operation of ["owned", "emit"] as const) {
           stdRoot: resolve(root, "std"),
           prelude: resolve(root, "std/prelude.blot"),
           cacheDirectory: false,
-          codegenTier: tier,
           profileBackend: true,
           startupTimeoutMs: 5000,
         });

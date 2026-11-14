@@ -165,212 +165,209 @@ function expectedSeparate(
   return Uint32Array.from(dst);
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap prefixes (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-merge-loops-" });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
+Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap prefixes`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-merge-loops-" });
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({
+      sources: { [entry]: source + ranges },
     });
-    try {
-      const result = await compiler.build({
-        sources: { [entry]: source + ranges },
-      });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = async (name: string, input: unknown = null) => {
-          if (asynchronous) return await guest.callAsync(name, input);
-          return guest.call(name, input);
-        };
-        try {
-          const values = [1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12];
-          for (
-            const [left, mid, right] of [
-              [0, 5, 11],
-              [2, 5, 11],
-              [12, 5, 0xffffffff],
-              [0, 5, 5],
-              [0xffffffff, 5, 11],
-            ]
-          ) {
-            await call("reset");
-            assert.deepEqual(
-              await call("run", new Uint32Array([left, mid, right])),
-              expected(values, Array(12).fill(99), left, mid, right),
-            );
-          }
-          const alias = [1, 3, 5, 2, 4, 6];
-          assert.deepEqual(
-            await call("alias"),
-            expected(alias, alias, 0, 2, 5),
-          );
-          assert.deepEqual(
-            await call("ties"),
-            new Uint32Array([2, 2, 2, 99, 99, 99]),
-          );
-          await call("reset");
-          await assert.rejects(
-            () => call("short_target"),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(await call("read_tiny"), new Uint32Array([1, 2, 3]));
-          await call("reset");
-          await assert.rejects(
-            () => call("run", new Uint32Array([0, 5, 12])),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(
-            await call("read"),
-            expected(values, Array(12).fill(99), 0, 5, 12),
-          );
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = async (name: string, input: unknown = null) => {
+        if (asynchronous) return await guest.callAsync(name, input);
+        return guest.call(name, input);
+      };
+      try {
+        const values = [1, 3, 5, 7, 9, 13, 2, 4, 6, 8, 10, 12];
+        for (
+          const [left, mid, right] of [
+            [0, 5, 11],
+            [2, 5, 11],
+            [12, 5, 0xffffffff],
+            [0, 5, 5],
+            [0xffffffff, 5, 11],
+          ]
+        ) {
           await call("reset");
           assert.deepEqual(
-            await call("run", new Uint32Array([0, 0xffffffff, 0])),
-            expected(values, Array(12).fill(99), 0, 0xffffffff, 0),
+            await call("run", new Uint32Array([left, mid, right])),
+            expected(values, Array(12).fill(99), left, mid, right),
           );
-          const wide = Array.from({ length: 48 }, (_, i) => {
-            if (i < 24) return i * 2;
-            return (i - 24) * 2 + 1;
-          });
-          for (
-            const [left, mid, right, capacity, offset] of [
-              [0, 23, 47, 47, 0],
-              [0, 23, 47, 48, 0],
-              [0, 23, 47, 48, 1],
-              [2, 23, 47, 48, 2],
-              [0, 7, 15, 15, 0],
-              [0, 6, 14, 15, 0],
-              [48, 23, 0xffffffff, 1, 0],
-              [0, 23, 23, 1, 0],
-            ]
-          ) {
-            assert.deepEqual(
-              await call(
-                "wide",
-                new Uint32Array([left, mid, right, capacity, offset]),
-              ),
-              expectedSeparate(
-                wide,
-                wide,
-                Array(capacity).fill(99),
-                left,
-                mid,
-                right,
-                offset,
-              ),
-            );
-          }
-          const aliases = wide.slice();
+        }
+        const alias = [1, 3, 5, 2, 4, 6];
+        assert.deepEqual(
+          await call("alias"),
+          expected(alias, alias, 0, 2, 5),
+        );
+        assert.deepEqual(
+          await call("ties"),
+          new Uint32Array([2, 2, 2, 99, 99, 99]),
+        );
+        await call("reset");
+        await assert.rejects(
+          () => call("short_target"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(await call("read_tiny"), new Uint32Array([1, 2, 3]));
+        await call("reset");
+        await assert.rejects(
+          () => call("run", new Uint32Array([0, 5, 12])),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(
+          await call("read"),
+          expected(values, Array(12).fill(99), 0, 5, 12),
+        );
+        await call("reset");
+        assert.deepEqual(
+          await call("run", new Uint32Array([0, 0xffffffff, 0])),
+          expected(values, Array(12).fill(99), 0, 0xffffffff, 0),
+        );
+        const wide = Array.from({ length: 48 }, (_, i) => {
+          if (i < 24) return i * 2;
+          return (i - 24) * 2 + 1;
+        });
+        for (
+          const [left, mid, right, capacity, offset] of [
+            [0, 23, 47, 47, 0],
+            [0, 23, 47, 48, 0],
+            [0, 23, 47, 48, 1],
+            [2, 23, 47, 48, 2],
+            [0, 7, 15, 15, 0],
+            [0, 6, 14, 15, 0],
+            [48, 23, 0xffffffff, 1, 0],
+            [0, 23, 23, 1, 0],
+          ]
+        ) {
           assert.deepEqual(
-            await call("wide_alias"),
-            expected(aliases, aliases, 0, 23, 47),
+            await call(
+              "wide",
+              new Uint32Array([left, mid, right, capacity, offset]),
+            ),
+            expectedSeparate(
+              wide,
+              wide,
+              Array(capacity).fill(99),
+              left,
+              mid,
+              right,
+              offset,
+            ),
           );
-          assert.deepEqual(
-            await call("wide_ties", 47),
-            new Uint32Array(24).fill(7),
-          );
-          assert.deepEqual(
-            await call("wide_ties", 0xffffffff),
-            new Uint32Array(24).fill(7),
-          );
-          for (const offset of [2, 0xfffffffe, 0xffffffff]) {
-            await call("wide_reset");
-            await assert.rejects(
-              () => call("wide_store_trap", offset),
-              WebAssembly.RuntimeError,
-            );
-            assert.deepEqual(
-              await call("wide_read"),
-              expectedSeparate(
-                wide,
-                wide,
-                Array(48).fill(99),
-                0,
-                23,
-                47,
-                offset,
-              ),
-            );
-          }
+        }
+        const aliases = wide.slice();
+        assert.deepEqual(
+          await call("wide_alias"),
+          expected(aliases, aliases, 0, 23, 47),
+        );
+        assert.deepEqual(
+          await call("wide_ties", 47),
+          new Uint32Array(24).fill(7),
+        );
+        assert.deepEqual(
+          await call("wide_ties", 0xffffffff),
+          new Uint32Array(24).fill(7),
+        );
+        for (const offset of [2, 0xfffffffe, 0xffffffff]) {
           await call("wide_reset");
           await assert.rejects(
-            () => call("wide_source_trap"),
+            () => call("wide_store_trap", offset),
             WebAssembly.RuntimeError,
           );
-          const late = Array.from({ length: 48 }, (_, i) => {
-            if (i < 24) return i + 100;
-            return i - 24;
-          });
           assert.deepEqual(
             await call("wide_read"),
-            expected(late, Array(48).fill(99), 0, 23, 63),
-          );
-          const left = Array.from({ length: 32 }, (_, i) => i * 2);
-          const right = Array.from({ length: 64 }, (_, i) => {
-            if (i < 32) return 0;
-            return (i - 32) * 2 + 1;
-          });
-          assert.deepEqual(
-            await call("separate"),
-            expectedSeparate(right, left, Array(63).fill(99), 0, 31, 63, 0),
-          );
-          await call("wide_reset");
-          await assert.rejects(
-            () => call("separate_trap"),
-            WebAssembly.RuntimeError,
-          );
-          assert.deepEqual(
-            await call("separate_read"),
-            expectedSeparate(right, left, Array(64).fill(99), 0, 39, 63, 0),
-          );
-          for (
-            const [start, mid, end, offset, kind] of [
-              [0, 23, 47, 0, 0],
-              [0, 23, 47, 0, 1],
-              [0, 23, 47, 0, 2],
-              [2, 23, 47, 5, 0],
-              [0, 23, 47, 0, 3],
-              [0, 23, 47, 1, 3],
-            ]
-          ) {
-            let input = wide.slice();
-            if (kind === 1) input = late.slice();
-            if (kind === 2) input = Array(48).fill(7);
-            let target = Array(64).fill(99);
-            if (kind === 3) target = input;
-            const cursors: number[] = [];
             expectedSeparate(
-              input,
-              input,
-              target,
-              start,
-              mid,
-              end,
+              wide,
+              wide,
+              Array(48).fill(99),
+              0,
+              23,
+              47,
               offset,
-              cursors,
-            );
-            assert.equal(
-              await call(
-                "positions",
-                new Uint32Array([start, mid, end, 64, offset, kind]),
-              ),
-              (cursors[0] * 65536 + cursors[1] * 256 + cursors[2]) >>> 0,
-            );
-          }
-        } finally {
-          guest.dispose();
+            ),
+          );
         }
+        await call("wide_reset");
+        await assert.rejects(
+          () => call("wide_source_trap"),
+          WebAssembly.RuntimeError,
+        );
+        const late = Array.from({ length: 48 }, (_, i) => {
+          if (i < 24) return i + 100;
+          return i - 24;
+        });
+        assert.deepEqual(
+          await call("wide_read"),
+          expected(late, Array(48).fill(99), 0, 23, 63),
+        );
+        const left = Array.from({ length: 32 }, (_, i) => i * 2);
+        const right = Array.from({ length: 64 }, (_, i) => {
+          if (i < 32) return 0;
+          return (i - 32) * 2 + 1;
+        });
+        assert.deepEqual(
+          await call("separate"),
+          expectedSeparate(right, left, Array(63).fill(99), 0, 31, 63, 0),
+        );
+        await call("wide_reset");
+        await assert.rejects(
+          () => call("separate_trap"),
+          WebAssembly.RuntimeError,
+        );
+        assert.deepEqual(
+          await call("separate_read"),
+          expectedSeparate(right, left, Array(64).fill(99), 0, 39, 63, 0),
+        );
+        for (
+          const [start, mid, end, offset, kind] of [
+            [0, 23, 47, 0, 0],
+            [0, 23, 47, 0, 1],
+            [0, 23, 47, 0, 2],
+            [2, 23, 47, 5, 0],
+            [0, 23, 47, 0, 3],
+            [0, 23, 47, 1, 3],
+          ]
+        ) {
+          let input = wide.slice();
+          if (kind === 1) input = late.slice();
+          if (kind === 2) input = Array(48).fill(7);
+          let target = Array(64).fill(99);
+          if (kind === 3) target = input;
+          const cursors: number[] = [];
+          expectedSeparate(
+            input,
+            input,
+            target,
+            start,
+            mid,
+            end,
+            offset,
+            cursors,
+          );
+          assert.equal(
+            await call(
+              "positions",
+              new Uint32Array([start, mid, end, 64, offset, kind]),
+            ),
+            (cursors[0] * 65536 + cursors[1] * 256 + cursors[2]) >>> 0,
+          );
+        }
+      } finally {
+        guest.dispose();
       }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

@@ -13,12 +13,11 @@ Deno.test("shape only member calls retain method edits empty elements and captur
     new URL("../../std/prelude.blot", import.meta.url),
   );
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const options = {
         executable,
         entry,
         prelude,
-        codegenTier,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);

@@ -491,7 +491,7 @@ test "wide unordered source record uniqueness uses one bounded symbol-stamp lane
     g.extra = enlarged;
     g.nodes[record_id] = .{ .tag = .record, .a = @intCast(start), .b = @intCast(count) };
     try @import("dependency_interface_validation.zig").validate(&value.modules[1].interface, count + 101, value.modules.len);
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = a };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = a };
     try @import("dependency_interface_validation.zig").validateGraph(tracked.allocator(), &value.modules[1].interface);
     try std.testing.expectEqual(@as(usize, 0), tracked.counts.live_bytes);
     try std.testing.expect(tracked.counts.allocated_bytes < 128 * 1024);

@@ -11,22 +11,9 @@ const { values, positionals } = parseArgs({
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
     trace: { type: "boolean", default: false },
-    tier: { type: "string", default: "optimized" },
-    backend: { type: "string", default: "scoped" },
-    workers: { type: "string", default: "1" },
     "frontend-workers": { type: "string", default: "4" },
   },
 });
-if (values.tier !== "development" && values.tier !== "optimized") {
-  throw new Error("--tier must be development or optimized");
-}
-if (values.backend !== "scoped" && values.backend !== "direct") {
-  throw new Error("--backend must be scoped or direct");
-}
-const workers = Number(values.workers);
-if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
-  throw new Error("--workers must be an integer from 1 to 16");
-}
 const frontendWorkers = Number(values["frontend-workers"]);
 if (
   !Number.isInteger(frontendWorkers) || frontendWorkers < 1 ||
@@ -99,10 +86,6 @@ try {
     startupTimeoutMs: Math.min(timeoutMs, 5000),
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,
-    codegenTier: values.tier,
-    // Older compilers predate the field; scoped is their only backend.
-    ...(values.backend === "direct" ? { backend: "direct" as const } : {}),
-    codegenWorkers: workers,
     frontendWorkers,
   });
   buildStarted = performance.now();
@@ -164,9 +147,6 @@ const output = {
     penJsonSha256: await sha256(penBytes),
   },
   deadlineMs: timeoutMs,
-  codegenTier: values.tier,
-  backend: values.backend,
-  codegenWorkers: workers,
   frontendWorkers,
   buildMs,
   sessionOpenMs,

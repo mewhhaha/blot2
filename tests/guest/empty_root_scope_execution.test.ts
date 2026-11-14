@@ -30,12 +30,11 @@ Deno.test("empty lexical frames preserve packed folds traps foreign allocation a
   const entry = `${directory}/main.blot`;
   const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
         prelude,
-        codegenTier,
         cacheDirectory: false,
       });
       try {

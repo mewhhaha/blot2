@@ -102,11 +102,10 @@ Deno.test("private pure cursor successors preserve break snapshots returned head
   const directory = await Deno.makeTempDir({ prefix: "blot-successor-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         cacheDirectory: false,
       });
@@ -257,12 +256,11 @@ Deno.test("private cursor families rederive dependency archives and local edits"
       new TextDecoder().decode(packed.stdout) +
         new TextDecoder().decode(packed.stderr),
     );
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0],
         entry,
         prelude,
-        codegenTier,
         cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler({

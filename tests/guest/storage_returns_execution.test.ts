@@ -32,50 +32,47 @@ entry const mixed = func (tag: U32) => return do:
     _ => 20
 
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`owned returns preserve completed and continuing match exits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-owned-return-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (
-            const [name, input, expected] of [
-              ["answer", 1, 7],
-              ["answer", 2, 5],
-              ["mixed", 0, 10],
-              ["mixed", 1, 20],
-            ] as const
-          ) {
-            const actual = asynchronous
-              ? await guest.callAsync(name, input)
-              : guest.call(name, input);
-            assert.equal(actual, expected);
-          }
-          if (asynchronous) {
-            await assert.rejects(() => guest.callAsync("answer", 0));
-          } else assert.throws(() => guest.call("answer", 0));
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`owned returns preserve completed and continuing match exits`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-owned-return-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (
+          const [name, input, expected] of [
+            ["answer", 1, 7],
+            ["answer", 2, 5],
+            ["mixed", 0, 10],
+            ["mixed", 1, 20],
+          ] as const
+        ) {
+          const actual = asynchronous
+            ? await guest.callAsync(name, input)
+            : guest.call(name, input);
+          assert.equal(actual, expected);
+        }
+        if (asynchronous) {
+          await assert.rejects(() => guest.callAsync("answer", 0));
+        } else assert.throws(() => guest.call("answer", 0));
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

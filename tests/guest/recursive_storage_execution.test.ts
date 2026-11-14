@@ -5,10 +5,7 @@ import {
   type ZigProjectCompiler,
 } from "../../host/zig_project_client.ts";
 
-type Tier = "development" | "optimized";
-
 async function withCompiler(
-  codegenTier: Tier,
   run: (compiler: ZigProjectCompiler, entry: string) => Promise<void>,
 ): Promise<void> {
   const directory = await Deno.makeTempDir({ prefix: "blot-recursion-" });
@@ -20,7 +17,6 @@ async function withCompiler(
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
     cacheDirectory: false,
-    codegenTier,
     startupTimeoutMs: 5000,
   });
   try {
@@ -329,115 +325,113 @@ entry const answer = func (input: U32): Array U32 => return do:
   return #[result, values[0], values[1], rows[0], saved]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`unchanged recursive Goose sorts execute bounded inputs (${codegenTier})`, async () => {
-    const source = await sortSource();
-    await withCompiler(codegenTier, async (compiler, entry) => {
-      const result = await build(compiler, entry, source);
-      assert(result.success, JSON.stringify(result));
-      let state = 42;
-      const random = Array.from({ length: 32 }, () => {
-        state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-        return state % 1000;
-      });
-      const cases = [
-        [],
-        [42],
-        [0, 1, 2, 3, 4, 5, 6, 7],
-        [7, 6, 5, 4, 3, 2, 1, 0],
-        [3, 3, 1, 3, 1, 0, 0, 3],
-        random,
-      ];
-      await withGuests(result.bytes, async (_guest, call) => {
-        for (const name of ["merge_sorted", "quick_sorted"]) {
-          for (const values of cases) {
-            const input = new Uint32Array(values);
-            const output = await call(name, input);
-            assert.deepEqual(
-              output,
-              new Uint32Array(values.toSorted((a, b) => a - b)),
-            );
-            assert.deepEqual(input, new Uint32Array(values));
-          }
+Deno.test(`unchanged recursive Goose sorts execute bounded inputs`, async () => {
+  const source = await sortSource();
+  await withCompiler(async (compiler, entry) => {
+    const result = await build(compiler, entry, source);
+    assert(result.success, JSON.stringify(result));
+    let state = 42;
+    const random = Array.from({ length: 32 }, () => {
+      state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+      return state % 1000;
+    });
+    const cases = [
+      [],
+      [42],
+      [0, 1, 2, 3, 4, 5, 6, 7],
+      [7, 6, 5, 4, 3, 2, 1, 0],
+      [3, 3, 1, 3, 1, 0, 0, 3],
+      random,
+    ];
+    await withGuests(result.bytes, async (_guest, call) => {
+      for (const name of ["merge_sorted", "quick_sorted"]) {
+        for (const values of cases) {
+          const input = new Uint32Array(values);
+          const output = await call(name, input);
+          assert.deepEqual(
+            output,
+            new Uint32Array(values.toSorted((a, b) => a - b)),
+          );
+          assert.deepEqual(input, new Uint32Array(values));
         }
-        for (const name of ["empty_range", "singleton_range"]) {
-          assert.deepEqual(await call(name, null), new Uint32Array([9, 5, 3]));
-        }
-      });
+      }
+      for (const name of ["empty_range", "singleton_range"]) {
+        assert.deepEqual(await call(name, null), new Uint32Array([9, 5, 3]));
+      }
     });
   });
+});
 
-  Deno.test(`recursive fixed ABI preserves scalars owner aliases and trap recovery (${codegenTier})`, async () => {
-    await withCompiler(codegenTier, async (compiler, entry) => {
-      const result = await build(compiler, entry, depthSource);
-      assert(result.success, JSON.stringify(result));
-      await withGuests(result.bytes, async (_guest, call) => {
-        for (const depth of [0, 1, 2, 129, 257, 512, 3, 0, 257]) {
-          assert.deepEqual(
-            await call("answer", depth),
-            new Uint32Array(depthExpected(depth)),
-          );
-        }
-        for (const depth of [0, 1, 3, 7]) {
-          assert.deepEqual(
-            await call("distinct", depth),
-            new Uint32Array([1 + 2 * (depth + 1), depth + 3]),
-          );
-          const aliased = (2 ** (depth + 1) + depth + 1) >>> 0;
-          assert.deepEqual(
-            await call("aliased", depth),
-            new Uint32Array([aliased, aliased]),
-          );
-        }
-        await assert.rejects(() => call("checked", 5));
-        assert.equal(await call("checked", 3), 6);
-        // More invocations than the owner-slot budget expose retained owners.
-        for (let index = 0; index < 8192; index++) {
-          assert.equal(await call("checked", 3), 6);
-        }
+Deno.test(`recursive fixed ABI preserves scalars owner aliases and trap recovery`, async () => {
+  await withCompiler(async (compiler, entry) => {
+    const result = await build(compiler, entry, depthSource);
+    assert(result.success, JSON.stringify(result));
+    await withGuests(result.bytes, async (_guest, call) => {
+      for (const depth of [0, 1, 2, 129, 257, 512, 3, 0, 257]) {
         assert.deepEqual(
-          await call("answer", 257),
-          new Uint32Array(depthExpected(257)),
+          await call("answer", depth),
+          new Uint32Array(depthExpected(depth)),
         );
-      });
+      }
+      for (const depth of [0, 1, 3, 7]) {
+        assert.deepEqual(
+          await call("distinct", depth),
+          new Uint32Array([1 + 2 * (depth + 1), depth + 3]),
+        );
+        const aliased = (2 ** (depth + 1) + depth + 1) >>> 0;
+        assert.deepEqual(
+          await call("aliased", depth),
+          new Uint32Array([aliased, aliased]),
+        );
+      }
+      await assert.rejects(() => call("checked", 5));
+      assert.equal(await call("checked", 3), 6);
+      // More invocations than the owner-slot budget expose retained owners.
+      for (let index = 0; index < 8192; index++) {
+        assert.equal(await call("checked", 3), 6);
+      }
+      assert.deepEqual(
+        await call("answer", 257),
+        new Uint32Array(depthExpected(257)),
+      );
     });
   });
+});
 
-  Deno.test(`outlined caller preserves live bank values across ordinary recursion (${codegenTier})`, async () => {
-    await withCompiler(codegenTier, async (compiler, entry) => {
-      const result = await build(compiler, entry, outlineSource);
-      assert(result.success, JSON.stringify(result));
-      await withGuests(result.bytes, async (guest, call) => {
-        assert.equal(guest.abi.version, 8);
-        for (const input of [0, 1, 7, 129, 3, 0, 129]) {
-          const first = input + input * (input + 1) / 2;
-          const total = input * (outlineUpdates + 1);
-          assert.deepEqual(
-            await call("answer", input),
-            new Uint32Array([
-              total + first,
-              first,
-              input * input,
-              input + 1,
-              input + 333,
-            ]),
-          );
+Deno.test(`outlined caller preserves live bank values across ordinary recursion`, async () => {
+  await withCompiler(async (compiler, entry) => {
+    const result = await build(compiler, entry, outlineSource);
+    assert(result.success, JSON.stringify(result));
+    await withGuests(result.bytes, async (guest, call) => {
+      assert.equal(guest.abi.version, 8);
+      for (const input of [0, 1, 7, 129, 3, 0, 129]) {
+        const first = input + input * (input + 1) / 2;
+        const total = input * (outlineUpdates + 1);
+        assert.deepEqual(
+          await call("answer", input),
+          new Uint32Array([
+            total + first,
+            first,
+            input * input,
+            input + 1,
+            input + 333,
+          ]),
+        );
+      }
+    });
+  });
+});
+
+for (const item of recursive) {
+  Deno.test(`recursion through ${item.name} runs`, async () => {
+    await withCompiler(async (compiler, entry) => {
+      const built = await build(compiler, entry, recursiveSource(item));
+      assert(built.success, JSON.stringify(built));
+      await withGuests(built.bytes, async (_guest, call) => {
+        for (const n of [0, 1, 2, 5]) {
+          assert.equal(await call("bad", n), item.expected(n), item.name);
         }
       });
     });
   });
-
-  for (const item of recursive) {
-    Deno.test(`recursion through ${item.name} runs (${codegenTier})`, async () => {
-      await withCompiler(codegenTier, async (compiler, entry) => {
-        const built = await build(compiler, entry, recursiveSource(item));
-        assert(built.success, JSON.stringify(built));
-        await withGuests(built.bytes, async (_guest, call) => {
-          for (const n of [0, 1, 2, 5]) {
-            assert.equal(await call("bad", n), item.expected(n), item.name);
-          }
-        });
-      });
-    });
-  }
 }

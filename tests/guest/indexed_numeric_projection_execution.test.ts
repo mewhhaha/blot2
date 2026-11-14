@@ -28,60 +28,57 @@ entry const escaped = func (value: F32) => return do:
 entry const checked_index = func (divisor: U32) => return (@array.fill 1 ($Row {a: 1, b: 2, c: 3, d: 4, e: 7, f: 6, g: 7, h: 8, i: 9}))[@u32.div 0 divisor].e
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`indexed numeric projections preserve bounds snapshots nested escapes and bits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-indexed-rows-" });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
-    });
+Deno.test(`indexed numeric projections preserve bounds snapshots nested escapes and bits`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-indexed-rows-" });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
     try {
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        for (
-          const index of [0, 1, 26, 27, 31, 32, 33, 243, 244, 255, 256, 512]
-        ) {
-          assert.equal(guest.call("array", index), index + 7);
-          assert.equal(guest.call("list", index), index + 7);
-          // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
-          assert.equal(guest.call("snapshot", index), 2000);
+      for (
+        const index of [0, 1, 26, 27, 31, 32, 33, 243, 244, 255, 256, 512]
+      ) {
+        assert.equal(guest.call("array", index), index + 7);
+        assert.equal(guest.call("list", index), index + 7);
+        // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
+        assert.equal(guest.call("snapshot", index), 2000);
+      }
+      for (const entry of ["array", "list", "snapshot"]) {
+        for (const index of entry === "list" ? [513] : [513, 0xffffffff]) {
+          assert.throws(
+            () => guest.call(entry, index),
+            WebAssembly.RuntimeError,
+          );
         }
-        for (const entry of ["array", "list", "snapshot"]) {
-          for (const index of entry === "list" ? [513] : [513, 0xffffffff]) {
-            assert.throws(
-              () => guest.call(entry, index),
-              WebAssembly.RuntimeError,
-            );
-          }
-          assert.equal(guest.call(entry, 1), entry === "snapshot" ? 2000 : 8);
+        assert.equal(guest.call(entry, 1), entry === "snapshot" ? 2000 : 8);
+      }
+      assert.throws(
+        () => guest.call("checked_index", 0),
+        WebAssembly.RuntimeError,
+      );
+      assert.equal(guest.call("checked_index", 1), 7);
+      for (const value of [-0, 0, 1.5, -1000, Infinity, -Infinity]) {
+        const expected = Float32Array.of(value, 2);
+        for (const entry of ["nested_bits", "escaped"]) {
+          const actual = guest.call(entry, value) as Float32Array;
+          assert.deepEqual(
+            new Uint32Array(actual.buffer, actual.byteOffset, actual.length),
+            new Uint32Array(expected.buffer),
+          );
         }
-        assert.throws(
-          () => guest.call("checked_index", 0),
-          WebAssembly.RuntimeError,
-        );
-        assert.equal(guest.call("checked_index", 1), 7);
-        for (const value of [-0, 0, 1.5, -1000, Infinity, -Infinity]) {
-          const expected = Float32Array.of(value, 2);
-          for (const entry of ["nested_bits", "escaped"]) {
-            const actual = guest.call(entry, value) as Float32Array;
-            assert.deepEqual(
-              new Uint32Array(actual.buffer, actual.byteOffset, actual.length),
-              new Uint32Array(expected.buffer),
-            );
-          }
-        }
-      } finally {
-        guest.dispose();
       }
     } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      guest.dispose();
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

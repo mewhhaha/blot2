@@ -293,7 +293,7 @@ pub const PrincipalGraph = struct {
     /// Only source descriptions with no session observations or publications
     /// may cross revisions. A residual theorem is a separate, stronger claim.
     retention_eligible: bool = false,
-    allocations: @import("../runtime/memory.zig").TrackedAllocator,
+    allocations: @import("../memory.zig").TrackedAllocator,
     types: types.Store,
     root: types.Id = 0,
     imports: []TypeImport = &.{},
@@ -2584,7 +2584,7 @@ pub const Session = struct {
     pub fn copySnapshotMeasured(self: *Session, backing: Allocator) Allocator.Error!Snapshot {
         // Only slices escape this adapter. Their durable caller frees with the
         // same backing allocator; no allocator pointer enters the snapshot.
-        var meter: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = backing };
+        var meter: @import("../memory.zig").TrackedAllocator = .{ .backing = backing };
         defer {
             self.counters.snapshot_copy_bytes += meter.counts.allocated_bytes;
             self.counters.snapshot_copy_allocations += meter.counts.allocations;
@@ -10387,7 +10387,7 @@ const ClosureRegion = struct {
             return err;
         };
         errdefer graph.deinit(a);
-        var copy_meter: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = graph.allocations.allocator() };
+        var copy_meter: @import("../memory.zig").TrackedAllocator = .{ .backing = graph.allocations.allocator() };
         defer {
             self.session.counters.principal_copy_buffer_bytes += copy_meter.counts.allocated_bytes;
             self.session.counters.principal_copy_buffer_allocations += copy_meter.counts.allocations;
@@ -12807,7 +12807,7 @@ pub fn evaluate(allocator: Allocator, units: []const core.Module, target: core.B
 }
 
 fn lexicalSnapshotScenario(backing: Allocator, eligible: usize) !void {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = backing };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     var source = try types.Store.init(allocator);
     defer source.deinit();
@@ -13688,7 +13688,7 @@ test "concrete self runtime method remains fuel-limited when a constant forces r
 }
 
 fn solverCapacityExportsScenario(backing: Allocator) !void {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = backing };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = backing };
     const allocator = tracked.allocator();
     var session = try Session.init(allocator, &.{});
     var session_alive = true;

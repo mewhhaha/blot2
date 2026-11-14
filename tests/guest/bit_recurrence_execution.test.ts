@@ -59,14 +59,13 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
   const directory = await Deno.makeTempDir({ prefix: "blot-bit-laws-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
         stdRoot,
         prelude: `${stdRoot}/prelude.blot`,
         cacheDirectory: false,
-        codegenTier,
       });
       try {
         let source = "";
@@ -206,14 +205,13 @@ Deno.test.ignore("bit loops through an addressed local write through the referen
   const directory = await Deno.makeTempDir({ prefix: "blot-bit-addressed-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
         stdRoot,
         prelude: `${stdRoot}/prelude.blot`,
         cacheDirectory: false,
-        codegenTier,
       });
       try {
         const addressed = await compiler.build({

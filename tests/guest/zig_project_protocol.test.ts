@@ -129,7 +129,6 @@ async function host() {
     "backend-checkpoints",
     "native-assets-v1",
     "editor-completion-v1",
-    "allocation-explanations-v1",
   ]);
   return {
     entry,
@@ -238,9 +237,6 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
       stdRoot: null,
       dependencies: null,
       profileBackend: false,
-      codegenTier: "development",
-      shareMachineCode: false,
-      codegenWorkers: 1,
       checkpoint: false,
     });
     const built = await peer.send({
@@ -972,8 +968,6 @@ Deno.test("wire contract preserves Zig numeric-string and enum-tag allowances", 
       id: "1",
       version: "1e0",
       entry: peer.entry,
-      codegenWorkers: "1.0",
-      codegenTier: "1",
     });
     equal(opened.metadata, { kind: "open", id: 1, epoch: "1", revision: 0 });
     const payload = encoder.encode("entry const answer = 7\n");

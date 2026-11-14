@@ -47,97 +47,91 @@ entry const staged = func () => return do:
   let owner: Array U32 = #[0]
   return @u32.add table owner[0]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`owned Array comprehensions preserve order and fixed payloads (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-owned-comprehension-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = async (name: string, arg: unknown = null) =>
-          asynchronous
-            ? await guest.callAsync(name, arg)
-            : guest.call(name, arg);
-        try {
-          assert.deepEqual(
-            await call("ordered"),
-            new Uint32Array([1, 3, 10, 11, 20, 30, 31]),
-          );
-          assert.deepEqual(await call("selected", 0), new Uint32Array([]));
-          assert.deepEqual(
-            await call("selected", 4),
-            new Uint32Array([10, 20, 30]),
-          );
-          assert.deepEqual(await call("nested"), new Uint32Array([13, 23]));
-          assert.deepEqual(
-            await call("closure_guard"),
-            new Uint32Array([1, 3]),
-          );
-          assert.equal(await call("aggregate"), 3.75);
-          assert.deepEqual(
-            await call("generic"),
-            new Float32Array([1, 2, 3, 4]),
-          );
-          assert.deepEqual(
-            await call("generic_ordered", 0),
-            new Float32Array([]),
-          );
-          assert.deepEqual(
-            await call("generic_ordered", 2),
-            new Float32Array([1, 2, 3, 4, 10, 11, 21, 30, 31, 41]),
-          );
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-owned-comprehension-",
   });
-}
-
-for (const codegenTier of ["development", "optimized"] as const) {
-  // Direct backend gap: staging expressions (`#run`) are not supported (tasks/DELETE_SCOPED.md).
-  Deno.test.ignore(`owned Array comprehensions run during staging (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-owned-comprehension-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: staged } });
-      assert(result.success, JSON.stringify(result));
-      const guest = await instantiateGuest(result.bytes);
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = async (name: string, arg: unknown = null) =>
+        asynchronous
+          ? await guest.callAsync(name, arg)
+          : guest.call(name, arg);
       try {
-        assert.equal(guest.call("staged", null), 4);
+        assert.deepEqual(
+          await call("ordered"),
+          new Uint32Array([1, 3, 10, 11, 20, 30, 31]),
+        );
+        assert.deepEqual(await call("selected", 0), new Uint32Array([]));
+        assert.deepEqual(
+          await call("selected", 4),
+          new Uint32Array([10, 20, 30]),
+        );
+        assert.deepEqual(await call("nested"), new Uint32Array([13, 23]));
+        assert.deepEqual(
+          await call("closure_guard"),
+          new Uint32Array([1, 3]),
+        );
+        assert.equal(await call("aggregate"), 3.75);
+        assert.deepEqual(
+          await call("generic"),
+          new Float32Array([1, 2, 3, 4]),
+        );
+        assert.deepEqual(
+          await call("generic_ordered", 0),
+          new Float32Array([]),
+        );
+        assert.deepEqual(
+          await call("generic_ordered", 2),
+          new Float32Array([1, 2, 3, 4, 10, 11, 21, 30, 31, 41]),
+        );
       } finally {
         guest.dispose();
       }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+// Direct backend gap: staging expressions (`#run`) are not supported (tasks/DELETE_SCOPED.md).
+Deno.test.ignore(`owned Array comprehensions run during staging`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-owned-comprehension-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: staged } });
+    assert(result.success, JSON.stringify(result));
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      assert.equal(guest.call("staged", null), 4);
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

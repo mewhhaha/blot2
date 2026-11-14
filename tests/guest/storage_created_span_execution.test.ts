@@ -99,89 +99,86 @@ function mixedExpected(createdFirst: boolean) {
   return Uint32Array.from([...local, ...input]);
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  for (const createdFirst of [true, false]) {
-    Deno.test(`created scalar spans retain authority and bounds (${codegenTier}, created first ${createdFirst})`, async () => {
-      const directory = await Deno.makeTempDir({
-        prefix: "blot-created-span-",
+for (const createdFirst of [true, false]) {
+  Deno.test(`created scalar spans retain authority and bounds (created first ${createdFirst})`, async () => {
+    const directory = await Deno.makeTempDir({
+      prefix: "blot-created-span-",
+    });
+    const entry = `${directory}/main.blot`;
+    const stdRoot = new URL("../../std", import.meta.url).pathname;
+    const compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      stdRoot,
+      prelude: `${stdRoot}/prelude.blot`,
+      cacheDirectory: false,
+    });
+    try {
+      const result = await compiler.build({
+        sources: { [entry]: source(createdFirst) },
       });
-      const entry = `${directory}/main.blot`;
-      const stdRoot = new URL("../../std", import.meta.url).pathname;
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
-        codegenTier,
-      });
-      try {
-        const result = await compiler.build({
-          sources: { [entry]: source(createdFirst) },
-        });
-        assert(result.success, JSON.stringify(result));
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(result.bytes, { asynchronous });
-          const call = async (name: string, input: unknown = null) => {
-            if (asynchronous) return await guest.callAsync(name, input);
-            return guest.call(name, input);
-          };
-          try {
-            assert.deepEqual(
-              await call("mixed", new Uint32Array([10, 20, 30, 40])),
-              mixedExpected(createdFirst),
+      assert(result.success, JSON.stringify(result));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(result.bytes, { asynchronous });
+        const call = async (name: string, input: unknown = null) => {
+          if (asynchronous) return await guest.callAsync(name, input);
+          return guest.call(name, input);
+        };
+        try {
+          assert.deepEqual(
+            await call("mixed", new Uint32Array([10, 20, 30, 40])),
+            mixedExpected(createdFirst),
+          );
+          await call("reset");
+          assert.deepEqual(
+            await call("globals"),
+            mixedExpected(createdFirst),
+          );
+          assert.deepEqual(
+            await call("aliased"),
+            new Uint32Array([3, 5, 7, 9]),
+          );
+          assert.equal(await call("skipped", new Uint32Array()), 0);
+          for (const count of [0, 1, 4, 6, 12, 21]) {
+            assert.equal(
+              await call("varying", count),
+              (count - Math.ceil(count / 5)) * 8,
             );
-            await call("reset");
-            assert.deepEqual(
-              await call("globals"),
-              mixedExpected(createdFirst),
-            );
-            assert.deepEqual(
-              await call("aliased"),
-              new Uint32Array([3, 5, 7, 9]),
-            );
-            assert.equal(await call("skipped", new Uint32Array()), 0);
-            for (const count of [0, 1, 4, 6, 12, 21]) {
-              assert.equal(
-                await call("varying", count),
-                (count - Math.ceil(count / 5)) * 8,
-              );
-            }
-            for (const name of ["varying_oob", "created_oob", "public_oob"]) {
-              let input: unknown = null;
-              if (name === "created_oob") input = 4;
-              if (name === "public_oob") input = new Uint32Array([1, 2, 3]);
-              await assert.rejects(
-                () => call(name, input),
-                WebAssembly.RuntimeError,
-              );
-            }
-            await call("reset");
+          }
+          for (const name of ["varying_oob", "created_oob", "public_oob"]) {
+            let input: unknown = null;
+            if (name === "created_oob") input = 4;
+            if (name === "public_oob") input = new Uint32Array([1, 2, 3]);
             await assert.rejects(
-              () => call("prefix_trap", 6),
+              () => call(name, input),
               WebAssembly.RuntimeError,
             );
-            assert.deepEqual(
-              await call("read_global"),
-              new Uint32Array([11, 21, 31, 41]),
-            );
-            const bits = new Uint32Array([0x80000000, 0x7fc01234]);
-            const floats = await call(
-              "floats",
-              new Float32Array(bits.buffer),
-            ) as Float32Array;
-            assert.deepEqual(
-              new Uint32Array(floats.buffer, floats.byteOffset, floats.length),
-              bits,
-            );
-          } finally {
-            guest.dispose();
           }
+          await call("reset");
+          await assert.rejects(
+            () => call("prefix_trap", 6),
+            WebAssembly.RuntimeError,
+          );
+          assert.deepEqual(
+            await call("read_global"),
+            new Uint32Array([11, 21, 31, 41]),
+          );
+          const bits = new Uint32Array([0x80000000, 0x7fc01234]);
+          const floats = await call(
+            "floats",
+            new Float32Array(bits.buffer),
+          ) as Float32Array;
+          assert.deepEqual(
+            new Uint32Array(floats.buffer, floats.byteOffset, floats.length),
+            bits,
+          );
+        } finally {
+          guest.dispose();
         }
-      } finally {
-        await compiler.dispose();
-        await Deno.remove(directory, { recursive: true });
       }
-    });
-  }
+    } finally {
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

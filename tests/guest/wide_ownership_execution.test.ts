@@ -29,11 +29,10 @@ Deno.test("wide ownership preserves snapshots float bits and static shape reloca
     producer = `${directory}/model.blot`,
     prefix = `${directory}/prefix.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable,
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false as const,
       };
@@ -109,11 +108,10 @@ Deno.test.ignore("wide ownership selects exact bitmap and size for differently s
     return `f${String(word).padStart(3, "0")}: ${word}`;
   }).join(", ");
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false,
       });

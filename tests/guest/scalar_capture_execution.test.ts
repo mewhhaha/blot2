@@ -38,14 +38,12 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
   const directory = await Deno.makeTempDir({ prefix: "blot-scalar-capture-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false,
-        codegenTier,
-        shareMachineCode: true,
       });
       try {
         const edited = source.replace(
@@ -68,8 +66,6 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
             entry,
             prelude: new URL("../../std/prelude.blot", import.meta.url),
             cacheDirectory: false,
-            codegenTier,
-            shareMachineCode: true,
           });
           try {
             const repeated = await fresh.build({ sources: { [entry]: text } });

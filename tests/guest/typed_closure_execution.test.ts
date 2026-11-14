@@ -92,110 +92,107 @@ function descriptorExpected(input: number): Uint32Array {
   return new Uint32Array([first, second, total, 31, 37]);
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`typed closures preserve runtime captures schemas and descriptor reads (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-typed-closures-",
-    });
-    const entry = `${directory}/main.blot`;
-    let compiler:
-      | Awaited<ReturnType<typeof createZigProjectCompiler>>
-      | undefined;
-    try {
-      compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        prelude: null,
-        codegenTier,
-        cacheDirectory: false,
-        startupTimeoutMs: 5_000,
-      });
-      const built = await compiler.build({
-        sources: { [entry]: source },
-        signal: AbortSignal.timeout(5_000),
-      });
-      assert(built.success, JSON.stringify(built));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        try {
-          const call = async (name: string, input: number) => {
-            if (asynchronous) return await guest.callAsync(name, input);
-            return guest.call(name, input);
-          };
-          for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
-            assert.equal(
-              await call("shared_parents", input),
-              (input * 4 + 42) >>> 0,
-            );
-            assert.deepEqual(
-              await call("integers", input),
-              new Uint32Array([
-                input,
-                3,
-                input + 7,
-                5,
-                input + 13,
-                11,
-                input + 19,
-                17,
-              ]),
-            );
-            assert.deepEqual(
-              await call("nominals", input),
-              new Uint32Array([
-                input,
-                input + 1,
-                input + 2,
-                input + 3,
-              ]),
-            );
-            assert.deepEqual(
-              await call("descriptors", input),
-              descriptorExpected(input),
-            );
-            assert.deepEqual(
-              await call("snapshots", input),
-              new Uint32Array([
-                input + 1,
-                input + 2,
-                input + 99,
-              ]),
-            );
-            let selected = input;
-            if (input === 0) selected = 31;
-            assert.deepEqual(
-              await call("variants", input),
-              new Uint32Array([
-                31,
-                input,
-                103,
-                input + 7,
-                selected,
-              ]),
-            );
-          }
-          for (const input of [-0, 1.25, -10.5, 3, -0]) {
-            assert.deepEqual(
-              await call("floating", input),
-              new Float32Array([
-                input,
-                23,
-                -0,
-                29,
-                input + 1.5,
-                31,
-                input,
-                37,
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler?.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`typed closures preserve runtime captures schemas and descriptor reads`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-typed-closures-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  let compiler:
+    | Awaited<ReturnType<typeof createZigProjectCompiler>>
+    | undefined;
+  try {
+    compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      prelude: null,
+      cacheDirectory: false,
+      startupTimeoutMs: 5_000,
+    });
+    const built = await compiler.build({
+      sources: { [entry]: source },
+      signal: AbortSignal.timeout(5_000),
+    });
+    assert(built.success, JSON.stringify(built));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      try {
+        const call = async (name: string, input: number) => {
+          if (asynchronous) return await guest.callAsync(name, input);
+          return guest.call(name, input);
+        };
+        for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
+          assert.equal(
+            await call("shared_parents", input),
+            (input * 4 + 42) >>> 0,
+          );
+          assert.deepEqual(
+            await call("integers", input),
+            new Uint32Array([
+              input,
+              3,
+              input + 7,
+              5,
+              input + 13,
+              11,
+              input + 19,
+              17,
+            ]),
+          );
+          assert.deepEqual(
+            await call("nominals", input),
+            new Uint32Array([
+              input,
+              input + 1,
+              input + 2,
+              input + 3,
+            ]),
+          );
+          assert.deepEqual(
+            await call("descriptors", input),
+            descriptorExpected(input),
+          );
+          assert.deepEqual(
+            await call("snapshots", input),
+            new Uint32Array([
+              input + 1,
+              input + 2,
+              input + 99,
+            ]),
+          );
+          let selected = input;
+          if (input === 0) selected = 31;
+          assert.deepEqual(
+            await call("variants", input),
+            new Uint32Array([
+              31,
+              input,
+              103,
+              input + 7,
+              selected,
+            ]),
+          );
+        }
+        for (const input of [-0, 1.25, -10.5, 3, -0]) {
+          assert.deepEqual(
+            await call("floating", input),
+            new Float32Array([
+              input,
+              23,
+              -0,
+              29,
+              input + 1.5,
+              31,
+              input,
+              37,
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler?.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

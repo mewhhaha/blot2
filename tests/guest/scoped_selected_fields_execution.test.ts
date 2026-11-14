@@ -66,91 +66,88 @@ entry const view_bound = func (at: U32): U32 => return do:
   return (&rows[1..2])[at].count
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`selected stored fields preserve update order and bounds (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-selected-fields-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    let compiler:
-      | Awaited<ReturnType<typeof createZigProjectCompiler>>
-      | undefined;
-    try {
-      compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
-        codegenTier,
-        startupTimeoutMs: 5_000,
-      });
-      const result = await compiler.build({
-        sources: { [entry]: source },
-        signal: AbortSignal.timeout(5_000),
-      });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          const call = async (name: string, input: number | boolean | null) => {
-            if (asynchronous) return await guest.callAsync(name, input);
-            return guest.call(name, input);
-          };
-          for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
-            assert.deepEqual(
-              await call("getter", input),
-              new Uint32Array([input, 0]),
-            );
-            assert.deepEqual(
-              await call("ordered", input),
-              new Uint32Array([
-                input + 12,
-                77,
-                83,
-                13,
-                65,
-                63,
-                input + 12,
-              ]),
-            );
-          }
-          for (const input of [-0, 1.25, -10.5, -0]) {
-            assert.deepEqual(
-              await call("floating", input),
-              new Float32Array([
-                input,
-                -0,
-                47,
-                71,
-              ]),
-            );
-          }
-          assert.deepEqual(
-            await call("joined", true),
-            new Uint32Array([19, 20, 100, 100]),
-          );
-          assert.deepEqual(
-            await call("joined", false),
-            new Uint32Array([10, 29, 100, 100]),
-          );
-          assert.equal(await call("effects", null), 0);
-          assert.equal(await call("view_bound", 0), 20);
-          await assert.rejects(() => call("view_bound", 1));
-          await assert.rejects(() => call("out_of_bounds", 1));
-          assert.equal(await call("effects", null), 0);
-          await assert.rejects(() => call("empty", null));
-          assert.equal(await call("effects", null), 0);
-          assert.equal(await call("out_of_bounds", 0), 99);
-          assert.equal(await call("effects", null), 1);
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler?.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`selected stored fields preserve update order and bounds`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-selected-fields-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  let compiler:
+    | Awaited<ReturnType<typeof createZigProjectCompiler>>
+    | undefined;
+  try {
+    compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      stdRoot,
+      prelude: `${stdRoot}/prelude.blot`,
+      cacheDirectory: false,
+      startupTimeoutMs: 5_000,
+    });
+    const result = await compiler.build({
+      sources: { [entry]: source },
+      signal: AbortSignal.timeout(5_000),
+    });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        const call = async (name: string, input: number | boolean | null) => {
+          if (asynchronous) return await guest.callAsync(name, input);
+          return guest.call(name, input);
+        };
+        for (const input of [0, 1, 41, 0xfffffffd, 3, 0]) {
+          assert.deepEqual(
+            await call("getter", input),
+            new Uint32Array([input, 0]),
+          );
+          assert.deepEqual(
+            await call("ordered", input),
+            new Uint32Array([
+              input + 12,
+              77,
+              83,
+              13,
+              65,
+              63,
+              input + 12,
+            ]),
+          );
+        }
+        for (const input of [-0, 1.25, -10.5, -0]) {
+          assert.deepEqual(
+            await call("floating", input),
+            new Float32Array([
+              input,
+              -0,
+              47,
+              71,
+            ]),
+          );
+        }
+        assert.deepEqual(
+          await call("joined", true),
+          new Uint32Array([19, 20, 100, 100]),
+        );
+        assert.deepEqual(
+          await call("joined", false),
+          new Uint32Array([10, 29, 100, 100]),
+        );
+        assert.equal(await call("effects", null), 0);
+        assert.equal(await call("view_bound", 0), 20);
+        await assert.rejects(() => call("view_bound", 1));
+        await assert.rejects(() => call("out_of_bounds", 1));
+        assert.equal(await call("effects", null), 0);
+        await assert.rejects(() => call("empty", null));
+        assert.equal(await call("effects", null), 0);
+        assert.equal(await call("out_of_bounds", 0), 99);
+        assert.equal(await call("effects", null), 1);
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler?.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

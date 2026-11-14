@@ -62,8 +62,8 @@ pub const Arena = struct {
     available: [bin_count]?*Large = @splat(null),
     // The Arena is heap-stable and exclusively leased. These adapters measure
     // logical client requests, not the backing block totals or retained capacity.
-    solver_meter: @import("../runtime/memory.zig").TrackedAllocator = undefined,
-    scratch_meter: @import("../runtime/memory.zig").TrackedAllocator = undefined,
+    solver_meter: @import("../memory.zig").TrackedAllocator = undefined,
+    scratch_meter: @import("../memory.zig").TrackedAllocator = undefined,
 
     fn beginLease(self: *Arena) void {
         self.costs = .{};
@@ -281,7 +281,7 @@ pub const Pool = struct {
 };
 
 fn ownershipScenario(backing: A) !void {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = backing };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = backing };
     const a = tracked.allocator();
     var pool = Pool.init(a);
     var alive = true;
@@ -327,7 +327,7 @@ fn ownershipScenario(backing: A) !void {
 }
 
 fn growingBuffers(backing: A) !void {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = backing };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = backing };
     const a = tracked.allocator();
     var pool = Pool.init(a);
     var alive = true;

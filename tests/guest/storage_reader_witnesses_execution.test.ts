@@ -13,40 +13,37 @@ entry const answer = func (input: U32) => return do:
   let links: GrowArray U32 = #[@u32.add input 30, @u32.add input 130]
   return @u32.add (read first links 0) (read second links 1)
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`planned borrows retain their checked View Ref and Link witnesses (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-reader-witness-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (const input of [0, 1, 100]) {
-            const actual = asynchronous
-              ? await guest.callAsync("answer", input)
-              : guest.call("answer", input);
-            assert.equal(actual, input * 6 + 420);
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`planned borrows retain their checked View Ref and Link witnesses`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-reader-witness-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (const input of [0, 1, 100]) {
+          const actual = asynchronous
+            ? await guest.callAsync("answer", input)
+            : guest.call("answer", input);
+          assert.equal(actual, input * 6 + 420);
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

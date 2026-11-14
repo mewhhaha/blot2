@@ -20,11 +20,11 @@ import * as words from "./words"
 entry const answer = func () => return text.concat (words.words true) (text.format false)
 `);
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ?? new URL("compiler/zig-out/bin/blotc", root),
         entry, prelude: new URL("std/prelude.blot", root), stdRoot: new URL("std/", root),
-        codegenTier, cacheDirectory: false as const,
+        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

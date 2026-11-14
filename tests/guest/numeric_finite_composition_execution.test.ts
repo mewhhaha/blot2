@@ -92,82 +92,79 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
     }
   }
 }
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`numeric finite nested selected closures preserve exact operands unknown effects and imports (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/logic.blot`;
-    const archive = `${directory}/logic.blotdep`;
-    try {
-      await Deno.writeTextFile(entry, source);
-      await Deno.writeTextFile(dependency, library);
-      const packed = await new Deno.Command(executable, {
-        args: ["dependencies", entry, archive, "--prelude", "none"],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      assert(
-        packed.success,
-        new TextDecoder().decode(packed.stdout) +
-          new TextDecoder().decode(packed.stderr),
-      );
-      let expected: Uint8Array<ArrayBuffer> | undefined;
-      for (const dependencies of [undefined, archive]) {
-        const options = {
-          executable,
-          entry,
-          prelude: null,
-          dependencies,
-          codegenTier,
-          cacheDirectory: false as const,
-        };
-        const compiler = await createZigProjectCompiler(options);
+Deno.test(`numeric finite nested selected closures preserve exact operands unknown effects and imports`, async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const dependency = `${directory}/logic.blot`;
+  const archive = `${directory}/logic.blotdep`;
+  try {
+    await Deno.writeTextFile(entry, source);
+    await Deno.writeTextFile(dependency, library);
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, archive, "--prelude", "none"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(
+      packed.success,
+      new TextDecoder().decode(packed.stdout) +
+        new TextDecoder().decode(packed.stderr),
+    );
+    let expected: Uint8Array<ArrayBuffer> | undefined;
+    for (const dependencies of [undefined, archive]) {
+      const options = {
+        executable,
+        entry,
+        prelude: null,
+        dependencies,
+        cacheDirectory: false as const,
+      };
+      const compiler = await createZigProjectCompiler(options);
+      try {
+        const built = await compiler.build();
+        assert(built.success, JSON.stringify(built));
+        if (dependencies) assert(built.stats.cachedModules > 0);
+        if (expected) assert.deepEqual(built.bytes, expected);
+        else expected = built.bytes;
+        await observe(built.bytes);
+        const invalid = await compiler.build({
+          sources: { [entry]: source.replace("run index", "run true") },
+        });
+        assert(!invalid.success);
+        const recovered = await compiler.build({
+          sources: { [entry]: source },
+        });
+        assert(recovered.success, JSON.stringify(recovered));
+        assert.deepEqual(recovered.bytes, built.bytes);
+        const changed = library.replace(
+          "let copied = forwarded 0",
+          "let copied = forwarded 1",
+        );
+        const edited = await compiler.build({
+          sources: { [dependency]: changed },
+        });
+        assert(edited.success, JSON.stringify(edited));
+        await observe(edited.bytes, true);
+        const fresh = await createZigProjectCompiler(options);
         try {
-          const built = await compiler.build();
-          assert(built.success, JSON.stringify(built));
-          if (dependencies) assert(built.stats.cachedModules > 0);
-          if (expected) assert.deepEqual(built.bytes, expected);
-          else expected = built.bytes;
-          await observe(built.bytes);
-          const invalid = await compiler.build({
-            sources: { [entry]: source.replace("run index", "run true") },
-          });
-          assert(!invalid.success);
-          const recovered = await compiler.build({
-            sources: { [entry]: source },
-          });
-          assert(recovered.success, JSON.stringify(recovered));
-          assert.deepEqual(recovered.bytes, built.bytes);
-          const changed = library.replace(
-            "let copied = forwarded 0",
-            "let copied = forwarded 1",
-          );
-          const edited = await compiler.build({
+          const independent = await fresh.build({
             sources: { [dependency]: changed },
           });
-          assert(edited.success, JSON.stringify(edited));
-          await observe(edited.bytes, true);
-          const fresh = await createZigProjectCompiler(options);
-          try {
-            const independent = await fresh.build({
-              sources: { [dependency]: changed },
-            });
-            assert(independent.success, JSON.stringify(independent));
-            assert.deepEqual(independent.bytes, edited.bytes);
-          } finally {
-            await fresh.close();
-          }
-          const reverted = await compiler.build({
-            sources: { [dependency]: library },
-          });
-          assert(reverted.success, JSON.stringify(reverted));
-          assert.deepEqual(reverted.bytes, built.bytes);
+          assert(independent.success, JSON.stringify(independent));
+          assert.deepEqual(independent.bytes, edited.bytes);
         } finally {
-          await compiler.close();
+          await fresh.close();
         }
+        const reverted = await compiler.build({
+          sources: { [dependency]: library },
+        });
+        assert(reverted.success, JSON.stringify(reverted));
+        assert.deepEqual(reverted.bytes, built.bytes);
+      } finally {
+        await compiler.close();
       }
-    } finally {
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

@@ -51,8 +51,8 @@ entry const fallback = func (input: U32): Array U32 => return do:
   return #[@storage.load whole.a_omitted, @storage.load merged.a_omitted, whole.tick 4, access.hidden original]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`nominal physical fields preserve imported dictionaries aliases getters and whole uses (${codegenTier})`, async () => {
+{
+  Deno.test(`nominal physical fields preserve imported dictionaries aliases getters and whole uses`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-nominal-fields-",
     });
@@ -64,7 +64,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
       cacheDirectory: false as const,
-      codegenTier,
     };
     const compiler = await createZigProjectCompiler(options);
     try {

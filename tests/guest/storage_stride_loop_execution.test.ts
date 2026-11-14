@@ -66,112 +66,109 @@ function expected(first: number, last: number, stride: number) {
   return { cursor, rows, trapped };
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-stride-loops-" });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      const counters = result.stats.workCounters as Record<string, number>;
-      assert.equal(counters.scoped_stride_reductions, 0);
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = async (name: string, input: unknown = null) => {
-          if (asynchronous) return await guest.callAsync(name, input);
-          return guest.call(name, input);
-        };
-        try {
-          for (
-            const [first, last, stride] of [
-              [0, 95, 1],
-              [4, 95, 3],
-              [5, 93, 2],
-              [95, 95, 1],
-              [0, 0, 0xffffffff],
-              [1, 1, 0xfffffffe],
-              [96, 95, 0],
-              [0xffffffff, 95, 1],
-              [96, 0, 0xffffffff],
-              [2, 20, 0xffffffff],
-              [4, 95, 0xfffffffd],
-              [95, 95, 0xffffffff],
-              [1, 1, 0xffffffff],
-              [0, 100, 3],
-              [92, 0xffffffff, 7],
-              [96, 100, 0],
-              [0xffffffff, 0xffffffff, 1],
-            ]
-          ) {
-            await call("reset");
-            const scalar = expected(first, last, stride);
-            const run = () =>
-              call("run", new Uint32Array([first, last, stride]));
-            const local = () =>
-              call("local_run", new Uint32Array([first, last, stride]));
-            if (scalar.trapped) {
-              await assert.rejects(run, WebAssembly.RuntimeError);
-              await assert.rejects(local, WebAssembly.RuntimeError);
-            } else {
-              assert.equal(await run(), scalar.cursor);
-              assert.deepEqual(await local(), scalar.rows);
-              assert.equal(
-                await call(
-                  "local_cursor",
-                  new Uint32Array([first, last, stride]),
-                ),
-                scalar.cursor,
-              );
-            }
-            assert.deepEqual(await call("read"), scalar.rows);
-          }
-          for (const [first, last] of [[3, 95], [5, 94], [96, 95]]) {
-            await call("reset");
-            const scalar = expected(first, last, 2);
-            assert.equal(
-              await call("odd", new Uint32Array([first, last])),
-              scalar.cursor,
-            );
-            assert.deepEqual(await call("read"), scalar.rows);
-            assert.deepEqual(
-              await call("local_odd", new Uint32Array([first, last])),
-              scalar.rows,
-            );
-            assert.equal(
-              await call("local_odd_cursor", new Uint32Array([first, last])),
-              scalar.cursor,
-            );
-          }
-          for (const first of [1, 3, 7, 95]) {
-            await call("reset");
-            const scalar = expected(first, 95, first);
-            assert.equal(
-              await call("same_start_and_stride", first),
-              scalar.cursor,
-            );
-            assert.deepEqual(await call("read"), scalar.rows);
-            assert.deepEqual(
-              await call("local_same_start_and_stride", first),
-              scalar.rows,
-            );
-            assert.equal(await call("local_same_cursor", first), scalar.cursor);
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-stride-loops-" });
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
   });
-}
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    const counters = result.stats.workCounters as Record<string, number>;
+    assert.equal(counters.scoped_stride_reductions, 0);
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = async (name: string, input: unknown = null) => {
+        if (asynchronous) return await guest.callAsync(name, input);
+        return guest.call(name, input);
+      };
+      try {
+        for (
+          const [first, last, stride] of [
+            [0, 95, 1],
+            [4, 95, 3],
+            [5, 93, 2],
+            [95, 95, 1],
+            [0, 0, 0xffffffff],
+            [1, 1, 0xfffffffe],
+            [96, 95, 0],
+            [0xffffffff, 95, 1],
+            [96, 0, 0xffffffff],
+            [2, 20, 0xffffffff],
+            [4, 95, 0xfffffffd],
+            [95, 95, 0xffffffff],
+            [1, 1, 0xffffffff],
+            [0, 100, 3],
+            [92, 0xffffffff, 7],
+            [96, 100, 0],
+            [0xffffffff, 0xffffffff, 1],
+          ]
+        ) {
+          await call("reset");
+          const scalar = expected(first, last, stride);
+          const run = () =>
+            call("run", new Uint32Array([first, last, stride]));
+          const local = () =>
+            call("local_run", new Uint32Array([first, last, stride]));
+          if (scalar.trapped) {
+            await assert.rejects(run, WebAssembly.RuntimeError);
+            await assert.rejects(local, WebAssembly.RuntimeError);
+          } else {
+            assert.equal(await run(), scalar.cursor);
+            assert.deepEqual(await local(), scalar.rows);
+            assert.equal(
+              await call(
+                "local_cursor",
+                new Uint32Array([first, last, stride]),
+              ),
+              scalar.cursor,
+            );
+          }
+          assert.deepEqual(await call("read"), scalar.rows);
+        }
+        for (const [first, last] of [[3, 95], [5, 94], [96, 95]]) {
+          await call("reset");
+          const scalar = expected(first, last, 2);
+          assert.equal(
+            await call("odd", new Uint32Array([first, last])),
+            scalar.cursor,
+          );
+          assert.deepEqual(await call("read"), scalar.rows);
+          assert.deepEqual(
+            await call("local_odd", new Uint32Array([first, last])),
+            scalar.rows,
+          );
+          assert.equal(
+            await call("local_odd_cursor", new Uint32Array([first, last])),
+            scalar.cursor,
+          );
+        }
+        for (const first of [1, 3, 7, 95]) {
+          await call("reset");
+          const scalar = expected(first, 95, first);
+          assert.equal(
+            await call("same_start_and_stride", first),
+            scalar.cursor,
+          );
+          assert.deepEqual(await call("read"), scalar.rows);
+          assert.deepEqual(
+            await call("local_same_start_and_stride", first),
+            scalar.rows,
+          );
+          assert.equal(await call("local_same_cursor", first), scalar.cursor);
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

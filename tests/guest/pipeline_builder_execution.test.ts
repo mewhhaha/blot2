@@ -35,58 +35,55 @@ entry const floats = func (seed: F32) => return do:
   let lanes = array.flatten chunks payload
   break lanes
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`pipeline fallback preserves snapshots ragged lengths traps and F32 order (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-pipeline-controls-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url),
-      stdRoot: new URL("../../std", import.meta.url),
-      cacheDirectory: false,
-      codegenTier,
-    });
+Deno.test(`pipeline fallback preserves snapshots ragged lengths traps and F32 order`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-pipeline-controls-",
+  });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    stdRoot: new URL("../../std", import.meta.url),
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: controls } });
+    assert(built.success, JSON.stringify(built));
+    const { instantiateGuest } = await import("../../host/guest.ts");
+    const guest = await instantiateGuest(built.bytes);
     try {
-      const built = await compiler.build({ sources: { [entry]: controls } });
-      assert(built.success, JSON.stringify(built));
-      const { instantiateGuest } = await import("../../host/guest.ts");
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        for (const count of [0, 1, 2, 32, 128]) {
-          assert.equal(
-            guest.call("saved", count),
-            count * 3 + (count === 0 ? 0 : 2),
-          );
-          assert.equal(guest.call("ragged", count), count * (count + 1) / 2);
+      for (const count of [0, 1, 2, 32, 128]) {
+        assert.equal(
+          guest.call("saved", count),
+          count * 3 + (count === 0 ? 0 : 2),
+        );
+        assert.equal(guest.call("ragged", count), count * (count + 1) / 2);
+      }
+      assert.throws(() => guest.call("trap", 0), WebAssembly.RuntimeError);
+      assert.equal(guest.call("trap", 1), 0);
+      for (const [index, expected] of [3, 4, 5].entries()) {
+        assert.equal(guest.call("constant_read", index), expected);
+      }
+      for (const seed of [-0, 1.234567, Infinity, -Infinity]) {
+        const expected = Float32Array.from(
+          { length: 72 },
+          (_, index) =>
+            Math.fround(
+              Math.fround(Math.fround(seed) + Math.floor(index / 24)) *
+                (index % 24),
+            ),
+        );
+        const actual = guest.call("floats", seed) as Float32Array;
+        for (let i = 0; i < expected.length; i++) {
+          assert(Object.is(actual[i], expected[i]), `lane ${i}`);
         }
-        assert.throws(() => guest.call("trap", 0), WebAssembly.RuntimeError);
-        assert.equal(guest.call("trap", 1), 0);
-        for (const [index, expected] of [3, 4, 5].entries()) {
-          assert.equal(guest.call("constant_read", index), expected);
-        }
-        for (const seed of [-0, 1.234567, Infinity, -Infinity]) {
-          const expected = Float32Array.from(
-            { length: 72 },
-            (_, index) =>
-              Math.fround(
-                Math.fround(Math.fround(seed) + Math.floor(index / 24)) *
-                  (index % 24),
-              ),
-          );
-          const actual = guest.call("floats", seed) as Float32Array;
-          for (let i = 0; i < expected.length; i++) {
-            assert(Object.is(actual[i], expected[i]), `lane ${i}`);
-          }
-        }
-      } finally {
-        guest.dispose();
       }
     } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      guest.dispose();
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

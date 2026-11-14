@@ -125,8 +125,8 @@ entry const direct = func (input: U32) => return do:
   return quotient
 `;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
-      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, cacheDirectory: false, codegenTier });
+    {
+      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, cacheDirectory: false });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });
         assert(result.success, JSON.stringify(result));

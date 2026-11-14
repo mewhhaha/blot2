@@ -170,7 +170,7 @@ test "body check cache copied owners survive allocation failures and unchanged r
 }
 
 test "body check cache sparse storage and elaboration scale with admitted declarations" {
-    const memory = @import("../runtime/memory.zig");
+    const memory = @import("../memory.zig");
     for ([_]usize{ 64, 128, 256 }) |count| {
         var source: std.ArrayList(u8) = .empty;
         defer source.deinit(a);

@@ -7,7 +7,7 @@ async function trapsAtInstantiation(bytes: Uint8Array<ArrayBuffer>) {
   await assert.rejects(WebAssembly.instantiate(bytes), WebAssembly.RuntimeError);
 }
 
-Deno.test("completed captured callbacks preserve edits rejection recovery and both codegen tiers", async () => {
+Deno.test("completed captured callbacks preserve edits and rejection recovery", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-completed-capture-",
   });
@@ -23,14 +23,12 @@ entry const answer = func (extra: U32) : U32 => return callback extra
 `;
   try {
     await Deno.writeTextFile(entry, source(42, 7));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
@@ -88,14 +86,12 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
       'import { make } from "./library"\nentry const answer: U32 = (make 6) 2\n',
     );
     await Deno.writeTextFile(library, source(2, 1));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
@@ -156,14 +152,12 @@ ${layers}
 `;
   try {
     await Deno.writeTextFile(entry, source(2));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
@@ -221,15 +215,13 @@ entry const third: U32 = local (odd ${seed})
 `;
   try {
     await Deno.writeTextFile(entry, source(2));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
-        cacheDirectory: `${directory}/cache-${codegenTier}`,
+        cacheDirectory: `${directory}/cache`,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -304,14 +296,12 @@ entry const answer: U32 = local 41
 `;
   try {
     await Deno.writeTextFile(entry, source("add", 1));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
@@ -378,14 +368,12 @@ entry const answer: U32 = case local 41.25 of
 `;
   try {
     await Deno.writeTextFile(entry, source("floor"));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);

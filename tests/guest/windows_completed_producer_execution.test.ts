@@ -66,11 +66,10 @@ Deno.test("completed window producers preserve all widths snapshots pull order a
   });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot: new URL("../../std", import.meta.url).pathname,
         cacheDirectory: false,
@@ -112,7 +111,7 @@ Deno.test("completed window producers preserve all widths snapshots pull order a
                     mode * 16777216 + (width - 1) * 65536 + count,
                   ),
                   Uint32Array.from([pulls, trace, answer >>> 0]),
-                  JSON.stringify({ codegenTier, width, count, mode }),
+                  JSON.stringify({ width, count, mode }),
                 );
               }
               let snapshots = 999;
@@ -123,7 +122,7 @@ Deno.test("completed window producers preserve all widths snapshots pull order a
               assert.equal(
                 guest.call("snapshots", (width - 1) * 65536 + count),
                 snapshots,
-                JSON.stringify({ codegenTier, width, count }),
+                JSON.stringify({ width, count }),
               );
             }
           }

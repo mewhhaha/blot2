@@ -17,10 +17,6 @@ const native_assets = @import("../backend/native_assets.zig");
 const phase_profile = @import("../phase_profile.zig");
 const session_heap = @import("../runtime/session_heap.zig");
 
-/// Optimizer workers for a session whose open names none. Four beat one on
-/// every gdev build and edit measured (CT89: game wall -3.9%, a literal edit
-/// -9.2%) with CPU within 1.3% and byte-identical output.
-pub const default_codegen_workers: u8 = 4;
 const Request = struct {
     kind: enum { open, build, close, checkpoint, complete },
     id: u32,
@@ -37,15 +33,7 @@ const Request = struct {
     dependencies: ?[]const u8 = null,
     profileBackend: bool = false,
     profileTrace: bool = false,
-    explainAllocations: bool = false,
-    codegenTier: @import("../compilation_tier.zig").Tier = .optimized,
-    /// Absent keeps the server's --backend (default scoped).
-    backend: ?@import("../execution_policy.zig").Backend = null,
     storage: ?@import("../backend/storage_plan.zig").Budgets = null,
-    shareMachineCode: bool = false,
-    profileMemory: bool = false,
-    requireCollectorFree: bool = false,
-    codegenWorkers: u8 = default_codegen_workers,
     checkpoint: bool = false,
     sources: []const SourceRange = &.{},
     nativeAssets: ?native_assets.Options = null,
@@ -96,7 +84,6 @@ fn validPath(path: []const u8) bool {
 }
 fn validateOpen(request: Request) !project.Options {
     if (request.version == null or request.version.? != protocol_version) return error.VersionMismatch;
-    if (request.codegenWorkers == 0 or request.codegenWorkers > 16) return error.InvalidOpen;
     if (request.storage) |budgets| if (!budgets.valid()) return error.InvalidOpen;
     if (request.entry == null or !validPath(request.entry.?) or request.epoch != null or request.revision != null) return error.InvalidOpen;
     for ([_]?[]const u8{ request.prelude, request.stdRoot, request.dependencies }) |path| if (path) |p| {
@@ -153,13 +140,7 @@ const OpenProject = struct {
         errdefer session.deinit();
         session.compiler_identity = compiler;
         session.profile_backend = request.profileBackend;
-        session.explain_allocations = request.explainAllocations;
-        session.policy.codegen_tier = request.codegenTier;
-        if (request.backend) |backend| session.policy.backend = backend;
         session.policy.storage = request.storage orelse .{};
-        session.policy.share_machine_code = request.shareMachineCode;
-        session.policy.memory_profile = request.profileMemory;
-        session.policy.require_collector_free = request.requireCollectorFree;
         var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(a, root, compiler, entry) catch null else null;
         errdefer if (cache_file) |*file| file.deinit();
         var cache_loaded = false;
@@ -181,7 +162,6 @@ const OpenProject = struct {
             }
             checkpoint_pending = true;
         }
-        session.policy.codegen_workers = request.codegenWorkers;
         return .{ .profile_trace = request.profileTrace, .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .seed_pending = checkpoint_pending and request.dependencies == null, .last_write = last_write };
     }
     /// A seed that fails to decode for this compiler and these settings, or
@@ -615,7 +595,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         .protocol = "blot-zig-project",
         .version = protocol_version,
         .compilerIdentity = &identity,
-        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1", "editor-completion-v1", "allocation-explanations-v1" },
+        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1", "editor-completion-v1" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
     // Released after `opened`: a profiled session allocates through it.
@@ -651,13 +631,13 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 opened.?.allocation_counter = allocation_counter;
                 opened.?.session.policy.semantic_workers = policy.semantic_workers;
                 opened.?.session.policy.frontend_workers = policy.frontend_workers;
-                if (request.backend == null) opened.?.session.policy.backend = policy.backend;
+                opened.?.session.policy.backend = policy.backend;
                 opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
             .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainAllocations or request.codegenTier != .optimized or request.backend != null or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
+                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;

@@ -81,12 +81,11 @@ entry const broken = func (value: F32) : F32 => return do:
     "transform value - value",
   );
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude,
-        codegenTier,
       });
       try {
         const bad = await compiler.build({ sources: { [entry]: invalid } });
@@ -157,12 +156,11 @@ entry const broken = func (value: F32) : F32 => return do:
     "difference (transform value) value",
   );
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude,
-        codegenTier,
       });
       try {
         const bad = await compiler.build({
@@ -225,12 +223,11 @@ const Meters.sub = func (left: Meters) => return func (right: F32) => return do:
 entry const distance = func (value: F32) : F32 => return ($Meters value) - 1.0
 `;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude,
-        codegenTier,
       });
       try {
         const built = await compiler.build({ sources: { [entry]: source } });

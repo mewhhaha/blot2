@@ -54,53 +54,50 @@ entry const breakchange = func (input: U32): Array U32 => return do:
       break
   return #[row.first, row.second, row.steady, marker[0]]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`flat loop lanes preserve zero iterations swaps and all exits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-loop-lanes-" });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build({
-        sources: { [entry]: source },
-        signal: AbortSignal.timeout(5_000),
-      });
-      assert(built.success, JSON.stringify(built));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        try {
-          for (const input of [0, 1, 17, 0xffff_ffff, 0]) {
-            const expected: Record<string, number[]> = {
-              lanes: [input + 3, input + 5, input + 9, input],
-              changed: [input + 4, input + 1, input + 16, input],
-              zero: [input, input + 1, input + 9, input],
-              swaps: [input + 1, input, input + 9, input],
-              nested: [input + 6, input + 1, input + 9, input],
-              breakchange: [input + 2, input + 1, input + 16, input],
-            };
-            for (const [name, words] of Object.entries(expected)) {
-              let actual: unknown;
-              if (asynchronous) actual = await guest.callAsync(name, input);
-              else actual = guest.call(name, input);
-              assert.deepEqual(
-                actual,
-                new Uint32Array(words),
-                `${name} input ${input}`,
-              );
-            }
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`flat loop lanes preserve zero iterations swaps and all exits`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-loop-lanes-" });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: null,
+    cacheDirectory: false,
   });
-}
+  try {
+    const built = await compiler.build({
+      sources: { [entry]: source },
+      signal: AbortSignal.timeout(5_000),
+    });
+    assert(built.success, JSON.stringify(built));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      try {
+        for (const input of [0, 1, 17, 0xffff_ffff, 0]) {
+          const expected: Record<string, number[]> = {
+            lanes: [input + 3, input + 5, input + 9, input],
+            changed: [input + 4, input + 1, input + 16, input],
+            zero: [input, input + 1, input + 9, input],
+            swaps: [input + 1, input, input + 9, input],
+            nested: [input + 6, input + 1, input + 9, input],
+            breakchange: [input + 2, input + 1, input + 16, input],
+          };
+          for (const [name, words] of Object.entries(expected)) {
+            let actual: unknown;
+            if (asynchronous) actual = await guest.callAsync(name, input);
+            else actual = guest.call(name, input);
+            assert.deepEqual(
+              actual,
+              new Uint32Array(words),
+              `${name} input ${input}`,
+            );
+          }
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

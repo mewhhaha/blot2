@@ -69,14 +69,13 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
     return (exports[name] as CallableFunction)(input);
   };
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         stdRoot: new URL("../../std", import.meta.url),
         cacheDirectory: false,
-        codegenTier,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });
@@ -93,7 +92,7 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
             "nominal_record",
           ]
         ) {
-          assert.equal(run(result.bytes, name, 5), 11, `${codegenTier} ${name}`);
+          assert.equal(run(result.bytes, name, 5), 11, `${name}`);
         }
         for (const count of [32, 128, 512]) {
           for (
@@ -109,11 +108,11 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
             assert.equal(
               run(result.bytes, name, count),
               count,
-              `${codegenTier} ${name} ${count}`,
+              `${name} ${count}`,
             );
           }
         }
-        if (codegenTier === "optimized") {
+        {
           const changedSource = source.replace(
             "return replace index value values",
             "return replace index (value + 1) values",

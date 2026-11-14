@@ -1,7 +1,7 @@
 //! Short allocator critical sections for otherwise independently owned jobs.
 //! Allocators already safe for concurrent use are handed to jobs unwrapped.
 const std = @import("std");
-const shareable = @import("../runtime/memory.zig").shareable;
+const shareable = @import("../memory.zig").shareable;
 const A = std.mem.Allocator;
 pub const LockedAllocator = struct {
     backing: A,

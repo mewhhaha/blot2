@@ -75,11 +75,10 @@ entry const run = func count => return do:
   break total
 `;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
         cacheDirectory: false as const,
@@ -268,11 +267,10 @@ entry const run = func count => return iter.fold_left consumer.sum 0 (iter.enume
 `,
   });
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
         cacheDirectory: false as const,

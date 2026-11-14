@@ -39,66 +39,63 @@ entry const destination_first = func (index: U32): U32 => return do:
   return rows[0]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`scalar replacements preserve aliases self bits and destination-before-RHS traps (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-scalar-replacements-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        const call = async (name: string, input: unknown = null) => {
-          if (asynchronous) return await guest.callAsync(name, input);
-          return guest.call(name, input);
-        };
-        try {
-          for (const input of [0, 7, 0xffffffff]) {
-            assert.deepEqual(
-              await call("copied", input),
-              new Uint32Array([input, (input + 5) >>> 0, input]),
-            );
-            assert.equal(await call("self_value", input), (input + 14) >>> 0);
-          }
-          const floats = await call("floats", 1.25) as Float32Array;
-          assert.equal(floats[0], 1.25);
-          assert(Object.is(floats[1], -0));
-          assert.equal(
-            new Uint32Array(floats.buffer, floats.byteOffset, floats.length)[2],
-            0x7fc01234,
-          );
-          assert.equal(await call("booleans", true), false);
-          assert.equal(await call("booleans", false), true);
-          await assert.rejects(
-            () => call("rhs_trap", 0),
-            WebAssembly.RuntimeError,
-          );
-          assert.equal(await call("read"), 9);
-          await assert.rejects(() => call("destination_first", 1), {
-            name: "RuntimeError",
-            message: /unreachable/,
-          });
-          assert.equal(await call("read"), 9);
-          assert.equal(await call("rhs_trap", 2), 21);
-          assert.equal(await call("read"), 21);
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`scalar replacements preserve aliases self bits and destination-before-RHS traps`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-scalar-replacements-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      const call = async (name: string, input: unknown = null) => {
+        if (asynchronous) return await guest.callAsync(name, input);
+        return guest.call(name, input);
+      };
+      try {
+        for (const input of [0, 7, 0xffffffff]) {
+          assert.deepEqual(
+            await call("copied", input),
+            new Uint32Array([input, (input + 5) >>> 0, input]),
+          );
+          assert.equal(await call("self_value", input), (input + 14) >>> 0);
+        }
+        const floats = await call("floats", 1.25) as Float32Array;
+        assert.equal(floats[0], 1.25);
+        assert(Object.is(floats[1], -0));
+        assert.equal(
+          new Uint32Array(floats.buffer, floats.byteOffset, floats.length)[2],
+          0x7fc01234,
+        );
+        assert.equal(await call("booleans", true), false);
+        assert.equal(await call("booleans", false), true);
+        await assert.rejects(
+          () => call("rhs_trap", 0),
+          WebAssembly.RuntimeError,
+        );
+        assert.equal(await call("read"), 9);
+        await assert.rejects(() => call("destination_first", 1), {
+          name: "RuntimeError",
+          message: /unreachable/,
+        });
+        assert.equal(await call("read"), 9);
+        assert.equal(await call("rhs_trap", 2), 21);
+        assert.equal(await call("read"), 21);
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

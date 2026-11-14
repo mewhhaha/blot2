@@ -5,15 +5,14 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`generic identities preserve concrete aliases (${codegenTier})`, async () => {
+{
+  Deno.test(`generic identities preserve concrete aliases`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({
       executable,
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: false,
     });
     try {

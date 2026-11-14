@@ -24,77 +24,74 @@ const replace = func values => return func index => return func value => return 
 entry const run = func (index: U32) : Array U32 => return update index
 entry const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`body path update receipts preserve selector order and writes through the alias (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
-    const options = {
-      executable,
-      entry,
-      prelude: null,
-      cacheDirectory: false as const,
-      codegenTier,
-    };
-    const compiler = await createZigProjectCompiler(options);
-    try {
-      const prefix = "const earlier = func (value: F32) => return @f32.add value 1.0\n";
-      const revisions: readonly (readonly [string, number | null])[] = [
-        [source("2"), 2],
-        [source("2", prefix), 2],
-        [source("3", prefix), 3],
-        [source("missing_name"), null],
-        [source("3", prefix, "{ y: Array U32, x: U32 }"), 3],
-        [source("2"), 2],
-      ];
-      for (const [text, seed] of revisions) {
-        const fresh = await createZigProjectCompiler(options);
-        try {
-          const sources = { [entry]: text };
-          const ordinary = await fresh.build({ sources });
-          const result = await compiler.build({ sources });
-          assert.equal(result.success, ordinary.success);
-          if (!result.success || !ordinary.success) {
-            assert.ok(!result.success && !ordinary.success);
-            if (seed !== null) console.error(result.diagnostics);
-            assert.equal(seed, null);
-            assert.deepEqual(result.diagnostics, ordinary.diagnostics);
-            continue;
-          }
-          assert.ok(seed !== null);
-          assert.deepEqual(result.bytes, ordinary.bytes);
-          const guest = await instantiateGuest(result.bytes);
-          try {
-            for (let round = 0; round < 2; round++) {
-              for (let call = 0; call < 64; call++) {
-                const index = call % 2;
-                // `before` aliases `bucket`, so it sees the write
-                // (tasks/LANGUAGE_COHERENCE.md A7).
-                const after: number = (index + 1) * 10 + seed;
-                assert.deepEqual(
-                  guest.call("run", index),
-                  Uint32Array.of(after, after),
-                );
-                assert.deepEqual(
-                  guest.call("replaced", call),
-                  Uint32Array.of(seed, call),
-                );
-              }
-            }
-            assert.throws(() => guest.call("run", 2));
-            assert.deepEqual(
-              guest.call("run", 1),
-              Uint32Array.of(20 + seed, 20 + seed),
-            );
-          } finally {
-            guest.dispose();
-          }
-        } finally {
-          await fresh.dispose();
+Deno.test(`body path update receipts preserve selector order and writes through the alias`, async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false as const,
+  };
+  const compiler = await createZigProjectCompiler(options);
+  try {
+    const prefix = "const earlier = func (value: F32) => return @f32.add value 1.0\n";
+    const revisions: readonly (readonly [string, number | null])[] = [
+      [source("2"), 2],
+      [source("2", prefix), 2],
+      [source("3", prefix), 3],
+      [source("missing_name"), null],
+      [source("3", prefix, "{ y: Array U32, x: U32 }"), 3],
+      [source("2"), 2],
+    ];
+    for (const [text, seed] of revisions) {
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const sources = { [entry]: text };
+        const ordinary = await fresh.build({ sources });
+        const result = await compiler.build({ sources });
+        assert.equal(result.success, ordinary.success);
+        if (!result.success || !ordinary.success) {
+          assert.ok(!result.success && !ordinary.success);
+          if (seed !== null) console.error(result.diagnostics);
+          assert.equal(seed, null);
+          assert.deepEqual(result.diagnostics, ordinary.diagnostics);
+          continue;
         }
+        assert.ok(seed !== null);
+        assert.deepEqual(result.bytes, ordinary.bytes);
+        const guest = await instantiateGuest(result.bytes);
+        try {
+          for (let round = 0; round < 2; round++) {
+            for (let call = 0; call < 64; call++) {
+              const index = call % 2;
+              // `before` aliases `bucket`, so it sees the write
+              // (tasks/LANGUAGE_COHERENCE.md A7).
+              const after: number = (index + 1) * 10 + seed;
+              assert.deepEqual(
+                guest.call("run", index),
+                Uint32Array.of(after, after),
+              );
+              assert.deepEqual(
+                guest.call("replaced", call),
+                Uint32Array.of(seed, call),
+              );
+            }
+          }
+          assert.throws(() => guest.call("run", 2));
+          assert.deepEqual(
+            guest.call("run", 1),
+            Uint32Array.of(20 + seed, 20 + seed),
+          );
+        } finally {
+          guest.dispose();
+        }
+      } finally {
+        await fresh.dispose();
       }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

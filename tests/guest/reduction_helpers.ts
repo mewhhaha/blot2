@@ -15,11 +15,10 @@ export async function compileAndRun(
   const directory = await Deno.makeTempDir({ prefix: "blot-rolling-" });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        codegenTier,
         stdRoot: options.stdRoot,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         cacheDirectory: false,

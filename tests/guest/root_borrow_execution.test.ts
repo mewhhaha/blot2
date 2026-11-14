@@ -19,12 +19,11 @@ entry const lists = func (count: U32) => return scan (@list.generate count ident
 Deno.test("persistent cursor root borrows preserve finite traversal and normal List fallback", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-root-borrow-" });
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const entry = `${directory}/main.blot`;
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         cacheDirectory: false,
       });

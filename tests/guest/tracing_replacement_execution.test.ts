@@ -147,11 +147,10 @@ Deno.test("checked field updates preserve variant layouts aliases captures and r
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable,
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false as const,
       };
@@ -232,11 +231,10 @@ Deno.test("allocating loops compute their totals with ordinary and shared machin
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   try {
-    for (const shareMachineCode of [false, true]) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
-        shareMachineCode,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false,
       });

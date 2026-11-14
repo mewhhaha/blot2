@@ -100,61 +100,58 @@ entry const plain = func (count: U32): U32 => return do:
   return total
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds traps (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-empty-rows-" });
-    const entry = `${directory}/main.blot`;
-    await Deno.writeTextFile(entry, source);
-    const compiler = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      codegenTier,
-      cacheDirectory: false,
-    });
-    try {
-      const result = await compiler.build();
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = (name: string, value: number | null) =>
-          asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
-        try {
-          for (const count of [0, 1, 4]) {
-            assert.equal(await call("empty", count), 0);
-            assert.equal(await call("seeded", count), count === 0 ? 0 : 65);
-            assert.equal(await call("joined", count), 0);
-            assert.equal(await call("mixed", count), count === 0 ? 0 : 65);
-            assert.equal(await call("alias_write", count), count * 65);
-            assert.equal(await call("plain", count), Math.max(0, count - 1));
-          }
-          assert.equal(await call("skipped", 0), 65);
-          assert.equal(await call("copied", null), 0);
-          assert.equal(await call("effect_count", null), 0);
-          for (
-            const name of ["direct", "pattern", "argument", "record", "array"]
-          ) {
-            for (const index of [0, 1, 0xFFFFFFFF]) {
-              let trapped = false;
-              try {
-                await call(name, index);
-              } catch (error) {
-                assert(error instanceof WebAssembly.RuntimeError);
-                trapped = true;
-              }
-              assert(trapped);
-            }
-          }
-          assert.equal(await call("effect_count", null), 15);
-          assert.equal(await call("seeded", 1), 65);
-          assert.equal(await call("empty", 0), 0);
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds traps`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-empty-rows-" });
+  const entry = `${directory}/main.blot`;
+  await Deno.writeTextFile(entry, source);
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    cacheDirectory: false,
   });
-}
+  try {
+    const result = await compiler.build();
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = (name: string, value: number | null) =>
+        asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
+      try {
+        for (const count of [0, 1, 4]) {
+          assert.equal(await call("empty", count), 0);
+          assert.equal(await call("seeded", count), count === 0 ? 0 : 65);
+          assert.equal(await call("joined", count), 0);
+          assert.equal(await call("mixed", count), count === 0 ? 0 : 65);
+          assert.equal(await call("alias_write", count), count * 65);
+          assert.equal(await call("plain", count), Math.max(0, count - 1));
+        }
+        assert.equal(await call("skipped", 0), 65);
+        assert.equal(await call("copied", null), 0);
+        assert.equal(await call("effect_count", null), 0);
+        for (
+          const name of ["direct", "pattern", "argument", "record", "array"]
+        ) {
+          for (const index of [0, 1, 0xFFFFFFFF]) {
+            let trapped = false;
+            try {
+              await call(name, index);
+            } catch (error) {
+              assert(error instanceof WebAssembly.RuntimeError);
+              trapped = true;
+            }
+            assert(trapped);
+          }
+        }
+        assert.equal(await call("effect_count", null), 15);
+        assert.equal(await call("seeded", 1), 65);
+        assert.equal(await call("empty", 0), 0);
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

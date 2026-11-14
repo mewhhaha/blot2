@@ -67,61 +67,58 @@ entry const dynamic = func (value: U32): U32 => return do:
 entry const effect_count = func (): U32 => return effects[0]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`refutable bindings preserve iterator and exiting fallback control flow (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-pattern-fallback-",
-    });
-    const entry = `${directory}/main.blot`;
-    await Deno.writeTextFile(entry, source);
-    const compiler = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      codegenTier,
-      cacheDirectory: false,
-    });
-    try {
-      const result = await compiler.build();
-      assert(
-        result.success,
-        !result.success ? JSON.stringify(result.diagnostics) : "",
-      );
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        const call = (name: string, value: number | null) =>
-          asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
-        let effects = 0;
-        try {
-          for (const count of [0, 1, 4]) {
-            assert.equal(await call("empty", count), 0);
-            assert.equal(await call("populated", count), count === 0 ? 0 : 2);
-            assert.equal(await call("joined", count), count === 0 ? 0 : 2);
-            assert.equal(await call("fallback_break", count), 42);
-            effects += count === 0 ? 0 : 1;
-            assert.equal(await call("fallback_continue", count), 42);
-            effects += count;
-            assert.equal(await call("effect_count", null), effects);
-          }
-          for (const value of [0, 1, 42, 0xFFFFFFFF]) {
-            assert.equal(await call("fallback_return", value), value);
-            effects++;
-            assert.equal(await call("evaluated", value), 99);
-            effects += 3;
-            assert.equal(
-              await call("dynamic", value),
-              value === 0 ? 99 : value,
-            );
-            effects++;
-            assert.equal(await call("effect_count", null), effects);
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`refutable bindings preserve iterator and exiting fallback control flow`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-pattern-fallback-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  await Deno.writeTextFile(entry, source);
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build();
+    assert(
+      result.success,
+      !result.success ? JSON.stringify(result.diagnostics) : "",
+    );
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      const call = (name: string, value: number | null) =>
+        asynchronous ? guest.callAsync(name, value) : guest.call(name, value);
+      let effects = 0;
+      try {
+        for (const count of [0, 1, 4]) {
+          assert.equal(await call("empty", count), 0);
+          assert.equal(await call("populated", count), count === 0 ? 0 : 2);
+          assert.equal(await call("joined", count), count === 0 ? 0 : 2);
+          assert.equal(await call("fallback_break", count), 42);
+          effects += count === 0 ? 0 : 1;
+          assert.equal(await call("fallback_continue", count), 42);
+          effects += count;
+          assert.equal(await call("effect_count", null), effects);
+        }
+        for (const value of [0, 1, 42, 0xFFFFFFFF]) {
+          assert.equal(await call("fallback_return", value), value);
+          effects++;
+          assert.equal(await call("evaluated", value), 99);
+          effects += 3;
+          assert.equal(
+            await call("dynamic", value),
+            value === 0 ? 99 : value,
+          );
+          effects++;
+          assert.equal(await call("effect_count", null), effects);
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

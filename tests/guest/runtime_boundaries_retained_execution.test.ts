@@ -25,76 +25,73 @@ entry const pipeline = func (count: U32) => return do:
   break array.fold_left (func sum -> value => return sum + value) 0 values
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  // Direct backend gap: `@array.flatten` is not supported ("array operation flatten is not supported yet") (tasks/DELETE_SCOPED.md).
-  Deno.test.ignore(`runtime results follow imported body edit revert and restart (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-runtime-revisions-",
-    });
-    const entry = `${directory}/main.blot`,
-      dependency = `${directory}/helper.blot`;
-    const options = {
-      executable: Deno.args[0],
-      entry,
-      codegenTier,
-      prelude: new URL("../../std/prelude.blot", import.meta.url),
-      stdRoot: new URL("../../std", import.meta.url),
-      cacheDirectory: `${directory}/cache`,
-    };
-    const check = async (bytes: Uint8Array<ArrayBuffer>, delta: number) => {
-      const guest = await instantiateGuest(bytes);
-      try {
-        assert.equal(guest.call("variants", 32), 528);
-        assert.equal(guest.call("pipeline", 32), 768 * 767 / 2 + 768 * delta);
-      } finally {
-        guest.dispose();
-      }
-    };
-    let finalBytes: Uint8Array<ArrayBuffer> | undefined;
-    const retained = await createZigProjectCompiler(options);
-    try {
-      for (const delta of [0, 1, 0]) {
-        const edited = delta
-          ? helper.replace("i * 24 + j", "i * 24 + j + 1")
-          : helper;
-        const sources = { [entry]: source, [dependency]: edited };
-        const built = await retained.build({ sources });
-        assert(built.success, JSON.stringify(built));
-        await check(built.bytes, delta);
-        const fresh = await createZigProjectCompiler({
-          ...options,
-          cacheDirectory: false,
-        });
-        try {
-          const clean = await fresh.build({ sources });
-          assert(clean.success, JSON.stringify(clean));
-          assert.deepEqual(
-            built.bytes,
-            clean.bytes,
-            "retained builds match fresh emission",
-          );
-        } finally {
-          await fresh.dispose();
-        }
-        finalBytes = built.bytes;
-      }
-    } finally {
-      await retained.dispose();
-    }
-    try {
-      const restarted = await createZigProjectCompiler(options);
-      try {
-        const built = await restarted.build({
-          sources: { [entry]: source, [dependency]: helper },
-        });
-        assert(built.success, JSON.stringify(built));
-        assert.deepEqual(built.bytes, finalBytes);
-        await check(built.bytes, 0);
-      } finally {
-        await restarted.dispose();
-      }
-    } finally {
-      await Deno.remove(directory, { recursive: true });
-    }
+// Direct backend gap: `@array.flatten` is not supported ("array operation flatten is not supported yet") (tasks/DELETE_SCOPED.md).
+Deno.test.ignore(`runtime results follow imported body edit revert and restart`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-runtime-revisions-",
   });
-}
+  const entry = `${directory}/main.blot`,
+    dependency = `${directory}/helper.blot`;
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url),
+    stdRoot: new URL("../../std", import.meta.url),
+    cacheDirectory: `${directory}/cache`,
+  };
+  const check = async (bytes: Uint8Array<ArrayBuffer>, delta: number) => {
+    const guest = await instantiateGuest(bytes);
+    try {
+      assert.equal(guest.call("variants", 32), 528);
+      assert.equal(guest.call("pipeline", 32), 768 * 767 / 2 + 768 * delta);
+    } finally {
+      guest.dispose();
+    }
+  };
+  let finalBytes: Uint8Array<ArrayBuffer> | undefined;
+  const retained = await createZigProjectCompiler(options);
+  try {
+    for (const delta of [0, 1, 0]) {
+      const edited = delta
+        ? helper.replace("i * 24 + j", "i * 24 + j + 1")
+        : helper;
+      const sources = { [entry]: source, [dependency]: edited };
+      const built = await retained.build({ sources });
+      assert(built.success, JSON.stringify(built));
+      await check(built.bytes, delta);
+      const fresh = await createZigProjectCompiler({
+        ...options,
+        cacheDirectory: false,
+      });
+      try {
+        const clean = await fresh.build({ sources });
+        assert(clean.success, JSON.stringify(clean));
+        assert.deepEqual(
+          built.bytes,
+          clean.bytes,
+          "retained builds match fresh emission",
+        );
+      } finally {
+        await fresh.dispose();
+      }
+      finalBytes = built.bytes;
+    }
+  } finally {
+    await retained.dispose();
+  }
+  try {
+    const restarted = await createZigProjectCompiler(options);
+    try {
+      const built = await restarted.build({
+        sources: { [entry]: source, [dependency]: helper },
+      });
+      assert(built.success, JSON.stringify(built));
+      assert.deepEqual(built.bytes, finalBytes);
+      await check(built.bytes, 0);
+    } finally {
+      await restarted.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

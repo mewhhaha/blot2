@@ -3,7 +3,7 @@
 //! no cross-call analysis. See tasks/FAST_COMPILE.md.
 const std = @import("std");
 const core = @import("../check/core.zig");
-const backend = @import("../backend/core_backend.zig");
+const backend = @import("../compile.zig");
 const emit = @import("emit.zig");
 const function = @import("function.zig");
 const W = @import("writer.zig");

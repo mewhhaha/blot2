@@ -51,69 +51,66 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
   }
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`U32 identity proofs preserve bits traps and edits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-bit-proof-" });
-    const entry = `${directory}/main.blot`;
-    const dependency = `${directory}/logic.blot`;
-    const dependencies = `${directory}/logic.blotdep`;
-    const options = {
-      executable,
-      entry,
-      prelude: null,
-      cacheDirectory: false as const,
-      codegenTier,
-    };
+Deno.test(`U32 identity proofs preserve bits traps and edits`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-bit-proof-" });
+  const entry = `${directory}/main.blot`;
+  const dependency = `${directory}/logic.blot`;
+  const dependencies = `${directory}/logic.blotdep`;
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false as const,
+  };
+  try {
+    await Deno.writeTextFile(entry, source);
+    await Deno.writeTextFile(dependency, library);
+    const packed = await new Deno.Command(executable, {
+      args: ["dependencies", entry, dependencies, "--prelude", "none"],
+      stdout: "piped",
+      stderr: "piped",
+    }).output();
+    assert(packed.success, new TextDecoder().decode(packed.stderr));
+    const compiler = await createZigProjectCompiler(options);
+    const archive = await createZigProjectCompiler({
+      ...options,
+      dependencies,
+    });
+    let expected: Uint8Array<ArrayBuffer>;
     try {
-      await Deno.writeTextFile(entry, source);
-      await Deno.writeTextFile(dependency, library);
-      const packed = await new Deno.Command(executable, {
-        args: ["dependencies", entry, dependencies, "--prelude", "none"],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      assert(packed.success, new TextDecoder().decode(packed.stderr));
-      const compiler = await createZigProjectCompiler(options);
-      const archive = await createZigProjectCompiler({
-        ...options,
-        dependencies,
+      const first = await compiler.build();
+      const frozen = await archive.build();
+      assert(first.success, JSON.stringify(first));
+      assert(frozen.success, JSON.stringify(frozen));
+      assert(frozen.stats.cachedModules > 0);
+      assert.deepEqual(frozen.bytes, first.bytes);
+      expected = first.bytes;
+      await observe(expected);
+      const invalid = await archive.build({
+        sources: { [entry]: source.replace("lookup index", "lookup true") },
       });
-      let expected: Uint8Array<ArrayBuffer>;
-      try {
-        const first = await compiler.build();
-        const frozen = await archive.build();
-        assert(first.success, JSON.stringify(first));
-        assert(frozen.success, JSON.stringify(frozen));
-        assert(frozen.stats.cachedModules > 0);
-        assert.deepEqual(frozen.bytes, first.bytes);
-        expected = first.bytes;
-        await observe(expected);
-        const invalid = await archive.build({
-          sources: { [entry]: source.replace("lookup index", "lookup true") },
+      assert(!invalid.success);
+      const changed = library.replace(
+        "@u32.shl masked 32",
+        "@u32.shl masked 33",
+      );
+      for (const current of [compiler, archive]) {
+        const edited = await current.build({
+          sources: { [entry]: source, [dependency]: changed },
         });
-        assert(!invalid.success);
-        const changed = library.replace(
-          "@u32.shl masked 32",
-          "@u32.shl masked 33",
-        );
-        for (const current of [compiler, archive]) {
-          const edited = await current.build({
-            sources: { [entry]: source, [dependency]: changed },
-          });
-          assert(edited.success, JSON.stringify(edited));
-          await observe(edited.bytes, true);
-          const reverted = await current.build({
-            sources: { [entry]: source, [dependency]: library },
-          });
-          assert(reverted.success, JSON.stringify(reverted));
-          assert.deepEqual(reverted.bytes, expected);
-        }
-      } finally {
-        await compiler.dispose();
-        await archive.dispose();
+        assert(edited.success, JSON.stringify(edited));
+        await observe(edited.bytes, true);
+        const reverted = await current.build({
+          sources: { [entry]: source, [dependency]: library },
+        });
+        assert(reverted.success, JSON.stringify(reverted));
+        assert.deepEqual(reverted.bytes, expected);
       }
     } finally {
-      await Deno.remove(directory, { recursive: true });
+      await compiler.dispose();
+      await archive.dispose();
     }
-  });
-}
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});

@@ -210,7 +210,7 @@ test "shared dependency revisions bound storage across repeated errors and rever
     try fixture.write("changed.blot", "const value: U32 = 42\n");
     var expected_edited = try fresh(&fixture);
     defer expected_edited.deinit(a);
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = a };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = a };
     const alloc = tracked.allocator();
     var session = try retained.Session.initEmpty(alloc, .{});
     var alive = true;

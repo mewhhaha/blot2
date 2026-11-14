@@ -49,12 +49,11 @@ entry const answer: Unit -> U32 = func unit => return consume Read
     new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
   const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable,
         entry,
         prelude,
-        codegenTier,
       });
       try {
         const bad = await compiler.build({ sources: { [entry]: invalid } });

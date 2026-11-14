@@ -145,106 +145,103 @@ entry const floating = func () => return do:
   return unwrap (present ($Some (wrap 2.5)))
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`selected generic readers retain nominal payloads and captured instantiations (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-generic-reader-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({ sources: { [entry]: source } });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          const call = async (name: string, input: unknown = null) =>
-            asynchronous
-              ? await guest.callAsync(name, input)
-              : guest.call(name, input);
-          for (const input of [-100, -1.25, -0, 0, 1.25]) {
-            assert.deepEqual(
-              await call("primitive_getters", input),
-              new Float32Array([
-                Math.abs(input),
-                Math.abs(input),
-                Math.abs(input) + 10,
-                input + 2,
-              ]),
-            );
-          }
-          for (const input of [0, 1, 100]) {
-            assert.deepEqual(
-              await call("global_writer", input),
-              new Uint32Array([input, input + 7, input + 7]),
-            );
-            assert.deepEqual(
-              await call("region_reuse", input),
-              new Uint32Array([
-                input,
-                input,
-                input + 1,
-                input + 10,
-                input + 11,
-                input + 20,
-                input + 21,
-                input + 30,
-                input + 31,
-                input + 40,
-                input + 41,
-                input + 50,
-                input + 51,
-              ]),
-            );
-            assert.equal(await call("nested_readers", input), input == 1);
-            assert.deepEqual(
-              await call("answer", input),
-              new Uint32Array([input + 1, input + 102, input + 13]),
-            );
-            assert.equal(await call("integer"), 3);
-            assert.equal(await call("floating"), 3.75);
-            assert.equal(await call("partial_integer", input), input + 5);
-            assert.equal(await call("partial_floating", input), input + 5.75);
-            assert.deepEqual(
-              await call("staged_effect", input),
-              new Uint32Array([0, 1, input + 1]),
-            );
-            assert.deepEqual(
-              await call("getters", input),
-              new Uint32Array([2, input + 2, 101, 210]),
-            );
-            assert.deepEqual(
-              await call("large_key", input),
-              new Uint32Array([input + 10, input + 11, input + 11]),
-            );
-            assert.deepEqual(
-              await call("scratch_writer", input),
-              new Uint32Array([
-                300,
-                input,
-                input + 1,
-                input,
-                input + 99,
-                input + 100,
-                input + 99,
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`selected generic readers retain nominal payloads and captured instantiations`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-generic-reader-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({ sources: { [entry]: source } });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        const call = async (name: string, input: unknown = null) =>
+          asynchronous
+            ? await guest.callAsync(name, input)
+            : guest.call(name, input);
+        for (const input of [-100, -1.25, -0, 0, 1.25]) {
+          assert.deepEqual(
+            await call("primitive_getters", input),
+            new Float32Array([
+              Math.abs(input),
+              Math.abs(input),
+              Math.abs(input) + 10,
+              input + 2,
+            ]),
+          );
+        }
+        for (const input of [0, 1, 100]) {
+          assert.deepEqual(
+            await call("global_writer", input),
+            new Uint32Array([input, input + 7, input + 7]),
+          );
+          assert.deepEqual(
+            await call("region_reuse", input),
+            new Uint32Array([
+              input,
+              input,
+              input + 1,
+              input + 10,
+              input + 11,
+              input + 20,
+              input + 21,
+              input + 30,
+              input + 31,
+              input + 40,
+              input + 41,
+              input + 50,
+              input + 51,
+            ]),
+          );
+          assert.equal(await call("nested_readers", input), input == 1);
+          assert.deepEqual(
+            await call("answer", input),
+            new Uint32Array([input + 1, input + 102, input + 13]),
+          );
+          assert.equal(await call("integer"), 3);
+          assert.equal(await call("floating"), 3.75);
+          assert.equal(await call("partial_integer", input), input + 5);
+          assert.equal(await call("partial_floating", input), input + 5.75);
+          assert.deepEqual(
+            await call("staged_effect", input),
+            new Uint32Array([0, 1, input + 1]),
+          );
+          assert.deepEqual(
+            await call("getters", input),
+            new Uint32Array([2, input + 2, 101, 210]),
+          );
+          assert.deepEqual(
+            await call("large_key", input),
+            new Uint32Array([input + 10, input + 11, input + 11]),
+          );
+          assert.deepEqual(
+            await call("scratch_writer", input),
+            new Uint32Array([
+              300,
+              input,
+              input + 1,
+              input,
+              input + 99,
+              input + 100,
+              input + 99,
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

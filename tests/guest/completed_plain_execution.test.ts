@@ -89,160 +89,156 @@ function toBits(value: number): number {
   floatBytes.setFloat32(0, value);
   return floatBytes.getUint32(0);
 }
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`completed plain plans preserve nominal updates and typed bits across modules (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-plain-plans-" });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      imports: { "trial/": directory },
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build({
-        sources: {
-          [entry]: mainSource,
-          [`${directory}/common.blot`]: commonSource,
-          [`${directory}/left.blot`]: callerSource,
-          [`${directory}/right.blot`]: callerSource,
-        },
-      });
-      assert(built.success, JSON.stringify(built));
-      assert(WebAssembly.validate(built.bytes));
-      assert.equal(
-        readGuestAbi(new WebAssembly.Module(built.bytes)).version,
-        8,
-      );
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        try {
-          for (const input of [0, 1, 17, 0xfffffffd, 0]) {
-            let actual;
-            if (asynchronous) actual = await guest.callAsync("integer", input);
-            else actual = guest.call("integer", input);
-            const values = [
-              input,
-              input + 1,
-              input + 6,
-              input + 3,
-              17,
-              input + 9,
-              9,
-            ];
-            assert.deepEqual(actual, new Uint32Array([...values, ...values]));
-          }
-          for (
-            const bits of [
-              0,
-              0x80000000,
-              0x3fc00000,
-              0xc0e80000,
-              0x7f800000,
-              0xff800000,
-              1,
-              0,
-            ]
-          ) {
-            let actual;
-            if (asynchronous) actual = await guest.callAsync("floating", bits);
-            else actual = guest.call("floating", bits);
-            const input = fromBits(bits);
-            const negated = (bits ^ 0x80000000) >>> 0;
-            const values = [
-              bits,
-              negated,
-              negated,
-              negated,
-              toBits(input + 1),
-              toBits(-input + 2),
-              23,
-            ];
-            assert.deepEqual(actual, new Uint32Array([...values, ...values]));
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`completed plain plans preserve nominal updates and typed bits across modules`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-plain-plans-" });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    imports: { "trial/": directory },
+    prelude: null,
+    cacheDirectory: false,
   });
-  Deno.test(`completed plain plans keep hidden pools and host effects (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-plain-fallback-",
+  try {
+    const built = await compiler.build({
+      sources: {
+        [entry]: mainSource,
+        [`${directory}/common.blot`]: commonSource,
+        [`${directory}/left.blot`]: callerSource,
+        [`${directory}/right.blot`]: callerSource,
+      },
     });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
+    assert(built.success, JSON.stringify(built));
+    assert(WebAssembly.validate(built.bytes));
+    assert.equal(
+      readGuestAbi(new WebAssembly.Module(built.bytes)).version,
+      8,
+    );
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      try {
+        for (const input of [0, 1, 17, 0xfffffffd, 0]) {
+          let actual;
+          if (asynchronous) actual = await guest.callAsync("integer", input);
+          else actual = guest.call("integer", input);
+          const values = [
+            input,
+            input + 1,
+            input + 6,
+            input + 3,
+            17,
+            input + 9,
+            9,
+          ];
+          assert.deepEqual(actual, new Uint32Array([...values, ...values]));
+        }
+        for (
+          const bits of [
+            0,
+            0x80000000,
+            0x3fc00000,
+            0xc0e80000,
+            0x7f800000,
+            0xff800000,
+            1,
+            0,
+          ]
+        ) {
+          let actual;
+          if (asynchronous) actual = await guest.callAsync("floating", bits);
+          else actual = guest.call("floating", bits);
+          const input = fromBits(bits);
+          const negated = (bits ^ 0x80000000) >>> 0;
+          const values = [
+            bits,
+            negated,
+            negated,
+            negated,
+            toBits(input + 1),
+            toBits(-input + 2),
+            23,
+          ];
+          assert.deepEqual(actual, new Uint32Array([...values, ...values]));
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+Deno.test(`completed plain plans keep hidden pools and host effects`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-plain-fallback-",
+  });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  });
+  try {
+    const persistent = await compiler.build({
+      sources: { [entry]: persistentSource },
     });
-    try {
-      const persistent = await compiler.build({
-        sources: { [entry]: persistentSource },
+    assert(persistent.success, JSON.stringify(persistent));
+    assert(WebAssembly.validate(persistent.bytes));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(persistent.bytes, {
+        asynchronous,
       });
-      assert(persistent.success, JSON.stringify(persistent));
-      assert(WebAssembly.validate(persistent.bytes));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(persistent.bytes, {
-          asynchronous,
+      try {
+        let pool = 4;
+        for (const input of [0, 7, 0xfffffffd, 0]) {
+          let actual;
+          if (asynchronous) actual = await guest.callAsync("answer", input);
+          else actual = guest.call("answer", input);
+          assert.deepEqual(
+            actual,
+            new Uint32Array([input + pool, input + pool + 10, pool + 10]),
+          );
+          pool += 10;
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+    const hostBuilt = await compiler.build({
+      sources: { [entry]: hostSource },
+    });
+    assert(hostBuilt.success, JSON.stringify(hostBuilt));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(hostBuilt.bytes, { asynchronous });
+      try {
+        const calls: number[] = [];
+        const host = guest.capability({
+          parameter: "U32",
+          result: "U32",
+          call: (value) => {
+            assert.equal(typeof value, "number");
+            calls.push(value as number);
+            return (value as number) * 3;
+          },
         });
-        try {
-          let pool = 4;
-          for (const input of [0, 7, 0xfffffffd, 0]) {
-            let actual;
-            if (asynchronous) actual = await guest.callAsync("answer", input);
-            else actual = guest.call("answer", input);
-            assert.deepEqual(
-              actual,
-              new Uint32Array([input + pool, input + pool + 10, pool + 10]),
-            );
-            pool += 10;
-          }
-        } finally {
-          guest.dispose();
+        for (let round = 0; round < 2; round++) {
+          let actual;
+          if (asynchronous) actual = await guest.callAsync("answer", host);
+          else actual = guest.call("answer", host);
+          assert.equal(actual, 32);
         }
+        assert.deepEqual(calls, [8, 8]);
+      } finally {
+        guest.dispose();
       }
-      const hostBuilt = await compiler.build({
-        sources: { [entry]: hostSource },
-      });
-      assert(hostBuilt.success, JSON.stringify(hostBuilt));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(hostBuilt.bytes, { asynchronous });
-        try {
-          const calls: number[] = [];
-          const host = guest.capability({
-            parameter: "U32",
-            result: "U32",
-            call: (value) => {
-              assert.equal(typeof value, "number");
-              calls.push(value as number);
-              return (value as number) * 3;
-            },
-          });
-          for (let round = 0; round < 2; round++) {
-            let actual;
-            if (asynchronous) actual = await guest.callAsync("answer", host);
-            else actual = guest.call("answer", host);
-            assert.equal(actual, 32);
-          }
-          assert.deepEqual(calls, [8, 8]);
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 const boundarySource =
   `type Choice is data = $Count U32 | $Pair {x: U32, y: U32}
@@ -285,69 +281,66 @@ entry const answer = func (bits: U32): Array U32 => return do:
   return #[output,record.x,record.y,again.x,again.y,first,second,marker[0],selected]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`completed plain word ABI preserves scalar floats nullary results variants and scratch (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-plain-boundaries-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build({
-        sources: { [entry]: boundarySource },
-      });
-      assert(built.success, JSON.stringify(built));
-      assert(WebAssembly.validate(built.bytes));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        try {
-          for (
-            const bits of [
-              0,
-              1,
-              0x80000000,
-              0x3fc00000,
-              0x7fc01234,
-              0xffffffff,
-              0,
-            ]
-          ) {
-            let actual;
-            if (asynchronous) actual = await guest.callAsync("answer", bits);
-            else actual = guest.call("answer", bits);
-            let selected = bits + 1;
-            if (bits % 2 !== 0) selected += 17;
-            assert.deepEqual(
-              actual,
-              new Uint32Array([
-                (bits ^ 0x80000000) >>> 0,
-                7,
-                3,
-                7,
-                3,
-                bits * 2 + 1,
-                bits * 2 + 3,
-                bits,
-                selected,
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`completed plain word ABI preserves scalar floats nullary results variants and scratch`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-plain-boundaries-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({
+      sources: { [entry]: boundarySource },
+    });
+    assert(built.success, JSON.stringify(built));
+    assert(WebAssembly.validate(built.bytes));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      try {
+        for (
+          const bits of [
+            0,
+            1,
+            0x80000000,
+            0x3fc00000,
+            0x7fc01234,
+            0xffffffff,
+            0,
+          ]
+        ) {
+          let actual;
+          if (asynchronous) actual = await guest.callAsync("answer", bits);
+          else actual = guest.call("answer", bits);
+          let selected = bits + 1;
+          if (bits % 2 !== 0) selected += 17;
+          assert.deepEqual(
+            actual,
+            new Uint32Array([
+              (bits ^ 0x80000000) >>> 0,
+              7,
+              3,
+              7,
+              3,
+              bits * 2 + 1,
+              bits * 2 + 3,
+              bits,
+              selected,
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 // Direct backend gap: references to whole local values are not supported yet (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("completed plain local references write through to the local", async () => {

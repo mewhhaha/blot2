@@ -67,7 +67,6 @@ function exportedFunction(bytes: Uint8Array<ArrayBuffer>, name: string) {
 
 async function inspectBuild(
   source: string,
-  codegenTier: "development" | "optimized",
   inspect: (bytes: Uint8Array<ArrayBuffer>) => void | Promise<void>,
 ) {
   const directory = await Deno.makeTempDir({ prefix: "blot-wrapper-heap-" });
@@ -79,7 +78,6 @@ async function inspectBuild(
       entry,
       prelude: null,
       cacheDirectory: false,
-      codegenTier,
     });
     try {
       const built = await compiler.build();
@@ -93,9 +91,9 @@ async function inspectBuild(
   }
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
+{
   for (const record of [false, true]) {
-    Deno.test(`opaque ${record ? "generic record" : "reference"} wrappers share their arrays like plain aliases (${codegenTier})`, async () => {
+    Deno.test(`opaque ${record ? "generic record" : "reference"} wrappers share their arrays like plain aliases`, async () => {
       for (const opaque of [false, true]) {
         const source = `type Token${record ? " a" : ""}${
           opaque ? " is opaque" : ""
@@ -120,7 +118,7 @@ entry const captured = func (value: U32) => return do:
   original[0] := 0
   break @u32.add (saved ())[0] 2
 `;
-        await inspectBuild(source, codegenTier, async (bytes) => {
+        await inspectBuild(source, async (bytes) => {
           const guest = await instantiateGuest(bytes);
           try {
             // The wrapper holds `original` itself, so it reads the write of 0
@@ -135,7 +133,7 @@ entry const captured = func (value: U32) => return do:
     });
   }
 
-  Deno.test(`opaque payload bindings remove only irrefutable pattern control (${codegenTier})`, async () => {
+  Deno.test(`opaque payload bindings remove only irrefutable pattern control`, async () => {
     await inspectBuild(
       `type Token is opaque = U32
 type Pair is opaque = (U32, U32)
@@ -147,7 +145,6 @@ entry const pair = func (value: U32) => return do:
   let $Pair (left, right) = $Pair (value, 2)
   break @u32.add left right
 `,
-      codegenTier,
       async (bytes) => {
         const guest = await instantiateGuest(bytes);
         try {
@@ -164,77 +161,74 @@ entry const pair = func (value: U32) => return do:
 }
 
 for (const type of ["U32", "F32"]) {
-  for (const codegenTier of ["development", "optimized"] as const) {
-    Deno.test(`opaque ${type} round trips preserve exported machine operations (${codegenTier})`, async () => {
-      const directory = await Deno.makeTempDir({ prefix: "blot-wrapper-ops-" });
-      const entry = `${directory}/main.blot`;
-      let plain: ReturnType<typeof exportedFunction> | undefined;
-      try {
-        for (const opaque of [false, true]) {
-          const source = `type Token${opaque ? " is opaque" : ""} = ${type}
+  Deno.test(`opaque ${type} round trips preserve exported machine operations`, async () => {
+    const directory = await Deno.makeTempDir({ prefix: "blot-wrapper-ops-" });
+    const entry = `${directory}/main.blot`;
+    let plain: ReturnType<typeof exportedFunction> | undefined;
+    try {
+      for (const opaque of [false, true]) {
+        const source = `type Token${opaque ? " is opaque" : ""} = ${type}
 const make: ${type} -> Token = func value => return ${opaque ? "$Token " : ""}value
 const read: Token -> ${type} = func ${
-            opaque ? "($Token value)" : "value"
-          } => return value
+          opaque ? "($Token value)" : "value"
+        } => return value
 entry const run = func (value: ${type}) => return read (make value)
 `;
-          await Deno.writeTextFile(entry, source);
-          const compiler = await createZigProjectCompiler({
-            executable: Deno.args[0],
-            entry,
-            prelude: null,
-            cacheDirectory: false,
-            codegenTier,
-          });
+        await Deno.writeTextFile(entry, source);
+        const compiler = await createZigProjectCompiler({
+          executable: Deno.args[0],
+          entry,
+          prelude: null,
+          cacheDirectory: false,
+        });
+        try {
+          const built = await compiler.build();
+          assert(built.success, JSON.stringify(built));
+          const guest = await instantiateGuest(built.bytes);
           try {
-            const built = await compiler.build();
-            assert(built.success, JSON.stringify(built));
-            const guest = await instantiateGuest(built.bytes);
-            try {
-              for (
-                const value of type === "F32"
-                  ? [-0, NaN, Infinity, -Infinity, 42.5]
-                  : [0, 42, 0xffffffff]
-              ) {
-                assert.equal(guest.call("run", value), value);
-              }
-              if (type === "F32") {
-                const word = new DataView(new ArrayBuffer(4));
-                for (
-                  const bits of [
-                    0,
-                    0x80000000,
-                    0x7f800000,
-                    0xff800000,
-                    0x7fc00001,
-                    0xffc12345,
-                  ]
-                ) {
-                  word.setUint32(0, bits, true);
-                  const value = word.getFloat32(0, true);
-                  word.setFloat32(0, value, true);
-                  assert.equal(
-                    word.getUint32(0, true),
-                    bits,
-                    "Host bit control",
-                  );
-                  word.setFloat32(0, guest.call("run", value) as number, true);
-                  assert.equal(word.getUint32(0, true), bits);
-                }
-              }
-              const machine = exportedFunction(built.bytes, "run");
-              if (opaque) assert.deepEqual(machine, plain);
-              else plain = machine;
-            } finally {
-              guest.dispose();
+            for (
+              const value of type === "F32"
+                ? [-0, NaN, Infinity, -Infinity, 42.5]
+                : [0, 42, 0xffffffff]
+            ) {
+              assert.equal(guest.call("run", value), value);
             }
+            if (type === "F32") {
+              const word = new DataView(new ArrayBuffer(4));
+              for (
+                const bits of [
+                  0,
+                  0x80000000,
+                  0x7f800000,
+                  0xff800000,
+                  0x7fc00001,
+                  0xffc12345,
+                ]
+              ) {
+                word.setUint32(0, bits, true);
+                const value = word.getFloat32(0, true);
+                word.setFloat32(0, value, true);
+                assert.equal(
+                  word.getUint32(0, true),
+                  bits,
+                  "Host bit control",
+                );
+                word.setFloat32(0, guest.call("run", value) as number, true);
+                assert.equal(word.getUint32(0, true), bits);
+              }
+            }
+            const machine = exportedFunction(built.bytes, "run");
+            if (opaque) assert.deepEqual(machine, plain);
+            else plain = machine;
           } finally {
-            await compiler.dispose();
+            guest.dispose();
           }
+        } finally {
+          await compiler.dispose();
         }
-      } finally {
-        await Deno.remove(directory, { recursive: true });
       }
-    });
-  }
+    } finally {
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

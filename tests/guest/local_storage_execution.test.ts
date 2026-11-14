@@ -9,8 +9,8 @@ const box = func value => return $Box value
 const get = func ($Box mapper) => return mapper
 `;
 
-for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`closed local initializers preserve loop and branch versions (${codegenTier})`, async () => {
+{
+  Deno.test(`closed local initializers preserve loop and branch versions`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({
@@ -18,7 +18,6 @@ for (const codegenTier of ["optimized", "development"] as const) {
         new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
       entry,
       prelude: null,
-      codegenTier,
       cacheDirectory: false,
     });
     try {

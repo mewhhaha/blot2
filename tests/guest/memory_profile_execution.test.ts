@@ -33,65 +33,61 @@ const options = (entry: string) => ({
   cacheDirectory: false as const,
 });
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`copies, traps and retained source edits keep their results (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-memory-profile-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      ...options(entry),
-      codegenTier,
-    });
+Deno.test(`copies, traps and retained source edits keep their results`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-memory-profile-",
+  });
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    ...options(entry),
+  });
+  try {
+    const built = await compiler.build({ sources: { [entry]: source } });
+    assert(built.success, JSON.stringify(built));
+    const guest = await instantiateGuest(built.bytes);
     try {
-      const built = await compiler.build({ sources: { [entry]: source } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        for (let pass = 0; pass < 5; pass++) {
-          assert.deepEqual(
-            guest.call("boxed", pass),
-            Uint32Array.of(pass, pass + 1),
-          );
-          // `old` aliases `values`, so it reads the write of 99
-          // (tasks/LANGUAGE_COHERENCE.md A7).
-          assert.equal(guest.call("copied", 32), 230);
-          assert.throws(
-            () => guest.call("trapped", 8),
-            WebAssembly.RuntimeError,
-          );
-          assert.equal(guest.call("trapped", 0), 1);
-        }
-      } finally {
-        guest.dispose();
-      }
-      const repeated = await compiler.build({ sources: { [entry]: source } });
-      assert(repeated.success);
-      assert.deepEqual(repeated.bytes, built.bytes);
-      const shiftedSource = "// updated source locations\n" + source;
-      const shifted = await compiler.build({
-        sources: { [entry]: shiftedSource },
-      });
-      assert(shifted.success);
-      const fresh = await createZigProjectCompiler({
-        ...options(entry),
-        codegenTier,
-      });
-      try {
-        const rebuilt = await fresh.build({
-          sources: { [entry]: shiftedSource },
-        });
-        assert(rebuilt.success);
-        assert.deepEqual(shifted.bytes, rebuilt.bytes);
-      } finally {
-        await fresh.dispose();
+      for (let pass = 0; pass < 5; pass++) {
+        assert.deepEqual(
+          guest.call("boxed", pass),
+          Uint32Array.of(pass, pass + 1),
+        );
+        // `old` aliases `values`, so it reads the write of 99
+        // (tasks/LANGUAGE_COHERENCE.md A7).
+        assert.equal(guest.call("copied", 32), 230);
+        assert.throws(
+          () => guest.call("trapped", 8),
+          WebAssembly.RuntimeError,
+        );
+        assert.equal(guest.call("trapped", 0), 1);
       }
     } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      guest.dispose();
     }
-  });
-}
+    const repeated = await compiler.build({ sources: { [entry]: source } });
+    assert(repeated.success);
+    assert.deepEqual(repeated.bytes, built.bytes);
+    const shiftedSource = "// updated source locations\n" + source;
+    const shifted = await compiler.build({
+      sources: { [entry]: shiftedSource },
+    });
+    assert(shifted.success);
+    const fresh = await createZigProjectCompiler({
+      ...options(entry),
+    });
+    try {
+      const rebuilt = await fresh.build({
+        sources: { [entry]: shiftedSource },
+      });
+      assert(rebuilt.success);
+      assert.deepEqual(shifted.bytes, rebuilt.bytes);
+    } finally {
+      await fresh.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 // Direct backend gap: a closure parameter typed only by a later call is an unresolved type variable (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("copied arrays of curried closures keep their results", async () => {

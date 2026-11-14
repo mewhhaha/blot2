@@ -226,7 +226,6 @@ export async function auditProject(options: Options) {
     inferenceBudget: settings.inferenceBudget,
     storage: settings.storage,
     cacheDirectory: false,
-    codegenTier: "development",
   });
   const report = {
     mode: "frontend-api-only",

@@ -35,68 +35,65 @@ entry const run = func (limit: U32) : U32 => return sum limit
 entry const copied = func (limit: U32) : Array U32 => return keep #[limit, seed]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`body loop receipts preserve lexical exits owning arrays and failed revisions (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir();
-    const entry = `${directory}/main.blot`;
-    const options = {
-      executable,
-      entry,
-      prelude: null,
-      cacheDirectory: false as const,
-      codegenTier,
-    };
-    const retained = await createZigProjectCompiler(options);
-    try {
-      const inserted =
-        "const earlier = func (value: F32) : F32 => return @f32.add value 1.0\n";
-      const revisions: readonly (readonly [string, number | null])[] = [
-        [source("2"), 2],
-        [source("2", inserted), 2],
-        [source("3", inserted), 3],
-        [source("missing_name"), null],
-        [source("3", inserted, 2), 3],
-        [source("2"), 2],
-      ];
-      for (const [text, seed] of revisions) {
-        const fresh = await createZigProjectCompiler(options);
+Deno.test(`body loop receipts preserve lexical exits owning arrays and failed revisions`, async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false as const,
+  };
+  const retained = await createZigProjectCompiler(options);
+  try {
+    const inserted =
+      "const earlier = func (value: F32) : F32 => return @f32.add value 1.0\n";
+    const revisions: readonly (readonly [string, number | null])[] = [
+      [source("2"), 2],
+      [source("2", inserted), 2],
+      [source("3", inserted), 3],
+      [source("missing_name"), null],
+      [source("3", inserted, 2), 3],
+      [source("2"), 2],
+    ];
+    for (const [text, seed] of revisions) {
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const sources = { [entry]: text };
+        const expected = await fresh.build({ sources });
+        const actual = await retained.build({ sources });
+        assert.equal(actual.success, expected.success);
+        if (!actual.success || !expected.success) {
+          assert.ok(!actual.success && !expected.success);
+          assert.equal(seed, null);
+          assert.deepEqual(actual.diagnostics, expected.diagnostics);
+          continue;
+        }
+        assert.notEqual(seed, null);
+        assert.deepEqual(actual.bytes, expected.bytes);
+        const guest = await instantiateGuest(actual.bytes);
         try {
-          const sources = { [entry]: text };
-          const expected = await fresh.build({ sources });
-          const actual = await retained.build({ sources });
-          assert.equal(actual.success, expected.success);
-          if (!actual.success || !expected.success) {
-            assert.ok(!actual.success && !expected.success);
-            assert.equal(seed, null);
-            assert.deepEqual(actual.diagnostics, expected.diagnostics);
-            continue;
-          }
-          assert.notEqual(seed, null);
-          assert.deepEqual(actual.bytes, expected.bytes);
-          const guest = await instantiateGuest(actual.bytes);
-          try {
-            for (let call = 0; call < 64; call++) {
-              assert.equal(guest.call("run", call % 8), 42);
-              assert.deepEqual(
-                guest.call("copied", call),
-                Uint32Array.of(call, seed!),
-              );
-            }
-          } finally {
-            guest.dispose();
-          }
-          if (text === source("2", inserted)) {
-            const work = actual.stats.frontend.body_elaborations;
-            const ordinary = expected.stats.frontend.body_elaborations;
-            assert.ok(work !== null && ordinary !== null && work < ordinary);
+          for (let call = 0; call < 64; call++) {
+            assert.equal(guest.call("run", call % 8), 42);
+            assert.deepEqual(
+              guest.call("copied", call),
+              Uint32Array.of(call, seed!),
+            );
           }
         } finally {
-          await fresh.dispose();
+          guest.dispose();
         }
+        if (text === source("2", inserted)) {
+          const work = actual.stats.frontend.body_elaborations;
+          const ordinary = expected.stats.frontend.body_elaborations;
+          assert.ok(work !== null && ordinary !== null && work < ordinary);
+        }
+      } finally {
+        await fresh.dispose();
       }
-    } finally {
-      await retained.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+  } finally {
+    await retained.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

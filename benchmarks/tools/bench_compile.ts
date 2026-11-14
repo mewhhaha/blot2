@@ -62,7 +62,7 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|review|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
   [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
-  [--shared-session] [--guard-cpu] [--codegen-workers 4]
+  [--shared-session] [--guard-cpu]
   [--candidate-profile] [--manifest FILE] [--hashes FILE] [--scenarios NAMES]
   [--semantic-workers N] [--candidate-semantic-workers N]
   [--frontend-workers N] [--candidate-frontend-workers N]
@@ -95,7 +95,6 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   --guard-cpu             require at least three paired fresh game builds; fail
                           if the median candidate/baseline CPU ratio exceeds 1.05.
                           Output-difference declarations never waive this guard.
-  --codegen-workers       pin both compilers to 1..16 codegen workers (default 4).
   --semantic-workers      opt both variants into 1..16 semantic workers.
   --candidate-semantic-workers  override the candidate for a worker-policy comparison.
   --frontend-workers      pin both compilers to 1..16 module checker workers.
@@ -123,7 +122,6 @@ const { values: args } = parseArgs({
     "restart-cache": { type: "boolean", default: false },
     "shared-session": { type: "boolean", default: false },
     "guard-cpu": { type: "boolean", default: false },
-    "codegen-workers": { type: "string", default: "4" },
     "semantic-workers": { type: "string" },
     "candidate-semantic-workers": { type: "string" },
     "frontend-workers": { type: "string" },
@@ -142,7 +140,6 @@ const hashesPath = resolve(
 const snapshotRoot = resolve(
   args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
 );
-const codegenWorkers = Number(args["codegen-workers"]);
 const semanticWorkers = args["semantic-workers"] === undefined
   ? undefined
   : Number(args["semantic-workers"]);
@@ -336,7 +333,6 @@ async function openSession(
 ): Promise<Session> {
   const compiler = await createZigProjectCompiler({
     ...sessionOptions(variant.executable, workload),
-    codegenWorkers,
     frontendWorkers: variant.name === "candidate"
       ? candidateFrontendWorkers
       : frontendWorkers,
@@ -530,12 +526,6 @@ async function main(): Promise<number> {
     "",
   );
   const out = resolve(args.out ?? `${repo}/build/tmp/bench/${timestamp}`);
-  if (
-    !Number.isInteger(codegenWorkers) || codegenWorkers < 1 ||
-    codegenWorkers > 16
-  ) {
-    throw new Error("--codegen-workers must be an integer in 1..16");
-  }
   await Deno.mkdir(out, { recursive: true });
   for (
     const [name, count] of [
@@ -1072,7 +1062,6 @@ async function main(): Promise<number> {
           deno: Deno.version.deno,
           os: Deno.build.os,
           cpus,
-          codegen_workers: codegenWorkers,
           frontend_workers: frontendWorkers ?? null,
           candidate_frontend_workers: candidateFrontendWorkers ?? null,
           semantic_workers: semanticWorkers ?? null,
@@ -1088,7 +1077,6 @@ async function main(): Promise<number> {
           scenarios: w.scenarios.map((s) => s.name),
           settings: {
             inferenceBudget: w.inferenceBudget ?? 1_000_000,
-            codegenTier: w.codegenTier ?? "optimized",
             stdRoot: w.stdRoot,
             nativeAssetImports: w.nativeAssetImports,
           },

@@ -55,99 +55,96 @@ const guarded = func (input: U32): Four => return do:
 `;
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`inline return registers retain nested results bits traps and source edits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-inline-registers-",
-    });
-    const entry = `${directory}/main.blot`;
-    const values = `${directory}/values.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const options = {
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false as const,
-      codegenTier,
-    };
-    const compiler = await createZigProjectCompiler(options);
-    try {
-      let latest: Uint8Array<ArrayBuffer> | undefined;
-      let sources: Record<string, string> = {};
-      for (const offset of [0, 7, 19]) {
-        sources = { [entry]: caller, [values]: producer(offset) };
-        const result = await compiler.build({ sources });
-        assert(result.success, JSON.stringify(result));
-        latest = result.bytes;
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(result.bytes, { asynchronous });
-          try {
-            const call = async (name: string, input: number) => {
-              if (asynchronous) return await guest.callAsync(name, input);
-              return guest.call(name, input);
-            };
-            for (const input of [0, 9, 0xFFFFFFFF]) {
-              assert.deepEqual(
-                await call("answer", input),
-                new Uint32Array([
-                  input + offset,
-                  2,
-                  3,
-                  4,
-                  input + 10 + offset,
-                  4,
-                  99 + offset,
-                  input,
-                  0x80000000,
-                  0x7FC01234,
-                  0x80000000,
-                  0x7FC01234,
-                  123 + offset,
-                ]),
-              );
-              let selected = 0;
-              if (input !== 0) selected = input + 1;
-              assert.deepEqual(
-                await call("fallback", input),
-                new Uint32Array([input, 5, selected]),
-              );
-            }
+Deno.test(`inline return registers retain nested results bits traps and source edits`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-inline-registers-",
+  });
+  const entry = `${directory}/main.blot`;
+  const values = `${directory}/values.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false as const,
+  };
+  const compiler = await createZigProjectCompiler(options);
+  try {
+    let latest: Uint8Array<ArrayBuffer> | undefined;
+    let sources: Record<string, string> = {};
+    for (const offset of [0, 7, 19]) {
+      sources = { [entry]: caller, [values]: producer(offset) };
+      const result = await compiler.build({ sources });
+      assert(result.success, JSON.stringify(result));
+      latest = result.bytes;
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(result.bytes, { asynchronous });
+        try {
+          const call = async (name: string, input: number) => {
+            if (asynchronous) return await guest.callAsync(name, input);
+            return guest.call(name, input);
+          };
+          for (const input of [0, 9, 0xFFFFFFFF]) {
             assert.deepEqual(
-              await call("guarded", 0),
-              new Uint32Array([offset, 4, 55 + offset, 4]),
+              await call("answer", input),
+              new Uint32Array([
+                input + offset,
+                2,
+                3,
+                4,
+                input + 10 + offset,
+                4,
+                99 + offset,
+                input,
+                0x80000000,
+                0x7FC01234,
+                0x80000000,
+                0x7FC01234,
+                123 + offset,
+              ]),
             );
-            await assert.rejects(
-              async () => await call("guarded", 1),
-              WebAssembly.RuntimeError,
-            );
-            await assert.rejects(
-              async () => await call("stopped", 1),
-              WebAssembly.RuntimeError,
-            );
+            let selected = 0;
+            if (input !== 0) selected = input + 1;
             assert.deepEqual(
-              await call("guarded", 8),
-              new Uint32Array([8 + offset, 4, 8 + offset, 4]),
+              await call("fallback", input),
+              new Uint32Array([input, 5, selected]),
             );
-          } finally {
-            guest.dispose();
           }
+          assert.deepEqual(
+            await call("guarded", 0),
+            new Uint32Array([offset, 4, 55 + offset, 4]),
+          );
+          await assert.rejects(
+            async () => await call("guarded", 1),
+            WebAssembly.RuntimeError,
+          );
+          await assert.rejects(
+            async () => await call("stopped", 1),
+            WebAssembly.RuntimeError,
+          );
+          assert.deepEqual(
+            await call("guarded", 8),
+            new Uint32Array([8 + offset, 4, 8 + offset, 4]),
+          );
+        } finally {
+          guest.dispose();
         }
       }
-      const fresh = await createZigProjectCompiler(options);
-      try {
-        const result = await fresh.build({ sources });
-        assert(result.success, JSON.stringify(result));
-        assert.deepEqual(result.bytes, latest);
-      } finally {
-        await fresh.dispose();
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
     }
-  });
-}
+    const fresh = await createZigProjectCompiler(options);
+    try {
+      const result = await fresh.build({ sources });
+      assert(result.success, JSON.stringify(result));
+      assert.deepEqual(result.bytes, latest);
+    } finally {
+      await fresh.dispose();
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
 
 const plannedSource = `type Pair is data = $Pair {x: U32, y: U32}
 const pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
@@ -191,64 +188,61 @@ entry const rollback = func (input: U32): Array U32 => return do:
   let count = change rows
   return #[left[0], right[0], count]
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`inline return registers survive reusable helpers and enclosing loops (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-inline-registers-helpers-",
-    });
-    const entry = `${directory}/main.blot`;
-    const stdRoot = new URL("../../std", import.meta.url).pathname;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      stdRoot,
-      prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const result = await compiler.build({
-        sources: { [entry]: plannedSource },
-      });
-      assert(result.success, JSON.stringify(result));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(result.bytes, { asynchronous });
-        try {
-          for (const input of [0, 91, 0xFFFFFFFF]) {
-            let actual: unknown;
-            if (asynchronous) actual = await guest.callAsync("answer", input);
-            else actual = guest.call("answer", input);
-            let rolled: unknown;
-            if (asynchronous) rolled = await guest.callAsync("rollback", input);
-            else rolled = guest.call("rollback", input);
-            assert.deepEqual(
-              rolled,
-              new Uint32Array([input + 1, input + 11, 13]),
-            );
-            assert.deepEqual(
-              actual,
-              new Uint32Array([
-                input,
-                input + 1,
-                1,
-                input + 1000,
-                input + 1001,
-                input + 2000,
-                input + 2001,
-                input + 1000,
-                input + 1001,
-                input + 2000,
-                input + 2001,
-              ]),
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`inline return registers survive reusable helpers and enclosing loops`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-inline-registers-helpers-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const stdRoot = new URL("../../std", import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    stdRoot,
+    prelude: `${stdRoot}/prelude.blot`,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build({
+      sources: { [entry]: plannedSource },
+    });
+    assert(result.success, JSON.stringify(result));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(result.bytes, { asynchronous });
+      try {
+        for (const input of [0, 91, 0xFFFFFFFF]) {
+          let actual: unknown;
+          if (asynchronous) actual = await guest.callAsync("answer", input);
+          else actual = guest.call("answer", input);
+          let rolled: unknown;
+          if (asynchronous) rolled = await guest.callAsync("rollback", input);
+          else rolled = guest.call("rollback", input);
+          assert.deepEqual(
+            rolled,
+            new Uint32Array([input + 1, input + 11, 13]),
+          );
+          assert.deepEqual(
+            actual,
+            new Uint32Array([
+              input,
+              input + 1,
+              1,
+              input + 1000,
+              input + 1001,
+              input + 2000,
+              input + 2001,
+              input + 1000,
+              input + 1001,
+              input + 2000,
+              input + 2001,
+            ]),
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

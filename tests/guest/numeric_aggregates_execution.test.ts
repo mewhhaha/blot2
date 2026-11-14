@@ -42,14 +42,13 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
   try {
     await Deno.writeTextFile(entry, main);
     await Deno.writeTextFile(library, fixture.shapes);
-    for (const codegenTier of ["development", "optimized"] as const) {
+    {
       const options = {
         executable,
         entry,
         stdRoot: new URL("../../std", import.meta.url),
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         cacheDirectory: false as const,
-        codegenTier,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

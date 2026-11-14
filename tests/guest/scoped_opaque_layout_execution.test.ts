@@ -43,77 +43,74 @@ async function execute(bytes: Uint8Array<ArrayBuffer>, asynchronous: boolean) {
   }
 }
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`opaque variant layouts preserve private identity and representation edits (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({ prefix: "blot-scoped-opaque-" });
-    const entry = `${directory}/main.blot`;
-    const tokens = `${directory}/tokens.blot`;
-    const original = await Deno.readTextFile(new URL("tokens.blot", fixture));
-    const main = await Deno.readTextFile(new URL("main.blot", fixture));
-    const changed = original.replace(
-      "{ kind: kind, region:",
-      "{ padding: U32, kind: kind, region:",
-    ).replace("$Handle {kind, region", "$Handle {padding: 91, kind, region");
-    assert.notEqual(changed, original);
-    await Deno.writeTextFile(entry, main);
-    await Deno.writeTextFile(tokens, original);
-    await Deno.writeTextFile(
-      `${directory}/facade.blot`,
-      await Deno.readTextFile(new URL("facade.blot", fixture)),
-    );
-    const options = {
-      executable,
-      entry,
-      prelude: null,
-      codegenTier,
-      cacheDirectory: false as const,
-    };
-    const compiler = await createZigProjectCompiler(options);
-    try {
-      let successful: Uint8Array<ArrayBuffer> | undefined;
-      for (const source of [original, changed, original]) {
-        const sources = { [tokens]: source };
-        const result = await compiler.build({ sources });
-        assert(result.success, JSON.stringify(result));
-        const fresh = await createZigProjectCompiler(options);
-        try {
-          const expected = await fresh.build({ sources });
-          assert(expected.success, JSON.stringify(expected));
-          assert.deepEqual(result.bytes, expected.bytes);
-        } finally {
-          await fresh.dispose();
-        }
-        for (const asynchronous of [false, true]) {
-          await execute(result.bytes, asynchronous);
-        }
-        successful = result.bytes;
+Deno.test(`opaque variant layouts preserve private identity and representation edits`, async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-opaque-" });
+  const entry = `${directory}/main.blot`;
+  const tokens = `${directory}/tokens.blot`;
+  const original = await Deno.readTextFile(new URL("tokens.blot", fixture));
+  const main = await Deno.readTextFile(new URL("main.blot", fixture));
+  const changed = original.replace(
+    "{ kind: kind, region:",
+    "{ padding: U32, kind: kind, region:",
+  ).replace("$Handle {kind, region", "$Handle {padding: 91, kind, region");
+  assert.notEqual(changed, original);
+  await Deno.writeTextFile(entry, main);
+  await Deno.writeTextFile(tokens, original);
+  await Deno.writeTextFile(
+    `${directory}/facade.blot`,
+    await Deno.readTextFile(new URL("facade.blot", fixture)),
+  );
+  const options = {
+    executable,
+    entry,
+    prelude: null,
+    cacheDirectory: false as const,
+  };
+  const compiler = await createZigProjectCompiler(options);
+  try {
+    let successful: Uint8Array<ArrayBuffer> | undefined;
+    for (const source of [original, changed, original]) {
+      const sources = { [tokens]: source };
+      const result = await compiler.build({ sources });
+      assert(result.success, JSON.stringify(result));
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const expected = await fresh.build({ sources });
+        assert(expected.success, JSON.stringify(expected));
+        assert.deepEqual(result.bytes, expected.bytes);
+      } finally {
+        await fresh.dispose();
       }
-
-      const rejections = [
-        [
-          "entry const invalid = func () => return (token.make () 1 2 3 4).region\n",
-          "private_access",
-        ],
-        [
-          "entry const invalid = func () => return $token.Handle {kind: (), region: 1, origin: 2, slot: 3, generation: 4}\n",
-          "private_access",
-        ],
-      ];
-      for (const [body, code] of rejections) {
-        const rejected = await compiler.build({
-          sources: { [entry]: `${main}\n${body}` },
-        });
-        assert(!rejected.success, code);
-        assert.equal(rejected.diagnostics[0].code, code);
-        assert.equal("bytes" in rejected, false);
+      for (const asynchronous of [false, true]) {
+        await execute(result.bytes, asynchronous);
       }
-      const recovered = await compiler.build();
-      assert(recovered.success, JSON.stringify(recovered));
-      assert.deepEqual(recovered.bytes, successful);
-      await execute(recovered.bytes, false);
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
+      successful = result.bytes;
     }
-  });
-}
+
+    const rejections = [
+      [
+        "entry const invalid = func () => return (token.make () 1 2 3 4).region\n",
+        "private_access",
+      ],
+      [
+        "entry const invalid = func () => return $token.Handle {kind: (), region: 1, origin: 2, slot: 3, generation: 4}\n",
+        "private_access",
+      ],
+    ];
+    for (const [body, code] of rejections) {
+      const rejected = await compiler.build({
+        sources: { [entry]: `${main}\n${body}` },
+      });
+      assert(!rejected.success, code);
+      assert.equal(rejected.diagnostics[0].code, code);
+      assert.equal("bytes" in rejected, false);
+    }
+    const recovered = await compiler.build();
+    assert(recovered.success, JSON.stringify(recovered));
+    assert.deepEqual(recovered.bytes, successful);
+    await execute(recovered.bytes, false);
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

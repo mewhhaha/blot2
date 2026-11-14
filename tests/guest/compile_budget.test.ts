@@ -1,15 +1,14 @@
 // Compile-cost budgets on deterministic work counters, never wall time.
 //
 // Each synthetic program scales one pattern (see benchmarks/tools/corpus.ts) and
-// the compiler reports counters that depend only on the source: type nodes,
-// inference regions and scopes, callee body collections, solver passes and
-// occurs steps, and requested allocator bytes. Most budgets are the value
-// measured when set times 1.5, so ordinary churn passes while any super-linear
-// regression in instantiation, collection or solving fails.
+// the compiler reports counters that depend only on the source: type nodes and
+// requested allocator bytes. Most budgets are the value measured when set times
+// 1.5, so ordinary churn passes while any super-linear regression in checking
+// or code generation fails.
 //
-// Later hills (summary-based instantiation) are expected to LOWER these
-// counters. When they do, re-measure and tighten `today` below; a budget that
-// stays loose after an improvement stops guarding against regressions.
+// When an improvement lowers these counters, re-measure and tighten `today`
+// below; a budget that stays loose after an improvement stops guarding against
+// regressions.
 import { strict as assert } from "node:assert";
 import { instantiateGuest } from "../../host/guest.ts";
 import {
@@ -34,28 +33,14 @@ const scratchRoot = new URL("../../build/tmp/", import.meta.url).pathname;
 /** Headroom over the measured value; a later hill should tighten `today`. */
 const headroom = 1.5;
 
-interface Counters {
-  inference_regions: number;
-  region_scopes: number;
-  max_region_scopes: number;
-  call_collections_closed: number;
-  call_collections_unresolved: number;
-  call_memo_hits: number;
-  solver_passes: number;
-  solver_constraint_visits: number;
-  occurs_steps: number;
-}
 interface Measurement {
   success: boolean;
   diagnostic?: { code: string };
   type_nodes: number;
   allocated_bytes: number;
-  counters: Counters;
 }
-/** Counters pinned by a budget; call_memo_hits is informational only. */
-type Budgeted =
-  & { type_nodes: number; allocated_bytes: number }
-  & Omit<Counters, "call_memo_hits">;
+/** Counters pinned by a budget. */
+type Budgeted = { type_nodes: number; allocated_bytes: number };
 
 async function measure(program: SyntheticProgram): Promise<Measurement> {
   await Deno.mkdir(scratchRoot, { recursive: true });
@@ -81,7 +66,6 @@ async function measure(program: SyntheticProgram): Promise<Measurement> {
       diagnostic: records.find((record) => record.kind === "diagnostic"),
       type_nodes: metrics.type_nodes,
       allocated_bytes: metrics.memory.allocated_bytes,
-      counters: metrics.work_counters,
     };
   } finally {
     await Deno.remove(directory, { recursive: true });
@@ -98,7 +82,6 @@ function assertWithinBudget(
   const observed: Budgeted = {
     type_nodes: actual.type_nodes,
     allocated_bytes: actual.allocated_bytes,
-    ...actual.counters,
   };
   const failures: string[] = [];
   for (const [name, measured] of Object.entries(today)) {
@@ -130,14 +113,6 @@ Deno.test("budget: chain_mono N=128 stays linear", async () => {
     {
       type_nodes: 10461,
       allocated_bytes: 6350930,
-      inference_regions: 264,
-      region_scopes: 396,
-      max_region_scopes: 2,
-      call_collections_closed: 0,
-      call_collections_unresolved: 0,
-      solver_passes: 660,
-      solver_constraint_visits: 780,
-      occurs_steps: 9,
     },
   );
 });
@@ -152,14 +127,6 @@ Deno.test("budget: chain_generic N=64 stays linear", async () => {
       // Re-pinned after the previous 1.5x allowance became smaller than
       // current main's measured 8,530,096 bytes; retain tighter 5% headroom.
       allocated_bytes: 8536992,
-      inference_regions: 201,
-      region_scopes: 204,
-      max_region_scopes: 2,
-      call_collections_closed: 0,
-      call_collections_unresolved: 0,
-      solver_passes: 725,
-      solver_constraint_visits: 844,
-      occurs_steps: 591,
     },
     1.05,
   );
@@ -173,14 +140,6 @@ Deno.test("budget: diamond N=8 stays linear", async () => {
     {
       type_nodes: 6479,
       allocated_bytes: 3357343,
-      inference_regions: 33,
-      region_scopes: 36,
-      max_region_scopes: 2,
-      call_collections_closed: 0,
-      call_collections_unresolved: 0,
-      solver_passes: 109,
-      solver_constraint_visits: 116,
-      occurs_steps: 87,
     },
   );
 });
@@ -194,14 +153,6 @@ Deno.test("budget: fanout N=128 stays linear", async () => {
     {
       type_nodes: 18554,
       allocated_bytes: 10786346,
-      inference_regions: 782,
-      region_scopes: 791,
-      max_region_scopes: 2,
-      call_collections_closed: 0,
-      call_collections_unresolved: 0,
-      solver_passes: 1311,
-      solver_constraint_visits: 2582,
-      occurs_steps: 1563,
     },
   );
 });
@@ -215,16 +166,12 @@ for (
     diamond(16),
   ]
 ) {
-  Deno.test(`budget: ${program.name} N=${program.size} compiles with bounded regions`, async () => {
+  Deno.test(`budget: ${program.name} N=${program.size} compiles`, async () => {
     const actual = await measure(program);
     assert(
       actual.success,
       `${program.name} rejected: ${actual.diagnostic?.code}`,
     );
-    assert(actual.counters.region_scopes <= program.size * 4 + 20);
-    assert(actual.counters.max_region_scopes <= 4);
-    assert.equal(actual.counters.call_collections_unresolved, 0);
-    assert(actual.counters.solver_constraint_visits <= program.size * 16 + 32);
   });
 }
 

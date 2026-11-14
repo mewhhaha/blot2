@@ -95,8 +95,6 @@ Deno.test("optimized evaluated folds compute ranges maps filters and takes", asy
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      codegenTier: "optimized",
-      codegenWorkers: 1,
       cacheDirectory: false,
     });
     try {
@@ -172,14 +170,12 @@ entry const stable = func (value: U32) => return scalar value
   try {
     await Deno.writeTextFile(entry, source(1));
     await Deno.writeTextFile(producer, library([41, 7]));
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0] ??
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        codegenTier,
-        codegenWorkers: 1,
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
@@ -205,7 +201,7 @@ entry const stable = func (value: U32) => return scalar value
             assert.deepEqual(
               built.bytes,
               expected.bytes,
-              `${codegenTier}/${revision}`,
+              `${revision}`,
             );
           } finally {
             await fresh.dispose();

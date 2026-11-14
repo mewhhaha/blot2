@@ -101,57 +101,54 @@ entry const answer = func (input: U32) => return do:
   return #[rows[0], rows[1], live[0], live[1], live[2]]
 `;
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  for (const kind of ["reader", "writer", "witnesses", "scratch"] as const) {
-    Deno.test(`storage descriptor DAGs preserve ${kind} values and owner effects (${codegenTier})`, async () => {
-      const directory = await Deno.makeTempDir({ prefix: "blot-storage-dag-" });
-      const entry = `${directory}/main.blot`;
-      const stdRoot = new URL("../../std", import.meta.url).pathname;
-      let compiler:
-        | Awaited<ReturnType<typeof createZigProjectCompiler>>
-        | undefined;
-      try {
-        compiler = await createZigProjectCompiler({
-          executable: Deno.args[0],
-          entry,
-          stdRoot,
-          prelude: `${stdRoot}/prelude.blot`,
-          cacheDirectory: false,
-          codegenTier,
-          startupTimeoutMs: 5_000,
-        });
-        let source = witnesses;
-        if (kind === "scratch") source = scratch;
-        if (kind === "reader" || kind === "writer") {
-          source = storageCallSource(kind, 4, 5);
-        }
-        const result = await compiler.build({
-          sources: { [entry]: source },
-          signal: AbortSignal.timeout(5_000),
-        });
-        assert(result.success, JSON.stringify(result));
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(result.bytes, { asynchronous });
-          try {
-            for (const input of [0, 1, 7, 41, 0xfffffffd, 3, 0]) {
-              let expected: Uint32Array;
-              if (kind === "witnesses") expected = witnessExpected(input);
-              else if (kind === "scratch") {
-                expected = new Uint32Array([input + 15, 29, 71, 73, 79]);
-              } else expected = storageCallExpected(kind, 4, 5, input);
-              let actual;
-              if (asynchronous) actual = await guest.callAsync("answer", input);
-              else actual = guest.call("answer", input);
-              assert.deepEqual(actual, expected);
-            }
-          } finally {
-            guest.dispose();
-          }
-        }
-      } finally {
-        await compiler?.dispose();
-        await Deno.remove(directory, { recursive: true });
+for (const kind of ["reader", "writer", "witnesses", "scratch"] as const) {
+  Deno.test(`storage descriptor DAGs preserve ${kind} values and owner effects`, async () => {
+    const directory = await Deno.makeTempDir({ prefix: "blot-storage-dag-" });
+    const entry = `${directory}/main.blot`;
+    const stdRoot = new URL("../../std", import.meta.url).pathname;
+    let compiler:
+      | Awaited<ReturnType<typeof createZigProjectCompiler>>
+      | undefined;
+    try {
+      compiler = await createZigProjectCompiler({
+        executable: Deno.args[0],
+        entry,
+        stdRoot,
+        prelude: `${stdRoot}/prelude.blot`,
+        cacheDirectory: false,
+        startupTimeoutMs: 5_000,
+      });
+      let source = witnesses;
+      if (kind === "scratch") source = scratch;
+      if (kind === "reader" || kind === "writer") {
+        source = storageCallSource(kind, 4, 5);
       }
-    });
-  }
+      const result = await compiler.build({
+        sources: { [entry]: source },
+        signal: AbortSignal.timeout(5_000),
+      });
+      assert(result.success, JSON.stringify(result));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(result.bytes, { asynchronous });
+        try {
+          for (const input of [0, 1, 7, 41, 0xfffffffd, 3, 0]) {
+            let expected: Uint32Array;
+            if (kind === "witnesses") expected = witnessExpected(input);
+            else if (kind === "scratch") {
+              expected = new Uint32Array([input + 15, 29, 71, 73, 79]);
+            } else expected = storageCallExpected(kind, 4, 5, input);
+            let actual;
+            if (asynchronous) actual = await guest.callAsync("answer", input);
+            else actual = guest.call("answer", input);
+            assert.deepEqual(actual, expected);
+          }
+        } finally {
+          guest.dispose();
+        }
+      }
+    } finally {
+      await compiler?.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

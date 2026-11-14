@@ -32,55 +32,52 @@ entry const answer = func (input: ${scalar}) => return do:
 }
 
 for (const scalar of ["U32", "F32"] as const) {
-  for (const codegenTier of ["development", "optimized"] as const) {
-    Deno.test(`reusable helpers retain captured ${scalar} values through enclosing loops (${codegenTier})`, async () => {
-      const directory = await Deno.makeTempDir({
-        prefix: "blot-machine-regions-",
-      });
-      const entry = `${directory}/main.blot`;
-      const stdRoot = new URL("../../std", import.meta.url).pathname;
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
-        codegenTier,
-      });
-      try {
-        const result = await compiler.build({
-          sources: { [entry]: sourceFor(scalar) },
-        });
-        assert(result.success, JSON.stringify(result));
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(result.bytes, { asynchronous });
-          try {
-            for (
-              const input of scalar === "U32"
-                ? [0, 9, 100, 0xffffffff]
-                : [-0, 1.25, -5.5, Infinity, NaN]
-            ) {
-              const expected = scalar === "U32"
-                ? (input + 7 + padding) >>> 0
-                : input;
-              const value = asynchronous
-                ? await guest.callAsync("answer", input)
-                : guest.call("answer", input);
-              assert.deepEqual(
-                value,
-                scalar === "U32"
-                  ? new Uint32Array([1, expected, expected, expected])
-                  : new Float32Array([1, expected, expected, expected]),
-              );
-            }
-          } finally {
-            guest.dispose();
-          }
-        }
-      } finally {
-        await compiler.dispose();
-        await Deno.remove(directory, { recursive: true });
-      }
+  Deno.test(`reusable helpers retain captured ${scalar} values through enclosing loops`, async () => {
+    const directory = await Deno.makeTempDir({
+      prefix: "blot-machine-regions-",
     });
-  }
+    const entry = `${directory}/main.blot`;
+    const stdRoot = new URL("../../std", import.meta.url).pathname;
+    const compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      stdRoot,
+      prelude: `${stdRoot}/prelude.blot`,
+      cacheDirectory: false,
+    });
+    try {
+      const result = await compiler.build({
+        sources: { [entry]: sourceFor(scalar) },
+      });
+      assert(result.success, JSON.stringify(result));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(result.bytes, { asynchronous });
+        try {
+          for (
+            const input of scalar === "U32"
+              ? [0, 9, 100, 0xffffffff]
+              : [-0, 1.25, -5.5, Infinity, NaN]
+          ) {
+            const expected = scalar === "U32"
+              ? (input + 7 + padding) >>> 0
+              : input;
+            const value = asynchronous
+              ? await guest.callAsync("answer", input)
+              : guest.call("answer", input);
+            assert.deepEqual(
+              value,
+              scalar === "U32"
+                ? new Uint32Array([1, expected, expected, expected])
+                : new Float32Array([1, expected, expected, expected]),
+            );
+          }
+        } finally {
+          guest.dispose();
+        }
+      }
+    } finally {
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

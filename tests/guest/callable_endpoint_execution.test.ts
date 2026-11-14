@@ -23,52 +23,48 @@ Deno.test("returned callable endpoints retain owners through graph publication a
   });
   const entry = `${directory}/main.blot`;
   try {
-    for (const codegenTier of ["development", "optimized"] as const) {
-      for (const shareMachineCode of [false, true]) {
-        const options = {
-          executable,
-          entry,
-          codegenTier,
-          shareMachineCode,
-          cacheDirectory: false as const,
-          prelude: new URL("../../std/prelude.blot", import.meta.url),
-        };
-        const compiler = await createZigProjectCompiler(options);
-        try {
-          for (
-            const [text, expected] of [[record, 82], [array, 84], [
-              array.replace("seed + 1", "seed + 2"),
-              86,
-            ], [record, 82]] as const
-          ) {
-            const sources = { [entry]: text + main };
-            const built = await compiler.build({ sources });
-            assert(built.success, JSON.stringify(built));
-            const fresh = await createZigProjectCompiler(options);
+    {
+      const options = {
+        executable,
+        entry,
+        cacheDirectory: false as const,
+        prelude: new URL("../../std/prelude.blot", import.meta.url),
+      };
+      const compiler = await createZigProjectCompiler(options);
+      try {
+        for (
+          const [text, expected] of [[record, 82], [array, 84], [
+            array.replace("seed + 1", "seed + 2"),
+            86,
+          ], [record, 82]] as const
+        ) {
+          const sources = { [entry]: text + main };
+          const built = await compiler.build({ sources });
+          assert(built.success, JSON.stringify(built));
+          const fresh = await createZigProjectCompiler(options);
+          try {
+            const rebuilt = await fresh.build({ sources });
+            assert(rebuilt.success, JSON.stringify(rebuilt));
+            assert.deepEqual(built.bytes, rebuilt.bytes);
+          } finally {
+            await fresh.dispose();
+          }
+          for (const asynchronous of [false, true]) {
+            const guest = await instantiateGuest(built.bytes, {
+              asynchronous,
+            });
             try {
-              const rebuilt = await fresh.build({ sources });
-              assert(rebuilt.success, JSON.stringify(rebuilt));
-              assert.deepEqual(built.bytes, rebuilt.bytes);
+              let value;
+              if (asynchronous) value = await guest.callAsync("run", 41);
+              else value = guest.call("run", 41);
+              assert.equal(value, expected);
             } finally {
-              await fresh.dispose();
-            }
-            for (const asynchronous of [false, true]) {
-              const guest = await instantiateGuest(built.bytes, {
-                asynchronous,
-              });
-              try {
-                let value;
-                if (asynchronous) value = await guest.callAsync("run", 41);
-                else value = guest.call("run", 41);
-                assert.equal(value, expected);
-              } finally {
-                guest.dispose();
-              }
+              guest.dispose();
             }
           }
-        } finally {
-          await compiler.dispose();
         }
+      } finally {
+        await compiler.dispose();
       }
     }
   } finally {

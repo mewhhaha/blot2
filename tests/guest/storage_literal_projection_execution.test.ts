@@ -2,8 +2,8 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`literal record projections preserve imported names F32 bits source traps and retained edits (${codegenTier})`, async () => {
+{
+  Deno.test(`literal record projections preserve imported names F32 bits source traps and retained edits`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-literal-projection-",
     });
@@ -17,7 +17,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
       cacheDirectory: false as const,
-      codegenTier,
     };
     const caller = `import * as left from "./palette"
 import * as right from "./other"

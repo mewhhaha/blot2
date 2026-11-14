@@ -22,43 +22,40 @@ entry const answer = func () => return do:
   let fraction = invoke (capture 1.25)
   return @u32.add (@u32.add whole (@f32.to_u32 fraction)) (@storage.length kept)
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  for (
-    const [name, source] of [["wide policy", wide], [
-      "captured types",
-      captured,
-    ]]
-  ) {
-    Deno.test(`owned selected type keys execute ${name} (${codegenTier})`, async () => {
-      const directory = await Deno.makeTempDir({ prefix: "blot-type-key-" });
-      const entry = `${directory}/main.blot`;
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        prelude: null,
-        cacheDirectory: false,
-        codegenTier,
-      });
-      try {
-        const result = await compiler.build({ sources: { [entry]: source } });
-        assert(result.success, JSON.stringify(result));
-        for (const asynchronous of [false, true]) {
-          const guest = await instantiateGuest(result.bytes, { asynchronous });
-          try {
-            assert.equal(
-              asynchronous
-                ? await guest.callAsync("answer", null)
-                : guest.call("answer", null),
-              42,
-            );
-          } finally {
-            guest.dispose();
-          }
-        }
-      } finally {
-        await compiler.dispose();
-        await Deno.remove(directory, { recursive: true });
-      }
+for (
+  const [name, source] of [["wide policy", wide], [
+    "captured types",
+    captured,
+  ]]
+) {
+  Deno.test(`owned selected type keys execute ${name}`, async () => {
+    const directory = await Deno.makeTempDir({ prefix: "blot-type-key-" });
+    const entry = `${directory}/main.blot`;
+    const compiler = await createZigProjectCompiler({
+      executable: Deno.args[0],
+      entry,
+      prelude: null,
+      cacheDirectory: false,
     });
-  }
+    try {
+      const result = await compiler.build({ sources: { [entry]: source } });
+      assert(result.success, JSON.stringify(result));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(result.bytes, { asynchronous });
+        try {
+          assert.equal(
+            asynchronous
+              ? await guest.callAsync("answer", null)
+              : guest.call("answer", null),
+            42,
+          );
+        } finally {
+          guest.dispose();
+        }
+      }
+    } finally {
+      await compiler.dispose();
+      await Deno.remove(directory, { recursive: true });
+    }
+  });
 }

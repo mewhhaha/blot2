@@ -225,12 +225,11 @@ entry const floating = func (values: Array F32) => return do:
   let selected = choices[@u32.rem (@array.length values) 2]
   break selected 1.0
 `);
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const compiler = await createZigProjectCompiler({
         executable: Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
         entry,
         prelude: null,
-        codegenTier,
         cacheDirectory: false,
       });
       try {

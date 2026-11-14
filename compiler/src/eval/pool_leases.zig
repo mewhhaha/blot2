@@ -166,7 +166,7 @@ pub fn free(leases: *const Leases, a: A, comptime field: Field, items: anytype) 
 }
 
 test "leased slices share equal content, copy changes and release once" {
-    var tracked: @import("../runtime/memory.zig").TrackedAllocator = .{ .backing = std.testing.allocator };
+    var tracked: @import("../memory.zig").TrackedAllocator = .{ .backing = std.testing.allocator };
     const a = tracked.allocator();
     var first: Builder = .{ .allocator = a, .previous = null };
     const values = try first.dupe(.runtime_order, u32, &.{ 1, 2, 3 }, null);

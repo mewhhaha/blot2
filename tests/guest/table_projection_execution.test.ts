@@ -91,11 +91,10 @@ Deno.test("table projection consumes exact changed source bodies in retained bui
   const program =
     `import * as iter from "std/iter"\nimport * as reduce from "./reduce"\nentry const run = func count => return iter.fold_left reduce.add 0 (iter.range 0 count)\n`;
   try {
-    for (const codegenTier of ["optimized", "development"] as const) {
+    {
       const options = {
         executable: Deno.args[0],
         entry,
-        codegenTier,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
         cacheDirectory: false as const,

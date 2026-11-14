@@ -20,67 +20,64 @@ entry const floating = func (input: F32): F32 => return do:
   let value = @f32.mul input 1.0
   return @f32.div value 1.0
 `;
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`stack expressions preserve repeated values reads writes branches and F32 (${codegenTier})`, async () => {
-    const directory = await Deno.makeTempDir({
-      prefix: "blot-stack-expressions-",
-    });
-    const entry = `${directory}/main.blot`;
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build({
-        sources: { [entry]: source },
-        signal: AbortSignal.timeout(5000),
-      });
-      assert(built.success, JSON.stringify(built));
-      assert(WebAssembly.validate(built.bytes));
-      for (const asynchronous of [false, true]) {
-        const guest = await instantiateGuest(built.bytes, { asynchronous });
-        try {
-          for (const input of [0, 1, 17, 0xffff_ffff, 0]) {
-            const reused = (input - 7) >>> 0;
-            const after = (input + 5) >>> 0;
-            const mixed = (Math.imul(reused, 3) - (after ^ 12345)) >>> 0;
-            let actual: unknown;
-            if (asynchronous) actual = await guest.callAsync("ordered", input);
-            else actual = guest.call("ordered", input);
-            let chosen = mixed;
-            if (input === 0) chosen = reused;
-            assert.deepEqual(
-              actual,
-              new Uint32Array([
-                input,
-                after,
-                reused,
-                reused + mixed,
-                chosen,
-                input + 9,
-                input + 1,
-              ]),
-            );
-          }
-          for (const input of [-0, 0, 1.25, -7.5, NaN, Infinity, -Infinity]) {
-            let actual: unknown;
-            if (asynchronous) actual = await guest.callAsync("floating", input);
-            else actual = guest.call("floating", input);
-            assert(
-              Object.is(actual, input),
-              `${String(input)}: ${String(actual)}`,
-            );
-          }
-        } finally {
-          guest.dispose();
-        }
-      }
-    } finally {
-      await compiler.dispose();
-      await Deno.remove(directory, { recursive: true });
-    }
+Deno.test(`stack expressions preserve repeated values reads writes branches and F32`, async () => {
+  const directory = await Deno.makeTempDir({
+    prefix: "blot-stack-expressions-",
   });
-}
+  const entry = `${directory}/main.blot`;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: null,
+    cacheDirectory: false,
+  });
+  try {
+    const built = await compiler.build({
+      sources: { [entry]: source },
+      signal: AbortSignal.timeout(5000),
+    });
+    assert(built.success, JSON.stringify(built));
+    assert(WebAssembly.validate(built.bytes));
+    for (const asynchronous of [false, true]) {
+      const guest = await instantiateGuest(built.bytes, { asynchronous });
+      try {
+        for (const input of [0, 1, 17, 0xffff_ffff, 0]) {
+          const reused = (input - 7) >>> 0;
+          const after = (input + 5) >>> 0;
+          const mixed = (Math.imul(reused, 3) - (after ^ 12345)) >>> 0;
+          let actual: unknown;
+          if (asynchronous) actual = await guest.callAsync("ordered", input);
+          else actual = guest.call("ordered", input);
+          let chosen = mixed;
+          if (input === 0) chosen = reused;
+          assert.deepEqual(
+            actual,
+            new Uint32Array([
+              input,
+              after,
+              reused,
+              reused + mixed,
+              chosen,
+              input + 9,
+              input + 1,
+            ]),
+          );
+        }
+        for (const input of [-0, 0, 1.25, -7.5, NaN, Infinity, -Infinity]) {
+          let actual: unknown;
+          if (asynchronous) actual = await guest.callAsync("floating", input);
+          else actual = guest.call("floating", input);
+          assert(
+            Object.is(actual, input),
+            `${String(input)}: ${String(actual)}`,
+          );
+        }
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
