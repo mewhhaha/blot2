@@ -118,21 +118,12 @@ while (true) {
     assetDependencies: dependencies,
     assetStats,
     stats: {
-      nativeWorkSteps: 0,
       sourceBytes: 0,
       freshModules: 0,
       cachedModules: 0,
-      restartCacheLoaded: false,
+      emittedFunctions: 0,
       frontend: {},
-      backend: {},
-      optimization: {},
-      runtimeOptimization: {},
-      backendTiming: {},
-      workCounters: {},
-      principals: {},
-      refinements: {},
-      selectedQueries: {},
-      attemptStats: {},
+      phaseProfile: {},
     },
   };
   if (mode === "missing") delete reply.assetStats;

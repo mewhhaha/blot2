@@ -30,7 +30,6 @@ Deno.test(`scoped temporary locals execute large ordered Foreign bodies`, async 
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
     inferenceBudget: 20000000,
   });
   try {

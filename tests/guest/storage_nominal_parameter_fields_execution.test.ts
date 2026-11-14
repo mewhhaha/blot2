@@ -63,7 +63,6 @@ entry const fallback = func (input: U32): Array U32 => return do:
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false as const,
     };
     const compiler = await createZigProjectCompiler(options);
     try {

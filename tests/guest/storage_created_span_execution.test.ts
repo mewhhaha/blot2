@@ -111,7 +111,6 @@ for (const createdFirst of [true, false]) {
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
     });
     try {
       const result = await compiler.build({

@@ -9,8 +9,11 @@ model first), then port the result to Goose.
 ## Current frontier
 
 - **Direct backend.** The only code generator `blotc` runs; the CLI and the
-  project protocol no longer select a backend or a codegen tier. The scoped
-  backend's code is still in the tree until its deletion lands.
+  project protocol no longer select a backend or a codegen tier.
+  `serve-project` builds each revision fresh (load, check, lower, compile),
+  taking a dependency bundle's unchanged modules as checked; checkpoints,
+  restart caches and retained candidates are gone from the protocol. The
+  scoped backend's code is still in the tree until its deletion lands.
 - **Gdev Main.** On a release compiler it builds in 1.15 s against the scoped
   backend's 6.61 s (backend 95 ms against 5,533 ms), producing 2.7 MB of Wasm
   against 9.2 MB. Its first Pen frame is byte-identical (frame.png 19a03f0a…,

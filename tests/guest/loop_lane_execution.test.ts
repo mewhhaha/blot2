@@ -61,7 +61,6 @@ Deno.test(`flat loop lanes preserve zero iterations swaps and all exits`, async 
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({

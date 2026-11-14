@@ -75,7 +75,6 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         stdRoot: new URL("../../std", import.meta.url),
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });

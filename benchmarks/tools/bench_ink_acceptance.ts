@@ -27,7 +27,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
     imports: { "ink/": `${ink}/lib/` },
     stdRoot: `${root}/std/`,
     prelude: `${root}/std/prelude.blot`,
-    cacheDirectory: false,
     codegenTier,
     codegenWorkers: 1,
   });

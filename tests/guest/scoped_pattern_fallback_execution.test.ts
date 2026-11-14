@@ -77,7 +77,6 @@ Deno.test(`refutable bindings preserve iterator and exiting fallback control flo
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build();

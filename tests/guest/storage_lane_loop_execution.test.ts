@@ -84,7 +84,6 @@ Deno.test(`cyclic lanes retain exact words aliases tails and trap prefixes`, asy
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({
@@ -186,7 +185,6 @@ Deno.test.ignore("cyclic lanes call the prelude's U32.add", async () => {
       entry,
       stdRoot,
       prelude: customPrelude,
-      cacheDirectory: false,
     });
     try {
       const custom = await customCompiler.build({

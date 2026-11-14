@@ -30,7 +30,6 @@ const options = (entry: string) => ({
   entry,
   prelude: new URL("../../std/prelude.blot", import.meta.url),
   stdRoot: new URL("../../std", import.meta.url),
-  cacheDirectory: false as const,
 });
 
 Deno.test(`copies, traps and retained source edits keep their results`, async () => {

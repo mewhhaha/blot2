@@ -107,7 +107,6 @@ Deno.test("source buffers preserve the last good revision through errors deletio
     const recovered = await compiler.build({ sources });
     await answer(recovered, 42);
     equal(recovered.revision, 2);
-    ok(recovered.success && recovered.stats.attemptStats.reused_output);
     const missing = await compiler.build({ sources: { [item.entry]: main } });
     ok(!missing.success);
     equal(missing.revision, 2);

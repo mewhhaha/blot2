@@ -10,7 +10,6 @@ function createCompiler(entry: string) {
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
     storage: {
       temporaryBytes: 16384,
       growerBytes: 16384,

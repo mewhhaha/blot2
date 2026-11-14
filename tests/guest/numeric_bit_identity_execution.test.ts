@@ -60,7 +60,6 @@ Deno.test(`U32 identity proofs preserve bits traps and edits`, async () => {
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   try {
     await Deno.writeTextFile(entry, source);

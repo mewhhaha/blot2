@@ -25,7 +25,7 @@ entry const found = func () : U32 => return value
 Deno.test("constant recursion walks long tables and traps runaway calls at run time", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-depth-" });
   const entry = `${directory}/main.blot`;
-  const options = { executable, entry, prelude, cacheDirectory: false as const };
+  const options = { executable, entry, prelude };
   // [source, expected guest result, or null for a trap]
   const revisions: [string, number | null][] = [
     [registry(600, 599), 1],

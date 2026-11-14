@@ -72,7 +72,6 @@ Deno.test("completed window producers preserve all widths snapshots pull order a
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot: new URL("../../std", import.meta.url).pathname,
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: program } });
@@ -150,7 +149,6 @@ Deno.test.ignore("window sources accept an unannotated map callback", async () =
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     stdRoot: new URL("../../std", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({

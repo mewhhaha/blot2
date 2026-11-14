@@ -59,7 +59,6 @@ Deno.test(`loaded nominal fields retain checked dispatch across generic contexts
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
     startupTimeoutMs: 5_000,
   });
   try {

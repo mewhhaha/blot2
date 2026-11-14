@@ -36,7 +36,6 @@ Deno.test(`closed generic layout witnesses survive mixed caller contexts`, async
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

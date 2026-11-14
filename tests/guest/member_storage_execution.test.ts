@@ -40,7 +40,6 @@ Deno.test.ignore(`single-use selected member storage retains checked scalar and 
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const fresh = await compiler.build({ sources: { [entry]: source } });

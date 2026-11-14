@@ -240,7 +240,6 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           entry: probe.entry,
           prelude: `${repo}/std/prelude.blot`,
           stdRoot: `${repo}/std`,
-          cacheDirectory: false,
           startupTimeoutMs: 5000,
           profileBackend: true,
           codegenTier: values.tier,

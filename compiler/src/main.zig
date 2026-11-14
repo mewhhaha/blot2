@@ -475,14 +475,13 @@ fn run(init: std.process.Init) !bool {
     // Zig 0.17 defaults safe Init.gpa to a validating allocator.
     // Keep compiler checks, but use the standard production heap in releases.
     const backing = if (builtin.mode == .debug) init.gpa else std.heap.smp_allocator;
-    const cache_root = @import("reuse/restart_cache.zig").root(init.arena.allocator(), init.environ_map) catch null;
     const args = try init.minimal.args.toSlice(init.arena.allocator());
     if (args.len == 1 or std.mem.eql(u8, args[1], "--help")) {
         try Io.File.stdout().writeStreamingAll(init.io, usage);
         return true;
     }
     if (std.mem.eql(u8, args[1], "serve-project")) {
-        var policy: Policy = .{ .backend = .direct };
+        var policy: Policy = .{};
         var at: usize = 2;
         while (at < args.len) : (at += 2) {
             if (at + 1 >= args.len) return error.InvalidServeArguments;
@@ -498,11 +497,7 @@ fn run(init: std.process.Init) !bool {
         var output_buffer: [4096]u8 = undefined;
         var input = Io.File.stdin().readerStreaming(init.io, &input_buffer);
         var output = Io.File.stdout().writerStreaming(init.io, &output_buffer);
-        // A retained session outlives many revisions; its heap reuses freed
-        // blocks across them instead of stranding them per thread slot.
-        var heap: @import("runtime/session_heap.zig").Heap = .{};
-        const serving = if (builtin.mode == .debug) backing else heap.allocator();
-        try @import("reuse/zig_project_server.zig").runWithPolicy(serving, init.io, &input.interface, &output.interface, configured_identity, cache_root, policy);
+        try @import("reuse/zig_project_server.zig").run(backing, init.io, &input.interface, &output.interface, configured_identity, policy);
         return true;
     }
     const command = (if (std.mem.eql(u8, args[1], "parse-project")) Command.parse_project else if (std.mem.eql(u8, args[1], "check-project")) Command.check_project else if (std.mem.eql(u8, args[1], "build-project")) Command.build_project else std.meta.stringToEnum(Command, args[1])) orelse {

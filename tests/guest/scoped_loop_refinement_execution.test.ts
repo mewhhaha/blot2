@@ -14,7 +14,6 @@ Deno.test(`loop carries forget entry-only inline variant refinements`, async () 
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build();

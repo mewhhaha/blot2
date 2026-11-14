@@ -293,7 +293,7 @@ const extra = func (n: U32) : F32 => return simd.f32_sum (${bias === 5 ? "twice"
   try {
     const options = {
       executable: Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname, entry,
-      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname, stdRoot, cacheDirectory: false as const,
+      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname, stdRoot,
     };
     const retained = await createZigProjectCompiler(options);
     const results = new Map<number, unknown>();

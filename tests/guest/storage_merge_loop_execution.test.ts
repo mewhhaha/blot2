@@ -174,7 +174,6 @@ Deno.test(`checked merge loops preserve aliases ties skipped accesses and trap p
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({

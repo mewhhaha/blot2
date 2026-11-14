@@ -1045,12 +1045,8 @@ export const devCheckAreas = {
     ],
     "guests": [
       "tests/guest/runtime_text_execution.test.ts",
-      "tests/guest/body_check_cache.test.ts",
     ],
-    "guestFilters": {
-      "tests/guest/body_check_cache.test.ts":
-        "body checker reuse relocates and follows executable edits through rejected revisions",
-    } as Record<string, string>,
+    "guestFilters": {} as Record<string, string>,
   },
 } as const;
 

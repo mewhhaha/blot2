@@ -83,7 +83,6 @@ Deno.test("completion has no entry or build dependency and never publishes its r
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     let snapshot = 0;
@@ -189,7 +188,6 @@ Deno.test("asset completion reads generated names without publishing parser cach
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
     assets: {
       "./asset": {
         path: "./config.json",
@@ -243,7 +241,6 @@ Deno.test("completion retains the deterministic best prefix in an oversized sema
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const query = {
@@ -284,7 +281,6 @@ Deno.test("completion bounds asset parser failure messages at a UTF-8 boundary",
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
     assets: {
       "./asset": {
         path: "./config.json",

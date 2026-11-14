@@ -46,7 +46,6 @@ entry const answer = func (input: U32): Array U32 => return do:
       executable: Deno.args[0],
       entry,
       prelude: null,
-      cacheDirectory: false,
     });
     try {
       const built = await compiler.build({

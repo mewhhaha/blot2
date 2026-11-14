@@ -187,7 +187,6 @@ Deno.test("budget: retained edit suite matches fresh builds", async () => {
     entry: `${directory}/${editSuite.entry}`,
     prelude,
     stdRoot,
-    cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
   const record = async (phase: string, result: ZigProjectBuildResult) => {
@@ -285,7 +284,6 @@ Deno.test("budget: retained edits with check errors match fresh diagnostics", as
     entry: `${directory}/${editSuite.entry}`,
     prelude,
     stdRoot,
-    cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
   try {
@@ -318,100 +316,4 @@ Deno.test("budget: retained edits with check errors match fresh diagnostics", as
     await retained.dispose();
     await Deno.remove(directory, { recursive: true });
   }
-});
-
-// One session switching the module overlaid at a fixture entry, as pen's test
-// workers do: after the first build, each entry checks only itself and the
-// modules no earlier entry reached, and reuses the rest from the session's
-// library (CT90). Lower validated and higher relocated counts are better.
-const switchEntries: readonly { name: string; source: string }[] = [
-  {
-    name: "robots",
-    source: 'import * as robots from "./robots"\n' +
-      "entry const walked = func (x: F32) => return robots.walk x\n",
-  },
-  {
-    name: "hud",
-    source: 'import * as hud from "./hud"\nimport * as math from "./math"\n' +
-      "entry const width = func (x: F32) => return hud.width (math.scale x math.unit)\n",
-  },
-  { name: "all", source: editSuite.files[editSuite.entry] },
-  {
-    name: "robots_again",
-    source: 'import * as robots from "./robots"\n' +
-      "entry const walked = func (x: F32) => return robots.walk x\n",
-  },
-];
-const switchToday: Record<
-  string,
-  { validated_modules: number; relocated_modules: number }
-> = {
-  robots: { validated_modules: 4, relocated_modules: 0 },
-  hud: { validated_modules: 2, relocated_modules: 2 },
-  all: { validated_modules: 1, relocated_modules: 4 },
-  robots_again: { validated_modules: 1, relocated_modules: 3 },
-};
-Deno.test("budget: entry switches check only modules no earlier entry reached", async () => {
-  await Deno.mkdir(scratchRoot, { recursive: true });
-  const directory = await Deno.makeTempDir({
-    dir: scratchRoot,
-    prefix: "budget-entry-switch-",
-  });
-  const options = {
-    executable: compiler,
-    entry: `${directory}/test_fixture.blot`,
-    prelude,
-    stdRoot,
-    cacheDirectory: false as const,
-  };
-  const retained = await createZigProjectCompiler(options);
-  const failures: string[] = [];
-  const improved: string[] = [];
-  try {
-    for (const [file, source] of Object.entries(editSuite.files)) {
-      await Deno.writeTextFile(`${directory}/${file}`, source);
-    }
-    for (const { name, source } of switchEntries) {
-      const sources = { [options.entry]: source };
-      const built = await retained.build({ sources });
-      const fresh = await createZigProjectCompiler(options);
-      try {
-        const expected = await fresh.build({ sources });
-        assert(built.success && expected.success, name);
-        assert.deepEqual(built.bytes, expected.bytes, name);
-      } finally {
-        await fresh.dispose();
-      }
-      const attempt = built.stats.attemptStats as Record<string, unknown>;
-      const fallback = attempt.fallback as Record<string, number>;
-      const budget = switchToday[name];
-      for (const counter of ["validated_modules", "relocated_modules"]) {
-        assert(
-          Number.isSafeInteger(fallback[counter]) && fallback[counter] >= 0,
-          `${name} ${counter}: missing or invalid counter`,
-        );
-      }
-      if (fallback.validated_modules > budget.validated_modules) {
-        failures.push(
-          `${name} validated_modules: ${fallback.validated_modules} exceeds ${budget.validated_modules}`,
-        );
-      } else if (fallback.validated_modules < budget.validated_modules) {
-        improved.push(`${name} validated_modules`);
-      }
-      if (fallback.relocated_modules < budget.relocated_modules) {
-        failures.push(
-          `${name} relocated_modules: ${fallback.relocated_modules} below ${budget.relocated_modules}`,
-        );
-      } else if (fallback.relocated_modules > budget.relocated_modules) {
-        improved.push(`${name} relocated_modules`);
-      }
-    }
-  } finally {
-    await retained.dispose();
-    await Deno.remove(directory, { recursive: true });
-  }
-  if (improved.length) {
-    console.log(`Tighten switchToday: ${improved.join(", ")} improved.`);
-  }
-  assert.equal(failures.length, 0, failures.join("\n"));
 });

@@ -82,7 +82,6 @@ try {
     },
     inferenceBudget: settings.inferenceBudget,
     storage: settings.storage,
-    cacheDirectory: false,
     startupTimeoutMs: Math.min(timeoutMs, 5000),
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,

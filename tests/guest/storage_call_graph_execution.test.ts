@@ -115,7 +115,6 @@ for (const kind of ["reader", "writer", "witnesses", "scratch"] as const) {
         entry,
         stdRoot,
         prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
         startupTimeoutMs: 5_000,
       });
       let source = witnesses;

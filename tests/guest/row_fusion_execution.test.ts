@@ -243,7 +243,6 @@ const consume = func row => return @u32.add row.a row.b
         entry,
         prelude: null,
         dependencies,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -303,7 +302,6 @@ Deno.test(`named packed row consumers preserve widths slices saved rows and F32 
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const { source, cases } = pipelineSources();

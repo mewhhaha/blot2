@@ -126,7 +126,7 @@ entry const direct = func (input: U32) => return do:
 `;
   try {
     {
-      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, cacheDirectory: false });
+      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });
         assert(result.success, JSON.stringify(result));

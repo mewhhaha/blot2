@@ -90,7 +90,6 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
           executable,
           entry,
           prelude: null,
-          cacheDirectory: false,
         });
         try {
           const result = await compiler.build({ sources: { [entry]: source } });
@@ -130,7 +129,6 @@ entry const answer = func (input: U32) => return calculate { d: 4, c: 3, b: 2, a
         executable,
         entry,
         prelude: null,
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });

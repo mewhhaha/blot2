@@ -34,7 +34,6 @@ Deno.test("wide ownership preserves snapshots float bits and static shape reloca
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -113,7 +112,6 @@ Deno.test.ignore("wide ownership selects exact bitmap and size for differently s
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({

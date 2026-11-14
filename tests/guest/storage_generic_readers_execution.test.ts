@@ -156,7 +156,6 @@ Deno.test(`selected generic readers retain nominal payloads and captured instant
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

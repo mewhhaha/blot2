@@ -9,7 +9,6 @@ Deno.test(`copied nominal payloads and reference arrays show writes through the 
       import.meta.url,
     ),
     prelude: new URL("../../std/prelude.blot", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build();

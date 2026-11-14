@@ -24,7 +24,6 @@ Deno.test(`planned borrows retain their checked View Ref and Link witnesses`, as
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

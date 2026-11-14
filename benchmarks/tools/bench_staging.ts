@@ -83,7 +83,6 @@ const build = func (value: U32) => return ${
           prelude: null,
           codegenTier,
           codegenWorkers: 1,
-          cacheDirectory: false as const,
           dependencies: archive ? bundle : undefined,
         };
         let retained;

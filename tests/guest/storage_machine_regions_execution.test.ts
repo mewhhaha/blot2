@@ -43,7 +43,6 @@ for (const scalar of ["U32", "F32"] as const) {
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
     });
     try {
       const result = await compiler.build({

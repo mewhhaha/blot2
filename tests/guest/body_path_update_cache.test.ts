@@ -31,7 +31,6 @@ Deno.test(`body path update receipts preserve selector order and writes through 
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const compiler = await createZigProjectCompiler(options);
   try {

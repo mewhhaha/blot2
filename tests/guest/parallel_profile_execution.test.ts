@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 for (const profileBackend of [false, true]) {
-  Deno.test(`heap diagnostics preserve executed output and failed-edit recovery (backend profile ${profileBackend})`, async () => {
+  Deno.test(`profiled sessions preserve executed output and failed-edit recovery (backend profile ${profileBackend})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-heap-profile-" });
     const entry = `${directory}/main.blot`;
     const source = "entry const answer = func (value: U32): U32 => return @u32.add value 1\n";
@@ -11,7 +11,6 @@ for (const profileBackend of [false, true]) {
       executable: Deno.args[0],
       entry,
       prelude: null,
-      cacheDirectory: false as const,
       frontendWorkers: 4,
       startupTimeoutMs: 5000,
     };
@@ -34,22 +33,6 @@ for (const profileBackend of [false, true]) {
         });
         assert(built.success, JSON.stringify(built));
         if (text === source) assert.deepEqual(built.bytes, reference.bytes);
-        const heap = built.stats.sessionHeap as {
-          complete: boolean;
-          diagnostic: {
-            diagnostic: boolean;
-            acquisitions: number;
-            contended_acquisitions: number;
-            wait_kind: string;
-            wait_ns: number | null;
-          };
-        };
-        assert(heap.complete);
-        assert(heap.diagnostic.diagnostic);
-        assert(heap.diagnostic.acquisitions > 0);
-        assert(heap.diagnostic.contended_acquisitions <= heap.diagnostic.acquisitions);
-        assert.equal(heap.diagnostic.wait_kind, "worker_sum");
-        if (heap.diagnostic.wait_ns !== null) assert(heap.diagnostic.wait_ns >= 0);
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {

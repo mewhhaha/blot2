@@ -230,7 +230,6 @@ entry const floating = func (values: Array F32) => return do:
         executable: Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
         entry,
         prelude: null,
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build();

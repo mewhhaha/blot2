@@ -77,7 +77,6 @@ async function inspectBuild(
       executable: Deno.args[0],
       entry,
       prelude: null,
-      cacheDirectory: false,
     });
     try {
       const built = await compiler.build();
@@ -179,7 +178,6 @@ entry const run = func (value: ${type}) => return read (make value)
           executable: Deno.args[0],
           entry,
           prelude: null,
-          cacheDirectory: false,
         });
         try {
           const built = await compiler.build();

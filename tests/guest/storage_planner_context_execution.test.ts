@@ -43,7 +43,6 @@ Deno.test(`imported planner closures retain their own field obligations`, async 
     entry,
     stdRoot,
     prelude: `${directory}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     await Deno.writeTextFile(helperFile, helper);

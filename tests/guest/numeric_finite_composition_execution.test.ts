@@ -117,7 +117,6 @@ Deno.test(`numeric finite nested selected closures preserve exact operands unkno
         entry,
         prelude: null,
         dependencies,
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

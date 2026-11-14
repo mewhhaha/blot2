@@ -36,7 +36,6 @@ Deno.test(`scoped standard SIMD wrappers retain exact lane bits`, async () => {
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build();
@@ -122,7 +121,6 @@ Deno.test.ignore("scoped standard SIMD wrappers require literal in-range selecto
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
     stdRoot: new URL("../../std/", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build();

@@ -65,7 +65,6 @@ const options: ZigProjectCompilerOptions = {
   },
   storage: settings.storage,
   inferenceBudget: settings.inferenceBudget,
-  cacheDirectory: false,
   profileTrace: true,
   profileBackend: true,
   codegenTier: "optimized",

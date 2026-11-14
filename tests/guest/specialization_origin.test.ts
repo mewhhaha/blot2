@@ -22,7 +22,6 @@ Deno.test.ignore("specialization uses survive fresh CLI, retained project reject
     executable,
     entry,
     prelude,
-    cacheDirectory: false,
   });
   try {
     const good = {
@@ -124,7 +123,6 @@ Deno.test.ignore("a concrete invalid operation in a library stays in that librar
     executable,
     entry,
     prelude,
-    cacheDirectory: false,
   });
   try {
     const source = "const broken=func ignored=> return true + false\n";
@@ -176,7 +174,6 @@ Deno.test.ignore("compiled callback definitions preserve source origins", async 
       entry,
       prelude,
       dependencies,
-      cacheDirectory: false,
     });
     try {
       const result = await compiler.build();

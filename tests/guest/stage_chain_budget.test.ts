@@ -50,7 +50,6 @@ Deno.test("CLI rejects inference budget exhaustion without publishing output", a
         "--inference-budget",
         "256",
       ],
-      env: { BLOT_CACHE_DIR: "" },
       stdout: "piped",
       stderr: "piped",
     }).output();
@@ -80,7 +79,6 @@ Deno.test.ignore("fresh and retained stage-chain rejection agrees and the server
     inferenceBudget: 256,
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
   let original: Uint8Array<ArrayBuffer> | undefined;

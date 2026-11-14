@@ -98,7 +98,6 @@ func increment (value: U32) : U32 => return hidden value
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false,
       startupTimeoutMs: 5000,
     });
     try {

@@ -165,7 +165,6 @@ export class CompletionBridge {
         const compiler = await createZigProjectCompiler({
           ...this.options,
           entry: file,
-          cacheDirectory: false,
           startupTimeoutMs: remaining,
         });
         this.#child = {

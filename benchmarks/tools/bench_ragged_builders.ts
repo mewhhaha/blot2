@@ -356,7 +356,6 @@ for (let pair = 0; pair < 7; pair++) {
       entry: input,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
     });
     try {
       for (

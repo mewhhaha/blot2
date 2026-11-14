@@ -49,7 +49,6 @@ Deno.test.ignore(`primitive scalar aliases preserve eager calls partial snapshot
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const source = await Deno.readTextFile(fixture);
@@ -291,7 +290,6 @@ Deno.test(`prelude primitive aliases retain operators associated dispatch and no
     executable: Deno.args[0],
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({

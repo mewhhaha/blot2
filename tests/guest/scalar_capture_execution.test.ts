@@ -43,7 +43,6 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
       });
       try {
         const edited = source.replace(
@@ -65,7 +64,6 @@ Deno.test("private scalar captures preserve early exits loop reentry host suspen
             executable,
             entry,
             prelude: new URL("../../std/prelude.blot", import.meta.url),
-            cacheDirectory: false,
           });
           try {
             const repeated = await fresh.build({ sources: { [entry]: text } });

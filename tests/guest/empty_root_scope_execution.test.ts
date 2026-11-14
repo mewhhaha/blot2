@@ -35,7 +35,6 @@ Deno.test("empty lexical frames preserve packed folds traps foreign allocation a
         executable: Deno.args[0],
         entry,
         prelude,
-        cacheDirectory: false,
       });
       try {
         const built = await compiler.build({ sources: { [entry]: source } });

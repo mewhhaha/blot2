@@ -32,7 +32,6 @@ Deno.test(`wide fields use scoped indexes or forward complete result words`, asy
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

@@ -13,7 +13,6 @@ const entry =
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false,
       storage: {
         temporaryBytes: 1024,
         growerBytes: 256,

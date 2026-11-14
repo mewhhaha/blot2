@@ -95,7 +95,6 @@ Deno.test("optimized evaluated folds compute ranges maps filters and takes", asy
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
     });
     try {
       const built = await compiler.build({
@@ -176,7 +175,6 @@ entry const stable = func (value: U32) => return scalar value
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {

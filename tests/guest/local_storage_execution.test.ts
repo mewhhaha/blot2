@@ -18,7 +18,6 @@ const get = func ($Box mapper) => return mapper
         new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
       entry,
       prelude: null,
-      cacheDirectory: false,
     });
     try {
       const source = `
@@ -234,7 +233,6 @@ Deno.test.ignore("closed local wrapper body edits retain fresh failure recovery"
       new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const library = `type Box f is data = $Box (f, U32)
 const box = func value => return $Box (value, 1)

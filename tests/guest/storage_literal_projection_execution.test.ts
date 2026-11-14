@@ -16,7 +16,6 @@ import { instantiateGuest } from "../../host/guest.ts";
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false as const,
     };
     const caller = `import * as left from "./palette"
 import * as right from "./other"

@@ -71,7 +71,6 @@ async function host() {
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
     clearEnv: true,
-    env: { BLOT_CACHE_DIR: "" },
     stdin: "piped",
     stdout: "piped",
     stderr: "piped",
@@ -273,7 +272,6 @@ function rejection(frame: Frame, code: string, stage = "asset") {
     "revision",
     "success",
     "diagnostics",
-    "attemptStats",
   ]);
   equal(meta.success, false);
   equal(frame.payload.length, 0);
@@ -298,7 +296,6 @@ function rejection(frame: Frame, code: string, stage = "asset") {
   ok(diagnostic.start <= diagnostic.end);
   equal(diagnostic.utf16, null);
   equal(diagnostic.details, null);
-  if (stage === "asset") equal(meta.attemptStats, null);
   return diagnostic;
 }
 function definition(

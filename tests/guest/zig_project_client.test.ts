@@ -78,7 +78,7 @@ async function answer(result: ZigProjectBuildResult, value: number) {
     !Object.hasOwn(built, "const_steps") &&
       !Object.hasOwn(built, "remaining_steps"),
   );
-  ok(Number.isSafeInteger(built.stats.nativeWorkSteps));
+  ok(Number.isSafeInteger(built.stats.emittedFunctions));
 }
 async function command(
   directory: string,
@@ -187,7 +187,7 @@ async function record(value: Record<string, unknown>) {
   await trace("BLOT_PROFILE " + JSON.stringify({ ...value, space: value.space ?? "source" }) + "\n");
 }
 async function rejectBuild(metadata: Record<string, any>) {
-  await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.blot",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}],attemptStats:null});
+  await writeFrame({kind:"build",id:metadata.id,epoch:"trace",revision:0,success:false,diagnostics:[{filename:"main.blot",stage:"check",code:"fixture",message:"expected",start:0,end:0,offset_encoding:"utf8_bytes"}]});
 }
 await writeFrame({
   kind: "hello",
@@ -268,7 +268,6 @@ while (true) {
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false,
       profileBackend: true,
       profileTrace: true,
     });
@@ -384,9 +383,9 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
     await answer(queued[1], 42);
     await fresh(directory, entry, queued[1], "initial");
     success(queued[0]).bytes.fill(0);
-    success(queued[0]).stats.nativeWorkSteps = 999;
+    success(queued[0]).stats.emittedFunctions = 999;
     await answer(queued[1], 42);
-    ok(success(queued[1]).stats.nativeWorkSteps !== 999);
+    ok(success(queued[1]).stats.emittedFunctions !== 999);
     await Deno.writeTextFile(entry, original.replace("42", "43"));
     const edited = await compiler.build();
     equal(edited.revision, 3);
@@ -397,7 +396,6 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
     ok(!rejected.success);
     equal(rejected.revision, 3);
     equal(rejected.diagnostics[0].offset_encoding, "utf8_bytes");
-    ok(rejected.attemptStats !== null);
     await Deno.writeTextFile(
       directory + "/rejected.client.json",
       JSON.stringify(rejected, null, 2) + "\n",
@@ -406,20 +404,6 @@ Deno.test("Zig project client queues revisions and preserves entry edit/error/mi
     const missing = await compiler.build();
     ok(!missing.success);
     equal(missing.revision, 3);
-    ok(missing.attemptStats !== null);
-    equal(
-      (missing.attemptStats.inputs as { source_reads: number }).source_reads,
-      0,
-    );
-    equal(
-      (missing.attemptStats.fallback as { body_elaborations: number })
-        .body_elaborations,
-      0,
-    );
-    ok(
-      JSON.stringify(missing.attemptStats) !==
-        JSON.stringify(success(edited).stats.attemptStats),
-    );
     await Deno.writeTextFile(
       directory + "/missing.client.json",
       JSON.stringify(missing, null, 2) + "\n",
@@ -470,8 +454,6 @@ Deno.test("Zig project client keeps lexical alias roots through retargeting and 
         executable,
         entry,
         prelude: null,
-        // This law measures explicit dependency admission, not restart reuse.
-        cacheDirectory: false,
         imports: { "lib/": link },
       };
     const identity = await verified(directory);

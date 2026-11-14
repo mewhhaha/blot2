@@ -42,12 +42,14 @@ const maxMetadataBytes = 16 * 1024 * 1024;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ZigProjectStats = { [key: string]: Json };
 export interface ZigProjectBuildStats extends ZigProjectStats {
-  nativeWorkSteps: number;
   frontend: ZigProjectStats;
   sourceBytes: number;
+  /** Modules checked for this build and modules taken from `dependencies`. */
   freshModules: number;
   cachedModules: number;
-  attemptStats: ZigProjectStats;
+  emittedFunctions: number;
+  /** Phase clocks; empty unless `profileBackend` was set. */
+  phaseProfile: ZigProjectStats;
 }
 export interface ZigProjectSourceLocation {
   filename: string;
@@ -97,7 +99,6 @@ export type ZigProjectBuildResult =
     success: false;
     revision: number;
     diagnostics: ZigProjectDiagnostic[];
-    attemptStats: ZigProjectStats | null;
   };
 export interface StorageBudgets {
   temporaryBytes?: number;
@@ -113,11 +114,11 @@ export interface ZigProjectCompilerOptions {
   stdRoot?: string | URL | null;
   imports?: Readonly<Record<string, string | URL>>;
   dependencies?: string | URL | null;
-  /** Collect detailed backend phase and slow inference-region timings. */
+  /** Collect phase clocks and allocation counts for each build. */
   profileBackend?: boolean;
   /** Stream bounded phase, module and region progress records over stderr. */
   profileTrace?: boolean;
-  /** Bounded data stacks; byte budgets are positive multiples of 16. */
+  /** Accepted for Pen settings; the direct backend lays out fixed regions. */
   storage?: Readonly<StorageBudgets>;
   /** Lowers modules on 1..16 workers; default stays serial. */
   semanticWorkers?: number;
@@ -125,11 +126,6 @@ export interface ZigProjectCompilerOptions {
   frontendWorkers?: number;
   /** Process-local inference limit, included in compiler identity. */
   inferenceBudget?: number;
-  /** Optional backend checkpoint from exportCheckpoint; copied at startup. */
-  checkpoint?: Uint8Array<ArrayBuffer>;
-  /** Native restart cache root. Defaults to the platform cache directory when
-   * its environment is readable; false disables automatic persistence. */
-  cacheDirectory?: string | URL | false;
   startupTimeoutMs?: number;
   expectedCompilerIdentity?: string;
   assets?: AssetImports;
@@ -145,8 +141,6 @@ export interface ZigProjectCompiler {
   complete(
     options: ZigProjectCompletionOptions,
   ): Promise<ZigProjectCompletionResult>;
-  /** Portable candidates from the last successful revision; does not advance it. */
-  exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>>;
   close(): Promise<void>;
   dispose(): Promise<void>;
 }
@@ -313,33 +307,16 @@ function buildStats(value: unknown): ZigProjectBuildStats {
   const object = stats(value, "stats");
   for (
     const field of [
-      "nativeWorkSteps",
       "sourceBytes",
       "freshModules",
       "cachedModules",
+      "emittedFunctions",
     ]
   ) {
     natural(object[field], `stats ${field}`);
   }
-  for (
-    const field of [
-      "frontend",
-      "backend",
-      "optimization",
-      "runtimeOptimization",
-      "backendTiming",
-      "workCounters",
-      "principals",
-      "refinements",
-      "selectedQueries",
-      "attemptStats",
-    ]
-  ) stats(object[field], `stats ${field}`);
-  if (object.sourceValidation !== undefined) {
-    stats(object.sourceValidation, "stats sourceValidation");
-  }
-  if (typeof object.restartCacheLoaded !== "boolean") {
-    throw new ZigProjectProtocolError("Invalid stats restartCacheLoaded");
+  for (const field of ["frontend", "phaseProfile"]) {
+    stats(object[field], `stats ${field}`);
   }
   return object as ZigProjectBuildStats;
 }
@@ -520,7 +497,6 @@ class ProjectProcess implements ZigProjectCompiler {
   #editorCompletion = false;
   #nativeAssets = false;
   #entry = "";
-  #checkpoints = false;
   #epoch = "";
   #revision = 0;
   #nextId = 1;
@@ -528,7 +504,6 @@ class ProjectProcess implements ZigProjectCompiler {
 
   constructor(
     executable: string,
-    cacheEnvironment: Record<string, string>,
     semanticWorkers?: number,
     inferenceBudget?: number,
     frontendWorkers?: number,
@@ -546,7 +521,6 @@ class ProjectProcess implements ZigProjectCompiler {
     this.#child = new Deno.Command(executable, {
       args,
       clearEnv: true,
-      env: cacheEnvironment,
       stdin: "piped",
       stdout: "piped",
       stderr: "piped",
@@ -899,7 +873,6 @@ class ProjectProcess implements ZigProjectCompiler {
     open: Record<string, unknown>,
     timeout: number,
     expectedIdentity?: string,
-    checkpoint?: Uint8Array<ArrayBuffer>,
   ) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -932,7 +905,6 @@ class ProjectProcess implements ZigProjectCompiler {
           this.#editorCompletion = capabilities.includes(
             "editor-completion-v1",
           );
-          this.#checkpoints = capabilities.includes("backend-checkpoints");
           this.#nativeAssets = open.nativeAssets !== undefined;
           this.#entry = open.entry as string;
           if (
@@ -942,17 +914,12 @@ class ProjectProcess implements ZigProjectCompiler {
               "Compiler does not support native assets",
             );
           }
-          if (checkpoint && !this.#checkpoints) {
-            throw new ZigProjectProtocolError(
-              "Compiler does not support checkpoints",
-            );
-          }
           const response = await this.#exchange({
             kind: "open",
             id: this.#id(),
             version: 1,
             ...open,
-          }, checkpoint ? [checkpoint] : []);
+          });
           if (
             response.payload.length ||
             typeof response.metadata.epoch !== "string" ||
@@ -1205,9 +1172,6 @@ class ProjectProcess implements ZigProjectCompiler {
           success: false,
           revision,
           diagnostics: metadata.diagnostics.map(diagnostic),
-          attemptStats: metadata.attemptStats === null
-            ? null
-            : stats(metadata.attemptStats, "attemptStats"),
         };
       }
       if (!job.cancelled) this.#revision = revision;
@@ -1379,52 +1343,6 @@ class ProjectProcess implements ZigProjectCompiler {
       );
     });
   }
-  exportCheckpoint(): Promise<Uint8Array<ArrayBuffer>> {
-    if (!this.#checkpoints) {
-      return Promise.reject(new Error("Compiler does not support checkpoints"));
-    }
-    if (!this.#accepting) {
-      return Promise.reject(this.#terminal ?? new Error("Compiler is closing"));
-    }
-    const task = this.#queue.then(async () => {
-      if (this.#terminal) throw this.#terminal;
-      let frame: Frame;
-      try {
-        frame = await this.#exchange({
-          kind: "checkpoint",
-          id: this.#id(),
-          epoch: this.#epoch,
-          revision: this.#revision,
-        });
-        const metadata = frame.metadata;
-        if (
-          metadata.epoch !== this.#epoch ||
-          metadata.revision !== this.#revision ||
-          typeof metadata.success !== "boolean" ||
-          (metadata.success
-            ? frame.payload.length === 0
-            : frame.payload.length !== 0 || typeof metadata.code !== "string")
-        ) {
-          throw new ZigProjectProtocolError(
-            "Invalid checkpoint acknowledgement",
-          );
-        }
-      } catch (error) {
-        this.#break(
-          error instanceof Error ? error : new Error(String(error)),
-          true,
-        );
-        await this.#shutdown(true);
-        throw this.#failure(error);
-      }
-      if (!frame.metadata.success) {
-        throw new Error(`Unable to export checkpoint: ${frame.metadata.code}`);
-      }
-      return frame.payload;
-    });
-    this.#queue = task.then(() => {}, () => {});
-    return task;
-  }
   close(): Promise<void> {
     if (this.#closing) return this.#closing;
     if (this.#terminal) return this.dispose();
@@ -1484,8 +1402,6 @@ export async function createZigProjectCompiler(
     "semanticWorkers",
     "frontendWorkers",
     "inferenceBudget",
-    "checkpoint",
-    "cacheDirectory",
     "startupTimeoutMs",
     "expectedCompilerIdentity",
     "assets",
@@ -1524,20 +1440,6 @@ export async function createZigProjectCompiler(
       storage[key] = value;
     }
   }
-  if (
-    options.checkpoint !== undefined &&
-    !(options.checkpoint instanceof Uint8Array)
-  ) {
-    throw new TypeError("checkpoint must contain bytes from exportCheckpoint");
-  }
-  if (
-    options.checkpoint !== undefined &&
-    (options.checkpoint.length === 0 ||
-      options.checkpoint.length > maxFrameBytes - maxMetadataBytes - 8)
-  ) {
-    throw new RangeError("Checkpoint payload exceeds protocol limits");
-  }
-  const checkpoint = options.checkpoint && new Uint8Array(options.checkpoint);
   if (
     options.profileBackend !== undefined &&
     typeof options.profileBackend !== "boolean"
@@ -1583,7 +1485,6 @@ export async function createZigProjectCompiler(
     stdRoot: nullablePath(options.stdRoot, "stdRoot"),
     imports,
     dependencies: nullablePath(options.dependencies, "dependencies"),
-    ...(checkpoint ? { checkpoint: true } : {}),
     ...(options.profileBackend ? { profileBackend: true } : {}),
     ...(options.profileTrace ? { profileTrace: true } : {}),
     ...(storage ? { storage } : {}),
@@ -1608,30 +1509,6 @@ export async function createZigProjectCompiler(
     )
       .length > maxMetadataBytes
   ) throw new RangeError("Open metadata exceeds 16 MiB");
-  const cacheEnvironment: Record<string, string> = {};
-  if (options.cacheDirectory !== undefined) {
-    cacheEnvironment.BLOT_CACHE_DIR = options.cacheDirectory === false
-      ? ""
-      : path(options.cacheDirectory, "cache directory");
-  } else {
-    // Preserve the isolated child environment. Only cache-location variables
-    // that the caller can already read are forwarded; never prompt for access.
-    for (
-      const variable of [
-        "BLOT_CACHE_DIR",
-        "XDG_CACHE_HOME",
-        "HOME",
-        "LOCALAPPDATA",
-      ]
-    ) {
-      if (
-        Deno.permissions.querySync({ name: "env", variable }).state !==
-          "granted"
-      ) continue;
-      const value = Deno.env.get(variable);
-      if (value !== undefined) cacheEnvironment[variable] = value;
-    }
-  }
   if (
     options.inferenceBudget !== undefined &&
     (!Number.isSafeInteger(options.inferenceBudget) ||
@@ -1641,12 +1518,11 @@ export async function createZigProjectCompiler(
   }
   const process = new ProjectProcess(
     executable,
-    cacheEnvironment,
     options.semanticWorkers,
     options.inferenceBudget,
     options.frontendWorkers,
   );
-  await process.initialize(open, timeout, identity, checkpoint);
+  await process.initialize(open, timeout, identity);
   if (assets !== undefined) {
     try {
       return await withAssetImports(process, entry, assets);

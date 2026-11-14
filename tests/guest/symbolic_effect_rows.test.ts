@@ -63,7 +63,6 @@ entry const floating = func () => return @product.get (@effect.run State.get Sta
         entry,
         prelude: null,
         dependencies,
-        cacheDirectory: false,
       });
       try {
         for (const expected of [42, 43, null, 42]) {
@@ -139,7 +138,6 @@ entry const fraction = func () : F32 => return do (@effect.provider (Signal.get 
         entry,
         prelude: null,
         dependencies,
-        cacheDirectory: false,
       });
       try {
         for (const value of [21, 22, 21]) {

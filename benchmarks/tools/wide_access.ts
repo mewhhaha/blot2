@@ -67,7 +67,6 @@ for (
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
     startupTimeoutMs: 5000,
     profileBackend: true,
     codegenTier: "optimized",

@@ -97,7 +97,6 @@ Deno.test("table projection consumes exact changed source bodies in retained bui
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {

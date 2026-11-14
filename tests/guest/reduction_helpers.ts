@@ -21,7 +21,6 @@ export async function compileAndRun(
         entry,
         stdRoot: options.stdRoot,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-        cacheDirectory: false,
       });
       try {
         const built = await compiler.build({ sources: { [entry]: source } });

@@ -219,7 +219,6 @@ try {
     },
     inferenceBudget: settings.inferenceBudget,
     storage: settings.storage,
-    cacheDirectory: false,
     startupTimeoutMs: Math.min(8_000, remainingBuildMs()),
     profileBackend: true,
     codegenTier: "optimized",

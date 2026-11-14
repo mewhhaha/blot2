@@ -93,7 +93,6 @@ for (const kind of ["matrix", "settings"]) {
         stdRoot: `${repo}/std`,
         prelude: `${repo}/std/prelude.blot`,
         imports: { "ink/": resolve(repo, "../ink/lib") },
-        cacheDirectory: false,
         codegenTier,
         codegenWorkers,
         profileBackend: true,

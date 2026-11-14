@@ -97,7 +97,6 @@ Deno.test(`completed plain plans preserve nominal updates and typed bits across 
     entry,
     imports: { "trial/": directory },
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({
@@ -178,7 +177,6 @@ Deno.test(`completed plain plans keep hidden pools and host effects`, async () =
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const persistent = await compiler.build({
@@ -290,7 +288,6 @@ Deno.test(`completed plain word ABI preserves scalar floats nullary results vari
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({
@@ -350,7 +347,6 @@ Deno.test.ignore("completed plain local references write through to the local", 
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({

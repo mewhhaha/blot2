@@ -47,7 +47,6 @@ for (const tier of ["development", "optimized"] as const) {
       entry,
       stdRoot: `${root}/std`,
       prelude: `${root}/std/prelude.blot`,
-      cacheDirectory: false,
       codegenTier: tier,
       codegenWorkers: 1,
     });

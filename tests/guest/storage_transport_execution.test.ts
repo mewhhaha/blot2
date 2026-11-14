@@ -36,7 +36,6 @@ Deno.test(`scoped transport preserves nested swaps stack operands and F32 bits`,
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({

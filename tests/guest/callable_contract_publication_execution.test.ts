@@ -31,7 +31,6 @@ Deno.test("returned callable endpoints retain owners through graph publication a
       const options = {
         executable,
         entry,
-        cacheDirectory: false as const,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
       };
       const compiler = await createZigProjectCompiler(options);

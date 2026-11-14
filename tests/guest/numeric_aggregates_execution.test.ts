@@ -48,7 +48,6 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
         entry,
         stdRoot: new URL("../../std", import.meta.url),
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

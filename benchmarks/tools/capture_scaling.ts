@@ -238,7 +238,6 @@ for (const width of widths) {
                 executable,
                 entry,
                 prelude: null,
-                cacheDirectory: false,
                 codegenTier: "optimized",
                 codegenWorkers: 1,
                 frontendWorkers: 1,

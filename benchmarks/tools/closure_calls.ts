@@ -136,7 +136,6 @@ for (const count of [1, 4, 8]) {
     imports: { "ink/": inkRoot },
     stdRoot,
     prelude: resolve(stdRoot, "prelude.blot"),
-    cacheDirectory: false,
     profileBackend: true,
     codegenTier: values.tier,
     codegenWorkers: workers,

@@ -42,7 +42,6 @@ Deno.test(`numeric helpers with private scopes keep tails, aliased writes and sc
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({ sources: { [entry]: source } });
@@ -116,7 +115,6 @@ Deno.test("numeric helper admission revalidates retained edits", async () => {
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false,
     });
     try {
       for (const text of [source, changed, source]) {
@@ -126,7 +124,6 @@ Deno.test("numeric helper admission revalidates retained edits", async () => {
           executable,
           entry,
           prelude: null,
-          cacheDirectory: false,
         });
         try {
           const ordinary = await fresh.build({ sources: { [entry]: text } });

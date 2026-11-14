@@ -16,7 +16,6 @@ async function withCompiler(
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
     startupTimeoutMs: 5000,
   });
   try {

@@ -62,7 +62,6 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
     executable,
     entry: `${directory}/main.blot`,
     prelude: null,
-    cacheDirectory: false as const,
   };
   try {
     const zero = Array.from({ length: modules }, () => 0);

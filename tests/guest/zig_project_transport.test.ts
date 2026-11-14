@@ -253,7 +253,6 @@ for (const mode of ["fragmented", "coalesced", "reject-first"]) {
       );
       if (mode === "reject-first") {
         ok(!results[0].success);
-        strictEqual(results[0].attemptStats, null);
       } else {
         ok(results[0].success);
         results[0].bytes.fill(255);
@@ -401,10 +400,9 @@ for (
     "related-surrogate",
     "related-array",
     "source-fuel",
-    "missing-work",
-    "fractional-work",
+    "missing-functions",
+    "fractional-functions",
     "invalid-stats-object",
-    "invalid-stats-boolean",
     "truncated-header",
     "truncated-metadata",
     "truncated-payload",

@@ -46,7 +46,6 @@ entry const run = func (count: U32): Array U32 => return do:
       executable,
       entry,
       prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      cacheDirectory: false,
     });
     try {
       const result = await compiler.build();

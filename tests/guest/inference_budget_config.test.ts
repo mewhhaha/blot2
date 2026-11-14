@@ -8,8 +8,7 @@ const executable = Deno.args[0] ??
 Deno.test("runtime inference configuration binds identity and preserves the production default", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-budget-config-" });
   const entry = `${directory}/main.blot`;
-  const cacheDirectory = `${directory}/cache`;
-  const options = { executable, entry, prelude: null, cacheDirectory };
+  const options = { executable, entry, prelude: null };
   const sources = { [entry]: "entry const answer = func () => return 42\n" };
   const production = await createZigProjectCompiler(options);
   const explicit = await createZigProjectCompiler({
@@ -39,9 +38,6 @@ Deno.test("runtime inference configuration binds identity and preserves the prod
       explicit.dispose(),
       bounded.dispose(),
     ]);
-    // Reopening this cache key joins any detached writer before teardown.
-    const settled = await createZigProjectCompiler(options);
-    await settled.close();
     await Deno.remove(directory, { recursive: true });
   }
 });

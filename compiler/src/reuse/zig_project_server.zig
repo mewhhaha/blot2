@@ -1,24 +1,25 @@
-//! One owned project and serial build stream per child process. A ready
-//! revision is committed only after its complete reply has been encoded and
+//! One owned project and serial build stream per child process. Each build
+//! loads, checks, lowers and compiles its revision from the sources it names.
+//! A revision is committed only after its complete reply has been encoded and
 //! bounded. Failure delivering a committed reply terminates this process.
 const std = @import("std");
 const frames = @import("zig_project_frames.zig");
 const project = @import("project.zig");
 const inputs = @import("revision_inputs.zig");
-const retained = @import("retained_revision.zig");
 const partial = @import("partial_dependency.zig");
 const dep_cli = @import("dependency_cli.zig");
 const dep_loader = @import("dependency_project_loader.zig");
+const D = @import("frozen_dependency.zig");
+const format = @import("dependency_format.zig");
 const ast = @import("../parse/ast.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
-const restart_cache = @import("restart_cache.zig");
 const native_assets = @import("../backend/native_assets.zig");
 const phase_profile = @import("../phase_profile.zig");
-const session_heap = @import("../runtime/session_heap.zig");
+const Policy = @import("../execution_policy.zig").Policy;
 
 const Request = struct {
-    kind: enum { open, build, close, checkpoint, complete },
+    kind: enum { open, build, close, complete },
     id: u32,
     snapshot: ?u32 = null,
     filename: ?[]const u8 = null,
@@ -33,8 +34,8 @@ const Request = struct {
     dependencies: ?[]const u8 = null,
     profileBackend: bool = false,
     profileTrace: bool = false,
+    /// Accepted and validated; the direct backend lays out its own regions.
     storage: ?@import("../backend/storage_plan.zig").Budgets = null,
-    checkpoint: bool = false,
     sources: []const SourceRange = &.{},
     nativeAssets: ?native_assets.Options = null,
     assetSources: []const SourceRange = &.{},
@@ -98,25 +99,23 @@ fn validateOpen(request: Request) !project.Options {
 
 const OpenProject = struct {
     profile_trace: bool = false,
+    profile_backend: bool = false,
     allocator: Allocator,
     entry: []u8,
     options_owner: inputs.Snapshot,
-    session: retained.Session,
+    /// Checked modules of the open's dependency bundle, and the settings key
+    /// they were checked with. A build takes the modules whose sources are
+    /// unchanged and checks the rest.
+    seed: ?D.FrozenDependency = null,
+    seed_settings: [32]u8 = undefined,
     assets: ?native_assets.Session = null,
-    cache_file: ?restart_cache.File,
-    cache_loaded: bool,
-    /// The cache's checkpoint is read at the first build that compiles, so a
-    /// restored output never pays for decoding it.
-    checkpoint_pending: bool = false,
-    /// So is its dependency seed, when no explicit dependencies were opened.
-    seed_pending: bool = false,
-    /// What the cache's last writer reported when this process opened.
-    last_write: ?restart_cache.Report = null,
-    saved_revision: usize = 0,
+    policy: Policy,
+    /// Successful builds so far; each one is a revision.
+    revisions: usize = 0,
     /// Present for profiled sessions: every session allocation passes it.
     allocation_counter: ?*phase_profile.CountingAllocator = null,
 
-    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, checkpoint_bytes: []const u8, cache_root: ?[]const u8) !OpenProject {
+    fn init(a: Allocator, io: Io, request: Request, compiler: [32]u8, policy: Policy) !OpenProject {
         const raw = try validateOpen(request);
         var assets = if (request.nativeAssets) |definitions| try native_assets.Session.init(a, definitions) else null;
         errdefer if (assets) |*owner| owner.deinit();
@@ -124,135 +123,66 @@ const OpenProject = struct {
         errdefer a.free(entry);
         var options = try inputs.Snapshot.init(a, raw);
         errdefer options.deinit();
-        var session = if (request.dependencies) |path| blk: {
-            // Wire admission uses the artifact's canonical settings. Keep the
-            // original absolute lexical resolver inputs for subsequent builds;
-            // every revision re-resolves them, including symlink retargeting.
+        var result: OpenProject = .{ .profile_trace = request.profileTrace, .profile_backend = request.profileBackend, .allocator = a, .entry = entry, .options_owner = options, .assets = assets, .policy = policy };
+        if (request.dependencies) |path| {
+            // Wire admission uses the artifact's canonical settings. Builds
+            // keep the original absolute options and re-resolve them, so a
+            // retargeted symlink stops the bundle's modules being taken.
             var canonical = try dep_cli.CanonicalOptions.init(a, io, raw);
             defer canonical.deinit(a);
             const actual = canonical.view(raw);
             const bytes = try Io.Dir.cwd().readFileAlloc(io, path, a, .limited(512 * 1024 * 1024));
             defer a.free(bytes);
             var stats: dep_loader.Stats = .{};
-            const seed = try dep_loader.load(a, io, bytes, compiler, dep_cli.settings(actual), actual, &stats);
-            break :blk retained.Session.init(a, seed, options.options);
-        } else try retained.Session.initEmpty(a, options.options);
-        errdefer session.deinit();
-        session.compiler_identity = compiler;
-        session.profile_backend = request.profileBackend;
-        session.policy.storage = request.storage orelse .{};
-        var cache_file: ?restart_cache.File = if (cache_root) |root| restart_cache.File.init(a, root, compiler, entry) catch null else null;
-        errdefer if (cache_file) |*file| file.deinit();
-        var cache_loaded = false;
-        var checkpoint_pending = false;
-        var last_write: ?restart_cache.Report = null;
-        if (checkpoint_bytes.len != 0) session.checkpoint = @import("../backend/backend_checkpoint.zig").decode(a, compiler, checkpoint_bytes) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            else => null, // Optional candidates never replace source validation.
-        } else if (cache_file) |*file| {
-            _ = file.settle(io);
-            last_write = file.readReport(io);
-            if (file.read(io, .output)) |bytes| {
-                defer a.free(bytes);
-                session.restored = retained.Restored.decode(a, compiler, bytes) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                    else => null,
-                };
-                cache_loaded = session.restored != null;
-            }
-            checkpoint_pending = true;
+            result.seed_settings = dep_cli.settings(actual);
+            result.seed = try dep_loader.load(a, io, bytes, compiler, result.seed_settings, actual, &stats);
         }
-        return .{ .profile_trace = request.profileTrace, .allocator = a, .entry = entry, .options_owner = options, .session = session, .assets = assets, .cache_file = cache_file, .cache_loaded = cache_loaded, .checkpoint_pending = checkpoint_pending, .seed_pending = checkpoint_pending and request.dependencies == null, .last_write = last_write };
-    }
-    /// A seed that fails to decode for this compiler and these settings, or
-    /// fails validation, is ignored.
-    fn loadSeed(self: *OpenProject, io: Io) !void {
-        if (!self.seed_pending) return;
-        self.seed_pending = false;
-        const file = &(self.cache_file orelse return);
-        const bytes = file.read(io, .seed) orelse return;
-        defer self.allocator.free(bytes);
-        var seed = retained.decodeSeed(self.allocator, file.compiler, self.session.seed_settings, bytes) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            else => return,
-        };
-        self.session.adoptCachedSeed(seed) catch |err| {
-            @import("dependency_format.zig").deinit(self.allocator, &seed);
-            if (err == error.OutOfMemory) return error.OutOfMemory;
-            return;
-        };
-        self.cache_loaded = true;
-    }
-    fn loadCheckpoint(self: *OpenProject, io: Io) void {
-        if (!self.checkpoint_pending) return;
-        self.checkpoint_pending = false;
-        const file = &(self.cache_file orelse return);
-        // Open already waited for writers; published files are whole.
-        self.session.checkpoint = file.loadPublished(io);
-        if (self.session.checkpoint != null) self.cache_loaded = true;
-    }
-    /// A restored revision exports the checkpoint its writer published with
-    /// it, if the cache still holds exactly that file.
-    fn checkpointBytes(self: *OpenProject, io: Io, compiler: [32]u8) ![]u8 {
-        const restored: ?*retained.Restored = if (self.session.current != null) null else if (self.session.restored) |*value| value else null;
-        const owner = restored orelse return self.session.checkpointBytes(compiler);
-        const expected = owner.checkpoint_digest orelse return error.NoSuccessfulRevision;
-        const file = &(self.cache_file orelse return error.NoSuccessfulRevision);
-        const bytes = file.read(io, .checkpoint) orelse return error.NoSuccessfulRevision;
-        errdefer self.allocator.free(bytes);
-        if (!std.mem.eql(u8, &expected, &@import("dependency_format.zig").digest(bytes))) return error.NoSuccessfulRevision;
-        return bytes;
-    }
-    /// Starts saving the committed revision. Where writes are detached, the
-    /// writer holds the cache lock when this returns, so the caller can reply
-    /// at once and a later open still waits for the complete file.
-    fn persist(self: *OpenProject, io: Io, joined: bool) void {
-        // A restored revision is already what the cache holds.
-        if (self.saved_revision == self.session.revisions or self.session.current == null) return;
-        const file = &(self.cache_file orelse return);
-        const encoding: CheckpointEncoding = .{ .session = &self.session, .compiler = file.compiler };
-        const producer: restart_cache.Producer = .{ .context = &encoding, .encode = CheckpointEncoding.encode };
-        const result = if (joined) file.persistJoined(io, producer) else file.persist(io, producer);
-        switch (result) {
-            .failed => {},
-            .written, .detached => self.saved_revision = self.session.revisions,
-        }
+        return result;
     }
     fn deinit(self: *OpenProject) void {
-        self.session.deinit();
+        if (self.seed) |*seed| format.deinit(self.allocator, seed);
         if (self.assets) |*assets| assets.deinit();
-        if (self.cache_file) |*file| file.deinit();
         self.options_owner.deinit();
         self.allocator.free(self.entry);
         self.* = undefined;
     }
-};
-
-/// Encodes the committed revision, in a detached writer over its copy of the
-/// session, with the allocator the writer gives it.
-const CheckpointEncoding = struct {
-    session: *const retained.Session,
-    compiler: [32]u8,
-    fn encode(context: *const anyopaque, a: Allocator, part: restart_cache.Part, checkpoint: ?[]const u8, report: *restart_cache.Report) ?[]u8 {
-        const self: *const CheckpointEncoding = @ptrCast(@alignCast(context));
-        switch (part) {
-            .checkpoint => {
-                var notes: @import("../backend/backend_checkpoint.zig").Report = .{};
-                defer report.semantic_over_limit = notes.semantic_over_limit;
-                return self.session.encodeCheckpoint(a, self.compiler, &notes) catch |err| {
-                    report.over_limit = report.over_limit or err == error.ArtifactLimit;
-                    return null;
-                };
-            },
-            .output => return self.session.encodeRestored(a, self.compiler, checkpoint) catch |err| {
-                report.over_limit = report.over_limit or err == error.ArtifactLimit;
-                return null;
-            },
-            .seed => return self.session.encodeSeed(a, self.compiler) catch |err| {
-                report.over_limit = report.over_limit or err == error.ArtifactLimit;
-                return null;
-            },
+    fn configure(self: *const OpenProject, io: Io, source: *project.Project) void {
+        source.lowering = .{ .io = io, .workers = self.policy.semantic_workers };
+        source.checking = .{ .io = io, .workers = self.policy.frontend_workers };
+    }
+    /// Loads, checks and lowers this revision's sources. With a dependency
+    /// bundle, the bundle's unchanged modules are taken as checked; a
+    /// rejection there is reported by the fresh check of every module.
+    fn prepare(self: *const OpenProject, io: Io, snapshot: *inputs.Snapshot) !partial.Preparation {
+        const a = self.allocator;
+        if (self.seed) |*seed| seeded: {
+            var canonical = dep_cli.CanonicalOptions.init(a, io, snapshot.options) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                break :seeded;
+            };
+            defer canonical.deinit(a);
+            if (!std.mem.eql(u8, &self.seed_settings, &dep_cli.settings(canonical.view(snapshot.options)))) break :seeded;
+            const reuse = (try snapshot.libraryModules(io, seed)) orelse break :seeded;
+            defer a.free(reuse);
+            var source = project.loadCompiledMixedReadOnly(a, io, self.entry, snapshot.options, seed, snapshot.provider(), reuse) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                break :seeded;
+            };
+            defer source.deinit(a);
+            self.configure(io, &source);
+            if (source.diagnostics.items.len != 0) break :seeded;
+            var preparation = partial.prepareProject(a, &source, self.entry, null, seed) catch |err| {
+                if (err == error.OutOfMemory) return error.OutOfMemory;
+                break :seeded;
+            };
+            if (preparation == .ready) return preparation;
+            preparation.deinit(a);
         }
+        var source = try project.loadWithInputs(a, io, self.entry, snapshot.options, snapshot.provider());
+        defer source.deinit(a);
+        self.configure(io, &source);
+        const empty: D.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
+        return partial.prepareProject(a, &source, self.entry, null, &empty);
     }
 };
 
@@ -332,50 +262,44 @@ fn reply(a: Allocator, writer: *Io.Writer, metadata: anytype, payload: []const u
     defer a.free(bytes);
     try frames.write(writer, bytes, payload);
 }
-fn reject(a: Allocator, writer: *Io.Writer, id: u32, revision: usize, diagnostic: Diagnostic, attempt: ?retained.Stats) !void {
-    try reply(a, writer, .{ .kind = "build", .id = id, .epoch = epoch, .revision = revision, .success = false, .diagnostics = &[_]Diagnostic{diagnostic}, .attemptStats = attempt }, &.{});
+fn reject(a: Allocator, writer: *Io.Writer, id: u32, revision: usize, diagnostic: Diagnostic) !void {
+    try reply(a, writer, .{ .kind = "build", .id = id, .epoch = epoch, .revision = revision, .success = false, .diagnostics = &[_]Diagnostic{diagnostic} }, &.{});
 }
-fn operationFailure(a: Allocator, writer: *Io.Writer, opened: *OpenProject, id: u32, code: []const u8, message: []const u8, attempt: ?retained.Stats) !void {
-    try reject(a, writer, id, opened.session.revisions, .{ .filename = opened.entry, .stage = "build-project", .code = code, .start = 0, .end = 0, .message = message }, attempt);
+fn operationFailure(a: Allocator, writer: *Io.Writer, opened: *OpenProject, id: u32, code: []const u8, message: []const u8) !void {
+    try reject(a, writer, id, opened.revisions, .{ .filename = opened.entry, .stage = "build-project", .code = code, .start = 0, .end = 0, .message = message });
 }
 
 const AssetRange = struct { id: u32, path: []const u8, mediaType: []const u8, sha256: []const u8, start: u32, length: u32 };
 const AssetDependency = struct { path: []const u8, sha256: ?[]const u8 };
 
 fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32, sources: []const inputs.overlays.Source, asset_sources: []const inputs.overlays.Source) !void {
-    // Use the raw process allocator, never the session's counting adapter.
-    // Preparation joins every worker before returning, and its cleanup runs
-    // before this defer on every success/error path. No build pointer escapes.
-    if (opened.profile_trace) session_heap.Heap.beginDiagnostics(a);
-    defer if (opened.profile_trace) {
-        _ = session_heap.Heap.endDiagnostics(a);
-    };
     // Profiled sessions clock this build until its stats are published.
     var diagnostic_trace: ?phase_profile.Trace = if (opened.profile_trace) .init(io, id) else null;
     const trace_installation = phase_profile.installTrace(if (diagnostic_trace) |*owner| owner else null);
     defer trace_installation.restore();
     defer if (diagnostic_trace) |*owner| owner.flushPasses();
-    var profile: ?phase_profile.Profile = if (opened.session.profile_backend) .init(io) else null;
+    var profile: ?phase_profile.Profile = if (opened.profile_backend) .init(io) else null;
     const installation: ?phase_profile.Installation = if (profile) |*owner| phase_profile.install(owner) else null;
     defer if (installation) |installed| installed.restore();
     if (opened.allocation_counter) |counter| if (profile) |*owner| counter.attach(owner);
     defer if (opened.allocation_counter) |counter| counter.detach();
+    const session = opened.allocator;
     var assets: ?*native_assets.Candidate = null;
-    defer if (assets) |candidate| candidate.deinit(a);
+    defer if (assets) |candidate| candidate.deinit(session);
     if (opened.assets) |*owner| {
         const timing = phase_profile.enter(.assets);
         defer timing.exit();
         assets = owner.prepare(io, opened.entry, sources, asset_sources) catch |err| {
-            return operationFailure(a, writer, opened, id, @errorName(err), "Unable to prepare native asset inputs", null);
+            return operationFailure(a, writer, opened, id, @errorName(err), "Unable to prepare native asset inputs");
         };
-        if (assets.?.issue) |diagnostic| return reject(a, writer, id, opened.session.revisions, .{
+        if (assets.?.issue) |diagnostic| return reject(a, writer, id, opened.revisions, .{
             .filename = diagnostic.filename,
             .stage = "asset",
             .code = diagnostic.code,
             .start = diagnostic.start,
             .end = diagnostic.end,
             .message = diagnostic.message,
-        }, null);
+        });
     }
     var merged: std.ArrayList(inputs.overlays.Source) = .empty;
     defer merged.deinit(a);
@@ -384,126 +308,101 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
         try merged.appendSlice(a, sources);
     }
     const complete_sources = if (assets != null) merged.items else sources;
-    const restored = opened.session.prepareRestored(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => null, // The ordinary preparation reports it.
+    var snapshot = inputs.Snapshot.initWithSources(session, io, opened.options_owner.options, complete_sources) catch |err| {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed");
     };
-    var preparation = restored orelse compiled: {
-        opened.loadCheckpoint(io);
-        try opened.loadSeed(io);
-        break :compiled opened.session.prepareRevisionWithSources(io, opened.entry, null, opened.options_owner.options, complete_sources) catch |err| {
-            return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed", null);
-        };
+    defer snapshot.deinit();
+    var preparation = opened.prepare(io, &snapshot) catch |err| {
+        if (err == error.OutOfMemory) return error.OutOfMemory;
+        return operationFailure(a, writer, opened, id, @errorName(err), "Compiler operation failed");
     };
-    defer preparation.deinit();
-    switch (preparation) {
-        .rejected => |*rejection| try reject(a, writer, id, opened.session.revisions, try issue(&rejection.result, opened.entry), rejection.stats),
-        .ready => |candidate| {
-            const result = candidate.result() orelse return error.MissingCandidateResult;
-            const stats = .{
-                .nativeWorkSteps = result.result.compiled.constant_steps,
-                .frontend = result.result.stats,
-                .backend = result.result.compiled.reuse,
-                .optimization = result.result.compiled.optimization,
-                .runtimeOptimization = result.result.compiled.runtime_optimization,
-                .sourceValidation = result.result.compiled.source_validation,
-                .backendTiming = result.result.compiled.timing,
-                .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
-                .sessionHeap = if (profile != null or opened.profile_trace) session_heap.Heap.snapshot(a) else null,
-                .workCounters = result.result.compiled.counters,
-                .allocationSites = result.result.compiled.allocation_emission,
-                .arrayCosts = result.array_costs,
-                .principals = result.result.compiled.principal,
-                .refinements = result.result.compiled.refinements,
-                .selectedQueries = result.result.compiled.completed_queries,
-                .constantReceipts = result.result.compiled.constant_receipts,
-                .restartCacheLoaded = opened.cache_loaded,
-                .restartCacheWrite = opened.last_write,
-                .sourceBytes = result.source_bytes,
-                .freshModules = result.fresh_modules,
-                .cachedModules = result.cached_modules,
-                .attemptStats = candidate.stats,
-            };
-            var payload_parts: std.ArrayList([]const u8) = .empty;
-            defer payload_parts.deinit(a);
-            var ranges: std.ArrayList(AssetRange) = .empty;
-            defer ranges.deinit(a);
-            var dependencies: std.ArrayList(AssetDependency) = .empty;
-            defer dependencies.deinit(a);
-            var payload_size = result.result.compiled.bytes.len;
-            if (assets) |snapshot| {
-                if (payload_size > frames.max_frame_bytes - 8) {
-                    candidate.discard();
-                    return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
-                }
-                for (snapshot.resources.items) |resource| {
-                    if (resource.bytes.len > frames.max_frame_bytes - 8 - payload_size) {
-                        candidate.discard();
-                        return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
-                    }
-                    payload_size += resource.bytes.len;
-                }
-                var start = result.result.compiled.bytes.len;
-                for (snapshot.resources.items) |*resource| {
-                    try ranges.append(a, .{ .id = resource.id, .path = resource.path, .mediaType = resource.mediaType, .sha256 = &resource.sha256, .start = @intCast(start), .length = @intCast(resource.bytes.len) });
-                    start += resource.bytes.len;
-                }
-                for (snapshot.dependencies.items) |*dependency| try dependencies.append(a, .{ .path = dependency.path, .sha256 = if (dependency.sha256) |*digest| digest else null });
-            }
-            const metadata = (if (assets) |snapshot| std.json.Stringify.valueAlloc(a, .{
-                .kind = "build",
-                .id = id,
-                .epoch = epoch,
-                .revision = opened.session.revisions + 1,
-                .success = true,
-                .stats = stats,
-                .wasmBytes = result.result.compiled.bytes.len,
-                .assets = ranges.items,
-                .assetDependencies = dependencies.items,
-                .assetStats = snapshot.stats,
-            }, .{}) else std.json.Stringify.valueAlloc(a, .{
-                .kind = "build",
-                .id = id,
-                .epoch = epoch,
-                .revision = opened.session.revisions + 1,
-                .success = true,
-                .stats = stats,
-            }, .{})) catch |err| {
-                candidate.discard();
-                return operationFailure(a, writer, opened, id, @errorName(err), "Unable to encode build reply", candidate.stats);
-            };
-            defer a.free(metadata);
-            frames.checkLengths(metadata.len, payload_size) catch {
-                candidate.discard();
-                return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits", candidate.stats);
-            };
-            if (assets) |snapshot| {
-                try payload_parts.ensureTotalCapacity(a, snapshot.resources.items.len + 1);
-                payload_parts.appendAssumeCapacity(result.result.compiled.bytes);
-                for (snapshot.resources.items) |resource| payload_parts.appendAssumeCapacity(resource.bytes);
-            }
-            const wasm_bytes = result.result.compiled.bytes;
-            // Metadata and all segment lengths are encoded/bounded before
-            // either owner transfers. Commits retain the borrowed Wasm/asset
-            // bytes through the final write; neither commit allocates or does IO.
-            if (!opened.session.commit(candidate)) return error.InvalidCandidate;
-            if (assets) |snapshot| {
-                opened.assets.?.commit(snapshot);
-                assets = null;
-            }
-            // Where writes are detached, the writer holds the cache lock before
-            // the reply and encodes after it; a kill after the reply loses
-            // nothing, since the next open waits for the writer.
-            if (opened.session.revisions == 1) opened.persist(io, false);
-            if (payload_parts.items.len != 0) try frames.writeParts(writer, metadata, payload_parts.items) else try frames.write(writer, metadata, wasm_bytes);
-        },
+    defer preparation.deinit(session);
+    const ready = switch (preparation) {
+        .rejected => |*rejection| return reject(a, writer, id, opened.revisions, try issue(rejection, opened.entry)),
+        .ready => |*value| value,
+    };
+    var result = emitted: {
+        const timing = phase_profile.enter(.backend);
+        defer timing.exit();
+        break :emitted try ready.emitWithOptions(session, .{ .policy = .{ .backend = .direct } });
+    };
+    defer result.deinit(session);
+    if (result.result.compiled.diagnostic != null) return reject(a, writer, id, opened.revisions, try issue(&result, opened.entry));
+    const wasm_bytes = result.result.compiled.bytes;
+    const stats = .{
+        .frontend = result.result.stats,
+        .sourceBytes = result.source_bytes,
+        .freshModules = result.fresh_modules,
+        .cachedModules = result.cached_modules,
+        .emittedFunctions = result.result.compiled.emitted_functions,
+        .phaseProfile = if (profile) |*owner| owner.record() else phase_profile.Record{},
+    };
+    var payload_parts: std.ArrayList([]const u8) = .empty;
+    defer payload_parts.deinit(a);
+    var ranges: std.ArrayList(AssetRange) = .empty;
+    defer ranges.deinit(a);
+    var dependencies: std.ArrayList(AssetDependency) = .empty;
+    defer dependencies.deinit(a);
+    var payload_size = wasm_bytes.len;
+    if (assets) |candidate| {
+        if (payload_size > frames.max_frame_bytes - 8) return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits");
+        for (candidate.resources.items) |resource| {
+            if (resource.bytes.len > frames.max_frame_bytes - 8 - payload_size) return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits");
+            payload_size += resource.bytes.len;
+        }
+        var start = wasm_bytes.len;
+        for (candidate.resources.items) |*resource| {
+            try ranges.append(a, .{ .id = resource.id, .path = resource.path, .mediaType = resource.mediaType, .sha256 = &resource.sha256, .start = @intCast(start), .length = @intCast(resource.bytes.len) });
+            start += resource.bytes.len;
+        }
+        for (candidate.dependencies.items) |*dependency| try dependencies.append(a, .{ .path = dependency.path, .sha256 = if (dependency.sha256) |*digest| digest else null });
     }
+    const metadata = (if (assets) |candidate| std.json.Stringify.valueAlloc(a, .{
+        .kind = "build",
+        .id = id,
+        .epoch = epoch,
+        .revision = opened.revisions + 1,
+        .success = true,
+        .stats = stats,
+        .wasmBytes = wasm_bytes.len,
+        .assets = ranges.items,
+        .assetDependencies = dependencies.items,
+        .assetStats = candidate.stats,
+    }, .{}) else std.json.Stringify.valueAlloc(a, .{
+        .kind = "build",
+        .id = id,
+        .epoch = epoch,
+        .revision = opened.revisions + 1,
+        .success = true,
+        .stats = stats,
+    }, .{})) catch |err| {
+        return operationFailure(a, writer, opened, id, @errorName(err), "Unable to encode build reply");
+    };
+    defer a.free(metadata);
+    frames.checkLengths(metadata.len, payload_size) catch {
+        return operationFailure(a, writer, opened, id, "response_limit", "Build reply exceeds protocol limits");
+    };
+    if (assets) |candidate| {
+        try payload_parts.ensureTotalCapacity(a, candidate.resources.items.len + 1);
+        payload_parts.appendAssumeCapacity(wasm_bytes);
+        for (candidate.resources.items) |resource| payload_parts.appendAssumeCapacity(resource.bytes);
+    }
+    // Metadata and all segment lengths are encoded and bounded before the
+    // revision commits. The asset commit retains the borrowed asset bytes
+    // through the final write; neither commit allocates or does IO.
+    opened.revisions += 1;
+    if (assets) |candidate| {
+        opened.assets.?.commit(candidate);
+        assets = null;
+    }
+    if (payload_parts.items.len != 0) try frames.writeParts(writer, metadata, payload_parts.items) else try frames.write(writer, metadata, wasm_bytes);
 }
 
 fn completionFailure(a: Allocator, writer: *Io.Writer, opened: *OpenProject, request: Request, code: []const u8, message: []const u8, position: u32) !void {
     var end = @min(message.len, 1024);
     while (end != 0 and end < message.len and message[end] & 0xc0 == 0x80) end -= 1;
-    try reply(a, writer, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = false, .diagnostics = [_]Diagnostic{.{ .filename = request.filename.?, .stage = "complete", .code = code, .start = position, .end = position, .message = message[0..end] }} }, &.{});
+    try reply(a, writer, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = false, .diagnostics = [_]Diagnostic{.{ .filename = request.filename.?, .stage = "complete", .code = code, .start = position, .end = position, .message = message[0..end] }} }, &.{});
 }
 fn complete(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, request: Request, sources: []const inputs.overlays.Source) !void {
     if (request.snapshot.? == 0) return completionFailure(a, writer, opened, request, "invalid_completion", "Snapshot must be nonzero", 0);
@@ -552,7 +451,7 @@ fn complete(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, requ
     // A large context cannot evict already proved suggestions. Check it with
     // the required fields first, then preserve the best bounded item prefix.
     if (result.context) |context| {
-        const context_bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = context, .items = [_]u8{}, .truncated = true, .diagnostics = [_]u8{} }, .{});
+        const context_bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = context, .items = [_]u8{}, .truncated = true, .diagnostics = [_]u8{} }, .{});
         defer a.free(context_bytes);
         if (context_bytes.len > 256 * 1024) {
             context.deinit(a);
@@ -563,7 +462,7 @@ fn complete(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, requ
     var item_count = result.items.len;
     var diagnostic_count = result.diagnostics.len;
     while (true) {
-        const bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.session.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = result.context, .items = result.items[0..item_count], .truncated = result.truncated, .diagnostics = result.diagnostics[0..diagnostic_count] }, .{});
+        const bytes = try std.json.Stringify.valueAlloc(a, .{ .kind = "complete", .id = request.id, .epoch = epoch, .revision = opened.revisions, .snapshot = request.snapshot.?, .filename = request.filename.?, .position = request.position.?, .success = true, .replace = result.replace, .context = result.context, .items = result.items[0..item_count], .truncated = result.truncated, .diagnostics = result.diagnostics[0..diagnostic_count] }, .{});
         defer a.free(bytes);
         if (bytes.len <= 256 * 1024) return frames.write(writer, bytes, &.{});
         if (!result.truncated) {
@@ -585,17 +484,14 @@ fn complete(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, requ
 }
 
 /// No diagnostic/metrics text is written to stdout in serve mode.
-pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8) !void {
-    return runWithPolicy(a, io, reader, writer, compiler, cache_root, .{});
-}
-pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, cache_root: ?[]const u8, policy: @import("../execution_policy.zig").Policy) !void {
+pub fn run(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Writer, compiler: [32]u8, policy: Policy) !void {
     const identity = std.fmt.bytesToHex(compiler, .lower);
     try reply(a, writer, .{
         .kind = "hello",
         .protocol = "blot-zig-project",
         .version = protocol_version,
         .compilerIdentity = &identity,
-        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "backend-checkpoints", "native-assets-v1", "editor-completion-v1" },
+        .capabilities = &[_][]const u8{ "project-build", "utf8_bytes", "abort-disposes-process", "source-overlays", "native-assets-v1", "editor-completion-v1" },
         .maxFrameBytes = frames.max_frame_bytes,
     }, &.{});
     // Released after `opened`: a profiled session allocates through it.
@@ -615,7 +511,7 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
         if (request.kind != .complete and (request.snapshot != null or request.filename != null or request.position != null)) return error.InvalidRequest;
         switch (request.kind) {
             .open => {
-                if (request.sources.len != 0 or request.assetSources.len != 0 or request.checkpoint != (frame.payload().len != 0)) return error.InvalidOpen;
+                if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidOpen;
                 if (opened != null) return error.AlreadyOpen;
                 const session_allocator = if (request.profileBackend) counted: {
                     const counter = try a.create(phase_profile.CountingAllocator);
@@ -627,18 +523,14 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 } else a;
                 // AlreadyOpen above proves the optional owns no previous session.
                 // zig-analyzer: disable-next-line overwritten-owning-value
-                opened = try OpenProject.init(session_allocator, io, request, compiler, frame.payload(), cache_root);
+                opened = try OpenProject.init(session_allocator, io, request, compiler, policy);
                 opened.?.allocation_counter = allocation_counter;
-                opened.?.session.policy.semantic_workers = policy.semantic_workers;
-                opened.?.session.policy.frontend_workers = policy.frontend_workers;
-                opened.?.session.policy.backend = policy.backend;
-                opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
-            .build, .close, .checkpoint, .complete => {
+            .build, .close, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.checkpoint) return error.InvalidRequest;
-                if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
+                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace) return error.InvalidRequest;
+                if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;
                     if (request.assetSources.len != 0) return error.InvalidRequest;
@@ -647,25 +539,12 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                     try complete(a, io, writer, owner, request, sources);
                     continue;
                 }
-                if (request.kind == .checkpoint) {
-                    if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
-                    const bytes = owner.checkpointBytes(io, compiler) catch |err| {
-                        try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = @errorName(err) }, &.{});
-                        continue;
-                    };
-                    defer a.free(bytes);
-                    if (bytes.len > frames.max_frame_bytes - 1024) {
-                        try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = false, .code = "checkpoint_limit" }, &.{});
-                    } else try reply(a, writer, .{ .kind = "checkpoint", .id = request.id, .epoch = epoch, .revision = owner.session.revisions, .success = true }, bytes);
-                    continue;
-                }
                 if (request.kind == .close) {
                     if (request.sources.len != 0 or request.assetSources.len != 0 or frame.payload().len != 0) return error.InvalidRequest;
-                    owner.persist(io, true);
-                    try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.session.revisions }, &.{});
+                    try reply(a, writer, .{ .kind = "close", .id = request.id, .epoch = epoch, .revision = owner.revisions }, &.{});
                     return;
                 }
-                if (owner.session.revisions >= frames.max_revision) return error.RevisionLimit;
+                if (owner.revisions >= frames.max_revision) return error.RevisionLimit;
                 if (request.assetSources.len != 0 and owner.assets == null) return error.InvalidRequest;
                 const source_bytes = if (request.assetSources.len != 0) request.assetSources[0].start else frame.payload().len;
                 if (source_bytes > frame.payload().len) return error.InvalidSources;

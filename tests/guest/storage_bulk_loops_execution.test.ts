@@ -113,7 +113,6 @@ Deno.test(`bulk fixed scalar loops preserve ranges aliases bits and prefix traps
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

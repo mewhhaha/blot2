@@ -97,7 +97,6 @@ for (
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false as const,
     };
     try {
       await Deno.writeTextFile(entry, source);

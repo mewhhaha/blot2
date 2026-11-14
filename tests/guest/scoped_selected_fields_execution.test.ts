@@ -81,7 +81,6 @@ Deno.test(`selected stored fields preserve update order and bounds`, async () =>
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
-      cacheDirectory: false,
       startupTimeoutMs: 5_000,
     });
     const result = await compiler.build({

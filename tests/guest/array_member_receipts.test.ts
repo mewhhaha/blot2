@@ -18,7 +18,6 @@ Deno.test("shape only member calls retain method edits empty elements and captur
         executable,
         entry,
         prelude,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {

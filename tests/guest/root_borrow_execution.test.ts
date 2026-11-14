@@ -25,7 +25,6 @@ Deno.test("persistent cursor root borrows preserve finite traversal and normal L
         executable: Deno.args[0],
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-        cacheDirectory: false,
       });
       try {
         const built = await compiler.build({ sources: { [entry]: source } });

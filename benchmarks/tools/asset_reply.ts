@@ -95,7 +95,6 @@ try {
         executable: binaries[variant],
         entry,
         prelude: null,
-        cacheDirectory: false,
         nativeAssets: {
           imports: ["a", "b"].map((name) => ({
             module: `./${name}.bin`,

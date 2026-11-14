@@ -60,7 +60,6 @@ async function session(
         executable,
         entry,
         prelude: preludePath,
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: source } });
@@ -110,7 +109,6 @@ Deno.test("resolved collection iteration rechecks exact cursor producers through
         executable,
         entry,
         prelude: preludePath,
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

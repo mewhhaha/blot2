@@ -48,7 +48,6 @@ Deno.test("State provider reads keep replaced fields alive across owner destruct
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
       });
       try {
         for (const text of [source, source + callback, source]) {
@@ -58,7 +57,6 @@ Deno.test("State provider reads keep replaced fields alive across owner destruct
             executable,
             entry,
             prelude: new URL("../../std/prelude.blot", import.meta.url),
-            cacheDirectory: false,
           });
           try {
             const rebuilt = await fresh.build({ sources: { [entry]: text } });

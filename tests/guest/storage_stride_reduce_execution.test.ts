@@ -69,7 +69,6 @@ Deno.test(`strided reductions preserve matches wrapping counters exits and check
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

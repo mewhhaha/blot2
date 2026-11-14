@@ -81,7 +81,6 @@ entry const run = func count => return do:
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       const sources = (emptyFirst: boolean) => {
@@ -273,7 +272,6 @@ entry const run = func count => return iter.fold_left consumer.sum 0 (iter.enume
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {

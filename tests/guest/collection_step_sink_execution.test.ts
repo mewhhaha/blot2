@@ -78,7 +78,6 @@ for (const direct of [false, true]) {
           entry,
           prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
           stdRoot: new URL("../../std", import.meta.url).pathname,
-          cacheDirectory: false,
         });
         try {
           const built = await compiler.build({ sources: { [entry]: source } });
@@ -219,7 +218,6 @@ for (const direct of [false, true]) {
           entry,
           prelude,
           stdRoot,
-          cacheDirectory: false as const,
         };
         const compiler = await createZigProjectCompiler({
           ...options,

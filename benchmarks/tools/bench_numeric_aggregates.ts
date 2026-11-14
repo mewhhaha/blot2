@@ -129,7 +129,6 @@ for (const tier of ["development", "optimized"] as const) {
         prelude: new URL("../../std/prelude.blot", import.meta.url),
         codegenTier: tier,
         codegenWorkers: 1,
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

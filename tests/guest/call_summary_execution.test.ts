@@ -403,20 +403,17 @@ entry const floating_factory = func (value: F32) => return library.floating_fact
     }).output();
     assert(packed.success, new TextDecoder().decode(packed.stdout));
     const producer = await createZigProjectCompiler(options);
-    let checkpoint: Uint8Array<ArrayBuffer>;
     let initial: Uint8Array<ArrayBuffer>;
     try {
       const first = await producer.build();
       assert(first.success, JSON.stringify(first));
       initial = first.bytes;
-      checkpoint = await producer.exportCheckpoint();
     } finally {
       await producer.dispose();
     }
     const retained = await createZigProjectCompiler({
       ...options,
       dependencies: bundle,
-      checkpoint,
     });
     try {
       const restored = await retained.build();

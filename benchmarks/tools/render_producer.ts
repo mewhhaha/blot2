@@ -71,7 +71,6 @@ try {
     },
     inferenceBudget: settings.inferenceBudget,
     storage: settings.storage,
-    cacheDirectory: false,
     startupTimeoutMs: 5000,
     profileBackend: true,
   });

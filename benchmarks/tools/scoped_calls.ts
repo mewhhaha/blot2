@@ -207,7 +207,6 @@ for (const width of sizes) {
       entry: entryPath,
       prelude: `${stdRoot}/prelude.blot`,
       stdRoot,
-      cacheDirectory: false,
       startupTimeoutMs: timeoutMs,
       profileBackend: args.has("--profile"),
     });

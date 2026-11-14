@@ -29,7 +29,6 @@ Deno.test(`stack expressions preserve repeated values reads writes branches and 
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({

@@ -97,7 +97,6 @@ Deno.test(`checked row products preserve lane order, slices, traps and aliased w
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const { source, cases } = rowPrograms();

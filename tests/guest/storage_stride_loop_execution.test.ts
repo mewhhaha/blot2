@@ -75,13 +75,10 @@ Deno.test(`strided fills preserve cursor wrapping lazy exits and trap prefixes`,
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });
     assert(result.success, JSON.stringify(result));
-    const counters = result.stats.workCounters as Record<string, number>;
-    assert.equal(counters.scoped_stride_reductions, 0);
     for (const asynchronous of [false, true]) {
       const guest = await instantiateGuest(result.bytes, { asynchronous });
       const call = async (name: string, input: unknown = null) => {

@@ -35,7 +35,6 @@ Deno.test("typed specialization preserves imported captures through relocation a
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const main = `import {amount, other} from "./dep"\n` + source(0)
     .replaceAll("value: 0", "value: amount")

@@ -68,7 +68,6 @@ const open = (binary: string) =>
   createZigProjectCompiler({
     ...sessionOptions(resolve(binary), workload),
     codegenWorkers: 4,
-    cacheDirectory: false,
     profileBackend: values.profile,
   });
 const digest = async (bytes: Uint8Array<ArrayBuffer>) =>

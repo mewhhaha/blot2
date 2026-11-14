@@ -24,7 +24,6 @@ entry const answer = func () => return text.concat (words.words true) (text.form
       const options = {
         executable: Deno.args[0] ?? new URL("compiler/zig-out/bin/blotc", root),
         entry, prelude: new URL("std/prelude.blot", root), stdRoot: new URL("std/", root),
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

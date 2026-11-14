@@ -37,7 +37,6 @@ Deno.test.ignore(`runtime results follow imported body edit revert and restart`,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
-    cacheDirectory: `${directory}/cache`,
   };
   const check = async (bytes: Uint8Array<ArrayBuffer>, delta: number) => {
     const guest = await instantiateGuest(bytes);
@@ -61,7 +60,6 @@ Deno.test.ignore(`runtime results follow imported body edit revert and restart`,
       await check(built.bytes, delta);
       const fresh = await createZigProjectCompiler({
         ...options,
-        cacheDirectory: false,
       });
       try {
         const clean = await fresh.build({ sources });

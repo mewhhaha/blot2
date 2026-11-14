@@ -162,7 +162,6 @@ for (const callers of [1, 4, 8]) {
           imports: { "ink/": resolve(root, "../ink/lib") },
           stdRoot: resolve(root, "std"),
           prelude: resolve(root, "std/prelude.blot"),
-          cacheDirectory: false,
           profileBackend: true,
           codegenTier: values.tier,
           codegenWorkers: 1,

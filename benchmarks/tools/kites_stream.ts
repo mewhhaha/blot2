@@ -110,7 +110,6 @@ for (
       },
       inferenceBudget: settings.inferenceBudget,
       storage: settings.storage,
-      cacheDirectory: false,
       startupTimeoutMs: timeoutMs,
       profileBackend: true,
       profileTrace: values.trace,

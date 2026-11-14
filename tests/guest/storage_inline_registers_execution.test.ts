@@ -67,7 +67,6 @@ Deno.test(`inline return registers retain nested results bits traps and source e
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false as const,
   };
   const compiler = await createZigProjectCompiler(options);
   try {
@@ -199,7 +198,6 @@ Deno.test(`inline return registers survive reusable helpers and enclosing loops`
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({

@@ -23,7 +23,6 @@ Deno.test("private semantic workers preserve fresh retained edited Wasm and fail
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false as const,
     };
     const retained: Awaited<ReturnType<typeof createZigProjectCompiler>>[] = [];
     try {
@@ -119,7 +118,6 @@ Deno.test("semantic worker profiling does not change Wasm", async () => {
         executable,
         entry,
         prelude: null,
-        cacheDirectory: false,
         semanticWorkers: 4,
         profileBackend,
       });

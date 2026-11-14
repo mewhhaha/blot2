@@ -9,21 +9,7 @@ const executable = resolve(
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
-const statObjects = [
-  "sourceValidation",
-  "frontend",
-  "backend",
-  "optimization",
-  "runtimeOptimization",
-  "backendTiming",
-  "phaseProfile",
-  "workCounters",
-  "principals",
-  "refinements",
-  "selectedQueries",
-  "constantReceipts",
-  "attemptStats",
-];
+const statObjects = ["frontend", "phaseProfile"];
 type Metadata = Record<string, any>;
 function wire(
   metadata: string | Metadata,
@@ -63,7 +49,6 @@ async function host() {
   const child = new Deno.Command(executable, {
     args: ["serve-project"],
     clearEnv: true,
-    env: { BLOT_CACHE_DIR: "" },
     stdin: "piped",
     stdout: "piped",
     stderr: "piped",
@@ -126,7 +111,6 @@ async function host() {
     "utf8_bytes",
     "abort-disposes-process",
     "source-overlays",
-    "backend-checkpoints",
     "native-assets-v1",
     "editor-completion-v1",
   ]);
@@ -190,7 +174,6 @@ function rejected(
     "revision",
     "success",
     "diagnostics",
-    "attemptStats",
   ]);
   const meta = reply.metadata;
   equal([meta.kind, meta.id, meta.epoch, meta.revision, meta.success], [
@@ -202,7 +185,6 @@ function rejected(
   ]);
   equal(reply.payload.length, 0);
   equal(meta.diagnostics.length, 1);
-  if (meta.attemptStats !== null) object(meta.attemptStats);
   const diagnostic = meta.diagnostics[0];
   fields(diagnostic, [
     "filename",
@@ -237,7 +219,6 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
       stdRoot: null,
       dependencies: null,
       profileBackend: false,
-      checkpoint: false,
     });
     const built = await peer.send({
       kind: "build",
@@ -264,28 +245,21 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
     const wasm = await WebAssembly.instantiate(built.payload);
     equal((wasm.instance.exports.answer as WebAssembly.Global).value, 42);
     fields(built.metadata.stats, [
-      "nativeWorkSteps",
-      "allocationSites",
-      "arrayCosts",
       "sourceBytes",
       "freshModules",
       "cachedModules",
-      "restartCacheLoaded",
-      "restartCacheWrite",
-      "sessionHeap",
+      "emittedFunctions",
       ...statObjects,
     ]);
     for (
       const key of [
-        "nativeWorkSteps",
         "sourceBytes",
         "freshModules",
         "cachedModules",
+        "emittedFunctions",
       ]
     ) natural(built.metadata.stats[key]);
     for (const key of statObjects) object(built.metadata.stats[key]);
-    equal(built.metadata.stats.restartCacheLoaded, false);
-    equal(built.metadata.stats.sessionHeap, null);
     let id = 3;
     for (
       const source of [
@@ -443,7 +417,6 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
       diagnostic.utf16,
       diagnostic.details,
     ], ["build-project", "DuplicateSourcePath", 0, 0, null, null]);
-    equal(duplicate.metadata.attemptStats, null);
     const oversizedSource = new Uint8Array(16 * 1024 * 1024 + 1).fill(32);
     const limited = await peer.send({
       kind: "build",
@@ -457,7 +430,6 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
       "build-project",
       "SourceLimit",
     ]);
-    equal(limited.metadata.attemptStats, null);
     const recovery = await peer.send({
       kind: "build",
       id: id++,
@@ -820,19 +792,6 @@ const invalid: {
       wire({ kind: "close", id: 2, epoch: "1", revision: 0 }, Uint8Array.of(1)),
   },
   {
-    name: "checkpoint sources",
-    error: "InvalidRequest",
-    opened: true,
-    bytes: (entry) =>
-      wire({
-        kind: "checkpoint",
-        id: 2,
-        epoch: "1",
-        revision: 0,
-        sources: [{ path: entry, start: 0, length: 0 }],
-      }),
-  },
-  {
     name: "gap in sources",
     error: "InvalidSources",
     opened: true,
@@ -923,40 +882,6 @@ Deno.test("wire contract boundary EOF and cancellation dispose the process", asy
     equal(status.signal, "SIGKILL");
   } finally {
     await cancelled.cleanup();
-  }
-});
-
-Deno.test("wire contract checkpoints reject before success and invalid candidates are optional", async () => {
-  const peer = await host();
-  try {
-    await peer.open({ checkpoint: true }, Uint8Array.of(1, 2, 3));
-    const checkpoint = await peer.send({
-      kind: "checkpoint",
-      id: 2,
-      epoch: "1",
-      revision: 0,
-    });
-    equal(checkpoint.metadata, {
-      kind: "checkpoint",
-      id: 2,
-      epoch: "1",
-      revision: 0,
-      success: false,
-      code: "NoSuccessfulRevision",
-    });
-    equal(checkpoint.payload.length, 0);
-    const result = await peer.send({
-      kind: "build",
-      id: 3,
-      epoch: "1",
-      revision: 0,
-    });
-    equal(result.metadata.success, true);
-    equal(result.metadata.revision, 1);
-    await peer.send({ kind: "close", id: 4, epoch: "1", revision: 1 });
-    await peer.ended(0);
-  } finally {
-    await peer.cleanup();
   }
 });
 

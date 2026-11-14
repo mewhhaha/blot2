@@ -29,7 +29,6 @@ entry const answer = func (extra: U32) : U32 => return callback extra
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -92,7 +91,6 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -158,7 +156,6 @@ ${layers}
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -221,7 +218,6 @@ entry const third: U32 = local (odd ${seed})
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: `${directory}/cache`,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -242,7 +238,6 @@ entry const third: U32 = local (odd ${seed})
           const built = await retained.build({ sources });
           const fresh = await createZigProjectCompiler({
             ...options,
-            cacheDirectory: false,
           });
           try {
             const expected = await fresh.build({ sources });
@@ -302,7 +297,6 @@ entry const answer: U32 = local 41
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -374,7 +368,6 @@ entry const answer: U32 = case local 41.25 of
           new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {

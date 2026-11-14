@@ -40,7 +40,6 @@ const binary = resolve(values.binary!);
 const compiler = await createZigProjectCompiler({
   ...sessionOptions(binary, workload),
   codegenWorkers: 4,
-  cacheDirectory: false,
   profileBackend: false,
 });
 const pins = {

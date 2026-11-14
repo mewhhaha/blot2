@@ -205,7 +205,6 @@ Deno.test({
         executable: Deno.args[0],
         entry,
         prelude: null,
-        cacheDirectory: false as const,
       };
       const original = await createZigProjectCompiler(options);
       const rewritten = await createZigProjectCompiler(options);
@@ -368,7 +367,6 @@ Deno.test("formatter keeps public examples and std modules compiling to identica
       entry,
       prelude,
       stdRoot,
-      cacheDirectory: false as const,
     };
     const original = await createZigProjectCompiler(options);
     const rewritten = await createZigProjectCompiler(options);

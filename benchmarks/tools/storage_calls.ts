@@ -171,7 +171,6 @@ async function main() {
           entry,
           stdRoot: `${repo}/std`,
           prelude: `${repo}/std/prelude.blot`,
-          cacheDirectory: false,
           startupTimeoutMs: timeoutMs,
           profileBackend: true,
         });

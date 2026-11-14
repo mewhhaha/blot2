@@ -43,7 +43,6 @@ Deno.test(`owned returns preserve completed and continuing match exits`, async (
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });

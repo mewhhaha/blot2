@@ -24,7 +24,6 @@ Deno.test("production million-step budget rejects adversarial stage chains", asy
     await Deno.writeTextFile(entry, source);
     const result = await new Deno.Command(executable, {
       args: ["build", entry, output, "--prelude", prelude],
-      env: { BLOT_CACHE_DIR: "" },
       stdout: "piped",
       stderr: "piped",
     }).output();

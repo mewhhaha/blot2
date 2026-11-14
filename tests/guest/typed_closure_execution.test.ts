@@ -105,7 +105,6 @@ Deno.test(`typed closures preserve runtime captures schemas and descriptor reads
       executable: Deno.args[0],
       entry,
       prelude: null,
-      cacheDirectory: false,
       startupTimeoutMs: 5_000,
     });
     const built = await compiler.build({

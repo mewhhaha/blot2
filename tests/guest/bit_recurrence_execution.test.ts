@@ -65,7 +65,6 @@ Deno.test("fixed bit loops preserve polynomial count boundaries helpers shifts e
         entry,
         stdRoot,
         prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
       });
       try {
         let source = "";
@@ -211,7 +210,6 @@ Deno.test.ignore("bit loops through an addressed local write through the referen
         entry,
         stdRoot,
         prelude: `${stdRoot}/prelude.blot`,
-        cacheDirectory: false,
       });
       try {
         const addressed = await compiler.build({
@@ -250,7 +248,6 @@ Deno.test("retained bit proofs observe helper edits rejected revisions and exact
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const original = recurrence("bits", 8, 0xEDB88320);

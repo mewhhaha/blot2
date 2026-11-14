@@ -38,7 +38,6 @@ Deno.test(`generic substitution preserves fixed structure and per-use effects`, 
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false,
     startupTimeoutMs: 5_000,
   });
   let original: Uint8Array | undefined;

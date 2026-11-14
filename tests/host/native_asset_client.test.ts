@@ -31,7 +31,6 @@ Deno.test("native asset modules execute retained edits rejection recovery and co
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
     nativeAssets: {
       imports: [{
         module: "./config.json",
@@ -89,7 +88,6 @@ Deno.test("native references publish deterministic handles and independent binar
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
     nativeAssets: {
       imports: [
         {
@@ -156,7 +154,6 @@ async function peer(mode: string) {
     executable,
     entry: directory + "/entry.blot",
     prelude: null,
-    cacheDirectory: false as const,
     nativeAssets: { imports: [] },
   };
   return {
@@ -299,7 +296,6 @@ Deno.test("native roots discover four readers and refresh membership before reta
   const compiler = await createCompiler({
     executable,
     entry,
-    cacheDirectory: false,
     nativeAssets: { roots: ["."] },
   });
   try {

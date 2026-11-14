@@ -81,7 +81,6 @@ Deno.test(`numeric variants preserve active arms lists static values and snapsho
     executable: Deno.args[0],
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({ sources: { [entry]: source } });

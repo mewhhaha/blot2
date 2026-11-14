@@ -64,7 +64,6 @@ Deno.test(`opaque variant layouts preserve private identity and representation e
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const compiler = await createZigProjectCompiler(options);
   try {

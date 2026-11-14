@@ -56,7 +56,6 @@ Deno.test("private constructor alternatives and outward loop returns preserve sn
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
         stdRoot: new URL("../../std", import.meta.url).pathname,
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({ sources: { [entry]: program } });

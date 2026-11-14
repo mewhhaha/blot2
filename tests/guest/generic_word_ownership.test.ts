@@ -13,7 +13,6 @@ const executable = Deno.args[0] ??
       executable,
       entry,
       prelude: null,
-      cacheDirectory: false,
     });
     try {
       const source = `
@@ -93,7 +92,6 @@ Deno.test.ignore("unobserved generic identities compile without a concrete type"
     executable,
     entry,
     prelude: null,
-    cacheDirectory: false,
   });
   try {
     const source = `

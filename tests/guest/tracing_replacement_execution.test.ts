@@ -12,7 +12,6 @@ Deno.test("discarded Arrays inside nested collecting loops keep the checksum", a
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({
@@ -59,7 +58,6 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({
@@ -107,7 +105,6 @@ Deno.test("borrowed reference returns preserve field aliases when their parent r
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({
@@ -152,7 +149,6 @@ Deno.test("checked field updates preserve variant layouts aliases captures and r
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
       try {
@@ -236,7 +232,6 @@ Deno.test("allocating loops compute their totals with ordinary and shared machin
         executable,
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
       });
       try {
         const result = await compiler.build({

@@ -45,7 +45,6 @@ Deno.test(`pipeline fallback preserves snapshots ragged lengths traps and F32 or
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url),
     stdRoot: new URL("../../std", import.meta.url),
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({ sources: { [entry]: controls } });

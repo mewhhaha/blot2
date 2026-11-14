@@ -22,7 +22,6 @@ for (const operation of ["owned", "emit"] as const) {
           imports: { "ink/": resolve(root, "../ink/lib") },
           stdRoot: resolve(root, "std"),
           prelude: resolve(root, "std/prelude.blot"),
-          cacheDirectory: false,
           profileBackend: true,
           startupTimeoutMs: 5000,
         });

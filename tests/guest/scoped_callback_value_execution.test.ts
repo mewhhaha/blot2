@@ -40,7 +40,6 @@ Deno.test(`ordinary callback values survive imports fresh and retained builds an
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-    cacheDirectory: false as const,
   };
   let compiler = await createZigProjectCompiler(options);
   try {

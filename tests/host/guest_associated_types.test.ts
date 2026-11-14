@@ -89,7 +89,6 @@ const make: a -> (Identity.Item a) = func value => return value
     executable: Deno.args[0],
     entry,
     prelude: null,
-    cacheDirectory: false as const,
   };
   const compiler = await createZigProjectCompiler(options);
   try {

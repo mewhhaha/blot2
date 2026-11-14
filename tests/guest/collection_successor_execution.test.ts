@@ -107,7 +107,6 @@ Deno.test("private pure cursor successors preserve break snapshots returned head
         executable: Deno.args[0],
         entry,
         prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-        cacheDirectory: false,
       });
       try {
         const built = await compiler.build({ sources: { [entry]: source } });
@@ -213,7 +212,6 @@ Deno.test.ignore("private pure cursor successors keep reference rows under alloc
       executable: Deno.args[0],
       entry,
       prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-      cacheDirectory: false,
     });
     try {
       const built = await compiler.build({ sources: { [entry]: source } });
@@ -261,7 +259,6 @@ Deno.test("private cursor families rederive dependency archives and local edits"
         executable: Deno.args[0],
         entry,
         prelude,
-        cacheDirectory: false as const,
       };
       const compiler = await createZigProjectCompiler({
         ...options,

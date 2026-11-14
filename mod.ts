@@ -73,26 +73,13 @@ export type CompilerOptions = Omit<ZigProjectCompilerOptions, "executable"> & {
   executable?: string | URL;
 };
 
-/** Keep this compiler open across builds to reuse unchanged project work.
+/** Keep this compiler open across builds of one project.
  * The packaged compiler and prelude are defaults; null disables the prelude. */
 export async function createCompiler(
   options: CompilerOptions,
 ): Promise<ZigProjectCompiler> {
   const path = (value: string | URL): string =>
     resolve(value instanceof URL ? fileURLToPath(value) : value);
-  if (options.checkpoint !== undefined) {
-    if (!(options.checkpoint instanceof Uint8Array)) {
-      throw new TypeError(
-        "checkpoint must contain bytes from exportCheckpoint",
-      );
-    }
-    if (
-      options.checkpoint.length === 0 ||
-      options.checkpoint.length > 63 * 1024 * 1024 - 8
-    ) {
-      throw new RangeError("Checkpoint payload exceeds protocol limits");
-    }
-  }
   if (options.assets !== undefined && options.nativeAssets !== undefined) {
     throw new TypeError("assets and nativeAssets cannot be used together");
   }
@@ -104,7 +91,6 @@ export async function createCompiler(
       options.nativeAssets,
       path(options.entry),
     ),
-    checkpoint: options.checkpoint && new Uint8Array(options.checkpoint),
     entry: path(options.entry),
     prelude: options.prelude === null
       ? null
@@ -115,10 +101,6 @@ export async function createCompiler(
     dependencies: options.dependencies == null
       ? options.dependencies
       : path(options.dependencies),
-    cacheDirectory:
-      options.cacheDirectory === undefined || options.cacheDirectory === false
-        ? options.cacheDirectory
-        : path(options.cacheDirectory),
     imports: options.imports &&
       Object.fromEntries(
         Object.entries(options.imports).map((
@@ -175,7 +157,6 @@ export async function createCompiler(
       },
       build: (buildOptions) => compiler.build(buildOptions),
       complete: (completionOptions) => compiler.complete(completionOptions),
-      exportCheckpoint: () => compiler.exportCheckpoint(),
       async close() {
         try {
           await compiler.close();

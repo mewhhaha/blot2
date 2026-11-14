@@ -40,7 +40,6 @@ Deno.test("calls of every shape execute and follow edits", async () => {
     executable,
     entry,
     prelude,
-    cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
   try {

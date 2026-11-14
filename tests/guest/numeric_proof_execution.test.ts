@@ -33,7 +33,6 @@ entry const lookup = func (index: U32) => return do:
       executable,
       entry,
       prelude: null,
-      cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
       const guest = await instantiateGuest(bytes);
@@ -73,7 +72,6 @@ entry const lookup = func (index: U32) => return do:
       await observe(changed.bytes, true);
       const independent = await createZigProjectCompiler({
         ...options,
-        cacheDirectory: false,
       });
       try {
         const fresh = await independent.build({ sources: changedSources });
@@ -156,7 +154,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       executable,
       entry,
       prelude: null,
-      cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
       const guest = await instantiateGuest(bytes);
@@ -215,7 +212,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       await observe(changed.bytes, true);
       const independent = await createZigProjectCompiler({
         ...options,
-        cacheDirectory: false,
       });
       try {
         const fresh = await independent.build({ sources: changedSources });
@@ -301,7 +297,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       executable,
       entry,
       prelude: null,
-      cacheDirectory: `${directory}/cache`,
     };
     const observe = async (bytes: Uint8Array<ArrayBuffer>, changed = false) => {
       const guest = await instantiateGuest(bytes);
@@ -364,7 +359,6 @@ entry const ordered = func (host: U32 -> U32 ! {Foreign}) => return do:
       await observe(changed.bytes, true);
       const independent = await createZigProjectCompiler({
         ...options,
-        cacheDirectory: false,
       });
       try {
         const fresh = await independent.build({ sources: changedSources });
@@ -439,7 +433,6 @@ entry const lookup = func (index: U32) => return do:
       executable,
       entry,
       prelude: null,
-      cacheDirectory: `${directory}/cache`,
     };
     const compiler = await createZigProjectCompiler(options);
     const sources = { [entry]: main, [dependency]: library };
@@ -477,7 +470,6 @@ entry const lookup = func (index: U32) => return do:
       await observe(changed.bytes, true);
       const fresh = await createZigProjectCompiler({
         ...options,
-        cacheDirectory: false,
       });
       try {
         const independent = await fresh.build({ sources: edited });

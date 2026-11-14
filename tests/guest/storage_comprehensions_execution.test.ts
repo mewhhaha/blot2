@@ -58,7 +58,6 @@ Deno.test(`owned Array comprehensions preserve order and fixed payloads`, async 
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: source } });
@@ -119,7 +118,6 @@ Deno.test.ignore(`owned Array comprehensions run during staging`, async () => {
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build({ sources: { [entry]: staged } });

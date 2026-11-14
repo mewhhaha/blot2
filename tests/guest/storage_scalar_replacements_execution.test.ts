@@ -50,7 +50,6 @@ Deno.test(`scalar replacements preserve aliases self bits and destination-before
     entry,
     stdRoot,
     prelude: `${stdRoot}/prelude.blot`,
-    cacheDirectory: false,
   });
   try {
     const built = await compiler.build({ sources: { [entry]: source } });

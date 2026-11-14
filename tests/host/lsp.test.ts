@@ -85,7 +85,6 @@ async function setup(compiler = executable) {
   const bridge = new CompletionBridge(new LspWriter(output), {
     executable: compiler,
     prelude: null,
-    cacheDirectory: false,
   });
   const entry = directory + "/main.blot", uri = pathToFileURL(entry).href;
   const send = (method: string, params: unknown = {}, id?: number) => {

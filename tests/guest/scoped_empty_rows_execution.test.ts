@@ -108,7 +108,6 @@ Deno.test(`empty borrowed row traversal preserves zero-iteration flow and bounds
     executable,
     entry,
     prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-    cacheDirectory: false,
   });
   try {
     const result = await compiler.build();
