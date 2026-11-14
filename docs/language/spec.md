@@ -388,15 +388,14 @@ entry func main (): Unit =>
 - `Foreign` is the one built-in effect. It marks host callbacks. Source
   cannot declare or provide it.
 
-**State (approved; spellings open).** The prelude declares one effect whose
-provider is built in:
+**State (approved; spellings open).** The prelude declares one effect,
+`State a`, whose operations and provider are built in:
 
 ```blot
-type State a is effect = {
-  get: Unit -> a,
-  set: own a -> Unit,
-  modify: (own a -> a) -> Unit,
-}
+State.get:    Unit -> a ! {State a}
+State.set:    own a -> Unit ! {State a}
+State.modify: (own a -> a) -> Unit ! {State a}
+State.read:   (a -> b) -> b ! {State a}
 
 func count (items: Array Item): U32 =>
   let total = 0
@@ -410,6 +409,13 @@ func count (items: Array Item): U32 =>
   that installs it.
 - `modify` hands that value to its function as `own` and keeps the result,
   so state that holds an array is updated in place.
+- `read` lends the value to its function, as a borrowed parameter. The
+  result cannot hold an array of the state without `values.copy`
+  **(open)**.
+- `get` is allowed only when the state's type holds no array. For a type
+  that may hold one, type variables included, `get` is an error that points
+  to `read` **(open)**. Otherwise `get` would hand out a second holder of
+  an array that `modify` changes in place.
 - The meaning is state passing: the program behaves as if every function
   called under the `with` took the state and returned it. No value that a
   name holds ever changes.
@@ -979,12 +985,10 @@ unnecessary.
    differs from the memory model file in three places, and that file is the
    older one: passing an array to a call no longer ends ownership, a call's
    result is owned, and ownership returns at the other holder's last use.
-   Still open:
-   - `State.get` on state that holds an array hands out a second holder
-     while the provider keeps the first. It must copy, be an error, or lend
-     the state to a function. Section 6.5 does not say which;
-   - `modify` returns `Unit`, so reading one number out of array state
-     needs `get`. A form that also returns a result may be wanted.
+   Still open: section 6.5 forbids `State.get` on state that may hold an
+   array and adds a lending `State.read`. That is the implementer's
+   recommendation, chosen because the alternative is a copy on every `get`.
+   The owner has not seen it.
 1. **Spellings chosen by this document.** The owner approved the changes and
    has not seen these spellings: `State.new`; `with`; `values.copy`,
    `panic`; `_`
