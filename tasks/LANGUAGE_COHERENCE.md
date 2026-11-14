@@ -208,11 +208,109 @@ Trade-offs to record:
 - Errors in generated code surface at the splice site, so diagnostics need
   both the generator's location and the splice's.
 
-Not yet decided, and not yet seen by the owner: whether `impl` is its own
-declaration form. A marker is needed to tell the canonical constant from an
-ordinary one, but it could be a modifier on `const` in the slot `entry` and
-`private` use (`impl const eq_u32: Eq U32 = ...`); `given` is the alternative
-word.
+### Update: no `impl`, dotting types, chaining values
+
+The owner approved this ("Yeah, add all that. Sounds good."). It supersedes the
+`impl` declaration form above. It is still provisional, and the spellings are
+illustrative.
+
+1. **No `impl`.** The implementation is the constant named after the trait,
+   in the type's namespace.
+
+   ```
+   type Eq a is trait = { eq: a -> a -> Bool }
+   const U32.Eq: Eq U32 = { eq: U32.eq }
+   const Array.Eq: Eq (Array a) where { Eq a } = { eq: equal_array }
+   const Vec3.Mul: Mul Vec3 -> [F32, Vec3] = { mul: Vec3.scale }
+   ```
+
+   - Lookup is a name lookup: `where { Eq a }` at `a = U32` resolves to
+     `U32.Eq`. The same name passes the record explicitly, so there are no
+     invented names like `eq_u32`.
+   - Uniqueness comes free, because a namespace holds one member per name. No
+     disjointness check is needed.
+   - `T.Trait` may be declared in the type's module or the trait's module.
+   - A trait dispatches on one type, and every other parameter is an output:
+     `Mul left -> [right, out]`. So `*` cannot be both `Vec3 * F32` and
+     `Vec3 * Vec3`. Current code agrees: each operator member has one
+     signature per type (`Vec3.mul` takes F32, `Quat.mul` takes Quat; Vec2,
+     Vec4 and Color likewise). If dispatch on both operands is wanted later, a
+     keyword and a keyed table return then.
+   - Open: two traits of the same name from different modules would both want
+     `U32.Format`.
+   - The rest of the amendment stands: traits are nominal record types,
+     defaults are functions that build the record, inheritance is a field
+     holding another record, the `_by` form takes the record as a parameter,
+     `where` is a compile-time hidden argument, and there are no run-time
+     dictionaries.
+2. **Dotting a type finds types.** A concrete type holds type members in its
+   namespace, as it already holds functions:
+   `type Pool.Id = U32`, `type Pool.Row a = Maybe a`,
+   `func Pool.read (pool: Pool a) -> (id: Pool.Id): Pool.Row a`.
+
+   A type variable finds a trait's output by name. The checker looks only in
+   the function's own `where` clause, so this is a rewrite to the
+   output-parameter form, not a projection type.
+
+   ```
+   type Collection c -> item is trait = { length: c -> U32, at: c -> U32 -> item }
+   const Array.Collection: Collection (Array a) -> a = { length: Array.length, at: Array.at }
+
+   func first (values: c): Maybe c.item where { Collection c } => ...
+   // means exactly:
+   func first (values: c): Maybe item where { Collection c -> item } => ...
+   ```
+
+   - On a concrete type, lookup tries inherent members first, then the
+     outputs of traits implemented for it: `(Array U32).item` is U32.
+   - When two traits offer the same name, qualify it: `Collection.item c`.
+   - Open: whether outputs are lowercase (type parameters) or PascalCase like
+     other type names.
+3. **Chaining from values.** `value.name` looks in three places, in order:
+   - a field of the value;
+   - a function in its type's namespace that takes the value first
+     (`Vec3.length`);
+   - a member of a trait the type implements: `robot.eq other` is
+     `Robot.Eq.eq robot other`. In generic code this step looks only at the
+     function's own `where` clause. When two traits supply the name, it must
+     be qualified.
+
+   A line that starts with `.name` continues the expression above it:
+
+   ```
+   let reach = robots
+     .filter (func robot => robot.charge > 0.2)
+     .map (func robot => robot.home.length)
+     .fold 0.0 F32.max
+   ```
+
+   - This replaces `|>` and takes over the leading-dot spelling from
+     selectors (`.x` as a function), so selectors go. They have no uses in
+     Gdev or Ink.
+   - One-liners use parentheses: `(values.filter keep).map double`. A space
+     before a mid-line dot means nothing, so `keep.map` and `keep .map` are
+     the same.
+   - It depends on data-first, lambda-last order (E4), because the receiver's
+     type must be known at the dot.
+
+In summary, the dot on a type finds types, functions, constants and trait
+implementations; on a value it finds fields, functions and trait members.
+`::` is still not needed (C2).
+
+The `#run` example in this form:
+
+```
+type Robot is data = $Robot { id: U32, charge: F32, home: Vec3 }
+const Robot.Eq: Eq Robot = #run derive.eq (#type Robot)
+
+// std/derive; `#quote` and `#( )` are placeholder names
+func eq (target: Type): Code =>
+  let checks = [#quote (Eq.eq left.#(field.name) right.#(field.name)) | field <- target.fields]
+  return #quote { eq: func left -> right => #(code.all_of checks) }
+```
+
+Other modules check against the hand-written `Eq Robot` before the generator
+runs; the spliced record is then checked against it.
 
 ## D. Systems gaps
 
