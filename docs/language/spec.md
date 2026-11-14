@@ -241,7 +241,8 @@ Body      = Expression | Suite
 ```
 
 - Every parameter and the result are annotated **(approved)**.
-- `own` marks a parameter the function takes over (section 10.3) **(open)**.
+- `own` marks a parameter the function takes over (section 10.3)
+  **(approved)**.
 - `->` separates parameters. A function takes them one at a time:
   `func add (left: U32) -> (right: U32): U32` has type `U32 -> U32 -> U32`,
   and `add 2` is a function.
@@ -387,6 +388,34 @@ entry func main (): Unit =>
 - `Foreign` is the one built-in effect. It marks host callbacks. Source
   cannot declare or provide it.
 
+**State (approved; spellings open).** The prelude declares one effect whose
+provider is built in:
+
+```blot
+type State a is effect = {
+  get: Unit -> a,
+  set: own a -> Unit,
+  modify: (own a -> a) -> Unit,
+}
+
+func count (items: Array Item): U32 =>
+  let total = 0
+  with State.new 0:
+    visit items
+    total := State.get U32 ()
+  return total
+```
+
+- `State.new initial` gives a provider that keeps one value for the `with`
+  that installs it.
+- `modify` hands that value to its function as `own` and keeps the result,
+  so state that holds an array is updated in place.
+- The meaning is state passing: the program behaves as if every function
+  called under the `with` took the state and returned it. No value that a
+  name holds ever changes.
+- A program cannot write this provider itself, because nothing else in the
+  language keeps a value between calls.
+
 ### 6.6 Tags
 
 **(approved)**
@@ -449,7 +478,7 @@ EffectLabel = TypePath TypeArg?
 - **Text (approved).** `Text` is `Array U8` holding UTF-8. Its length counts
   bytes.
 - `own` before a parameter's type is part of the function type
-  (section 10.3) **(open)**.
+  (section 10.3) **(approved)**.
 - **Arrays.** `Array a` has a fixed length, `GrowArray a` can append, and
   `ResizeArray a` can also shrink. All three are immutable values: an
   append, like any update, gives a successor **(approved)**.
@@ -726,7 +755,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
 
 ### 10.3 Reuse
 
-**(approved; the rules across calls are open)**
+**(approved)**
 
 The owner's goal: "efficient immutability. Maybe even more efficient than
 mutable languages." An immutable program must cost no more than the same
@@ -749,8 +778,10 @@ it cannot, the statement is an error that asks for an explicit copy
 - It stays the owner through its own `:=` updates.
 - It stops owning the array when the array is bound to another name,
   captured by a lambda, placed in another value, or referenced with `&`.
-  It owns the array again after the last use of that other holder
-  **(open)**.
+  It owns the array again after the last use of that other holder. A
+  lambda that is returned, placed in a value or given to an `own` parameter
+  has no last use in the function, so what it captures stays shared to the
+  end of the scope.
 - Reading an element that holds no array, and taking the length, change
   nothing.
 - Where branches join, a local owns its array only if it does on every
@@ -762,8 +793,8 @@ it cannot, the statement is an error that asks for an explicit copy
 [The memory model](../../tasks/MEMORY_MODEL.md) lists these rules in full
 under "Uniqueness".
 
-**Across calls (open).** No fact about ownership is inferred across a call.
-The signature states it.
+**Across calls.** No fact about ownership is inferred across a call. The
+signature states it.
 
 - A parameter is **borrowed** unless marked. The function may read it and
   lend it on. It may not update it in place, return it, or return anything
@@ -930,7 +961,7 @@ with this revision.
 | `[x]` with `[0]` as a one-value cell | a local, or a field of a record that is passed and returned | round 3 |
 | `Trait T -> out`, `Trait T -> [a, b]` | `Trait T { out: … }` | round 2 |
 | `@storage.copy values`, `@panic "…"`, `@hole` | `values.copy`, `panic "…"`, `_` | round 2 |
-| `@effect.provider`, `@effect.state`, `@effect.run`, `@effect.reader`, `@effect.writer`; `type Get a is effect = Unit -> a`; operation labels in rows | a provider record; a local; a record-form effect; effect labels | round 2 |
+| `@effect.provider`, `@effect.state`, `@effect.run`, `@effect.reader`, `@effect.writer`; `type Get a is effect = Unit -> a`; operation labels in rows | a provider record; the prelude's `State`; a record-form effect; effect labels | round 2 |
 | `do:` with `break value`, `#run do:`, `#do:` | a function that returns the value; `#run` of a call | round 2 |
 | `do provider:` | `with provider:` | round 2 |
 | `let` over a local or parameter in scope | `:=`, or a new name | round 2 |
@@ -944,30 +975,19 @@ unnecessary.
 
 ## Annex B. Open spellings and questions
 
-0. **Ownership across calls.** The owner removed mutation and asked for as
-   much reuse as possible. Three standing decisions shape what that can
-   mean: no ownership facts are inferred across calls, signatures are
-   complete, and an array is never copied silently. Section 10.3 meets all
-   three with one mark, `own`. Without some rule here, a function could not
-   update an array it was passed. The alternatives are a run-time reference
-   count on each array (reuse when the count is one, copy otherwise) and
-   silent copies. Open within the proposed rule:
-   - a generic function that returns an `a` read out of a borrowed
-     parameter. Section 10.3 takes the implementer's rule: it needs a copy
-     whenever `a` may hold an array;
-   - ownership returning at the other holder's last use. Section 10.3
-     takes it, on the implementer's advice that it is cheap inside one
-     function. The memory model ends ownership for the rest of the scope;
-   - state. With `Cell` and `@effect.state` gone, state shared between
-     calls is passed as an `own` parameter and returned. An effect
-     operation that hands out an array gives a second holder, so a state
-     effect would need an operation that takes over the state and puts the
-     successor back;
-   - the memory model says passing an array to any call ends ownership and
-     that a call's result is not owned. Section 10.3 says the opposite on
-     both, because the signature now carries the fact.
+0. **Ownership across calls.** Approved as section 10.3 states it. It
+   differs from the memory model file in three places, and that file is the
+   older one: passing an array to a call no longer ends ownership, a call's
+   result is owned, and ownership returns at the other holder's last use.
+   Still open:
+   - `State.get` on state that holds an array hands out a second holder
+     while the provider keeps the first. It must copy, be an error, or lend
+     the state to a function. Section 6.5 does not say which;
+   - `modify` returns `Unit`, so reading one number out of array state
+     needs `get`. A form that also returns a result may be wanted.
 1. **Spellings chosen by this document.** The owner approved the changes and
-   has not seen these spellings: `own`; `with`; `values.copy`, `panic`; `_`
+   has not seen these spellings: `State.new`; `with`; `values.copy`,
+   `panic`; `_`
    for a hole; the braces for trait outputs; `#quote` and `#( )`; the names
    of the description and code types.
 2. **Output names.** Lowercase like type variables, as written here, or
