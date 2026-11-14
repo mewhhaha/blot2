@@ -318,10 +318,13 @@ pub const Fn = struct {
             },
             else => return err,
         };
+        // Holes no use can reach: variables the checker left ambiguous, or
+        // ones this instance's key already left unused.
+        const unused = holed and try self.holesUnused(self.m.typeOf(id), 0);
         if (holed and self.tagOf(ty) == .function) {
-            // Only a function stored as a field of a literal record can go
-            // unused at a type no use fixes; anything else is a missing type.
-            if (!self.field_value) return self.g.typeFailure(self.m, id);
+            // A function stored as a field of a literal record can go unused
+            // at a type no use fixes; otherwise its holes must be unused.
+            if (!self.field_value and !unused) return self.g.typeFailure(self.m, id);
             return self.trapClosure(ty, id);
         }
         if (primitiveAlias(tm, target.binding) != null) return self.partial(.primitive, target, ty, &.{}, id);
@@ -332,11 +335,44 @@ pub const Fn = struct {
                 else => {},
             }
             // A constant: its instance computes the value.
-            const instance = try self.g.named(target, ty, self.m, id);
+            const instance = try self.g.namedWith(target, ty, unused, self.m, id);
             try self.opIndex(.call, self.g.instance(instance).function);
             return self.received(ty, id);
         }
         return self.g.fail(self.m, id, "reference to a {s} binding without a value", .{@tagName(binding.kind)});
+    }
+    /// Whether every variable of Core type `ty` that the environment leaves
+    /// unbound is unused: ambiguous (no scheme quantifies it), or quantified
+    /// by this instance's binding when its key's holes are unused.
+    fn holesUnused(self: *Fn, ty: T.Id, depth: usize) Error!bool {
+        if (ty <= T.never) return true;
+        if (depth > 64) return false;
+        const n = self.m.types.node(ty);
+        switch (n.tag) {
+            .variable => {
+                if (self.env.contains(.{ .unit = self.m.unit, .ty = ty })) return true;
+                if (!try self.g.isQuantified(self.m, ty)) return true;
+                const instance = self.g.instance(self.instance_id);
+                if (!instance.unused_holes or instance.key.kind != .named or instance.key.unit != self.m.unit) return false;
+                return std.mem.findScalar(T.Id, self.m.types.list(self.m.binding(instance.key.id).scheme.variables), ty) != null;
+            },
+            .bound => return self.env.contains(.{ .unit = self.m.unit, .ty = ty }),
+            .usage, .forall, .array, .list, .cursor => return self.holesUnused(n.a, depth + 1),
+            .function => return try self.holesUnused(n.a, depth + 1) and try self.holesUnused(n.b, depth + 1),
+            .product => {
+                for (self.m.types.list(.{ .start = n.a, .len = n.b })) |child| if (!try self.holesUnused(child, depth + 1)) return false;
+                return true;
+            },
+            .record => {
+                for (0..n.b) |index| if (!try self.holesUnused(self.m.types.recordField(n, index).ty, depth + 1)) return false;
+                return true;
+            },
+            .nominal => {
+                for (self.m.types.nominalArguments(n)) |argument| if (!try self.holesUnused(argument, depth + 1)) return false;
+                return true;
+            },
+            else => return false,
+        }
     }
     /// Whether no hole (`never`) of `ty` affects its layout: holes may sit
     /// under function and container types, whose layouts are fixed.
@@ -1818,7 +1854,7 @@ pub const Fn = struct {
         const ref = self.m.reference(children[0]);
         if (ref.unit != 0 and ref.unit != self.m.unit) return null;
         const list = self.bindings.get(ref.binding) orelse return null;
-        if (self.tagOf(list.ty) != .list) return null;
+        if (self.tagOf(list.ty) != .list and self.tagOf(list.ty) != .array) return null;
         if (try self.uses(ref.binding) != 1) return null;
         const value = try self.expr(children[1]);
         const rt = try self.g.runtime_();
@@ -1831,16 +1867,21 @@ pub const Fn = struct {
         try self.writeFlat(address, 0, value, id);
         return .{ .ty = list.ty, .words = list.words };
     }
-    /// References to local `binding` in this body, counted once per body.
+    /// References to local `binding` in this unit, counted once. A loop
+    /// exit (`break_`) carrying a version is on a path exclusive with any
+    /// later rebinding of it, so it does not count.
     fn uses(self: *Fn, binding: core.BindingId) Error!u32 {
         if (self.use_counts == null) {
+            var exits: std.AutoHashMapUnmanaged(core.Id, void) = .empty;
+            for (self.m.nodes, 0..) |node, index| if (node.tag == .break_) {
+                for (self.m.children(@intCast(index))) |child| try exits.put(self.arena, child, {});
+            };
             var counts: std.AutoHashMapUnmanaged(core.BindingId, u32) = .empty;
-            for (self.m.nodes, 0..) |node, index| if (node.tag == .reference) {
+            for (self.m.nodes, 0..) |node, index| if (node.tag == .reference and !exits.contains(@intCast(index))) {
                 const target = self.m.references[node.a];
                 if (target.unit != 0 and target.unit != self.m.unit) continue;
                 const entry = try counts.getOrPut(self.arena, target.binding);
                 entry.value_ptr.* = if (entry.found_existing) entry.value_ptr.* + 1 else 1;
-                _ = index;
             };
             self.use_counts = counts;
         }

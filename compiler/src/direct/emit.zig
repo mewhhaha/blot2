@@ -44,6 +44,9 @@ pub const Instance = struct {
     /// Being emitted to learn its result type; already emitted.
     inferring: bool = false,
     emitted: bool = false,
+    /// Every hole (`never`) of the key is a part no use reaches, so the
+    /// instance's unbound scheme variables are unused too.
+    unused_holes: bool = false,
 };
 const runtime = @import("runtime.zig");
 
@@ -61,6 +64,9 @@ pub const Generator = struct {
     solve_depth: u32 = 0,
     /// Closures built for function values no use determines (they trap).
     trap_closures: u32 = 0,
+    /// Type variables some scheme quantifies, per unit (built on demand).
+    quantified: std.AutoHashMapUnmanaged(types.VarKey, void) = .empty,
+    quantified_units: std.AutoHashMapUnmanaged(u32, void) = .empty,
     failures: std.ArrayList(struct { failure: Failure, count: u32 = 1, samples: [48]core.Span = undefined, sample_units: [48]u32 = undefined }) = .empty,
     /// The storage runtime, emitted on first use.
     rt: ?runtime.Runtime = null,
@@ -86,6 +92,8 @@ pub const Generator = struct {
         self.holds_memory.deinit(self.allocator);
         self.host_imports.deinit(self.allocator);
         self.pool_globals.deinit(self.allocator);
+        self.quantified.deinit(self.allocator);
+        self.quantified_units.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         for (self.failures.items) |item| self.allocator.free(item.failure.message);
         self.failures.deinit(self.allocator);
@@ -266,8 +274,72 @@ pub const Generator = struct {
         return self.module.signature(words.items, try self.types.layout(result));
     }
 
+    /// Whether a scheme of `m` quantifies variable `ty`. A variable none
+    /// quantifies is one the checker left ambiguous: no use fixes it.
+    /// Only variables an instance key can reach count: ones the binding's
+    /// type mentions, or obligations on reachable variables determine. A
+    /// scheme may also quantify variables its body alone leaves open.
+    pub fn isQuantified(self: *Generator, m: *const core.Module, ty: T.Id) Error!bool {
+        if (!self.quantified_units.contains(m.unit)) {
+            try self.quantified_units.put(self.allocator, m.unit, {});
+            var reach: std.AutoHashMapUnmanaged(T.Id, void) = .empty;
+            defer reach.deinit(self.allocator);
+            for (m.bindings, 0..) |binding, index| {
+                const body = m.body(@intCast(index));
+                reach.clearRetainingCapacity();
+                try self.mentions(m, binding.ty, &reach, 0);
+                var obligations: [2]T.List = .{ binding.scheme.obligations, if (body) |b| b.scheme.obligations else .{} };
+                // Obligations on reachable receivers reach their results.
+                var grew = true;
+                while (grew) {
+                    grew = false;
+                    for (&obligations) |span| for (m.obligations[span.start..][0..span.len]) |goal| {
+                        if (!try self.touches(m, goal.ty, &reach, 0)) continue;
+                        const before = reach.count();
+                        for ([_]T.Id{ goal.result, goal.other, goal.signature }) |part| try self.mentions(m, part, &reach, 0);
+                        if (reach.count() != before) grew = true;
+                    };
+                }
+                var schemes: [2]T.List = .{ binding.scheme.variables, if (body) |b| b.scheme.variables else .{} };
+                for (&schemes) |span| for (m.types.list(span)) |variable| if (reach.contains(variable))
+                    try self.quantified.put(self.allocator, .{ .unit = m.unit, .ty = variable }, {});
+            }
+        }
+        return self.quantified.contains(.{ .unit = m.unit, .ty = ty });
+    }
+    fn mentions(self: *Generator, m: *const core.Module, ty: T.Id, into: *std.AutoHashMapUnmanaged(T.Id, void), depth: usize) Error!void {
+        if (ty <= T.never or depth > 64) return;
+        const n = m.types.node(ty);
+        switch (n.tag) {
+            .variable, .bound => try into.put(self.allocator, ty, {}),
+            .usage, .forall, .array, .list, .cursor => try self.mentions(m, n.a, into, depth + 1),
+            .function => {
+                try self.mentions(m, n.a, into, depth + 1);
+                try self.mentions(m, n.b, into, depth + 1);
+            },
+            .product => for (m.types.list(.{ .start = n.a, .len = n.b })) |child| try self.mentions(m, child, into, depth + 1),
+            .record => for (0..n.b) |index| try self.mentions(m, m.types.recordField(n, index).ty, into, depth + 1),
+            .nominal => for (m.types.nominalArguments(n)) |argument| try self.mentions(m, argument, into, depth + 1),
+            else => {},
+        }
+    }
+    /// Whether `ty` is closed or mentions a variable of `reach`.
+    fn touches(self: *Generator, m: *const core.Module, ty: T.Id, reach: *const std.AutoHashMapUnmanaged(T.Id, void), depth: usize) Error!bool {
+        var found: std.AutoHashMapUnmanaged(T.Id, void) = .empty;
+        defer found.deinit(self.allocator);
+        try self.mentions(m, ty, &found, depth);
+        if (found.count() == 0) return true;
+        var it = found.keyIterator();
+        while (it.next()) |key| if (reach.contains(key.*)) return true;
+        return false;
+    }
+
     /// The instance of a named function at concrete function type `ty`.
     pub fn named(self: *Generator, target: core.BindingRef, ty: Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
+        return self.namedWith(target, ty, false, site, site_id);
+    }
+    /// `named`, where `unused_holes` says every hole of `ty` is unused.
+    pub fn namedWith(self: *Generator, target: core.BindingRef, ty: Ty, unused_holes: bool, site: *const core.Module, site_id: core.Id) Error!u32 {
         const key: InstanceKey = .{ .kind = .named, .unit = target.unit, .id = target.binding, .ty = ty };
         if (self.instance_index.get(key)) |found| return found;
         const m = self.unitModule(target.unit);
@@ -285,18 +357,23 @@ pub const Generator = struct {
         };
         const result = self.types.lower(m, m.typeOf(body.root), &env) catch |err| switch (err) {
             // The body determines its result type: emit it now.
-            error.Unsupported => return self.inferResult(key, env, lowered, site, site_id),
+            error.Unsupported => return self.inferResultWith(key, env, lowered, unused_holes, site, site_id),
             else => return err,
         };
-        return self.addInstance(key, env, lowered, result, site, site_id);
+        const id = try self.addInstance(key, env, lowered, result, site, site_id);
+        self.instance(id).unused_holes = unused_holes;
+        return id;
     }
     /// An instance whose result type only its body determines: emitted
     /// immediately, with its signature fixed once the result is known.
     fn inferResult(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
+        return self.inferResultWith(key, env, parameters, false, site, site_id);
+    }
+    fn inferResultWith(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, unused_holes: bool, site: *const core.Module, site_id: core.Id) Error!u32 {
         const function = try self.module.addFunction(try self.module.signature(&.{}, &.{}));
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
-        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .inferring = true, .emitted = true };
+        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .inferring = true, .emitted = true, .unused_holes = unused_holes };
         try self.nameFunction(function, key);
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);

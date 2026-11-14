@@ -44,7 +44,19 @@ const cases: Record<string, Call[]> = {
     ["chosen", 1, 1001],
   ],
   "view_calls.blot": [["run", 1, 25], ["run", 0, 3]],
-  "comprehensions.blot": [["comp", 10, 45], ["simple", 2, 15]],
+  "comprehensions.blot": [
+    ["comp", 10, 45],
+    ["simple", 2, 15],
+    ["guarded", 2, 7],
+    ["from_view", 1, 9],
+    ["nested", 4, 4],
+  ],
+  "unused_stages.blot": [["top", 4, 5], ["nested", 1, 7]],
+  "generic_comprehensions.blot": [
+    ["annotated_count", 4, 3],
+    ["generic_count", 4, 3],
+    ["generic_view_count", 4, 3],
+  ],
   "closures.blot": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],
@@ -103,9 +115,13 @@ for (const backend of ["direct", "scoped"] as const) {
   });
 }
 
-// Generic function values left open by every use: the scoped backend
-// requires concrete representation evidence for these.
-const directOnly = new Set(["open_codec.blot", "policy_record.blot"]);
+// The scoped backend rejects these: generic function values every use
+// leaves open, and array elements whose layout only an instance fixes.
+const directOnly = new Set([
+  "open_codec.blot",
+  "policy_record.blot",
+  "generic_comprehensions.blot",
+]);
 for (const [fixture, calls] of Object.entries(cases)) {
   for (const backend of ["direct", "scoped"] as const) {
     if (backend === "scoped" && directOnly.has(fixture)) continue;

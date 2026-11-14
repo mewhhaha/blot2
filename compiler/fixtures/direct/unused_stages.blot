@@ -1,0 +1,11 @@
+func no_action access => return ()
+func stages reset -> start -> settle => return {reset, start, settle}
+func start stages -> access => return do:
+  stages.start access
+  return access[0]
+func bump (access: Array U32) => return do:
+  access[0] := self + 1
+const application = stages no_action bump no_action
+func with_columns body => return body #[5, 6]
+entry func top (n: U32): U32 => return start application #[n]
+entry func nested (n: U32): U32 => return with_columns (func access => return start application access) + n
