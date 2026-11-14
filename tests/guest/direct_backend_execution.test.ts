@@ -4,7 +4,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-type Call = [name: string, argument: number, expected: number];
+type Call = [name: string, argument: number | boolean, expected: number | boolean];
 const cases: Record<string, Call[]> = {
   "calls.blot": [["answer", 40, 42]],
   "data_and_control.blot": [
