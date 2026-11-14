@@ -6,6 +6,8 @@ const T = @import("../check/types.zig");
 const W = @import("writer.zig");
 const types = @import("types.zig");
 const emit = @import("emit.zig");
+const runtime = @import("runtime.zig");
+const storage_ops = @import("../check/storage_ops.zig");
 const Ty = types.Ty;
 const Val = emit.Val;
 const Generator = emit.Generator;
@@ -23,6 +25,10 @@ const Label = struct {
     top: u32 = 0,
     iteration: []const Val = &.{},
     outgoing: []const Val = &.{},
+    /// Owner and stack mark locals an iteration releases to, and whether a
+    /// `continue` already released to them.
+    release: ?[2]u32 = null,
+    used: bool = false,
 };
 
 pub const Fn = struct {
@@ -43,6 +49,8 @@ pub const Fn = struct {
     /// that may refer to it; such a body restores the stack on exit unless
     /// its result can hold that memory.
     allocates: bool = false,
+    /// Allocation events so far, so a loop can tell whether its body allocated.
+    allocations: u32 = 0,
 
     fn a(self: *Fn) A {
         return self.g.allocator;
@@ -175,6 +183,9 @@ pub const Fn = struct {
             .constructor_function => self.constructorFunction(id),
             .primitive_function => self.primitiveFunction(id),
             .update => self.update(id),
+            .array => self.arrayLiteral(id),
+            .array_op => self.arrayOp(id),
+            .storage => self.storageOp(id),
             .break_ => self.breakNode(id),
             .panic => blk: {
                 try self.op(.unreachable_);
@@ -223,6 +234,10 @@ pub const Fn = struct {
         if (primitiveAlias(tm, target.binding) != null) return self.partial(.primitive, target, ty, &.{}, id);
         if (tm.body(target.binding)) |body| {
             if (body.is_function) return self.partial(.partial, target, ty, &.{}, id);
+            switch (self.tagOf(ty)) {
+                .array, .grow, .resize => return self.pool(target, ty, id),
+                else => {},
+            }
             // A constant: its instance computes the value.
             const instance = try self.g.named(target, ty, self.m, id);
             try self.opIndex(.call, self.g.instance(instance).function);
@@ -233,27 +248,43 @@ pub const Fn = struct {
     /// Pops a call result; a result that may refer to scope memory makes
     /// this body responsible for releasing it.
     fn received(self: *Fn, ty: Ty, id: core.Id) Error!Val {
-        if (try self.g.holdsMemory(ty)) self.allocates = true;
+        if (try self.g.holdsMemory(ty)) self.noteAllocation();
         return self.pop(ty, id);
     }
 
-    /// Allocates `bytes` of environment memory and returns its address local.
+    /// Allocates `bytes` of scope memory and returns its address local.
     fn allocate(self: *Fn, bytes: u32) Error!u32 {
-        self.allocates = true;
-        const sp = try self.g.stackPointer();
+        self.noteAllocation();
+        const rt = try self.g.runtime_();
         const address = try self.local(.i32);
-        try self.opIndex(.global_get, sp);
-        try self.opIndex(.local_tee, address);
         try self.i32Const(bytes);
-        try self.op(.i32_add);
-        try self.opIndex(.global_set, sp);
-        try self.opIndex(.global_get, sp);
-        try self.i32Const(emit.env_base + emit.env_bytes);
-        try self.op(.i32_gt_u);
-        _ = try self.open(.if_);
-        try self.op(.unreachable_);
-        try self.close();
+        try self.opIndex(.call, rt.stack);
+        try self.opIndex(.local_set, address);
         return address;
+    }
+    fn noteAllocation(self: *Fn) void {
+        self.allocates = true;
+        self.allocations += 1;
+    }
+    /// Code that records the current owner and stack marks into locals.
+    fn markInto(self: *Fn, out: *W.Bytes, owner_mark: u32, stack_mark: u32) Error!void {
+        const rt = try self.g.runtime_();
+        try out.byte(self.a(), @backingInt(W.Op.global_get));
+        try out.uleb(self.a(), rt.owner_top);
+        try out.byte(self.a(), @backingInt(W.Op.local_set));
+        try out.uleb(self.a(), owner_mark);
+        try out.byte(self.a(), @backingInt(W.Op.global_get));
+        try out.uleb(self.a(), rt.stack_pointer);
+        try out.byte(self.a(), @backingInt(W.Op.local_set));
+        try out.uleb(self.a(), stack_mark);
+    }
+    /// Releases every owner and stack byte allocated since the marks.
+    fn releaseTo(self: *Fn, owner_mark: u32, stack_mark: u32) Error!void {
+        const rt = try self.g.runtime_();
+        try self.opIndex(.local_get, owner_mark);
+        try self.opIndex(.call, rt.release);
+        try self.opIndex(.local_get, stack_mark);
+        try self.opIndex(.global_set, rt.stack_pointer);
     }
     /// A closure over `captures`, invoking instance `instance` with them.
     fn makeClosure(self: *Fn, instance: u32, ty: Ty, captures: []const Val, id: core.Id) Error!Val {
@@ -406,11 +437,647 @@ pub const Fn = struct {
         return self.partial(.primitive, .{ .unit = self.m.unit, .binding = id | primitive_node_bit }, ty, &.{}, id);
     }
 
+    /// A global array constant: one persistent owner per instance,
+    /// initialized on first use.
+    fn pool(self: *Fn, target: core.BindingRef, ty: Ty, id: core.Id) Error!Val {
+        const key: emit.InstanceKey = .{ .kind = .pool, .unit = target.unit, .id = target.binding, .ty = ty };
+        const instance = self.g.find(key) orelse blk: {
+            const created = try self.g.addInstanceWith(key, .empty, &.{}, ty, false, &.{}, self.m, id);
+            try self.g.pool_globals.put(self.a(), created, .{ try self.g.module.addGlobal(.i32, true, 0), try self.g.module.addGlobal(.i32, true, 0), try self.g.module.addGlobal(.i32, true, 0) });
+            break :blk created;
+        };
+        try self.opIndex(.call, self.g.instance(instance).function);
+        return self.pop(ty, id);
+    }
+    fn poolBody(self: *Fn, instance: *const emit.Instance) Error!Val {
+        const globals = self.g.pool_globals.get(self.instance_id).?;
+        const rt = try self.g.runtime_();
+        const key = instance.key;
+        try self.opIndex(.global_get, globals[2]);
+        try self.i32Const(1);
+        try self.op(.i32_ne);
+        _ = try self.open(.if_);
+        // Initialization cycles trap.
+        try self.opIndex(.global_get, globals[2]);
+        try self.i32Const(2);
+        try self.op(.i32_eq);
+        try self.trap();
+        try self.i32Const(2);
+        try self.opIndex(.global_set, globals[2]);
+        const marks: [2]u32 = .{ try self.local32(), try self.local32() };
+        var prefix: W.Bytes = .{};
+        defer prefix.deinit(self.a());
+        try self.markInto(&prefix, marks[0], marks[1]);
+        try self.code.raw(self.a(), prefix.items());
+        const value_instance = try self.g.named(.{ .unit = key.unit, .binding = key.id }, key.ty, self.m, 0);
+        try self.opIndex(.call, self.g.instance(value_instance).function);
+        const value = try self.pop(key.ty, 0);
+        try self.opIndex(.local_get, value.words[0]);
+        try self.opIndex(.local_get, value.words[1]);
+        try self.i32Const(try self.stride(try self.elementOf(key.ty, 0), 0));
+        try self.i32Const(@intFromBool(self.growable(key.ty)));
+        try self.opIndex(.call, rt.persist);
+        try self.opIndex(.global_set, globals[1]);
+        try self.opIndex(.global_set, globals[0]);
+        try self.releaseTo(marks[0], marks[1]);
+        try self.i32Const(1);
+        try self.opIndex(.global_set, globals[2]);
+        try self.close();
+        const result = try self.fresh(key.ty, 0);
+        try self.opIndex(.global_get, globals[0]);
+        try self.opIndex(.local_set, result.words[0]);
+        try self.opIndex(.global_get, globals[1]);
+        try self.opIndex(.local_set, result.words[1]);
+        return result;
+    }
+
+    // ----- host boundary -----------------------------------------------
+
+    /// A fresh fixed array copied from the host packet at `packet` (a local).
+    fn fromPacket(self: *Fn, ty: Ty, packet: u32) Error!Val {
+        const rt = try self.g.runtime_();
+        const length = try self.local32();
+        try self.opIndex(.local_get, packet);
+        try self.opIndex(.call, rt.packet_length);
+        try self.opIndex(.local_set, length);
+        const array_ty = try self.g.types.intern(.array, &.{self.g.types.node(ty).a});
+        const handle = try self.create(array_ty, length, 0);
+        const base = try self.baseOf(handle);
+        try self.opIndex(.local_get, base);
+        try self.opIndex(.local_get, packet);
+        try self.i32Const(4);
+        try self.op(.i32_add);
+        try self.opIndex(.local_get, length);
+        try self.i32Const(4);
+        try self.op(.i32_mul);
+        try self.op(.prefix_fc);
+        try self.code.uleb(self.a(), 10);
+        try self.code.byte(self.a(), 0);
+        try self.code.byte(self.a(), 0);
+        return .{ .ty = ty, .words = handle.words };
+    }
+    /// Copies an array into a fresh host packet; returns its address local.
+    fn toPacket(self: *Fn, value: Val, id: core.Id) Error!u32 {
+        const rt = try self.g.runtime_();
+        const length = try self.lengthOf(value, id);
+        try self.i32Const(0);
+        try self.opIndex(.call, rt.reset);
+        try self.op(.drop);
+        const packet = try self.local32();
+        try self.opIndex(.local_get, length);
+        try self.i32Const(4);
+        try self.op(.i32_mul);
+        try self.i32Const(4);
+        try self.op(.i32_add);
+        try self.opIndex(.call, rt.allocate);
+        try self.opIndex(.local_tee, packet);
+        try self.opIndex(.local_get, length);
+        try self.op(.i32_store);
+        try self.code.uleb(self.a(), 2);
+        try self.code.uleb(self.a(), 0);
+        _ = try self.open(.block);
+        try self.opIndex(.local_get, length);
+        try self.op(.i32_eqz);
+        try self.opIndex(.br_if, 0);
+        const base = try self.baseOf(value);
+        try self.opIndex(.local_get, packet);
+        try self.i32Const(4);
+        try self.op(.i32_add);
+        try self.opIndex(.local_get, base);
+        try self.opIndex(.local_get, length);
+        try self.i32Const(4);
+        try self.op(.i32_mul);
+        try self.op(.prefix_fc);
+        try self.code.uleb(self.a(), 10);
+        try self.code.byte(self.a(), 0);
+        try self.code.byte(self.a(), 0);
+        try self.close();
+        return packet;
+    }
+    /// A closure calling host callback `slot` of table 1.
+    fn hostClosure(self: *Fn, ty: Ty, kinds: [2]Abi, slot: u32) Error!Val {
+        const import = try hostImport(self.g, kinds);
+        const key: emit.InstanceKey = .{ .kind = .host, .unit = self.m.unit, .id = import, .ty = ty };
+        const arrow = self.g.types.node(ty);
+        const instance = self.g.find(key) orelse try self.g.addInstanceWith(key, .empty, try self.g.arena.allocator().dupe(Ty, &.{arrow.a}), arrow.b, true, try self.g.arena.allocator().dupe(Ty, &.{types.u32_}), self.m, 0);
+        const captured = try self.constLocal(slot);
+        return self.makeClosure(instance, ty, &.{.{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{captured}) }}, 0);
+    }
+    /// The host adapter body: converts the argument, calls the import with
+    /// the callback's externref and converts the result.
+    fn hostBody(self: *Fn, instance: *const emit.Instance, captures: []const Val, argument: Val) Error!Val {
+        const arrow = self.g.types.node(instance.key.ty);
+        const kinds = callbackAbi(self.g, instance.key.ty) orelse return self.g.fail(self.m, 0, "host callback shape", .{});
+        var packet: ?u32 = null;
+        if (isArray(kinds[0])) packet = try self.toPacket(argument, 0);
+        try self.opIndex(.local_get, captures[0].words[0]);
+        try self.opIndex(.table_get, 1);
+        if (packet) |address| try self.opIndex(.local_get, address) else if (kinds[0] == .unit) try self.i32Const(0) else try self.push(argument);
+        try self.opIndex(.call, instance.key.id);
+        if (isArray(kinds[1])) {
+            const address = try self.local32();
+            try self.opIndex(.local_set, address);
+            self.noteAllocation();
+            return self.fromPacket(arrow.b, address);
+        }
+        if (kinds[1] == .unit) {
+            try self.op(.drop);
+            return unitVal();
+        }
+        return self.pop(arrow.b, 0);
+    }
+
+    // ----- storage -----------------------------------------------------
+
+    fn wordBytes(kind: W.ValType) u32 {
+        return if (kind == .v128) 16 else 4;
+    }
+    /// Bytes per element of a container holding `element`.
+    fn stride(self: *Fn, element: Ty, id: core.Id) Error!u32 {
+        var bytes: u32 = 0;
+        for (try self.layout(element, id)) |kind| bytes += wordBytes(kind);
+        return @max(bytes, 4);
+    }
+    fn storeAt(self: *Fn, address: u32, offset: u32, value: Val) Error!void {
+        var at = offset;
+        for (value.words) |word| {
+            const kind = self.locals.items[word];
+            try self.opIndex(.local_get, address);
+            try self.opIndex(.local_get, word);
+            switch (kind) {
+                .f32 => try self.op(.f32_store),
+                .v128 => {
+                    try self.op(.prefix_fd);
+                    try self.code.uleb(self.a(), 11);
+                },
+                else => try self.op(.i32_store),
+            }
+            try self.code.uleb(self.a(), if (kind == .v128) 4 else 2);
+            try self.code.uleb(self.a(), at);
+            at += wordBytes(kind);
+        }
+    }
+    fn loadAt(self: *Fn, address: u32, offset: u32, ty: Ty, id: core.Id) Error!Val {
+        const value = try self.fresh(ty, id);
+        var at = offset;
+        for (value.words) |word| {
+            const kind = self.locals.items[word];
+            try self.opIndex(.local_get, address);
+            switch (kind) {
+                .f32 => try self.op(.f32_load),
+                .v128 => {
+                    try self.op(.prefix_fd);
+                    try self.code.uleb(self.a(), 0);
+                },
+                else => try self.op(.i32_load),
+            }
+            try self.code.uleb(self.a(), if (kind == .v128) 4 else 2);
+            try self.code.uleb(self.a(), at);
+            try self.opIndex(.local_set, word);
+            at += wordBytes(kind);
+        }
+        return value;
+    }
+    fn tagOf(self: *Fn, ty: Ty) types.Tag {
+        return self.g.types.node(ty).tag;
+    }
+    fn elementOf(self: *Fn, ty: Ty, id: core.Id) Error!Ty {
+        return switch (self.tagOf(ty)) {
+            .array, .list, .grow, .resize, .view, .ref, .link => self.g.types.node(ty).a,
+            else => self.g.fail(self.m, id, "storage operation on a {s}", .{@tagName(self.tagOf(ty))}),
+        };
+    }
+    fn growable(self: *Fn, ty: Ty) bool {
+        const tag = self.tagOf(ty);
+        return tag == .grow or tag == .resize;
+    }
+    fn local32(self: *Fn) Error!u32 {
+        return self.local(.i32);
+    }
+    /// A fresh owner of `ty` (a container) with `length` zeroed elements.
+    fn create(self: *Fn, ty: Ty, length: u32, id: core.Id) Error!Val {
+        const rt = try self.g.runtime_();
+        self.noteAllocation();
+        const element = try self.elementOf(ty, id);
+        try self.opIndex(.local_get, length);
+        try self.i32Const(try self.stride(element, id));
+        try self.i32Const(@intFromBool(self.growable(ty)));
+        try self.opIndex(.call, rt.create);
+        return self.pop(ty, id);
+    }
+    /// The address of element 0 of an owner handle.
+    fn baseOf(self: *Fn, handle: Val) Error!u32 {
+        const rt = try self.g.runtime_();
+        const base = try self.local32();
+        try self.opIndex(.local_get, handle.words[0]);
+        try self.opIndex(.local_get, handle.words[1]);
+        try self.opIndex(.call, rt.check);
+        try self.op(.i32_load);
+        try self.code.uleb(self.a(), 2);
+        try self.code.uleb(self.a(), runtime.entry_base);
+        try self.opIndex(.local_set, base);
+        return base;
+    }
+    fn lengthOf(self: *Fn, container: Val, id: core.Id) Error!u32 {
+        const rt = try self.g.runtime_();
+        if (self.tagOf(container.ty) == .view) return container.words[3];
+        _ = try self.elementOf(container.ty, id);
+        const length = try self.local32();
+        try self.opIndex(.local_get, container.words[0]);
+        try self.opIndex(.local_get, container.words[1]);
+        try self.opIndex(.call, rt.length);
+        try self.opIndex(.local_set, length);
+        return length;
+    }
+    /// The checked address of element `index` (a local) of a container or
+    /// view; views check their own range first.
+    fn elementAddress(self: *Fn, container: Val, index: u32, id: core.Id) Error!u32 {
+        const rt = try self.g.runtime_();
+        const element = try self.elementOf(container.ty, id);
+        var position = index;
+        if (self.tagOf(container.ty) == .view) {
+            try self.opIndex(.local_get, index);
+            try self.opIndex(.local_get, container.words[3]);
+            try self.op(.i32_ge_u);
+            try self.trap();
+            position = try self.local32();
+            try self.opIndex(.local_get, container.words[2]);
+            try self.opIndex(.local_get, index);
+            try self.op(.i32_add);
+            try self.opIndex(.local_set, position);
+        }
+        const address = try self.local32();
+        try self.opIndex(.local_get, container.words[0]);
+        try self.opIndex(.local_get, container.words[1]);
+        try self.opIndex(.local_get, position);
+        try self.i32Const(try self.stride(element, id));
+        try self.opIndex(.call, rt.address);
+        try self.opIndex(.local_set, address);
+        return address;
+    }
+    /// Traps when the i32 on the stack is nonzero.
+    fn trap(self: *Fn) Error!void {
+        _ = try self.open(.if_);
+        try self.op(.unreachable_);
+        try self.close();
+    }
+    fn scalarLocal(self: *Fn, value: Val, id: core.Id) Error!u32 {
+        if (value.words.len != 1) return self.g.fail(self.m, id, "expected a scalar", .{});
+        return value.words[0];
+    }
+    fn readElement(self: *Fn, container: Val, index: u32, id: core.Id) Error!Val {
+        const address = try self.elementAddress(container, index, id);
+        return self.loadAt(address, 0, try self.elementOf(container.ty, id), id);
+    }
+    fn constLocal(self: *Fn, value: u32) Error!u32 {
+        const local_ = try self.local32();
+        try self.i32Const(value);
+        try self.opIndex(.local_set, local_);
+        return local_;
+    }
+
+    fn arrayLiteral(self: *Fn, id: core.Id) Error!Val {
+        const ty = try self.typeOf(id);
+        const children = self.m.children(id);
+        const values = try self.arena.alloc(Val, children.len);
+        for (children, values) |child, *slot| slot.* = try self.expr(child);
+        const handle = try self.create(ty, try self.constLocal(@intCast(children.len)), id);
+        if (children.len == 0) return handle;
+        const base = try self.baseOf(handle);
+        const step = try self.stride(try self.elementOf(ty, id), id);
+        for (values, 0..) |value, index| try self.storeAt(base, @intCast(index * step), value);
+        return handle;
+    }
+
+    fn arrayOp(self: *Fn, id: core.Id) Error!Val {
+        const operation = self.m.arrayOperation(id);
+        const children = self.m.children(id);
+        const ty = try self.typeOf(id);
+        switch (operation) {
+            .length => {
+                const container = try self.expr(children[0]);
+                return .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{try self.lengthOf(container, id)}) };
+            },
+            .get => {
+                const container = try self.expr(children[0]);
+                const index = try self.scalarLocal(try self.expr(children[1]), id);
+                return self.readElement(container, index, id);
+            },
+            .identity, .convert => {
+                const value = try self.expr(children[0]);
+                if (operation == .identity) return .{ .ty = ty, .words = value.words };
+                return self.copyContainer(value, ty, id);
+            },
+            .fill, .generate => {
+                const count = try self.scalarLocal(try self.expr(children[0]), id);
+                const source = try self.expr(children[1]);
+                const handle = try self.create(ty, count, id);
+                const base = try self.baseOf(handle);
+                const element = try self.elementOf(ty, id);
+                const step = try self.stride(element, id);
+                const index = try self.constLocal(0);
+                const exit = try self.open(.block);
+                const top = try self.open(.loop);
+                try self.opIndex(.local_get, index);
+                try self.opIndex(.local_get, count);
+                try self.op(.i32_ge_u);
+                try self.br(.br_if, exit);
+                const value = if (operation == .fill) source else try self.applyClosure(source, .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{index}) }, id);
+                const address = try self.local32();
+                try self.opIndex(.local_get, base);
+                try self.opIndex(.local_get, index);
+                try self.i32Const(step);
+                try self.op(.i32_mul);
+                try self.op(.i32_add);
+                try self.opIndex(.local_set, address);
+                try self.storeAt(address, 0, value);
+                try self.opIndex(.local_get, index);
+                try self.i32Const(1);
+                try self.op(.i32_add);
+                try self.opIndex(.local_set, index);
+                try self.br(.br, top);
+                try self.close();
+                try self.close();
+                return handle;
+            },
+            .append, .prepend, .concat => {
+                const first = try self.expr(children[0]);
+                const second = try self.expr(children[1]);
+                const element = try self.elementOf(ty, id);
+                const parts: []const Val = switch (operation) {
+                    .append => &.{ first, second },
+                    .prepend => &.{ second, first },
+                    else => &.{ first, second },
+                };
+                return self.joined(ty, element, parts, operation == .concat, id);
+            },
+            .slice => {
+                const container = try self.expr(children[0]);
+                const start = try self.scalarLocal(try self.expr(children[1]), id);
+                const count = try self.scalarLocal(try self.expr(children[2]), id);
+                const length = try self.lengthOf(container, id);
+                // start + count <= length, without overflow.
+                try self.opIndex(.local_get, start);
+                try self.opIndex(.local_get, length);
+                try self.op(.i32_gt_u);
+                try self.opIndex(.local_get, count);
+                try self.opIndex(.local_get, length);
+                try self.opIndex(.local_get, start);
+                try self.op(.i32_sub);
+                try self.op(.i32_gt_u);
+                try self.op(.i32_or);
+                try self.trap();
+                const handle = try self.create(ty, count, id);
+                try self.copyElements(container, start, handle, try self.constLocal(0), count, id);
+                return handle;
+            },
+            else => return self.g.fail(self.m, id, "array operation {s} is not supported yet", .{@tagName(operation)}),
+        }
+    }
+    /// Copies `count` elements from `source[from..]` to `target[to..]`.
+    fn copyElements(self: *Fn, source: Val, from: u32, target: Val, to: u32, count: u32, id: core.Id) Error!void {
+        const step = try self.stride(try self.elementOf(target.ty, id), id);
+        _ = try self.open(.block);
+        try self.opIndex(.local_get, count);
+        try self.op(.i32_eqz);
+        try self.opIndex(.br_if, 0);
+        const destination = try self.elementAddress(target, to, id);
+        const origin = try self.elementAddress(source, from, id);
+        // Both ranges end inside their owners: check the last elements too.
+        const last = try self.local32();
+        try self.opIndex(.local_get, count);
+        try self.i32Const(1);
+        try self.op(.i32_sub);
+        try self.opIndex(.local_set, last);
+        const end_target = try self.local32();
+        try self.opIndex(.local_get, to);
+        try self.opIndex(.local_get, last);
+        try self.op(.i32_add);
+        try self.opIndex(.local_set, end_target);
+        _ = try self.elementAddress(target, end_target, id);
+        const end_source = try self.local32();
+        try self.opIndex(.local_get, from);
+        try self.opIndex(.local_get, last);
+        try self.op(.i32_add);
+        try self.opIndex(.local_set, end_source);
+        _ = try self.elementAddress(source, end_source, id);
+        try self.opIndex(.local_get, destination);
+        try self.opIndex(.local_get, origin);
+        try self.opIndex(.local_get, count);
+        try self.i32Const(step);
+        try self.op(.i32_mul);
+        try self.op(.prefix_fc);
+        try self.code.uleb(self.a(), 10);
+        try self.code.byte(self.a(), 0);
+        try self.code.byte(self.a(), 0);
+        try self.close();
+    }
+    /// A new fixed array: the elements of each part in order (a part is
+    /// either a container or, unless `containers`, one element).
+    fn joined(self: *Fn, ty: Ty, element: Ty, parts: []const Val, containers: bool, id: core.Id) Error!Val {
+        const lengths = try self.arena.alloc(?u32, parts.len);
+        const total = try self.constLocal(0);
+        for (parts, lengths) |part, *length| {
+            const is_container = containers or part.ty != element;
+            length.* = if (is_container) try self.lengthOf(part, id) else null;
+            try self.opIndex(.local_get, total);
+            if (length.*) |value| try self.opIndex(.local_get, value) else try self.i32Const(1);
+            try self.op(.i32_add);
+            try self.opIndex(.local_set, total);
+        }
+        const handle = try self.create(ty, total, id);
+        const at = try self.constLocal(0);
+        for (parts, lengths) |part, length| {
+            if (length) |count| {
+                try self.copyElements(part, try self.constLocal(0), handle, at, count, id);
+                try self.opIndex(.local_get, at);
+                try self.opIndex(.local_get, count);
+            } else {
+                try self.storeAt(try self.elementAddress(handle, at, id), 0, part);
+                try self.opIndex(.local_get, at);
+                try self.i32Const(1);
+            }
+            try self.op(.i32_add);
+            try self.opIndex(.local_set, at);
+        }
+        return handle;
+    }
+    /// An independent owner of type `ty` with `value`'s elements.
+    fn copyContainer(self: *Fn, value: Val, ty: Ty, id: core.Id) Error!Val {
+        const length = try self.lengthOf(value, id);
+        const handle = try self.create(ty, length, id);
+        try self.copyElements(value, try self.constLocal(0), handle, try self.constLocal(0), length, id);
+        return handle;
+    }
+
+    fn storageOp(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const operation: storage_ops.Op = @fromBackingInt(n.c);
+        const children = self.m.children(id);
+        const ty = try self.typeOf(id);
+        const rt = try self.g.runtime_();
+        switch (operation) {
+            .reserve => {
+                _ = try self.expr(children[0]);
+                return unitVal();
+            },
+            .length => {
+                const container = try self.expr(children[0]);
+                return .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{try self.lengthOf(container, id)}) };
+            },
+            .read => {
+                const container = try self.expr(children[0]);
+                return self.readElement(container, try self.scalarLocal(try self.expr(children[1]), id), id);
+            },
+            .push => {
+                const container = try self.expr(children[0]);
+                const value = try self.expr(children[1]);
+                const address = try self.local32();
+                try self.opIndex(.local_get, container.words[0]);
+                try self.opIndex(.local_get, container.words[1]);
+                try self.i32Const(try self.stride(try self.elementOf(container.ty, id), id));
+                try self.opIndex(.call, rt.push);
+                try self.opIndex(.local_set, address);
+                try self.storeAt(address, 0, value);
+                return unitVal();
+            },
+            .pop => {
+                const container = try self.expr(children[0]);
+                const address = try self.local32();
+                try self.opIndex(.local_get, container.words[0]);
+                try self.opIndex(.local_get, container.words[1]);
+                try self.i32Const(try self.stride(try self.elementOf(container.ty, id), id));
+                try self.opIndex(.call, rt.pop);
+                try self.opIndex(.local_set, address);
+                return self.loadAt(address, 0, ty, id);
+            },
+            .truncate => {
+                const container = try self.expr(children[0]);
+                const count = try self.scalarLocal(try self.expr(children[1]), id);
+                try self.opIndex(.local_get, container.words[0]);
+                try self.opIndex(.local_get, container.words[1]);
+                try self.opIndex(.local_get, count);
+                try self.opIndex(.call, rt.truncate);
+                return unitVal();
+            },
+            .freeze => {
+                const container = try self.expr(children[0]);
+                try self.opIndex(.local_get, container.words[0]);
+                try self.opIndex(.local_get, container.words[1]);
+                try self.opIndex(.call, rt.freeze);
+                return .{ .ty = ty, .words = container.words };
+            },
+            .copy => {
+                const container = try self.expr(children[0]);
+                return self.copyContainer(container, ty, id);
+            },
+            .view => {
+                const container = try self.expr(children[0]);
+                const start = try self.scalarLocal(try self.expr(children[1]), id);
+                const end = try self.scalarLocal(try self.expr(children[2]), id);
+                const length = try self.lengthOf(container, id);
+                try self.opIndex(.local_get, start);
+                try self.opIndex(.local_get, end);
+                try self.op(.i32_gt_u);
+                try self.opIndex(.local_get, end);
+                try self.opIndex(.local_get, length);
+                try self.op(.i32_gt_u);
+                try self.op(.i32_or);
+                try self.trap();
+                const result = try self.fresh(ty, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[0..1] }, .{ .ty = types.u32_, .words = result.words[0..1] }, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[1..2] }, .{ .ty = types.u32_, .words = result.words[1..2] }, id);
+                if (self.tagOf(container.ty) == .view) {
+                    try self.opIndex(.local_get, container.words[2]);
+                    try self.opIndex(.local_get, start);
+                    try self.op(.i32_add);
+                } else try self.opIndex(.local_get, start);
+                try self.opIndex(.local_set, result.words[2]);
+                try self.opIndex(.local_get, end);
+                try self.opIndex(.local_get, start);
+                try self.op(.i32_sub);
+                try self.opIndex(.local_set, result.words[3]);
+                return result;
+            },
+            .at, .link => {
+                const container = try self.expr(children[0]);
+                const index = try self.scalarLocal(try self.expr(children[1]), id);
+                // Check now, so a reference never names a missing element.
+                _ = try self.elementAddress(container, index, id);
+                const result = try self.fresh(ty, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[0..1] }, .{ .ty = types.u32_, .words = result.words[0..1] }, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[1..2] }, .{ .ty = types.u32_, .words = result.words[1..2] }, id);
+                if (self.tagOf(container.ty) == .view) {
+                    try self.opIndex(.local_get, container.words[2]);
+                    try self.opIndex(.local_get, index);
+                    try self.op(.i32_add);
+                } else try self.opIndex(.local_get, index);
+                try self.opIndex(.local_set, result.words[2]);
+                return result;
+            },
+            .load, .write => {
+                const reference_ = try self.expr(children[0]);
+                const element = try self.elementOf(reference_.ty, id);
+                const address = try self.local32();
+                try self.opIndex(.local_get, reference_.words[0]);
+                try self.opIndex(.local_get, reference_.words[1]);
+                try self.opIndex(.local_get, reference_.words[2]);
+                try self.i32Const(try self.stride(element, id));
+                try self.opIndex(.call, rt.address);
+                try self.opIndex(.local_set, address);
+                if (operation == .load) return self.loadAt(address, 0, element, id);
+                const value = try self.expr(children[1]);
+                try self.storeAt(address, 0, value);
+                return unitVal();
+            },
+            .ref => return self.g.fail(self.m, id, "references to whole values are not supported yet", .{}),
+        }
+    }
+
     /// `root` with the field path of an update replaced by its new value.
     fn update(self: *Fn, id: core.Id) Error!Val {
         const info = self.m.updateInfo(id);
         const root = try self.expr(info.root);
         return self.updateAt(id, root, 0);
+    }
+    /// `container[index].fields... := value` writes the selected place
+    /// through the owner and leaves the handle unchanged.
+    fn indexedUpdate(self: *Fn, id: core.Id, container: Val, at: usize) Error!Val {
+        const info = self.m.updateInfo(id);
+        const selectors = self.m.updateSelectors(id);
+        const index = try self.scalarLocal(try self.expr(selectors[at].index), id);
+        const address = try self.elementAddress(container, index, id);
+        var ty = try self.elementOf(container.ty, id);
+        var offset: u32 = 0;
+        for (selectors[at + 1 ..]) |step| {
+            if (step.kind == .index) return self.g.fail(self.m, id, "nested indexed updates are not supported yet", .{});
+            const projection = self.m.projection(step.projection);
+            const spelling = self.m.fieldSpelling(projection.field) orelse return self.g.fail(self.m, id, "updated field without a spelling", .{});
+            const name = try self.g.types.fieldName(spelling);
+            var record = ty;
+            if (self.tagOf(ty) == .nominal) {
+                const cases = self.g.types.variants(ty) catch |err| switch (err) {
+                    error.Unsupported => return self.g.typeFailure(self.m, id),
+                    else => return err,
+                };
+                if (cases.payloads.len != 1) return self.g.fail(self.m, id, "update of a multi-constructor element", .{});
+                record = cases.payloads[0];
+            }
+            const position = self.g.types.findField(record, name) orelse return self.g.fail(self.m, id, "updated field missing", .{});
+            for (0..position) |before| offset += try self.byteWidth(self.g.types.recordField(record, before).ty, id);
+            ty = self.g.types.recordField(record, position).ty;
+        }
+        const old = try self.loadAt(address, offset, ty, id);
+        try self.bindings.put(self.a(), info.self_binding, old);
+        const replacement = try self.expr(info.value);
+        if (replacement.ty == types.never) return replacement;
+        try self.storeAt(address, offset, replacement);
+        return container;
+    }
+    fn byteWidth(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
+        var bytes: u32 = 0;
+        for (try self.layout(ty, id)) |kind| bytes += wordBytes(kind);
+        return bytes;
     }
     fn updateAt(self: *Fn, id: core.Id, value: Val, at: usize) Error!Val {
         const info = self.m.updateInfo(id);
@@ -421,7 +1088,7 @@ pub const Fn = struct {
             try self.bindings.put(self.a(), info.self_binding, value);
             return self.expr(info.value);
         }
-        if (selectors.len != 0 and selectors[at].kind == .index) return self.g.fail(self.m, id, "indexed updates are not supported yet", .{});
+        if (selectors.len != 0 and selectors[at].kind == .index) return self.indexedUpdate(id, value, at);
         const projection = self.m.projection(if (selectors.len != 0) selectors[at].projection else path[at]);
         const spelling = self.m.fieldSpelling(projection.field) orelse return self.g.fail(self.m, id, "updated field without a spelling", .{});
         const name = try self.g.types.fieldName(spelling);
@@ -1010,6 +1677,24 @@ pub const Fn = struct {
         }
         for (staged, targets) |value, target| try self.copy(value, target, id);
     }
+    fn holdsClosure(self: *Fn, ty: Ty) Error!bool {
+        const n = self.g.types.node(ty);
+        return switch (n.tag) {
+            .function => true,
+            .tuple => for (self.g.types.tupleItems(ty)) |item| {
+                if (try self.holdsClosure(item)) break true;
+            } else false,
+            .record => for (0..n.b) |index| {
+                if (try self.holdsClosure(self.g.types.recordField(ty, index).ty)) break true;
+            } else false,
+            .nominal => blk: {
+                const cases = self.g.types.variants(ty) catch break :blk true;
+                for (cases.payloads) |payload| if (payload != ty and try self.holdsClosure(payload)) break :blk true;
+                break :blk false;
+            },
+            else => false,
+        };
+    }
     fn carryVals(self: *Fn, carries: []const core.LoopCarry, comptime field: []const u8, id: core.Id) Error![]Val {
         const out = try self.arena.alloc(Val, carries.len);
         for (carries, out) |carry, *slot| slot.* = try self.fresh(try self.lower(self.m.binding(@field(carry, field)).ty, id), id);
@@ -1024,44 +1709,68 @@ pub const Fn = struct {
         for (carries, incoming) |carry, *slot| slot.* = self.bindings.get(carry.incoming) orelse return self.g.fail(self.m, id, "loop carry without an incoming value", .{});
         try self.assign(incoming, iteration, id);
         for (carries, iteration) |carry, value| try self.bindings.put(self.a(), carry.iteration, value);
-        var index: ?Val = null;
+        var index: ?u32 = null;
         var end: ?Val = null;
+        var source: ?Val = null;
         switch (info.kind) {
             .forever => {},
             .range => {
-                index = try self.fresh(types.u32_, id);
-                try self.copy(try self.expr(info.first), index.?, id);
+                index = try self.local32();
+                try self.copy(try self.expr(info.first), .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{index.?}) }, id);
                 end = try self.fresh(types.u32_, id);
                 try self.copy(try self.expr(info.end), end.?, id);
             },
-            .array => return self.g.fail(self.m, id, "array loops are not supported yet", .{}),
+            .array => {
+                source = try self.expr(info.first);
+                index = try self.constLocal(0);
+                end = .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{try self.lengthOf(source.?, id)}) };
+            },
         }
         const exit = try self.open(.block);
         const top = try self.open(.loop);
         if (index) |counter| {
-            try self.opIndex(.local_get, counter.words[0]);
+            try self.opIndex(.local_get, counter);
             try self.opIndex(.local_get, end.?.words[0]);
             try self.op(.i32_ge_u);
             _ = try self.open(.if_);
             try self.assign(iteration, outgoing, id);
             try self.br(.br, exit);
             try self.close();
-            const current = try self.fresh(types.u32_, id);
-            try self.copy(counter, current, id);
-            try self.opIndex(.local_get, counter.words[0]);
+            const current = try self.local32();
+            try self.opIndex(.local_get, counter);
+            try self.opIndex(.local_set, current);
+            try self.opIndex(.local_get, counter);
             try self.i32Const(1);
             try self.op(.i32_add);
-            try self.opIndex(.local_set, counter.words[0]);
-            if (info.pattern != 0) try self.test_(info.pattern, current, null, id);
+            try self.opIndex(.local_set, counter);
+            const item: Val = if (source) |container| try self.readElement(container, current, id) else .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{current}) };
+            if (info.pattern != 0) try self.test_(info.pattern, item, null, id);
         }
-        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing });
+        // An iteration releases what it allocated unless a carried value is
+        // a closure; fresh owners cannot be carried, and a stale one traps.
+        var release = true;
+        for (iteration) |value| if (try self.holdsClosure(value.ty)) {
+            release = false;
+        };
+        const marks: [2]u32 = .{ try self.local(.i32), try self.local(.i32) };
+        const mark_at = self.code.list.items.len;
+        const allocations = self.allocations;
+        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null });
         const body = try self.expr(info.body);
-        _ = self.labels.pop();
+        const label = self.labels.pop().?;
         if (body.ty != types.never) {
             const backedge = try self.arena.alloc(Val, carries.len);
             for (carries, backedge) |carry, *slot| slot.* = self.bindings.get(carry.backedge) orelse return self.g.fail(self.m, id, "loop carry without a backedge value", .{});
             try self.assign(backedge, iteration, id);
+            if (label.release) |pair| if (self.allocations != allocations) try self.releaseTo(pair[0], pair[1]);
             try self.br(.br, top);
+        }
+        if (release and (self.allocations != allocations or label.used)) {
+            // Insert the iteration's marks at its start, now that the body is known to allocate.
+            var prefix: W.Bytes = .{};
+            defer prefix.deinit(self.a());
+            try self.markInto(&prefix, marks[0], marks[1]);
+            try self.code.list.insertSlice(self.a(), mark_at, prefix.items());
         }
         try self.close();
         try self.close();
@@ -1082,6 +1791,10 @@ pub const Fn = struct {
             if (values.len != label.iteration.len) return self.g.fail(self.m, id, "break carries the wrong number of values", .{});
             if (n.op == .continue_) {
                 try self.assign(values, label.iteration, id);
+                if (label.release) |pair| {
+                    try self.releaseTo(pair[0], pair[1]);
+                    self.labels.items[at].used = true;
+                }
                 try self.br(.br, label.top);
             } else {
                 try self.assign(values, label.outgoing, id);
@@ -1147,7 +1860,8 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
         slot.* = .{ .ty = ty, .words = locals };
     }
     f.parameter_words = @intCast(f.locals.items.len);
-    const saved = try f.local(.i32);
+    const owner_mark = try f.local(.i32);
+    const stack_mark = try f.local(.i32);
     if (instance.closure) captures = try f.loadCaptures(instance.captures, 0);
     switch (instance.key.kind) {
         .named => {
@@ -1161,7 +1875,7 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
             try f.bindings.put(g.allocator, info.parameter.binding, inputs[0]);
             root = info.body;
         },
-        .partial, .primitive, .constructor => {},
+        .partial, .primitive, .constructor, .host, .pool => {},
     }
     const result = try f.fresh(instance.result, root);
     const exit = try f.open(.block);
@@ -1169,25 +1883,18 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
     const value = switch (instance.key.kind) {
         .named, .lambda => try f.expr(root),
         .partial, .primitive, .constructor => try f.adapterBody(instance, captures, inputs[0]),
+        .host => try f.hostBody(instance, captures, inputs[0]),
+        .pool => try f.poolBody(instance),
     };
     try f.copy(value, result, root);
     try f.close();
     const release = f.allocates and !try g.holdsMemory(instance.result);
-    if (release) _ = try g.stackPointer();
-    if (release) {
-        try f.opIndex(.local_get, saved);
-        try f.opIndex(.global_set, g.stack_pointer.?);
-    }
+    if (release) try f.releaseTo(owner_mark, stack_mark);
     try f.push(result);
     try f.op(.end);
     var prologue: W.Bytes = .{};
     defer prologue.deinit(g.allocator);
-    if (release) {
-        try prologue.byte(g.allocator, @backingInt(W.Op.global_get));
-        try prologue.uleb(g.allocator, g.stack_pointer.?);
-        try prologue.byte(g.allocator, @backingInt(W.Op.local_set));
-        try prologue.uleb(g.allocator, saved);
-    }
+    if (release) try f.markInto(&prologue, owner_mark, stack_mark);
     try finishWith(g, instance.function, &f, prologue.items());
 }
 
@@ -1221,10 +1928,49 @@ fn finishWith(g: *Generator, function: u32, f: *Fn, prologue: []const u8) Error!
     try g.module.setBody(function, out.items());
 }
 
-/// An exported entry: converts its one ABI argument, calls the instance and
-/// converts the result.
+/// ABI 8 value kinds (runtime_ir.Scalar), and callback import names.
+const Abi = enum(u8) { unit = 0, u32 = 1, bool = 2, f32 = 3, array_u32 = 5, array_f32 = 6 };
+fn abiKind(g: *Generator, ty: Ty) ?Abi {
+    const n = g.types.node(ty);
+    return switch (n.tag) {
+        .unit => .unit,
+        .u32 => .u32,
+        .boolean => .bool,
+        .f32 => .f32,
+        .array, .grow, .resize => switch (g.types.node(n.a).tag) {
+            .u32 => .array_u32,
+            .f32 => .array_f32,
+            else => null,
+        },
+        else => null,
+    };
+}
+fn abiMachine(kind: Abi) W.ValType {
+    return if (kind == .f32) .f32 else .i32;
+}
+fn isArray(kind: Abi) bool {
+    return kind == .array_u32 or kind == .array_f32;
+}
+/// A Foreign host callback parameter: its argument and result kinds.
+pub fn callbackAbi(g: *Generator, ty: Ty) ?[2]Abi {
+    const n = g.types.node(ty);
+    if (n.tag != .function) return null;
+    return .{ abiKind(g, n.a) orelse return null, abiKind(g, n.b) orelse return null };
+}
+/// Declares the host import for a callback shape; imports precede functions.
+pub fn hostImport(g: *Generator, kinds: [2]Abi) Error!u32 {
+    const key: [2]u8 = .{ @backingInt(kinds[0]), @backingInt(kinds[1]) };
+    if (g.host_imports.get(key)) |found| return found;
+    const name = try g.arena.allocator().print("call_{s}_{s}", .{ @tagName(kinds[0]), @tagName(kinds[1]) });
+    const signature = try g.module.signature(&.{ .externref, abiMachine(kinds[0]) }, &.{abiMachine(kinds[1])});
+    const import = try g.module.importFunction("blot:host/1", name, signature);
+    try g.host_imports.put(g.allocator, key, import);
+    return import;
+}
+
+/// An exported entry: resets temporaries, converts its one ABI argument,
+/// calls the instance, converts the result and releases temporaries.
 pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes) Error!void {
-    const parameters = m.bodyParameters(body);
     var empty: types.Env = .empty;
     const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
         error.Unsupported => return g.typeFailure(m, body.root),
@@ -1233,14 +1979,11 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     const instance_id = try g.named(.{ .unit = m.unit, .binding = body.binding }, ty, m, body.root);
     const instance = g.instance(instance_id);
     const parameter = instance.parameters[0];
-    const parameter_abi = try abiScalar(g, m, body.root, parameter);
-    const result_abi = try abiScalar(g, m, body.root, instance.result);
-    const machine = struct {
-        fn of(kind: u8) W.ValType {
-            return if (kind == 3) .f32 else .i32;
-        }
-    };
-    const signature = try g.module.signature(&.{machine.of(parameter_abi)}, &.{machine.of(result_abi)});
+    const callback = callbackAbi(g, parameter);
+    const parameter_abi: Abi = if (callback != null) .unit else abiKind(g, parameter) orelse return g.fail(m, body.root, "entry parameters of type {s} are not supported", .{@tagName(g.types.node(parameter).tag)});
+    const result_abi = abiKind(g, instance.result) orelse return g.fail(m, body.root, "entry results of type {s} are not supported", .{@tagName(g.types.node(instance.result).tag)});
+    const machine: W.ValType = if (callback != null) .externref else abiMachine(parameter_abi);
+    const signature = try g.module.signature(&.{machine}, &.{abiMachine(result_abi)});
     const function = try g.module.addFunction(signature);
     var arena = std.heap.ArenaAllocator.init(g.allocator);
     defer arena.deinit();
@@ -1249,27 +1992,57 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
         f.code.deinit(g.allocator);
         f.locals.deinit(g.allocator);
     }
-    _ = try f.local(machine.of(parameter_abi));
+    _ = try f.local(machine);
     f.parameter_words = 1;
-    if (parameter != types.unit) try f.opIndex(.local_get, 0);
+    // The host requires the storage exports exactly when packets cross.
+    const packets = isArray(parameter_abi) or isArray(result_abi) or (if (callback) |kinds| isArray(kinds[0]) or isArray(kinds[1]) else false);
+    const rt = try g.runtime_();
+    // Recover temporaries a trapped earlier call may have left behind.
+    try f.i32Const(1);
+    try f.opIndex(.call, rt.release);
+    try f.i32Const(rt.layout.stack_base);
+    try f.opIndex(.global_set, rt.stack_pointer);
+    var argument: Val = .{ .ty = types.unit };
+    if (callback) |kinds| {
+        const slot = g.module.host_slots;
+        g.module.host_slots += 1;
+        try f.i32Const(slot);
+        try f.opIndex(.local_get, 0);
+        try f.opIndex(.table_set, 1);
+        argument = try f.hostClosure(parameter, kinds, slot);
+    } else if (isArray(parameter_abi)) {
+        argument = try f.fromPacket(parameter, 0);
+    } else if (parameter != types.unit) {
+        argument = .{ .ty = parameter, .words = try f.arena.dupe(u32, &.{0}) };
+    }
+    try f.push(argument);
     try f.opIndex(.call, instance.function);
-    if (instance.result == types.unit) try f.i32Const(0);
+    const result = try f.pop(instance.result, body.root);
+    if (isArray(result_abi)) {
+        const packet = try f.toPacket(result, body.root);
+        try f.i32Const(1);
+        try f.opIndex(.call, rt.release);
+        try f.opIndex(.local_get, packet);
+    } else {
+        try f.i32Const(1);
+        try f.opIndex(.call, rt.release);
+        if (instance.result == types.unit) try f.i32Const(0) else try f.push(result);
+    }
     try f.op(.end);
     try finish(g, function, &f);
     const name = m.name(body.export_name);
     try g.module.exportItem(name, .function, function);
     try abi.name(g.allocator, name);
-    try abi.byte(g.allocator, parameter_abi);
-    try abi.byte(g.allocator, result_abi);
-    _ = parameters;
-}
-
-fn abiScalar(g: *Generator, m: *const core.Module, id: core.Id, ty: Ty) Error!u8 {
-    return switch (g.types.node(ty).tag) {
-        .unit => 0,
-        .u32 => 1,
-        .boolean => 2,
-        .f32 => 3,
-        else => g.fail(m, id, "entry values of type {s} are not supported yet", .{@tagName(g.types.node(ty).tag)}),
-    };
+    if (callback) |kinds| {
+        try abi.byte(g.allocator, 4);
+        try abi.byte(g.allocator, @backingInt(kinds[0]));
+        try abi.byte(g.allocator, @backingInt(kinds[1]));
+    } else try abi.byte(g.allocator, @backingInt(parameter_abi));
+    try abi.byte(g.allocator, @backingInt(result_abi));
+    if (packets and !g.exported_storage) {
+        g.exported_storage = true;
+        try g.module.exportItem("blot:memory", .memory, 0);
+        try g.module.exportItem("blot:allocate", .function, rt.allocate);
+        try g.module.exportItem("blot:reset", .function, rt.reset);
+    }
 }

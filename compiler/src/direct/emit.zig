@@ -24,7 +24,9 @@ pub const Val = struct {
 /// `parent` instance; partial: a named function applied to its first
 /// `parent` arguments; primitive: the same for a primitive alias binding;
 /// constructor: a constructor (catalog index `id`) as a function value.
-pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor };
+/// host: a Foreign callback adapter calling import `id`; pool: the
+/// lazily initialized persistent owner of a global array constant.
+pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor, host, pool };
 pub const InstanceKey = struct { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 };
 pub const Instance = struct {
     key: InstanceKey,
@@ -38,10 +40,7 @@ pub const Instance = struct {
     captures: []const Ty = &.{},
     slot: u32 = 0,
 };
-/// Closure environments: a bump stack, released by each scope whose result
-/// holds no closure. The data-stack runtime will own this storage.
-pub const env_base: u32 = 1024;
-pub const env_bytes: u32 = 1 << 20;
+const runtime = @import("runtime.zig");
 
 pub const Generator = struct {
     allocator: A,
@@ -54,8 +53,13 @@ pub const Generator = struct {
     instance_index: std.AutoHashMapUnmanaged(InstanceKey, u32) = .empty,
     queue: std.ArrayList(u32) = .empty,
     failure: ?Failure = null,
-    /// The environment stack pointer global, created on first use.
-    stack_pointer: ?u32 = null,
+    /// The storage runtime, emitted on first use.
+    rt: ?runtime.Runtime = null,
+    /// Host callback imports by (parameter, result) ABI kinds.
+    host_imports: std.AutoHashMapUnmanaged([2]u8, u32) = .empty,
+    exported_storage: bool = false,
+    /// Pool instance globals: (slot, generation, state) by instance.
+    pool_globals: std.AutoHashMapUnmanaged(u32, [3]u32) = .empty,
     holds_memory: std.AutoHashMapUnmanaged(Ty, bool) = .empty,
 
     pub fn init(allocator: A, units: []const core.Module) A.Error!Generator {
@@ -71,6 +75,8 @@ pub const Generator = struct {
         self.instance_index.deinit(self.allocator);
         self.queue.deinit(self.allocator);
         self.holds_memory.deinit(self.allocator);
+        self.host_imports.deinit(self.allocator);
+        self.pool_globals.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         self.types.deinit();
         self.module.deinit();
@@ -153,11 +159,9 @@ pub const Generator = struct {
     pub fn find(self: *Generator, key: InstanceKey) ?u32 {
         return self.instance_index.get(key);
     }
-    pub fn stackPointer(self: *Generator) Error!u32 {
-        if (self.stack_pointer) |global| return global;
-        const global = try self.module.addGlobal(.i32, true, env_base);
-        self.stack_pointer = global;
-        return global;
+    pub fn runtime_(self: *Generator) Error!*const runtime.Runtime {
+        if (self.rt == null) self.rt = try runtime.emit(self.allocator, &self.module, .{});
+        return &self.rt.?;
     }
     /// Whether a value of `ty` can refer to scope-allocated memory.
     pub fn holdsMemory(self: *Generator, ty: Ty) Error!bool {

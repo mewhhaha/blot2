@@ -410,8 +410,13 @@ pub const Types = struct {
                     }
                 }
             },
-            .array, .list, .cursor, .grow, .resize, .ref, .view, .link => {
-                self.failure_reason = "storage values are not supported by the direct backend yet";
+            // Owner handles: (slot, generation); views add (start, length),
+            // element references and links add an index.
+            .array, .list, .grow, .resize => try words.appendSlice(self.allocator, &.{ .i32, .i32 }),
+            .view => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32, .i32 }),
+            .ref, .link => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32 }),
+            .cursor => {
+                self.failure_reason = "cursors are not supported by the direct backend yet";
                 return error.Unsupported;
             },
         }

@@ -1,0 +1,48 @@
+entry func sum_array (n: U32): U32 => return do:
+  let values: GrowArray U32 = #[]
+  for i in 0..n:
+    @storage.push values (i * i)
+  let total = 0
+  for v in values:
+    total := self + v
+  break total
+entry func fixed (n: U32): U32 => return do:
+  let values = #[1, 2, 3, n]
+  values[1] := self + 40
+  break values[1] + values[3]
+type Cell is data = $Cell { value: U32, flag: Bool }
+entry func records (n: U32): U32 => return do:
+  let cells: ResizeArray Cell = #[$Cell { value: 1, flag: true }]
+  @storage.push cells ($Cell { value: n, flag: false })
+  cells[1].value := self * 2
+  let total = 0
+  for cell in cells:
+    let $Cell { value, flag } = cell
+    if flag:
+      total := self + value
+    else:
+      total := self + 100 * value
+  @storage.truncate cells 1
+  break total + @storage.length cells
+entry func views (n: U32): U32 => return do:
+  let values = #[10, 20, 30, 40, 50]
+  let middle = &values[1..4]
+  let total = 0
+  for v in middle:
+    total := self + v
+  break total + n
+entry func copies (n: U32): U32 => return do:
+  let values: GrowArray U32 = #[1, 2]
+  let original = @storage.copy values
+  values[0] := n
+  break original[0] * 100 + values[0]
+entry func generated (n: U32): U32 => return do:
+  let squares = @array.generate n (func i => return i * i)
+  break squares[n - 1]
+func fresh (n: U32): Array U32 => return #[n, n + 1, n + 2]
+entry func returned (n: U32): U32 => return do:
+  let total = 0
+  for i in 0..1000:
+    let a = fresh i
+    total := self + a[2] - a[0]
+  break total + n

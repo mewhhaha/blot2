@@ -28,9 +28,20 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     var entries: W.Bytes = .{};
     defer entries.deinit(g.allocator);
     var count: u32 = 0;
+    // Host callback imports precede every defined function.
     for (m.bodies) |*body| {
         if (!body.exported or !body.is_function) continue;
-        if (m.bodyParameters(body).len != 1) return g.fail(m, body.root, "entry functions take exactly one parameter", .{});
+        const parameters = m.bodyParameters(body);
+        if (parameters.len != 1) return g.fail(m, body.root, "entry functions take exactly one parameter", .{});
+        var empty: @import("types.zig").Env = .empty;
+        const ty = g.types.lower(m, parameters[0].ty, &empty) catch |err| switch (err) {
+            error.Unsupported => return g.typeFailure(m, body.root),
+            else => return err,
+        };
+        if (function.callbackAbi(g, ty)) |kinds| _ = try function.hostImport(g, kinds);
+    }
+    for (m.bodies) |*body| {
+        if (!body.exported or !body.is_function) continue;
         try function.emitExport(g, m, body, &entries);
         count += 1;
     }
@@ -43,6 +54,5 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     try abi.raw(g.allocator, entries.items());
     try abi.uleb(g.allocator, 0);
     try g.module.custom("blot:abi", abi.items());
-    if (g.stack_pointer != null) g.module.memory_pages = (emit.env_base + emit.env_bytes + 0xffff) / 0x10000;
     return g.module.assemble(g.allocator);
 }

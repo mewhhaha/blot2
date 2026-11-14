@@ -20,6 +20,15 @@ const cases: Record<string, Call[]> = {
     ["sum_to", 10, 38],
     ["first_big", 20, 8],
   ],
+  "storage.blot": [
+    ["sum_array", 10, 285],
+    ["fixed", 7, 49],
+    ["records", 5, 1002],
+    ["views", 1, 91],
+    ["copies", 9, 109],
+    ["generated", 5, 16],
+    ["returned", 3, 2003],
+  ],
   "closures.blot": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],
@@ -31,27 +40,59 @@ const cases: Record<string, Call[]> = {
   ],
 };
 
+async function build(fixture: string, backend: "direct" | "scoped") {
+  const entry = new URL(`../../compiler/fixtures/direct/${fixture}`, import.meta.url).pathname;
+  const compiler = await createZigProjectCompiler({
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std", import.meta.url).pathname,
+    cacheDirectory: false,
+    backend,
+  });
+  try {
+    const built = await compiler.build({ signal: AbortSignal.timeout(20000) });
+    if (!built.success) assert.fail(JSON.stringify(built));
+    return await instantiateGuest(built.bytes);
+  } finally {
+    await compiler.close();
+  }
+}
+
+for (const backend of ["direct", "scoped"] as const) {
+  Deno.test(`global array pools persist across calls on the ${backend} backend`, async () => {
+    const guest = await build("pools.blot", backend);
+    assert.equal(guest.call("append", 5), 2);
+    assert.equal(guest.call("append", 6), 3);
+    assert.equal(guest.call("read", 0), 41);
+    assert.equal(guest.call("read", 2), 6);
+    assert.deepEqual(Array.from(guest.call("doubled", Uint32Array.of(1, 2, 3)) as Uint32Array), [2, 4, 6]);
+    assert.equal(guest.call("scaled", Float32Array.of(0.5, 1.5, 2)), 4);
+  });
+  Deno.test(`Foreign callbacks exchange packets on the ${backend} backend`, async () => {
+    const guest = await build("host.blot", backend);
+    let calls = 0;
+    const host = guest.capability({
+      parameter: "Array F32",
+      result: "Array F32",
+      call: (packet: Float32Array) => {
+        calls++;
+        return Float32Array.from(packet, (value) => value * 2);
+      },
+    });
+    assert.deepEqual(Array.from(guest.call("main", host) as Float32Array), [9.5, 3, 10]);
+    assert.equal(calls, 2);
+    const counter = guest.capability({ parameter: "U32", result: "U32", call: (value: number) => value + 1 });
+    assert.equal(guest.call("scalar_host", counter), 43);
+  });
+}
+
 for (const [fixture, calls] of Object.entries(cases)) {
   for (const backend of ["direct", "scoped"] as const) {
     Deno.test(`${fixture} entries run on the ${backend} backend`, async () => {
-      const entry = new URL(`../../compiler/fixtures/direct/${fixture}`, import.meta.url).pathname;
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
-        stdRoot: new URL("../../std", import.meta.url).pathname,
-        cacheDirectory: false,
-        backend,
-      });
-      try {
-        const built = await compiler.build({ signal: AbortSignal.timeout(20000) });
-        if (!built.success) assert.fail(JSON.stringify(built));
-        const guest = await instantiateGuest(built.bytes);
-        for (const [name, argument, expected] of calls) {
-          assert.equal(guest.call(name, argument), expected, `${name} ${argument}`);
-        }
-      } finally {
-        await compiler.close();
+      const guest = await build(fixture, backend);
+      for (const [name, argument, expected] of calls) {
+        assert.equal(guest.call(name, argument), expected, `${name} ${argument}`);
       }
     });
   }

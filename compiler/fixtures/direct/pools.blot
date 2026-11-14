@@ -1,0 +1,11 @@
+const values: GrowArray U32 = #[41]
+entry func append (value: U32): U32 => return do:
+  @storage.push values value
+  break @storage.length values
+entry func read (index: U32): U32 => return values[index]
+entry func doubled (input: Array U32): Array U32 => return @array.generate input.length (func i => return input[i] * 2)
+entry func scaled (input: Array F32): F32 => return do:
+  let total = 0.0
+  for v in input:
+    total := self + v
+  break total
