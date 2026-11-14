@@ -1,0 +1,9 @@
+type Cell is data = $Cell { values: Array U32, tag: U32 }
+entry func grid (n: U32): U32 => return do:
+  let rows = #[#[1, 2], #[3, 4]]
+  rows[1][0] := self + n
+  return rows[0][0] + rows[0][1] + rows[1][0] + rows[1][1]
+entry func fields (n: U32): U32 => return do:
+  let cells = #[$Cell { values: #[1, 2, 3], tag: 7 }]
+  cells[0].values[2] := self * n
+  return cells[0].values[2] + cells[0].tag

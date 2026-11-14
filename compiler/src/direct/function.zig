@@ -1718,8 +1718,18 @@ pub const Fn = struct {
         const address = try self.elementAddress(container, index, id);
         var ty = try self.elementOf(container.ty, id);
         var offset: u32 = 0;
-        for (selectors[at + 1 ..]) |step| {
-            if (step.kind == .index) return self.g.fail(self.m, id, "nested indexed updates are not supported yet", .{});
+        for (selectors[at + 1 ..], at + 1..) |step, position_| {
+            if (step.kind == .index) {
+                // The place holds an owner: the write goes through it, so the
+                // handle stored here is unchanged.
+                const inner = if (offset == 0) try self.loadElement(address, 0, ty, id) else try self.loadAt(address, offset, ty, id);
+                switch (self.tagOf(ty)) {
+                    .array, .list, .grow, .resize, .view => {},
+                    else => return self.g.fail(self.m, id, "indexed update of a {s}", .{@tagName(self.tagOf(ty))}),
+                }
+                _ = try self.indexedUpdate(id, inner, position_);
+                return container;
+            }
             const projection = self.m.projection(step.projection);
             const spelling = self.m.fieldSpelling(projection.field) orelse return self.g.fail(self.m, id, "updated field without a spelling", .{});
             const name = try self.g.types.fieldName(spelling);
