@@ -74,29 +74,22 @@ Settle this first. It answers the "later review" in FAST_COMPILE decision 1.
 
 ### Decisions (owner, 14 November 2026)
 
-- **Two writes.** `place = value` stores into storage in place, and every
-  alias sees it; it replaces `@storage.write`. `name := value` and
-  `name.path := value` (fields and indices, as in `rows[i] := row`) build a
-  successor and rebind the local, as the guide already says: aliases keep
-  the old root. `rows[i] := row` means `rows := @array.set rows i row`.
-- **No hidden copies.** An indexed or field `:=` through storage (an array,
-  a cell, a root) is done in place when the compiler proves, inside the
-  one function, that nothing else can observe the old root. Otherwise it is
-  an error that asks for an explicit copy (`@storage.copy`) or for `=`.
-  Later, a type with a copy trait (traits redesign, C) may copy
-  implicitly instead. No ownership facts cross calls (FAST_COMPILE
-  decision 1).
-- **Cell.** `Cell a`, created with `@cell x`, read as `c.value`, stored with
-  `c.value = v`. It replaces `#[x]` plus `[0]`.
-- **Owner group.** A declaration kind, `type World is root = { ... }`
-  (the owner's suggested word, matching Goose's `root struct`). Its
-  components are fixed for its life, share one lifetime, and declare their
-  initial values once. It replaces Gdev's `with_owners`.
+The first answers (a store statement `place = value`, `Cell`, `is root`) were
+replaced the same day: "Just immutable and then our goal is to reuse as much
+memory as possible." tasks/MEMORY_MODEL.md has the rules; this is the
+summary.
+- **Everything is a value.** Arrays included; `:=` always builds the
+  successor, and aliases keep the old root.
+- **No hidden copies.** A `:=` through an array is done in place when the
+  local owns it, otherwise it is an error that asks for `values.copy`.
+- **`own` parameters** (approved): parameters are borrowed unless marked
+  `own`; an `own` argument spends the caller's name until rebound; call
+  results are owned by the caller; a state `modify` hands the state over as
+  `own`.
 - **Value restriction.** A local is generalized only when its value is a
-  syntactic function.
-- This replaces item 7's reading that `:=` writes through aliases: aliased
-  roots now reject `:=`, so `array_snapshot`-style programs say which
-  meaning they want.
+  syntactic `func`.
+- **Transition.** The `=` store that landed before this decision stays,
+  unspecified, until Ink and Gdev are rewritten to the `own` style.
 
 ## B. Effects: keep the small core
 
