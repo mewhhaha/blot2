@@ -248,6 +248,21 @@ pub const Fn = struct {
     }
 
     fn reference(self: *Fn, id: core.Id) Error!Val {
+        return self.referenceInner(id) catch |err| switch (err) {
+            error.Unsupported => {
+                // Name the binding: a generic function value needs annotations.
+                const target = self.g.resolve(self.m, self.m.reference(id));
+                const tm = self.g.unitModule(target.unit);
+                if (tm.body(target.binding)) |body| if (self.g.failure) |failure| if (std.mem.find(u8, failure.message, "unresolved type variable") != null) {
+                    self.g.dropFailure();
+                    return self.g.fail(self.m, id, "value of `{s}` (unit {d}) has a type its uses leave open", .{ tm.name(body.declaration_name), target.unit });
+                };
+                return err;
+            },
+            else => return err,
+        };
+    }
+    fn referenceInner(self: *Fn, id: core.Id) Error!Val {
         const ref = self.m.reference(id);
         if (ref.unit == 0 or ref.unit == self.m.unit) {
             if (self.bindings.get(ref.binding)) |value| return value;
@@ -946,7 +961,12 @@ pub const Fn = struct {
                     return result;
                 }
                 const rt = try self.g.runtime_();
-                const element = self.g.types.node(cursor.ty).a;
+                // A cursor's type argument is its collection.
+                const collection = self.g.types.node(cursor.ty).a;
+                const element = switch (self.tagOf(collection)) {
+                    .array, .list, .grow, .resize, .view => self.g.types.node(collection).a,
+                    else => collection,
+                };
                 const address = try self.local32();
                 try self.opIndex(.local_get, cursor.words[0]);
                 try self.opIndex(.local_get, cursor.words[1]);
@@ -1660,7 +1680,7 @@ pub const Fn = struct {
             if (n.op != .none and (tag == .u32 or tag == .f32 or tag == .boolean)) {
                 for (forwarded) |value| try self.push(value);
                 try self.scalarOp(n.op, left.ty, id);
-                return try self.pop(result, id);
+                return try self.pop(if (self.tagOf(result) == .never) scalarResult(n.op, left.ty) else result, id);
             }
             const identity = self.g.receiverIdentity(left.ty) orelse return null;
             const target = self.g.dispatchTarget(tm, identity, n.c, .none) orelse return null;
@@ -1702,7 +1722,7 @@ pub const Fn = struct {
             try self.push(left);
             if (right) |value| try self.push(value);
             try self.scalarOp(n.op, left.ty, id);
-            return self.pop(result orelse try self.typeOf(id), id);
+            return self.pop(result orelse scalarResult(n.op, left.ty), id);
         }
         const identity = self.g.receiverIdentity(left.ty) orelse return self.g.fail(self.m, id, "associated member on a {s}", .{@tagName(tag)});
         const target = self.g.dispatchTarget(self.m, identity, n.c, .none) orelse return self.g.fail(self.m, id, "no associated member for this receiver", .{});
@@ -2262,6 +2282,16 @@ fn primitiveAlias(m: *const core.Module, binding_id: core.BindingId) ?core.Id {
     const value = if (m.body(binding_id)) |body| (if (body.is_function) return null else body.root) else binding.initializer;
     if (value == 0 or m.node(value).tag != .primitive_function) return null;
     return value;
+}
+
+/// The result type of a scalar operator on operands of type `operand`.
+fn scalarResult(op: core.Op, operand: Ty) Ty {
+    return switch (op) {
+        .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => types.boolean,
+        .convert_u32_f32 => types.f32_,
+        .convert_f32_u32 => types.u32_,
+        else => operand,
+    };
 }
 
 fn operatorOf(op: core.Op) ?T.Operator {

@@ -58,7 +58,7 @@ pub const Generator = struct {
     queue: std.ArrayList(u32) = .empty,
     failure: ?Failure = null,
     solve_depth: u32 = 0,
-    failures: std.ArrayList(struct { failure: Failure, count: u32 = 1, samples: [4]core.Span = undefined, sample_units: [4]u32 = undefined }) = .empty,
+    failures: std.ArrayList(struct { failure: Failure, count: u32 = 1, samples: [48]core.Span = undefined, sample_units: [48]u32 = undefined }) = .empty,
     /// The storage runtime, emitted on first use.
     rt: ?runtime.Runtime = null,
     /// Host callback imports by (parameter, result) ABI kinds.
@@ -96,7 +96,7 @@ pub const Generator = struct {
         const failure = self.failure orelse Failure{ .unit = m.unit, .span = if (id < m.spans.len) m.span(id) else .{ .start = 0, .end = 0 }, .message = try self.allocator.dupe(u8, "Direct backend: unsupported form") };
         self.failure = null;
         for (self.failures.items) |*seen| if (std.mem.eql(u8, seen.failure.message, failure.message)) {
-            if (seen.count < 4) {
+            if (seen.count < 48) {
                 seen.samples[seen.count] = failure.span;
                 seen.sample_units[seen.count] = failure.unit;
             }
@@ -125,7 +125,7 @@ pub const Generator = struct {
             const prefix = "Direct backend: ";
             try text.appendSlice(self.allocator, if (std.mem.startsWith(u8, message, prefix)) message[prefix.len..] else message);
             try text.print(self.allocator, " ({d}x at", .{item.count});
-            for (0..@min(item.count, 4)) |sample| try text.print(self.allocator, " {d}:{d}", .{ item.sample_units[sample], item.samples[sample].start });
+            for (0..@min(item.count, 48)) |sample| try text.print(self.allocator, " {d}:{d}", .{ item.sample_units[sample], item.samples[sample].start });
             try text.appendSlice(self.allocator, ")");
         }
         const first = self.failures.items[0].failure;

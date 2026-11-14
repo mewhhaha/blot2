@@ -1,0 +1,12 @@
+import * as iter from "std/iter"
+entry func chained (n: U32): U32 => return do:
+  let values = #[1, 2, 3, 4, 5]
+  let total = 0
+  for v in iter.map (func x => return x * 2) values:
+    total := self + v
+  break total + n
+entry func taken (n: U32): U32 => return do:
+  let total = 0
+  for v in iter.take 3 (iter.filter (func x => return x > n) #[1, 5, 9, 12, 20]):
+    total := self + v
+  break total
