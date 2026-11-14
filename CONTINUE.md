@@ -58,6 +58,14 @@ ports code that is now being deleted. Phase 7 ports the rewritten compiler
 instead. The full narrative, commands and evidence are pinned at b9875a88
 (CONTINUE.md there); its evidence files stay under benchmarks/evidence/.
 
+The port now builds with plain upstream Goose (owner, 14 November 2026):
+`compiler-goose/tools/build_upstream_goose.py` builds
+github.com/aardappel/goose at d92c4315 without patches, and the private
+patched checker is gone. Plain upstream does not finish checking the old
+port: `goose check compiler-goose/src/main.goose` was stopped after 25
+minutes (about 1 GB resident) without a diagnostic. Phase 7 ports the
+rewritten, much smaller compiler against plain upstream from the start.
+
 ## Contracts and remaining coverage
 
 - Preserve ABI 8/session 2, named owners, invocation borrows, explicit copies,
