@@ -1,0 +1,13 @@
+import * as simd from "std/simd"
+entry func shuffled (n: F32): F32 => return do:
+  let (a, b, c, d) = simd.f32_shuffle (0, 4, 1, 7) (n, 2.0, 3.0, 4.0) (10.0, 20.0, 30.0, 40.0)
+  return a * 1000.0 + b * 100.0 + c * 10.0 + d
+entry func swizzled (n: U32): U32 => return do:
+  let (a, b, c, d) = simd.u32_swizzle (3, 2, 1, 0) (n, 2, 3, 4)
+  return a * 1000 + b * 100 + c * 10 + d
+entry func broadcast (n: U32): U32 => return do:
+  let (a, b, c, d) = simd.u32_broadcast 2 (1, 2, n, 4)
+  return a + b + c + d
+entry func shifted (n: U32): U32 => return do:
+  let (a, b, c, d) = simd.u32_shr 16 (n, 0x20000, 0x30000, 0xFFFFFFFF)
+  return a + b * 10 + c * 100 + d

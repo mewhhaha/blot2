@@ -1,0 +1,9 @@
+import * as array from "std/array"
+func update (limit: U32) -> (changed: Array U32) => return do:
+  let n = limit
+  let changed = array.filter (func i => return i < n) changed
+  let next = @array.generate changed.length (func (k: U32) => return changed[k] * 2)
+  return next
+entry func run (n: U32): U32 => return do:
+  let out = update n #[1, 5, 2, 9, 3]
+  return out.length * 100 + out[0] + out[out.length - 1]

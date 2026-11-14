@@ -115,9 +115,35 @@ pub const Fn = struct {
     }
     fn lower(self: *Fn, ty: T.Id, id: core.Id) Error!Ty {
         return self.g.types.lower(self.m, ty, self.env) catch |err| switch (err) {
-            error.Unsupported => return self.g.typeFailure(self.m, id),
+            error.Unsupported => {
+                // Values refined since the instance began may now decide
+                // the enclosing body's obligations (a collection's element).
+                if (self.enclosingBody()) |body| {
+                    const before = self.env.count();
+                    try self.g.solveObligationsPublic(self.m, body.scheme.obligations, self.env);
+                    if (self.env.count() != before) if (self.g.types.lower(self.m, ty, self.env)) |found| {
+                        self.g.dropFailure();
+                        return found;
+                    } else |_| {};
+                }
+                return self.g.typeFailure(self.m, id);
+            },
             else => return err,
         };
+    }
+    /// The named body this instance's code belongs to (a lambda's enclosing
+    /// named instance), in this unit.
+    fn enclosingBody(self: *Fn) ?*const core.Body {
+        var instance = self.g.instance(self.instance_id);
+        for (0..64) |_| {
+            if (instance.key.unit != self.m.unit) return null;
+            switch (instance.key.kind) {
+                .lambda => instance = self.g.instance(instance.key.parent),
+                .named => return self.m.body(instance.key.id),
+                else => return null,
+            }
+        }
+        return null;
     }
     fn typeOf(self: *Fn, id: core.Id) Error!Ty {
         return self.lower(self.m.typeOf(id), id);
@@ -1023,7 +1049,17 @@ pub const Fn = struct {
     fn arrayOp(self: *Fn, id: core.Id) Error!Val {
         const operation = self.m.arrayOperation(id);
         const children = self.m.children(id);
-        const ty = try self.typeOf(id);
+        // Operations whose operands decide the result type look at them
+        // when the node's own type is still open.
+        const declared: ?Ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => null,
+            else => return err,
+        };
+        switch (operation) {
+            .length, .get, .fill, .generate => {},
+            else => if (declared == null) return self.g.typeFailure(self.m, id),
+        }
+        const ty = declared orelse types.never;
         switch (operation) {
             .length => {
                 const container = try self.expr(children[0]);
@@ -1042,9 +1078,17 @@ pub const Fn = struct {
             .fill, .generate => {
                 const count = try self.scalarLocal(try self.expr(children[0]), id);
                 const source = try self.expr(children[1]);
-                const handle = try self.create(ty, count, id);
+                const ty_ = declared orelse blk: {
+                    const element = if (operation == .fill) source.ty else self.g.types.node(source.ty).b;
+                    if (operation == .generate and self.tagOf(source.ty) != .function) return self.g.typeFailure(self.m, id);
+                    const container = try self.g.types.lowerHoles(self.m, self.m.typeOf(id), self.env);
+                    const built = try self.g.types.intern(self.tagOf(container), &.{element});
+                    try self.refine(self.m.typeOf(id), built);
+                    break :blk built;
+                };
+                const handle = try self.create(ty_, count, id);
                 const base = try self.baseOf(handle);
-                const element = try self.elementOf(ty, id);
+                const element = try self.elementOf(ty_, id);
                 const step = try self.stride(element, id);
                 const index = try self.constLocal(0);
                 const exit = try self.open(.block);
@@ -1632,8 +1676,38 @@ pub const Fn = struct {
                 }
                 return result;
             },
+            .shuffle, .swizzle, .broadcast => {
+                // Lane selectors index the candidate words: shuffle's two
+                // products (0-3, 4-7), swizzle's one, broadcast's one lane.
+                const operand = right orelse return self.g.fail(self.m, id, "{s} without operands", .{@tagName(op_)});
+                const candidates = if (op_ == .broadcast) left.words else operand.words;
+                for (0..4) |index| {
+                    const selector = if (op_ == .broadcast) operand.words[0] else left.words[index];
+                    try self.opIndex(.local_get, candidates[0]);
+                    for (candidates[1..], 1..) |candidate, position| {
+                        const value = try self.local(self.locals.items[candidate]);
+                        try self.opIndex(.local_set, value);
+                        try self.opIndex(.local_get, candidate);
+                        try self.opIndex(.local_get, value);
+                        try self.opIndex(.local_get, selector);
+                        try self.i32Const(@intCast(position));
+                        try self.op(.i32_eq);
+                        try self.op(.select);
+                    }
+                    try self.opIndex(.local_set, result.words[index]);
+                }
+                return result;
+            },
             else => {},
         }
+        // A scalar right operand (a shift count) applies to every lane.
+        var broadcast: [4]u32 = undefined;
+        const right_words: ?[]const u32 = if (right) |value| blk: {
+            if (value.words.len != 1) break :blk value.words;
+            broadcast = @splat(value.words[0]);
+            break :blk &broadcast;
+        } else null;
+        if (right_words) |words| if (words.len != 4) return self.g.fail(self.m, id, "lane operation with a {d}-word right operand", .{words.len});
         for (0..4) |index| {
             switch (op_) {
                 .bits, .from_bits => {
@@ -1642,7 +1716,7 @@ pub const Fn = struct {
                 },
                 .min, .max => {
                     // The prelude's `if a < b then a else b`, NaN and zero signs included.
-                    const r = (right orelse return self.g.fail(self.m, id, "lane operation without a right operand", .{})).words[index];
+                    const r = (right_words orelse return self.g.fail(self.m, id, "lane operation without a right operand", .{}))[index];
                     try self.opIndex(.local_get, left.words[index]);
                     try self.opIndex(.local_get, r);
                     try self.opIndex(.local_get, left.words[index]);
@@ -1651,7 +1725,7 @@ pub const Fn = struct {
                     try self.op(.select);
                 },
                 .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => {
-                    const r = (right orelse return self.g.fail(self.m, id, "comparison without a right operand", .{})).words[index];
+                    const r = (right_words orelse return self.g.fail(self.m, id, "comparison without a right operand", .{}))[index];
                     // A lane mask: all ones where the comparison holds.
                     try self.i32Const(0);
                     try self.opIndex(.local_get, left.words[index]);
@@ -1661,7 +1735,7 @@ pub const Fn = struct {
                 },
                 else => {
                     try self.opIndex(.local_get, left.words[index]);
-                    if (right) |value| try self.opIndex(.local_get, value.words[index]);
+                    if (right_words) |words| try self.opIndex(.local_get, words[index]);
                     try self.scalarOp(op_, lane, id);
                 },
             }

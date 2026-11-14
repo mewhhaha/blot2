@@ -52,6 +52,13 @@ const cases: Record<string, Call[]> = {
     ["nested", 4, 4],
   ],
   "unused_stages.blot": [["top", 4, 5], ["nested", 1, 7]],
+  "simd_lanes.blot": [
+    ["shuffled", 5, 6060],
+    ["swizzled", 9, 4329],
+    ["broadcast", 7, 28],
+    ["shifted", 65536, 65856],
+  ],
+  "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "generic_comprehensions.blot": [
     ["annotated_count", 4, 3],
     ["generic_count", 4, 3],
@@ -121,6 +128,7 @@ const directOnly = new Set([
   "open_codec.blot",
   "policy_record.blot",
   "generic_comprehensions.blot",
+  "generated_from_filter.blot",
 ]);
 for (const [fixture, calls] of Object.entries(cases)) {
   for (const backend of ["direct", "scoped"] as const) {
