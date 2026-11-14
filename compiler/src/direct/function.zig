@@ -17,7 +17,8 @@ const Label = struct {
     target: core.Id,
     depth: u32,
     result: Val = .{ .ty = types.unit },
-    kind: enum { block, loop } = .block,
+    /// function: the body's own exit, the target of every unmatched return.
+    kind: enum { block, loop, function } = .block,
     /// Loops: the backedge target depth, current iteration and exit values.
     top: u32 = 0,
     iteration: []const Val = &.{},
@@ -29,12 +30,19 @@ pub const Fn = struct {
     m: *const core.Module,
     env: *const types.Env,
     arena: A,
+    instance_id: u32 = 0,
     code: W.Bytes = .{},
     locals: std.ArrayList(W.ValType) = .empty,
     parameter_words: u32 = 0,
     bindings: std.AutoHashMapUnmanaged(core.BindingId, Val) = .empty,
+    /// Generalized local function values by binding, built at each use.
+    polymorphic: std.AutoHashMapUnmanaged(core.BindingId, core.Id) = .empty,
     labels: std.ArrayList(Label) = .empty,
     depth: u32 = 0,
+    /// Set when this body allocates environment memory or receives a value
+    /// that may refer to it; such a body restores the stack on exit unless
+    /// its result can hold that memory.
+    allocates: bool = false,
 
     fn a(self: *Fn) A {
         return self.g.allocator;
@@ -141,6 +149,16 @@ pub const Fn = struct {
                 break :blk if (last.ty == types.never) last else unitVal();
             },
             .bind => blk: {
+                // A generalized local closure is built at each use, at that
+                // use's types; its captures are already immutable values.
+                const deferred = switch (self.m.node(n.b).tag) {
+                    .closure, .constructor_function, .primitive_function, .reference => true,
+                    else => false,
+                };
+                if (deferred and self.m.binding(n.a).scheme.variables.len != 0) {
+                    try self.polymorphic.put(self.a(), n.a, n.b);
+                    break :blk unitVal();
+                }
                 const value = try self.expr(n.b);
                 try self.bindings.put(self.a(), n.a, value);
                 break :blk if (value.ty == types.never) value else unitVal();
@@ -152,6 +170,11 @@ pub const Fn = struct {
             .match => self.match(id),
             .pattern_bind => self.patternBind(id),
             .loop => self.loop(id),
+            .closure => self.closureNode(id),
+            .apply => self.apply(id),
+            .constructor_function => self.constructorFunction(id),
+            .primitive_function => self.primitiveFunction(id),
+            .update => self.update(id),
             .break_ => self.breakNode(id),
             .panic => blk: {
                 try self.op(.unreachable_);
@@ -175,7 +198,20 @@ pub const Fn = struct {
 
     fn reference(self: *Fn, id: core.Id) Error!Val {
         const ref = self.m.reference(id);
-        if (ref.unit == 0 or ref.unit == self.m.unit) if (self.bindings.get(ref.binding)) |value| return value;
+        if (ref.unit == 0 or ref.unit == self.m.unit) {
+            if (self.bindings.get(ref.binding)) |value| return value;
+            if (self.polymorphic.get(ref.binding)) |closure| {
+                var env: types.Env = .empty;
+                defer env.deinit(self.a());
+                var it = self.env.iterator();
+                while (it.next()) |entry| try env.put(self.a(), entry.key_ptr.*, entry.value_ptr.*);
+                try self.g.types.match(self.m, self.m.typeOf(closure), try self.typeOf(id), &env);
+                const previous = self.env;
+                self.env = &env;
+                defer self.env = previous;
+                return self.expr(closure);
+            }
+        }
         const target = self.g.resolve(self.m, ref);
         const tm = self.g.unitModule(target.unit);
         const binding = tm.binding(target.binding);
@@ -183,16 +219,243 @@ pub const Fn = struct {
             .local, .parameter => return self.g.fail(self.m, id, "unbound local reference", .{}),
             else => {},
         }
+        const ty = try self.typeOf(id);
+        if (primitiveAlias(tm, target.binding) != null) return self.partial(.primitive, target, ty, &.{}, id);
         if (tm.body(target.binding)) |body| {
-            if (!body.is_function) {
-                // A constant: its instance computes the value.
-                const ty = try self.typeOf(id);
-                const instance = try self.g.named(target, ty, self.m, id);
-                try self.opIndex(.call, self.g.instance(instance).function);
-                return self.pop(ty, id);
+            if (body.is_function) return self.partial(.partial, target, ty, &.{}, id);
+            // A constant: its instance computes the value.
+            const instance = try self.g.named(target, ty, self.m, id);
+            try self.opIndex(.call, self.g.instance(instance).function);
+            return self.received(ty, id);
+        }
+        return self.g.fail(self.m, id, "reference to a {s} binding without a value", .{@tagName(binding.kind)});
+    }
+    /// Pops a call result; a result that may refer to scope memory makes
+    /// this body responsible for releasing it.
+    fn received(self: *Fn, ty: Ty, id: core.Id) Error!Val {
+        if (try self.g.holdsMemory(ty)) self.allocates = true;
+        return self.pop(ty, id);
+    }
+
+    /// Allocates `bytes` of environment memory and returns its address local.
+    fn allocate(self: *Fn, bytes: u32) Error!u32 {
+        self.allocates = true;
+        const sp = try self.g.stackPointer();
+        const address = try self.local(.i32);
+        try self.opIndex(.global_get, sp);
+        try self.opIndex(.local_tee, address);
+        try self.i32Const(bytes);
+        try self.op(.i32_add);
+        try self.opIndex(.global_set, sp);
+        try self.opIndex(.global_get, sp);
+        try self.i32Const(emit.env_base + emit.env_bytes);
+        try self.op(.i32_gt_u);
+        _ = try self.open(.if_);
+        try self.op(.unreachable_);
+        try self.close();
+        return address;
+    }
+    /// A closure over `captures`, invoking instance `instance` with them.
+    fn makeClosure(self: *Fn, instance: u32, ty: Ty, captures: []const Val, id: core.Id) Error!Val {
+        const slot = self.g.instance(instance).slot;
+        var words: usize = 0;
+        for (captures) |capture| words += capture.words.len;
+        const result = try self.fresh(ty, id);
+        try self.i32Const(slot);
+        try self.opIndex(.local_set, result.words[0]);
+        if (words == 0) {
+            try self.i32Const(0);
+            try self.opIndex(.local_set, result.words[1]);
+            return result;
+        }
+        const address = try self.allocate(@intCast(words * 4));
+        var offset: u32 = 0;
+        for (captures) |capture| for (capture.words) |word| {
+            try self.opIndex(.local_get, address);
+            try self.opIndex(.local_get, word);
+            try self.op(if (self.locals.items[word] == .f32) .f32_store else .i32_store);
+            try self.code.uleb(self.a(), 2);
+            try self.code.uleb(self.a(), offset);
+            offset += 4;
+        };
+        try self.opIndex(.local_get, address);
+        try self.opIndex(.local_set, result.words[1]);
+        return result;
+    }
+    /// Loads a closure's captures from its environment parameter (local 0).
+    fn loadCaptures(self: *Fn, captures: []const Ty, id: core.Id) Error![]Val {
+        const out = try self.arena.alloc(Val, captures.len);
+        var offset: u32 = 0;
+        for (captures, out) |ty, *slot| {
+            slot.* = try self.fresh(ty, id);
+            for (slot.words) |word| {
+                try self.opIndex(.local_get, 0);
+                try self.op(if (self.locals.items[word] == .f32) .f32_load else .i32_load);
+                try self.code.uleb(self.a(), 2);
+                try self.code.uleb(self.a(), offset);
+                try self.opIndex(.local_set, word);
+                offset += 4;
             }
         }
-        return self.g.fail(self.m, id, "function values are not supported yet", .{});
+        return out;
+    }
+
+    /// A curried function value: `target` (a named function, primitive alias
+    /// or constructor) applied to its first `arguments`.
+    fn partial(self: *Fn, kind: emit.InstanceKind, target: core.BindingRef, ty: Ty, arguments: []const Val, id: core.Id) Error!Val {
+        const full = try self.curried(arguments, ty);
+        const instance = try self.adapter(kind, target, full, arguments.len, id);
+        return self.makeClosure(instance, ty, arguments, id);
+    }
+    /// The closure taking argument `count` of `target` at function type `full`.
+    fn adapter(self: *Fn, kind: emit.InstanceKind, target: core.BindingRef, full: Ty, count: usize, id: core.Id) Error!u32 {
+        const key: emit.InstanceKey = .{ .kind = kind, .unit = target.unit, .id = target.binding, .ty = full, .parent = @intCast(count) };
+        if (self.g.find(key)) |found| return found;
+        var captures: std.ArrayList(Ty) = .empty;
+        var rest = full;
+        for (0..count) |_| {
+            const arrow = self.g.types.node(rest);
+            if (arrow.tag != .function) return self.g.fail(self.m, id, "partial application beyond the function's arity", .{});
+            try captures.append(self.g.arena.allocator(), arrow.a);
+            rest = arrow.b;
+        }
+        const arrow = self.g.types.node(rest);
+        if (arrow.tag != .function) return self.g.fail(self.m, id, "function value of a non-function type", .{});
+        const parameters = try self.g.arena.allocator().dupe(Ty, &.{arrow.a});
+        return self.g.addInstanceWith(key, .empty, parameters, arrow.b, true, captures.items, self.m, id);
+    }
+
+    /// The body of a curried adapter: the captured arguments plus this one
+    /// either saturate the target or form the next partial application.
+    fn adapterBody(self: *Fn, instance: *const emit.Instance, captures: []const Val, argument: Val) Error!Val {
+        const key = instance.key;
+        const arguments = try self.arena.alloc(Val, captures.len + 1);
+        @memcpy(arguments[0..captures.len], captures);
+        arguments[captures.len] = argument;
+        const result = instance.result;
+        switch (key.kind) {
+            .partial => {
+                const target: core.BindingRef = .{ .unit = key.unit, .binding = key.id };
+                const tm = self.g.unitModule(key.unit);
+                const parameters = tm.bodyParameters(tm.body(key.id).?);
+                if (arguments.len < parameters.len) return self.partial(.partial, target, result, arguments, 0);
+                return self.callTarget(target, arguments, key.ty, result, 0);
+            },
+            .primitive => {
+                const tm = self.g.unitModule(key.unit);
+                const primitive = if (key.id & primitive_node_bit != 0) tm.primitive(key.id & ~primitive_node_bit) else tm.primitive(primitiveAlias(tm, key.id).?);
+                return self.applyPrimitive(primitive, arguments, key.ty, result, .{ .unit = key.unit, .binding = key.id }, 0);
+            },
+            .constructor => {
+                const tm = self.g.unitModule(key.unit);
+                const constructor = tm.constructor(key.id);
+                return self.wrapVariant(result, constructor.tag, argument, 0);
+            },
+            else => unreachable,
+        }
+    }
+    fn closureNode(self: *Fn, id: core.Id) Error!Val {
+        const ty = try self.typeOf(id);
+        const arrow = self.g.types.node(ty);
+        if (arrow.tag != .function) return self.g.fail(self.m, id, "closure of a non-function type", .{});
+        const capture_ids = self.m.closureCaptures(id);
+        const captures = try self.arena.alloc(Val, capture_ids.len);
+        for (capture_ids, captures) |binding, *slot| slot.* = self.bindings.get(binding) orelse return self.g.fail(self.m, id, "closure capture without a value", .{});
+        const key: emit.InstanceKey = .{ .kind = .lambda, .unit = self.m.unit, .id = id, .ty = ty, .parent = self.instance_id };
+        const instance = self.g.find(key) orelse blk: {
+            const capture_types = try self.g.arena.allocator().alloc(Ty, captures.len);
+            for (captures, capture_types) |capture, *slot| slot.* = capture.ty;
+            var env: types.Env = .empty;
+            var it = self.env.iterator();
+            while (it.next()) |entry| try env.put(self.a(), entry.key_ptr.*, entry.value_ptr.*);
+            const parameters = try self.g.arena.allocator().dupe(Ty, &.{arrow.a});
+            break :blk try self.g.addInstanceWith(key, env, parameters, arrow.b, true, capture_types, self.m, id);
+        };
+        return self.makeClosure(instance, ty, captures, id);
+    }
+
+    /// Calls the closure `callee` with one argument.
+    fn applyClosure(self: *Fn, callee: Val, argument: Val, id: core.Id) Error!Val {
+        const arrow = self.g.types.node(callee.ty);
+        if (arrow.tag != .function or callee.words.len != 2) return self.g.fail(self.m, id, "application of a non-function value", .{});
+        try self.opIndex(.local_get, callee.words[1]);
+        try self.push(argument);
+        try self.opIndex(.local_get, callee.words[0]);
+        const signature = self.g.closureSignature(arrow.a, arrow.b) catch |err| switch (err) {
+            error.Unsupported => return self.g.typeFailure(self.m, id),
+            else => return err,
+        };
+        try self.opIndex(.call_indirect, signature);
+        try self.code.uleb(self.a(), 0);
+        return self.received(arrow.b, id);
+    }
+    fn apply(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const callee = try self.expr(n.a);
+        const argument = try self.expr(n.b);
+        return self.applyClosure(callee, argument, id);
+    }
+    fn constructorFunction(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const ty = try self.typeOf(id);
+        return self.partial(.constructor, .{ .unit = self.m.unit, .binding = n.a }, ty, &.{}, id);
+    }
+    fn primitiveFunction(self: *Fn, id: core.Id) Error!Val {
+        const ty = try self.typeOf(id);
+        // A primitive node is its own target: the unit's primitive catalog.
+        return self.partial(.primitive, .{ .unit = self.m.unit, .binding = id | primitive_node_bit }, ty, &.{}, id);
+    }
+
+    /// `root` with the field path of an update replaced by its new value.
+    fn update(self: *Fn, id: core.Id) Error!Val {
+        const info = self.m.updateInfo(id);
+        const root = try self.expr(info.root);
+        return self.updateAt(id, root, 0);
+    }
+    fn updateAt(self: *Fn, id: core.Id, value: Val, at: usize) Error!Val {
+        const info = self.m.updateInfo(id);
+        const selectors = self.m.updateSelectors(id);
+        const path = self.m.updatePath(id);
+        const steps = @max(selectors.len, path.len);
+        if (at == steps) {
+            try self.bindings.put(self.a(), info.self_binding, value);
+            return self.expr(info.value);
+        }
+        if (selectors.len != 0 and selectors[at].kind == .index) return self.g.fail(self.m, id, "indexed updates are not supported yet", .{});
+        const projection = self.m.projection(if (selectors.len != 0) selectors[at].projection else path[at]);
+        const spelling = self.m.fieldSpelling(projection.field) orelse return self.g.fail(self.m, id, "updated field without a spelling", .{});
+        const name = try self.g.types.fieldName(spelling);
+        var record = value;
+        var wrapped: ?u32 = null;
+        if (self.g.types.node(value.ty).tag == .nominal) {
+            const cases = self.g.types.variants(value.ty) catch |err| switch (err) {
+                error.Unsupported => return self.g.typeFailure(self.m, id),
+                else => return err,
+            };
+            if (cases.payloads.len != 1) return self.g.fail(self.m, id, "update of a multi-constructor value", .{});
+            record = try self.unwrapVariant(value, cases.tags[0], id);
+            wrapped = cases.tags[0];
+        }
+        const position = self.g.types.findField(record.ty, name) orelse return self.g.fail(self.m, id, "updated field missing", .{});
+        const slice = try self.fieldSlice(record.ty, position, id);
+        const old: Val = .{ .ty = self.g.types.recordField(record.ty, position).ty, .words = record.words[slice.start..][0..slice.len] };
+        const replacement = try self.updateAt(id, old, at + 1);
+        if (replacement.ty == types.never) return replacement;
+        var words: std.ArrayList(u32) = .empty;
+        try words.appendSlice(self.arena, record.words[0..slice.start]);
+        try words.appendSlice(self.arena, replacement.words);
+        try words.appendSlice(self.arena, record.words[slice.start + slice.len ..]);
+        var ty = record.ty;
+        if (replacement.ty != old.ty) {
+            const shape = self.g.types.node(record.ty);
+            const fields = try self.arena.alloc(types.Field, shape.b);
+            for (fields, 0..) |*field, index| field.* = self.g.types.recordField(record.ty, index);
+            fields[position].ty = replacement.ty;
+            ty = try self.g.types.record(fields);
+        }
+        const updated: Val = .{ .ty = ty, .words = words.items };
+        if (wrapped != null) return .{ .ty = value.ty, .words = updated.words };
+        return updated;
     }
 
     fn scalar(self: *Fn, id: core.Id) Error!Val {
@@ -297,24 +560,50 @@ pub const Fn = struct {
     fn callTarget(self: *Fn, target: core.BindingRef, arguments: []const Val, callee: Ty, result: Ty, id: core.Id) Error!Val {
         const tm = self.g.unitModule(target.unit);
         const binding = tm.binding(target.binding);
+        _ = binding;
         if (tm.body(target.binding)) |body| if (body.is_function) {
             const parameters = tm.bodyParameters(body);
-            if (arguments.len != parameters.len) return self.g.fail(self.m, id, "partial or over-application of a named function", .{});
-            if (try self.forward(tm, body, arguments, callee, result, id)) |value| return value;
-            const instance = try self.g.named(target, callee, self.m, id);
-            for (arguments) |argument| try self.push(argument);
-            const function = self.g.instance(instance);
-            try self.opIndex(.call, function.function);
-            return self.pop(function.result, id);
+            if (arguments.len < parameters.len) return self.partial(.partial, target, try self.restType(callee, arguments.len, id), arguments, id);
+            const direct = arguments[0..parameters.len];
+            const after = try self.restType(callee, parameters.len, id);
+            var value = (try self.forward(tm, body, direct, callee, after, id)) orelse blk: {
+                const instance = try self.g.named(target, callee, self.m, id);
+                for (direct) |argument| try self.push(argument);
+                const function = self.g.instance(instance);
+                try self.opIndex(.call, function.function);
+                break :blk try self.received(function.result, id);
+            };
+            for (arguments[parameters.len..]) |argument| value = try self.applyClosure(value, argument, id);
+            return value;
         };
-        if (primitiveAlias(tm, target.binding)) |node| {
-            const primitive = tm.primitive(node);
-            if (primitive.kind != .scalar or primitive.arity != arguments.len) return self.g.fail(self.m, id, "primitive application arity", .{});
-            for (arguments) |argument| try self.push(argument);
-            try self.scalarOp(primitive.op, arguments[0].ty, id);
-            return self.pop(result, id);
+        if (primitiveAlias(tm, target.binding)) |node| return self.applyPrimitive(tm.primitive(node), arguments, callee, result, target, id);
+        // A constant holding a function value: apply it one argument at a time.
+        var value = try self.namedValue(target, callee, id);
+        for (arguments) |argument| value = try self.applyClosure(value, argument, id);
+        return value;
+    }
+    fn namedValue(self: *Fn, target: core.BindingRef, ty: Ty, id: core.Id) Error!Val {
+        const instance = try self.g.named(target, ty, self.m, id);
+        try self.opIndex(.call, self.g.instance(instance).function);
+        return self.received(ty, id);
+    }
+    fn applyPrimitive(self: *Fn, primitive: core.Primitive, arguments: []const Val, callee: Ty, result: Ty, target: core.BindingRef, id: core.Id) Error!Val {
+        if (primitive.kind != .scalar) return self.g.fail(self.m, id, "array primitives are not supported yet", .{});
+        if (arguments.len < primitive.arity) return self.partial(.primitive, target, try self.restType(callee, arguments.len, id), arguments, id);
+        if (arguments.len > primitive.arity) return self.g.fail(self.m, id, "primitive over-application", .{});
+        for (arguments) |argument| try self.push(argument);
+        try self.scalarOp(primitive.op, arguments[0].ty, id);
+        return self.pop(result, id);
+    }
+    /// The type left after applying `count` arguments to function type `ty`.
+    fn restType(self: *Fn, ty: Ty, count: usize, id: core.Id) Error!Ty {
+        var rest = ty;
+        for (0..count) |_| {
+            const arrow = self.g.types.node(rest);
+            if (arrow.tag != .function) return self.g.fail(self.m, id, "too many arguments", .{});
+            rest = arrow.b;
         }
-        return self.g.fail(self.m, id, "call of a {s} binding", .{@tagName(binding.kind)});
+        return rest;
     }
     /// A wrapper whose body only passes its parameters to an associated
     /// member or another named function is resolved at the call site, so an
@@ -447,14 +736,12 @@ pub const Fn = struct {
         while (at != 0) {
             at -= 1;
             const label = self.labels.items[at];
-            if (label.target != n.b or label.kind != .block) continue;
+            if ((label.target != n.b and label.kind != .function) or label.kind == .loop) continue;
             try self.copy(value, label.result, id);
             try self.br(.br, label.depth);
             return neverVal();
         }
-        try self.push(value);
-        try self.op(.return_);
-        return neverVal();
+        return self.g.fail(self.m, id, "return outside its block", .{});
     }
 
     /// Word offset and width of record field `index` of `ty`.
@@ -832,35 +1119,84 @@ fn primitiveAlias(m: *const core.Module, binding_id: core.BindingId) ?core.Id {
     return value;
 }
 
+/// Marks a primitive node (rather than a binding) as a partial target.
+const primitive_node_bit: u32 = 0x8000_0000;
+
 pub fn emitInstance(g: *Generator, id: u32) Error!void {
     const instance = g.instance(id);
     const m = g.unitModule(instance.key.unit);
     var arena = std.heap.ArenaAllocator.init(g.allocator);
     defer arena.deinit();
-    var f: Fn = .{ .g = g, .m = m, .env = &instance.env, .arena = arena.allocator() };
+    var f: Fn = .{ .g = g, .m = m, .env = &instance.env, .arena = arena.allocator(), .instance_id = id };
     defer {
         f.code.deinit(g.allocator);
         f.locals.deinit(g.allocator);
         f.bindings.deinit(g.allocator);
+        f.polymorphic.deinit(g.allocator);
         f.labels.deinit(g.allocator);
     }
-    const body = m.body(instance.key.id).?;
-    const parameters = m.bodyParameters(body);
-    for (parameters, instance.parameters) |parameter, ty| {
-        const words = try f.layout(ty, body.root);
+    var root: core.Id = 0;
+    var captures: []Val = &.{};
+    var inputs: []Val = &.{};
+    if (instance.closure) _ = try f.local(.i32);
+    inputs = try f.arena.alloc(Val, instance.parameters.len);
+    for (instance.parameters, inputs) |ty, *slot| {
+        const words = try f.layout(ty, 0);
         const locals = try f.arena.alloc(u32, words.len);
-        for (words, locals) |word, *slot| slot.* = try f.local(word);
-        try f.bindings.put(g.allocator, parameter.binding, .{ .ty = ty, .words = locals });
+        for (words, locals) |word, *local_| local_.* = try f.local(word);
+        slot.* = .{ .ty = ty, .words = locals };
     }
     f.parameter_words = @intCast(f.locals.items.len);
-    const result = try f.expr(body.root);
-    if (result.ty == types.never) try f.op(.unreachable_) else try f.push(result);
+    const saved = try f.local(.i32);
+    if (instance.closure) captures = try f.loadCaptures(instance.captures, 0);
+    switch (instance.key.kind) {
+        .named => {
+            const body = m.body(instance.key.id).?;
+            for (m.bodyParameters(body), inputs) |parameter, value| try f.bindings.put(g.allocator, parameter.binding, value);
+            root = body.root;
+        },
+        .lambda => {
+            const info = m.closure(instance.key.id);
+            for (m.closureCaptures(instance.key.id), captures) |binding, value| try f.bindings.put(g.allocator, binding, value);
+            try f.bindings.put(g.allocator, info.parameter.binding, inputs[0]);
+            root = info.body;
+        },
+        .partial, .primitive, .constructor => {},
+    }
+    const result = try f.fresh(instance.result, root);
+    const exit = try f.open(.block);
+    try f.labels.append(g.allocator, .{ .target = std.math.maxInt(u32), .depth = exit, .result = result, .kind = .function });
+    const value = switch (instance.key.kind) {
+        .named, .lambda => try f.expr(root),
+        .partial, .primitive, .constructor => try f.adapterBody(instance, captures, inputs[0]),
+    };
+    try f.copy(value, result, root);
+    try f.close();
+    const release = f.allocates and !try g.holdsMemory(instance.result);
+    if (release) _ = try g.stackPointer();
+    if (release) {
+        try f.opIndex(.local_get, saved);
+        try f.opIndex(.global_set, g.stack_pointer.?);
+    }
+    try f.push(result);
     try f.op(.end);
-    try finish(g, instance.function, &f);
+    var prologue: W.Bytes = .{};
+    defer prologue.deinit(g.allocator);
+    if (release) {
+        try prologue.byte(g.allocator, @backingInt(W.Op.global_get));
+        try prologue.uleb(g.allocator, g.stack_pointer.?);
+        try prologue.byte(g.allocator, @backingInt(W.Op.local_set));
+        try prologue.uleb(g.allocator, saved);
+    }
+    try finishWith(g, instance.function, &f, prologue.items());
+}
+
+pub fn finish(g: *Generator, function: u32, f: *Fn) Error!void {
+    return finishWith(g, function, f, &.{});
 }
 
 /// Encodes the body: local declarations (in runs of one type) then code.
-pub fn finish(g: *Generator, function: u32, f: *Fn) Error!void {
+fn finishWith(g: *Generator, function: u32, f: *Fn, prologue: []const u8) Error!void {
     var out: W.Bytes = .{};
     defer out.deinit(g.allocator);
     const declared = f.locals.items[f.parameter_words..];
@@ -880,6 +1216,7 @@ pub fn finish(g: *Generator, function: u32, f: *Fn) Error!void {
         try out.byte(g.allocator, @backingInt(declared[at]));
         at = end;
     }
+    try out.raw(g.allocator, prologue);
     try out.raw(g.allocator, f.code.items());
     try g.module.setBody(function, out.items());
 }

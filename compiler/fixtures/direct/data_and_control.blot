@@ -1,0 +1,41 @@
+type Shape is data = $Circle F32 | $Rect { w: F32, h: F32 } | $Empty
+func area (shape: Shape): F32 => return case shape of
+  $Circle r => 3.0 * r * r
+  $Rect { w, h } => w * h
+  $Empty => 0.0
+func pick (n: U32): Shape => return if n == 0 then $Circle 2.0 else if n == 1 then $Rect { w: 3.0, h: 4.0 } else $Empty
+entry func shape_area (n: U32): F32 => return area (pick n)
+func swap (pair: (U32, U32)): (U32, U32) => return do:
+  let (a, b) = pair
+  break (b, a)
+entry func swapped (n: U32): U32 => return do:
+  let (x, y) = swap (n, 10)
+  break x * 100 + y
+func first (p: { a: U32, b: U32 }): U32 => return p.a
+entry func record_field (n: U32): U32 => return first { b: n, a: n + 1 }
+func maybe_double (m: Maybe U32): U32 => return case m of
+  $Some v => v * 2
+  $Nothing => 7
+entry func maybe (n: U32): U32 => return maybe_double (if n > 5 then $Some n else $Nothing)
+func generic_pair (x: a) -> (y: b): (b, a) => return (y, x)
+entry func generic (n: U32): F32 => return do:
+  let (f, u) = generic_pair n 2.5
+  break f + u.to_f32
+entry func factorial (value: U32) : U32 => return do:
+  if value <= 1:
+    break 1
+  break value * factorial (value - 1)
+entry func sum_to (n: U32): U32 => return do:
+  let total = 0
+  for i in 0..n:
+    if i == 7:
+      continue
+    total := self + i
+  break total
+entry func first_big (n: U32): U32 => return do:
+  let found = 0
+  for i in 0..n:
+    if i * i > 50:
+      found := i
+      break
+  break found

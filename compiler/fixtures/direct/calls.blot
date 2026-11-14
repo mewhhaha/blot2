@@ -1,0 +1,2 @@
+func add (x: U32) -> (y: U32): U32 => return x + y
+entry func answer (value: U32): U32 => return add value 2

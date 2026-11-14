@@ -1,0 +1,29 @@
+func twice value => return value + value
+func apply_twice transform => return func value => return transform (transform value)
+entry func offset_twice (value: F32) : F32 => return apply_twice (func x => return x + 1.0) (twice value)
+func add3 (a: U32) -> (b: U32) -> (c: U32): U32 => return a * 100 + b * 10 + c
+entry func partials (n: U32): U32 => return do:
+  let f = add3 n
+  let g = f 2
+  break g 3
+func compose2 outer -> inner -> value => return outer (inner value)
+entry func composed (n: U32): U32 => return compose2 (func x => return x * 3) (func x => return x + 1) n
+entry func counter (n: U32): U32 => return do:
+  let base = n
+  let adder = func x => return x + base
+  let total = 0
+  for i in 0..4:
+    total := self + adder i
+  break total
+type Point is data = $Point { x: U32, y: U32 }
+entry func moved (n: U32): U32 => return do:
+  let p = $Point { x: n, y: 5 }
+  p.x := self + 10
+  let $Point { x, y } = p
+  break x * 100 + y
+entry func maybe_map (n: U32): U32 => return do:
+  let m = Maybe.map (func v => return v * 2) ($Some n)
+  break Maybe.unwrap_or 0 m
+entry func ctor_value (n: U32): U32 => return do:
+  let wrap = $Some
+  break Maybe.unwrap_or 9 (wrap n)

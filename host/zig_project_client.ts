@@ -121,6 +121,8 @@ export interface ZigProjectCompilerOptions {
   explainAllocations?: boolean;
   /** Development skips optional scalar/vector passes; checking and cleanup remain. */
   codegenTier?: "optimized" | "development";
+  /** The scoped backend (default) or the modular direct backend. */
+  backend?: "scoped" | "direct";
   /** Bounded data stacks; byte budgets are positive multiples of 16. */
   storage?: Readonly<StorageBudgets>;
   /** Prototype: share identical internal machine bodies while keeping table slots. */
@@ -1501,6 +1503,7 @@ export async function createZigProjectCompiler(
     "profileTrace",
     "explainAllocations",
     "codegenTier",
+    "backend",
     "storage",
     "shareMachineCode",
     "profileMemory",
@@ -1588,6 +1591,12 @@ export async function createZigProjectCompiler(
     throw new TypeError("codegenTier must be optimized or development");
   }
   if (
+    options.backend !== undefined &&
+    options.backend !== "scoped" && options.backend !== "direct"
+  ) {
+    throw new TypeError("backend must be scoped or direct");
+  }
+  if (
     options.requireCollectorFree !== undefined &&
     typeof options.requireCollectorFree !== "boolean"
   ) throw new TypeError("requireCollectorFree must be a boolean");
@@ -1648,6 +1657,7 @@ export async function createZigProjectCompiler(
     ...(options.profileTrace ? { profileTrace: true } : {}),
     ...(options.explainAllocations ? { explainAllocations: true } : {}),
     ...(options.codegenTier ? { codegenTier: options.codegenTier } : {}),
+    ...(options.backend ? { backend: options.backend } : {}),
     ...(storage ? { storage } : {}),
     ...(options.shareMachineCode ? { shareMachineCode: true } : {}),
     ...(options.profileMemory ? { profileMemory: true } : {}),

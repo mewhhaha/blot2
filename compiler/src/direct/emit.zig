@@ -20,15 +20,28 @@ pub const Val = struct {
     words: []const u32 = &.{},
 };
 
-const InstanceKind = enum(u8) { named, lambda };
-const InstanceKey = struct { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 };
-const Instance = struct {
+/// named: a function or constant binding; lambda: a closure node of the
+/// `parent` instance; partial: a named function applied to its first
+/// `parent` arguments; primitive: the same for a primitive alias binding;
+/// constructor: a constructor (catalog index `id`) as a function value.
+pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor };
+pub const InstanceKey = struct { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 };
+pub const Instance = struct {
     key: InstanceKey,
     env: types.Env,
     function: u32,
     parameters: []const Ty,
     result: Ty,
+    /// Closure convention: the environment pointer is the first parameter.
+    /// Captures are its contents, and slot is the function's table index.
+    closure: bool = false,
+    captures: []const Ty = &.{},
+    slot: u32 = 0,
 };
+/// Closure environments: a bump stack, released by each scope whose result
+/// holds no closure. The data-stack runtime will own this storage.
+pub const env_base: u32 = 1024;
+pub const env_bytes: u32 = 1 << 20;
 
 pub const Generator = struct {
     allocator: A,
@@ -41,6 +54,9 @@ pub const Generator = struct {
     instance_index: std.AutoHashMapUnmanaged(InstanceKey, u32) = .empty,
     queue: std.ArrayList(u32) = .empty,
     failure: ?Failure = null,
+    /// The environment stack pointer global, created on first use.
+    stack_pointer: ?u32 = null,
+    holds_memory: std.AutoHashMapUnmanaged(Ty, bool) = .empty,
 
     pub fn init(allocator: A, units: []const core.Module) A.Error!Generator {
         const interned = types.Types.init(allocator, units) catch |err| switch (err) {
@@ -54,6 +70,7 @@ pub const Generator = struct {
         self.instances.deinit(self.allocator);
         self.instance_index.deinit(self.allocator);
         self.queue.deinit(self.allocator);
+        self.holds_memory.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         self.types.deinit();
         self.module.deinit();
@@ -124,6 +141,50 @@ pub const Generator = struct {
         return null;
     }
 
+    /// `(env, parameter words) -> result words`, the call_indirect type of
+    /// every closure of type `parameter -> result`.
+    pub fn closureSignature(self: *Generator, parameter: Ty, result: Ty) Error!u32 {
+        var words: std.ArrayList(W.ValType) = .empty;
+        defer words.deinit(self.allocator);
+        try words.append(self.allocator, .i32);
+        try words.appendSlice(self.allocator, try self.types.layout(parameter));
+        return self.module.signature(words.items, try self.types.layout(result));
+    }
+    pub fn find(self: *Generator, key: InstanceKey) ?u32 {
+        return self.instance_index.get(key);
+    }
+    pub fn stackPointer(self: *Generator) Error!u32 {
+        if (self.stack_pointer) |global| return global;
+        const global = try self.module.addGlobal(.i32, true, env_base);
+        self.stack_pointer = global;
+        return global;
+    }
+    /// Whether a value of `ty` can refer to scope-allocated memory.
+    pub fn holdsMemory(self: *Generator, ty: Ty) Error!bool {
+        if (self.holds_memory.get(ty)) |hit| return hit;
+        const n = self.types.node(ty);
+        const result = switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never => false,
+            .function, .array, .list, .cursor, .grow, .resize, .ref, .view, .link => true,
+            .tuple => blk: {
+                for (self.types.tupleItems(ty)) |item| if (try self.holdsMemory(item)) break :blk true;
+                break :blk false;
+            },
+            .record => blk: {
+                for (0..n.b) |index| if (try self.holdsMemory(self.types.recordField(ty, index).ty)) break :blk true;
+                break :blk false;
+            },
+            .nominal => blk: {
+                try self.holds_memory.put(self.allocator, ty, false); // recursion guard
+                const cases = try self.types.variants(ty);
+                for (cases.payloads) |payload| if (try self.holdsMemory(payload)) break :blk true;
+                break :blk false;
+            },
+        };
+        try self.holds_memory.put(self.allocator, ty, result);
+        return result;
+    }
+
     pub fn signatureOf(self: *Generator, parameters: []const Ty, result: Ty) Error!u32 {
         var words: std.ArrayList(W.ValType) = .empty;
         defer words.deinit(self.allocator);
@@ -155,14 +216,18 @@ pub const Generator = struct {
         return self.addInstance(key, env, lowered, result, site, site_id);
     }
     fn addInstance(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, result: Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
-        const signature = self.signatureOf(parameters, result) catch |err| switch (err) {
+        return self.addInstanceWith(key, env, parameters, result, false, &.{}, site, site_id);
+    }
+    pub fn addInstanceWith(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, result: Ty, closure: bool, captures: []const Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
+        if (closure and parameters.len != 1) return self.fail(site, site_id, "closures take one parameter", .{});
+        const signature = (if (closure and parameters.len == 1) self.closureSignature(parameters[0], result) else self.signatureOf(parameters, result)) catch |err| switch (err) {
             error.Unsupported => return self.typeFailure(site, site_id),
             else => return err,
         };
         const function = try self.module.addFunction(signature);
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
-        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = result };
+        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = result, .closure = closure, .captures = captures, .slot = if (closure) try self.module.tableSlot(function) else 0 };
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);
         try self.queue.append(self.allocator, id);

@@ -43,5 +43,6 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     try abi.raw(g.allocator, entries.items());
     try abi.uleb(g.allocator, 0);
     try g.module.custom("blot:abi", abi.items());
+    if (g.stack_pointer != null) g.module.memory_pages = (emit.env_base + emit.env_bytes + 0xffff) / 0x10000;
     return g.module.assemble(g.allocator);
 }

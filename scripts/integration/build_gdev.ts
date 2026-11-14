@@ -12,12 +12,16 @@ const { values, positionals } = parseArgs({
     profile: { type: "boolean", default: false },
     trace: { type: "boolean", default: false },
     tier: { type: "string", default: "optimized" },
+    backend: { type: "string", default: "scoped" },
     workers: { type: "string", default: "1" },
     "frontend-workers": { type: "string", default: "4" },
   },
 });
 if (values.tier !== "development" && values.tier !== "optimized") {
   throw new Error("--tier must be development or optimized");
+}
+if (values.backend !== "scoped" && values.backend !== "direct") {
+  throw new Error("--backend must be scoped or direct");
 }
 const workers = Number(values.workers);
 if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
@@ -96,6 +100,7 @@ try {
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,
     codegenTier: values.tier,
+    backend: values.backend,
     codegenWorkers: workers,
     frontendWorkers,
   });
@@ -159,6 +164,7 @@ const output = {
   },
   deadlineMs: timeoutMs,
   codegenTier: values.tier,
+  backend: values.backend,
   codegenWorkers: workers,
   frontendWorkers,
   buildMs,
