@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-14",
+  "subject": "Gdev Main guest time per frame: direct backend against scoped backend",
+  "command": "pen bench --project <gdev copy> --runs 3 --json; pen packets DIR --project <gdev copy>",
+  "pen": "../pen target/release/pen 0.1.0, wasmtime 49.0.3",
+  "compilers": {
+    "direct": "compiler/zig-out-direct (native fast, -Ddirect-default=true) with --backend direct, source d40ac45b+",
+    "scoped": "compiler/zig-out-dev (scoped default), same source"
+  },
+  "gdev": "../gdev 81662ac, hard-linked copy with absolute std/ink paths",
+  "direct": {
+    "guest_mean_ms": 0.08374994375000004,
+    "guest_median_ms": 0.07886,
+    "guest_p95_ms": 0.101593,
+    "load_ms": 3231.690242,
+    "snapshot_median_ms": 0.461217
+  },
+  "scoped": {
+    "guest_mean_ms": 2.4775635166666685,
+    "guest_median_ms": 2.4511089999999998,
+    "guest_p95_ms": 2.577348,
+    "load_ms": 5775.510687999999,
+    "snapshot_median_ms": 16.086372
+  },
+  "frames": 600,
+  "warmup": 120,
+  "runs": 3,
+  "packets": {
+    "frames": 120,
+    "identical_outputs": true,
+    "identical_inputs": true,
+    "identical_final_snapshot": true,
+    "final_snapshot_sha256": "eaa7be919a72149cc86a81e8678ca16239e715b0ef5cd0d839e9ec72fd5e5781"
+  },
+  "reading": "The direct output runs each frame about 31x faster (median 0.079 ms against 2.45 ms) and loads in 3.2 s against 5.8 s, with byte-identical render packets for 120 frames."
+}

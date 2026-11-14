@@ -118,9 +118,15 @@ the scoped backend rejects.
    with phase 5's frontend work.
 3. Phase 7 (Goose port) last.
 
-Before a release tier depends on the direct backend alone, measure Gdev's
-run-time frame cost on both backends. Pen's single-frame run has no
-timings, so this needs a multi-frame harness.
+Run-time cost, measured with `pen bench` and `pen packets`
+([evidence](../benchmarks/evidence/measurements/2026-11-14-direct-gdev-runtime.json)):
+- Gdev Main's guest time per frame is 0.079 ms median on the direct backend
+  against 2.45 ms on the scoped one; state snapshots take 0.46 ms against
+  16 ms, and loading takes 3.2 s against 5.8 s.
+- The 120 frames' render packets and the final snapshot are byte-identical.
+
+No run-time reason remains to keep the scoped backend for release builds;
+`wasm-opt` stays optional.
 
 ## Phases
 
