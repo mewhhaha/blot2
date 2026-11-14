@@ -1,0 +1,12 @@
+import { Vec3 } from "std/vector"
+type ActorId is data = $ActorId U32
+func ActorId.eq ($ActorId a) -> ($ActorId b) => return a == b
+func same (a: Maybe ActorId) -> (b: ActorId) => return case a of
+  $Some s => s == b
+  $Nothing => false
+entry func ids (n: U32): U32 => return if same ($Some ($ActorId n)) ($ActorId 3) then 1 else 0
+func shifted v => return (v + $Vec3 { x: 1.0, y: 2.0, z: 3.0 }) * 2.0
+entry func vec (n: F32): F32 => return do:
+  let v = shifted ($Vec3 { x: n, y: 0.0, z: 0.0 })
+  let w = v - $Vec3 { x: 1.0, y: 1.0, z: 1.0 }
+  break w.x + w.y + w.z + v.length_squared

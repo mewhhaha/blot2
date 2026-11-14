@@ -14,7 +14,7 @@ pub fn compile(allocator: A, units: []const core.Module, entry: u32) A.Error!bac
     defer g.deinit();
     const bytes = build(&g, entry) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.Unsupported => {
+        error.Unsupported, error.Diverged => {
             const failure = g.failure orelse emit.Failure{ .unit = entry, .span = .{ .start = 0, .end = 0 }, .message = try allocator.dupe(u8, "Direct backend: unsupported program") };
             g.failure = null;
             return .{ .diagnostic = .{ .unit = failure.unit, .span = failure.span, .code = .storage_unsupported, .detail = failure.message }, .owned_message = failure.message };
@@ -47,6 +47,11 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     }
     if (count == 0) return g.fail(m, 0, "the entry module exports no functions", .{});
     try g.emitAll();
+    if (try g.summary()) |failure| {
+        if (g.failure) |previous| g.allocator.free(previous.message);
+        g.failure = failure;
+        return error.Unsupported;
+    }
     var abi: W.Bytes = .{};
     defer abi.deinit(g.allocator);
     try abi.byte(g.allocator, 8);

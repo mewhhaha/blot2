@@ -10,7 +10,8 @@ const types = @import("types.zig");
 const Ty = types.Ty;
 const A = std.mem.Allocator;
 
-pub const Error = A.Error || error{Unsupported};
+/// Diverged: an operand never produced a value; its user diverges too.
+pub const Error = A.Error || error{ Unsupported, Diverged };
 
 pub const Failure = struct { unit: u32, span: core.Span, message: []u8 };
 
@@ -39,6 +40,9 @@ pub const Instance = struct {
     closure: bool = false,
     captures: []const Ty = &.{},
     slot: u32 = 0,
+    /// Being emitted to learn its result type; already emitted.
+    inferring: bool = false,
+    emitted: bool = false,
 };
 const runtime = @import("runtime.zig");
 
@@ -53,6 +57,8 @@ pub const Generator = struct {
     instance_index: std.AutoHashMapUnmanaged(InstanceKey, u32) = .empty,
     queue: std.ArrayList(u32) = .empty,
     failure: ?Failure = null,
+    solve_depth: u32 = 0,
+    failures: std.ArrayList(struct { failure: Failure, count: u32 = 1, samples: [4]core.Span = undefined, sample_units: [4]u32 = undefined }) = .empty,
     /// The storage runtime, emitted on first use.
     rt: ?runtime.Runtime = null,
     /// Host callback imports by (parameter, result) ABI kinds.
@@ -78,9 +84,58 @@ pub const Generator = struct {
         self.host_imports.deinit(self.allocator);
         self.pool_globals.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
+        for (self.failures.items) |item| self.allocator.free(item.failure.message);
+        self.failures.deinit(self.allocator);
         self.types.deinit();
         self.module.deinit();
         self.arena.deinit();
+    }
+
+    /// Moves the current failure into the build's list, counting repeats.
+    pub fn recordFailure(self: *Generator, m: *const core.Module, id: core.Id) Error!void {
+        const failure = self.failure orelse Failure{ .unit = m.unit, .span = if (id < m.spans.len) m.span(id) else .{ .start = 0, .end = 0 }, .message = try self.allocator.dupe(u8, "Direct backend: unsupported form") };
+        self.failure = null;
+        for (self.failures.items) |*seen| if (std.mem.eql(u8, seen.failure.message, failure.message)) {
+            if (seen.count < 4) {
+                seen.samples[seen.count] = failure.span;
+                seen.sample_units[seen.count] = failure.unit;
+            }
+            seen.count += 1;
+            self.allocator.free(failure.message);
+            return;
+        };
+        try self.failures.append(self.allocator, .{ .failure = failure });
+        const added = &self.failures.items[self.failures.items.len - 1];
+        added.samples[0] = failure.span;
+        added.sample_units[0] = failure.unit;
+    }
+    /// One failure summarizing every distinct unsupported form, if any.
+    pub fn summary(self: *Generator) Error!?Failure {
+        if (self.failures.items.len == 0) return null;
+        var text: std.ArrayList(u8) = .empty;
+        errdefer text.deinit(self.allocator);
+        try text.print(self.allocator, "Direct backend: {d} unsupported form(s): ", .{self.failures.items.len});
+        for (self.failures.items, 0..) |item, index| {
+            if (index == 24) {
+                try text.appendSlice(self.allocator, "; ...");
+                break;
+            }
+            if (index != 0) try text.appendSlice(self.allocator, "; ");
+            const message = item.failure.message;
+            const prefix = "Direct backend: ";
+            try text.appendSlice(self.allocator, if (std.mem.startsWith(u8, message, prefix)) message[prefix.len..] else message);
+            try text.print(self.allocator, " ({d}x at", .{item.count});
+            for (0..@min(item.count, 4)) |sample| try text.print(self.allocator, " {d}:{d}", .{ item.sample_units[sample], item.samples[sample].start });
+            try text.appendSlice(self.allocator, ")");
+        }
+        const first = self.failures.items[0].failure;
+        return .{ .unit = first.unit, .span = first.span, .message = try text.toOwnedSlice(self.allocator) };
+    }
+
+    /// Discards a failure an optional attempt recorded.
+    pub fn dropFailure(self: *Generator) void {
+        if (self.failure) |failure| self.allocator.free(failure.message);
+        self.failure = null;
     }
 
     pub fn fail(self: *Generator, m: *const core.Module, id: core.Id, comptime format: []const u8, arguments: anytype) error{ Unsupported, OutOfMemory } {
@@ -91,7 +146,8 @@ pub const Generator = struct {
         return error.Unsupported;
     }
     pub fn typeFailure(self: *Generator, m: *const core.Module, id: core.Id) error{ Unsupported, OutOfMemory } {
-        return self.fail(m, id, "unsupported type ({s})", .{self.types.failure_reason});
+        const tag = if (id != 0 and id < m.nodes.len) @tagName(m.node(id).tag) else "declaration";
+        return self.fail(m, id, "unsupported type ({s}) at a {s}", .{ self.types.failure_reason, tag });
     }
 
     pub fn unitModule(self: *Generator, unit_id: u32) *const core.Module {
@@ -119,7 +175,15 @@ pub const Generator = struct {
             .f32 => .{ .unit = 0, .decl = T.f32_type },
             .boolean => .{ .unit = 0, .decl = T.boolean },
             .unit => .{ .unit = 0, .decl = T.unit },
-            .array, .grow, .resize => .{ .unit = 0, .decl = std.math.maxInt(u32) },
+            .array => .{ .unit = 0, .decl = std.math.maxInt(u32) },
+            // Storage capabilities are compiler-owned nominal identities.
+            .grow, .resize, .ref, .view, .link => .{ .unit = std.math.maxInt(u32), .decl = @backingInt(@as(@import("../check/storage_types.zig").Kind, switch (n.tag) {
+                .grow => .grow,
+                .resize => .resize,
+                .ref => .ref,
+                .view => .view,
+                else => .link,
+            })) },
             .list => .{ .unit = 0, .decl = std.math.maxInt(u32) - 1 },
             .cursor => .{ .unit = 0, .decl = std.math.maxInt(u32) - 2 },
             else => null,
@@ -132,10 +196,8 @@ pub const Generator = struct {
         for ([_]*const core.Module{ m, owner }, 0..) |catalog, index| {
             if (index == 1 and catalog == m) continue;
             for (catalog.associated) |method| {
-                // Catalog identities may name their own unit as zero.
-                const local = method.identity.unit == 0 and method.identity.decl != 0;
-                const same = (method.identity.unit == identity.unit or (local and catalog.unit == identity.unit)) and method.identity.decl == identity.decl;
-                if (!same) continue;
+                // Unit zero names built-in receivers; nominals carry their unit.
+                if (method.identity.unit != identity.unit or method.identity.decl != identity.decl) continue;
                 if (if (member != 0) method.member != member else method.operator != operator) continue;
                 var target = method.target;
                 if (target.unit == 0) target.unit = catalog.unit;
@@ -214,10 +276,29 @@ pub const Generator = struct {
             else => return err,
         };
         const result = self.types.lower(m, m.typeOf(body.root), &env) catch |err| switch (err) {
-            error.Unsupported => return self.typeFailure(site, site_id),
+            // The body determines its result type: emit it now.
+            error.Unsupported => return self.inferResult(key, env, lowered, site, site_id),
             else => return err,
         };
         return self.addInstance(key, env, lowered, result, site, site_id);
+    }
+    /// An instance whose result type only its body determines: emitted
+    /// immediately, with its signature fixed once the result is known.
+    fn inferResult(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
+        const function = try self.module.addFunction(try self.module.signature(&.{}, &.{}));
+        const id: u32 = @intCast(self.instances.items.len);
+        const owned = try self.arena.allocator().create(Instance);
+        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .inferring = true, .emitted = true };
+        try self.instances.append(self.allocator, owned);
+        try self.instance_index.put(self.allocator, key, id);
+        try @import("function.zig").emitInstance(self, id);
+        owned.inferring = false;
+        const signature = self.signatureOf(parameters, owned.result) catch |err| switch (err) {
+            error.Unsupported => return self.typeFailure(site, site_id),
+            else => return err,
+        };
+        self.module.functions.items[function - self.module.imports.items.len].signature = signature;
+        return id;
     }
     fn addInstance(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, result: Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
         return self.addInstanceWith(key, env, parameters, result, false, &.{}, site, site_id);
@@ -238,6 +319,94 @@ pub const Generator = struct {
         return id;
     }
 
+    /// The concrete type of `target` when applied to `arguments`: its
+    /// parameter types fix its variables, obligations the dependent ones.
+    pub fn calleeFromArguments(self: *Generator, target: core.BindingRef, arguments: []const Val, site: *const core.Module, site_id: core.Id) Error!Ty {
+        const m = self.unitModule(target.unit);
+        const binding = m.binding(target.binding);
+        var env: types.Env = .empty;
+        defer env.deinit(self.allocator);
+        var arrow = binding.ty;
+        for (arguments) |argument| {
+            var n = m.types.node(arrow);
+            while (n.tag == .forall or n.tag == .usage) {
+                arrow = n.a;
+                n = m.types.node(arrow);
+            }
+            if (n.tag != .function) break;
+            try self.types.match(m, n.a, argument.ty, &env);
+            arrow = n.b;
+        }
+        if (m.body(target.binding)) |body| try self.solveObligations(m, body.scheme.obligations, &env);
+        try self.solveObligations(m, binding.scheme.obligations, &env);
+        if (self.types.lower(m, binding.ty, &env)) |ty| return ty else |err| switch (err) {
+            error.Unsupported => {},
+            else => return err,
+        }
+        // Only the body determines the result: key the instance by its
+        // parameter types, infer the result, and alias the full type.
+        const body = m.body(target.binding) orelse return self.typeFailure(site, site_id);
+        const parameters = m.bodyParameters(body);
+        if (!body.is_function or arguments.len < parameters.len) return self.typeFailure(site, site_id);
+        const instance_id = try self.namedByParameters(target, arguments[0..parameters.len], site, site_id);
+        const instance_ = self.instance(instance_id);
+        var full = instance_.result;
+        var at = parameters.len;
+        while (at != 0) {
+            at -= 1;
+            full = try self.types.function(arguments[at].ty, full);
+        }
+        try self.instance_index.put(self.allocator, .{ .kind = .named, .unit = target.unit, .id = target.binding, .ty = full }, instance_id);
+        return full;
+    }
+    fn namedByParameters(self: *Generator, target: core.BindingRef, arguments: []const Val, site: *const core.Module, site_id: core.Id) Error!u32 {
+        var marker = types.never;
+        var at = arguments.len;
+        while (at != 0) {
+            at -= 1;
+            marker = try self.types.function(arguments[at].ty, marker);
+        }
+        const key: InstanceKey = .{ .kind = .named, .unit = target.unit, .id = target.binding, .ty = marker };
+        if (self.instance_index.get(key)) |found| return found;
+        const m = self.unitModule(target.unit);
+        const body = m.body(target.binding).?;
+        var env: types.Env = .empty;
+        errdefer env.deinit(self.allocator);
+        const parameters = m.bodyParameters(body);
+        const lowered = try self.arena.allocator().alloc(Ty, parameters.len);
+        for (parameters, arguments, lowered) |parameter, argument, *slot| {
+            try self.types.match(m, parameter.ty, argument.ty, &env);
+            slot.* = argument.ty;
+        }
+        try self.solveObligations(m, body.scheme.obligations, &env);
+        const result = self.types.lower(m, m.typeOf(body.root), &env) catch |err| switch (err) {
+            error.Unsupported => return self.inferResult(key, env, lowered, site, site_id),
+            else => return err,
+        };
+        return self.addInstance(key, env, lowered, result, site, site_id);
+    }
+
+    pub fn solveObligationsPublic(self: *Generator, m: *const core.Module, goals_span: T.List, env: *types.Env) Error!void {
+        return self.solveObligations(m, goals_span, env);
+    }
+    /// A lambda instance whose result type its body determines.
+    pub fn inferClosure(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, captures: []const Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
+        const function = try self.module.addFunction(try self.module.signature(&.{}, &.{}));
+        const id: u32 = @intCast(self.instances.items.len);
+        const owned = try self.arena.allocator().create(Instance);
+        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .closure = true, .captures = captures, .slot = try self.module.tableSlot(function), .inferring = true, .emitted = true };
+        try self.instances.append(self.allocator, owned);
+        try self.instance_index.put(self.allocator, key, id);
+        try @import("function.zig").emitInstance(self, id);
+        owned.inferring = false;
+        if (parameters.len != 1) return self.fail(site, site_id, "closures take one parameter", .{});
+        const signature = self.closureSignature(parameters[0], owned.result) catch |err| switch (err) {
+            error.Unsupported => return self.typeFailure(site, site_id),
+            else => return err,
+        };
+        self.module.functions.items[function - self.module.imports.items.len].signature = signature;
+        return id;
+    }
     /// Dependent type variables (field and element results) follow from the
     /// receivers the instance's parameters already fixed.
     fn solveObligations(self: *Generator, m: *const core.Module, goals_span: T.List, env: *types.Env) Error!void {
@@ -262,14 +431,31 @@ pub const Generator = struct {
                 const record = switch (n.tag) {
                     .record => receiver,
                     .nominal => blk: {
-                        const cases = self.types.variants(receiver) catch continue;
-                        if (cases.payloads.len != 1) continue;
+                        const cases = self.types.variants(receiver) catch break :blk receiver;
+                        if (cases.payloads.len != 1) break :blk receiver;
                         break :blk cases.payloads[0];
                     },
-                    else => continue,
+                    else => receiver,
                 };
-                const position = self.types.findField(record, name) orelse continue;
-                try self.types.match(m, goal.result, self.types.recordField(record, position).ty, env);
+                if (self.types.findField(record, name)) |position| {
+                    try self.types.match(m, goal.result, self.types.recordField(record, position).ty, env);
+                    continue;
+                }
+                // A receiver member: its result at this receiver.
+                if (self.solve_depth >= 32) continue;
+                const identity = self.receiverIdentity(receiver) orelse continue;
+                const target = self.dispatchTarget(m, identity, goal.name, .none) orelse continue;
+                self.solve_depth += 1;
+                defer self.solve_depth -= 1;
+                const callee = self.calleeFromArguments(target, &.{.{ .ty = receiver }}, m, 0) catch |err| switch (err) {
+                    error.Unsupported => {
+                        self.dropFailure();
+                        continue;
+                    },
+                    else => return err,
+                };
+                const arrow = self.types.node(callee);
+                if (arrow.tag == .function) try self.types.match(m, goal.result, arrow.b, env);
             }
             if (env.count() == before) return;
         }
@@ -278,6 +464,9 @@ pub const Generator = struct {
     pub fn emitAll(self: *Generator) Error!void {
         var next: usize = 0;
         while (next < self.queue.items.len) : (next += 1) {
+            const item = self.instance(self.queue.items[next]);
+            if (item.emitted) continue;
+            item.emitted = true;
             try @import("function.zig").emitInstance(self, self.queue.items[next]);
         }
     }

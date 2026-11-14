@@ -67,6 +67,7 @@ pub const Types = struct {
     in_layout: std.AutoHashMapUnmanaged(Ty, void) = .empty,
     /// The Core type that last failed to lower, for diagnostics.
     failure: ?VarKey = null,
+    holes: bool = false,
     failure_reason: []const u8 = "",
 
     pub fn init(allocator: A, units: []const core.Module) Error!Types {
@@ -206,6 +207,14 @@ pub const Types = struct {
         var open = false;
         return self.lowerInner(m, ty, env, &open, 0);
     }
+    /// Like lower, but unbound variables become `never` holes, which
+    /// `match` skips: an expected type known only in part.
+    pub fn lowerHoles(self: *Types, m: *const core.Module, ty: T.Id, env: *const Env) Error!Ty {
+        self.holes = true;
+        defer self.holes = false;
+        var open = false;
+        return self.lowerInner(m, ty, env, &open, 0);
+    }
     fn lowerInner(self: *Types, m: *const core.Module, ty: T.Id, env: *const Env, open: *bool, depth: usize) Error!Ty {
         switch (ty) {
             T.unit => return unit,
@@ -223,7 +232,7 @@ pub const Types = struct {
         const result: Ty = switch (n.tag) {
             .variable, .bound => blk: {
                 child_open = true;
-                break :blk env.get(key) orelse return self.fail(m, ty, "unresolved type variable");
+                break :blk env.get(key) orelse (if (self.holes) never else return self.fail(m, ty, "unresolved type variable"));
             },
             .usage, .forall => try self.lowerInner(m, n.a, env, &child_open, depth + 1),
             .function => try self.function(try self.lowerInner(m, n.a, env, &child_open, depth + 1), try self.lowerInner(m, n.b, env, &child_open, depth + 1)),
@@ -261,7 +270,7 @@ pub const Types = struct {
                 if (n.a == std.math.maxInt(u32)) return self.fail(m, ty, "compiler-owned nominal type");
                 const payload = try self.allocator.alloc(u32, arguments.len + 2);
                 defer self.allocator.free(payload);
-                payload[0] = if (n.a == 0) m.unit else n.a;
+                payload[0] = n.a;
                 payload[1] = n.b;
                 for (arguments, payload[2..]) |argument, *slot| slot.* = try self.lowerInner(m, argument, env, &child_open, depth + 1);
                 break :blk try self.intern(.nominal, payload);
@@ -291,6 +300,7 @@ pub const Types = struct {
         const have = self.node(actual);
         switch (n.tag) {
             .variable, .bound => {
+                if (actual == never) return; // a hole in a partly known type
                 const entry = try env.getOrPut(self.allocator, .{ .unit = m.unit, .ty = pattern });
                 if (!entry.found_existing) entry.value_ptr.* = actual;
             },
@@ -317,7 +327,7 @@ pub const Types = struct {
                     if (arguments.len == 1 and isContainer(have.tag)) try self.matchInner(m, arguments[0], have.a, env, depth + 1);
                 } else if (have.tag == .nominal) {
                     const identity = self.nominalIdentity(actual);
-                    if (identity.unit != (if (n.a == 0) m.unit else n.a) or identity.decl != n.b) return;
+                    if (identity.unit != n.a or identity.decl != n.b) return;
                     const items = self.nominalArguments(actual);
                     if (items.len != arguments.len) return;
                     for (arguments, items) |argument, item| try self.matchInner(m, argument, item, env, depth + 1);
@@ -331,6 +341,10 @@ pub const Types = struct {
     /// The constructors of a concrete nominal type and their payload types.
     pub fn variants(self: *Types, ty: Ty) Error!Variants {
         if (self.variant_cache.get(ty)) |hit| return hit;
+        if (self.node(ty).tag != .nominal) {
+            self.failure_reason = "constructor of a non-nominal type";
+            return error.Unsupported;
+        }
         const identity = self.nominalIdentity(ty);
         const owner = self.module(identity.unit) orelse return error.Unsupported;
         const ordinal = try self.nominalOrdinal(owner, identity);
@@ -354,8 +368,7 @@ pub const Types = struct {
     pub fn nominalOrdinal(self: *Types, owner: *const core.Module, identity: T.NominalIdentity) Error!u32 {
         if (self.nominal_positions.get(identity)) |hit| return hit;
         for (owner.nominals, 0..) |nominal, ordinal| {
-            const unit_id = if (nominal.identity.unit == 0) owner.unit else nominal.identity.unit;
-            if (unit_id == identity.unit and nominal.identity.decl == identity.decl) {
+            if (nominal.identity.unit == identity.unit and nominal.identity.decl == identity.decl) {
                 try self.nominal_positions.put(self.allocator, identity, @intCast(ordinal));
                 return @intCast(ordinal);
             }
@@ -415,10 +428,7 @@ pub const Types = struct {
             .array, .list, .grow, .resize => try words.appendSlice(self.allocator, &.{ .i32, .i32 }),
             .view => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32, .i32 }),
             .ref, .link => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32 }),
-            .cursor => {
-                self.failure_reason = "cursors are not supported by the direct backend yet";
-                return error.Unsupported;
-            },
+            .cursor => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32, .i32 }),
         }
         const owned = try self.arena.allocator().dupe(W.ValType, words.items);
         self.layouts.items[ty] = owned;

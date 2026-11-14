@@ -29,6 +29,9 @@ const cases: Record<string, Call[]> = {
     ["generated", 5, 16],
     ["returned", 3, 2003],
   ],
+  "nested_updates.blot": [["run", 5, 609]],
+  "inferred_types.blot": [["run", 5, 7], ["loopuse", 4, 9]],
+  "dispatch.blot": [["ids", 3, 1], ["ids", 4, 0], ["vec", 1, 79]],
   "closures.blot": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],

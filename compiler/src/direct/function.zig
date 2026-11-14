@@ -18,7 +18,8 @@ const A = std.mem.Allocator;
 const Label = struct {
     target: core.Id,
     depth: u32,
-    result: Val = .{ .ty = types.unit },
+    /// Allocated by the first value that leaves the block.
+    result: *?Val,
     /// function: the body's own exit, the target of every unmatched return.
     kind: enum { block, loop, function } = .block,
     /// Loops: the backedge target depth, current iteration and exit values.
@@ -34,7 +35,9 @@ const Label = struct {
 pub const Fn = struct {
     g: *Generator,
     m: *const core.Module,
-    env: *const types.Env,
+    /// The instance's type variables, refined as emission learns the
+    /// concrete type of each expression (dependent field/element results).
+    env: *types.Env,
     arena: A,
     instance_id: u32 = 0,
     code: W.Bytes = .{},
@@ -126,7 +129,7 @@ pub const Fn = struct {
     }
     fn copy(self: *Fn, from: Val, to: Val, id: core.Id) Error!void {
         if (from.ty == types.never) return;
-        if (from.words.len != to.words.len) return self.g.fail(self.m, id, "value layout mismatch", .{});
+        if (from.words.len != to.words.len) return self.g.fail(self.m, id, "value layout mismatch ({s} of {d} words into {s} of {d})", .{ @tagName(self.tagOf(from.ty)), from.words.len, @tagName(self.tagOf(to.ty)), to.words.len });
         for (from.words, to.words) |source, target| {
             if (source == target) continue;
             try self.opIndex(.local_get, source);
@@ -140,7 +143,41 @@ pub const Fn = struct {
         return .{ .ty = types.never };
     }
 
+    /// An operand: if it diverges, so does the expression using it.
     pub fn expr(self: *Fn, id: core.Id) Error!Val {
+        const value = try self.stmt(id);
+        if (value.ty == types.never) return error.Diverged;
+        return value;
+    }
+    /// A value that may diverge (statements, branches, bodies). An
+    /// unsupported form is recorded and compiled as a trap, so one build
+    /// reports every missing form; the compilation still fails.
+    pub fn stmt(self: *Fn, id: core.Id) Error!Val {
+        const depth = self.depth;
+        const labels = self.labels.items.len;
+        const value = self.exprInner(id) catch |err| switch (err) {
+            error.Unsupported, error.Diverged => {
+                if (err == error.Unsupported) try self.g.recordFailure(self.m, id);
+                // The rest is unreachable; close what the operand left open.
+                while (self.depth > depth) try self.close();
+                self.labels.shrinkRetainingCapacity(labels);
+                try self.op(.unreachable_);
+                return neverVal();
+            },
+            else => return err,
+        };
+        if (value.ty != types.never and id != 0) try self.refine(self.m.typeOf(id), value.ty);
+        return value;
+    }
+    /// Binds the variables of Core type `ty` that `actual` determines.
+    fn refine(self: *Fn, ty: T.Id, actual: Ty) Error!void {
+        if (ty <= T.never) return;
+        if (self.g.types.closed.contains(.{ .unit = self.m.unit, .ty = ty })) return;
+        try self.g.types.match(self.m, ty, actual, self.env);
+    }
+    fn exprInner(self: *Fn, id: core.Id) Error!Val {
+        // Node zero is an absent value, such as a bare `return ()`.
+        if (id == 0) return unitVal();
         const n = self.m.node(id);
         return switch (n.tag) {
             .constant => self.constant(id),
@@ -153,7 +190,7 @@ pub const Fn = struct {
             .block => self.block(id),
             .suite => blk: {
                 var last = unitVal();
-                for (self.m.children(id)) |child| last = try self.expr(child);
+                for (self.m.children(id)) |child| last = try self.stmt(child);
                 break :blk if (last.ty == types.never) last else unitVal();
             },
             .bind => blk: {
@@ -167,7 +204,8 @@ pub const Fn = struct {
                     try self.polymorphic.put(self.a(), n.a, n.b);
                     break :blk unitVal();
                 }
-                const value = try self.expr(n.b);
+                const value = try self.stmt(n.b);
+                if (value.ty != types.never) try self.refine(self.m.binding(n.a).ty, value.ty);
                 try self.bindings.put(self.a(), n.a, value);
                 break :blk if (value.ty == types.never) value else unitVal();
             },
@@ -186,6 +224,8 @@ pub const Fn = struct {
             .array => self.arrayLiteral(id),
             .array_op => self.arrayOp(id),
             .storage => self.storageOp(id),
+            .record_merge => self.recordMerge(id),
+            .result_associated => self.resultAssociated(id),
             .break_ => self.breakNode(id),
             .panic => blk: {
                 try self.op(.unreachable_);
@@ -386,7 +426,10 @@ pub const Fn = struct {
         }
     }
     fn closureNode(self: *Fn, id: core.Id) Error!Val {
-        const ty = try self.typeOf(id);
+        const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => return self.inferredClosure(id),
+            else => return err,
+        };
         const arrow = self.g.types.node(ty);
         if (arrow.tag != .function) return self.g.fail(self.m, id, "closure of a non-function type", .{});
         const capture_ids = self.m.closureCaptures(id);
@@ -405,6 +448,29 @@ pub const Fn = struct {
         return self.makeClosure(instance, ty, captures, id);
     }
 
+    /// A lambda whose parameter type is known but whose result only its
+    /// body determines: its instance is emitted now to learn the result.
+    fn inferredClosure(self: *Fn, id: core.Id) Error!Val {
+        const info = self.m.closure(id);
+        const parameter = try self.lower(info.parameter.ty, id);
+        const capture_ids = self.m.closureCaptures(id);
+        const captures = try self.arena.alloc(Val, capture_ids.len);
+        for (capture_ids, captures) |binding, *slot| slot.* = self.bindings.get(binding) orelse return self.g.fail(self.m, id, "closure capture without a value", .{});
+        const marker = try self.g.types.function(parameter, types.never);
+        const key: emit.InstanceKey = .{ .kind = .lambda, .unit = self.m.unit, .id = id, .ty = marker, .parent = self.instance_id };
+        const instance = self.g.find(key) orelse blk: {
+            const capture_types = try self.g.arena.allocator().alloc(Ty, captures.len);
+            for (captures, capture_types) |capture, *slot| slot.* = capture.ty;
+            var env: types.Env = .empty;
+            var it = self.env.iterator();
+            while (it.next()) |entry| try env.put(self.a(), entry.key_ptr.*, entry.value_ptr.*);
+            const parameters = try self.g.arena.allocator().dupe(Ty, &.{parameter});
+            break :blk try self.g.inferClosure(key, env, parameters, capture_types, self.m, id);
+        };
+        const ty = try self.g.types.function(parameter, self.g.instance(instance).result);
+        try self.refine(self.m.typeOf(id), ty);
+        return self.makeClosure(instance, ty, captures, id);
+    }
     /// Calls the closure `callee` with one argument.
     fn applyClosure(self: *Fn, callee: Val, argument: Val, id: core.Id) Error!Val {
         const arrow = self.g.types.node(callee.ty);
@@ -831,6 +897,86 @@ pub const Fn = struct {
                 try self.copyElements(container, start, handle, try self.constLocal(0), count, id);
                 return handle;
             },
+            .cursor => {
+                // (slot, generation, position, end) over the container's live range.
+                const container = try self.expr(children[0]);
+                const result = try self.fresh(ty, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[0..1] }, .{ .ty = types.u32_, .words = result.words[0..1] }, id);
+                try self.copy(.{ .ty = types.u32_, .words = container.words[1..2] }, .{ .ty = types.u32_, .words = result.words[1..2] }, id);
+                const length = try self.lengthOf(container, id);
+                if (self.tagOf(container.ty) == .view) {
+                    try self.opIndex(.local_get, container.words[2]);
+                    try self.opIndex(.local_set, result.words[2]);
+                    try self.opIndex(.local_get, container.words[2]);
+                    try self.opIndex(.local_get, length);
+                    try self.op(.i32_add);
+                } else {
+                    try self.i32Const(0);
+                    try self.opIndex(.local_set, result.words[2]);
+                    try self.opIndex(.local_get, length);
+                }
+                try self.opIndex(.local_set, result.words[3]);
+                return result;
+            },
+            .cursor_has => {
+                const cursor = try self.expr(children[0]);
+                const result = try self.fresh(types.boolean, id);
+                try self.opIndex(.local_get, cursor.words[2]);
+                try self.opIndex(.local_get, cursor.words[3]);
+                try self.op(.i32_lt_u);
+                try self.opIndex(.local_set, result.words[0]);
+                return result;
+            },
+            .cursor_value, .cursor_advance => {
+                const cursor = try self.expr(children[0]);
+                try self.opIndex(.local_get, cursor.words[2]);
+                try self.opIndex(.local_get, cursor.words[3]);
+                try self.op(.i32_ge_u);
+                try self.trap();
+                if (operation == .cursor_advance) {
+                    const result = try self.fresh(cursor.ty, id);
+                    for (cursor.words, result.words, 0..) |from, to, index| {
+                        try self.opIndex(.local_get, from);
+                        if (index == 2) {
+                            try self.i32Const(1);
+                            try self.op(.i32_add);
+                        }
+                        try self.opIndex(.local_set, to);
+                    }
+                    return result;
+                }
+                const rt = try self.g.runtime_();
+                const element = self.g.types.node(cursor.ty).a;
+                const address = try self.local32();
+                try self.opIndex(.local_get, cursor.words[0]);
+                try self.opIndex(.local_get, cursor.words[1]);
+                try self.opIndex(.local_get, cursor.words[2]);
+                try self.i32Const(try self.stride(element, id));
+                try self.opIndex(.call, rt.address);
+                try self.opIndex(.local_set, address);
+                return self.loadAt(address, 0, element, id);
+            },
+            .simd_load, .simd_store => {
+                // Four consecutive elements, all in bounds.
+                const container = try self.expr(children[0]);
+                const index = try self.scalarLocal(try self.expr(children[1]), id);
+                const last = try self.local32();
+                try self.opIndex(.local_get, index);
+                try self.i32Const(3);
+                try self.op(.i32_add);
+                try self.opIndex(.local_tee, last);
+                try self.opIndex(.local_get, index);
+                try self.op(.i32_lt_u);
+                try self.trap();
+                _ = try self.elementAddress(container, last, id);
+                const address = try self.elementAddress(container, index, id);
+                const element = try self.elementOf(container.ty, id);
+                const lane_ty = try self.g.types.tuple(&.{ element, element, element, element });
+                if (operation == .simd_load) return self.loadAt(address, 0, lane_ty, id);
+                const lanes_value = try self.expr(children[2]);
+                try self.storeAt(address, 0, lanes_value);
+                return container;
+            },
             else => return self.g.fail(self.m, id, "array operation {s} is not supported yet", .{@tagName(operation)}),
         }
     }
@@ -1034,6 +1180,37 @@ pub const Fn = struct {
         }
     }
 
+    /// `@type.result "member" value`: dispatch on the expected result type.
+    fn resultAssociated(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const value = try self.expr(n.a);
+        const result = try self.typeOf(id);
+        const identity = self.g.receiverIdentity(result) orelse return self.g.fail(self.m, id, "result member on a {s}", .{@tagName(self.tagOf(result))});
+        const target = self.g.dispatchTarget(self.m, identity, n.b, .none) orelse return self.g.fail(self.m, id, "no result member for this type", .{});
+        const arguments = try self.arena.dupe(Val, &.{value});
+        return self.callTarget(target, arguments, try self.g.types.function(value.ty, result), result, id);
+    }
+
+    /// All fields of the left record, with same-named right fields replacing them.
+    fn recordMerge(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const left = try self.expr(n.a);
+        const right = try self.expr(n.b);
+        const ty = try self.typeOf(id);
+        if (self.tagOf(ty) != .record) return self.g.fail(self.m, id, "record merge of a non-record type", .{});
+        var words: std.ArrayList(u32) = .empty;
+        for (0..self.g.types.node(ty).b) |index| {
+            const name = self.g.types.recordField(ty, index).name;
+            const source = for ([_]Val{ right, left }) |side| {
+                if (self.tagOf(side.ty) != .record) continue;
+                if (self.g.types.findField(side.ty, name)) |position| break .{ side, position };
+            } else return self.g.fail(self.m, id, "merged field missing from both records", .{});
+            const slice = try self.fieldSlice(source[0].ty, source[1], id);
+            try words.appendSlice(self.arena, source[0].words[slice.start..][0..slice.len]);
+        }
+        return .{ .ty = ty, .words = words.items };
+    }
+
     /// `root` with the field path of an update replaced by its new value.
     fn update(self: *Fn, id: core.Id) Error!Val {
         const info = self.m.updateInfo(id);
@@ -1069,7 +1246,7 @@ pub const Fn = struct {
         }
         const old = try self.loadAt(address, offset, ty, id);
         try self.bindings.put(self.a(), info.self_binding, old);
-        const replacement = try self.expr(info.value);
+        const replacement = try self.stmt(info.value);
         if (replacement.ty == types.never) return replacement;
         try self.storeAt(address, offset, replacement);
         return container;
@@ -1086,7 +1263,7 @@ pub const Fn = struct {
         const steps = @max(selectors.len, path.len);
         if (at == steps) {
             try self.bindings.put(self.a(), info.self_binding, value);
-            return self.expr(info.value);
+            return self.stmt(info.value);
         }
         if (selectors.len != 0 and selectors[at].kind == .index) return self.indexedUpdate(id, value, at);
         const projection = self.m.projection(if (selectors.len != 0) selectors[at].projection else path[at]);
@@ -1127,20 +1304,137 @@ pub const Fn = struct {
 
     fn scalar(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
-        const operand = try self.typeOf(n.a);
         const left = try self.expr(n.a);
         const right = if (n.b != 0) try self.expr(n.b) else null;
+        var tag = self.tagOf(left.ty);
+        var operand_left = left;
+        var operand_right = right;
+        // Opaque wrappers of a scalar are erased at run time.
+        if (tag == .nominal) if (try self.scalarPayload(left)) |inner| {
+            const dispatch = n.c == 1 and self.g.dispatchTarget(self.m, self.g.receiverIdentity(left.ty).?, 0, operatorOf(n.op) orelse .none) != null;
+            if (!dispatch) {
+                operand_left = inner;
+                if (right) |value| operand_right = (try self.scalarPayload(value)) orelse value;
+                tag = self.tagOf(inner.ty);
+            }
+        };
+        if (tag == .u32 or tag == .f32 or tag == .boolean) if (operand_left.ty != left.ty) {
+            try self.push(operand_left);
+            if (operand_right) |value| try self.push(value);
+            try self.scalarOp(n.op, operand_left.ty, id);
+            return self.pop(try self.typeOf(id), id);
+        };
+        if (n.c == 1 and tag != .u32 and tag != .f32 and tag != .boolean and tag != .tuple) {
+            // Operator dispatch: the operand type's associated operator member.
+            const operator = operatorOf(n.op) orelse return self.g.fail(self.m, id, "{s} has no associated operator", .{@tagName(n.op)});
+            const identity = self.g.receiverIdentity(left.ty) orelse return self.g.fail(self.m, id, "{s} on a {s}", .{ @tagName(n.op), @tagName(tag) });
+            const target = self.g.dispatchTarget(self.m, identity, 0, operator) orelse return self.g.fail(self.m, id, "no {s} operator for this type", .{@tagName(n.op)});
+            const arguments: []const Val = if (right) |value| try self.arena.dupe(Val, &.{ left, value }) else try self.arena.dupe(Val, &.{left});
+            const callee = try self.g.calleeFromArguments(target, arguments, self.m, id);
+            return self.callTarget(target, arguments, callee, try self.restType(callee, arguments.len, id), id);
+        }
         const result = try self.typeOf(id);
+        if (tag == .tuple) return self.lanes(n.op, left, right, result, id);
         try self.push(left);
         if (right) |value| try self.push(value);
-        try self.scalarOp(n.op, operand, id);
+        try self.scalarOp(n.op, left.ty, id);
         return self.pop(result, id);
+    }
+    /// The scalar payload of a single-constructor value, if it has one.
+    fn scalarPayload(self: *Fn, value: Val) Error!?Val {
+        if (self.tagOf(value.ty) != .nominal) return null;
+        const cases = self.g.types.variants(value.ty) catch return null;
+        if (cases.payloads.len != 1) return null;
+        const payload = cases.payloads[0];
+        const tag = self.tagOf(payload);
+        if (tag != .u32 and tag != .f32 and tag != .boolean) return null;
+        return .{ .ty = payload, .words = value.words };
+    }
+    /// Four-lane operations on (U32|F32)x4 products, one lane at a time.
+    fn lanes(self: *Fn, op_: core.Op, left: Val, right: ?Val, result_ty: Ty, id: core.Id) Error!Val {
+        const items = self.g.types.tupleItems(left.ty);
+        if (items.len != 4) return self.g.fail(self.m, id, "lane operation on a {d}-tuple", .{items.len});
+        const lane = items[0];
+        const float = self.tagOf(lane) == .f32;
+        const result = try self.fresh(result_ty, id);
+        switch (op_) {
+            .any_true, .all_true => {
+                try self.i32Const(@intFromBool(op_ == .all_true));
+                for (left.words) |word| {
+                    try self.opIndex(.local_get, word);
+                    try self.i32Const(0);
+                    try self.op(.i32_ne);
+                    try self.op(if (op_ == .all_true) .i32_and else .i32_or);
+                }
+                try self.opIndex(.local_set, result.words[0]);
+                return result;
+            },
+            .select => {
+                // mask selects bits of the first product, the rest from the second.
+                const pair = right orelse return self.g.fail(self.m, id, "select without operands", .{});
+                for (0..4) |index| {
+                    const mask = left.words[index];
+                    const yes = pair.words[index];
+                    const no = pair.words[index + 4];
+                    const f = self.locals.items[yes] == .f32;
+                    try self.opIndex(.local_get, yes);
+                    if (f) try self.op(.i32_reinterpret_f32);
+                    try self.opIndex(.local_get, mask);
+                    try self.op(.i32_and);
+                    try self.opIndex(.local_get, no);
+                    if (f) try self.op(.i32_reinterpret_f32);
+                    try self.opIndex(.local_get, mask);
+                    try self.i32Const(0xffff_ffff);
+                    try self.op(.i32_xor);
+                    try self.op(.i32_and);
+                    try self.op(.i32_or);
+                    if (f) try self.op(.f32_reinterpret_i32);
+                    try self.opIndex(.local_set, result.words[index]);
+                }
+                return result;
+            },
+            else => {},
+        }
+        for (0..4) |index| {
+            switch (op_) {
+                .bits, .from_bits => {
+                    try self.opIndex(.local_get, left.words[index]);
+                    try self.op(if (op_ == .bits) .i32_reinterpret_f32 else .f32_reinterpret_i32);
+                },
+                .min, .max => {
+                    // The prelude's `if a < b then a else b`, NaN and zero signs included.
+                    const r = (right orelse return self.g.fail(self.m, id, "lane operation without a right operand", .{})).words[index];
+                    try self.opIndex(.local_get, left.words[index]);
+                    try self.opIndex(.local_get, r);
+                    try self.opIndex(.local_get, left.words[index]);
+                    try self.opIndex(.local_get, r);
+                    try self.op(if (float) (if (op_ == .min) W.Op.f32_lt else .f32_gt) else (if (op_ == .min) W.Op.i32_lt_u else .i32_gt_u));
+                    try self.op(.select);
+                },
+                .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => {
+                    const r = (right orelse return self.g.fail(self.m, id, "comparison without a right operand", .{})).words[index];
+                    // A lane mask: all ones where the comparison holds.
+                    try self.i32Const(0);
+                    try self.opIndex(.local_get, left.words[index]);
+                    try self.opIndex(.local_get, r);
+                    try self.scalarOp(op_, lane, id);
+                    try self.op(.i32_sub);
+                },
+                else => {
+                    try self.opIndex(.local_get, left.words[index]);
+                    if (right) |value| try self.opIndex(.local_get, value.words[index]);
+                    try self.scalarOp(op_, lane, id);
+                },
+            }
+            try self.opIndex(.local_set, result.words[index]);
+        }
+        return result;
     }
     /// Emits the machine operation for `op` on operands already on the stack.
     pub fn scalarOp(self: *Fn, op_: core.Op, operand: Ty, id: core.Id) Error!void {
         const tag = self.g.types.node(operand).tag;
         const float = tag == .f32;
-        if (tag != .u32 and tag != .f32 and tag != .boolean) return self.g.fail(self.m, id, "{s} on a non-scalar operand needs associated dispatch", .{@tagName(op_)});
+        if (tag != .u32 and tag != .f32 and tag != .boolean) return self.g.fail(self.m, id, "{s} on a {s} operand at a {s} node", .{ @tagName(op_), @tagName(tag), @tagName(self.m.node(id).tag) });
         const code: W.Op = switch (op_) {
             .add => if (float) .f32_add else .i32_add,
             .sub => if (float) .f32_sub else .i32_sub,
@@ -1219,8 +1513,64 @@ pub const Fn = struct {
         const info = self.m.call(id);
         const target = self.g.resolve(self.m, info.target);
         const values = try self.arena.alloc(Val, info.arguments.len);
-        for (info.arguments, values) |argument, *slot| slot.* = try self.expr(argument);
-        return self.callTarget(target, values, try self.lower(info.callee_type, id), try self.typeOf(id), id);
+        // Building a function value has no effects, so one whose type the
+        // other arguments still determine is built after them.
+        var deferred = false;
+        for (info.arguments, values) |argument, *slot| {
+            if (self.pureFunctionValue(argument) and !self.lowers(self.m.typeOf(argument))) {
+                deferred = true;
+                slot.* = neverVal();
+                continue;
+            }
+            slot.* = try self.expr(argument);
+        }
+        if (deferred) for (info.arguments, values, 0..) |argument, *slot, index| {
+            if (slot.ty != types.never) continue;
+            // Still unknown: take the type the callee expects from the
+            // arguments known so far, with holes for what they leave open.
+            if (!self.lowers(self.m.typeOf(argument))) {
+                if (try self.expectedArgument(target, values, index)) |expected| try self.refine(self.m.typeOf(argument), expected);
+            }
+            slot.* = try self.expr(argument);
+        };
+        const callee = self.g.types.lower(self.m, info.callee_type, self.env) catch |err| switch (err) {
+            error.Unsupported => try self.g.calleeFromArguments(target, values, self.m, id),
+            else => return err,
+        };
+        try self.refine(info.callee_type, callee);
+        return self.callTarget(target, values, callee, try self.restType(callee, values.len, id), id);
+    }
+    /// Parameter `index` of `target` as fixed by the evaluated `values`
+    /// (entries typed never are not yet evaluated), with holes.
+    fn expectedArgument(self: *Fn, target: core.BindingRef, values: []const Val, index: usize) Error!?Ty {
+        const tm = self.g.unitModule(target.unit);
+        var env: types.Env = .empty;
+        defer env.deinit(self.a());
+        var arrow = tm.binding(target.binding).ty;
+        var parameter: ?T.Id = null;
+        for (values, 0..) |value, at| {
+            var n = tm.types.node(arrow);
+            while (n.tag == .forall or n.tag == .usage) {
+                arrow = n.a;
+                n = tm.types.node(arrow);
+            }
+            if (n.tag != .function) return null;
+            if (at == index) parameter = n.a else if (value.ty != types.never) try self.g.types.match(tm, n.a, value.ty, &env);
+            arrow = n.b;
+        }
+        if (tm.body(target.binding)) |body| try self.g.solveObligationsPublic(tm, body.scheme.obligations, &env);
+        return try self.g.types.lowerHoles(tm, parameter orelse return null, &env);
+    }
+    fn pureFunctionValue(self: *Fn, id: core.Id) bool {
+        return switch (self.m.node(id).tag) {
+            .reference, .closure, .constructor_function, .primitive_function => true,
+            else => false,
+        };
+    }
+    /// Whether `ty` lowers under the current environment (no failure kept).
+    fn lowers(self: *Fn, ty: T.Id) bool {
+        _ = self.g.types.lower(self.m, ty, self.env) catch return false;
+        return true;
     }
     /// Applies a resolved module-level binding to evaluated arguments.
     /// `callee` is its concrete (curried) function type at this site.
@@ -1235,6 +1585,7 @@ pub const Fn = struct {
             const after = try self.restType(callee, parameters.len, id);
             var value = (try self.forward(tm, body, direct, callee, after, id)) orelse blk: {
                 const instance = try self.g.named(target, callee, self.m, id);
+                if (self.g.instance(instance).inferring) return self.g.fail(self.m, id, "recursion through a function whose result type its body determines", .{});
                 for (direct) |argument| try self.push(argument);
                 const function = self.g.instance(instance);
                 try self.opIndex(.call, function.function);
@@ -1342,69 +1693,89 @@ pub const Fn = struct {
         const n = self.m.node(id);
         const left = try self.expr(n.a);
         const right: ?Val = if (n.b != 0) try self.expr(n.b) else null;
-        const result = try self.typeOf(id);
+        const result: ?Ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => null,
+            else => return err,
+        };
         const tag = self.g.types.node(left.ty).tag;
         if (n.op != .none and (tag == .u32 or tag == .f32 or tag == .boolean)) {
             try self.push(left);
             if (right) |value| try self.push(value);
             try self.scalarOp(n.op, left.ty, id);
-            return self.pop(result, id);
+            return self.pop(result orelse try self.typeOf(id), id);
         }
         const identity = self.g.receiverIdentity(left.ty) orelse return self.g.fail(self.m, id, "associated member on a {s}", .{@tagName(tag)});
         const target = self.g.dispatchTarget(self.m, identity, n.c, .none) orelse return self.g.fail(self.m, id, "no associated member for this receiver", .{});
         const arguments: []const Val = if (right) |value| &.{ left, value } else &.{left};
         const owned = try self.arena.dupe(Val, arguments);
-        return self.callTarget(target, owned, try self.curried(owned, result), result, id);
+        const callee = if (result) |known| try self.curried(owned, known) else try self.g.calleeFromArguments(target, owned, self.m, id);
+        return self.callTarget(target, owned, callee, try self.restType(callee, owned.len, id), id);
     }
 
     fn ifNode(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
-        const ty = if (n.tag == .if_stmt) types.unit else try self.typeOf(id);
-        const result = try self.fresh(ty, id);
+        const result = try self.arena.create(?Val);
+        result.* = null;
         const merges = self.m.branchMerges(id);
-        const merged = try self.arena.alloc(Val, merges.len);
-        for (merges, merged) |merge, *slot| slot.* = try self.fresh(try self.lower(self.m.binding(merge.result).ty, id), id);
+        const merged = try self.arena.alloc(?Val, merges.len);
+        @memset(merged, null);
         try self.push(try self.expr(n.a));
         _ = try self.open(.if_);
-        const then = try self.expr(n.b);
-        if (then.ty != types.never) {
-            if (n.tag == .if_value) try self.copy(then, result, id);
-            for (merges, merged) |merge, slot| if (self.bindings.get(merge.then_binding)) |value| try self.copy(value, slot, id);
+        const then = try self.stmt(n.b);
+        var falls = then.ty != types.never;
+        if (falls) {
+            if (n.tag == .if_value) try self.deliver(then, result, id);
+            for (merges, merged) |merge, *slot| if (self.bindings.get(merge.then_binding)) |value| try self.deliver(value, slot, id);
         }
         try self.op(.else_);
         if (n.c != 0) {
-            const otherwise = try self.expr(n.c);
+            const otherwise = try self.stmt(n.c);
             if (otherwise.ty != types.never) {
-                if (n.tag == .if_value) try self.copy(otherwise, result, id);
-                for (merges, merged) |merge, slot| if (self.bindings.get(merge.else_binding)) |value| try self.copy(value, slot, id);
+                falls = true;
+                if (n.tag == .if_value) try self.deliver(otherwise, result, id);
+                for (merges, merged) |merge, *slot| if (self.bindings.get(merge.else_binding)) |value| try self.deliver(value, slot, id);
             }
-        } else for (merges, merged) |merge, slot| if (self.bindings.get(merge.else_binding)) |value| try self.copy(value, slot, id);
+        } else {
+            falls = true;
+            for (merges, merged) |merge, *slot| if (self.bindings.get(merge.else_binding)) |value| try self.deliver(value, slot, id);
+        }
         try self.close();
-        for (merges, merged) |merge, slot| try self.bindings.put(self.a(), merge.result, slot);
-        return result;
+        for (merges, merged) |merge, slot| if (slot) |value| try self.bindings.put(self.a(), merge.result, value);
+        if (!falls) return neverVal();
+        if (n.tag == .if_stmt) return unitVal();
+        return result.* orelse neverVal();
     }
 
     fn block(self: *Fn, id: core.Id) Error!Val {
-        const ty = try self.typeOf(id);
-        const result = try self.fresh(ty, id);
+        const result = try self.arena.create(?Val);
+        result.* = null;
         const depth = try self.open(.block);
         try self.labels.append(self.a(), .{ .target = id, .depth = depth, .result = result });
-        for (self.m.children(id)) |child| _ = try self.expr(child);
+        var last = unitVal();
+        for (self.m.children(id)) |child| last = try self.stmt(child);
         _ = self.labels.pop();
         try self.close();
-        return result;
+        if (result.*) |value| return value;
+        // A Unit block may fall through its end.
+        return if (last.ty != types.never and self.m.typeOf(id) == T.unit) unitVal() else neverVal();
+    }
+    /// Copies `value` into a lazily allocated result slot.
+    fn deliver(self: *Fn, value: Val, slot: *?Val, id: core.Id) Error!void {
+        if (value.ty == types.never) return;
+        if (slot.* == null) slot.* = try self.fresh(value.ty, id);
+        try self.copy(value, slot.*.?, id);
     }
 
     fn returnNode(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
-        const value = try self.expr(n.a);
+        const value = try self.stmt(n.a);
         if (value.ty == types.never) return neverVal();
         var at = self.labels.items.len;
         while (at != 0) {
             at -= 1;
             const label = self.labels.items[at];
             if ((label.target != n.b and label.kind != .function) or label.kind == .loop) continue;
-            try self.copy(value, label.result, id);
+            try self.deliver(value, label.result, id);
             try self.br(.br, label.depth);
             return neverVal();
         }
@@ -1468,6 +1839,10 @@ pub const Fn = struct {
             error.Unsupported => return self.g.typeFailure(self.m, id),
             else => return err,
         };
+        if (payload.ty == types.never) return neverVal();
+        const position_ = try self.variantPosition(cases, tag, id);
+        if ((try self.layout(cases.payloads[position_], id)).len != payload.words.len)
+            return self.g.fail(self.m, id, "constructor payload of type {s} does not match its declared {s}", .{ @tagName(self.tagOf(payload.ty)), @tagName(self.tagOf(cases.payloads[position_])) });
         if (cases.payloads.len == 1) return .{ .ty = ty, .words = payload.words };
         const result = try self.fresh(ty, id);
         try self.i32Const(tag);
@@ -1526,7 +1901,7 @@ pub const Fn = struct {
         if (nominal_field) {
             name_symbol = for (self.m.constructors) |constructor| {
                 const identity = self.m.nominal(constructor.nominal).identity;
-                if (identity.decl != projection.nominal.decl or constructor.tag != variants[0].tag) continue;
+                if (!sameNominal(self.m, identity, projection.nominal) or constructor.tag != variants[0].tag) continue;
                 const payload = self.m.types.node(constructor.payload);
                 if (payload.tag != .record or variants[0].field >= payload.b) return self.g.fail(self.m, id, "constructor field projection", .{});
                 break self.m.types.recordField(payload, variants[0].field).name;
@@ -1551,50 +1926,99 @@ pub const Fn = struct {
             const slice = try self.fieldSlice(record.ty, position, id);
             return .{ .ty = self.g.types.recordField(record.ty, position).ty, .words = record.words[slice.start..][0..slice.len] };
         }
-        if (nominal_field or self.g.types.node(record.ty).tag == .record) return self.g.fail(self.m, id, "projected field missing", .{});
+        if (nominal_field) return self.g.fail(self.m, id, "projected field missing", .{});
         // Not a data field: a receiver member, called with the value.
-        const result = try self.typeOf(id);
+        if (self.tagOf(value.ty) == .record) return self.g.fail(self.m, id, "projected field missing", .{});
         const identity = self.g.receiverIdentity(value.ty) orelse return self.g.fail(self.m, id, "member of a {s}", .{@tagName(self.g.types.node(value.ty).tag)});
         const target = self.g.dispatchTarget(self.m, identity, projection.field, .none) orelse return self.g.fail(self.m, id, "no member {s} for this receiver", .{spelling});
         const arguments = try self.arena.dupe(Val, &.{value});
-        return self.callTarget(target, arguments, try self.g.types.function(value.ty, result), result, id);
+        const callee = try self.g.calleeFromArguments(target, arguments, self.m, id);
+        return self.callTarget(target, arguments, callee, try self.restType(callee, 1, id), id);
     }
 
     fn match(self: *Fn, id: core.Id) Error!Val {
         const info = self.m.matchInfo(id);
         const inputs = self.m.matchInputs(id);
         const values = try self.arena.alloc(Val, inputs.len);
-        for (inputs, values) |input, *slot| slot.* = try self.expr(input);
-        const ty = if (info.statement) types.unit else try self.typeOf(id);
-        const result = try self.fresh(ty, id);
+        for (inputs, values) |input, *slot| {
+            slot.* = try self.expr(input);
+            if (slot.ty == types.never) return neverVal();
+        }
+        const result = try self.arena.create(?Val);
+        result.* = null;
+        const merges = self.m.branchMerges(id);
+        const merged = try self.arena.alloc(?Val, merges.len);
+        @memset(merged, null);
+        var falls = false;
         const done = try self.open(.block);
-        for (self.m.matchArms(id)) |arm| {
+        for (self.m.matchArms(id), 0..) |arm, arm_index| {
             const rows = self.m.armRows(arm);
-            if (rows.len != 1) return self.g.fail(self.m, id, "pattern alternatives are not supported yet", .{});
             const next = try self.open(.block);
-            for (self.m.rowPatterns(rows[0]), values) |pattern, value| try self.test_(pattern, value, next, id);
+            if (rows.len == 1) {
+                for (self.m.rowPatterns(rows[0]), values) |pattern, value| try self.test_(pattern, value, next, id);
+            } else {
+                // Alternatives bind the same names; later rows copy into the first row's locals.
+                const matched = try self.open(.block);
+                var first: std.AutoHashMapUnmanaged(core.BindingId, Val) = .empty;
+                for (rows, 0..) |row, row_index| {
+                    const row_fail = try self.open(.block);
+                    var before = try self.bindings.clone(self.a());
+                    defer before.deinit(self.a());
+                    for (self.m.rowPatterns(row), values) |pattern, value| try self.test_(pattern, value, row_fail, id);
+                    var it = self.bindings.iterator();
+                    while (it.next()) |entry| {
+                        const prior = before.get(entry.key_ptr.*);
+                        if (prior != null and std.mem.eql(u32, prior.?.words, entry.value_ptr.words)) continue;
+                        if (row_index == 0) {
+                            const owned = try self.fresh(entry.value_ptr.ty, id);
+                            try self.copy(entry.value_ptr.*, owned, id);
+                            try first.put(self.arena, entry.key_ptr.*, owned);
+                        } else if (first.get(entry.key_ptr.*)) |target| try self.copy(entry.value_ptr.*, target, id);
+                    }
+                    try self.br(.br, matched);
+                    try self.close();
+                }
+                try self.br(.br, next);
+                try self.close();
+                var it = first.iterator();
+                while (it.next()) |entry| try self.bindings.put(self.a(), entry.key_ptr.*, entry.value_ptr.*);
+            }
             if (arm.guard != 0) {
                 try self.push(try self.expr(arm.guard));
                 try self.op(.i32_eqz);
                 try self.br(.br_if, next);
             }
-            const body = try self.expr(arm.body);
-            if (!info.statement) try self.copy(body, result, id);
+            const body = try self.stmt(arm.body);
+            if (body.ty != types.never) {
+                falls = true;
+                if (!info.statement) try self.deliver(body, result, id);
+                // A two-arm statement match carries rebindings like an if.
+                if (merges.len != 0 and arm_index < 2) for (merges, merged) |merge, *slot| {
+                    if (self.bindings.get(if (arm_index == 0) merge.then_binding else merge.else_binding)) |value| try self.deliver(value, slot, id);
+                };
+            }
             try self.br(.br, done);
             try self.close();
         }
         try self.op(.unreachable_);
         try self.close();
-        return result;
+        for (merges, merged) |merge, slot| if (slot) |value| try self.bindings.put(self.a(), merge.result, value);
+        if (!falls) return neverVal();
+        if (info.statement) return unitVal();
+        return result.* orelse neverVal();
     }
 
     /// Tests `pattern` against `value`, branching to `fail` (a Wasm depth) on
     /// mismatch, and binds its names.
     fn test_(self: *Fn, pattern_id: core.PatternId, value: Val, fail: ?u32, id: core.Id) Error!void {
         const pattern = self.m.pattern(pattern_id);
+        if (value.ty == types.never) return;
         switch (pattern.tag) {
             .wildcard => {},
-            .bind => try self.bindings.put(self.a(), pattern.a, value),
+            .bind => {
+                try self.refine(self.m.binding(pattern.a).ty, value.ty);
+                try self.bindings.put(self.a(), pattern.a, value);
+            },
             .constant, .value => {
                 const tag = self.g.types.node(value.ty).tag;
                 try self.push(value);
@@ -1638,7 +2062,9 @@ pub const Fn = struct {
             },
             .record_payload => {
                 if (self.g.types.node(value.ty).tag != .record) return self.g.fail(self.m, id, "record pattern on a non-record", .{});
-                try self.recordPattern(self.m.patternChildren(pattern.b), self.m.types.node(pattern.ty), value, fail, id);
+                // A one-field record's child is that field's own pattern.
+                const children: []const core.PatternId = if (self.m.pattern(pattern.b).tag == .product) self.m.patternChildren(pattern.b) else &.{pattern.b};
+                try self.recordPattern(children, self.m.types.node(pattern.ty), value, fail, id);
             },
             .invalid => return self.g.fail(self.m, id, "invalid pattern", .{}),
         }
@@ -1703,10 +2129,14 @@ pub const Fn = struct {
     fn loop(self: *Fn, id: core.Id) Error!Val {
         const info = self.m.loopInfo(id);
         const carries = self.m.loopCarries(id);
-        const iteration = try self.carryVals(carries, "iteration", id);
-        const outgoing = try self.carryVals(carries, "outgoing", id);
         const incoming = try self.arena.alloc(Val, carries.len);
         for (carries, incoming) |carry, *slot| slot.* = self.bindings.get(carry.incoming) orelse return self.g.fail(self.m, id, "loop carry without an incoming value", .{});
+        const iteration = try self.arena.alloc(Val, carries.len);
+        const outgoing = try self.arena.alloc(Val, carries.len);
+        for (incoming, iteration, outgoing) |value, *current, *after| {
+            current.* = try self.fresh(value.ty, id);
+            after.* = try self.fresh(value.ty, id);
+        }
         try self.assign(incoming, iteration, id);
         for (carries, iteration) |carry, value| try self.bindings.put(self.a(), carry.iteration, value);
         var index: ?u32 = null;
@@ -1755,8 +2185,10 @@ pub const Fn = struct {
         const marks: [2]u32 = .{ try self.local(.i32), try self.local(.i32) };
         const mark_at = self.code.list.items.len;
         const allocations = self.allocations;
-        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null });
-        const body = try self.expr(info.body);
+        const unused = try self.arena.create(?Val);
+        unused.* = null;
+        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .result = unused, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null });
+        const body = try self.stmt(info.body);
         const label = self.labels.pop().?;
         if (body.ty != types.never) {
             const backedge = try self.arena.alloc(Val, carries.len);
@@ -1817,7 +2249,7 @@ pub const Fn = struct {
         try self.test_(n.a, value, failed, id);
         try self.br(.br, ok);
         try self.close();
-        _ = try self.expr(n.c);
+        _ = try self.stmt(n.c);
         try self.op(.unreachable_);
         try self.close();
         return unitVal();
@@ -1832,6 +2264,34 @@ fn primitiveAlias(m: *const core.Module, binding_id: core.BindingId) ?core.Id {
     return value;
 }
 
+fn operatorOf(op: core.Op) ?T.Operator {
+    return switch (op) {
+        .add => .add,
+        .sub => .sub,
+        .mul => .mul,
+        .div => .div,
+        .rem => .rem,
+        .equal => .equal,
+        .not_equal => .not_equal,
+        .less => .less,
+        .less_equal => .less_equal,
+        .greater => .greater,
+        .greater_equal => .greater_equal,
+        .bit_and => .bit_and,
+        .bit_or => .bit_or,
+        .bit_xor => .bit_xor,
+        .shift_left => .shift_left,
+        .shift_right => .shift_right,
+        else => null,
+    };
+}
+
+/// Whether two catalog identities name the same nominal type.
+fn sameNominal(m: *const core.Module, left: T.NominalIdentity, right: T.NominalIdentity) bool {
+    _ = m;
+    return left.unit == right.unit and left.decl == right.decl;
+}
+
 /// Marks a primitive node (rather than a binding) as a partial target.
 const primitive_node_bit: u32 = 0x8000_0000;
 
@@ -1840,7 +2300,11 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
     const m = g.unitModule(instance.key.unit);
     var arena = std.heap.ArenaAllocator.init(g.allocator);
     defer arena.deinit();
-    var f: Fn = .{ .g = g, .m = m, .env = &instance.env, .arena = arena.allocator(), .instance_id = id };
+    var env: types.Env = .empty;
+    defer env.deinit(g.allocator);
+    var it = instance.env.iterator();
+    while (it.next()) |entry| try env.put(g.allocator, entry.key_ptr.*, entry.value_ptr.*);
+    var f: Fn = .{ .g = g, .m = m, .env = &env, .arena = arena.allocator(), .instance_id = id };
     defer {
         f.code.deinit(g.allocator);
         f.locals.deinit(g.allocator);
@@ -1877,20 +2341,27 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
         },
         .partial, .primitive, .constructor, .host, .pool => {},
     }
-    const result = try f.fresh(instance.result, root);
+    const slot = try f.arena.create(?Val);
+    slot.* = if (instance.inferring) null else try f.fresh(instance.result, root);
     const exit = try f.open(.block);
-    try f.labels.append(g.allocator, .{ .target = std.math.maxInt(u32), .depth = exit, .result = result, .kind = .function });
+    try f.labels.append(g.allocator, .{ .target = std.math.maxInt(u32), .depth = exit, .result = slot, .kind = .function });
     const value = switch (instance.key.kind) {
-        .named, .lambda => try f.expr(root),
+        .named, .lambda => try f.stmt(root),
         .partial, .primitive, .constructor => try f.adapterBody(instance, captures, inputs[0]),
         .host => try f.hostBody(instance, captures, inputs[0]),
         .pool => try f.poolBody(instance),
     };
-    try f.copy(value, result, root);
+    f.deliver(value, slot, root) catch |err| switch (err) {
+        error.Unsupported => try g.recordFailure(m, root),
+        else => return err,
+    };
     try f.close();
+    // An inferred result is the type of the first value the body delivers.
+    if (instance.inferring) instance.result = if (slot.*) |delivered| delivered.ty else types.never;
+    const result: Val = slot.* orelse .{ .ty = types.never };
     const release = f.allocates and !try g.holdsMemory(instance.result);
     if (release) try f.releaseTo(owner_mark, stack_mark);
-    try f.push(result);
+    if (result.ty == types.never) try f.op(.unreachable_) else try f.push(result);
     try f.op(.end);
     var prologue: W.Bytes = .{};
     defer prologue.deinit(g.allocator);

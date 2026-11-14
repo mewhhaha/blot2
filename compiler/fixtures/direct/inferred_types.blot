@@ -1,0 +1,13 @@
+import * as array from "std/array"
+func ident_map access => return array.map identity access.seen
+entry func run (n: U32): U32 => return do:
+  let r = ident_map { seen: #[n, 2] }
+  break r[0] + r[1]
+func focused (x: U32) -> (y: U32) => return x > y
+entry func loopuse (n: U32): U32 => return do:
+  let hover = 0
+  for row in #[1, 5, 9]:
+    use hit <- focused row n
+    if hit:
+      hover := row
+  break hover
