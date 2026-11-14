@@ -96,9 +96,19 @@ summary.
 
 1. Keep effect rows, `Foreign`, and user effects resolved by lexically scoped
    providers.
-2. Drop `use`. Every call is bound with `let x = f ()`, and its effects stay
-   in the type. The `let` / `:=` purity rule goes with it. 545 of the 773
-   `use` lines in Gdev and Ink are the statement form.
+2. **Reversed (owner, 14 November 2026): `use` stays.** The owner's words:
+   "I would differentiate effects with use x <- my_effect () so that we can
+   organize it easier and optimize it". Effectful calls are written
+   `use x <- call` (or `use call` to discard the result). Everything between
+   `use` statements is pure, so the compiler may reorder, share or skip it.
+   With mutation gone, a `let` can no longer observe a change, which was
+   the hole behind dropping `use`. Spec sections 2 (rule 7) and 10.10 have
+   the rules; how strictly the checker enforces them is open (Annex B, item
+   12). The original proposal and its evidence follow.
+
+   Original proposal: drop `use`. Every call is bound with `let x = f ()`,
+   and its effects stay in the type. The `let` / `:=` purity rule goes with
+   it. 545 of the 773 `use` lines in Gdev and Ink are the statement form.
 
    The review's probes show why:
    - A `Foreign` call as a bare statement compiles with or without `use`.
@@ -115,7 +125,8 @@ summary.
      `{state.get}`.
 
 The review did not cover `@effect.state`, `@effect.run`, `@effect.reader` or
-`@effect.writer`.
+`@effect.writer`; round 2, item 4 removes them (effects as records, state
+through the prelude's `State` operations).
 
 ## C. Dispatch: contracts only
 
