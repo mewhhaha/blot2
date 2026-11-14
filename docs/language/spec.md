@@ -656,8 +656,7 @@ LambdaParam = LowerName | "_" | "(" ")" | "(" Pattern (":" Type)? ")"
 - A lambda captures the values of the locals it names at the point where it
   is created. Captured storage is the same storage.
 - The body follows the rules of section 6.1.
-- A local bound to a lambda is generic only when the bound expression is
-  itself a `func` **(approved)**.
+- A local bound to a lambda may be generic (section 10.1).
 
 ### 9.6 Conditionals and matches
 
@@ -708,6 +707,9 @@ LetStmt = "let" Pattern (":" Type)? "=" Expression ("else" ":" Suite)?
   `break`, `continue` or a trap.
 - The names are in scope for the rest of the enclosing suite.
 - Any call may be bound with `let`, whatever its effects **(approved)**.
+- **Value restriction (approved).** A `let` binding is generic only when its
+  expression is itself a `func`. A constructor application, a call or a
+  partial application gives the local one type.
 - **(approved)** `let` introduces new names. A `let` or `if let` that binds
   a name already in scope as a local or parameter of the function is an
   error. A new value for an old name is written with `:=`. Lambda
