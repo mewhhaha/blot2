@@ -127,6 +127,93 @@ This holds the 11 November decision.
 The review did not cover parameter patterns, or extending `#run` to
 statements and build capabilities.
 
+### Amendment to C3, C5 and C8: traits as records, `#run` fills bodies
+
+Provisional. The owner's reply to blot2-2c's proposal: "For now it seems
+reasonable and we can add it and then iterate on it." Spellings are open.
+
+The owner's concern behind it: "contract" is too general a word, the system
+should compose better and be more orthogonal, and `#run` metaprogramming
+should be enabled more.
+
+1. **Split contracts into ordinary parts.**
+   - The interface is a nominal record type, with `trait` replacing
+     `contract` in the `is` slot:
+     `type Eq a is trait = { eq: a -> a -> Bool }`
+   - An implementation is a named constant of that record type, marked as the
+     canonical one for lookup:
+     `impl eq_u32: Eq U32 = { eq: U32.eq }`
+   - A conditional implementation has its own `where`:
+     `impl eq_array: Eq (Array a) where { Eq a } = { eq: equal_array }`
+   - `where { Eq a }` on a function is a hidden argument the compiler fills in
+     at compile time. This lookup is the only new rule.
+   - The explicit form needs no feature: the record is an ordinary
+     parameter, as in `member_by (eq: Eq a) -> ...`.
+
+   This replaces:
+   - Default members: a function builds the record, e.g.
+     `Ord.from_compare U32.compare`.
+   - Contract inclusion: a field holds another record.
+   - Opaque wrappers for a second implementation: pass a different record to
+     the `_by` form.
+
+   `where` keeps one predicate form, the trait application. `associated`,
+   `result`, `receiver`, `update`, `type_eq`, `operation`, `type_rep` and
+   `effect_rep` go.
+
+   Constraints:
+   - No run-time dictionaries. The record is a compile-time constant fixed by
+     the type arguments, so the `(binding, type arguments)` instance key does
+     not grow.
+   - Implementation heads are disjoint.
+   - An impl lives in the trait's module or the key type's module, so lookup
+     stays a table hit with no search.
+2. **Output parameters instead of associated types.** This settles the open
+   question in C5. A trait marks some parameters as determined by the others.
+   Lookup uses the inputs and unifies the outputs, so there are no projection
+   types to normalise.
+   - `type Mul [left, right] -> out is trait = { mul: left -> right -> out }`
+   - `impl mul_vec3_f32: Mul [Vec3, F32] -> Vec3 = { mul: Vec3.scale }`
+   - `func square (value: a): a where { Mul [a, a] -> a } => value * value`
+
+   This covers `Vec3 * F32` and removes `type_eq (Add.Output [a, a]) a`. The
+   four contracts in std and Ink today (`Eq`, `Format`, `Codec` twice) are
+   single-parameter records of functions, so none of them needs associated
+   types. The `-> out` spelling is illustrative.
+3. **`#run` only fills in bodies.** Every declaration's name and type are
+   written in source, so module interfaces stay knowable from parsing alone
+   and parallel checking is unaffected. Reflection flows one way: type to
+   data to term.
+   - Example: `impl codec_robot: Codec Robot = #run derive.codec (#type Robot)`
+   - `#type T` returns a plain data description: constructors, field names
+     and field types. C3 still holds for everything else: no evaluation
+     results in annotations, no validators, no `TypeInfo`.
+   - `derive.codec` is an ordinary function from that description to a code
+     value, using ordinary loops over fields.
+   - The result is spliced and checked against the written type at the splice
+     site.
+   - C8 changes from "retire typed staging" to "replace it". Code values are
+     untyped until spliced, instead of `code [T, row E]`. The proposer's
+     reading is that typed quotes cannot express "for each field of T",
+     because each piece's type depends on the description. Check that before
+     relying on it.
+   - Customer: Gdev and Ink have 202 hand-written encode/decode functions
+     across 68 files; derivation currently lives in host/derive_cli.ts.
+   - Left out for now: a blanket impl that runs a generator per instance, and
+     `#run` that generates declarations.
+
+Trade-offs to record:
+- Explicit passing lets two orderings meet in one data structure; storing the
+  record in the structure avoids it.
+- Errors in generated code surface at the splice site, so diagnostics need
+  both the generator's location and the splice's.
+
+Not yet decided, and not yet seen by the owner: whether `impl` is its own
+declaration form. A marker is needed to tell the canonical constant from an
+ordinary one, but it could be a modifier on `const` in the slot `entry` and
+`private` use (`impl const eq_u32: Eq U32 = ...`); `given` is the alternative
+word.
+
 ## D. Systems gaps
 
 1. Decide the numeric set and literal typing before finalising operator
