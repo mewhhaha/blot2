@@ -91,6 +91,18 @@ behaviour keeps the kept part.
 - Tests that read the scoped runtime's counters (`blot:rc_*` exports), v128
   locals, boxes or checkpoints are scoped internals.
 
+## Known direct-backend limits left to the memory model (A)
+
+- `values := @array.set values i v` in a loop copies the array each
+  iteration and keeps every copy until the function exits, which is
+  quadratic memory: about 1,500 iterations of a large array exhaust the
+  8 MiB stack region. Neither Gdev nor Ink uses `@array.set` or
+  `array.replace`. A's split between value copies and in-place stores
+  settles it.
+- Loops that allocate every iteration and also store memory-holding values,
+  or carry fresh owners, do not release per iteration (correctness first).
+  Long `for ever` loops that do both grow until the export returns.
+
 ## Order
 
 1. Implement the kept gaps in the direct backend: constant exports, entry ABI

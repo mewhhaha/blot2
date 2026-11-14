@@ -1770,7 +1770,10 @@ pub const Fn = struct {
         const replacement = try self.stmt(info.value);
         if (replacement.ty == types.never) return replacement;
         try self.noteStore(replacement);
-        try self.writeFlat(address, offset, replacement, id);
+        // The value may have grown the owner through an alias, moving its
+        // storage: find the element again before writing.
+        const target = try self.elementAddress(container, index, id);
+        try self.writeFlat(target, offset, replacement, id);
         return container;
     }
     fn byteWidth(self: *Fn, ty: Ty, id: core.Id) Error!u32 {

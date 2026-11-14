@@ -67,6 +67,7 @@ const cases: Record<string, Call[]> = {
     ["alternatives", 38, 40],
     ["alternatives", 1, 103],
     ["positional", 7, 157],
+    ["grown", 7, 77],
   ],
   "recursive_data.blot": [["tree", 1, 100010], ["chain", 10, 45]],
   "nested_updates_indexed.blot": [["grid", 10, 20], ["fields", 5, 22]],
