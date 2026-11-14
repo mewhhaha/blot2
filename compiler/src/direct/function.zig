@@ -2524,6 +2524,11 @@ pub const Fn = struct {
             },
             .constant, .value => {
                 const tag = self.g.types.node(value.ty).tag;
+                // Unit has one value: its pattern always matches.
+                if (tag == .unit) {
+                    if (pattern.tag == .value) _ = try self.expr(pattern.a);
+                    return;
+                }
                 try self.push(value);
                 if (pattern.tag == .constant) {
                     if (tag == .f32) try self.f32Const(pattern.a) else try self.i32Const(pattern.a);
@@ -2975,6 +2980,65 @@ pub fn hostImport(g: *Generator, kinds: [2]Abi) Error!u32 {
 
 /// An exported entry: resets temporaries, converts its one ABI argument,
 /// calls the instance, converts the result and releases temporaries.
+/// An exported scalar constant: a global its init function sets from the
+/// constant's instance. Returns the init function; the caller writes the ABI.
+pub fn emitConstantExport(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes) Error!u32 {
+    var empty: types.Env = .empty;
+    const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
+        error.Unsupported => return g.typeFailure(m, body.root),
+        else => return err,
+    };
+    const kind = abiKind(g, ty) orelse return g.fail(m, body.root, "exported constants of type {s} are not supported", .{@tagName(g.types.node(ty).tag)});
+    if (isArray(kind)) return g.fail(m, body.root, "exported constants must be scalars", .{});
+    const instance_id = try g.named(.{ .unit = m.unit, .binding = body.binding }, ty, m, body.root);
+    const instance = g.instance(instance_id);
+    const machine = abiMachine(kind);
+    const global = try g.module.addGlobal(machine, true, 0);
+    const function = try g.module.addFunction(try g.module.signature(&.{}, &.{}));
+    var arena = std.heap.ArenaAllocator.init(g.allocator);
+    defer arena.deinit();
+    var f: Fn = .{ .g = g, .m = m, .env = &empty, .arena = arena.allocator() };
+    defer {
+        f.code.deinit(g.allocator);
+        f.locals.deinit(g.allocator);
+    }
+    const rt = try g.runtime_();
+    try f.i32Const(1);
+    try f.opIndex(.call, rt.release);
+    try f.i32Const(rt.layout.stack_base);
+    try f.opIndex(.global_set, rt.stack_pointer);
+    try f.opIndex(.call, instance.function);
+    const value = try f.pop(ty, body.root);
+    if (ty == types.unit) try f.i32Const(0) else try f.push(value);
+    try f.opIndex(.global_set, global);
+    try f.i32Const(1);
+    try f.opIndex(.call, rt.release);
+    try f.op(.end);
+    try finish(g, function, &f);
+    const name = m.name(body.export_name);
+    try g.module.exportItem(name, .global, global);
+    try abi.name(g.allocator, name);
+    try abi.byte(g.allocator, @backingInt(kind));
+    return function;
+}
+
+/// The start function: computes every exported constant in order.
+pub fn startFunction(g: *Generator, m: *const core.Module, inits: []const u32) Error!u32 {
+    const function = try g.module.addFunction(try g.module.signature(&.{}, &.{}));
+    var arena = std.heap.ArenaAllocator.init(g.allocator);
+    defer arena.deinit();
+    var empty: types.Env = .empty;
+    var f: Fn = .{ .g = g, .m = m, .env = &empty, .arena = arena.allocator() };
+    defer {
+        f.code.deinit(g.allocator);
+        f.locals.deinit(g.allocator);
+    }
+    for (inits) |init| try f.opIndex(.call, init);
+    try f.op(.end);
+    try finish(g, function, &f);
+    return function;
+}
+
 pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes) Error!void {
     var empty: types.Env = .empty;
     const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
@@ -2983,10 +3047,16 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     };
     const instance_id = try g.named(.{ .unit = m.unit, .binding = body.binding }, ty, m, body.root);
     const instance = g.instance(instance_id);
-    const parameter = instance.parameters[0];
+    // An exported constant whose value is a function: its instance builds
+    // the closure, which the export then applies.
+    const via_closure = !body.is_function;
+    const arrow = g.types.node(ty);
+    if (via_closure and arrow.tag != .function) return g.fail(m, body.root, "exported constant of a non-function type", .{});
+    const parameter = if (via_closure) arrow.a else instance.parameters[0];
+    const result_ty = if (via_closure) arrow.b else instance.result;
     const callback = callbackAbi(g, parameter);
     const parameter_abi: Abi = if (callback != null) .unit else abiKind(g, parameter) orelse return g.fail(m, body.root, "entry parameters of type {s} are not supported", .{@tagName(g.types.node(parameter).tag)});
-    const result_abi = abiKind(g, instance.result) orelse return g.fail(m, body.root, "entry results of type {s} are not supported", .{@tagName(g.types.node(instance.result).tag)});
+    const result_abi = abiKind(g, result_ty) orelse return g.fail(m, body.root, "entry results of type {s} are not supported", .{@tagName(g.types.node(result_ty).tag)});
     const machine: W.ValType = if (callback != null) .externref else abiMachine(parameter_abi);
     const signature = try g.module.signature(&.{machine}, &.{abiMachine(result_abi)});
     const function = try g.module.addFunction(signature);
@@ -3020,9 +3090,15 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     } else if (parameter != types.unit) {
         argument = .{ .ty = parameter, .words = try f.arena.dupe(u32, &.{0}) };
     }
-    try f.push(argument);
-    try f.opIndex(.call, instance.function);
-    const result = try f.pop(instance.result, body.root);
+    const result = if (via_closure) blk: {
+        try f.opIndex(.call, instance.function);
+        const closure = try f.pop(ty, body.root);
+        break :blk try f.applyClosure(closure, argument, body.root);
+    } else blk: {
+        try f.push(argument);
+        try f.opIndex(.call, instance.function);
+        break :blk try f.pop(instance.result, body.root);
+    };
     if (isArray(result_abi)) {
         const packet = try f.toPacket(result, body.root);
         try f.i32Const(1);
@@ -3031,7 +3107,7 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     } else {
         try f.i32Const(1);
         try f.opIndex(.call, rt.release);
-        if (instance.result == types.unit) try f.i32Const(0) else try f.push(result);
+        if (result_ty == types.unit) try f.i32Const(0) else try f.push(result);
     }
     try f.op(.end);
     try finish(g, function, &f);

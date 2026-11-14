@@ -105,6 +105,14 @@ for (const backend of ["direct", "scoped"] as const) {
     assert.deepEqual(Array.from(guest.call("doubled", Uint32Array.of(1, 2, 3)) as Uint32Array), [2, 4, 6]);
     assert.equal(guest.call("scaled", Float32Array.of(0.5, 1.5, 2)), 4);
   });
+  Deno.test(`exported constants on the ${backend} backend`, async () => {
+    const guest = await build("constants.blot", backend);
+    assert.equal(guest.read("answer"), 42);
+    assert.equal(guest.read("unit_match"), 7);
+    assert.equal(guest.read("flag"), true);
+    assert.equal(guest.read("half"), 3);
+    assert.equal(guest.call("add", 2), 42);
+  });
   Deno.test(`Foreign callbacks exchange packets on the ${backend} backend`, async () => {
     const guest = await build("host.blot", backend);
     let calls = 0;

@@ -27,26 +27,30 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     const m = g.types.module(entry) orelse return error.Unsupported;
     var entries: W.Bytes = .{};
     defer entries.deinit(g.allocator);
+    var constants: W.Bytes = .{};
+    defer constants.deinit(g.allocator);
+    var inits: std.ArrayList(u32) = .empty;
+    defer inits.deinit(g.allocator);
     var count: u32 = 0;
     // Host callback imports precede every defined function.
     for (m.bodies) |*body| {
-        if (!body.exported or !body.is_function) continue;
-        const parameters = m.bodyParameters(body);
-        if (parameters.len != 1) return g.fail(m, body.root, "entry functions take exactly one parameter", .{});
-        var empty: @import("types.zig").Env = .empty;
-        const ty = g.types.lower(m, parameters[0].ty, &empty) catch |err| switch (err) {
-            error.Unsupported => return g.typeFailure(m, body.root),
-            else => return err,
-        };
-        if (function.callbackAbi(g, ty)) |kinds| _ = try function.hostImport(g, kinds);
+        if (!body.exported) continue;
+        const parameter = (try exportedParameter(g, m, body)) orelse continue;
+        if (function.callbackAbi(g, parameter)) |kinds| _ = try function.hostImport(g, kinds);
     }
     for (m.bodies) |*body| {
-        if (!body.exported or !body.is_function) continue;
+        if (!body.exported) continue;
+        if ((try exportedParameter(g, m, body)) == null) continue;
         try function.emitExport(g, m, body, &entries);
         count += 1;
     }
-    if (count == 0) return g.fail(m, 0, "the entry module exports no functions", .{});
+    for (m.bodies) |*body| {
+        if (!body.exported or (try exportedParameter(g, m, body)) != null) continue;
+        try inits.append(g.allocator, try function.emitConstantExport(g, m, body, &constants));
+    }
+    if (count == 0 and inits.items.len == 0) return g.fail(m, 0, "the entry module exports nothing", .{});
     try g.emitAll();
+    if (inits.items.len != 0) g.module.start = try function.startFunction(g, m, inits.items);
     if (try g.summary()) |failure| {
         if (g.failure) |previous| g.allocator.free(previous.message);
         g.failure = failure;
@@ -57,7 +61,28 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     try abi.byte(g.allocator, 8);
     try abi.uleb(g.allocator, count);
     try abi.raw(g.allocator, entries.items());
-    try abi.uleb(g.allocator, 0);
+    try abi.uleb(g.allocator, @intCast(inits.items.len));
+    try abi.raw(g.allocator, constants.items());
     try g.module.custom("blot:abi", abi.items());
     return g.module.assemble(g.allocator);
+}
+
+/// The parameter type of an exported function, or of an exported constant
+/// whose value is a function; null for an exported scalar constant.
+fn exportedParameter(g: *emit.Generator, m: *const core.Module, body: *const core.Body) emit.Error!?@import("types.zig").Ty {
+    var empty: @import("types.zig").Env = .empty;
+    if (body.is_function) {
+        const parameters = m.bodyParameters(body);
+        if (parameters.len != 1) return g.fail(m, body.root, "entry functions take exactly one parameter", .{});
+        return g.types.lower(m, parameters[0].ty, &empty) catch |err| switch (err) {
+            error.Unsupported => return g.typeFailure(m, body.root),
+            else => return err,
+        };
+    }
+    const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
+        error.Unsupported => return g.typeFailure(m, body.root),
+        else => return err,
+    };
+    const n = g.types.node(ty);
+    return if (n.tag == .function) n.a else null;
 }

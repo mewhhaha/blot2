@@ -1,0 +1,7 @@
+const base = 40
+entry const answer = base + 2
+entry const unit_match = case () of
+  () => 7
+entry const flag = base > 3
+entry const half = 1.5 * 2.0
+entry const add = func (value: U32) : U32 => return value + base

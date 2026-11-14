@@ -164,6 +164,8 @@ pub const Module = struct {
     /// Externref slots for host callbacks (table 1); zero when unused.
     host_slots: u32 = 0,
     memory_pages: ?u32 = null,
+    /// The start function (exported constants are computed there).
+    start: ?u32 = null,
     data_offset: u32 = 0,
     data: std.ArrayList(u8) = .empty,
     customs: std.ArrayList(struct { name: []const u8, payload: []const u8 }) = .empty,
@@ -310,6 +312,11 @@ pub const Module = struct {
             try payload.uleb(a, item.index);
         }
         try section(a, &out, 7, &payload);
+        // 8: start
+        if (self.start) |function| {
+            try payload.uleb(a, function);
+            try section(a, &out, 8, &payload);
+        }
         // 9: elements (table 0, offset 0, function indices)
         if (self.table.items.len != 0) {
             try payload.uleb(a, 1);
