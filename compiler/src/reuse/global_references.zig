@@ -129,7 +129,7 @@ const Walker = struct {
                 try self.visit(n.b);
                 try self.visit(n.a);
             },
-            .rebind_stmt => {
+            .rebind_stmt, .store_stmt => {
                 try self.push(.{ .restore = self.locals.items.len });
                 try self.visit(n.b);
                 if (self.resolver.self_name != 0) try self.push(.{ .bind = self.resolver.self_name });

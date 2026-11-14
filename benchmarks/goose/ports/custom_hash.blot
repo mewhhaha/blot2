@@ -7,11 +7,11 @@ entry const revision = func (): U32 => return arena_revision
 
 const prepare = func (bytes: Array U32) -> (size: U32): Unit => return do:
   for index in 0 .. size:
-    bytes[index] := 0
+    bytes[index] = 0
   let rng_last = 42
   for index in 0 .. size:
     rng_last := (self * 3877 + 29573) % 139968
-    bytes[index] := rng_last * 256 / 139968
+    bytes[index] = rng_last * 256 / 139968
   return ()
 
 const simple_digest = func (bytes: Array U32) -> (size: U32) -> (result: Array U32): Unit => return do:
@@ -24,10 +24,10 @@ const simple_digest = func (bytes: Array U32) -> (size: U32) -> (result: Array U
     hashes[hash_idx] := hash
   for index in 0 .. 8:
     let hash = hashes[index]
-    result[index * 4] := (hash >> 24) & 255
-    result[index * 4 + 1] := (hash >> 16) & 255
-    result[index * 4 + 2] := (hash >> 8) & 255
-    result[index * 4 + 3] := hash & 255
+    result[index * 4] = (hash >> 24) & 255
+    result[index * 4 + 1] = (hash >> 16) & 255
+    result[index * 4 + 2] = (hash >> 8) & 255
+    result[index * 4 + 3] = hash & 255
   return ()
 
 const run = func (bytes: Array U32) -> (size: U32): U32 => return do:

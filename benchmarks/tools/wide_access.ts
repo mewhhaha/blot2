@@ -36,7 +36,7 @@ const leaf = func access: U32 => return
 }[0]) (@u32.add access.${middle}[0] access.${last}[0])
 entry const answer = func (input: U32): Array U32 => return do:
   let rows: Array U32 = #[input]
-  @storage.write (@storage.at rows 0) input
+  rows[0] = input
   let access = {${
   names.map((name) => `${name}: rows`).join(", ")
 }, step: plus, unused_a: plus, unused_b: plus}

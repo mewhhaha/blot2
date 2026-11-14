@@ -179,7 +179,9 @@ Inside its RHS, `self` and the old name refer to the previous binding. Earlier
 closures keep old captures; aliases are not mutated. The new binding can have a
 different type and is visible in the remaining suite. An outer `self` is
 restored after the RHS. Rebinding requires purity, like `let`; record and array
-paths such as `world.camera.position := self + offset` are supported.
+paths such as `world.camera.position := self + offset` are supported. A path
+through storage needs a unique root, and `place = value` stores in place
+instead (see [Stores and successors](#stores-and-successors)).
 
 `break value` finishes the nearest `do` block with that value, even from inside
 a loop. Bare `break` exits the nearest loop; `return value` exits the innermost
@@ -518,7 +520,9 @@ and associated function with the same name produce an ambiguity error.
 Paths can mix fields and indices: `grid.rows[row][column] := self + 1`. The root
 and each index are evaluated once, left to right, before the replacement; `self`
 is the old value at the selected leaf. Existing aliases keep the old root. As
-with plain `:=`, the replacement must be pure; use `use` first for effects.
+with plain `:=`, the replacement must be pure; use `use` first for effects. A
+path that reaches an array updates that storage in place, so its root must be
+unique; otherwise store with `=` ([Stores and successors](#stores-and-successors)).
 
 `std/path` packages pure getters and setters as
 `Path source target focus replacement`. `make read write` constructs a path,
@@ -614,7 +618,8 @@ retaining an independent version. Exact layout and lifetime support is in
 [the owned-storage profile](../compiler/SCOPED_STORAGE.md).
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
-Only arrays support `values[index]`, `values[index] := replacement`, `get`, and
+Only arrays support `values[index]`, the store `values[index] = replacement`,
+`values[index] := replacement` on a unique root, `values.copy`, `get`, and
 `set`. Lists use `for`, comprehensions, `map`, `filter`, and folds; convert with
 `Array.from_list` when positional access is required. Generic indexing therefore
 infers an Array argument, while generic traversal accepts either type. Lengths
@@ -753,15 +758,69 @@ entry func answer () => return do:
   break copied[0] + copied[1] + copied[2]
 ```
 
+### Stores and successors
+
+Arrays are storage: they have identity, and every alias of an array names the
+same storage. Records, tuples, sums and scalars are values. Two statements
+change data:
+
+- `place = value` stores into storage in place, and every alias sees the
+  write. The place is a path that reaches an array element: `rows[i]`,
+  `grid[r][c]`, `rows[i].x`, or any of these through record fields of a local
+  (`world.counts[i]`) or after any expression of array type
+  (`(pick flag left right)[0]`). The value sees the old leaf as `self` and must
+  be pure. `=` on a path that never reaches an array, such as `point.x = 1`
+  for a local record, is `store_without_storage`; use `:=`.
+- `name := value` and `name.path := value` build a successor and rebind the
+  local; aliases keep the old value. A path that reaches an array is still
+  written in place, which is the successor only when nothing else can observe
+  the old root. The compiler proves that inside the one function and rejects
+  the rest with `aliased_update`: store with `=`, or take `values.copy` first to
+  keep the old value.
+
+A root is unique after it is bound to an array literal, a comprehension,
+`values.copy`, or a fresh `@array` result (`fill`, `generate`, `set`, `concat`,
+`slice`, `flatten`), and it stays unique across its own `:=` updates. A record
+local is unique along a path when every array the path passes through is. The
+root stops being unique, for the rest of the path that follows, once the same
+version is bound to another name or a pattern, captured, passed to a call or
+constructor, placed in a literal or record, returned or broken out, or read out
+as an array-holding element or field (`let row = grid[r]`). Reading a plain
+element or the length does not alias it. Parameters, call results and
+constants are never unique, and no fact crosses a call. Branches keep
+uniqueness only when every arm that continues keeps it; an arm that returns
+contributes nothing. A loop carry is unique when its first value and every
+value it carries back are.
+
+```blot
+entry func stores () => return do:
+  let rows = #[1, 2, 3]
+  let alias = rows
+  rows[1] = 20
+  break alias[1]
+
+entry func successors () => return do:
+  let rows = #[1, 2, 3]
+  let before = rows.copy
+  rows[1] := 20
+  break before[1] + rows[1]
+```
+
+`stores` returns 20: the alias sees the store. `successors` returns 22: the
+copy keeps the old element. Without `.copy`, `let before = rows` would make
+`rows[1] := 20` an `aliased_update`. A local whose value holds storage keeps one
+type and is not generalized, so its stores and reads agree.
+
 ### Named owners and explicit copies
 
 Declare independent owners and keep their payloads alive through every borrowed
 use. Assigning an owner to another binding, placing it in an access record or
-capturing it in a known callback preserves its identity. Indexed updates write
-through those aliases. Inline records and scalar values copy by value.
+capturing it in a known callback preserves its identity. Stores write through
+those aliases. Inline records and scalar values copy by value.
 
-`@storage.copy source` creates independent array storage. Use it for retained
-history and previous-state data; copy separately referenced payloads as needed.
+`values.copy` (in std, `@storage.copy values`) creates independent array
+storage. Use it for retained history and previous-state data; copy separately
+referenced payloads as needed.
 A view records a borrowed range and length, not a snapshot of its contents.
 `@storage.freeze` removes growth authority across aliases; it does not copy the
 payload. Functions can return fresh owners directly; their checked lifetime
@@ -796,7 +855,7 @@ const squares = array.generate 4 (func index => return index * index)
 entry func total () => return array.fold_left U32.add 0 squares
 entry func snapshot () => return do:
   let values = #[1, 2]
-  let original = @storage.copy values
+  let original = values.copy
   values[0] := self + 40
   break original[0] + values[0]
 func checked index => return squares.get(index)
@@ -1373,7 +1432,7 @@ entry func answer () => return do:
   let resizable: ResizeArray U32 = #[]
   let first: &U32 = &growing[0]
   let appended = @storage.push growing 9
-  let changed = @storage.write first 42
+  growing[0] = 42
   break @storage.load first
 ```
 
@@ -1382,8 +1441,9 @@ Existing arrays do not coerce between modes. `&T` borrows one value, `&[T]`
 borrows a range (`&items[start..end]`), and `^T` links to an element of a stable
 pool (`^items[index]`). The named forms are `Ref T`, `View T`, and `Link T`.
 `@storage.load` reads a reference/link and `@storage.read` reads a view/array.
-Explicit writes are shared by aliases; `@storage.copy` makes an independent
-array. `@storage.freeze` consumes the growth capability across aliases.
+References are read-only: write the owner with `=`, and every reference and
+alias sees it. `@storage.copy` (`values.copy`) makes an independent array.
+`@storage.freeze` consumes the growth capability across aliases.
 
 `@storage.reserve owner 1048576` requests a minimum planned capacity in elements
 for one `GrowArray` or `ResizeArray` owner. The count must be a U32 integer
@@ -1406,7 +1466,7 @@ layouts, generic helpers, known callbacks and lexical storage reuse. Named
 global pools, including computed initializers, persist per instance. Numeric
 arrays cross browser/Pen boundaries by copy; ordinary Foreign callbacks can
 suspend while the guest adapter excludes reentry. Inline records copy by value,
-while indexed updates write through array aliases. Use `@storage.copy` when an
+while stores write through array aliases. Use `values.copy` when an
 independent snapshot is needed. It checks borrowed results and permits shrinking
 after a local borrow’s final use. Language task execution is excluded from this
 model; host worker jobs and data queues remain in scope.

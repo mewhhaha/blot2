@@ -108,7 +108,9 @@ pub const UpdateKind = enum(u8) { field, index };
 /// Mixed update paths retain each index expression as owned IR. A field step
 /// uses a projection catalog; an index step uses its array/element type pair.
 pub const UpdateStep = struct { kind: UpdateKind, projection: u32 = 0, index: Id = 0, source_type: T.Id, result_type: T.Id };
-pub const UpdateInfo = struct { root: Id, path: List, value: Id, self_binding: BindingId, selectors: List = .{} };
+/// A store (`place = value`) is an update whose root is the container
+/// expression before the first index. It is a statement and rebinds nothing.
+pub const UpdateInfo = struct { root: Id, path: List, value: Id, self_binding: BindingId, selectors: List = .{}, store: bool = false };
 /// Captures name immutable lexical binding versions, in first-reference order.
 /// Nested closures propagate their free local requirements to this body.
 pub const ClosureInfo = struct { qualifier: BindingId = 0, body: Id, parameter: Parameter, captures: List, function_type: T.Id = 0, closed_rows: T.List = .{} };
@@ -151,7 +153,7 @@ pub const LoopCarry = struct { incoming: BindingId, iteration: BindingId, backed
 /// Range bounds and array expressions are evaluated exactly once before the
 /// body. A forever loop has no first/end expression and no iterator pattern.
 pub const LoopInfo = struct { kind: LoopKind, first: Id = 0, end: Id = 0, pattern: PatternId = 0, body: Id, carries: List = .{}, can_exit: bool = false };
-pub const Code = enum { unchecked, unsupported, unresolved_binding, invalid_call, complexity };
+pub const Code = enum { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update };
 pub const Diagnostic = struct {
     code: Code,
     span: Span,
@@ -162,6 +164,7 @@ pub const Diagnostic = struct {
             .unresolved_binding => "Typed expression has no resolved binding identity",
             .invalid_call => "Typed core requires a resolved named call or compiler primitive",
             .complexity => "Typed core exceeds its nesting or table limit",
+            .aliased_update => "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value",
         };
     }
 };

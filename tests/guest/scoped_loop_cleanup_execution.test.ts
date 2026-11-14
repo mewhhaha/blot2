@@ -95,7 +95,7 @@ const shrink_rhs = func (rows: ResizeArray U32): U32 => return do:
 entry const invalid = func (): U32 => return do:
   let rows: ResizeArray U32 = #[1]
   let alias = rows
-  rows[0] := shrink_rhs alias
+  rows[0] = shrink_rhs alias
   return rows[0]
 `,
         },

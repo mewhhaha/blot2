@@ -7,7 +7,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const padding = 2000;
 function sourceFor(scalar: "U32" | "F32"): string {
   return `const calculate = func (counter: Array U32) -> (input: ${scalar}): ${scalar} => return do:
-  counter[0] := @u32.add counter[0] 1
+  counter[0] = @u32.add counter[0] 1
   return ${scalar === "U32" ? "@u32.add input 7" : "input"}
 const consume = func (destination: ResizeArray ${scalar}) -> (read: Unit -> ${scalar} ! {|e}): Unit => return do:
   let total = read ()

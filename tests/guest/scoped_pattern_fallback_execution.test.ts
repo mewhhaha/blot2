@@ -15,7 +15,7 @@ const size = func collections: U32 => return do:
   return total
 const effects: GrowArray U32 = #[0]
 const tick = func (value: U32): U32 => return do:
-  @storage.write (@storage.at effects 0) (effects[0] + 1)
+  effects[0] = effects[0] + 1
   return value
 entry const empty = func (count: U32): U32 => return do:
   let rows: ResizeArray Row = #[]

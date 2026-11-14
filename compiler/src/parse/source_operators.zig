@@ -636,6 +636,15 @@ fn Validator(comptime Context: type) type {
                     try self.walk(node.a, depth + 1);
                     try self.walk(node.b, depth + 1);
                 },
+                // A store's place is an ordinary expression; only its value
+                // sees the old leaf as `self`.
+                .store_stmt => {
+                    try self.walk(node.a, depth + 1);
+                    const saved = self.locals.items.len;
+                    defer self.locals.shrinkRetainingCapacity(saved);
+                    try self.bind(self.pool.lookup("self") orelse 0);
+                    try self.walk(node.b, depth + 1);
+                },
                 .if_expr, .if_stmt, .range_stmt => {
                     try self.walk(node.a, depth + 1);
                     try self.scope(0, node.b, depth + 1);

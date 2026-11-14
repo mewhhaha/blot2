@@ -304,6 +304,25 @@ export const devCheckAreas = {
     ],
     guestFilters: {} as Record<string, string>,
   },
+  "memory-model": {
+    description:
+      "Stores, the uniqueness of := paths through storage and aliased_update (tasks/MEMORY_MODEL.md phase 1).",
+    native: [
+      "parse.parser_tests.test.a top-level = in a statement stores through a place; := still rebinds",
+      "check.uniqueness_tests.test.uniqueness accepts updates of fresh unique roots and rejects every aliased one",
+      "check.uniqueness_tests.test.uniqueness allocation failures release every fact, trail and record table",
+      "check.core_update_tests.test.owned mixed selectors retain nested update identities and lexical captures after frontend teardown",
+      "check.core_update_tests.test.mixed selector and nested update allocation failures release every owned table",
+    ],
+    guests: [
+      "tests/guest/store_uniqueness_execution.test.ts",
+      "tests/guest/update_execution.test.ts",
+      "tests/guest/entry_execution.test.ts",
+      "tests/guest/owned_array_execution.test.ts",
+      "tests/guest/storage_records_execution.test.ts",
+    ],
+    guestFilters: {} as Record<string, string>,
+  },
   "type-effects": {
     description:
       "Type identity, effect rollback, owned data and physical encoding.",

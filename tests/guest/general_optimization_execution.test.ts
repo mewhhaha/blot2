@@ -38,23 +38,23 @@ entry const versions = func () => return do:
   let store = $Store { left: leaf, right: leaf }
   let saved = func () => return store.left[0]
   for i in 0..2:
-    store.left[i] := 9
+    store.left[i] = 9
     if i == 0:
       break
-  store.left[1] := 8
+  store.left[1] = 8
   break #[saved (), leaf[0], store.right[0], store.left[0], store.left[1]]
 entry const extracted = func () => return do:
   let values = #[#[1], #[2]]
   let first = values[0]
-  values[0][0] := 9
+  values[0][0] = 9
   break #[first[0], values[0][0]]
 entry const after_break = func () => return do:
   let values = #[1, 2]
   let saved = values
   for ever:
-    values[0] := 8
+    values[0] = 8
     break
-  values[1] := 9
+  values[1] = 9
   break #[saved[0], saved[1], values[0], values[1]]
 `,
     (guest) => {
@@ -190,7 +190,7 @@ Deno.test("staged indexed construction freezes once and writes through input ali
 const build = func values => return do:
   let saved = func () => return values[0]
   for i in 0..4096:
-    values[i] := i + 1
+    values[i] = i + 1
   break (values, saved ())
 const source = @array.fill 4096 7
 const constructed = build source

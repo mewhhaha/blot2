@@ -336,7 +336,7 @@ pub const LoopExit = struct { node: ast.Id, loop: ast.Id, bindings: T.List };
 pub const StatementArm = struct { node: ast.Id };
 pub const ClosedRow = struct { owner: BindingId, variable: u32 };
 pub const Merge = struct { node: ast.Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
-pub const Code = enum { function_return_required, task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
+pub const Code = enum { function_return_required, task_escape, task_handle_consumed, task_capture_transfer, task_capability_shared, task_regions_overlap, task_host_contract, task_budget, invalid_proof_operand, proof_scope_escape, proof_runtime_use, proof_mismatch, contradictory_proof, proof_analysis_limit, effect_identity_scope, capability_escape, capability_analysis_limit, undetermined_implementation, orphan_implementation, overlapping_implementation, incompatible_implementation, recursive_evidence, missing_type_member, associated_arity, recursive_associated_type, associated_limit, missing_implementation, private_access, private_identity_escape, unbound_alias_row, recursive_contract, contract_arity, recursive_type_alias, typed_hole, effect_member, integer_range, float_range, float_literal, module_loader_required, intrinsic_arity, requests_scope, yield_scope, request_loop_scope, request_loop_body, request_loop_range, request_binding, request_completion, request_clause_fallthrough, request_completion_fallthrough, duplicate_request_handler, request_case_scope, unknown_value, syntax, duplicate_name, unknown_name, type_mismatch, infinite_type, effect_mismatch, infinite_effect, const_effect, initializer_effect, let_effect, sealed_effect, effect_arity, effect_family, unknown_effect, invalid_effect_annotation, invalid_constraint, higher_rank_constraint, missing_predicate, ambiguous_qualified, annotation_kind_mismatch, unsupported_polymorphic_effect_label, operation_signature, type_arity, operation_target, invalid_state_provider, unsupported, unsupported_attribute, recursive_tag, function_target, open_effect_descriptor, unsupported_expression, unsupported_type, ambiguous_operator, ambiguous_associated, missing_associated, ambiguous_member, missing_member, type_constructor_required, invalid_provider, resolver_required, literal_required, call_arity, break_scope, continue_scope, invalid_return, unreachable_statement, invalid_operator, return_outside_block, return_outside_function, return_across_continuation, unknown_rebinding, dead_rebinding, store_without_storage, case_arm_return, nesting_limit, unknown_constructor, constructor_marker, type_parameter, type_argument, duplicate_type_parameter, duplicate_type_field, unknown_field, duplicate_field, missing_field, non_exhaustive_match, refutable_pattern, constructor_arity, unknown_product_shape, product_index, product_index_literal, pattern_arity, pattern_bindings, value_pattern_type, non_exiting_fallback, unknown_operator, operator_associativity, operator_header_order, operator_precedence, duplicate_operator, unsupported_prefix, unknown_intrinsic, alternative_bindings, duplicate_pattern_binding, duplicate_record_field, unknown_record_field, record_constructor, missing_record_field, unknown_modifier, guard_fallthrough, product_arity, inference_budget, skolem_escape, rank_mismatch, package_expected, package_witness_mismatch, package_escape, abstract_representation_access, use_after_move, duplicate_owner, borrow_conflict, borrow_escape, once_reused, multiplicity_unknown, cleanup_not_safe, usage_evidence_mismatch, usage_analysis_limit, code_shape_mismatch, stage_unavailable, cross_stage_authority, descriptor_private, generated_binding_escape, staging_budget };
 pub const PurityWitness = @import("../reuse/purity_diagnostics.zig").Witness;
 pub const Diagnostic = struct {
     pub const TypeApplication = enum { missing_array, missing_nominal, extra };
@@ -519,6 +519,7 @@ pub const Diagnostic = struct {
             .return_across_continuation => "Return cannot cross a monadic continuation or a nested request callback; finish that do block with break value instead",
             .unknown_rebinding => if (self.symbol != 0) ":= requires an existing local binding" else "Rebinding requires an existing lexical name",
             .dead_rebinding => "This := inside a nested do: block is never read and leaves the enclosing binding unchanged; rebind it with if/else or a statement case, or assign a case expression",
+            .store_without_storage => "`=` stores into storage, but this path never reaches an array element; use := to build a successor value",
             .case_arm_return => "This break would leave only its case arm and skip the rebinding the arm carries out; break directly in the arm's do: block or restructure with if/else",
             .nesting_limit => "Semantic nesting exceeds the compiler limit",
             .inference_budget => "Type inference exceeded this module's work budget",
@@ -2324,7 +2325,7 @@ const Engine = struct {
             .type_field, .type_binder => {
                 if (node.b == 0) _ = try self.typeVariable(node.a, id) else try self.collectAnnotationNames(node.b, depth + 1);
             },
-            .apply, .index_access, .rebind_stmt, .type_apply, .type_effect => {
+            .apply, .index_access, .rebind_stmt, .store_stmt, .type_apply, .type_effect => {
                 try self.collectAnnotationNames(node.a, depth + 1);
                 try self.collectAnnotationNames(node.b, depth + 1);
             },
@@ -5049,10 +5050,9 @@ const Engine = struct {
                 }, target);
                 for (backwards[0 .. count - 1]) |argument| try self.constrain(try self.expression(argument), T.u32_type, argument);
             },
-            .load, .write => {
+            .load => {
                 valid = if (kind) |value| value.kind == .ref or value.kind == .link else false;
-                const target = if (valid) kind.?.element else try self.types.fresh();
-                if (op == .load) result = target else try self.constrain(try self.expression(backwards[0]), target, backwards[0]);
+                result = if (valid) kind.?.element else try self.types.fresh();
             },
             .length => {
                 valid = element != null;
@@ -12711,7 +12711,11 @@ const Engine = struct {
         }
         // Guard typing checks the value pattern before the failure
         // branch, whose lexical scope excludes successful binders.
-        const generalize = value_.fallback == 0 and self.tree.node(value_.pattern).tag == .pattern_name;
+        // Storage has one identity, so a local holding it keeps one type: its
+        // stores and reads must agree (tasks/MEMORY_MODEL.md rule 8). A closed
+        // type has nothing to generalize.
+        const generalize = value_.fallback == 0 and self.tree.node(value_.pattern).tag == .pattern_name and
+            !(try self.holdsStorage(value, 0) and !self.types.knownClosed(try self.types.resolve(value, 0)));
         const saved_pattern_source = self.let_pattern_source;
         self.let_pattern_source = id;
         const total = self.pattern(value_.pattern, value, scope, &.{}, generalize) catch |err| {
@@ -12750,6 +12754,27 @@ const Engine = struct {
         }
         self.expr_types[id] = if (exits) T.never else T.unit;
         return .{ .exits = exits, .breaks = exits };
+    }
+    /// Whether a value of `ty` is or directly holds storage, through records
+    /// and tuples. Unresolved and other types count as not holding it.
+    fn holdsStorage(self: *Engine, ty: T.Id, depth: usize) T.Error!bool {
+        if (depth > 8) return false;
+        const resolved = try self.types.resolve(ty, 0);
+        if (storage_types.readableElement(&self.types, resolved) != null) return true;
+        const node = self.types.node(resolved);
+        switch (node.tag) {
+            .record => {
+                for (0..node.b) |index| if (try self.holdsStorage(self.types.recordField(node, index).ty, depth + 1)) return true;
+                return false;
+            },
+            .product => {
+                const items = try self.allocator.dupe(T.Id, self.types.list(.{ .start = node.a, .len = node.b }));
+                defer self.allocator.free(items);
+                for (items) |item| if (try self.holdsStorage(item, depth + 1)) return true;
+                return false;
+            },
+            else => return false,
+        }
     }
     /// A nested do: keeps its own scope (issue #11): only if/if let, loops and
     /// the do: arms of a statement case carry a rebinding outward. A := of an
@@ -12919,6 +12944,7 @@ const Engine = struct {
         switch (node.tag) {
             .let_stmt => return self.letStatement(id),
             .rebind_stmt => return self.rebindStatement(id),
+            .store_stmt => return self.storeStatement(id),
             .return_stmt => return self.returnStatement(id),
             .function_return_stmt => return self.functionReturnStatement(id),
             .use_stmt, .iterator_bind => return self.useStatement(id),
@@ -13624,6 +13650,95 @@ const Engine = struct {
         self.rebindings[id] = .{ .root = previous, .self_binding = self_binding, .path = range };
         self.access_types[id] = try self.types.saveList(types_.items);
         self.access_nodes[id] = try self.types.saveList(reverse.items);
+        self.types.unifyEffects(self.ambient, 0) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            error.EffectMismatch => try self.diagnostic(.let_effect, id),
+            error.InfiniteEffect => try self.diagnostic(.infinite_effect, id),
+            else => return err,
+        };
+        return .{};
+    }
+    /// `place = value` writes storage in place and rebinds nothing. The
+    /// place before its first index is an ordinary expression of array type;
+    /// each later step selects an element or a field inside that storage.
+    /// The value sees the old leaf as `self` and, like `:=`, must be pure.
+    fn storeStatement(self: *Engine, id: ast.Id) T.Error!Flow {
+        const saved_ambient = self.ambient;
+        self.ambient = try self.types.freshEffects();
+        defer self.ambient = saved_ambient;
+        const statement_ = self.tree.node(id);
+        var reverse: std.ArrayList(ast.Id) = .empty;
+        defer reverse.deinit(self.allocator);
+        var cursor = statement_.a;
+        while (self.tree.node(cursor).tag == .field_access or self.tree.node(cursor).tag == .index_access) {
+            if (reverse.items.len >= 1024) return error.TypeLimit;
+            try reverse.append(self.allocator, cursor);
+            cursor = self.tree.node(cursor).a;
+        }
+        std.mem.reverse(ast.Id, reverse.items);
+        const first_index = for (reverse.items, 0..) |access, part| {
+            if (self.tree.node(access).tag == .index_access) break part;
+        } else {
+            try self.diagnostic(.store_without_storage, id);
+            return .{};
+        };
+        // A local root is typed as `:=` types it, through its binding's own
+        // type, and its fields join the path. Any other root is an ordinary
+        // expression up to the first index.
+        const root_node = self.tree.node(cursor);
+        const root_binding = if (root_node.tag == .name) self.lookup(root_node.a) else null;
+        const steps = if (root_binding != null) reverse.items else reverse.items[first_index..];
+        var ty: T.Id = undefined;
+        if (root_binding) |binding| {
+            ty = self.bindings.items[binding].ty;
+            self.resolved[cursor] = binding;
+            self.expr_types[cursor] = ty;
+        } else ty = try self.expression(self.tree.node(steps[0]).a);
+        var path: std.ArrayList(T.Id) = .empty;
+        defer path.deinit(self.allocator);
+        var types_: std.ArrayList(T.Id) = .empty;
+        defer types_.deinit(self.allocator);
+        try types_.append(self.allocator, ty);
+        for (steps, 0..) |access, part| {
+            const selector = self.tree.node(access);
+            var projection: u32 = 0;
+            if (root_binding != null and part < first_index) {
+                // A field that only selects the storage, as in `:=`.
+                const projected = try self.projectField(ty, selector.b, access, false, null);
+                ty = projected.ty;
+                projection = projected.projection;
+            } else if (selector.tag == .index_access) {
+                // Views are storage too until stores through them go (A4).
+                const element = storage_types.readableElement(&self.types, try self.types.resolve(ty, 0)) orelse blk: {
+                    const inferred = try self.types.fresh();
+                    try self.constrain(ty, try self.types.sequence(.array, inferred), access);
+                    break :blk inferred;
+                };
+                try self.constrain(try self.expression(selector.b), T.u32_type, selector.b);
+                ty = element;
+            } else {
+                const projected = try self.projectField(ty, selector.b, access, true, null);
+                ty = projected.ty;
+                projection = projected.projection;
+            }
+            self.expr_types[access] = ty;
+            self.projection_resolved[access] = projection;
+            try path.append(self.allocator, projection);
+            try types_.append(self.allocator, ty);
+        }
+        const self_binding = try self.addBinding(.{ .name = self.self_name, .declaration = id, .owner = self.owner, .kind = .local, .ty = ty, .scheme = .{ .root = ty } });
+        const scope = self.env.items.len;
+        try self.env.append(self.allocator, .{ .name = self.self_name, .binding = self_binding });
+        const value = self.expression(statement_.b) catch |err| {
+            self.env.shrinkRetainingCapacity(scope);
+            return err;
+        };
+        self.env.shrinkRetainingCapacity(scope);
+        try self.constrain(ty, value, id);
+        self.expr_types[id] = T.unit;
+        self.rebindings[id] = .{ .root = root_binding orelse 0, .self_binding = self_binding, .path = try self.types.saveList(path.items) };
+        self.access_types[id] = try self.types.saveList(types_.items);
+        self.access_nodes[id] = try self.types.saveList(steps);
         self.types.unifyEffects(self.ambient, 0) catch |err| switch (err) {
             error.OutOfMemory => return err,
             error.EffectMismatch => try self.diagnostic(.let_effect, id),

@@ -370,6 +370,7 @@ export type RuleName =
   | "statement"
   | "binding"
   | "rebinding"
+  | "store"
   | "index_access"
   | "slice_access"
   | "for_statement"
@@ -1167,7 +1168,7 @@ export interface SuiteCursor extends RuleCursorBase<"suite"> {
 }
 
 export interface StatementCursor extends RuleCursorBase<"statement"> {
-  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor;
+  field(name: "value"): BindingCursor | ConditionalCursor | EffectBindingCursor | EffectStepCursor | EverStatementCursor | ExpressionCursor | ForStatementCursor | FunctionExitCursor | LoopContinueCursor | LoopExitCursor | NamedFunctionCursor | PatternConditionalCursor | RangeStatementCursor | RebindingCursor | ReplyCursor | RequestCaseCursor | ResultCursor | StoreCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
 }
@@ -1185,6 +1186,14 @@ export interface BindingCursor extends RuleCursorBase<"binding"> {
 export interface RebindingCursor extends RuleCursorBase<"rebinding"> {
   field(name: "name"): SourceIdentifierCursor;
   field(name: "path"): ReadonlyArray<IndexAccessCursor | MemberAccessCursor>;
+  field(name: "value"): ExpressionCursor;
+  field(name: string): CursorFieldValue | undefined;
+  fieldArray(name: string): readonly CursorFieldValue[];
+}
+
+export interface StoreCursor extends RuleCursorBase<"store"> {
+  field(name: "path"): ReadonlyArray<IndexAccessCursor | MemberAccessCursor>;
+  field(name: "root"): GroupCursor | SourceIdentifierCursor;
   field(name: "value"): ExpressionCursor;
   field(name: string): CursorFieldValue | undefined;
   fieldArray(name: string): readonly CursorFieldValue[];
@@ -1508,6 +1517,7 @@ export type AnyRuleCursor =
   | StatementCursor
   | BindingCursor
   | RebindingCursor
+  | StoreCursor
   | IndexAccessCursor
   | SliceAccessCursor
   | ForStatementCursor

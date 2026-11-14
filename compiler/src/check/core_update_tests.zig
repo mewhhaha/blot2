@@ -50,7 +50,10 @@ const Fixture = struct {
 };
 
 fn verify(module: *const core.Module) !void {
-    try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
+    // The closure's root is a captured alias of a parameter, so its update
+    // through storage is rejected; the nested fresh `other` is accepted.
+    try std.testing.expectEqual(@as(usize, 1), module.diagnostics.len);
+    try std.testing.expectEqual(core.Code.aliased_update, module.diagnostics[0].code);
     try std.testing.expectEqual(@as(usize, 2), module.updates.len);
     try std.testing.expectEqual(@as(usize, 4), module.update_steps.len);
     try std.testing.expectEqual(@as(usize, 1), module.closures.len);
@@ -67,6 +70,7 @@ fn verify(module: *const core.Module) !void {
         else => {},
     };
     try std.testing.expect(inner != 0 and outer != 0 and closure != 0);
+    try std.testing.expectEqual(module.span(outer), module.diagnostics[0].span);
     const inner_steps = module.updateSelectors(inner);
     const steps = module.updateSelectors(outer);
     try std.testing.expectEqual(@as(usize, 1), inner_steps.len);

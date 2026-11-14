@@ -64,9 +64,15 @@ entry const vector_example = func () => return do:
 
 entry const array_snapshot = func () => return do:
   let original = #[1, 2, 3]
-  let next = original
+  let next = @storage.copy original
   next[1] := 20
   break original[1] + next[1]
+
+entry const array_store = func () => return do:
+  let original = #[1, 2, 3]
+  let alias = original
+  alias[1] = 20
+  break original[1] + alias[1]
 
 type Counter a is effect = { advance: a -> a }
 const local_counter = @effect.provider (Counter.advance U32) (func value => return value + 1)

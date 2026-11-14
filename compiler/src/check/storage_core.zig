@@ -47,13 +47,10 @@ pub fn contract(m: *const core.Module, id: core.Id) Error!Contract {
                 for (args[1..]) |arg| result.same(T.u32_type, m.typeOf(arg));
             }
         },
-        .load, .write => {
+        .load => {
             const target = kind orelse return error.InvalidArtifact;
             try require(target.kind == .ref or target.kind == .link);
-            if (op == .load) result.same(target.element, n.ty) else {
-                result.same(target.element, m.typeOf(args[1]));
-                result.same(T.unit, n.ty);
-            }
+            result.same(target.element, n.ty);
         },
         .length => {
             try require(element != null);

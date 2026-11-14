@@ -148,7 +148,7 @@ Deno.test(`inline return registers retain nested results bits traps and source e
 const plannedSource = `type Pair is data = $Pair {x: U32, y: U32}
 const pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
 const calculate = func (counter: Array U32) -> (input: U32): U32 => return do:
-  counter[0] := @u32.add counter[0] 1
+  counter[0] = @u32.add counter[0] 1
   return input
 const consume = func (destination: ResizeArray U32) -> (read: Unit -> U32 ! {|e}): Unit => return do:
   let total = read ()
@@ -169,11 +169,11 @@ entry const answer = func (input: U32): Array U32 => return do:
   let held = pair input
   exercise (calculate counter input) destination
   return #[held.x, held.y, counter[0], destination[0], destination[1], destination[2], destination[3], destination[8], destination[9], destination[10], destination[11]]
-type Row is data = $Row {target: Ref U32}
+type Row is data = $Row {owner: Array U32, index: U32}
 const rollback_pair = func (input: U32): Pair => return $Pair {x: input, y: @u32.add input 1}
 const bump = func (rows: ResizeArray Row): Unit => return do:
   for row in rows:
-    @storage.write row.target (@u32.add (@storage.load row.target) 1)
+    row.owner[row.index] = @u32.add row.owner[row.index] 1
 const change = func (rows: ResizeArray Row): U32 => return do:
   let held = rollback_pair (@storage.length rows)
   bump rows
@@ -183,7 +183,7 @@ const change = func (rows: ResizeArray Row): U32 => return do:
 entry const rollback = func (input: U32): Array U32 => return do:
   let left: Array U32 = #[input]
   let right: Array U32 = #[@u32.add input 10]
-  let rows: ResizeArray Row = #[$Row {target: @storage.at left 0}, $Row {target: @storage.at right 0}]
+  let rows: ResizeArray Row = #[$Row {owner: left, index: 0}, $Row {owner: right, index: 0}]
   let count = change rows
   return #[left[0], right[0], count]
 `;

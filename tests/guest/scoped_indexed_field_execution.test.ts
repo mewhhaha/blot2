@@ -8,15 +8,15 @@ const source = `
 type Mode is data = $Play | $Edit
 type Editor is data = $Editor {mode: Mode, counter: U32, nested: {mode: Mode}}
 const set_mode = func access => return do:
-  access.editor[0].mode := $Edit
+  access.editor[0].mode = $Edit
 const toggle = func access => return do:
-  access.editor[0].mode := case self of
+  access.editor[0].mode = case self of
     $Play => $Edit
     $Edit => $Play
 const increment = func access => return do:
-  access.editor[0].counter := self + 1
+  access.editor[0].counter = self + 1
 const nested = func access => return do:
-  access.inner.editor[0].nested.mode := $Edit
+  access.inner.editor[0].nested.mode = $Edit
 const number = func (mode: Mode): U32 => return case mode of
   $Play => 0
   $Edit => 1

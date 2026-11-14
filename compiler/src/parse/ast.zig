@@ -65,6 +65,9 @@ pub const Tag = enum(u32) {
     index_access,
     let_stmt,
     rebind_stmt,
+    // store_stmt(a=place,b=value): `place = value` writes storage in place.
+    // The place is a name or atom followed by field and index steps.
+    store_stmt,
     use_stmt,
     // Generated iteration setup/step: a=binder symbol,b=expression. Executes
     // normally even inside a monadic do; it is not that monad's bind.

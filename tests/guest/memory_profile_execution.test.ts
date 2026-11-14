@@ -8,7 +8,7 @@ entry const boxed = func (count: U32) : Array U32 => return #[count, count + 1]
 entry const copied = func (count: U32) => return do:
   let values = array.generate count (func index => return index + 1)
   let old = values
-  values[0] := 99
+  values[0] = 99
   break old[0] + values[0] + old.length
 entry const trapped = func (index: U32) => return do:
   let values = array.generate 8 (func i => return i + 1)

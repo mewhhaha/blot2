@@ -30,7 +30,7 @@ const only = func (input: U32) => return do:
     return {rows: rows, stamp: @u32.add input 60}
 entry const single_edge = func (input: U32): Array U32 => return do:
   let result = only (@u32.add input 1)
-  result.rows[0] := @u32.add self 0
+  result.rows[0] = @u32.add self 0
   return #[result.rows[0], result.stamp]
 entry const loop_swap = func (input: U32): Array U32 => return do:
   let left = input

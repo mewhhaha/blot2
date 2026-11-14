@@ -65,6 +65,7 @@ comptime {
     _ = @import("check/core_loop_tests.zig");
     _ = @import("check/core_case_statement_tests.zig");
     _ = @import("check/core_update_tests.zig");
+    _ = @import("check/uniqueness_tests.zig");
     _ = @import("check/core_monad_tests.zig");
     _ = @import("check/loop_targets_tests.zig");
     _ = @import("check/scoped_effect_backend_tests.zig");

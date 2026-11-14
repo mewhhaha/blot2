@@ -420,6 +420,39 @@ test "type witnesses structural records and array arguments remain distinct" {
     try clean("const witness = function :U32\nconst anonymous = { field: 2 }\nconst run = func () => return do:\n  function #[]\n  function #[1, 2]\n  function :U32\n  world.values[1] := self + 2\n  break ()\n");
 }
 
+test "a top-level = in a statement stores through a place; := still rebinds" {
+    const source =
+        \\const run = func world => return do:
+        \\  world.rows[1].x = self + 2
+        \\  (world.rows)[0] = 1
+        \\  world.rows[2] := 3
+        \\  break ()
+    ;
+    var pool: symbols.Pool = .{};
+    defer pool.deinit(std.testing.allocator);
+    var tree = try parsed(std.testing.allocator, source, &pool);
+    defer tree.deinit(std.testing.allocator);
+    var statements: [8]ast.Id = undefined;
+    var count: usize = 0;
+    for (tree.nodes.items, 0..) |node, id| if (node.tag == .block) {
+        for (tree.children(@intCast(id))) |child| {
+            statements[count] = child;
+            count += 1;
+        }
+    };
+    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
+    try std.testing.expectEqual(@as(usize, 4), count);
+    const store = tree.node(statements[0]);
+    try std.testing.expectEqual(ast.Tag.store_stmt, store.tag);
+    try std.testing.expectEqual(ast.Tag.field_access, tree.node(store.a).tag);
+    try std.testing.expectEqual(ast.Tag.index_access, tree.node(tree.node(store.a).a).tag);
+    try std.testing.expectEqualStrings("world.rows[1].x = self + 2", source[tree.span(statements[0]).start..tree.span(statements[0]).end]);
+    const grouped = tree.node(statements[1]);
+    try std.testing.expectEqual(ast.Tag.store_stmt, grouped.tag);
+    try std.testing.expectEqual(ast.Tag.group, tree.node(tree.node(grouped.a).a).tag);
+    try std.testing.expectEqual(ast.Tag.rebind_stmt, tree.node(statements[2]).tag);
+}
+
 test "argument projections and adjacent indexes bind before application" {
     const source =
         \\const projected = @u32.add (@array.get values 0).x 2

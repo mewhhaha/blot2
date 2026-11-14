@@ -13,7 +13,7 @@ entry func positional (n: U32): F32 => return do:
 entry func grown (n: U32): U32 => return do:
   let rows: GrowArray U32 = #[5]
   let alias = rows
-  rows[0] := do:
+  rows[0] = do:
     for i in 0..64:
       @storage.push alias i
     break self + n

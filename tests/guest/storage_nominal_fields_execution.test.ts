@@ -17,7 +17,7 @@ const shifted = func access -> tag => return do:
 entry const answer = func (input: F32) => return do:
   let pool: ResizeArray (Maybe shapes.Pose) = #[$Some $shapes.Pose {position: shapes.vector input}]
   let (integer, first) = shifted {pool} 7
-  pool[0] := $Some $shapes.Pose {position: shapes.vector (input + 10.0)}
+  pool[0] = $Some $shapes.Pose {position: shapes.vector (input + 10.0)}
   let (floating, second) = shifted {pool} input
   return #[U32.to_f32 integer, first.x, floating, second.x]
 type Payload a is data = $Payload {left: a, right: a}

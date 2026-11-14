@@ -8,7 +8,7 @@ Deno.test("data-stack host arrays copy packets and preserve application owners a
 const world: ResizeArray U32 = #[40]
 entry const exchange = func (input: Array U32): Array U32 => return do:
   let previous = @storage.copy world
-  let changed = @storage.write (&world[0]) input[0]
+  world[0] = input[0]
   return @storage.freeze previous
 entry const read = func () => return world[0]
 entry const floats = func (input: Array F32): Array F32 => return do:
@@ -75,7 +75,7 @@ const calls: ResizeArray U32 = #[0]
 const invoke = func host -> packet => return host packet
 entry const exchange = func (host: Array F32 -> Array F32 ! {Foreign}): Array F32 => return do:
   let request: GrowArray F32 = #[1.5, 2.5]
-  let changed = @storage.write (&calls[0]) (@u32.add calls[0] 1)
+  calls[0] = @u32.add calls[0] 1
   use first <- invoke host (@storage.freeze request)
   use second <- host first
   return #[first[0], second[0], request[0]]
@@ -128,8 +128,8 @@ entry const main = func (host: U32 -> U32 ! {Foreign}) => return do:
   let scratch: GrowArray U32 = #[40]
   let reference = &scratch[0]
   use next <- host (@storage.load reference)
-  let changed = @storage.write reference next
-  let published = @storage.write (&world[0]) next
+  scratch[0] = next
+  world[0] = next
   return @storage.load reference
 entry const read = func () => return world[0]
 `,
@@ -176,7 +176,7 @@ entry const exchange = func (host: Array U32 -> Array U32 ! {Foreign}) => return
   for 0 .. 153600:
     let item = @storage.push request 42
   use response <- host (@storage.freeze request)
-  let count = @storage.write (&calls[0]) (calls[0] + 1)
+  calls[0] = calls[0] + 1
   return response[153599] + request[0]
 entry const count = func () => return calls[0]
 `,
@@ -211,7 +211,7 @@ Deno.test("data-stack ABI identifies scalar-only exports without transport", asy
 const state: ResizeArray U32 = #[41]
 entry const next = func () => return do:
   let pool = state
-  pool[0] := @u32.add pool[0] 1
+  pool[0] = @u32.add pool[0] 1
   return state[0]
 `,
     (guest, bytes) => {

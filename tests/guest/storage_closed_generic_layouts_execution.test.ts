@@ -18,7 +18,7 @@ entry const answer = func (input: F32) => return do:
   let integers: ResizeArray (Envelope U32) = #[$Envelope {box: $Some ($Box {value: 13}), pair: $Nothing}]
   let first = read floats
   let second = read integers
-  floats[0] := $Envelope {box: $Nothing, pair: $Some ($Pair (8, input + 10.0))}
+  floats[0] = $Envelope {box: $Nothing, pair: $Some ($Pair (8, input + 10.0))}
   let third = read floats
   let $Pair (first_id, first_amount) = pair_or ($Pair (0, 0.0)) first.pair
   let $Pair (third_id, third_amount) = pair_or ($Pair (0, 0.0)) third.pair

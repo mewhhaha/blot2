@@ -9,7 +9,7 @@ type Row is data = $Row {text: &[U32]}
 type Plain is data = $Plain {amount: U32}
 const effects: GrowArray U32 = #[0]
 const index_effect = func (index: U32): U32 => return do:
-  @storage.write (@storage.at effects 0) (effects[0] + 1)
+  effects[0] = effects[0] + 1
   return index
 const append = func (rows: ResizeArray Row) -> (text: &[U32]) => return rows.push ($Row {text})
 const consume = func (row: Row): U32 => return row.text.at 0

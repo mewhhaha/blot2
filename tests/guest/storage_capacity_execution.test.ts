@@ -70,7 +70,7 @@ Deno.test("fixed application literals remain independent", async () => {
     `${declarations}
 entry const answer = func (): Array U32 => return do:
   let current = slot_0
-  current[0] := current[0] + 1
+  current[0] = current[0] + 1
   return #[${names.map((name) => `${name}[0]`).join(" + ")}]
 `,
     (guest) => {

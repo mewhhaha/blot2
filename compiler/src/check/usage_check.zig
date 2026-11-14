@@ -375,7 +375,7 @@ fn Walker(comptime Engine: type) type {
                 .field, .unary, .operator_tail => if (node.b != 0) {
                     try self.captures(node.b, owner, once, found, depth + 1);
                 },
-                .apply, .index_access, .rebind_stmt => {
+                .apply, .index_access, .rebind_stmt, .store_stmt => {
                     try self.captures(node.a, owner, once, found, depth + 1);
                     try self.captures(node.b, owner, once, found, depth + 1);
                 },
@@ -752,6 +752,10 @@ fn Walker(comptime Engine: type) type {
                 .rebind_stmt => {
                     if (try self.expression(node.b, depth + 1) == .exit) return .exit;
                     try self.introduce(self.engine.resolved[source]);
+                },
+                .store_stmt => {
+                    if (try self.expression(node.a, depth + 1) == .exit) return .exit;
+                    if (try self.expression(node.b, depth + 1) == .exit) return .exit;
                 },
                 .block => {
                     if (node.c != 0 and self.states.items.len != 0) try self.engine.usageDiagnostic(.multiplicity_unknown, source);

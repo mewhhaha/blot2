@@ -175,7 +175,7 @@ entry const packed = func (value: U32) => return do:
   rows := [{x: value + 40, y: value + 1}, ...self]
   let items = @array.from_list rows
   let before = items
-  items[0] := {x: self.x + 1, y: self.y + 2}
+  items[0] = {x: self.x + 1, y: self.y + 2}
   break #[(@array.from_list original)[0].x, (@array.from_list rows)[0].x, before[0].x, items[0].x, items[0].y]
 entry const floating = func (value: F32) => return do:
   let original = $Large {alpha: value, child: #[40], value: 7, tail: 3}

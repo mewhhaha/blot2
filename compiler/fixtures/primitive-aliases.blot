@@ -71,23 +71,23 @@ entry const references = func (value: U32): Array U32 => return do:
   let owner: GrowArray U32 = #[value]
   let reference: &U32 = &owner[0]
   let before = add (@storage.load reference)
-  @storage.write reference (apply_binary add (@storage.load reference) 10)
+  owner[0] = apply_binary add (@storage.load reference) 10
   let after = add (@storage.load reference)
   return #[before 2, after 2, owner[0]]
 
 entry const scalar_reference = func (value: U32): Array U32 => return do:
-  let current = value
-  let reference: &U32 = &current
+  let current: Array U32 = #[value]
+  let reference: &U32 = &current[0]
   let before = add (@storage.load reference)
-  @storage.write reference (apply_binary multiply (@storage.load reference) 3)
-  return #[before 2, add (@storage.load reference) 2, current]
+  current[0] = apply_binary multiply (@storage.load reference) 3
+  return #[before 2, add (@storage.load reference) 2, current[0]]
 
 entry const float_reference = func (value: F32): Array F32 => return do:
-  let current = value
-  let reference: &F32 = &current
+  let current: Array F32 = #[value]
+  let reference: &F32 = &current[0]
   let before = float_multiply (@storage.load reference)
-  @storage.write reference (apply_unary negate (@storage.load reference))
-  return #[before 2.0, float_multiply (@storage.load reference) 2.0, current]
+  current[0] = apply_unary negate (@storage.load reference)
+  return #[before 2.0, float_multiply (@storage.load reference) 2.0, current[0]]
 
 entry const floating = func (value: F32): Array F32 => return
   #[float_add value 0.5, float_subtract value 0.5,
@@ -118,10 +118,10 @@ entry const eager = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => retu
 
 const select_partial = func operation -> value => return operation value
 entry const partial_constants = func (value: U32): Array U32 => return do:
-  let current = 4
-  let reference: &U32 = &current
+  let current: Array U32 = #[4]
+  let reference: &U32 = &current[0]
   let before = add (@storage.load reference)
-  @storage.write reference 11
+  current[0] = 11
   let after = add (@storage.load reference)
   return #[select_partial (add 2) value, select_partial (add 9) value,
     select_partial (add 2) value, select_partial (add 9) value,

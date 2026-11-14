@@ -64,7 +64,7 @@ const peek = func (value: {x: U32}): {x: U32} => return do:
   return value
 entry const answer = func (input: U32): Array U32 => return do:
   let a = peek {x: input}
-  @storage.write (@storage.at pool 0) (@u32.add pool[0] 10)
+  pool[0] = @u32.add pool[0] 10
   let b = peek {x: input}
   return #[a.x,b.x,pool[0]]
 `;
@@ -339,36 +339,3 @@ Deno.test(`completed plain word ABI preserves scalar floats nullary results vari
   }
 });
 
-// Direct backend gap: references to whole local values are not supported yet (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("completed plain local references write through to the local", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-plain-local-ref-" });
-  const entry = `${directory}/main.blot`;
-  const compiler = await createZigProjectCompiler({
-    executable: Deno.args[0],
-    entry,
-    prelude: null,
-  });
-  try {
-    const built = await compiler.build({
-      sources: {
-        [entry]: `entry const local_ref = func (input: U32): U32 => return do:
-  let value = input
-  @storage.write (&value) (@u32.add input 5)
-  return value
-`,
-      },
-    });
-    assert(built.success, JSON.stringify(built));
-    const guest = await instantiateGuest(built.bytes);
-    try {
-      for (const input of [0, 1, 0xfffffffa]) {
-        assert.equal(guest.call("local_ref", input), (input + 5) >>> 0);
-      }
-    } finally {
-      guest.dispose();
-    }
-  } finally {
-    await compiler.dispose();
-    await Deno.remove(directory, { recursive: true });
-  }
-});

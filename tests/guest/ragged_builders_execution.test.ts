@@ -85,7 +85,7 @@ entry const packed = func count => return do:
   let input = @array.generate count (func i => return {a: i, b: i + 1, z: i * 3})
   let from_array = arrays input
   let snapshot = input
-  input[0].a := 42
+  input[0].a = 42
   break #[sum from_array, from_array.length, snapshot[0].a, input[0].a]
 `,
     (guest) => {

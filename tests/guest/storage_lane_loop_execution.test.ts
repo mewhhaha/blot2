@@ -9,7 +9,7 @@ const kernel =
     let word = state[slot]
     word := (self << 5) + self + input[index]
     word := (self + (self << 10)) ^ (self >> 6)
-    state[slot] := word
+    state[slot] = word
   return ()
 `;
 const initial = [

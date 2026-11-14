@@ -7,7 +7,7 @@ entry const build = func (count: U32) : Array U32 => return do:
   let values = fill (@u32.mul count 2) 0
   for outer in 0 .. count:
     for inner in 0 .. 2:
-      values[@u32.add (@u32.mul outer 2) inner] := outer
+      values[@u32.add (@u32.mul outer 2) inner] = outer
   break values
 entry const floating = func (count: U32) : Array F32 => return do:
   let values = @array.generate count (func index => return @u32.to_f32 index)
@@ -48,47 +48,47 @@ const delay = func value => return func () => return value
 entry const alias = func () => return do:
   let values = #[1, 2]
   let before = values
-  values[1] := 9
+  values[1] = 9
   break @u32.add before[1] values[1]
 entry const callback = func () => return do:
   let values = #[1, 2]
   let before = func () => return values[1]
-  values[1] := 9
+  values[1] = 9
   break @u32.add (before ()) values[1]
 entry const suspended = func () => return do:
   let values = #[1, 2]
   let before = delay values
-  values[1] := 9
+  values[1] = 9
   break @u32.add (@array.get (before ()) 1) values[1]
 entry const iterator = func () => return do:
   let values = #[1, 2]
   let sum = 0
   for value in values:
-    values[1] := 9
+    values[1] = 9
     sum := @u32.add sum value
   break sum
 entry const parameter = func (values: Array U32) => return do:
-  values[1] := 9
+  values[1] = 9
   break values
 entry const global = func () => return do:
   let values = stored
-  values[1] := 9
+  values[1] = 9
   break @u32.add stored[1] values[1]
 entry const retained = func () => return do:
   let values = #[1, 2]
   let state = $Cell values
-  values[1] := 9
+  values[1] = 9
   let ($Cell before, _) = @state.run state (func () => return ())
   break @u32.add before[1] values[1]
 entry const calls = func () => return do:
   let values = #[1, 2]
   let before = read values
-  values[1] := 9
+  values[1] = 9
   break @u32.add before values[1]
 entry const nested = func () => return do:
   let leaf = #[1]
   let values = @array.fill 2 leaf
-  values[0][0] := 9
+  values[0][0] = 9
   break @u32.add values[0][0] values[1][0]
 `,
     (guest) => {
@@ -128,37 +128,37 @@ entry const inlined = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   for i in 0..n:
     let x = get1 i values
-    values[i] := x * 0.5 + 0.25
+    values[i] = x * 0.5 + 0.25
   break values[n - 1]
 entry const called = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
-    values[i] := total values / @u32.to_f32 n + 1.0
+    values[i] = total values / @u32.to_f32 n + 1.0
   break values[n - 1]
 entry const generated = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   let doubled = @array.generate n (func i => return values[i] * 2.0)
   for i in 0..n:
-    values[i] := values[i] + doubled[i]
+    values[i] = values[i] + doubled[i]
   break values[n - 1]
 entry const mapped = func (n: U32) : F32 => return do:
   let values = @array.generate n (func i => return @u32.to_f32 i)
   let doubled = array.map (func value => return value * 2.0) values
   for i in 0..n:
-    values[i] := values[i] + doubled[i]
+    values[i] = values[i] + doubled[i]
   break values[n - 1]
 entry const local = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   let read = func (xs: Array F32) => return func (index: U32) => return xs[index]
   for i in 0..n:
     let x = read values i
-    values[i] := x + 1.0
+    values[i] = x + 1.0
   break values[n - 1]
 entry const match_read = func (n: U32) : F32 => return do:
   let values = @array.fill n 1.0
   for i in 0..n:
     let x = matched values i
-    values[i] := x + 1.0
+    values[i] = x + 1.0
   break values[n - 1]
 `,
     (guest) => {
@@ -214,7 +214,7 @@ entry const reassigned = func (n: U32) => return do:
   for i in 0..n:
     let before = merged (i == n) values
     let after = carried 0 values
-    values[i] := 9
+    values[i] = 9
     sum := sum + before[i] + after[i]
   break sum
 entry const returned = func (n: U32) => return do:
@@ -222,7 +222,7 @@ entry const returned = func (n: U32) => return do:
   let sum = 0
   for i in 0..n:
     let before = pass values
-    values[i] := 9
+    values[i] = 9
     sum := sum + before[i]
   break sum
 entry const stored = func (n: U32) => return do:
@@ -230,7 +230,7 @@ entry const stored = func (n: U32) => return do:
   let sum = 0
   for i in 0..n:
     let $Cell before = wrap values
-    values[i] := 9
+    values[i] = 9
     sum := sum + before[i]
   break sum
 entry const paired = func (n: U32) => return do:
@@ -238,7 +238,7 @@ entry const paired = func (n: U32) => return do:
   let sum = 0
   for i in 0..n:
     let (before, _) = pair values
-    values[i] := 9
+    values[i] = 9
     sum := sum + before[i]
   break sum
 entry const captured = func (n: U32) => return do:
@@ -246,7 +246,7 @@ entry const captured = func (n: U32) => return do:
   let read = reader values
   let sum = 0
   for i in 0..n:
-    values[i] := 9
+    values[i] = 9
     sum := sum + read i
   break sum
 entry const kept = func (n: U32) => return do:
@@ -255,7 +255,7 @@ entry const kept = func (n: U32) => return do:
   let copied = @array.generate n read
   let sum = 0
   for i in 0..n:
-    values[i] := 9
+    values[i] = 9
     sum := sum + read i + copied[i]
   break sum
 entry const nested = func (n: U32) => return do:
@@ -263,7 +263,7 @@ entry const nested = func (n: U32) => return do:
   let sum = 0
   for i in 0..n:
     let inner = first values
-    values[0][0] := 9
+    values[0][0] = 9
     sum := sum + inner[0]
   break sum
 entry const ordered = func (n: U32) => return do:
@@ -310,15 +310,15 @@ entry const retained = func (flag: Bool) => return do:
   let values = #[10, 20]
   let previous = values
   if flag:
-    values[0] := 1
+    values[0] = 1
   else:
-    values[0] := 3
+    values[0] = 3
   break #[previous[0], previous[1], values[0], values[1]]
 entry const nested_slice = func (value: U32) => return do:
   let inner = #[value]
   let source = #[inner, inner]
   let values = @array.slice source 0 2
-  values[0][0] := value + 1
+  values[0][0] = value + 1
   break #[inner[0], source[0][0], source[1][0], values[0][0], values[1][0]]
 `, (guest) => {
     for (const count of [1, 32, 4096, 20020]) {

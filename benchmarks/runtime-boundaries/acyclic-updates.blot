@@ -8,7 +8,7 @@ entry const update_snapshots = func (steps: U32) : U32 => return do:
   for step in 0..steps:
     let previous = world
     let index = step % 256
-    world.bodies[index].lanes := #[step]
+    world.bodies[index].lanes = #[step]
     sum := self + previous.bodies[index].lanes[0] + world.bodies[index].lanes[0]
   break sum
 entry const memory = func () : Array U32 => return #[]

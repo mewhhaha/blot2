@@ -1,12 +1,12 @@
 const pool: GrowArray U32 = #[4]
 const append = func (value: U32): U32 => return do:
-  @storage.write (&pool[0]) (@u32.add pool[0] value)
+  pool[0] = @u32.add pool[0] value
   @storage.push pool value
   return @storage.length pool
 const nested = func (value: U32): U32 => return append value
 const explicit = func (alias: GrowArray U32) -> (value: U32): U32 => return do:
-  alias[0] := @u32.add self value
-  @storage.write (&pool[0]) (@u32.add pool[0] 1)
+  alias[0] = @u32.add self value
+  pool[0] = @u32.add pool[0] 1
   return @u32.add alias[0] pool[0]
 const owned = func (): GrowArray U32 => return pool
 entry const mutate = func (value: U32): Array U32 => return do:
@@ -14,7 +14,7 @@ entry const mutate = func (value: U32): Array U32 => return do:
   let after = nested value
   let alias = owned ()
   let compared = explicit alias value
-  alias[0] := @u32.add self 2
+  alias[0] = @u32.add self 2
   return #[before, after, compared, pool[0], alias[0], @storage.length alias]
 entry const observe = func (index: U32): U32 => return pool[index]
 entry const count = func (): U32 => return @storage.length pool

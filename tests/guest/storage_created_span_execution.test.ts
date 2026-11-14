@@ -12,13 +12,13 @@ function source(createdFirst: boolean) {
   if @u32.eq remaining 0:
     return ()
   let index = @u32.sub remaining 1
-  left[index] := @u32.add left[index] right[index]
+  left[index] = @u32.add left[index] right[index]
   walk left right index
-  right[index] := @u32.add self 1
+  right[index] = @u32.add self 1
   return ()
 const wrapped = func (left: Array U32) -> (right: Array U32) -> (count: U32): Unit => return walk left right count
 const bump = func (rows: Array U32) -> (index: U32): Unit => return do:
-  rows[index] := @u32.add self 1
+  rows[index] = @u32.add self 1
   return ()
 const forwarded = func (rows: Array U32) -> (index: U32): Unit => return bump rows index
 const read_if = func (rows: Array U32) -> (index: U32) -> (flag: U32): U32 => return do:
@@ -29,7 +29,7 @@ const global: Array U32 = #[10, 20, 30, 40]
 entry const reset = func (): Unit => return do:
   let rows = global
   for index in 0 .. 4:
-    rows[index] := @u32.mul (@u32.add index 1) 10
+    rows[index] = @u32.mul (@u32.add index 1) 10
   return ()
 entry const mixed = func (input: Array U32): Array U32 => return do:
   let local: Array U32 = #[1, 2, 3, 4]
@@ -74,7 +74,7 @@ entry const prefix_trap = func (end: U32): Unit => return do:
   return ()
 entry const read_global = func (): Array U32 => return @storage.copy global
 const copy_float = func (dst: Array F32) -> (src: Array F32) -> (index: U32): Unit => return do:
-  dst[index] := src[index]
+  dst[index] = src[index]
   return ()
 entry const floats = func (input: Array F32): Array F32 => return do:
   let rows: Array F32 = @array.fill 2 0.0

@@ -12,14 +12,14 @@ entry const answer = func () => return do:
   let base = {owner: original, view: &original[0..1], retained: 7,
     operation: func (value: U32) => return value + 1}
   let left = func () => return do:
-    order[0] := self * 10 + 1
+    order[0] = self * 10 + 1
     return base
   let right = func () => return do:
-    order[0] := self * 10 + 2
+    order[0] = self * 10 + 2
     return {owner: scratch, view: &scratch[0..1], added: 9,
       operation: func (value: U32) => return value + 5}
   let merged = overlay (left ()) (right ())
-  merged.owner[0] := 31
+  merged.owner[0] = 31
   return #[order[0], merged.retained, merged.added, merged.view[0],
     merged.operation 10, base.operation 10, base.owner[0], base.view[0], scratch[0]]
 `,

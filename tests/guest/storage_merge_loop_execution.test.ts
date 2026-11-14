@@ -13,10 +13,10 @@ const source =
     if @u32.lt right j:
       break
     if @u32.lt src[j] src[i]:
-      dst[k] := src[j]
+      dst[k] = src[j]
       j := @u32.add self 1
     else:
-      dst[k] := src[i]
+      dst[k] = src[i]
       i := @u32.add self 1
     k := @u32.add self 1
   return ()
@@ -27,9 +27,9 @@ entry const reset = func () => return do:
   let target = dst
   let small = tiny
   for index in 0 .. 12:
-    target[index] := 99
+    target[index] = 99
   for index in 0 .. 3:
-    small[index] := 99
+    small[index] = 99
   return ()
 entry const run = func (bounds: Array U32): Array U32 => return do:
   merge dst src bounds[0] bounds[1] bounds[2]
@@ -87,9 +87,9 @@ entry const wide_reset = func () => return do:
   let target = wide_dst
   let other = separate_dst
   for index in 0 .. 48:
-    target[index] := 99
+    target[index] = 99
   for index in 0 .. 64:
-    other[index] := 99
+    other[index] = 99
   return ()
 entry const wide = func (bounds: Array U32): Array U32 => return do:
   let target: Array U32 = @array.fill bounds[3] 99

@@ -27,7 +27,7 @@ export function storageCallSource(
   } else {
     lines.push(
       "const stage_0 = func (rows: GrowArray U32) -> (amount: U32): Unit => return do:",
-      "  rows[0] := @u32.add rows[0] amount",
+      "  rows[0] = @u32.add rows[0] amount",
     );
     for (let level = 1; level <= depth; level++) {
       lines.push(
@@ -49,7 +49,7 @@ export function storageCallSource(
       lines.push(
         `  total := @u32.add total (stage_${depth} first index)`,
         `  total := @u32.add total (stage_${depth} second index)`,
-        "  first[index] := @u32.add first[index] 3",
+        "  first[index] = @u32.add first[index] 3",
       );
     } else {
       lines.push(

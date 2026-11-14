@@ -159,7 +159,7 @@ const run = func stages -> access -> events => return do:
     stages.update access event
 const update = func access -> event => return do:
   let rows: GrowArray U32 = access.rows
-  rows[0] := rows[0] + event
+  rows[0] = rows[0] + event
 const policy = {update}
 entry const answer = func (input: U32) => return do:
   let rows: GrowArray U32 = #[input]
@@ -215,7 +215,7 @@ entry const answer = func (input: U32) => return do:
   let alternate = &other[0..1]
   let first = read view 0
   let second = read alternate 0
-  rows[1] := 12
+  rows[1] = 12
   let last = read view 0
   let links: GrowArray U32 = #[12]
   let link = @storage.link links 0
@@ -317,7 +317,7 @@ entry const answer = func (input: U32) => return do:
   let view = &first[1..2]
   let before = reading view 0
   let other = reading (&second[0..1]) 0
-  first[1] := 12
+  first[1] = 12
   let after = reading view 0
   return @u32.add input (@u32.add before (@u32.add other after))
 `,
@@ -499,7 +499,7 @@ entry const answer = func (input: U32): U32 => return do:
   let second: ResizeArray U32 = #[11]
   let older = folded ($Bundle {rows: &first[1..3], bias: 1})
   let other = folded ($Bundle {rows: &second[0..1], bias: 2})
-  first[1] := 5
+  first[1] = 5
   let fresh = folded ($Bundle {rows: &first[1..3], bias: 1})
   return older.total + other.total + fresh.total + older.count
 `,
@@ -543,7 +543,7 @@ entry const answer = func (input: U32): U32 => return do:
   let a = folded add (&first[0..2])
   let b = folded add (&second[0..1])
   let c = folded subtract (&first[0..2])
-  bias[0] := 9
+  bias[0] = 9
   let d = folded add (&second[0..1])
   return a + b + c + d
 `,
@@ -558,7 +558,7 @@ const apply_callback = func callback -> (value: U32): U32 => return callback val
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray U32 = #[1]
   let change = func (value: U32): U32 => return do:
-    rows[0] := rows[0] + value
+    rows[0] = rows[0] + value
     return rows[0]
   let first = apply_callback change input
   let second = apply_callback change 2
@@ -587,9 +587,9 @@ entry const answer = func (input: U32): U32 => return do:
   let b = choose pair $Second
   let c = choose ($Pair {first: $Buffer {rows: third, label: 33}, second: $Buffer {rows: first, label: 44}}) $First
   let saved = a.rows[0]
-  a.rows[0] := 7
+  a.rows[0] = 7
   let view = window (&a.rows[0..2]) 1 2
-  a.rows[1] := 9
+  a.rows[1] = 9
   return saved + a.rows[0] + b.rows[0] + c.rows[0] + view[0] + a.label + b.label + c.label
 `,
     (guest) => {
@@ -617,7 +617,7 @@ const copied = func (rows: ResizeArray U32) => return @storage.copy rows
 entry const answer = func (input: U32): U32 => return do:
   let original: ResizeArray U32 = #[input]
   let independent = copied original
-  independent[0] := 9
+  independent[0] = 9
   return original[0] + independent[0]
 `,
     (guest) => {
@@ -661,13 +661,13 @@ Deno.test("Unit writers preserve callback aliases growth views and ordered updat
     `
 const execute = func callback -> (rows: ResizeArray U32) -> (amount: U32): Unit => return do:
   callback amount
-  rows[0] := rows[0] + 1
+  rows[0] = rows[0] + 1
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray U32 = #[input]
   let other: ResizeArray U32 = #[10]
   let view = &rows[0..1]
   let grow = func (amount: U32): Unit => return do:
-    rows[0] := rows[0] + amount
+    rows[0] = rows[0] + amount
     @storage.push rows amount
   execute grow rows 2
   execute grow other 3
@@ -682,8 +682,8 @@ entry const answer = func (input: U32): U32 => return do:
   await compileAndRun(
     `
 type Stage is data = $Cold | $Hot U32
-const publish = func (rows: ResizeArray Stage) -> (value: U32): Unit => return
-  @storage.write (@storage.at rows 0) ($Hot value)
+const publish = func (rows: ResizeArray Stage) -> (value: U32): Unit => return do:
+  rows[0] = $Hot value
 entry const answer = func (input: U32): U32 => return do:
   let rows: ResizeArray Stage = #[$Cold]
   let total = 0

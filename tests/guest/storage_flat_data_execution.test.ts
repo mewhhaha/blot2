@@ -42,10 +42,10 @@ Deno.test("owned flat Maybe rows preserve nested records guards and F32 payloads
 type Span is data = $Span {start: U32, count: U32}
 const read_optional = func rows -> (id: U32) => return if id < rows.length then rows.at id else $Nothing
 const bump = func access => return do:
-  access.rows[0] := access.rows[0] + 1
+  access.rows[0] = access.rows[0] + 1
 const run_known = func callback -> access => return callback access
 const accept = func (calls: GrowArray U32) => return func (value: U32) => return do:
-  let wrote = @storage.write (&calls[0]) (calls[0] + 1)
+  calls[0] = calls[0] + 1
   return value > 0
 entry const inspect = func (present: Bool) => return do:
   let calls: GrowArray U32 = #[0]
@@ -64,7 +64,7 @@ entry const generic_update = func (chosen: Bool) => return do:
   let selected = case chosen of
     true => do:
       if rows[0] == 1:
-        rows[0] := 41
+        rows[0] = 41
       break true
     false => false
   return rows[0] + (if selected then 1 else 0)
@@ -152,7 +152,7 @@ entry const snapshots = func () => return do:
   let saved: List U32 = @list.from_array source
   let cursor = @list.cursor saved
   let advanced = @cursor.advance cursor
-  let wrote = @storage.write (&source[0]) 7
+  source[0] = 7
   let extended = @list.append saved 9
   let joined = @list.concat extended [1]
   let copied: Array U32 = @array.from_list joined

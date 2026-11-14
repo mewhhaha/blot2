@@ -118,7 +118,7 @@ entry const operations = func count => return do:
   let before = values
   let extracted = values[1]
   let read = func () => return values[1].a
-  values[1].a := self + 100
+  values[1].a = self + 100
   let after = @array.set values 0 {a: 20, z: 30}
   let copied = @array.slice after 0 count
   let joined = @array.concat copied literal
@@ -132,7 +132,7 @@ entry const single_field = func count => return (@array.generate count (func i =
 entry const reference_rows = func count => return do:
   let values = @array.generate count (func i => return {items: #[i, i + 1], value: i})
   let before = values
-  values[0].items[0] := 99
+  values[0].items[0] = 99
   break #[before[0].items[0], values[0].items[0], values[count - 1].value]
 `,
     (guest) => {
@@ -171,7 +171,7 @@ entry const floating = func (input: Array F32) => return do:
   let rows = #[(i, value) | value <- input, let i = 9]
   let original = rows
   let selected = rows[0]
-  rows[0] := (0, 42.0)
+  rows[0] = (0, 42.0)
   let cursor = original.iter
   let fork = cursor
   let cursor = @cursor.advance cursor

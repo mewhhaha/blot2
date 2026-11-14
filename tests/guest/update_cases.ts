@@ -1,6 +1,22 @@
-// `before` aliases the updated array, so it reads the write
-// (tasks/LANGUAGE_COHERENCE.md A7).
+// `before` aliases the updated array, so it reads the store; a `:=`
+// through an aliased root is rejected, and `@storage.copy` first keeps the old
+// snapshot (tasks/MEMORY_MODEL.md rules 2 and 4).
 export const updateCases = [
+  {
+    name: "scalar_array_snapshots",
+    expected: { folded: 41, run: 41 },
+    arguments: { run: 1 },
+    source: `
+const update = func index => return do:
+  let values = #[10, 20, 30]
+  let before = values
+  values := @storage.copy values
+  values[index] := @u32.add self 1
+  break @u32.add (@array.get before index) (@array.get values index)
+entry const folded = update 1
+entry const run = func (index: U32) : U32 => return update index
+`,
+  },
   {
     name: "scalar_array_aliases",
     expected: { folded: 42, run: 42 },
@@ -9,7 +25,7 @@ export const updateCases = [
 const update = func index => return do:
   let values = #[10, 20, 30]
   let before = values
-  values[index] := @u32.add self 1
+  values[index] = @u32.add self 1
   break @u32.add (@array.get before index) (@array.get values index)
 entry const folded = update 1
 entry const run = func (index: U32) : U32 => return update index
@@ -24,7 +40,7 @@ type Bucket is data = $Bucket { points: Array Point }
 entry const run = func () : U32 => return do:
   let bucket = $Bucket { points: #[$Point { y: 1, x: 10 }, $Point { y: 2, x: 20 }] }
   let before = bucket
-  bucket.points[1].x := @u32.add self 2
+  bucket.points[1].x = @u32.add self 2
   break @u32.add before.points[1].x bucket.points[1].x
 `,
   },
@@ -35,7 +51,7 @@ entry const run = func () : U32 => return do:
 entry const run = func () : U32 => return do:
   let values = #[#[1, 2], #[3, 4]]
   let before = values
-  values[1][0] := @u32.add self 39
+  values[1][0] = @u32.add self 39
   break @u32.add before[1][0] values[1][0]
 `,
   },
@@ -54,7 +70,7 @@ entry const run = func () : U32 => return do:
     expected: { integer: 42, floating: 4.5 },
     source: `
 const replace = func values => return func index => return func value => return do:
-  values[index] := value
+  values[index] = value
   break values
 entry const integer = func () : U32 => return (replace #[1, 2] 1 42)[1]
 entry const floating = func () : F32 => return (replace #[1.0, 2.0] 0 4.5)[0]

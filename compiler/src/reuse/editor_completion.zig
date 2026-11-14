@@ -313,6 +313,10 @@ const Lexical = struct {
                 }
             },
             .let_stmt, .rebind_stmt, .unary => try self.scope(node.b, depth + 1),
+            .store_stmt => {
+                try self.scope(node.a, depth + 1);
+                try self.scope(node.b, depth + 1);
+            },
             .return_stmt, .function_return_stmt, .yield_stmt, .group, .field => try self.scope(node.a, depth + 1),
             .apply, .field_access, .index_access => {
                 try self.scope(node.a, depth + 1);

@@ -1487,27 +1487,40 @@ const Parser = struct {
             }
             return self.add(.use_stmt, 0, try self.expression(), 0, start);
         }
-        if ((self.at(.type_identifier) or self.at(.kw_true) or self.at(.kw_false)) and self.hasRebinding()) return self.identifierSyntax();
-        if (self.at(.identifier) and self.hasRebinding()) {
-            const name = try self.lowerIdentifier();
-            var target = try self.add(.name, name, 0, 0, start);
-            while (self.at(.dot) or self.at(.l_bracket)) {
-                if (self.at(.dot)) {
-                    const dot = self.advance();
-                    const member = try self.identifier();
-                    target = try self.add(.field_access, target, member, 0, start);
-                    try self.tree.operator_origins.append(self.allocator, .{ .node = target, .span = .{ .start = dot.start, .end = dot.end }, .member = member });
-                } else {
-                    _ = self.advance();
-                    const index = try self.expression();
-                    _ = try self.expect(.r_bracket);
-                    target = try self.add(.index_access, target, index, 0, start);
-                }
+        const assignment = self.assignmentOperator();
+        if (assignment == .colon_equal) {
+            if (self.at(.type_identifier) or self.at(.kw_true) or self.at(.kw_false)) return self.identifierSyntax();
+            if (self.at(.identifier)) {
+                const target = try self.place(start);
+                _ = try self.expect(.colon_equal);
+                return self.add(.rebind_stmt, target, try self.expression(), 0, start);
             }
-            _ = try self.expect(.colon_equal);
-            return self.add(.rebind_stmt, target, try self.expression(), 0, start);
+        }
+        if (assignment == .equal) {
+            const target = try self.place(start);
+            _ = try self.expect(.equal);
+            return self.add(.store_stmt, target, try self.expression(), 0, start);
         }
         return self.expression();
+    }
+    /// The target of `:=` or `=`: a name (or, for a store, any atom)
+    /// followed by `.field` and `[index]` steps.
+    fn place(self: *Parser, start: u32) Error!Id {
+        var target = if (self.at(.identifier)) try self.add(.name, try self.lowerIdentifier(), 0, 0, start) else try self.atom();
+        while (self.at(.dot) or self.at(.l_bracket)) {
+            if (self.at(.dot)) {
+                const dot = self.advance();
+                const member = try self.identifier();
+                target = try self.add(.field_access, target, member, 0, start);
+                try self.tree.operator_origins.append(self.allocator, .{ .node = target, .span = .{ .start = dot.start, .end = dot.end }, .member = member });
+            } else {
+                _ = self.advance();
+                const index = try self.expression();
+                _ = try self.expect(.r_bracket);
+                target = try self.add(.index_access, target, index, 0, start);
+            }
+        }
+        return target;
     }
     fn localFunctionDeclaration(self: *Parser) Error!Id {
         const declaration_id = try self.declaration(false, false);
@@ -1543,15 +1556,16 @@ const Parser = struct {
         return false;
     }
     // Classify before allocating a target. An ordinary call such as f [a, b]
-    // must not speculatively parse the argument as a rebinding index.
-    fn hasRebinding(self: *const Parser) bool {
+    // must not speculatively parse the argument as an index. A top-level
+    // `:=` on the statement's line rebinds; a top-level `=` stores.
+    fn assignmentOperator(self: *const Parser) ?token.Tag {
         var nesting: usize = 0;
         var i = self.index;
         while (i < self.tokens.len) : (i += 1) {
             const tag = self.tokens[i].tag;
             if (nesting == 0) switch (tag) {
-                .colon_equal => return true,
-                .newline, .dedent, .eof => return false,
+                .colon_equal, .equal => return tag,
+                .newline, .dedent, .eof => return null,
                 else => {},
             };
             switch (tag) {
@@ -1562,7 +1576,7 @@ const Parser = struct {
                 else => {},
             }
         }
-        return false;
+        return null;
     }
     fn trailingElse(self: *Parser) Error!Id {
         const saved = self.index;

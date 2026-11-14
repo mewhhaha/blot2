@@ -28,6 +28,8 @@ const usage =
     \\       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]
     \\       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]
     \\       blotc serve-project (owned project-build byte protocol)
+    \\       blotc migrate-stores ENTRY... [--project PEN_JSON] [--write-root DIR] [--include-std] [--dry-run] [project options]
+    \\       migrate-stores rewrites each := that gets aliased_update into the store =.
     \\       blotc check|build also accepts explicit --prelude PATH|none (default: none).
     \\       Project options accept --input-mode project|source (default: project).
     \\       --profile (build, build-project) adds phase clocks to the stats record.
@@ -40,6 +42,7 @@ const usage =
     \\
 ;
 const dependency_cli = @import("reuse/dependency_cli.zig");
+const migrate_stores = @import("migrate_stores.zig");
 const compiler_identity = @import("compiler_identity");
 /// Immutable executable defaults; individual compiler invocations own options.
 pub const compiler_defaults = .{ .inference_budget = compiler_identity.inference_budget };
@@ -49,7 +52,9 @@ pub fn inferenceBudget() usize {
     return configured_inference_budget;
 }
 fn configureInferenceBudget(value: []const u8) !void {
-    const limit = try std.fmt.parseInt(usize, value, 10);
+    try setInferenceBudget(try std.fmt.parseInt(usize, value, 10));
+}
+fn setInferenceBudget(limit: usize) !void {
     if (limit == 0) return error.InvalidInferenceBudget;
     configured_inference_budget = limit;
     configured_identity = compiler_identity.digest;
@@ -500,6 +505,7 @@ fn run(init: std.process.Init) !bool {
         try @import("reuse/zig_project_server.zig").run(backing, init.io, &input.interface, &output.interface, configured_identity, policy);
         return true;
     }
+    if (std.mem.eql(u8, args[1], "migrate-stores")) return migrateStores(init, backing, args[2..]);
     const command = (if (std.mem.eql(u8, args[1], "parse-project")) Command.parse_project else if (std.mem.eql(u8, args[1], "check-project")) Command.check_project else if (std.mem.eql(u8, args[1], "build-project")) Command.build_project else std.meta.stringToEnum(Command, args[1])) orelse {
         try Io.File.stderr().writeStreamingAll(init.io, usage);
         return false;
@@ -606,6 +612,63 @@ fn run(init: std.process.Init) !bool {
     }
     try output.interface.flush();
     return success;
+}
+fn migrateStores(init: std.process.Init, backing: std.mem.Allocator, args: []const []const u8) !bool {
+    const io = init.io;
+    var arena = std.heap.ArenaAllocator.init(backing);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var entries: std.ArrayList([]const u8) = .empty;
+    var aliases: std.ArrayList(project.Alias) = .empty;
+    var settings: migrate_stores.Settings = .{};
+    var write_root: ?[]const u8 = null;
+    var include_std = false;
+    var dry_run = false;
+    var at: usize = 0;
+    while (at < args.len) : (at += 1) {
+        const arg = args[at];
+        if (std.mem.eql(u8, arg, "--include-std")) {
+            include_std = true;
+        } else if (std.mem.eql(u8, arg, "--dry-run")) {
+            dry_run = true;
+        } else if (std.mem.startsWith(u8, arg, "--")) {
+            if (at + 1 >= args.len) return false;
+            at += 1;
+            const value = args[at];
+            if (std.mem.eql(u8, arg, "--project")) {
+                settings = try migrate_stores.projectSettings(a, io, value);
+                try aliases.appendSlice(a, settings.options.aliases);
+                if (write_root == null) write_root = try Io.Dir.cwd().realPathFileAlloc(io, Io.Dir.path.dirname(value) orelse ".", a);
+            } else if (std.mem.eql(u8, arg, "--write-root")) {
+                write_root = try Io.Dir.cwd().realPathFileAlloc(io, value, a);
+            } else if (std.mem.eql(u8, arg, "--std-root")) {
+                settings.options.std_root = value;
+            } else if (std.mem.eql(u8, arg, "--alias")) {
+                const split = std.mem.findScalar(u8, value, '=') orelse return false;
+                try aliases.append(a, .{ .prefix = value[0..split], .root = value[split + 1 ..] });
+            } else if (std.mem.eql(u8, arg, "--prelude")) {
+                settings.options.prelude_path = if (std.mem.eql(u8, value, "none")) null else value;
+            } else if (std.mem.eql(u8, arg, "--inference-budget")) {
+                settings.inference_budget = try std.fmt.parseInt(usize, value, 10);
+            } else return false;
+        } else try entries.append(a, try Io.Dir.cwd().realPathFileAlloc(io, arg, a));
+    }
+    if (entries.items.len == 0) {
+        try Io.File.stderr().writeStreamingAll(io, usage);
+        return false;
+    }
+    settings.options.aliases = aliases.items;
+    if (settings.inference_budget) |budget| try setInferenceBudget(budget);
+    var buffer: [4096]u8 = undefined;
+    var output = Io.File.stdout().writerStreaming(io, &buffer);
+    defer output.interface.flush() catch {};
+    return migrate_stores.run(backing, io, &output.interface, .{
+        .entries = entries.items,
+        .settings = settings,
+        .write_root = write_root orelse try Io.Dir.cwd().realPathFileAlloc(io, ".", a),
+        .include_std = include_std,
+        .dry_run = dry_run,
+    });
 }
 /// Compile-time evaluation recurses natively. Its depth limits assume this
 /// reserved stack; pages are committed only as deep evaluation touches them.

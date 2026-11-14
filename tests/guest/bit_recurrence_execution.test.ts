@@ -199,46 +199,6 @@ entry const effects = func (host: U32 -> U32 ! {Foreign}): U32 ! {Foreign} => re
   }
 });
 
-// Direct backend gap: references to whole local values are not supported yet (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("bit loops through an addressed local write through the reference", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-bit-addressed-" });
-  const entry = `${directory}/main.blot`;
-  try {
-    {
-      const compiler = await createZigProjectCompiler({
-        executable: Deno.args[0],
-        entry,
-        stdRoot,
-        prelude: `${stdRoot}/prelude.blot`,
-      });
-      try {
-        const addressed = await compiler.build({
-          sources: {
-            [entry]:
-              `entry const addressed = func (input: U32): U32 => return do:
-  let rows: GrowArray U32 = #[input]
-  let state = rows[0]
-  let address = @storage.ref state
-  for bit in 0 .. 8:
-    @storage.write address (@storage.load address >> 1)
-  return state
-`,
-          },
-        });
-        assert(addressed.success, JSON.stringify(addressed));
-        await withGuest(addressed.bytes, (guest) => {
-          for (const input of [0, 1, 0xffffffff]) {
-            assert.equal(guest.call("addressed", input), input >>> 8);
-          }
-        });
-      } finally {
-        await compiler.dispose();
-      }
-    }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
 
 Deno.test("retained bit proofs observe helper edits rejected revisions and exact reverts", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-bit-edits-" });

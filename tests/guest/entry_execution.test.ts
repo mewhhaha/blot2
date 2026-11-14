@@ -64,8 +64,9 @@ Deno.test("repository prelude and syntax examples execute their exported functio
     equal(guest.call("matching_example", null), 42);
     equal(guest.call("event_example", null), 42);
     equal(guest.call("vector_example", null), 50);
-    // `next` aliases `original`, so both read the write (LANGUAGE_COHERENCE A7).
-    equal(guest.call("array_snapshot", null), 40);
+    // `next` is a copy, so only it sees its `:=`; `alias` sees the store.
+    equal(guest.call("array_snapshot", null), 22);
+    equal(guest.call("array_store", null), 40);
     equal(guest.call("provider_example", null), 42);
   }, { prelude: "std/prelude.blot" });
 });

@@ -23,7 +23,7 @@ entry const list = func (index: U32) => return do:
 entry const saved = func (index: U32) => return do:
   let values = @array.generate 513 make
   let old = values
-  values[index] := $Pair {x: 100, y: 200}
+  values[index] = $Pair {x: 100, y: 200}
   break read old[index] + read values[index]
 entry const static_values = func (index: U32) => return do:
   let values = #[$Empty, $One 7, $Pair {x: 2, y: 3}]

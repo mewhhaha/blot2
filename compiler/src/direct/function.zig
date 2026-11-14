@@ -1741,7 +1741,7 @@ pub const Fn = struct {
                 try self.opIndex(.local_set, result.words[2]);
                 return result;
             },
-            .load, .write => {
+            .load => {
                 const reference_ = try self.expr(children[0]);
                 const element = try self.elementOf(reference_.ty, id);
                 const address = try self.local32();
@@ -1751,11 +1751,7 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(element, id));
                 try self.opIndex(.call, rt.address);
                 try self.opIndex(.local_set, address);
-                if (operation == .load) return self.loadElement(address, 0, element, id);
-                const value = try self.expr(children[1]);
-                try self.noteStore(value);
-                try self.writeFlat(address, 0, value, id);
-                return unitVal();
+                return self.loadElement(address, 0, element, id);
             },
             .ref => return self.g.fail(self.m, id, "references to whole values are not supported yet", .{}),
         }

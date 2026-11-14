@@ -5,23 +5,23 @@ import { instantiateGuest } from "../../host/guest.ts";
 const source =
   `const copy = func (dst: Array U32) -> (src: Array U32) -> (first: U32) -> (end: U32): Unit => return do:
   for index in first .. end:
-    dst[index] := src[index]
+    dst[index] = src[index]
   return ()
 const fill = func (dst: Array U32) -> (first: U32) -> (end: U32): Unit => return do:
   for index in first .. end:
-    dst[index] := 305419896
+    dst[index] = 305419896
   return ()
 const zero = func (dst: Array U32) -> (end: U32): Unit => return do:
   for index in 0 .. end:
-    dst[index] := 0
+    dst[index] = 0
   return ()
 const fcopy = func (dst: Array F32) -> (src: Array F32) -> (end: U32): Unit => return do:
   for index in 0 .. end:
-    dst[index] := src[index]
+    dst[index] = src[index]
   return ()
 const ffill = func (dst: Array F32) -> (end: U32): Unit => return do:
   for index in 0 .. end:
-    dst[index] := 1.5
+    dst[index] = 1.5
   return ()
 entry const copied = func (bounds: Array U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
@@ -70,7 +70,7 @@ entry const reset = func () => return zero persisted 48
 const effects: Array U32 = #[0]
 const rhs = func (index: U32): U32 => return do:
   let counter = effects
-  counter[0] := @u32.add counter[0] 1
+  counter[0] = @u32.add counter[0] 1
   return index
 entry const ordered = func (end: U32): Array U32 => return do:
   let dst: Array U32 = @array.fill 48 9
@@ -80,7 +80,7 @@ entry const ordered = func (end: U32): Array U32 => return do:
 entry const effect_count = func () => return effects[0]
 const fill_then_read = func (rows: Array U32) -> (first: U32) -> (end: U32) -> (read_index: U32): U32 => return do:
   for index in first .. end:
-    rows[index] := 7
+    rows[index] = 7
   let selected = rows[read_index]
   return @u32.add selected rows[0]
 entry const reads_after_fill = func (bounds: Array U32): U32 => return do:

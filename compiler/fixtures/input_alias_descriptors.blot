@@ -11,7 +11,7 @@ const windows = func (first: &[U32]) -> (second: &[U32]): U32 => return
 const append = func (first: GrowArray U32) -> (second: GrowArray U32) -> (view: &[U32]): {before: U32, after: U32, extent: U32, last: U32, observed: U32} => return do:
   let before = @storage.length second
   @storage.push first 99
-  first[0] := @u32.add self 3
+  first[0] = @u32.add self 3
   return {before, after: @storage.length second, extent: @storage.length view, last: second[before], observed: view[0]}
 entry const answer = func (input: U32): Array U32 => return do:
   let left: Array U32 = #[input, @u32.add input 1, @u32.add input 2, @u32.add input 3]

@@ -198,7 +198,7 @@ entry const owned = func (n: U32) : U32 => return do:
       if items.length > 20:
         total := items[1]
       else:
-        values[0] := self + 77
+        values[0] = self + 77
   break values.length + values[0] + total
 entry const escaping = func (n: U32) : Array U32 => return do:
   let beat = if n % 2 == 0 then $Up else $Down

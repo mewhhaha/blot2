@@ -95,8 +95,8 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
                 ...Array.from({ length: 15 }, (_, i) => i + 2),
               ]
                 .reduce((a, b) => Math.fround(a + b));
-              // `old` aliases `values`, so both read the edited row
-              // (tasks/LANGUAGE_COHERENCE.md A7).
+              // `old` aliases `values`, so both read the row the store
+              // edited (tasks/MEMORY_MODEL.md rule 2).
               assert.equal(
                 guest.call(`nested_edit_${shape}`, seed),
                 Math.fround(edited + edited),
@@ -111,8 +111,8 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
                 guest.call(`array_${shape}`, count),
                 8 * count * count + 112 * count,
               );
-              // `old` aliases `values`, so both read the replaced row.
-              assert.equal(guest.call(`snapshot_${shape}`, count), 32240);
+              // `old` is a copy, so only `values` reads the replaced row.
+              assert.equal(guest.call(`snapshot_${shape}`, count), 16240);
               assert.equal(
                 guest.call(`escaped_${shape}`, count),
                 16 * count + 104,

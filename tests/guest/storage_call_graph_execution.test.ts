@@ -14,8 +14,8 @@ const link_leaf = func (value: Link U32): U32 => return @storage.load value
 const link_twice = func (value: Link U32): U32 => return @u32.add (link_leaf value) (link_leaf value)
 const row_value = func (rows: ResizeArray U32): U32 => return rows[1]
 const mutate_pair = func (left: ResizeArray U32) -> (right: ResizeArray U32) -> (amount: U32): Unit => return do:
-  left[1] := @u32.add (row_value left) amount
-  right[1] := @u32.add (row_value right) (@u32.add amount 1)
+  left[1] = @u32.add (row_value left) amount
+  right[1] = @u32.add (row_value right) (@u32.add amount 1)
 const invoke = func callback -> (amount: U32): Unit => return do:
   callback amount
   callback (@u32.add amount 1)
@@ -36,17 +36,17 @@ entry const answer = func (input: U32) => return do:
   mutate_pair first first input
   mutate_pair first second 2
   let write_first = func (amount: U32): Unit => return do:
-    first[1] := @u32.add first[1] amount
+    first[1] = @u32.add first[1] amount
   let write_second = func (amount: U32): Unit => return do:
-    second[1] := @u32.add second[1] amount
+    second[1] = @u32.add second[1] amount
   invoke_twice write_first 1
   invoke_twice write_second 11
   let total: U32 = 0
   for index in 0 .. 3:
     mutate_pair first second index
     total := @u32.add total (@u32.add (view_twice first_view) (ref_twice second_ref))
-  links[0] := @u32.add links[0] 7
-  links[1] := @u32.add links[1] 9
+  links[0] = @u32.add links[0] 7
+  links[1] = @u32.add links[1] 9
   return #[before, total, view_twice first_view, view_twice second_view,
     ref_twice first_ref, ref_twice second_ref, link_twice first_link, link_twice second_link,
     first[0], first[2], second[0], second[2]]
@@ -87,7 +87,7 @@ function witnessExpected(input: number): Uint32Array {
 
 const scratch = `const leaf = func (rows: GrowArray U32): Unit => return do:
   let temporary: GrowArray U32 = #[rows[0], 3]
-  rows[0] := @u32.add temporary[0] temporary[1]
+  rows[0] = @u32.add temporary[0] temporary[1]
 const outer = func (rows: GrowArray U32): Unit => return do:
   leaf rows
   leaf rows

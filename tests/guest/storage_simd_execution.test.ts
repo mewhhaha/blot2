@@ -58,7 +58,6 @@ const broadcast = func values -> selector => return @simd.u32x4.broadcast values
 entry const answer = func () => return do:
   let lane = 0
   let place = @storage.ref lane
-  @storage.write place 3
   let (chosen, _, _, _) = broadcast (10,20,30,40) (${selector})
   return chosen
 `, "simd_lane_literal");

@@ -30,13 +30,13 @@ const nested = func (rows: Array U32) -> (limit: U32): U32 => return do:
   for step in 0..limit:
     if @u32.eq step 1:
       continue
-    state.nested.rows[0] := @u32.add self 1
+    state.nested.rows[0] = @u32.add self 1
     state.total := @u32.add self state.nested.rows[0]
     if @u32.eq step 3:
       break
   return state.total
 const write = func (rows: Array U32) -> (trace: GrowArray U32) -> (index: U32): U32 => return do:
-  rows[index] := do:
+  rows[index] = do:
     @storage.push trace 99
     break 42
   return rows[0]

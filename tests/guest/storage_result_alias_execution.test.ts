@@ -25,7 +25,7 @@ for (const width of [8, 600]) {
   }
   const source =
     `const carry = func row -> (flag: U32) -> (effects: Array U32) => return do:
-  effects[0] := @u32.add self 1
+  effects[0] = @u32.add self 1
   return ${returned}
 entry const answer = func (input: U32): Array U32 => return do:
   let effects: Array U32 = #[0]

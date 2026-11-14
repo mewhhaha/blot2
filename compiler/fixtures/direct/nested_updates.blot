@@ -5,8 +5,8 @@ func shift (access: Access) -> (by: U32) => return do:
   for index in 0 .. pinned.bricks.length:
     let brick = pinned.bricks[index]
     brick.from := self + by
-    pinned.bricks[index] := brick
-  pinned.count[0] := 7
+    pinned.bricks[index] = brick
+  pinned.count[0] = 7
   return ()
 entry func run (n: U32): U32 => return do:
   let bricks: GrowArray Brick = #[$Brick { from: 1, to: 2 }]

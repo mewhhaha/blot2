@@ -81,7 +81,7 @@ entry const run = func (count: U32) => return do:
     total := @u32.add total (consume (transform row))
   for row in lists:
     total := @u32.add total (consume (transform row))
-  arrays[0].a := 99
+  arrays[0].a = 99
   break #[total, saved[0].a, arrays[0].a]
 entry const stopped = func (count: U32) => return do:
   let rows = @list.generate count (func index => return {a: index, b: 1, c: 2})

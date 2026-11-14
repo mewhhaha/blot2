@@ -74,23 +74,23 @@ entry const grow_rhs = func (value: U32): Array U32 => return do:
   let rows: ResizeArray U32 = #[value]
   @storage.reserve rows 2
   let alias = rows
-  rows[0] := append_rhs alias value
+  rows[0] = append_rhs alias value
   return @storage.freeze rows
 
 const mutate_sibling = func (rows: Array {left: U32, right: U32}) -> (value: U32): U32 => return do:
-  rows[0].right := @u32.add value 1
+  rows[0].right = @u32.add value 1
   return value
 
 entry const sibling_rhs = func (value: U32): Array U32 => return do:
   let rows: Array {left: U32, right: U32} = #[{left: 1, right: 2}]
   let alias = rows
-  rows[0].left := mutate_sibling alias value
+  rows[0].left = mutate_sibling alias value
   return #[rows[0].left, rows[0].right]
 
 const counter: Array U32 = #[0]
 const bump = func (): U32 => return do:
   let state = counter
-  state[0] := @u32.add self 1
+  state[0] = @u32.add self 1
   return 42
 
 entry const counter_read = func (): U32 => return counter[0]

@@ -49,7 +49,7 @@ const stored = @list.generate 8193 (func i => return $Item { value: i })
 entry const frozen_item = func (index: U32) => return (Array.from_list stored)[index].value
 entry const frozen_edit = func (value: U32) => return do:
   let xs = Array.from_list stored
-  xs[8192].value := value
+  xs[8192].value = value
   break #[(Array.from_list stored)[8192].value, xs[8192].value]
 entry const answer = (Array.from_list staged)[1]
 entry const frozen_chunks = func (index: U32) => return (Array.from_list large)[index]
@@ -58,7 +58,7 @@ entry const floats = func (count: U32) => return
 entry const float_update = func (x: F32) => return do:
   let xs = Array.from_list [x, 2.5]
   let before = xs
-  xs[0] := 4.5
+  xs[0] = 4.5
   break #[before[0], xs[0], #[3.5, ...xs, 5.5][3]]
 @[func value => return value + 1]
 entry const tagged = 41

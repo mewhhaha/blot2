@@ -108,7 +108,7 @@ entry const staged = check 500
 entry const array = func seed => return do:
   let values = #[seed, seed + 1, seed + 2]
   let cursor = values.iter
-  values[0] := 1000
+  values[0] = 1000
   let $Some (_, second) = cursor.next else:
     break 0
   break first cursor + first second + values[0]

@@ -46,9 +46,9 @@ const write = func (destination: GrowArray U32) => return do:
 entry const answer = func (input: U32) => return do:
   let destination: GrowArray U32 = #[]
   let live = pool
-  live[0] := input
+  live[0] = input
   write destination
-  live[0] := input + 10
+  live[0] = input + 10
   write destination
   return @storage.freeze destination
 `,

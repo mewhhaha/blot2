@@ -12,7 +12,7 @@ const explicit_writer = func (destination: ResizeArray U32) -> (pool: Array U32)
   destination.push pool[0]
 entry const global_writer = func (input: U32) => return do:
   let pool = implicit_pool
-  pool[0] := @u32.add input 7
+  pool[0] = @u32.add input 7
   let destination: ResizeArray U32 = #[input]
   implicit_writer destination
   explicit_writer destination pool
@@ -90,7 +90,7 @@ entry const getters = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input]
   let second: ResizeArray U32 = #[10]
   let read = first.at
-  first[0] := @u32.add input 2
+  first[0] = @u32.add input 2
   first.push 99
   let shifted = $Shifted {rows: second}
   return #[first.length, read 0, shifted.length, shifted.at 0]
@@ -109,7 +109,7 @@ entry const scratch_writer = func (input: U32) => return do:
   return #[destination.length, destination[0], destination[1], destination[2], destination[297], destination[298], destination[299]]
 type LargeState = {${longField}: ResizeArray U32}
 const write_large = func (state: LargeState) -> (amount: U32) => return do:
-  state.${longField}[0] := @u32.add state.${longField}[0] amount
+  state.${longField}[0] = @u32.add state.${longField}[0] amount
 const read_large = func (state: LargeState) => return state.${longField}[0]
 entry const large_key = func (input: U32) => return do:
   let rows: ResizeArray U32 = #[10]
@@ -131,7 +131,7 @@ entry const answer = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input]
   let second: ResizeArray U32 = #[@u32.add input 10]
   let before = read ($Research {rows: &first[0..1], add: 1})
-  first[0] := @u32.add input 100
+  first[0] = @u32.add input 100
   let after = read ($Research {rows: &first[0..1], add: 2})
   let other = read ($Research {rows: &second[0..1], add: 3})
   return #[before, after, other]

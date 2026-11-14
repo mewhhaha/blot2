@@ -16,7 +16,7 @@ const word_of = func (sample: Sample): U32 => return case sample of
 entry const values = func () => return #[value_of saved[0], value_of saved[2]]
 entry const words = func () => return #[word_of saved[0], word_of saved[1], word_of saved[2]]
 entry const change = func () => return do:
-  let changed = @storage.write (&samples[0]) $Empty
+  samples[0] = $Empty
   return 0
 `,
     (guest) => {
@@ -46,8 +46,8 @@ const rows: GrowArray U32 = build seed
 const saved: Array U32 = @storage.copy seed
 entry const read = func () => return rows[0] + saved[0]
 entry const change = func (value: U32) => return do:
-  let changed_seed = @storage.write (&seed[0]) value
-  let changed_rows = @storage.write (&rows[0]) (value + 1)
+  seed[0] = value
+  rows[0] = value + 1
   return saved[0]
 `,
     (guest) => {
@@ -66,7 +66,7 @@ Deno.test("failed computed initialization traps at instantiation", async () => {
     `
 const attempts: ResizeArray U32 = #[0]
 const build = func (): Array U32 => return do:
-  let counted = @storage.write (&attempts[0]) (attempts[0] + 1)
+  attempts[0] = attempts[0] + 1
   if attempts[0] == 1:
     return @panic "first initialization fails"
   return #[40 + attempts[0]]

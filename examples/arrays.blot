@@ -8,7 +8,7 @@ entry const answer = func () => return array.fold_left U32.add 0 numbers
 entry const unchanged = func () => return do:
   let original = #[1, 2, 3]
   let updated = original
-  updated[1] := 40
+  updated[1] = 40
   break original[1] + updated[1]
 
 entry const checked = func index => return Maybe.unwrap_or 0 $ numbers.get(index)

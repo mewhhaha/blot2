@@ -16,7 +16,7 @@ entry const list = func (index: U32) => return do:
 entry const snapshot = func (index: U32) => return do:
   let values = @array.generate 513 row
   let old = values
-  values[index].e := 1000
+  values[index].e = 1000
   break @u32.add old[index].e values[index].e
 entry const nested_bits = func (value: F32) => return do:
   let rows = @array.fill 2 ($Nested {head: {value: $Vector {x: value, y: 2.0}, stamp: 3}, tail: 4})

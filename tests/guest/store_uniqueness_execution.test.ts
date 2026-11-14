@@ -1,0 +1,294 @@
+import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
+
+// The store `place = value` writes storage in place, and every alias sees
+// it. A `:=` through storage is accepted only when its root is unique; the
+// rest are `aliased_update` (tasks/MEMORY_MODEL.md rules 2, 4 and 5).
+const stdRoot = new URL("../../std", import.meta.url).pathname;
+
+Deno.test("stores write elements, element fields and nested rows in place through every alias", async () => {
+  await compileAndRun(`
+type Point is data = $Point { x: U32, y: U32 }
+const pool: GrowArray U32 = #[1, 2]
+const pick = func (flag: Bool) -> (left: Array U32) -> (right: Array U32) => return if flag then left else right
+entry func element (n: U32) : U32 => return do:
+  let rows = #[1, 2, 3]
+  let alias = rows
+  rows[1] = n
+  break alias[1] * 10 + rows[1]
+entry func field (n: U32) : U32 => return do:
+  let points = #[$Point { x: 1, y: 2 }, $Point { x: 3, y: 4 }]
+  let alias = points
+  points[1].y = self + n
+  break alias[1].y + points[1].x
+entry func nested (n: U32) : U32 => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  let row = grid[1]
+  grid[1][0] = n
+  break row[0]
+entry func record_field (n: U32) : U32 => return do:
+  let world = { counts: #[0, 0], size: 2 }
+  let counts = world.counts
+  world.counts[1] = n
+  break counts[1] + world.size
+entry func global (n: U32) : U32 => return do:
+  pool[0] = n
+  break pool[0] + pool[1]
+entry func expression_root (flag: Bool) : U32 => return do:
+  let left = #[1]
+  let right = #[2]
+  (pick flag left right)[0] = 9
+  break left[0] * 10 + right[0]
+entry func captured (n: U32) : U32 => return do:
+  let rows = #[0, 0]
+  let set = func (i: U32) => return do:
+    rows[i] = n
+  set 1
+  break rows[1]
+entry func looped (n: U32) : U32 => return do:
+  let rows: GrowArray U32 = #[]
+  for i in 0..n:
+    @storage.push rows 0
+    rows[i] = i * 2
+  let total = 0
+  for value in rows:
+    total := self + value
+  break total
+entry func method_write (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let alias = rows
+  rows.write 0 n
+  break alias[0]
+`, (guest) => {
+    equal(guest.call("element", 7), 77);
+    equal(guest.call("field", 5), 12);
+    equal(guest.call("nested", 8), 8);
+    equal(guest.call("record_field", 6), 8);
+    equal(guest.call("global", 40), 42);
+    equal(guest.call("expression_root", true), 92);
+    equal(guest.call("expression_root", false), 19);
+    equal(guest.call("captured", 5), 5);
+    equal(guest.call("looped", 4), 12);
+    equal(guest.call("method_write", 9), 9);
+  }, { stdRoot });
+});
+
+Deno.test("a store on a path that never reaches storage is rejected", async () => {
+  await compileExpectedFailure(`
+entry func run (n: U32) : U32 => return do:
+  let point = { x: 1, y: 2 }
+  point.x = n
+  break point.x
+`, "store_without_storage", undefined, { span: [76, 87] });
+  await compileExpectedFailure(`
+entry func run (n: U32) : U32 => return do:
+  let total = 0
+  total = n
+  break total
+`, "store_without_storage");
+});
+
+Deno.test(":= through storage updates unique roots in place and keeps successor results", async () => {
+  await compileAndRun(`
+import * as array from "std/array"
+type World is data = $World { counts: Array U32, other: Array U32 }
+entry func literal (n: U32) : U32 => return do:
+  let rows = #[1, 2, 3]
+  rows[0] := n
+  rows[1] := self + n
+  break rows[0] + rows[1]
+entry func intrinsics (n: U32) : U32 => return do:
+  let filled = @array.fill 3 0
+  let generated = @array.generate 3 (func index => return index)
+  filled[1] := n
+  generated[2] := self + n
+  break filled[1] + generated[2]
+entry func copied (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let saved = rows
+  let snapshot = @storage.copy rows
+  snapshot[0] := n
+  break saved[0] * 100 + snapshot[0]
+entry func comprehension (n: U32) : U32 => return do:
+  let doubled = #[x * 2 | x <- #[1, 2, 3]]
+  doubled[0] := n
+  break doubled[0] + doubled[2]
+entry func looped (n: U32) : U32 => return do:
+  let rows = #[0, 0, 0]
+  for i in 0..3:
+    rows[i] := n + i
+  break rows[0] + rows[2]
+entry func early_exit (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  if n == 0:
+    return array.fold_left U32.add 0 rows
+  rows[0] := n
+  break rows[0]
+entry func sibling (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let total = 0
+  if n == 0:
+    total := array.fold_left U32.add 0 rows
+  else:
+    rows[0] := n
+  break total + rows[0]
+entry func deep (n: U32) : U32 => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  grid[1][0] := n
+  break grid[1][0] + grid[0][1]
+entry func record_root (n: U32) : U32 => return do:
+  let shared = #[0, 0]
+  let world = { counts: shared, other: #[1, 1] }
+  world.other[1] := n
+  world.counts := #[5, 5]
+  world.counts[0] := n
+  break world.other[1] + world.counts[0] + shared[0]
+entry func nominal_root (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], other: #[1] }
+  world.counts[1] := n
+  break world.counts[1]
+`, (guest) => {
+    equal(guest.call("literal", 5), 12);
+    equal(guest.call("intrinsics", 4), 10);
+    equal(guest.call("copied", 9), 109);
+    equal(guest.call("comprehension", 1), 7);
+    equal(guest.call("looped", 10), 22);
+    equal(guest.call("early_exit", 0), 3);
+    equal(guest.call("early_exit", 5), 5);
+    equal(guest.call("sibling", 0), 4);
+    equal(guest.call("sibling", 6), 6);
+    equal(guest.call("deep", 9), 11);
+    equal(guest.call("record_root", 5), 10);
+    equal(guest.call("nominal_root", 3), 3);
+  }, { stdRoot });
+});
+
+// Each program's only `:=` through storage has an aliased root.
+const aliased: [string, string][] = [
+  ["bound to another name", `
+  let rows = #[1, 2]
+  let before = rows
+  rows[0] := n
+  break before[0]`],
+  ["captured by a closure", `
+  let rows = #[1, 2]
+  let read = func (i: U32) => return rows[i]
+  rows[0] := n
+  break read 0`],
+  ["passed to a call", `
+  let rows = #[1, 2]
+  let total = array.fold_left U32.add 0 rows
+  rows[0] := n
+  break total`],
+  ["placed in a constructor", `
+  let rows = #[1, 2]
+  let held = $Some rows
+  rows[0] := n
+  break case held of
+    $Some inner => inner[0]
+    $Nothing => 0`],
+  ["placed in a record", `
+  let rows = #[1, 2]
+  let world = { rows: rows }
+  world.rows[0] := n
+  break rows[0]`],
+  ["returned on the same path", `
+  let rows = #[1, 2]
+  if n == 0:
+    let kept = rows
+    rows[0] := n
+    return kept[0]
+  break rows[1]`],
+  ["read out as a storage-holding element", `
+  let grid = #[#[1, 2], #[3, 4]]
+  let row = grid[0]
+  grid[0][1] := n
+  break row[1]`],
+  ["a parameter", `
+  let rows = #[n]
+  break (func (values: Array U32) => return do:
+    values[0] := 1
+    break values[0]) rows`],
+  ["a call result", `
+  let rows = array.fill 2 0
+  rows[0] := n
+  break rows[0]`],
+  ["aliased later in a loop", `
+  let rows = #[0, 0]
+  let total = 0
+  for i in 0..2:
+    rows[i] := n
+    total := self + array.fold_left U32.add 0 rows
+  break total`],
+  ["aliased in a sibling branch of a loop", `
+  let rows = #[0, 0]
+  let total = 0
+  for i in 0..2:
+    if i == 0:
+      total := self + array.fold_left U32.add 0 rows
+    else:
+      rows[i] := n
+  break total`],
+  ["iterated by its own loop", `
+  let rows = #[1, 2, 3]
+  let total = 0
+  for value in rows:
+    total := self + value
+    rows[0] := n
+  break total`],
+  ["rows that share one fill", `
+  let grid = @array.fill 2 #[0, 0]
+  grid[0][0] := n
+  break grid[1][0]`],
+  ["bound by a pattern", `
+  let (rows, other) = (#[1, 2], 3)
+  rows[0] := n
+  break rows[0] + other`],
+];
+
+Deno.test(":= through an aliased root is rejected with both fixes named", async () => {
+  for (const [name, body] of aliased) {
+    const source = `import * as array from "std/array"
+entry func run (n: U32) : U32 => return do:${body}
+`;
+    const start = source.indexOf("] :=") + 2;
+    const line = source.lastIndexOf("\n", start) + 1;
+    const place = source.slice(line, start).trimStart();
+    try {
+      await compileExpectedFailure(
+        source,
+        "aliased_update",
+        "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value",
+        { stdRoot, span: [start - place.length, source.indexOf("\n", start)] },
+      );
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
+});
+
+Deno.test("each rejected := keeps its meaning as a store, or its snapshot after an explicit copy", async () => {
+  await compileAndRun(`
+entry func stored (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let before = rows
+  rows[0] = n
+  break before[0] + rows[0]
+entry func snapshot (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let before = rows
+  rows := rows.copy
+  rows[0] := n
+  break before[0] + rows[0]
+entry func grown (n: U32) : U32 => return do:
+  let rows: GrowArray U32 = #[1]
+  let before = rows
+  let fresh = rows.copy
+  @storage.push fresh n
+  fresh[0] := n
+  break before.length * 100 + before[0] * 10 + fresh[1]
+`, (guest) => {
+    equal(guest.call("stored", 5), 10);
+    equal(guest.call("snapshot", 5), 6);
+    equal(guest.call("grown", 5), 115);
+  });
+});

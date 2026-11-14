@@ -22,7 +22,7 @@ entry const divide = func (count: U32) => return @array.generate count (func ind
 entry const shared = func (count: U32) => return do:
   let original = @array.generate count integer
   let saved = original
-  original[0] := 99
+  original[0] = 99
   break #[saved[0], original[0], saved[@u32.sub count 1]]
 entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
   let values = @array.fill 9 0

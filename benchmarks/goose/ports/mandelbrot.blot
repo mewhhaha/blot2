@@ -6,7 +6,7 @@ const arena_revision = 0
 entry const revision = func (): U32 => return arena_revision
 
 const append_byte = func (image: Array U32) -> (size: U32) -> (value: U32): U32 => return do:
-  image[size] := value
+  image[size] = value
   return size + 1
 
 const append_dimension = func (image: Array U32) -> (size: U32) -> (value: U32): U32 => return do:

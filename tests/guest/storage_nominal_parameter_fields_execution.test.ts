@@ -38,8 +38,8 @@ entry const answer = func (input: U32): Array U32 => return do:
   let selected_b = access.choose b
   let selected_alias = access.choose (left.make (@storage.at first 0) (@storage.at first 0))
   let scoped = access.temporary_omitted (@storage.at first 0)
-  first[0] := @u32.add input 3
-  second[0] := 20
+  first[0] = @u32.add input 3
+  second[0] = 20
   return #[@storage.load selected_a, @storage.load selected_b, @storage.load selected_alias, @storage.load scoped, left.direct a, right.direct b]
 entry const fallback = func (input: U32): Array U32 => return do:
   let first: Array U32 = #[input]

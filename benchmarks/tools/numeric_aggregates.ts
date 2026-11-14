@@ -65,7 +65,7 @@ export function numericAggregateSources() {
   return total
 entry const snapshot_${id} = func (count: U32) => return do:
   let values = @array.generate count (func index => return shape.make_${id} (@u32.to_f32 index))
-  let old = values
+  let old = @storage.copy values
   values[0] := shape.make_${id} 1000.0
   return shape.read_${id} values[0] + shape.read_${id} old[0]
 entry const wire_${id} = func (seed: F32) => return shape.wire_${id} (shape.make_${id} seed)
@@ -78,7 +78,7 @@ entry const constant_${id} = func () => return do:
 entry const nested_edit_${id} = func (seed: F32) => return do:
   let values = @array.fill 2 (shape.make_${id} 1.0)
   let old = values
-  values[0].${nested ? "a.x" : "ax"} := seed
+  values[0].${nested ? "a.x" : "ax"} = seed
   return shape.read_${id} values[0] + shape.read_${id} old[0]
 entry const list_${id} = func (count: U32) => return do:
   let values = @list.from_array (@array.generate count (func index => return shape.make_${id} (@u32.to_f32 index)))

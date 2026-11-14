@@ -58,7 +58,7 @@ const consume = func row => return @f32.add (@f32.add (@f32.add (@f32.mul row.a 
 entry const shared = func (input: Array F32) => return do:
   let rows = @array.fill 257 {a: input[0], b: input[1], c: input[2], d: input[3]}
   let saved = rows
-  rows[0].a := 99.0
+  rows[0].a = 99.0
   let pressure = @array.fill 8192 123
   break #[consume saved[0], consume rows[0]]
 entry const effectful = func (host: F32 -> F32 ! {Foreign}) => return do:

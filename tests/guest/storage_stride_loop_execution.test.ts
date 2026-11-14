@@ -8,7 +8,7 @@ const marking =
   for ever:
     if @u32.lt last cursor:
       break
-    rows[cursor] := 305419896
+    rows[cursor] = 305419896
     cursor := @u32.add self stride
   return cursor
 `;
@@ -19,7 +19,7 @@ const rows: Array U32 = @array.fill 96 9
 entry const reset = func (): Unit => return do:
   let target = rows
   for index in 0 .. 96:
-    target[index] := 9
+    target[index] = 9
   return ()
 entry const run = func (bounds: Array U32): U32 => return mark rows bounds[0] bounds[1] bounds[2]
 entry const read = func (): Array U32 => return @storage.copy rows

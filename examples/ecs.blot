@@ -76,7 +76,7 @@ const move = func () => return do:
   let $Time { seconds } = time
   let next = positions
   for index in 0..positions.length:
-    next[index] := move_position positions[index] velocities[index] seconds
+    next[index] = move_position positions[index] velocities[index] seconds
   use set ($Column next)
 
 const add_ghost = func () => return do:
@@ -84,7 +84,7 @@ const add_ghost = func () => return do:
   let $Column ghosts = stored
   let next = ghosts
   for index in 0..ghosts.length:
-    next[index] := $Some ($Ghost { remaining: 1.0 })
+    next[index] = $Some ($Ghost { remaining: 1.0 })
   use set ($Column next)
 
 const update = func () => return do:

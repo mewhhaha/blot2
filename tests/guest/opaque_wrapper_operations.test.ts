@@ -109,12 +109,12 @@ const capture = func value => return do:
 entry const run = func (value: U32) => return do:
   let original = #[value, 7]
   let alias = read (make original)
-  original[0] := 0
+  original[0] = 0
   break @u32.add alias[0] 2
 entry const captured = func (value: U32) => return do:
   let original = #[value, 7]
   let saved = capture original
-  original[0] := 0
+  original[0] = 0
   break @u32.add (saved ())[0] 2
 `;
         await inspectBuild(source, async (bytes) => {

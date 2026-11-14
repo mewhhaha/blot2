@@ -100,25 +100,25 @@ const depthSource =
     return ()
   let saved = @u32.add remaining 17
   if @u32.eq (@u32.rem remaining 2) 0:
-    values[0] := @u32.add values[0] left
+    values[0] = @u32.add values[0] left
     descend values unused (@u32.sub remaining 1) (@u32.add left 1) (@u32.add right 3)
-    values[1] := @u32.add values[1] saved
+    values[1] = @u32.add values[1] saved
   else:
-    values[0] := @u32.add values[0] right
+    values[0] = @u32.add values[0] right
     descend values unused (@u32.sub remaining 1) (@u32.add left 2) (@u32.add right 1)
-    values[2] := @u32.add values[2] saved
-  values[3] := @u32.add values[3] (@u32.add left right)
+    values[2] = @u32.add values[2] saved
+  values[3] = @u32.add values[3] (@u32.add left right)
   return ()
 const pair = func (left: Array U32) -> (right: Array U32) -> (remaining: U32): Unit => return do:
-  left[0] := @u32.add left[0] right[0]
+  left[0] = @u32.add left[0] right[0]
   if @u32.lt 0 remaining:
     pair left right (@u32.sub remaining 1)
-  right[0] := @u32.add right[0] 1
+  right[0] = @u32.add right[0] 1
   return ()
 const touch = func (values: Array U32) -> (remaining: U32): Unit => return do:
   if @u32.lt 0 remaining:
     touch values (@u32.sub remaining 1)
-  values[remaining] := remaining
+  values[remaining] = remaining
   return ()
 entry const answer = func (depth: U32): Array U32 => return do:
   let values: Array U32 = #[0, 0, 0, 0]
@@ -185,7 +185,7 @@ const recursive: {
     second values (@u32.sub n 1)
   return ()
 const second = func (values: Array U32) -> (n: U32): Unit => return do:
-  values[0] := @u32.add values[0] n
+  values[0] = @u32.add values[0] n
   first values n
   return ()
 entry const bad = func (n: U32) => return do:
@@ -197,7 +197,7 @@ entry const bad = func (n: U32) => return do:
   {
     name: "captured closure backedge",
     expected: (n) => n,
-    body: `  values[0] := @u32.add values[0] n
+    body: `  values[0] = @u32.add values[0] n
   let again = func (next: U32): Unit => return walk values next
   if @u32.lt 0 n:
     again (@u32.sub n 1)`,
@@ -206,7 +206,7 @@ entry const bad = func (n: U32) => return do:
     name: "local allocation",
     expected: (n) => n,
     body: `  let temporary: Array U32 = #[n]
-  values[0] := temporary[0]
+  values[0] = temporary[0]
   if @u32.lt 0 n:
     walk values (@u32.sub n 1)`,
   },
@@ -216,7 +216,7 @@ entry const bad = func (n: U32) => return do:
     prefix:
       `const allocate = func (values: Array U32) -> (n: U32): Unit => return do:
   let temporary: Array U32 = #[n]
-  values[0] := temporary[0]
+  values[0] = temporary[0]
   return ()\n`,
     body: `  allocate values n
   if @u32.lt 0 n:
@@ -226,7 +226,7 @@ entry const bad = func (n: U32) => return do:
     name: "implicit global owner",
     expected: (n) => n,
     prefix: "const hidden: Array U32 = #[42]\n",
-    body: `  values[0] := hidden[0]
+    body: `  values[0] = hidden[0]
   if @u32.lt 0 n:
     walk values (@u32.sub n 1)`,
   },
@@ -235,7 +235,7 @@ entry const bad = func (n: U32) => return do:
     expected: () => 2,
     source:
       `const walk = func (left: Array U32) -> (right: Array U32) -> (n: U32): Unit => return do:
-  left[0] := right[0]
+  left[0] = right[0]
   if @u32.lt 0 n:
     walk right left (@u32.sub n 1)
   return ()
@@ -264,16 +264,17 @@ entry const bad = func (n: U32) => return do:
   },
   {
     name: "borrowed formal",
-    expected: () => 0,
-    source: `const walk = func (value: &U32) -> (n: U32): Unit => return do:
-  @storage.write value n
+    expected: (n) => n + 1,
+    source: `const walk = func (value: &U32) -> (sink: Array U32) -> (n: U32): Unit => return do:
+  sink[0] = @u32.add sink[0] (@storage.load value)
   if @u32.lt 0 n:
-    walk value (@u32.sub n 1)
+    walk value sink (@u32.sub n 1)
   return ()
 entry const bad = func (n: U32) => return do:
-  let values: Array U32 = #[0]
-  walk (&values[0]) n
-  return values[0]
+  let values: Array U32 = #[1]
+  let sink: Array U32 = #[0]
+  walk (&values[0]) sink n
+  return sink[0]
 `,
   },
 ];
@@ -303,8 +304,8 @@ const outlineSource =
   if @u32.lt 0 remaining:
     let saved = values[0]
     accumulate values (@u32.sub remaining 1)
-    values[0] := @u32.add values[0] remaining
-    values[1] := @u32.add values[1] saved
+    values[0] = @u32.add values[0] remaining
+    values[1] = @u32.add values[1] saved
   return ()
 const bulky = func (rows: ResizeArray U32) -> (values: Array U32) -> (input: U32): U32 => return do:
   @storage.reserve rows 4
@@ -314,7 +315,7 @@ ${
   }  accumulate values input
 ${
     "  total := @u32.add total input\n".repeat(outlineUpdates / 2)
-  }  rows[0] := @u32.add rows[0] 1
+  }  rows[0] = @u32.add rows[0] 1
   return @u32.add total values[0]
 entry const answer = func (input: U32): Array U32 => return do:
   let rows: ResizeArray U32 = #[input]

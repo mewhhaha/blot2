@@ -2558,37 +2558,16 @@ const Builder = struct {
                     const root = try self.referenceNode(source, metadata.root, try self.projectType(type_path[0], 0));
                     var path: std.ArrayList(core.Id) = .empty;
                     defer path.deinit(self.allocator);
-                    var selectors: std.ArrayList(core.UpdateStep) = .empty;
-                    defer selectors.deinit(self.allocator);
                     var mixed = false;
                     for (source_path) |catalog| if (catalog == 0) {
                         mixed = true;
                         break;
                     };
+                    var selector_range: core.List = .{};
                     if (mixed) {
-                        const access_nodes = self.source.checked.types.list(self.source.checked.access_nodes[source]);
-                        if (access_nodes.len != source_path.len) {
-                            try self.diagnostic(.unresolved_binding, source);
-                            return 0;
-                        }
-                        for (source_path, access_nodes, 0..) |catalog, access_id, index| {
-                            const access = self.source.tree.node(access_id);
-                            const owner_type = try self.projectType(type_path[index], 0);
-                            const result_type = try self.projectType(type_path[index + 1], 0);
-                            if (access.tag == .index_access and catalog == 0) {
-                                try selectors.append(self.allocator, .{ .kind = .index, .index = try self.expression(access.b, depth + 1), .source_type = owner_type, .result_type = result_type });
-                            } else if (access.tag == .field_access and catalog != 0) {
-                                try selectors.append(self.allocator, .{ .kind = .field, .projection = try self.projectionIndex(catalog, owner_type, result_type), .source_type = owner_type, .result_type = result_type });
-                            } else {
-                                try self.diagnostic(.unresolved_binding, access_id);
-                                return 0;
-                            }
-                        }
+                        selector_range = try self.updateSteps(source, source_path, type_path, depth) orelse return 0;
                     } else for (source_path, 0..) |catalog, index| try path.append(self.allocator, try self.projectionIndex(catalog, try self.projectType(type_path[index], 0), try self.projectType(type_path[index + 1], 0)));
                     const range = try self.save(path.items);
-                    if (selectors.items.len > std.math.maxInt(u32) - self.tables.update_steps.items.len) return error.CoreLimit;
-                    const selector_range: core.List = .{ .start = @intCast(self.tables.update_steps.items.len), .len = @intCast(selectors.items.len) };
-                    try self.tables.update_steps.appendSlice(self.allocator, selectors.items);
                     const value = try self.expression(syntax.b, depth + 1);
                     const index: u32 = @intCast(self.tables.updates.items.len);
                     try self.tables.updates.append(self.allocator, .{ .root = root, .path = range, .value = value, .self_binding = metadata.self_binding, .selectors = selector_range });
@@ -2596,6 +2575,32 @@ const Builder = struct {
                     return self.make(source, .{ .tag = .bind, .ty = T.unit, .a = binding, .b = updated });
                 }
                 return self.make(source, .{ .tag = .bind, .ty = T.unit, .a = binding, .b = try self.expression(syntax.b, depth + 1) });
+            },
+            // `place = value`: an update flagged as a store, of a local root
+            // or else of the container before the first index. It rebinds
+            // nothing; the backend writes the selected place in place.
+            .store_stmt => {
+                if (source >= self.source.checked.rebindings.len or self.source.checked.rebindings[source].path.len == 0) {
+                    try self.diagnostic(.unresolved_binding, source);
+                    return 0;
+                }
+                const metadata = self.source.checked.rebindings[source];
+                const type_path = self.source.checked.types.list(self.source.checked.access_types[source]);
+                const source_path = self.source.checked.types.list(metadata.path);
+                const access_nodes = self.source.checked.types.list(self.source.checked.access_nodes[source]);
+                if (type_path.len != source_path.len + 1 or access_nodes.len != source_path.len) {
+                    try self.diagnostic(.unresolved_binding, source);
+                    return 0;
+                }
+                const root = if (metadata.root != 0)
+                    try self.referenceNode(source, metadata.root, try self.projectType(type_path[0], 0))
+                else
+                    try self.expression(self.source.tree.node(access_nodes[0]).a, depth + 1);
+                const selector_range = try self.updateSteps(source, source_path, type_path, depth) orelse return 0;
+                const value = try self.expression(syntax.b, depth + 1);
+                const index: u32 = @intCast(self.tables.updates.items.len);
+                try self.tables.updates.append(self.allocator, .{ .root = root, .path = .{}, .value = value, .self_binding = metadata.self_binding, .selectors = selector_range, .store = true });
+                return self.make(source, .{ .tag = .update, .ty = try self.projectType(type_path[0], 0), .a = index });
             },
             .return_stmt => {
                 if (syntax.b != 0 or self.scratch.return_target == 0) {
@@ -2646,6 +2651,34 @@ const Builder = struct {
     }
     fn statementArm(self: *const Builder, source: ast.Id) bool {
         return self.scratch.statement_arms.len != 0 and self.scratch.statement_arms[source] != 0;
+    }
+    /// The field and index steps of a path update that reaches storage,
+    /// with each index lowered in written order. Null after a diagnostic.
+    fn updateSteps(self: *Builder, source: ast.Id, source_path: []const T.Id, type_path: []const T.Id, depth: usize) Error!?core.List {
+        const access_nodes = self.source.checked.types.list(self.source.checked.access_nodes[source]);
+        if (access_nodes.len != source_path.len) {
+            try self.diagnostic(.unresolved_binding, source);
+            return null;
+        }
+        var selectors: std.ArrayList(core.UpdateStep) = .empty;
+        defer selectors.deinit(self.allocator);
+        for (source_path, access_nodes, 0..) |catalog, access_id, index| {
+            const access = self.source.tree.node(access_id);
+            const owner_type = try self.projectType(type_path[index], 0);
+            const result_type = try self.projectType(type_path[index + 1], 0);
+            if (access.tag == .index_access and catalog == 0) {
+                try selectors.append(self.allocator, .{ .kind = .index, .index = try self.expression(access.b, depth + 1), .source_type = owner_type, .result_type = result_type });
+            } else if (access.tag == .field_access and catalog != 0) {
+                try selectors.append(self.allocator, .{ .kind = .field, .projection = try self.projectionIndex(catalog, owner_type, result_type), .source_type = owner_type, .result_type = result_type });
+            } else {
+                try self.diagnostic(.unresolved_binding, access_id);
+                return null;
+            }
+        }
+        if (selectors.items.len > std.math.maxInt(u32) - self.tables.update_steps.items.len) return error.CoreLimit;
+        const range: core.List = .{ .start = @intCast(self.tables.update_steps.items.len), .len = @intCast(selectors.items.len) };
+        try self.tables.update_steps.appendSlice(self.allocator, selectors.items);
+        return range;
     }
     fn carryingCase(self: *const Builder, source: ast.Id) bool {
         const syntax = self.source.tree.node(source);
@@ -3071,6 +3104,16 @@ pub fn lowerWithOrigins(allocator: Allocator, tree: *const ast.Tree, names: *con
     var result = try builder.finish();
     errdefer result.deinit(allocator);
     result.unit = checked.unit;
+    if (result.diagnostics.len == 0) {
+        var rejected: std.ArrayList(core.Diagnostic) = .empty;
+        defer rejected.deinit(allocator);
+        try @import("uniqueness.zig").check(allocator, &result, &rejected);
+        if (rejected.items.len != 0) {
+            allocator.free(result.diagnostics);
+            result.diagnostics = &.{};
+            result.diagnostics = try rejected.toOwnedSlice(allocator);
+        }
+    }
     return result;
 }
 

@@ -46,7 +46,7 @@ const reading = func (captured: ResizeArray U32) => return do:
   return func (argument: ResizeArray U32): U32 => return @u32.add saved[0] argument[0]
 const update = func (captured: ResizeArray U32) -> (argument: ResizeArray U32) -> (amount: U32): Unit => return do:
   let value = (reading captured) argument
-  argument[0] := @u32.add value amount
+  argument[0] = @u32.add value amount
   return ()
 entry const descriptors = func (input: U32) => return do:
   let first: ResizeArray U32 = #[input, 31]
