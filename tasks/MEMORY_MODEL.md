@@ -2,7 +2,8 @@
 
 The owner's decisions are in tasks/LANGUAGE_COHERENCE.md, section A,
 "Decisions (owner, 14 November 2026)". This file turns them into rules and
-phases.
+phases. App code spells the intrinsics as round 2, item 2 approved
+(`Cell.new`, `World.new ()`, `values.copy`); std may keep `@name` forms.
 
 ## Rules
 
@@ -33,7 +34,7 @@ phases.
    update is an error (`aliased_update`) whose message offers the two
    fixes:
    - `=` (store in place, aliases see it);
-   - an explicit `@storage.copy` before the update.
+   - an explicit copy (`values.copy`) before the update.
 
    A copy trait (traits redesign, C) may later allow an implicit copy. Paths
    that stay within values never need uniqueness.
@@ -42,9 +43,8 @@ phases.
      - an array literal;
      - `@array.fill`, `@array.generate`, `@array.set`, `@array.concat`,
        `@array.slice` or `@array.flatten`;
-     - spreads;
-     - `@storage.copy`;
-     - `@cell`;
+     - a copy (`values.copy`);
+     - `Cell.new`;
      - a comprehension.
    - It stays unique after a `:=` update of itself, and it is unique
      inside a record when every storage field reached by the path is unique.
@@ -62,7 +62,7 @@ phases.
    - A loop carry is unique when its initial value and every backedge value
      are.
    - Branches merge with "unique only if unique on every path".
-6. **Cell.** `Cell a` is storage holding one value. `@cell x` creates one,
+6. **Cell.** `Cell a` is storage holding one value. `Cell.new x` creates one,
    `c.value` reads it, and `c.value = v` stores into it. In the backend it
    is a one-element array.
 7. **Root.** A root declares a fixed group of storage components with their
@@ -74,9 +74,9 @@ phases.
    ```blot
    type World is root = {
      entities: ResizeArray Entity = #[],
-     viewport: Cell Viewport = @cell viewport.default,
+     viewport: Cell Viewport = Cell.new viewport.default,
    }
-   let world = @root World
+   let world = World.new ()
    ```
 
    It replaces Gdev's `with_owners`. The backend lowers it to a record of
@@ -106,9 +106,9 @@ the Gdev frame green, and migrates std, ../ink and ../gdev itself.
 2. **Value restriction.** Change it in the checker, then update the ignored
    guest cases that relied on generalized non-function locals: they become
    errors or are rewritten.
-3. **Cell.** Add the type, `@cell` and `.value`, and migrate the `#[x]` /
+3. **Cell.** Add the type, `Cell.new` and `.value`, and migrate the `#[x]` /
    `[0]` cells in Ink and Gdev where the array is used only as a cell.
-4. **Root.** Add the declaration, `@root`, defaults and the fixed-component
+4. **Root.** Add the declaration, `World.new ()`, defaults and the fixed-component
    rule, then move Gdev's `with_owners` to a root.
 5. **Read-only references** (A4). Reject stores through `&T` / `&[T]`.
    Escaping references are checked at run time (A6).

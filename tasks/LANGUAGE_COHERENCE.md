@@ -342,7 +342,7 @@ runs; the spliced record is then checked against it.
 
 1. Decide the numeric set and literal typing before finalising operator
    contracts: signed integers, bytes, 64-bit, F64. `Text` is `Array U32`
-   today.
+   today. (Settled by round 2, item 7.)
 2. Measure what runtime closures without inlining (decisions 4 and 6) cost in
    `array.map (func ...)`-style code. Gdev and Ink have about 1,300 inline
    lambdas. If the cost shows, add an explicit "specialize on this function
@@ -382,6 +382,71 @@ runs; the spliced record is then checked against it.
    operators, so parsing no longer depends on declarations.
 10. Type parameters in list form only. There are 45 list-shaped declarations
     and no record, tuple or curried ones.
+
+## Round 2 approvals (owner, 14 November 2026)
+
+The language review session listed nine proposals and three grammar
+problems. The owner approved them ("Yeah, do 1,2,3"; asked which list, "all
+items in all lists you made"). The spellings are the review's and still
+provisional. The full text is docs/language/spec.md: its body states the
+target language, Annex A the removed forms with their replacements, and
+Annex B the open questions.
+
+Grammar fixes to approved designs:
+
+1. **Trait outputs are named.** Write `type Collection c { item } is trait`,
+   `const Array.Collection: Collection (Array a) { item: a }`,
+   `type Mul left { right, out } is trait` and `where { Mul a { right: a,
+   out: a } }`. The arrowed spelling (`Mul Vec3 -> [F32, Vec3]`) in "Update:
+   no `impl`" parses as a function type, so this supersedes it.
+2. **Public spellings for intrinsics that apps write.** `Cell.new x`,
+   `World.new ()`, `values.copy`, `panic "..."` and `_` for a hole. `@name`
+   stays inside std (E5). tasks/MEMORY_MODEL.md uses these spellings.
+3. **Same-named traits.** `X.T` is recorded under the trait that `T`
+   resolves to in the declaring module. A module that imports two traits
+   with the same name renames one. This settles `U32.Format`.
+
+New changes:
+
+4. **Effects are built like traits.**
+   - An effect is a nominal record type of operations; the
+     single-operation form goes.
+   - A provider is an ordinary value of that type, and
+     `with provider, ...:` installs providers for a suite.
+   - Row labels are effects (`{Log, State U32}`).
+   - `@effect.provider` and `@effect.state/run/reader/writer` go; this
+     settles item B's open note.
+   - The direct backend keeps its frame mechanism; a provider becomes a
+     record of closures.
+   - Still open: a provider whose operations have effects of their own,
+     such as a Foreign host callback.
+5. **One target per leaving word.** Value blocks (`do:` with `break value`),
+   `#run do:` and `#do:` go. `return` leaves a function, and `break` /
+   `continue` act on loops only. A value `case` has expression arms. `do`
+   stops being a keyword and `with` becomes one.
+6. **Negative arguments.** A `-` with whitespace before and none after
+   starts a negated argument (`f -1.0`); `a - b` and `a-b` stay subtraction.
+7. **Numbers** (settles D1).
+   - The numeric types are U8 to U64, I8 to I64, F32 and F64.
+   - A literal takes the expected type, else U32 or F32.
+   - Integers wrap; division by zero and `MIN / -1` trap.
+   - Conversions are member calls (`count.to_f32`).
+   - Text becomes UTF-8 in `Array U8`.
+   - This changes what crosses the host boundary, which AGENTS.md says
+     preserves ABI 8, so when it lands is the owner's call.
+8. **`let` introduces new names.** Rebinding an in-scope local or parameter
+   with `let` or `if let` is an error; use `:=`. Lambda parameters, case arms
+   and loop patterns may still reuse names.
+9. **Tags are data.** `@[expr]` attaches a compile-time constant to a type
+   declaration, constructor or field, and `#type` shows it. The
+   function-applying tag goes.
+10. **Field defaults in data** (`$Config { volume: F32 = 1.0 }`). A
+    construction may omit a defaulted field, as with roots.
+11. **Loops over collections.** `for` and comprehensions accept arrays,
+    ranges and any `Collection` (the length is read once, then `at`). The
+    `iter` / `next` cursor protocol, `@cursor.*` and std/iter go, together
+    with the direct backend's cursor operations.
+12. **No spreads** (`[...values, value]`).
 
 ## Keep
 
