@@ -66,7 +66,7 @@
 - Run `deno task lint:zig` (zig-analyzer from `$ZIG_ANALYZER` or
   `../zig-analyzer/zig-out/bin/zig-analyzer`). `compiler/src` must stay at zero
   findings; CI enforces it.
-- Preserve uncommitted work. Measure fresh builds and retained edits separately.
+- Preserve uncommitted work.
 - Keep `CONTINUE.md` focused on the current frontier, contracts and evidence.
   Use pinned Git history for superseded checkpoint narratives. Preserve task
   requirements and qualification records; document cleanup is not completion.
