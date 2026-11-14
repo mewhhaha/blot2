@@ -80,6 +80,16 @@ behaviour keeps the kept part.
   annotated; tests that rely on the defaulting are rewritten with signatures.
 - Mixed-operand dispatch (`@type.call` falling back to the right operand's
   owner) goes with the traits redesign: a trait dispatches on one type.
+- Snapshot expectations elsewhere follow A7 too: tests that write through one
+  alias and read the old value through another (update_cases.ts
+  `scalar_array_aliases` 41→42, `mixed_nominal_array_fields` 42→44, the SIMD
+  "keep snapshots" tests) expect the write to be visible.
+- SIMD lane selectors no longer need to be literals (`simd_lane_literal`): the
+  direct backend selects lanes at run time, so the rule only served the
+  scoped backend's v128 shuffles. Open for the owner: keep the rule as a
+  language restriction or drop it.
+- Tests that read the scoped runtime's counters (`blot:rc_*` exports), v128
+  locals, boxes or checkpoints are scoped internals.
 
 ## Order
 

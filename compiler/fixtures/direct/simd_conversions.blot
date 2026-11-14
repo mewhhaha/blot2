@@ -1,0 +1,7 @@
+import * as simd from "std/simd"
+entry func lanes (n: U32): U32 => return do:
+  let (a, b, c, d) = simd.u32_andnot (n, 0xFF, 0xF0, 7) (1, 0x0F, 0xFF, 2)
+  return a + b + c + d
+entry func signed (value: F32): F32 => return do:
+  let (a, b, c, d) = simd.to_f32_signed (simd.to_u32_signed (value, -2.5, 3.7, -0.25))
+  return a * 1000.0 + b * 100.0 + c * 10.0 + d

@@ -1912,6 +1912,23 @@ pub const Fn = struct {
                 }
                 return result;
             },
+            .relaxed_madd, .relaxed_nmadd => {
+                // left * b + c (nmadd: c - left * b), with (b, c) the right pair.
+                const pair = right orelse return self.g.fail(self.m, id, "multiply-add without operands", .{});
+                if (pair.words.len != 8) return self.g.fail(self.m, id, "multiply-add with a {d}-word operand", .{pair.words.len});
+                for (0..4) |index| {
+                    if (op_ == .relaxed_nmadd) try self.opIndex(.local_get, pair.words[index + 4]);
+                    try self.opIndex(.local_get, left.words[index]);
+                    try self.opIndex(.local_get, pair.words[index]);
+                    try self.scalarOp(.mul, lane, id);
+                    if (op_ == .relaxed_madd) {
+                        try self.opIndex(.local_get, pair.words[index + 4]);
+                        try self.scalarOp(.add, lane, id);
+                    } else try self.scalarOp(.sub, lane, id);
+                    try self.opIndex(.local_set, result.words[index]);
+                }
+                return result;
+            },
             .shuffle, .swizzle, .broadcast => {
                 // Lane selectors index the candidate words: shuffle's two
                 // products (0-3, 4-7), swizzle's one, broadcast's one lane.
@@ -2022,6 +2039,19 @@ pub const Fn = struct {
             .convert_f32_u32 => {
                 try self.op(.prefix_fc);
                 try self.code.uleb(self.a(), 1); // i32.trunc_sat_f32_u
+                return;
+            },
+            .convert_f32_i32 => {
+                try self.op(.prefix_fc);
+                try self.code.uleb(self.a(), 0); // i32.trunc_sat_f32_s
+                return;
+            },
+            .convert_i32_f32 => .f32_convert_i32_s,
+            .bit_andnot => {
+                // left & ~right, both already on the stack.
+                try self.i32Const(0xffff_ffff);
+                try self.op(.i32_xor);
+                try self.op(.i32_and);
                 return;
             },
             .bit_not => {
@@ -3078,8 +3108,8 @@ fn primitiveAlias(m: *const core.Module, binding_id: core.BindingId) ?core.Id {
 fn scalarResult(op: core.Op, operand: Ty) Ty {
     return switch (op) {
         .equal, .not_equal, .less, .less_equal, .greater, .greater_equal => types.boolean,
-        .convert_u32_f32 => types.f32_,
-        .convert_f32_u32 => types.u32_,
+        .convert_u32_f32, .convert_i32_f32 => types.f32_,
+        .convert_f32_u32, .convert_f32_i32 => types.u32_,
         else => operand,
     };
 }

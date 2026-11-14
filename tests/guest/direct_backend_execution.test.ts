@@ -60,6 +60,7 @@ const cases: Record<string, Call[]> = {
   ],
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
+  "simd_conversions.blot": [["lanes", 9, 253], ["signed", -7.9, -7170]],
   "carried_owners.blot": [["plain", 10, 40], ["callbacks", 0, 12], ["stored", 5, 20]],
   "providers.blot": [
     ["nested", 1, 120],
