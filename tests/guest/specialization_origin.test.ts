@@ -114,7 +114,7 @@ Deno.test.ignore("specialization uses survive fresh CLI, retained project reject
   }
 });
 
-// Direct backend: `true + false` compiles instead of reporting missing_associated (tasks/DELETE_SCOPED.md).
+// Direct backend: missing_associated for `true + false` points into the prelude instead of the library (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("a concrete invalid operation in a library stays in that library", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
@@ -145,7 +145,7 @@ Deno.test.ignore("a concrete invalid operation in a library stays in that librar
   }
 });
 
-// Direct backend: `v + v` at Bool compiles instead of reporting missing_associated (tasks/DELETE_SCOPED.md).
+// Direct backend: missing_associated for `v + v` at Bool points into the library instead of the entry's use (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("compiled callback definitions preserve source origins", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;

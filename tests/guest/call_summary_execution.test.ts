@@ -216,7 +216,7 @@ for (
     ["intrinsic", "const f_0 = func value => return @u32.add value true", "U32"],
   ]
 ) {
-  // Direct backend: `true + true` compiles instead of reporting missing_associated (tasks/DELETE_SCOPED.md).
+  // Direct backend: missing_associated for `true + true` has no related prelude location (tasks/DELETE_SCOPED.md).
   const test = kind === "operator" ? Deno.test.ignore : Deno.test;
   test(`failed summary jobs retain ${kind} leaf diagnostics beyond the former depth limit`, async () => {
     const directory = await Deno.makeTempDir();

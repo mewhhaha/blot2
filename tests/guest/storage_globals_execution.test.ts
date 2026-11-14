@@ -60,9 +60,9 @@ entry const change = func (value: U32) => return do:
 });
 
 // Constants are computed at instantiation (tasks/DELETE_SCOPED.md), so a
-// failing initializer traps at the first read that needs it.
-Deno.test("failed computed initialization traps at its first read", async () => {
-  await compileAndRun(
+// failing initializer traps there.
+Deno.test("failed computed initialization traps at instantiation", async () => {
+  await assert.rejects(compileAndRun(
     `
 const attempts: ResizeArray U32 = #[0]
 const build = func (): Array U32 => return do:
@@ -74,9 +74,6 @@ const rows: Array U32 = build ()
 entry const answer = func () => return rows[0]
 entry const count = func () => return attempts[0]
 `,
-    (guest) => {
-      assert.throws(() => guest.call("answer", null), WebAssembly.RuntimeError);
-      assert.equal(guest.call("count", null), 1);
-    },
-  );
+    () => {},
+  ), WebAssembly.RuntimeError);
 });

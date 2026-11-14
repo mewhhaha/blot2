@@ -10,8 +10,7 @@ Deno.test("impossible constant array lengths trap at instantiation",async()=>{
   ]) await rejects(compileAndRun(source,()=>{},{prelude:"none"}),WebAssembly.RuntimeError);
 });
 
-// Direct backend gap: a panicking intrinsic operand emits invalid Wasm (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("panicking constant array operands trap at instantiation",async()=>{
+Deno.test("panicking constant array operands trap at instantiation",async()=>{
   for(const expression of [
     '@array.generate 4194304 (@panic "generator operand")',
     '@array.fill 4194304 (@panic "fill operand")',

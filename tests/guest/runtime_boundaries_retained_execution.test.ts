@@ -25,8 +25,7 @@ entry const pipeline = func (count: U32) => return do:
   break array.fold_left (func sum -> value => return sum + value) 0 values
 `;
 
-// Direct backend gap: `@array.flatten` is not supported ("array operation flatten is not supported yet") (tasks/DELETE_SCOPED.md).
-Deno.test.ignore(`runtime results follow imported body edit revert and restart`, async () => {
+Deno.test(`runtime results follow imported body edit revert and restart`, async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-runtime-revisions-",
   });

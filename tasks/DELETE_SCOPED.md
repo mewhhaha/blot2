@@ -22,10 +22,10 @@ cd .. && deno test -A --parallel --junit-path=J.xml tests/guest tests/host -- \
 ```
 
 Baseline at 51536924: 771 of 1,990 guest cases passed on a direct-default
-build. After the test edits and the default flip, the suite on the safe
-development compiler has 1,212 passing cases, 129 ignored (listed below) and
-none failing. `scripts/integration/direct_guest_gap.py` classified the
-baseline; delete it with the scoped backend.
+build. After the test edits and the default flip, 1,212 passed and 129 were
+ignored. After the code deletion (which also deleted tests of removed
+machinery) and the direct-backend fixes below, the safe development compiler
+passes 1,048 cases, ignores 103 and fails none.
 
 ## Decisions by category
 
@@ -142,46 +142,49 @@ Still in the tree and dead in practice: the checker's cross-revision reuse
 relocation, `runtime_identity`). Nothing offers a previous revision since
 `serve-project` builds fresh; it goes with the incremental redesign.
 
-## Ignored guest cases after the flip
+## Ignored guest cases
 
 Each ignored case names its reason in a comment (`Direct backend gap: …`,
-`Direct backend: …` for a diagnostic, or `Pending …`). By kind:
+`Direct backend: …` for a diagnostic, or `Pending …`).
 
-- **Invalid Wasm, fix first.** A constant or operand that is a bare
-  `@panic` (`const x: U32 = @panic "…"`, `@array.fill n (@panic …)`,
-  `@array.generate 0 (@panic …)`) fails validation with "not enough arguments
-  on the stack for local.set". A record constructor passed as a function
-  value (`$Pair` with fields `{zebra: U32, apple: F32}`) fails with
-  "local.set expected f32, found i32".
-- **Wrong results.**
-  - `true + true` at Bool compiles to a non-canonical Bool, where the kept
-    rule reports `missing_associated`.
-  - An array state cell set inside a loop traps `unreachable`.
-  - A prelude that redefines `U32.add` or `U32.gt` is ignored by `+`, `>`
-    and `@type.call` on U32 operands.
-  - Non-entry constants initialize on first read rather than at
-    instantiation, so an initializer's effects run in read order.
-  - A generalized builder local used through an alias (`let c = b`) traps
-    "function signature mismatch"; a curried render callback traps in
-    `Array.length`.
-- **Diagnostics to move to the checker.** `missing_associated` (with its
-  dispatch explanation and the use's position), `initialization_cycle`,
-  `const_runtime_dependency`, `unresolved_type` / `ambiguous_associated` for a
-  `from` with no destination, a reservation beyond Wasm32 memory, and
-  `entry_let_type` positions.
+Fixed after the flip, with their cases re-enabled:
+- constants and operands that are a bare `@panic` (invalid Wasm);
+- a record constructor passed as a function value (invalid Wasm);
+- `true + true` at Bool, which now reports `missing_associated`;
+- an array state cell set inside a loop (applying an effect operation now
+  counts as a store, so the loop keeps its allocations);
+- array constants, which now initialize at instantiation in declaration
+  order instead of at a first read;
+- a generalized local used through an alias (`let c = b`);
+- a whole record payload bound by one pattern (`$Pair payload`), now a tuple
+  in declared field order;
+- `@array.flatten`;
+- a field update of a boxed multi-constructor value;
+- unused generalized locals whose types no use fixes.
+
+Still ignored, by kind:
+- **Wrong results.** A prelude that redefines `U32.add` or `U32.gt` as a
+  function is ignored by `+`, `>` and `@type.call` on U32 operands: scalar
+  operators emit the machine operation unless the member aliases another
+  primitive. The traits redesign replaces this dispatch. A curried render
+  callback that a use leaves open traps in `Array.length`.
+- **Diagnostics to move to the checker.** `missing_associated` is reported
+  where the operator is written (often inside the prelude), without the
+  use-site origin, related location or dispatch explanation. Also
+  `initialization_cycle`, `const_runtime_dependency`, `unresolved_type` /
+  `ambiguous_associated` for a `from` with no destination, a reservation
+  beyond Wasm32 memory, and `entry_let_type` positions.
 - **Inference.** Unresolved type variables where no use fixes a hole, a
   closure parameter fixed only by a later call, a `from` result typed through
   an operator, an empty array with no fixed element type, `examples/ecs.blot`,
-  and generalized locals used at several types (the value restriction
-  question).
-- **Unsupported forms.** References to whole local values (`&local`, A4),
-  `@product.get` on a whole record payload, `@array.flatten`, field updates
-  of a multi-constructor value with a 15-field variant, and staging
-  (`#run` redesign).
-- **Memory model A.** Loops that allocate and carry fresh owners, and
-  `@array.set` / `array.push` loops, keep every allocation until the export
-  returns (below).
-- **Pending (40).** 37 for the traits redesign and 3 for the SIMD lane
+  type-changing rebinding of a generalized builder, and generalized locals
+  used at several types (the value restriction question).
+- **Unsupported forms.** References to whole local values (`&local`, A4) and
+  staging (`#run` redesign).
+- **Memory model A.** Loops that allocate and carry fresh owners, loops that
+  set a state cell while allocating, and `@array.set` / `array.push` loops
+  keep every allocation until the export returns (below).
+- **Pending (36).** 33 for the traits redesign and 3 for the SIMD lane
   literal decision.
 
 Found while editing, without an ignored case:
@@ -194,6 +197,9 @@ Found while editing, without an ignored case:
   constant.
 - Very large inputs (a 2M-float `change`, `@array.fill 1_073_741_823`) trap
   with `unreachable` or an out-of-bounds access instead of a size check.
+- A direct call that stores a fresh owner from a loop iteration into older
+  storage is not counted as a store by the caller's loop; the owner check
+  then traps at the next read.
 
 ## Known direct-backend limits left to the memory model (A)
 

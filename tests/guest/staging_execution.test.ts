@@ -12,8 +12,7 @@ entry const answer = func () => return @u32.add first second
 `, guest => equal(guest.call("answer", null), 82));
 });
 
-// Direct backend gap: passing a record constructor (`$Pair`) as a function value emits invalid Wasm ("constructor.constructor": local.set expected f32, found i32) (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("generic effect witnesses retain heterogeneous record storage after private proof", async () => {
+Deno.test("generic effect witnesses retain heterogeneous record storage after private proof", async () => {
   await compileAndRun(`
 const apple = 0.0
 type Pair is data = $Pair { zebra: U32, apple: F32 }

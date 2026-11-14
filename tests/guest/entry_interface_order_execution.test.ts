@@ -34,8 +34,7 @@ Deno.test("generic value interfaces reject before constant bounds while explicit
   );
 });
 
-// Direct backend gap: a constant initialized by a bare `@panic` emits invalid Wasm (local.set without a value) (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("explicit scalar entries initialized by a panic trap at instantiation", async () => {
+Deno.test("explicit scalar entries initialized by a panic trap at instantiation", async () => {
   await assert.rejects(
     compileAndRun('entry const answer: U32 = @panic "boom"\n', () => {}),
     WebAssembly.RuntimeError,

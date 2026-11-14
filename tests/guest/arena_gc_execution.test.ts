@@ -38,7 +38,7 @@ entry const memory = func () : Array U32 => return #[]
   );
 });
 
-// Direct backend gap: an array state cell set inside a loop traps unreachable (tasks/DELETE_SCOPED.md).
+// Direct backend gap: a loop that sets a state cell keeps every iteration's allocations, so 2,048 iterations of 8,192-element arrays exhaust memory (tasks/DELETE_SCOPED.md).
 Deno.test.ignore("forever collection traces updated state cells pinned before the loop", async () => {
   await compileAndRun(
     `

@@ -398,6 +398,27 @@ pub const Types = struct {
     }
 
     /// The constructors of a concrete nominal type and their payload types.
+    /// Whether `ty` has no hole (`never`) anywhere, even under functions and
+    /// containers.
+    pub fn concrete(self: *const Types, ty: Ty, depth: usize) bool {
+        if (depth > 64) return false;
+        const n = self.node(ty);
+        return switch (n.tag) {
+            .never => false,
+            .unit, .boolean, .u32, .f32 => true,
+            .function => self.concrete(n.a, depth + 1) and self.concrete(n.b, depth + 1),
+            .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => self.concrete(n.a, depth + 1),
+            .tuple, .state_provider => for (self.list(n.a, n.b)) |item| {
+                if (!self.concrete(item, depth + 1)) break false;
+            } else true,
+            .record => for (0..n.b) |index| {
+                if (!self.concrete(self.recordField(ty, index).ty, depth + 1)) break false;
+            } else true,
+            .nominal => for (self.nominalArguments(ty)) |argument| {
+                if (!self.concrete(argument, depth + 1)) break false;
+            } else true,
+        };
+    }
     pub fn variants(self: *Types, ty: Ty) Error!Variants {
         if (self.variant_cache.get(ty)) |hit| return hit;
         if (self.node(ty).tag != .nominal) {

@@ -58,6 +58,8 @@ pub const Instance = struct {
 };
 const runtime = @import("runtime.zig");
 
+const DispatchKey = struct { unit: u32, identity: T.NominalIdentity, member: u32, operator: T.Operator };
+
 pub const Generator = struct {
     allocator: A,
     arena: std.heap.ArenaAllocator,
@@ -72,6 +74,8 @@ pub const Generator = struct {
     solve_depth: u32 = 0,
     /// Closures built for function values no use determines (they trap).
     trap_closures: u32 = 0,
+    /// `dispatchTarget` results by catalog unit, receiver and member.
+    dispatch_cache: std.AutoHashMapUnmanaged(DispatchKey, ?core.BindingRef) = .empty,
     contents_memory: std.AutoHashMapUnmanaged(Ty, bool) = .empty,
     /// Effect operations (lowered operation types) and their frame ids.
     operation_ids: std.AutoHashMapUnmanaged(Ty, u32) = .empty,
@@ -107,6 +111,7 @@ pub const Generator = struct {
         self.operation_ids.deinit(self.allocator);
         self.contents_memory.deinit(self.allocator);
         self.quantified_units.deinit(self.allocator);
+        self.dispatch_cache.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         for (self.failures.items) |item| self.allocator.free(item.failure.message);
         self.failures.deinit(self.allocator);
@@ -227,6 +232,14 @@ pub const Generator = struct {
     /// The associated member `member` (a symbol of `m`) for `identity`: the
     /// referring unit's catalog first, then the nominal's own unit.
     pub fn dispatchTarget(self: *Generator, m: *const core.Module, identity: T.NominalIdentity, member: u32, operator: T.Operator) ?core.BindingRef {
+        const key: DispatchKey = .{ .unit = m.unit, .identity = identity, .member = member, .operator = operator };
+        if (self.dispatch_cache.get(key)) |hit| return hit;
+        const found = self.findDispatchTarget(m, identity, member, operator);
+        // Only a cache: a failed insert leaves the next lookup to search again.
+        self.dispatch_cache.put(self.allocator, key, found) catch {};
+        return found;
+    }
+    fn findDispatchTarget(self: *Generator, m: *const core.Module, identity: T.NominalIdentity, member: u32, operator: T.Operator) ?core.BindingRef {
         const owner = if (identity.unit == 0 or identity.unit == std.math.maxInt(u32)) m else self.types.module(identity.unit) orelse m;
         for ([_]*const core.Module{ m, owner }, 0..) |catalog, index| {
             if (index == 1 and catalog == m) continue;
@@ -418,14 +431,28 @@ pub const Generator = struct {
             error.Unsupported => return self.typeFailure(site, site_id),
             else => return err,
         };
-        const result = self.types.lower(m, m.typeOf(body.root), &env) catch |err| switch (err) {
-            // The body determines its result type: emit it now.
-            error.Unsupported => return self.inferResultWith(key, env, lowered, unused_holes, site, site_id),
+        // A body such as `@panic` leaves its own type open or `never`; a
+        // complete instance type still fixes the result.
+        const peeled = self.peeledResult(ty, parameters.len);
+        var result = self.types.lower(m, m.typeOf(body.root), &env) catch |err| switch (err) {
+            // Otherwise the body determines its result type: emit it now.
+            error.Unsupported => peeled orelse return self.inferResultWith(key, env, lowered, unused_holes, site, site_id),
             else => return err,
         };
+        if (result == types.never) result = peeled orelse result;
         const id = try self.addInstance(key, env, lowered, result, site, site_id);
         self.instance(id).unused_holes = unused_holes;
         return id;
+    }
+    /// The result of `ty` after `count` parameters, when it has no holes.
+    fn peeledResult(self: *Generator, ty: Ty, count: usize) ?Ty {
+        var result = ty;
+        for (0..count) |_| {
+            const n = self.types.node(result);
+            if (n.tag != .function) return null;
+            result = n.b;
+        }
+        return if (self.types.concrete(result, 0)) result else null;
     }
     /// An instance whose result type only its body determines: emitted
     /// immediately, with its signature fixed once the result is known.

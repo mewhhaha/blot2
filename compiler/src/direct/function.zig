@@ -273,7 +273,11 @@ pub const Fn = struct {
                 }
                 // A generalized local value is computed once: its uses decide
                 // the one type it is computed at.
-                if (self.m.binding(n.a).scheme.variables.len != 0) try self.typeByUses(n.a, n.b);
+                if (self.m.binding(n.a).scheme.variables.len != 0) {
+                    try self.typeByUses(n.a, n.b);
+                    // Nothing reads an unused local, so its open types are Unit.
+                    if (try self.uses(n.a) == 0) try self.defaultUnused(self.m.binding(n.a).ty, 0);
+                }
                 const value = try self.stmt(n.b);
                 if (value.ty != types.never) try self.refine(self.m.binding(n.a).ty, value.ty);
                 try self.bindings.put(self.a(), n.a, value);
@@ -634,6 +638,16 @@ pub const Fn = struct {
             .constructor => {
                 const tm = self.g.unitModule(key.unit);
                 const constructor = tm.constructor(key.id);
+                // A record-bodied constructor used as a function takes its
+                // fields as a tuple in declared order.
+                if (self.tagOf(argument.ty) == .tuple and constructor.payload != 0 and tm.types.node(constructor.payload).tag == .record) {
+                    const cases = self.g.types.variants(result) catch |err| switch (err) {
+                        error.Unsupported => return self.g.typeFailure(tm, 0),
+                        else => return err,
+                    };
+                    const payload = cases.payloads[try self.variantPosition(cases, constructor.tag, 0)];
+                    if (self.tagOf(payload) == .record) return self.wrapVariant(result, constructor.tag, try self.declaredRecord(tm, argument, payload, constructor.payload), 0);
+                }
                 return self.wrapVariant(result, constructor.tag, argument, 0);
             },
             else => unreachable,
@@ -878,6 +892,11 @@ pub const Fn = struct {
         const n = self.m.node(id);
         const callee = try self.expr(n.a);
         const argument = try self.expr(n.b);
+        // An effect operation's handler (a state cell's setter, for one) may
+        // store a memory-holding argument into older storage.
+        var head = n.a;
+        while (self.m.node(head).tag == .apply) head = self.m.node(head).a;
+        if (self.m.node(head).tag == .operation_value) try self.noteStore(argument);
         return self.applyClosure(callee, argument, id);
     }
     fn constructorFunction(self: *Fn, id: core.Id) Error!Val {
@@ -1502,7 +1521,42 @@ pub const Fn = struct {
                 try self.storeAt(address, 0, lanes_value);
                 return container;
             },
-            else => return self.g.fail(self.m, id, "array operation {s} is not supported yet", .{@tagName(operation)}),
+            .flatten => {
+                // Sum the inner lengths, then copy each inner array in turn.
+                const outer = try self.expr(children[0]);
+                const inner_ty = try self.elementOf(outer.ty, id);
+                const count = try self.lengthOf(outer, id);
+                const total = try self.constLocal(0);
+                const index = try self.local32();
+                for (0..2) |pass| {
+                    const result = if (pass == 1) try self.create(ty, total, id) else null;
+                    const at = try self.constLocal(0);
+                    try self.i32Const(0);
+                    try self.opIndex(.local_set, index);
+                    const exit = try self.open(.block);
+                    const top = try self.open(.loop);
+                    try self.opIndex(.local_get, index);
+                    try self.opIndex(.local_get, count);
+                    try self.op(.i32_ge_u);
+                    try self.br(.br_if, exit);
+                    const inner = try self.loadElement(try self.elementAddress(outer, index, id), 0, inner_ty, id);
+                    const length = try self.lengthOf(inner, id);
+                    if (result) |handle| try self.copyElements(inner, try self.constLocal(0), handle, at, length, id);
+                    try self.opIndex(.local_get, if (result == null) total else at);
+                    try self.opIndex(.local_get, length);
+                    try self.op(.i32_add);
+                    try self.opIndex(.local_set, if (result == null) total else at);
+                    try self.opIndex(.local_get, index);
+                    try self.i32Const(1);
+                    try self.op(.i32_add);
+                    try self.opIndex(.local_set, index);
+                    try self.br(.br, top);
+                    try self.close();
+                    try self.close();
+                    if (result) |handle| return handle;
+                }
+                unreachable;
+            },
         }
     }
     /// Copies `count` elements from `source[from..]` to `target[to..]`.
@@ -1808,7 +1862,7 @@ pub const Fn = struct {
                 error.Unsupported => return self.g.typeFailure(self.m, id),
                 else => return err,
             };
-            if (cases.payloads.len != 1) return self.g.fail(self.m, id, "update of a multi-constructor value", .{});
+            if (cases.payloads.len != 1) return self.updateBoxedShared(id, value, cases, name, at);
             record_ty = cases.payloads[0];
         }
         if (self.tagOf(record_ty) != .record) return self.g.fail(self.m, id, "update of a boxed {s}", .{@tagName(self.tagOf(record_ty))});
@@ -1823,6 +1877,56 @@ pub const Fn = struct {
         const memory_block = try self.newBlock(value.ty, id);
         try self.memoryCopy(memory_block, 0, value.words[0], try self.blockBytes(value.ty, id));
         try self.writeFlat(memory_block, offset, replacement, id);
+        return .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
+    }
+    /// A boxed sum with field `name`, which its constructors share, replaced.
+    /// The block starts with the tag, and the field's offset follows from it.
+    fn updateBoxedShared(self: *Fn, id: core.Id, value: Val, cases: types.Variants, name: u32, at: usize) Error!Val {
+        var field_ty: ?Ty = null;
+        const offset = try self.local32();
+        try self.i32Const(0);
+        try self.opIndex(.local_set, offset);
+        const tag = try self.local32();
+        try self.opIndex(.local_get, value.words[0]);
+        try self.op(.i32_load);
+        try self.code.uleb(self.a(), 2);
+        try self.code.uleb(self.a(), 0);
+        try self.opIndex(.local_set, tag);
+        for (cases.tags, cases.payloads) |case_tag, payload| {
+            if (self.tagOf(payload) != .record) continue;
+            const position = self.g.types.findField(payload, name) orelse continue;
+            const ty = self.g.types.recordField(payload, position).ty;
+            if (field_ty) |known| if (known != ty) return self.g.fail(self.m, id, "a shared field of different types", .{});
+            field_ty = ty;
+            try self.opIndex(.local_get, tag);
+            try self.i32Const(case_tag);
+            try self.op(.i32_eq);
+            _ = try self.open(.if_);
+            try self.i32Const(4 + try self.fieldOffset(payload, position, id));
+            try self.opIndex(.local_set, offset);
+            try self.close();
+        }
+        const ty = field_ty orelse return self.g.fail(self.m, id, "updated field missing", .{});
+        // A constructor without the field leaves the offset at zero.
+        try self.opIndex(.local_get, offset);
+        try self.op(.i32_eqz);
+        try self.trap();
+        const old_address = try self.local32();
+        try self.opIndex(.local_get, value.words[0]);
+        try self.opIndex(.local_get, offset);
+        try self.op(.i32_add);
+        try self.opIndex(.local_set, old_address);
+        const replacement = try self.updateAt(id, try self.readFlat(old_address, 0, ty, id), at + 1);
+        if (replacement.ty == types.never) return replacement;
+        if (replacement.ty != ty) return self.g.fail(self.m, id, "an update that changes a boxed field's type", .{});
+        const memory_block = try self.newBlock(value.ty, id);
+        try self.memoryCopy(memory_block, 0, value.words[0], try self.blockBytes(value.ty, id));
+        const new_address = try self.local32();
+        try self.opIndex(.local_get, memory_block);
+        try self.opIndex(.local_get, offset);
+        try self.op(.i32_add);
+        try self.opIndex(.local_set, new_address);
+        try self.writeFlat(new_address, 0, replacement, id);
         return .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
     }
     fn updateAt(self: *Fn, id: core.Id, value: Val, at: usize) Error!Val {
@@ -1937,10 +2041,29 @@ pub const Fn = struct {
         // reject a mix, so never emit one.
         if (right) |value| if (value.ty != left.ty)
             return self.g.failCode(self.m, id, .type_mismatch, "{s} applied to a {s} and a {s}", .{ @tagName(n.op), @tagName(self.tagOf(left.ty)), @tagName(self.tagOf(value.ty)) });
+        const machine = if (n.c == 1) try self.scalarMember(self.m, left.ty, 0, n.op, id) else n.op;
         try self.push(left);
         if (right) |value| try self.push(value);
-        try self.scalarOp(n.op, left.ty, id);
+        try self.scalarOp(machine, left.ty, id);
         return self.pop(result, id);
+    }
+    /// The machine operation an operator or member `member` (a symbol, or
+    /// zero to look up `op`'s operator) applies to a U32, F32 or Bool
+    /// receiver. The receiver's type must have the member; one that aliases
+    /// a primitive applies that primitive. Function members stand for the
+    /// machine operation until traits replace this dispatch
+    /// (tasks/LANGUAGE_COHERENCE.md C).
+    /// `catalog` is the module whose associated members the operator sees;
+    /// `id` in this function's module is where a missing member is reported.
+    fn scalarMember(self: *Fn, catalog: *const core.Module, receiver: Ty, member: u32, standard: core.Op, id: core.Id) Error!core.Op {
+        const identity = self.g.receiverIdentity(receiver) orelse return standard;
+        const operator = if (member != 0) .none else operatorOf(standard) orelse return standard;
+        const target = self.g.dispatchTarget(catalog, identity, member, operator) orelse
+            return self.g.failCode(self.m, id, .missing_associated, "{s} has no `{s}` member", .{ @tagName(self.tagOf(receiver)), if (member != 0) catalog.fieldSpelling(member) orelse @tagName(standard) else @tagName(standard) });
+        const defining = self.g.types.module(target.unit) orelse return standard;
+        const alias = primitiveAlias(defining, target.binding) orelse return standard;
+        const primitive = defining.primitive(alias);
+        return if (primitive.kind == .scalar and primitive.op != .none) primitive.op else standard;
     }
     /// The scalar payload of a single-constructor value, if it has one.
     fn scalarPayload(self: *Fn, value: Val) Error!?Val {
@@ -2308,20 +2431,35 @@ pub const Fn = struct {
     /// concrete type its references in this unit give it. References at
     /// different types cannot share one computed value.
     fn typeByUses(self: *Fn, binding: core.BindingId, id: core.Id) Error!void {
+        if (try self.usesType(binding, id, 0)) |ty| try self.refine(self.m.binding(binding).ty, ty);
+    }
+    /// The one concrete type the references to local `binding` agree on. A
+    /// reference that is the whole value of another generalized local
+    /// (`let c = b`) takes the type of that alias's uses.
+    fn usesType(self: *Fn, binding: core.BindingId, id: core.Id, depth: u32) Error!?Ty {
         var chosen: ?Ty = null;
         for (self.m.nodes, 0..) |node, index| {
             if (node.tag != .reference) continue;
             const target = self.m.references[node.a];
             if ((target.unit != 0 and target.unit != self.m.unit) or target.binding != binding) continue;
             const ty = self.g.types.lower(self.m, self.m.typeOf(@intCast(index)), self.env) catch |err| switch (err) {
-                error.Unsupported => continue,
+                error.Unsupported => (try self.aliasType(@intCast(index), id, depth)) orelse continue,
                 else => return err,
             };
             if (chosen) |previous| {
                 if (previous != ty) return self.g.fail(self.m, id, "a local value is used at different types; give it an annotation", .{});
             } else chosen = ty;
         }
-        if (chosen) |ty| try self.refine(self.m.binding(binding).ty, ty);
+        return chosen;
+    }
+    fn aliasType(self: *Fn, use: core.Id, id: core.Id, depth: u32) Error!?Ty {
+        if (depth >= 8) return null;
+        for (self.m.nodes) |node| {
+            if (node.tag != .bind or node.b != use) continue;
+            if (self.m.binding(node.a).scheme.variables.len == 0) return null;
+            return self.usesType(node.a, id, depth + 1);
+        }
+        return null;
     }
     /// References to local `binding` in this unit, counted once. A loop
     /// exit (`break_`) carrying a version is on a path exclusive with any
@@ -2474,9 +2612,10 @@ pub const Fn = struct {
             if (n.op != .none and (tag == .u32 or tag == .f32 or tag == .boolean)) {
                 for (forwarded[1..]) |value| if (value.ty != left.ty)
                     return self.g.failCode(self.m, id, .type_mismatch, "{s} applied to a {s} and a {s}", .{ @tagName(n.op), @tagName(tag), @tagName(self.tagOf(value.ty)) });
+                const machine = try self.scalarMember(tm, left.ty, n.c, n.op, id);
                 for (forwarded) |value| try self.push(value);
-                try self.scalarOp(n.op, left.ty, id);
-                return try self.pop(if (self.tagOf(result) == .never) scalarResult(n.op, left.ty) else result, id);
+                try self.scalarOp(machine, left.ty, id);
+                return try self.pop(if (self.tagOf(result) == .never) scalarResult(machine, left.ty) else result, id);
             }
             const identity = self.g.receiverIdentity(left.ty) orelse return null;
             const target = self.g.dispatchTarget(tm, identity, n.c, .none) orelse return null;
@@ -2515,10 +2654,11 @@ pub const Fn = struct {
         };
         const tag = self.g.types.node(left.ty).tag;
         if (n.op != .none and (tag == .u32 or tag == .f32 or tag == .boolean)) {
+            const machine = try self.scalarMember(self.m, left.ty, n.c, n.op, id);
             try self.push(left);
             if (right) |value| try self.push(value);
-            try self.scalarOp(n.op, left.ty, id);
-            return self.pop(result orelse scalarResult(n.op, left.ty), id);
+            try self.scalarOp(machine, left.ty, id);
+            return self.pop(result orelse scalarResult(machine, left.ty), id);
         }
         const identity = self.g.receiverIdentity(left.ty) orelse return self.g.fail(self.m, id, "associated member on a {s}", .{@tagName(tag)});
         const target = self.g.dispatchTarget(self.m, identity, n.c, .none) orelse return self.g.failCode(self.m, id, .missing_associated, "no associated member for this receiver", .{});
@@ -2719,6 +2859,26 @@ pub const Fn = struct {
         for (0..children.len) |position| {
             const name = self.g.types.recordField(record, position).name;
             for (fields, parts) |field, part| if (field.name == name) try words.appendSlice(self.arena, part.words);
+        }
+        return .{ .ty = record, .words = words.items };
+    }
+    /// Record `record` from `value`, a tuple whose items follow the fields of
+    /// `declared` (a Core record type of `tm`) in declared order.
+    fn declaredRecord(self: *Fn, tm: *const core.Module, value: Val, record: Ty, declared: T.Id) Error!Val {
+        const shape = tm.types.node(declared);
+        const items = self.g.types.tupleItems(value.ty);
+        if (items.len != shape.b or self.g.types.node(record).b != shape.b) return self.g.fail(tm, 0, "constructor tuple of {d} items for {d} fields", .{ items.len, shape.b });
+        const offsets = try self.arena.alloc(usize, items.len + 1);
+        offsets[0] = 0;
+        for (items, 0..) |item, index| offsets[index + 1] = offsets[index] + (try self.layout(item, 0)).len;
+        var words: std.ArrayList(u32) = .empty;
+        for (0..shape.b) |position| {
+            const name = self.g.types.recordField(record, position).name;
+            const index = for (0..shape.b) |candidate| {
+                const spelling = tm.fieldSpelling(tm.types.recordField(shape, candidate).name) orelse return self.g.fail(tm, 0, "record field without a spelling", .{});
+                if (try self.g.types.fieldName(spelling) == name) break candidate;
+            } else return self.g.fail(tm, 0, "constructor field missing from its declaration", .{});
+            try words.appendSlice(self.arena, value.words[offsets[index]..offsets[index + 1]]);
         }
         return .{ .ty = record, .words = words.items };
     }
@@ -3027,12 +3187,32 @@ pub const Fn = struct {
             },
             .record_payload => {
                 if (self.g.types.node(value.ty).tag != .record) return self.g.fail(self.m, id, "record pattern on a non-record", .{});
+                // One pattern for a wider record binds the whole payload as a
+                // tuple in declared field order.
+                const storage = self.m.types.node(pattern.ty);
+                if (self.m.pattern(pattern.b).tag != .product and storage.tag == .record and storage.b > 1)
+                    return self.test_(pattern.b, try self.declaredTuple(storage, value, id), fail, id);
                 // A one-field record's child is that field's own pattern.
                 const children: []const core.PatternId = if (self.m.pattern(pattern.b).tag == .product) self.m.patternChildren(pattern.b) else &.{pattern.b};
                 try self.recordPattern(children, self.m.types.node(pattern.ty), value, fail, id);
             },
             .invalid => return self.g.fail(self.m, id, "invalid pattern", .{}),
         }
+    }
+    /// The fields of record `value` as a tuple in the declared order of the
+    /// Core record type `storage`.
+    fn declaredTuple(self: *Fn, storage: T.Node, value: Val, id: core.Id) Error!Val {
+        const items = try self.arena.alloc(Ty, storage.b);
+        var words: std.ArrayList(u32) = .empty;
+        for (items, 0..) |*item, index| {
+            const field = self.m.types.recordField(storage, index);
+            const spelling = self.m.fieldSpelling(field.name) orelse return self.g.fail(self.m, id, "record pattern field without a spelling", .{});
+            const position = self.g.types.findField(value.ty, try self.g.types.fieldName(spelling)) orelse return self.g.fail(self.m, id, "record pattern field missing", .{});
+            const part = try self.recordField(value, position, id);
+            item.* = part.ty;
+            try words.appendSlice(self.arena, part.words);
+        }
+        return .{ .ty = try self.g.types.tuple(items), .words = words.items };
     }
     /// Child `i` matches field `i` of the Core record type `storage`.
     fn recordPattern(self: *Fn, children: []const core.PatternId, storage: T.Node, value: Val, fail: ?u32, id: core.Id) Error!void {
@@ -3536,6 +3716,37 @@ pub fn emitConstantExport(g: *Generator, m: *const core.Module, body: *const cor
     try g.module.exportItem(name, .global, global);
     try abi.name(g.allocator, name);
     try abi.byte(g.allocator, @backingInt(kind));
+    return function;
+}
+
+/// Initializes every array constant the program reads, in declaration order,
+/// so their initializers run at instantiation rather than at a first read.
+pub fn poolInits(g: *Generator, m: *const core.Module, pools: []const u32) Error!u32 {
+    const function = try g.module.addFunction(try g.module.signature(&.{}, &.{}));
+    var arena = std.heap.ArenaAllocator.init(g.allocator);
+    defer arena.deinit();
+    var empty: types.Env = .empty;
+    var f: Fn = .{ .g = g, .m = m, .env = &empty, .arena = arena.allocator() };
+    defer {
+        f.code.deinit(g.allocator);
+        f.locals.deinit(g.allocator);
+    }
+    const rt = try g.runtime_();
+    try f.i32Const(1);
+    try f.opIndex(.call, rt.release);
+    try f.i32Const(rt.layout.stack_base);
+    try f.opIndex(.global_set, rt.stack_pointer);
+    try f.i32Const(0);
+    try f.opIndex(.global_set, rt.effect_context);
+    for (pools) |pool| {
+        const instance = g.instance(pool);
+        try f.opIndex(.call, instance.function);
+        for (try g.types.layout(instance.result)) |_| try f.op(.drop);
+    }
+    try f.i32Const(1);
+    try f.opIndex(.call, rt.release);
+    try f.op(.end);
+    try finish(g, function, &f);
     return function;
 }
 

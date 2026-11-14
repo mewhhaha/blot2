@@ -11,8 +11,7 @@ const catalogSources = [
   'const U32.add=func left=> return func right=> return 99\nentry const answer=func(): U32 => return @type.call "add" 21 21\n',
 ];
 
-// Direct backend: missing_associated for a primitive member absent from the prelude catalog (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("primitive associated selection fails without a prelude catalog", async () => {
+Deno.test("primitive associated selection fails without a prelude catalog", async () => {
   for (const source of catalogSources) {
     await compileExpectedFailure(source, "missing_associated", undefined, {
       prelude: "none",

@@ -54,7 +54,6 @@ Deno.test.ignore("startup cycles and runtime dependencies of entry constants are
 });
 
 // Constants run at instantiation, so a panicking entry constant traps there.
-// Direct backend gap: a constant initialized by `@panic` emits invalid Wasm (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("a panicking entry constant traps at instantiation", async () => {
+Deno.test("a panicking entry constant traps at instantiation", async () => {
   await rejects(compileAndRun(`entry const answer: Unit -> U32 = func () => return 42\nentry const bad: U32 = @panic "later"\n`, () => {}), WebAssembly.RuntimeError);
 });

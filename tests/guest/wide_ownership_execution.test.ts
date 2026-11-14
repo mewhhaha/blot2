@@ -94,8 +94,7 @@ entry const bits = func (value: U32): F32 => return floating value
   }
 });
 
-// Direct backend gap: a field update of a multi-constructor value is unsupported (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("wide ownership selects exact bitmap and size for differently shaped constructor updates", async () => {
+Deno.test("wide ownership selects exact bitmap and size for differently shaped constructor updates", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const types = Array.from({ length: 40 }, (_, word) => {

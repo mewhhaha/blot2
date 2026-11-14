@@ -18,8 +18,7 @@ async function returnsArgument(source: string): Promise<void> {
   });
 }
 
-// Direct backend gap: a generalized local from a polymorphic builder traps with "function signature mismatch" (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("generalized local aliases take the concrete instance of the alias use", async () => {
+Deno.test("generalized local aliases take the concrete instance of the alias use", async () => {
   await returnsArgument(`${builder}
 entry const main = func (x: U32) => return do:
   let b = empty ()
@@ -97,8 +96,7 @@ entry const main = func (x: U32) => return do:
 `);
 });
 
-// Direct backend gap: a generalized local whose uses leave a type variable open is rejected ("unresolved type variable") (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("unobserved generalized locals choose storage for their holes", async () => {
+Deno.test("unobserved generalized locals choose storage for their holes", async () => {
   await returnsArgument(`${builder}
 const pair = func a => return func b => return (a, b)
 const choose = func () => return pair
@@ -467,8 +465,7 @@ ${locals}
 // above that size; both used to report `ownership_unproved`.
 const padding = Array.from({ length: 1000 }, (_, index) => `const pad${index} = func (x: U32) => return @u32.add (@u32.mul x ${index + 1}) ${index}`).join("\n");
 
-// Direct backend gap: a generalized local from a polymorphic builder traps with "function signature mismatch" (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("generalized local aliases in a unit above 4,096 nodes take the instance of their use", async () => {
+Deno.test("generalized local aliases in a unit above 4,096 nodes take the instance of their use", async () => {
   await returnsArgument(`${builder}${padding}
 entry const main = func (x: U32) => return do:
   let b = empty ()

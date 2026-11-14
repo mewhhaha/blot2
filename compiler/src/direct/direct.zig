@@ -20,7 +20,7 @@ pub fn compile(allocator: A, units: []const core.Module, entry: u32) A.Error!bac
             return .{ .diagnostic = .{ .unit = failure.unit, .span = failure.span, .code = failure.code, .detail = failure.message }, .owned_message = failure.message };
         },
     };
-    return .{ .bytes = bytes, .whole_module_only = true, .emitted_functions = g.module.functions.items.len };
+    return .{ .bytes = bytes, .emitted_functions = g.module.functions.items.len };
 }
 
 fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
@@ -50,7 +50,22 @@ fn build(g: *emit.Generator, entry: u32) emit.Error![]u8 {
     }
     if (count == 0 and inits.items.len == 0) return g.fail(m, 0, "the entry module exports nothing", .{});
     try g.emitAll();
-    if (inits.items.len != 0) g.module.start = try function.startFunction(g, m, inits.items);
+    var starts: std.ArrayList(u32) = .empty;
+    defer starts.deinit(g.allocator);
+    const pools = try g.allocator.alloc(u32, g.pool_globals.count());
+    defer g.allocator.free(pools);
+    var keys = g.pool_globals.keyIterator();
+    for (pools) |*slot| slot.* = keys.next().?.*;
+    std.mem.sort(u32, pools, g, struct {
+        fn less(generator: *emit.Generator, left: u32, right: u32) bool {
+            const a = generator.instance(left).key;
+            const b = generator.instance(right).key;
+            return if (a.unit != b.unit) a.unit < b.unit else if (a.id != b.id) a.id < b.id else left < right;
+        }
+    }.less);
+    if (pools.len != 0) try starts.append(g.allocator, try function.poolInits(g, m, pools));
+    try starts.appendSlice(g.allocator, inits.items);
+    if (starts.items.len != 0) g.module.start = try function.startFunction(g, m, starts.items);
     if (try g.summary()) |failure| {
         if (g.failure) |previous| g.allocator.free(previous.message);
         g.failure = failure;

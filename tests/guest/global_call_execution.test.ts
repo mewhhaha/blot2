@@ -28,8 +28,7 @@ for (
     "global_call_initialization.blot",
   ]
 ) {
-  // Direct backend gap: constants initialize on first read, so `answer` reads `audit` before the `first` and `second` initializers append to it (tasks/DELETE_SCOPED.md).
-  const test = name === "global_call_initialization.blot" ? Deno.test.ignore : Deno.test;
+  const test = Deno.test;
   test(`globals retain initialization aliases and cross-export mutation: ${name}`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-global-call-" });
     const entry = `${directory}/main.blot`;

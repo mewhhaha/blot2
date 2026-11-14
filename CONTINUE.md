@@ -18,8 +18,8 @@ out the approved [language coherence list](tasks/LANGUAGE_COHERENCE.md)
 - **Gdev Main.** On a release compiler it builds in 1.15 s against the scoped
   backend's 6.61 s (backend 95 ms against 5,533 ms), producing 2.7 MB of Wasm
   against 9.2 MB. Its first Pen frame is byte-identical (frame.png 19a03f0a…,
-  frames.trace 86d50101…). Its guest frame time is 0.079 ms median against
-  2.45 ms.
+  frames.trace 86d50101…). Its guest frame time is 0.075 ms median against
+  the scoped backend's 2.45 ms; `pen bench` load takes 2.5 s.
 - **Ink.** Ink's suite (`pen test-blot`) matches the scoped backend's last
   results on all 64 modules both compiled; the direct backend also passes
   extractions, retained and simd-batches, which the scoped backend rejected.
@@ -33,9 +33,11 @@ out the approved [language coherence list](tasks/LANGUAGE_COHERENCE.md)
   laws fail at ca3aa93c already (`numeric proof headers reject hidden kinds
   ...` and `value and effect quantifiers freshen independently ...`).
 
-**Next:** fix the ignored cases that emit invalid Wasm or wrong results
-(tasks/DELETE_SCOPED.md), and remove the checker's now-unused cross-revision
-reuse (body check caches, frontend cutoffs) with the incremental redesign.
+**Next:** make the full gate pass again (the two checker laws above), remove
+the checker's now-unused cross-revision reuse (body check caches, frontend
+cutoffs), then start the memory model (tasks/LANGUAGE_COHERENCE.md A). The
+direct-backend cases that emitted invalid Wasm are fixed; the remaining
+ignored cases are listed by kind in tasks/DELETE_SCOPED.md.
 
 ## Commands
 

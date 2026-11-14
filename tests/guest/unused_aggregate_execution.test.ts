@@ -4,8 +4,7 @@ import {
   equal,
 } from "./compile_helpers.ts";
 for (const asynchronous of [false, true]) {
-  // Direct backend gap: an unused generic constant (`const empty = $Nothing`) is rejected ("unresolved type variable at a reference") (tasks/DELETE_SCOPED.md).
-  Deno.test.ignore(`unused aggregate original (${asynchronous ? "JSPI" : "sync"})`, async () => {
+  Deno.test(`unused aggregate original (${asynchronous ? "JSPI" : "sync"})`, async () => {
     await compileAndRun(
       `
 type Maybe a is data = $Some a | $Nothing
@@ -181,8 +180,7 @@ async function trapsWhenRead(source: string) {
     equal(trapped, true);
   });
 }
-// Direct backend gap: a constant initialized by a bare `@panic` emits invalid Wasm (local.set without a value) (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("unused aggregate retains panic-order", async () => {
+Deno.test("unused aggregate retains panic-order", async () => {
   await trapsWhenRead(
     `type Maybe a is data = $Some a | $Nothing
 const identity = func value => return value

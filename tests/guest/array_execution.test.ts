@@ -40,8 +40,7 @@ entry const empty = func () : Array U32 => return @array.generate 0 (func (index
 });
 
 // Constants run at instantiation, so a panicking generator traps there.
-// Direct backend gap: a panicking generator argument emits invalid Wasm (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("array generation traps at instantiation on a panicking generator argument", async () => {
+Deno.test("array generation traps at instantiation on a panicking generator argument", async () => {
   await rejects(compileAndRun(`entry const value: U32 = @array.length (@array.generate 0 (@panic "generator argument"))\n`, () => {}), WebAssembly.RuntimeError);
 });
 

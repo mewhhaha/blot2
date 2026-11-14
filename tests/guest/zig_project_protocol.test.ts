@@ -264,9 +264,8 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
     for (
       const source of [
         "// 雪\nconst incomplete = func (value: U32) : U32 => return @hole\nentry const answer = 42\n",
-        // Direct backend: missing_associated (with its explanation details)
-        // for `@type.call "add" true true`; it compiles the call
-        // (tasks/DELETE_SCOPED.md).
+        // Direct backend: missing_associated for `@type.call "add" true true`
+        // has no explanation details (tasks/DELETE_SCOPED.md).
         // 'entry const answer: Bool = @type.call "add" true true\n',
       ]
     ) {

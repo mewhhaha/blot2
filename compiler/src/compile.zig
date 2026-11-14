@@ -22,8 +22,6 @@ pub const Result = struct {
     diagnostic: ?Diagnostic = null,
     owned_message: []u8 = &.{},
     emitted_functions: usize = 0,
-    /// Set by the direct backend; nothing reads it.
-    whole_module_only: bool = false,
     pub fn deinit(self: *Result, allocator: Allocator) void {
         allocator.free(self.bytes);
         allocator.free(self.owned_message);
