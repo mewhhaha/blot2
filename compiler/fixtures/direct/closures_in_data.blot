@@ -1,0 +1,9 @@
+type Builder callback is data = $Builder {run: callback}
+entry func builder (value: U32): U32 => return do:
+  let b = $Builder {run: func value => return value + 1}
+  let $Builder {run} = b
+  return run value
+entry func pair (value: U32): U32 => return do:
+  let pair = (1.5, func v => return v)
+  let (x, identity) = pair
+  return identity value

@@ -1,0 +1,10 @@
+type Shape is data = $Small {child: U32, value: U32} | $Large {alpha: F32, child: U32, value: U32}
+func replace (shape: Shape): Shape => return do:
+  shape.value := self + 2
+  return shape
+entry func run (mode: U32): U32 => return do:
+  let original = if mode == 0 then $Small {child: 40, value: 7} else $Large {alpha: 1.0, child: 40, value: 7}
+  let updated = replace original
+  return updated.value + updated.child + (case updated of
+    $Small _ => 100
+    $Large _ => 200)

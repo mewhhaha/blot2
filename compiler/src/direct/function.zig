@@ -648,7 +648,7 @@ pub const Fn = struct {
         if (arrow.tag != .function) return self.g.fail(self.m, id, "closure of a non-function type", .{});
         const capture_ids = self.m.closureCaptures(id);
         const captures = try self.arena.alloc(Val, capture_ids.len);
-        for (capture_ids, captures) |binding, *slot| slot.* = self.bindings.get(binding) orelse return self.g.fail(self.m, id, "closure capture without a value", .{});
+        for (capture_ids, captures) |binding, *slot| slot.* = try self.captureValue(binding, id);
         const key: emit.InstanceKey = .{ .kind = .lambda, .unit = self.m.unit, .id = id, .ty = ty, .parent = self.instance_id };
         const instance = self.g.find(key) orelse blk: {
             const capture_types = try self.g.arena.allocator().alloc(Ty, captures.len);
@@ -669,7 +669,7 @@ pub const Fn = struct {
         const parameter = try self.lower(info.parameter.ty, id);
         const capture_ids = self.m.closureCaptures(id);
         const captures = try self.arena.alloc(Val, capture_ids.len);
-        for (capture_ids, captures) |binding, *slot| slot.* = self.bindings.get(binding) orelse return self.g.fail(self.m, id, "closure capture without a value", .{});
+        for (capture_ids, captures) |binding, *slot| slot.* = try self.captureValue(binding, id);
         const marker = try self.g.types.function(parameter, types.never);
         const key: emit.InstanceKey = .{ .kind = .lambda, .unit = self.m.unit, .id = id, .ty = marker, .parent = self.instance_id };
         const instance = self.g.find(key) orelse blk: {
@@ -1292,10 +1292,10 @@ pub const Fn = struct {
         // An empty literal whose element type no use can fix holds no
         // element: its unused variables are Unit.
         const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
-            error.Unsupported => if (children.len == 0 and try self.holesUnused(self.m.typeOf(id), 0))
-                try self.g.types.lowerFilled(self.m, self.m.typeOf(id), self.env, types.unit)
-            else
-                return self.g.typeFailure(self.m, id),
+            error.Unsupported => if (try self.holesUnused(self.m.typeOf(id), 0)) blk: {
+                try self.defaultUnused(self.m.typeOf(id), 0);
+                break :blk try self.lower(self.m.typeOf(id), id);
+            } else return self.g.typeFailure(self.m, id),
             else => return err,
         };
         const values = try self.arena.alloc(Val, children.len);
@@ -1846,10 +1846,40 @@ pub const Fn = struct {
                 error.Unsupported => return self.g.typeFailure(self.m, id),
                 else => return err,
             };
-            if (cases.payloads.len != 1) return self.g.fail(self.m, id, "update of a multi-constructor value", .{});
+            if (cases.payloads.len != 1) return self.sharedFieldUpdate(id, value, cases, name, at);
             record = try self.unwrapVariant(value, cases.tags[0], id);
             wrapped = cases.tags[0];
         }
+        const updated = try self.updateField(id, record, name, at);
+        if (updated.ty == types.never) return updated;
+        if (wrapped != null) return .{ .ty = value.ty, .words = updated.words };
+        return updated;
+    }
+    /// A field several constructors declare, updated in whichever the value
+    /// holds; other constructors trap.
+    fn sharedFieldUpdate(self: *Fn, id: core.Id, value: Val, cases: types.Variants, name: u32, at: usize) Error!Val {
+        const result = try self.fresh(value.ty, id);
+        const exit = try self.open(.block);
+        for (cases.tags, cases.payloads) |tag, payload_ty| {
+            if (self.tagOf(payload_ty) != .record or self.g.types.findField(payload_ty, name) == null) continue;
+            const next = try self.open(.block);
+            try self.opIndex(.local_get, value.words[0]);
+            try self.i32Const(tag);
+            try self.op(.i32_ne);
+            try self.br(.br_if, next);
+            const updated = try self.updateField(id, try self.unwrapVariant(value, tag, id), name, at);
+            if (updated.ty != types.never) {
+                try self.copy(try self.wrapVariant(value.ty, tag, updated, id), result, id);
+                try self.br(.br, exit);
+            }
+            try self.close();
+        }
+        try self.op(.unreachable_);
+        try self.close();
+        return result;
+    }
+    /// Record `record` with field `name` replaced by the rest of the update.
+    fn updateField(self: *Fn, id: core.Id, record: Val, name: u32, at: usize) Error!Val {
         const position = self.g.types.findField(record.ty, name) orelse return self.g.fail(self.m, id, "updated field missing", .{});
         const slice = try self.fieldSlice(record.ty, position, id);
         const old: Val = .{ .ty = self.g.types.recordField(record.ty, position).ty, .words = record.words[slice.start..][0..slice.len] };
@@ -1867,9 +1897,7 @@ pub const Fn = struct {
             fields[position].ty = replacement.ty;
             ty = try self.g.types.record(fields);
         }
-        const updated: Val = .{ .ty = ty, .words = words.items };
-        if (wrapped != null) return .{ .ty = value.ty, .words = updated.words };
-        return updated;
+        return .{ .ty = ty, .words = words.items };
     }
 
     fn scalar(self: *Fn, id: core.Id) Error!Val {
@@ -1905,6 +1933,10 @@ pub const Fn = struct {
         }
         const result = try self.typeOf(id);
         if (tag == .tuple) return self.lanes(n.op, left, right, result, id);
+        // Machine operations take operands of one type; the checker should
+        // reject a mix, so never emit one.
+        if (right) |value| if (value.ty != left.ty)
+            return self.g.failCode(self.m, id, .type_mismatch, "{s} applied to a {s} and a {s}", .{ @tagName(n.op), @tagName(self.tagOf(left.ty)), @tagName(self.tagOf(value.ty)) });
         try self.push(left);
         if (right) |value| try self.push(value);
         try self.scalarOp(n.op, left.ty, id);
@@ -2261,6 +2293,17 @@ pub const Fn = struct {
         try self.writeFlat(address, 0, value, id);
         return .{ .ty = list.ty, .words = list.words };
     }
+    /// The value a closure captures for `binding`: a generalized local built
+    /// at each use is built here at the type its uses give it.
+    fn captureValue(self: *Fn, binding: core.BindingId, id: core.Id) Error!Val {
+        if (self.bindings.get(binding)) |value| return value;
+        const initializer = self.polymorphic.get(binding) orelse return self.g.fail(self.m, id, "closure capture without a value", .{});
+        try self.typeByUses(binding, initializer);
+        const value = try self.expr(initializer);
+        try self.refine(self.m.binding(binding).ty, value.ty);
+        try self.bindings.put(self.a(), binding, value);
+        return value;
+    }
     /// Binds the scheme variables of generalized local `binding` to the one
     /// concrete type its references in this unit give it. References at
     /// different types cannot share one computed value.
@@ -2429,6 +2472,8 @@ pub const Fn = struct {
             const left = forwarded[0];
             const tag = self.g.types.node(left.ty).tag;
             if (n.op != .none and (tag == .u32 or tag == .f32 or tag == .boolean)) {
+                for (forwarded[1..]) |value| if (value.ty != left.ty)
+                    return self.g.failCode(self.m, id, .type_mismatch, "{s} applied to a {s} and a {s}", .{ @tagName(n.op), @tagName(tag), @tagName(self.tagOf(value.ty)) });
                 for (forwarded) |value| try self.push(value);
                 try self.scalarOp(n.op, left.ty, id);
                 return try self.pop(if (self.tagOf(result) == .never) scalarResult(n.op, left.ty) else result, id);

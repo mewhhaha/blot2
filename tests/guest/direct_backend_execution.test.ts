@@ -62,6 +62,9 @@ const cases: Record<string, Call[]> = {
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
   "shared_fields.blot": [["first", 5, 314]],
   "generalized_values.blot": [["generalized", 41, 41]],
+  "captured_generalized.blot": [["captured", 2.5, 2.5], ["nested_empty", 1, 3]],
+  "closures_in_data.blot": [["builder", 41, 42], ["pair", 41, 41]],
+  "shared_field_update.blot": [["run", 0, 149], ["run", 1, 249]],
   "unused_generic_fields.blot": [["partial", 41, 2]],
   "miscompiles.blot": [
     ["lazy_and", false, false],

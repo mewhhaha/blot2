@@ -1,0 +1,8 @@
+type Box a is data = $Box { value: a }
+func unbox value => return case value of
+  $Box payload => payload
+func retain () => return do:
+  let constructor = $Box
+  return func value => return unbox (constructor value)
+entry func captured (value: F32): F32 => return (retain ()) value
+entry func nested_empty (n: U32): U32 => return #[#[], #[]].length + n
