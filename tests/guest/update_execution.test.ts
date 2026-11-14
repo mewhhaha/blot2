@@ -1,8 +1,5 @@
-import {
-  compileAndRun,
-  compileExpectedFailure,
-  equal,
-} from "./compile_helpers.ts";
+import { rejects } from "node:assert/strict";
+import { compileAndRun, equal } from "./compile_helpers.ts";
 import { updateCases } from "./update_cases.ts";
 
 for (const item of updateCases) {
@@ -24,15 +21,10 @@ for (const item of updateCases) {
   });
 }
 
-Deno.test("native indexed updates preserve outer-index, old-leaf and RHS failure order", async () => {
+// Constants run at instantiation, so invalid indexed updates trap there.
+Deno.test("native indexed updates trap on invalid outer indexes, old leaves and RHS panics", async () => {
   for (const item of updateCases) {
     if (!("error" in item)) continue;
-    await compileExpectedFailure(
-      item.source,
-      item.error,
-      item.error === "const_panic"
-        ? "rhs executes after selecting leaf"
-        : undefined,
-    );
+    await rejects(compileAndRun(item.source, () => {}), WebAssembly.RuntimeError);
   }
 });

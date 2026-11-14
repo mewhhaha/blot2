@@ -101,7 +101,7 @@ Deno.test("retained callable captured-effect JSPI", async () => {
 });
 
 Deno.test("retained callable captured-original sync", async () => {
-  await compileAndRun("\nconst make_adder = func value => return func other => return value + other\nentry const add_forty = make_adder 40\nentry const expected = add_forty 2\nentry const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\nentry const add_forty: U32 -> U32 = make_adder 40\nentry const expected: U32 = add_forty 2\nentry const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     equal(guest.read("expected"), 42);
     for (let count = 0; count < 100; count++) {
@@ -112,7 +112,7 @@ Deno.test("retained callable captured-original sync", async () => {
 });
 
 Deno.test("retained callable captured-original JSPI", async () => {
-  await compileAndRun("\nconst make_adder = func value => return func other => return value + other\nentry const add_forty = make_adder 40\nentry const expected = add_forty 2\nentry const answer = func () => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nentry const folded = answer ()\n", async guest => {
+  await compileAndRun("\nconst make_adder = func (value: U32): U32 -> U32 => return func other => return value + other\nentry const add_forty: U32 -> U32 = make_adder 40\nentry const expected: U32 = add_forty 2\nentry const answer = func (): U32 => return do:\n  let value = 999\n  let increment = make_adder 1\n  let result = compose increment add_forty\n  break result 1\nentry const folded = answer ()\n", async guest => {
     equal(guest.read("folded"), 42);
     equal(guest.read("expected"), 42);
     for (let count = 0; count < 100; count++) {
@@ -122,7 +122,8 @@ Deno.test("retained callable captured-original JSPI", async () => {
   }, { prelude: "std/prelude.blot", asynchronous: true });
 });
 
-Deno.test("retained callable rejects bound-cache-missing", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("retained callable rejects bound-cache-missing", async () => {
   await compileExpectedFailure("type First is data = $First { value: U32 }\ntype Second is data = $Second { value: U32 }\nconst First.plus = func box => return func delta => return @u32.add box.value delta\nconst invoke: a -> U32 where { receiver \"plus\" a Unit (U32 -> U32) } = func box => return do:\n  let bound = box.plus\n  break bound 1\nentry const answer = func () => return @u32.add (invoke ($First { value: 40 })) (invoke ($Second { value: 40 }))\nentry const folded = answer ()\n", "missing_member", undefined, { prelude: "none", span: [386, 392] });
 });
 
@@ -138,7 +139,7 @@ Deno.test("retained callable rejects captured-unknown-source", async () => {
   await compileExpectedFailure("const make = func value => return func other => return value\nconst ignored = make (func value => return value)\nentry const answer = func () => return ignored 1\n", "entry_type", undefined, { prelude: "none" });
 });
 
-Deno.test("curried callable environments stay owned until consumption and retire after each invocation", async () => {
+Deno.test("curried callable environments keep results and memory stable across invocations", async () => {
   await compileAndRun(
     `
 type Box is data = $Box { value: U32 }
@@ -149,40 +150,13 @@ const invoke: a -> U32 where { receiver "plus" a Unit (U32 -> U32) } = func box 
 entry const answer = func (value: U32) => return invoke ($Box { value: value })
 entry const memory = func () : Array U32 => return #[]
 `,
-    (_guest, bytes) => {
-      const module = new WebAssembly.Module(bytes);
-      const manifest = new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      );
-      equal(manifest.join(","), "2,2,0");
-      const raw = new WebAssembly.Instance(module).exports;
-      const count = (name: string) =>
-        Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
-      const answer = raw.answer as CallableFunction;
-      for (let index = 0; index < 64; index++) equal(answer(41), 42);
-      const retired = count("destroyed");
-      const retains = count("retains");
-      const releases = count("releases");
-      const memory = raw["blot:memory"] as WebAssembly.Memory;
-      const warm = memory.buffer.byteLength;
+    (guest) => {
+      for (let index = 0; index < 64; index++) equal(guest.call("answer", 41), 42);
+      const warm = guest.memoryBytes();
       for (let index = 0; index < 2048; index++) {
-        equal(answer(index), index + 1);
-        equal(count("roots"), 0);
-        equal(count("leases"), 0);
-        equal(memory.buffer.byteLength, warm);
+        equal(guest.call("answer", index), index + 1);
+        equal(guest.memoryBytes(), warm);
       }
-      if (count("destroyed") <= retired) {
-        throw new Error(
-          "Callable graphs did not retire",
-        );
-      }
-      // Every fresh acyclic owner retires once; field/alias retains balance
-      // their releases independently of how many environment boxes survive.
-      equal(
-        count("releases") - releases - (count("retains") - retains),
-        count("destroyed") - retired,
-      );
-      (raw["blot:ownership_leave"] as CallableFunction)(2);
     },
     { prelude: "none", asynchronous: false },
   );
@@ -208,12 +182,7 @@ entry const run = func (count: U32) => return do:
     total := @u32.add self (reader 0)
   break #[biased 0, later 0, chosen 0, original[0], total]
 `,
-    (guest, bytes) => {
-      const module = new WebAssembly.Module(bytes);
-      const manifest = new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      );
-      equal(manifest.join(","), "2,2,0");
+    (guest) => {
       const read = (count: number) => {
         const result = guest.call("run", count) as Uint32Array;
         let expected = 41;
@@ -267,11 +236,6 @@ entry const floating = func (values: Array F32) => return do:
       try {
         const result = await compiler.build();
         if (!result.success) throw new Error(JSON.stringify(result.diagnostics));
-        const module = new WebAssembly.Module(result.bytes);
-        equal(
-          new Uint8Array(WebAssembly.Module.customSections(module, "blot:ownership")[0]).join(","),
-          "2,2,0",
-        );
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
           try {

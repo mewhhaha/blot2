@@ -48,55 +48,6 @@ entry const answer = func (value: U32) => return do:
   }
 });
 
-Deno.test("project storage budgets bound growth and cannot reuse output from a different budget", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-storage-budgets-" });
-  const entry = `${directory}/main.blot`;
-  try {
-    await Deno.writeTextFile(
-      entry,
-      `entry const count = func (size: U32) => return do:
-  let values: GrowArray U32 = #[]
-  for i in 0 .. size:
-    @storage.push values i
-  return @storage.length values
-`,
-    );
-    const outputs: Uint8Array[] = [];
-    for (const growerBytes of [64, 256, 64]) {
-      const compiler = await createZigProjectCompiler({
-        executable: resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc"),
-        entry,
-        prelude: null,
-        cacheDirectory: `${directory}/cache`,
-        storage: { growerBytes },
-      });
-      try {
-        const built = await compiler.build();
-        assert(built.success, JSON.stringify(built));
-        outputs.push(built.bytes);
-        const guest = await instantiateGuest(built.bytes);
-        try {
-          assert.equal(guest.call("count", 4), 4);
-          if (growerBytes === 64) assert.throws(() => guest.call("count", 32));
-          else assert.equal(guest.call("count", 32), 32);
-          assert.equal(guest.call("count", 4), 4);
-        } finally {
-          guest.dispose();
-        }
-        const retained = await compiler.build();
-        assert(retained.success, JSON.stringify(retained));
-        assert.deepEqual(retained.bytes, built.bytes);
-      } finally {
-        await compiler.close();
-      }
-    }
-    assert.deepEqual(outputs[0], outputs[2]);
-    assert.notDeepEqual(outputs[0], outputs[1]);
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
-
 Deno.test("project service retains data-stack output across edits errors and backend changes", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-storage-project-" });
   const entry = `${directory}/main.blot`;

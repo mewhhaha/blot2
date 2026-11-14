@@ -82,7 +82,7 @@ Deno.test("private table projection keeps scalar folds reference publication and
   }, { stdRoot });
 });
 
-Deno.test("table projection consumes exact changed source bodies in retained and portable replay", async () => {
+Deno.test("table projection consumes exact changed source bodies in retained builds", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-table-projection-",
   });
@@ -101,7 +101,6 @@ Deno.test("table projection consumes exact changed source bodies in retained and
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
-      let checkpoint;
       try {
         for (const offset of [0, 0, 1, 0]) {
           const sources = {
@@ -125,35 +124,8 @@ Deno.test("table projection consumes exact changed source bodies in retained and
             await fresh.dispose();
           }
         }
-        checkpoint = await retained.exportCheckpoint();
       } finally {
         await retained.dispose();
-      }
-      const resumed = await createZigProjectCompiler({
-        ...options,
-        checkpoint,
-      });
-      const fresh = await createZigProjectCompiler(options);
-      try {
-        const sources = {
-          [entry]: program,
-          [helper]:
-            "const add = func (left: U32) => return func (right: U32) => return left + right + 1\n",
-        };
-        const built = await resumed.build({ sources });
-        const ordinary = await fresh.build({ sources });
-        assert(built.success && ordinary.success);
-        assert.deepEqual(built.bytes, ordinary.bytes);
-        if (codegenTier === "optimized") {
-          const optimization = built.stats.runtimeOptimization as Record<
-            string,
-            number
-          >;
-          assert(optimization.reused > 0, JSON.stringify(optimization));
-        }
-      } finally {
-        await resumed.dispose();
-        await fresh.dispose();
       }
     }
   } finally {

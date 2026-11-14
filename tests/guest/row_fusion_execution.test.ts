@@ -67,7 +67,7 @@ function pipelineSources() {
   return { source: helpers.join("\n") + functions.join("\n"), cases };
 }
 
-Deno.test("row producer composition preserves snapshots, wrapping and early exits", async () => {
+Deno.test("row producer composition preserves aliased writes, wrapping and early exits", async () => {
   await compileAndRun(
     `
 const transform = func row => return {a: @u32.add row.a 1, b: @u32.mul row.b 2, c: row.c}
@@ -100,9 +100,10 @@ entry const returned = func (count: U32) => return do:
 `,
     (guest) => {
       for (const count of [1, 82, 83, 84, 257, 600]) {
+        // `saved` aliases `arrays`, so it sees the write (tasks/LANGUAGE_COHERENCE.md A7).
         assert.deepEqual(
           guest.call("run", count),
-          Uint32Array.of((3 * count * (count - 1) + 4 * count) >>> 0, 0, 99),
+          Uint32Array.of((3 * count * (count - 1) + 4 * count) >>> 0, 99, 99),
         );
         const stopped = Math.min(count, 83);
         assert.equal(
@@ -206,7 +207,7 @@ entry const trap = func (host: U32 -> U32 ! {Foreign}) => return do:
   );
 });
 
-Deno.test("fused row consumers revalidate source, compiled and checkpoint dependency edits", async () => {
+Deno.test("fused row consumers revalidate source and compiled dependency edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-fused-revision-" });
   const entry = `${directory}/main.blot`;
   const library = `${directory}/rows.blot`;
@@ -259,8 +260,6 @@ const consume = func row => return @u32.add row.a row.b
           ] as const
         ) {
           const sources = { [library]: source };
-          let before: Uint8Array<ArrayBuffer> | undefined;
-          if (expected === null) before = await retained.exportCheckpoint();
           const built = await retained.build({ sources });
           const fresh = await createZigProjectCompiler(options);
           try {
@@ -270,7 +269,6 @@ const consume = func row => return @u32.add row.a row.b
               assert(!rebuilt.success);
               assert.equal(expected, null);
               assert.deepEqual(built.diagnostics, rebuilt.diagnostics);
-              assert.deepEqual(await retained.exportCheckpoint(), before);
               continue;
             }
             assert(rebuilt.success);
@@ -279,25 +277,11 @@ const consume = func row => return @u32.add row.a row.b
               if (initial) assert.deepEqual(built.bytes, initial);
               initial = built.bytes;
             }
-            const checkpoint = await retained.exportCheckpoint();
-            const restored = await createZigProjectCompiler({
-              ...options,
-              checkpoint,
-            });
+            const guest = await instantiateGuest(built.bytes);
             try {
-              const restarted = await restored.build({ sources });
-              assert(restarted.success, JSON.stringify(restarted));
-              assert.deepEqual(restarted.bytes, built.bytes);
-              for (const bytes of [built.bytes, restarted.bytes]) {
-                const guest = await instantiateGuest(bytes);
-                try {
-                  assert.equal(guest.call("run", 257), expected);
-                } finally {
-                  guest.dispose();
-                }
-              }
+              assert.equal(guest.call("run", 257), expected);
             } finally {
-              await restored.dispose();
+              guest.dispose();
             }
           } finally {
             await fresh.dispose();

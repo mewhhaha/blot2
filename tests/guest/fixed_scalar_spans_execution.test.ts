@@ -22,9 +22,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         signal: AbortSignal.timeout(5_000),
       });
       assert(built.success, JSON.stringify(built));
-      const work = built.stats.workCounters as Record<string, number>;
-      assert(work.scoped_fixed_spans > 0);
-      assert(work.scoped_fixed_span_accesses > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(built.bytes, { asynchronous });
         try {

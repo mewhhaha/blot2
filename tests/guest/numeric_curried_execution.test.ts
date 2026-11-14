@@ -87,7 +87,7 @@ for (
   ]
 ) {
   for (const codegenTier of ["development", "optimized"] as const) {
-    Deno.test(`curried selected proofs preserve ${name} captures traps archives and restart (${codegenTier})`, async () => {
+    Deno.test(`curried selected proofs preserve ${name} captures traps and archives (${codegenTier})`, async () => {
       const directory = await Deno.makeTempDir({
         prefix: "blot-curried-proof-",
       });
@@ -115,7 +115,6 @@ for (
           ...options,
           dependencies,
         });
-        let checkpoint: Uint8Array<ArrayBuffer>;
         let expected: Uint8Array<ArrayBuffer>;
         try {
           const first = await compiler.build();
@@ -126,11 +125,9 @@ for (
           assert.deepEqual(frozen.bytes, first.bytes);
           expected = first.bytes;
           await observe(expected);
-          checkpoint = await archive.exportCheckpoint();
           const broken = source.replace("run index", "run true");
           const failed = await archive.build({ sources: { [entry]: broken } });
           assert(!failed.success);
-          assert.deepEqual(await archive.exportCheckpoint(), checkpoint);
           const recovered = await archive.build({
             sources: { [entry]: source },
           });
@@ -155,19 +152,6 @@ for (
         } finally {
           await compiler.dispose();
           await archive.dispose();
-        }
-        const restored = await createZigProjectCompiler({
-          ...options,
-          dependencies,
-          checkpoint: checkpoint!,
-        });
-        try {
-          const replayed = await restored.build();
-          assert(replayed.success, JSON.stringify(replayed));
-          assert.deepEqual(replayed.bytes, expected!);
-          await observe(replayed.bytes);
-        } finally {
-          await restored.dispose();
         }
       } finally {
         await Deno.remove(directory, { recursive: true });

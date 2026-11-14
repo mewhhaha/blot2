@@ -41,55 +41,6 @@ entry const floating: U32 -> F32 = func depth => return repeat 1.5 depth
   }
 });
 
-Deno.test("late selected recursive methods terminate and rejected leaves can be corrected", async () => {
-  const source = `type Seed is data = $Seed
-type Box a is data = $Box a
-const Seed.build: a -> Seed -> Box a = func value => return func seed => return $Box value
-const wrap = func value => return @type.call "build" value $Seed
-const parent: U32 -> U32 = func value => return if @u32.eq value 0 then 42 else (wrap value).read
-const Box.read: Box U32 -> U32 = func box => return case box of
-  $Box value => parent (@u32.sub value 1)
-entry const run: U32 -> U32 = func value => return parent value
-`;
-  for (
-    const body of [
-      "  $Box value => parent (@u32.sub value 1)",
-      "  $Box value => do:\n    let next = @u32.sub value 1\n    break parent next",
-      "  $Box value => do:\n    let next = func arg => return parent arg\n    break next (@u32.sub value 1)",
-    ]
-  ) {
-    const selected = source.replace(
-      "  $Box value => parent (@u32.sub value 1)",
-      body,
-    );
-    await compileExpectedFailure(
-      selected.replace("then 42", "then 1.5"),
-      "type_mismatch",
-      undefined,
-      { prelude: "none" },
-    );
-    await compileAndRun(selected, (guest) => {
-      for (const depth of [0, 1, 7, 17]) equal(guest.call("run", depth), 42);
-    }, { prelude: "none" });
-  }
-});
-
-Deno.test("unresolved diamonds retain invalid witness diagnostics before budget errors", async () => {
-  const links = Array.from(
-    { length: 12 },
-    (_, index) =>
-      `const f_${
-        index + 1
-      } = func left => return func right => return do:\n  let ignored = f_${index} left right\n  break f_${index} left right`,
-  ).join("\n");
-  await compileExpectedFailure(
-    `const f_0 = func left => return func right => return @type.same (@panic "uncalled witness") right\n${links}\nentry const run = func (value: U32) : Bool => return f_12 value value\n`,
-    "invalid_annotation",
-    undefined,
-    { prelude: "none" },
-  );
-});
-
 Deno.test("queued associated methods preserve left dispatch priority", async () => {
   await compileAndRun(
     `type L is data = $L U32

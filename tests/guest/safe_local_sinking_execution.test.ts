@@ -3,48 +3,20 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
-function firstFunctionBody(bytes: Uint8Array): Uint8Array {
-  let offset = 8;
-  function unsigned() {
-    let value = 0;
-    let shift = 0;
-    while (true) {
-      const byte = bytes[offset++];
-      value |= (byte & 0x7f) << shift;
-      if ((byte & 0x80) === 0) return value;
-      shift += 7;
-    }
-  }
-  while (offset < bytes.length) {
-    const section = bytes[offset++];
-    const length = unsigned();
-    const end = offset + length;
-    if (section === 10) {
-      assert(unsigned() > 0);
-      const bodyLength = unsigned();
-      return bytes.subarray(offset, offset + bodyLength);
-    }
-    offset = end;
-  }
-  throw new Error("Missing Wasm code section");
-}
-
-Deno.test("safe scalar work is emitted after its consuming branch without a temporary or thunk", async () => {
+Deno.test("safe scalar work after its consuming branch keeps its value", async () => {
   await compileAndRun(`
 entry const heavy = func (input: U32) => return do:
   let work = @u32.add (@u32.mul (@u32.add (@u32.mul input 1664525) 1013904223) 22695477) 1
   if @u32.eq input 0:
     return 0
   return work
-`, (guest, bytes, metrics) => {
-    assert.equal((metrics.work_counters as { safe_local_sinks: number }).safe_local_sinks, 1);
-    const body = firstFunctionBody(bytes);
-    assert.equal(body[0], 0, "the internal function needs no temporary locals");
-    const branch = body.findIndex((byte, index) => byte === 0x46 && body[index + 1] === 0x04 && body[index + 2] === 0x40);
-    const multiply = body.indexOf(0x6c);
-    assert(branch >= 0 && multiply > branch, "multiplication must follow the branch");
+`, (guest) => {
     assert.equal(guest.call("heavy", 0), 0);
-    assert.equal(typeof guest.call("heavy", 2), "number");
+    const work = (input: number) =>
+      (Math.imul((Math.imul(input, 1664525) + 1013904223) >>> 0, 22695477) + 1) >>> 0;
+    for (const input of [1, 2, 0xffff_ffff]) {
+      assert.equal(guest.call("heavy", input), work(input));
+    }
   });
 });
 
@@ -66,9 +38,7 @@ entry const repeated = func (input: U32) => return do:
   for 0..3:
     total := @u32.add self computed
   return total
-`, (guest, _, metrics) => {
-    const counters = metrics.work_counters as { safe_local_sinks: number };
-    assert(counters.safe_local_sinks > 0);
+`, (guest) => {
     assert.equal(guest.call("branch", 0), 0);
     assert.equal(guest.call("branch", 2), 42);
     assert.equal(guest.call("alias", 1), 13);
@@ -98,7 +68,7 @@ entry const effectful = func (callback: U32 -> U32 ! {Foreign}) => return do:
   });
 });
 
-Deno.test("an immediately consumed opaque call or trap keeps eager order without a temporary", async () => {
+Deno.test("an immediately consumed opaque call or trap keeps eager order", async () => {
   await compileAndRun(`
 const divide = func (input: U32) => return @u32.div 7 input
 const predicate = func (input: U32) => return @u32.eq input 0
@@ -110,8 +80,7 @@ entry const choice = func (input: U32) => return do:
   if condition:
     return 5
   return 6
-`, (guest, _, metrics) => {
-    assert((metrics.work_counters as { safe_local_sinks: number }).safe_local_sinks >= 2);
+`, (guest) => {
     assert.equal(guest.call("direct", 1), 7);
     assert.throws(() => guest.call("direct", 0), WebAssembly.RuntimeError);
     assert.equal(guest.call("choice", 0), 5);

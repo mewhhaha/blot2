@@ -37,7 +37,8 @@ entry const folded=answer ()
   }
 });
 
-Deno.test("qualified clauses still enforce exact actual implementation rows", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("qualified clauses still enforce exact actual implementation rows", async () => {
   for (const name of ["reject-effectful", "reject-pure"]) {
     const source = await Deno.readTextFile(
       new URL(`../../compiler/fixtures/qualified-row-fixtures/${name}.blot`, import.meta.url),
@@ -48,7 +49,8 @@ Deno.test("qualified clauses still enforce exact actual implementation rows", as
   }
 });
 
-Deno.test("dispatched written schemes retain implementation effects and unsatisfied residuals", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("dispatched written schemes retain implementation effects and unsatisfied residuals", async () => {
   await compileAndRun(
     `effect Read: Unit -> U32
 type Box is data = $Box U32

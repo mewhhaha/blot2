@@ -29,7 +29,7 @@ Deno.test("development areas are discoverable and unknown names fail before buil
   }
 });
 
-Deno.test("guest evidence rejects zero-test filters, skipped tests and missing files", () => {
+Deno.test("guest evidence rejects zero-test filters, skipped requested tests and missing files", () => {
   const xml =
     '<testsuites><testsuite><testcase name="selected client" classname="./client.test.ts"></testcase></testsuite></testsuites>';
   assert.equal(
@@ -44,6 +44,13 @@ Deno.test("guest evidence rejects zero-test filters, skipped tests and missing f
       "client.test.ts",
     ])
   );
+  const ignored = xml.replace(
+    "</testsuite>",
+    '<testcase name="ignored client" classname="./client.test.ts"><skipped/></testcase></testsuite>',
+  );
+  assert.deepEqual(verifyGuestResults(ignored, ["client.test.ts"]), [
+    { name: "selected client", file: "./client.test.ts" },
+  ]);
   assert.throws(() => verifyGuestResults(xml, ["missing.test.ts"]));
   assert.throws(() =>
     verifyGuestResults(xml, ["client.test.ts"], ["missing client"])

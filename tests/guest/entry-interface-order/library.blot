@@ -1,3 +1,1 @@
-const compare = func left => return func right => return @type.same left right
-const alias = compare
 const index = func values => return @array.get values 0

@@ -31,7 +31,7 @@ async function run(bytes: Uint8Array<ArrayBuffer>, expected: number) {
   }
 }
 
-Deno.test("opaque source compiled forwarding and checkpoints keep privacy through failed edits", async () => {
+Deno.test("opaque source and compiled forwarding keep privacy through failed edits", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-opacity-" });
   const entry = `${directory}/main.blot`;
   const tokens = `${directory}/tokens.blot`;
@@ -63,7 +63,6 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
       ...options,
       dependencies: bundle,
     });
-    let checkpoint: Uint8Array<ArrayBuffer>;
     let expected: Uint8Array<ArrayBuffer>;
     try {
       const first = await source.build();
@@ -73,7 +72,6 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
       assert(cached.stats.cachedModules > 0);
       assert.deepEqual(cached.bytes, first.bytes);
       await run(cached.bytes, 42);
-      checkpoint = await compiled.exportCheckpoint();
       expected = first.bytes;
       for (
         const rejected of [
@@ -101,7 +99,6 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
         });
         assert(!fromSource.success && !fromArchive.success);
         assert.deepEqual(fromArchive.diagnostics, fromSource.diagnostics);
-        assert.deepEqual(await compiled.exportCheckpoint(), checkpoint);
       }
       for (
         const changed of [
@@ -135,21 +132,6 @@ Deno.test("opaque source compiled forwarding and checkpoints keep privacy throug
     } finally {
       await source.dispose();
       await compiled.dispose();
-    }
-    const restored = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: null,
-      dependencies: bundle,
-      checkpoint: checkpoint!,
-    });
-    try {
-      const built = await restored.build();
-      assert(built.success, JSON.stringify(built));
-      assert.deepEqual(built.bytes, expected!);
-      await run(built.bytes, 42);
-    } finally {
-      await restored.dispose();
     }
   } finally {
     await Deno.remove(directory, { recursive: true });

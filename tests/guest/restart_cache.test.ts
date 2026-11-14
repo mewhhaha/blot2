@@ -6,7 +6,7 @@ const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
 const source = (offset: string) => `
 const offset = ${offset}
-entry const folded: U32 where { type_rep U32 } = do:
+entry const folded: U32 = do:
   let local = func value => return value
   break local offset
 entry const answer = func (value: U32) => return @u32.add value offset
@@ -24,20 +24,14 @@ async function files(directory: string): Promise<string[]> {
 
 // Each key also keeps a `.lock` file; a `.partial` file only exists while its
 // writer runs.
-async function caches(directory: string): Promise<string[]> {
+async function outputs(directory: string): Promise<string[]> {
   const found = await files(directory);
   assert(!found.some((path) => path.endsWith(".partial")), found.join("\n"));
-  return found.filter((path) => path.endsWith(".blotcache"));
+  return found.filter((path) => path.endsWith(".blotout"));
 }
 
-// deno-lint-ignore no-explicit-any
-const saving = (metrics: any) => ({
-  loaded: metrics.restart_cache.loaded,
-  saved: metrics.restart_cache.saved,
-});
-
 for (const project of [false, true]) {
-  Deno.test(`default ${project ? "project" : "source"} CLI restart cache validates source and replaces corrupt candidates atomically`, async () => {
+  Deno.test(`default ${project ? "project" : "source"} CLI builds with a cache directory match builds without one`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
     const cache = `${directory}/cache`;
@@ -81,38 +75,18 @@ for (const project of [false, true]) {
     try {
       await Deno.writeTextFile(entry, source("1"));
       const fresh = await build("");
-      const populated = await build();
-      assert.deepEqual(saving(populated.metrics), { loaded: false, saved: true });
-      assert(populated.metrics.restart_cache.bytes > 0);
-      assert.equal(populated.metrics.restart_cache.over_limit, false);
-      const restarted = await build();
-      assert(restarted.metrics.restart_cache.loaded);
-      assert(restarted.metrics.principals.persisted_hits > 0);
-      assert.deepEqual(restarted.bytes, fresh.bytes);
-      const [artifact] = await caches(cache);
-      assert(artifact.endsWith(".blotcache"));
-      const valid = await Deno.readFile(artifact);
-      await Deno.writeTextFile(artifact, "truncated checkpoint");
-      const repaired = await build();
-      assert.deepEqual(saving(repaired.metrics), { loaded: false, saved: true });
-      assert.deepEqual(repaired.bytes, fresh.bytes);
-      // A foreign identity is rejected even if its file is placed under this key.
-      const foreign = valid.slice();
-      foreign[44] ^= 1;
-      await Deno.writeFile(artifact, foreign);
-      assert.equal((await build()).metrics.restart_cache.loaded, false);
+      for (const result of [await build(), await build()]) {
+        assert.deepEqual(result.bytes, fresh.bytes);
+      }
       for (const result of await Promise.all([build(), build()])) {
         assert.deepEqual(result.bytes, fresh.bytes);
       }
-      assert.equal((await caches(cache)).length, 1);
       await Deno.writeTextFile(entry, source("2"));
       const changed = await build();
       assert.deepEqual(changed.bytes, (await build("")).bytes);
-      const beforeFailure = await Deno.readFile(artifact);
       await Deno.writeTextFile(entry, source("true"));
       const failed = await build(cache, false);
       assert.deepEqual(failed.errors, (await build("", false)).errors);
-      assert.deepEqual(await Deno.readFile(artifact), beforeFailure);
       await Deno.writeTextFile(entry, source("1"));
       assert.deepEqual((await build()).bytes, fresh.bytes);
       const unavailable = `${directory}/file`;
@@ -124,7 +98,7 @@ for (const project of [false, true]) {
   });
 }
 
-Deno.test("project server persists committed checkpoints across disposal and graceful close", async () => {
+Deno.test("project server persists outputs across disposal and graceful close", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const options = {
@@ -145,8 +119,7 @@ Deno.test("project server persists committed checkpoints across disposal and gra
     } finally {
       await first.dispose();
     }
-    // Unchanged inputs publish the persisted output without compiling, and
-    // export the checkpoint written with it.
+    // Unchanged inputs publish the persisted output without compiling.
     const unchanged = await createZigProjectCompiler(options);
     try {
       const built = await unchanged.build();
@@ -154,12 +127,10 @@ Deno.test("project server persists committed checkpoints across disposal and gra
       assert.equal(built.stats.restartCacheLoaded, true);
       assert.equal(built.stats.attemptStats.restored_output, true);
       assert.deepEqual(built.bytes, original!);
-      assert((await unchanged.exportCheckpoint()).length > 0);
     } finally {
       await unchanged.dispose();
     }
-    // Another output policy cannot take the output; it compiles warm from
-    // the checkpoint instead.
+    // Another output policy cannot take the output; it compiles instead.
     const retained = await createZigProjectCompiler({
       ...options,
       codegenWorkers: 1,
@@ -171,9 +142,6 @@ Deno.test("project server persists committed checkpoints across disposal and gra
       assert.equal(built.stats.restartCacheLoaded, true);
       assert.equal(built.stats.attemptStats.restored_output, false);
       assert.deepEqual(built.bytes, original!);
-      assert(
-        (built.stats.principals as Record<string, number>).persisted_hits > 0,
-      );
       const changed = await retained.build({
         sources: { [entry]: source("2") },
       });
@@ -271,9 +239,9 @@ async function keyPaths(cache: string) {
   const [lock] = (await files(cache)).filter((path) => path.endsWith(".lock"));
   assert(lock);
   await settle(lock);
-  const [artifact] = await caches(cache);
-  assert(artifact);
-  return { lock, artifact, output: artifact.replace(/\.blotcache$/, ".blotout") };
+  const [output] = await outputs(cache);
+  assert(output);
+  return { lock, output };
 }
 
 // A detached writer only exists where the server forks one (Linux).
@@ -308,8 +276,7 @@ Deno.test({
       } finally {
         await first.dispose();
       }
-      const { lock, artifact, output } = await keyPaths(cache);
-      await Deno.remove(artifact);
+      const { lock, output } = await keyPaths(cache);
       await Deno.remove(output);
       const previous = await writer(lock);
       assert(previous !== undefined, "a writer names itself in the lock file");
@@ -333,7 +300,7 @@ Deno.test({
       // A killed process never runs again; wait briefly for it to be reaped.
       for (let tries = 0; tries < 200 && alive(stuck); tries++) await pause(5);
       // What a writer killed mid-write leaves behind is never read.
-      await Deno.writeTextFile(`${artifact}.partial`, "truncated checkpoint");
+      await Deno.writeTextFile(`${output}.partial`, "truncated output");
       await holder.unlock();
       holder.close();
       const cold = await createZigProjectCompiler(options);
@@ -346,7 +313,7 @@ Deno.test({
         await cold.dispose();
       }
       await settle(lock);
-      assert.deepEqual(await caches(cache), [artifact]);
+      assert.deepEqual(await outputs(cache), [output]);
       const warm = await createZigProjectCompiler(options);
       try {
         const built = await warm.build();
@@ -381,9 +348,8 @@ Deno.test({
       } finally {
         await first.dispose();
       }
-      const { lock, artifact, output } = await keyPaths(cache);
-      const published = await Deno.readFile(artifact);
-      await Deno.remove(artifact);
+      const { lock, output } = await keyPaths(cache);
+      const published = await Deno.readFile(output);
       await Deno.remove(output);
       // This test stands in for a writer: it holds the lock, then publishes.
       const holder = await Deno.open(lock, { read: true, write: true });
@@ -397,8 +363,8 @@ Deno.test({
       );
       await new Promise((resolve) => setTimeout(resolve, 300));
       assert.deepEqual(opened, [false, false], "opens wait for the writer");
-      await Deno.writeFile(`${artifact}.test`, published);
-      await Deno.rename(`${artifact}.test`, artifact);
+      await Deno.writeFile(`${output}.test`, published);
+      await Deno.rename(`${output}.test`, output);
       await holder.unlock();
       holder.close();
       const compilers = await Promise.all(pending);
@@ -499,7 +465,7 @@ Deno.test("project server reports the cache's last write, including growth past 
     );
     await settle(lock);
     const written = JSON.parse(await Deno.readTextFile(lock));
-    assert(written.writer > 0 && written.checkpoint_bytes > 0, JSON.stringify(written));
+    assert(written.writer > 0, JSON.stringify(written));
     assert(written.output_bytes > 0 && !written.over_limit && !written.semantic_over_limit);
     const next = await build();
     assert.deepEqual(next.stats.restartCacheWrite, written);

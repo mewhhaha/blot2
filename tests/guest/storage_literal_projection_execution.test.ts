@@ -47,8 +47,6 @@ const poison: Palette = $Palette {z: 7, a: 1.5, m: @u32.div 19 0}
         sources = { [entry]: caller, [producer]: left, [other]: right };
         const result = await compiler.build({ sources });
         assert(result.success, JSON.stringify(result));
-        const counters = result.stats.workCounters as Record<string, number>;
-        assert(counters.scoped_literal_record_projections > 0);
         latest = result.bytes;
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });

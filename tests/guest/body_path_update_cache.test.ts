@@ -25,7 +25,7 @@ entry const run = func (index: U32) : Array U32 => return update index
 entry const replaced = func (value: U32) : Array U32 => return replace #[seed, 41] 1 value
 `;
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`body path update receipts preserve selector order old leaf and snapshots (${codegenTier})`, async () => {
+  Deno.test(`body path update receipts preserve selector order and writes through the alias (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
     const options = {
@@ -67,10 +67,12 @@ for (const codegenTier of ["development", "optimized"] as const) {
             for (let round = 0; round < 2; round++) {
               for (let call = 0; call < 64; call++) {
                 const index = call % 2;
-                const before = (index + 1) * 10;
+                // `before` aliases `bucket`, so it sees the write
+                // (tasks/LANGUAGE_COHERENCE.md A7).
+                const after: number = (index + 1) * 10 + seed;
                 assert.deepEqual(
                   guest.call("run", index),
-                  Uint32Array.of(before, before + seed),
+                  Uint32Array.of(after, after),
                 );
                 assert.deepEqual(
                   guest.call("replaced", call),
@@ -81,15 +83,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
             assert.throws(() => guest.call("run", 2));
             assert.deepEqual(
               guest.call("run", 1),
-              Uint32Array.of(20, 20 + seed),
+              Uint32Array.of(20 + seed, 20 + seed),
             );
           } finally {
             guest.dispose();
-          }
-          if (text === source("2", prefix)) {
-            const work = result.stats.frontend.body_elaborations;
-            const expected = ordinary.stats.frontend.body_elaborations;
-            assert.ok(work !== null && expected !== null && work < expected);
           }
         } finally {
           await fresh.dispose();

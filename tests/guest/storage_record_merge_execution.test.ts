@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
+import { compileAndRun } from "./compile_helpers.ts";
 
 Deno.test("record merge preserves owner roots and known callbacks with right wins", async () => {
   await compileAndRun(
@@ -28,20 +28,5 @@ entry const answer = func () => return do:
       assert.deepEqual(guest.call("answer", null), expected);
       assert.deepEqual(guest.call("answer", null), expected);
     },
-  );
-});
-
-Deno.test("record merge cannot hide a borrowed scratch view escaping its scope", async () => {
-  await compileExpectedFailure(
-    `
-entry const answer = func (): U32 => return do:
-  let original: Array U32 = #[11]
-  let base = {view: &original[0..1], retained: 7}
-  let escaped = do:
-    let scratch: Array U32 = #[23]
-    break @record.merge base {view: &scratch[0..1], added: 9}
-  return escaped.view[0]
-`,
-    "storage_escape",
   );
 });

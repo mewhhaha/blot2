@@ -52,7 +52,7 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
 }
 
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`U32 identity proofs preserve bits traps edits and portable ownership (${codegenTier})`, async () => {
+  Deno.test(`U32 identity proofs preserve bits traps and edits (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-bit-proof-" });
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/logic.blot`;
@@ -78,7 +78,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         ...options,
         dependencies,
       });
-      let checkpoint: Uint8Array<ArrayBuffer>;
       let expected: Uint8Array<ArrayBuffer>;
       try {
         const first = await compiler.build();
@@ -89,12 +88,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
         assert.deepEqual(frozen.bytes, first.bytes);
         expected = first.bytes;
         await observe(expected);
-        checkpoint = await archive.exportCheckpoint();
         const invalid = await archive.build({
           sources: { [entry]: source.replace("lookup index", "lookup true") },
         });
         assert(!invalid.success);
-        assert.deepEqual(await archive.exportCheckpoint(), checkpoint);
         const changed = library.replace(
           "@u32.shl masked 32",
           "@u32.shl masked 33",
@@ -114,19 +111,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
       } finally {
         await compiler.dispose();
         await archive.dispose();
-      }
-      const restored = await createZigProjectCompiler({
-        ...options,
-        dependencies,
-        checkpoint: checkpoint!,
-      });
-      try {
-        const replayed = await restored.build();
-        assert(replayed.success, JSON.stringify(replayed));
-        assert.deepEqual(replayed.bytes, expected!);
-        await observe(replayed.bytes);
-      } finally {
-        await restored.dispose();
       }
     } finally {
       await Deno.remove(directory, { recursive: true });

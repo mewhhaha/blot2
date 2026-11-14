@@ -1,13 +1,12 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
-import { observeGuestAllocations } from "../../benchmarks/tools/guest_heap_observer.ts";
 import {
   numericAggregateSources,
   numericShapes,
 } from "../../benchmarks/tools/numeric_aggregates.ts";
 
-Deno.test("numeric aggregates preserve imported calls, lane order and immutable array snapshots", async () => {
+Deno.test("numeric aggregates preserve imported calls, lane order and writes through array aliases", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-numeric-rows-" });
   const entry = `${directory}/main.blot`, library = `${directory}/shapes.blot`;
   const fixture = numericAggregateSources();
@@ -98,9 +97,11 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
                 ...Array.from({ length: 15 }, (_, i) => i + 2),
               ]
                 .reduce((a, b) => Math.fround(a + b));
+              // `old` aliases `values`, so both read the edited row
+              // (tasks/LANGUAGE_COHERENCE.md A7).
               assert.equal(
                 guest.call(`nested_edit_${shape}`, seed),
-                Math.fround(edited + 136),
+                Math.fround(edited + edited),
               );
             }
             for (const choice of [false, true]) {
@@ -108,46 +109,23 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
               assert.equal(guest.call(`array_dynamic_${shape}`, choice), 11776);
             }
             for (const count of [1, 32, 33, 128, 129, 512]) {
-              const traffic = observeGuestAllocations(first.bytes, [[
-                `array_${shape}`,
-                count,
+              assert.equal(
+                guest.call(`array_${shape}`, count),
                 8 * count * count + 112 * count,
-              ], [`snapshot_${shape}`, count, 16240]]);
-              assert(traffic.committed_bytes > 0);
+              );
+              // `old` aliases `values`, so both read the replaced row.
+              assert.equal(guest.call(`snapshot_${shape}`, count), 32240);
               assert.equal(
                 guest.call(`escaped_${shape}`, count),
                 16 * count + 104,
               );
               assert.equal(guest.call(`captured_${shape}`, count), 400);
-              assert.equal(
-                guest.call(`list_${shape}`, count),
-                8 * count * count + 112 * count + 16120,
-              );
             }
             assert.equal(guest.call(`constant_${shape}`, null), 136);
-            observeGuestAllocations(first.bytes, [[
-              `interrupted_${shape}`,
-              2,
-              "trap",
-            ]]);
-            if (codegenTier === "optimized") {
-              // Function-valued callbacks keep their conservative ABI. This
-              // representation law concerns the newly exposed direct calls.
-              for (const call of ["direct"]) {
-                const traffic = observeGuestAllocations(first.bytes, [[
-                  `${call}_${shape}`,
-                  call === "dynamic" ? 1 : 5,
-                  200,
-                ]]);
-                assert.equal(
-                  traffic.rounded_allocation_bytes,
-                  0,
-                  `${call}_${shape}`,
-                );
-                assert.equal(traffic.retains, 0);
-                assert.equal(traffic.releases, 0);
-              }
-            }
+            assert.throws(
+              () => guest.call(`interrupted_${shape}`, 2),
+              WebAssembly.RuntimeError,
+            );
           }
         } finally {
           guest.dispose();

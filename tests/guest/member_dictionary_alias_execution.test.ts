@@ -4,7 +4,8 @@ import {
   equal,
 } from "./compile_helpers.ts";
 
-Deno.test("inferred named member aliases retain their dictionary abstraction", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("inferred named member aliases retain their dictionary abstraction", async () => {
   await compileAndRun(
     `type Render a is contract = { const show: a -> U32 }
 impl Number : Render U32 = { const show = func value => return value }
@@ -47,7 +48,8 @@ entry const answer = func (host: Unit -> U32 ! {Foreign}) => return do:
   );
 });
 
-Deno.test("curried member aliases support partial values through unknown callables", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("curried member aliases support partial values through unknown callables", async () => {
   await compileAndRun(
     `type Render a is contract = { const sum: a -> a -> U32 }
 impl Number : Render U32 = { const sum = func left => return func right => return @u32.add left right }
@@ -63,7 +65,8 @@ entry const answer: Unit -> U32 = func () => return both render
   );
 });
 
-Deno.test("associated member aliases preserve opaque result witnesses", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("associated member aliases preserve opaque result witnesses", async () => {
   await compileAndRun(
     `type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
 impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }
@@ -78,7 +81,8 @@ entry const answer: Unit -> U32 = func () => return both render
   );
 });
 
-Deno.test("ordinary inferred helpers retain projected public result signatures", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("ordinary inferred helpers retain projected public result signatures", async () => {
   await compileAndRun(
     `type Source a is contract = { type Item, const get: a -> (Source.Item a), const show: a -> (Source.Item a) -> U32 }
 impl Number : Source U32 = { type Item = U32, const get = func value => return value, const show = func owner => return func value => return value }

@@ -41,15 +41,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
     try {
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
-      const counters = result.stats.workCounters as Record<
-        string,
-        number
-      >;
-      assert(
-        counters.max_scoped_emission_body_steps > 100000,
-        JSON.stringify(counters),
-      );
-      assert(counters.max_scoped_emission_body_steps <= 500000);
 
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });

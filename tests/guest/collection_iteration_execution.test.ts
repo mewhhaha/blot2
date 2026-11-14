@@ -66,15 +66,6 @@ async function session(
       try {
         const result = await compiler.build({ sources: { [entry]: source } });
         assert(result.success, JSON.stringify(result));
-        const module = new WebAssembly.Module(result.bytes);
-        assert.deepEqual(
-          Array.from(
-            new Uint8Array(
-              WebAssembly.Module.customSections(module, "blot:ownership")[0],
-            ),
-          ),
-          [2, 2, 0],
-        );
         const guest = await instantiateGuest(result.bytes);
         try {
           check(guest);
@@ -158,77 +149,6 @@ Deno.test("resolved collection iteration rechecks exact cursor producers through
     await Deno.remove(directory, { recursive: true });
   }
 });
-Deno.test("effectful collection iter and next retain written pulls and early exit", async () => {
-  const original = await Deno.readTextFile(preludePath);
-  const changed = original
-    .replace(
-      "const List.iter = func values => return @list.cursor values",
-      "const List.iter = func values => return do:\n  use Audit.pull 1\n  break @list.cursor values",
-    )
-    .replace(
-      "const Cursor.next = func cursor => return\n  if @cursor.has cursor\n  then $Some (@cursor.value cursor, @cursor.advance cursor)\n  else $Nothing",
-      "const Cursor.next = func cursor => return do:\n  use Audit.pull 0\n  if @cursor.has cursor:\n    break $Some (@cursor.value cursor, @cursor.advance cursor)\n  break $Nothing",
-    ) + "\ntype Audit is effect = { pull: U32 -> Unit }\n";
-  const source = `${fold}
-const measured = func action => return do:
-  let pulls = 0
-  for request in @requests action:
-    case request of
-      effect Audit.pull value =>
-        pulls := self + 1
-        yield ()
-      complete value =>
-        break #[value, pulls]
-entry const run = func (count: U32) => return measured (@computation (func () => return fold add 0 (@list.generate count identity)))
-const first = func values => return do:
-  for value in values:
-    break value
-  break 0
-entry const early = func () => return measured (@computation (func () => return first [3, 4, 5]))
-`;
-  const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  try {
-    for (const codegenTier of ["optimized", "development"] as const) {
-      const compiler = await createZigProjectCompiler({
-        executable,
-        entry,
-        codegenTier,
-        prelude: preludePath,
-        cacheDirectory: false,
-      });
-      try {
-        const result = await compiler.build({
-          sources: { [entry]: source, [preludePath]: changed },
-        });
-        assert(result.success, JSON.stringify(result));
-        const guest = await instantiateGuest(result.bytes);
-        try {
-          for (const count of [0, 1, 3, 245]) {
-            assert.deepEqual(
-              Array.from(guest.call("run", count) as Uint32Array),
-              [
-                (count * (count - 1) / 2) >>> 0,
-                count + 2,
-              ],
-            );
-          }
-          assert.deepEqual(
-            Array.from(guest.call("early", null) as Uint32Array),
-            [3, 2],
-          );
-        } finally {
-          guest.dispose();
-        }
-      } finally {
-        compiler.dispose();
-      }
-    }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
-
 // The iteration proof reads a per-unit def-use index, so it no longer stops
 // at 4,096 Core nodes: a thousand padding functions put this program above
 // that size, and its loops, including one that matches optional entries as

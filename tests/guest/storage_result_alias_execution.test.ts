@@ -56,18 +56,6 @@ entry const answer = func (input: U32): Array U32 => return do:
           signal: AbortSignal.timeout(10_000),
         });
         assert(built.success, JSON.stringify(built));
-        const work = built.stats.workCounters as Record<string, number>;
-        assert(
-          work.scoped_result_store_words_avoided >= width - 1,
-          JSON.stringify(work),
-        );
-        assert(
-          work.scoped_result_load_words_avoided >= width - 1,
-          JSON.stringify(work),
-        );
-        assert(work.scoped_function_plan_hits > 0);
-        if (width === 600) assert(work.scoped_packed_plans_promoted > 0);
-        else assert(work.scoped_owned_word_calls > 0);
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(built.bytes, { asynchronous });
           try {

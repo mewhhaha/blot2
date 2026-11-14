@@ -52,10 +52,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
       await Deno.writeTextFile(`${directory}/prelude.blot`, prelude);
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
-      assert(
-        (result.stats.workCounters as Record<string, number>)
-          .scoped_emission_expressions > 0,
-      );
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });
         try {

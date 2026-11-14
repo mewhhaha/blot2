@@ -228,261 +228,8 @@ for (
   });
 }
 
-/**
- * Work a retained revision redoes, from serve-project stats. Lower is better:
- * a budget is the count when it was set, with no headroom.
- */
-interface Reuse {
-  /** Named and closure instances specialized afresh (`stats.backend`). */
-  fresh_named: number;
-  fresh_closures: number;
-  /** Named instances reused from a previous revision; higher is better. */
-  reused_named: number;
-  /** Modules whose frontend was validated again (`attemptStats.fallback`). */
-  validated_modules: number;
-  recheck_body_elaborations: number;
-  /** Bodies elaborated within the whole-project check of a rebuilt seed. */
-  check_body_elaborations: number;
-  /** Bodies lowered in the whole-project check; lower is better. */
-  check_body_lowerings: number;
-  /** The dependency seed was rebuilt; true permits either outcome. */
-  rebuilt_seed: boolean;
-  /** The previous output was published unchanged; true requires it. */
-  reused_output: boolean;
-}
-function reuse(result: ZigProjectBuildResult): Reuse {
-  assert(result.success, JSON.stringify(result));
-  const backend = result.stats.backend as Record<string, number>;
-  const attempt = result.stats.attemptStats as Record<string, unknown>;
-  const fallback = attempt.fallback as Record<string, number>;
-  return {
-    fresh_named: backend.fresh_named,
-    fresh_closures: backend.fresh_closures,
-    reused_named: backend.reused_named,
-    validated_modules: fallback.validated_modules,
-    recheck_body_elaborations: fallback.recheck_body_elaborations,
-    check_body_elaborations: fallback.body_elaborations,
-    check_body_lowerings: fallback.body_lowerings,
-    rebuilt_seed: attempt.rebuilt_seed as boolean,
-    reused_output: attempt.reused_output as boolean,
-  };
-}
-
-// One retained session over the edit suite: population, then each scenario's
-// edit and revert. Retained hills (seeding reuse on population, output and
-// body cutoffs) are expected to LOWER these; re-measure and tighten `today`.
-// Every edit must still match a fresh build of the same sources.
-const retainedToday: Record<string, Reuse> = {
-  "population": {
-    fresh_named: 10,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 5,
-    recheck_body_elaborations: 0,
-    // Bool.eq and Bool.ne add two prelude bodies to the first population.
-    check_body_elaborations: 152,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_lowerings: 152,
-  },
-  "edit:trivia": {
-    fresh_named: 0,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 0,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: false,
-    reused_output: true,
-    check_body_elaborations: 0,
-    check_body_lowerings: 0,
-  },
-  "revert:trivia": {
-    fresh_named: 0,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 0,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: false,
-    reused_output: true,
-    check_body_elaborations: 0,
-    check_body_lowerings: 0,
-  },
-  "edit:literal_constant": {
-    fresh_named: 2,
-    fresh_closures: 0,
-    reused_named: 8,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "revert:literal_constant": {
-    fresh_named: 2,
-    fresh_closures: 0,
-    reused_named: 8,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "edit:literal_in_body": {
-    fresh_named: 3,
-    fresh_closures: 0,
-    reused_named: 7,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "revert:literal_in_body": {
-    fresh_named: 3,
-    fresh_closures: 0,
-    reused_named: 7,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "edit:body_change": {
-    fresh_named: 3,
-    fresh_closures: 0,
-    reused_named: 7,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "revert:body_change": {
-    fresh_named: 3,
-    fresh_closures: 0,
-    reused_named: 7,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  // A changed data type re-specializes every instance today.
-  "edit:type_change": {
-    fresh_named: 10,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 2,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 8,
-    check_body_lowerings: 8,
-  },
-  "revert:type_change": {
-    fresh_named: 10,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 2,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 8,
-    check_body_lowerings: 8,
-  },
-  "edit:imported_body": {
-    fresh_named: 4,
-    fresh_closures: 0,
-    reused_named: 6,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  "revert:imported_body": {
-    fresh_named: 4,
-    fresh_closures: 0,
-    reused_named: 6,
-    validated_modules: 1,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 5,
-    check_body_lowerings: 5,
-  },
-  // An unused export leaves the Wasm unchanged but rebuilds everything today.
-  "edit:unused_export": {
-    fresh_named: 10,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 4,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 16,
-    check_body_lowerings: 16,
-  },
-  "revert:unused_export": {
-    fresh_named: 10,
-    fresh_closures: 0,
-    reused_named: 0,
-    validated_modules: 4,
-    recheck_body_elaborations: 0,
-    rebuilt_seed: true,
-    reused_output: false,
-    check_body_elaborations: 15,
-    check_body_lowerings: 15,
-  },
-};
-
-/**
- * Frozen dependency modules whose Core or principal interface a retained
- * revision validated again instead of reusing the previous receipt
- * (`attemptStats.fallback.dependency_storage`). Lower is better; a budget is
- * the count when it was set.
- */
-interface Revalidation {
-  core_checked: number;
-  interface_checked: number;
-}
-function revalidation(result: ZigProjectBuildResult): Revalidation {
-  assert(result.success, JSON.stringify(result));
-  const attempt = result.stats.attemptStats as Record<string, unknown>;
-  const fallback = attempt.fallback as Record<string, unknown>;
-  const storage = fallback.dependency_storage as Record<string, number>;
-  return {
-    core_checked: storage.core_checked,
-    interface_checked: storage.interface_checked,
-  };
-}
-// Only modules that are new or read a changed producer revalidate.
-const revalidationToday: Record<string, Revalidation> = {
-  "population": { core_checked: 4, interface_checked: 4 },
-  "edit:trivia": { core_checked: 0, interface_checked: 0 },
-  "revert:trivia": { core_checked: 0, interface_checked: 0 },
-  "edit:literal_constant": { core_checked: 1, interface_checked: 1 },
-  "revert:literal_constant": { core_checked: 1, interface_checked: 1 },
-  "edit:literal_in_body": { core_checked: 1, interface_checked: 1 },
-  "revert:literal_in_body": { core_checked: 1, interface_checked: 1 },
-  "edit:body_change": { core_checked: 1, interface_checked: 1 },
-  "revert:body_change": { core_checked: 1, interface_checked: 1 },
-  "edit:type_change": { core_checked: 1, interface_checked: 1 },
-  "revert:type_change": { core_checked: 1, interface_checked: 1 },
-  "edit:imported_body": { core_checked: 1, interface_checked: 1 },
-  "revert:imported_body": { core_checked: 1, interface_checked: 1 },
-  "edit:unused_export": { core_checked: 3, interface_checked: 3 },
-  "revert:unused_export": { core_checked: 3, interface_checked: 3 },
-};
-
-Deno.test("budget: retained edit suite reuses at least today's work", async () => {
+// Every retained edit and revert of the edit suite matches a fresh build.
+Deno.test("budget: retained edit suite matches fresh builds", async () => {
   await Deno.mkdir(scratchRoot, { recursive: true });
   const directory = await Deno.makeTempDir({
     dir: scratchRoot,
@@ -496,12 +243,8 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
     cacheDirectory: false as const,
   };
   const retained = await createZigProjectCompiler(options);
-  const observed: Record<string, Reuse> = {};
-  const revalidated: Record<string, Revalidation> = {};
   const record = async (phase: string, result: ZigProjectBuildResult) => {
-    observed[phase] = reuse(result);
-    revalidated[phase] = revalidation(result);
-    assert(result.success);
+    assert(result.success, JSON.stringify(result));
     const guest = await instantiateGuest(result.bytes);
     try {
       assert.equal(
@@ -555,70 +298,10 @@ Deno.test("budget: retained edit suite reuses at least today's work", async () =
     await retained.dispose();
     await Deno.remove(directory, { recursive: true });
   }
-  assert.deepEqual(Object.keys(observed), Object.keys(retainedToday));
-  assert.deepEqual(Object.keys(revalidated), Object.keys(revalidationToday));
-  const failures: string[] = [];
-  const improved: string[] = [];
-  for (const [phase, budget] of Object.entries(revalidationToday)) {
-    for (const [name, limit] of Object.entries(budget)) {
-      const value = revalidated[phase][name as keyof Revalidation];
-      assert(
-        Number.isSafeInteger(value) && value >= 0,
-        `${phase} ${name}: missing or invalid counter`,
-      );
-      if (value > limit) {
-        failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
-      } else if (value < limit) improved.push(`${phase} ${name}`);
-    }
-  }
-  for (const [phase, budget] of Object.entries(retainedToday)) {
-    const actual = observed[phase];
-    for (const [name, limit] of Object.entries(budget)) {
-      const value = actual[name as keyof Reuse];
-      if (typeof limit === "boolean") {
-        assert.equal(
-          typeof value,
-          "boolean",
-          `${phase} ${name}: missing boolean counter`,
-        );
-      } else {
-        assert(
-          Number.isSafeInteger(value) && Number(value) >= 0,
-          `${phase} ${name}: missing or invalid counter`,
-        );
-      }
-      if (name === "reused_named") {
-        if (Number(value) < Number(limit)) {
-          failures.push(`${phase} ${name}: ${value} below ${limit}`);
-        } else if (Number(value) > Number(limit)) {
-          improved.push(`${phase} ${name}`);
-        }
-      } else if (name === "reused_output") {
-        if (limit && !value) failures.push(`${phase} ${name}: lost`);
-        else if (!limit && value) improved.push(`${phase} ${name}`);
-      } else if (Number(value) > Number(limit)) {
-        failures.push(`${phase} ${name}: ${value} exceeds ${limit}`);
-      } else if (Number(value) < Number(limit)) {
-        improved.push(`${phase} ${name}`);
-      }
-    }
-  }
-  if (improved.length) {
-    console.log(`Tighten retainedToday: ${improved.join(", ")} improved.`);
-  }
-  assert.equal(
-    failures.length,
-    0,
-    `retained edit suite redid more work:\n${failures.join("\n")}\nobserved ${
-      JSON.stringify(observed)
-    }`,
-  );
 });
 
-// An edit with a check error costs one partial check: the lane that checks the
-// changed modules (or the entry against the frozen dependencies) publishes a
-// portable rejection without checking the whole project again, and its
-// diagnostic equals a fresh build's.
+// An edit with a check error reports the diagnostic a fresh build reports, and
+// reverting it builds again.
 const rejectedEdits: readonly {
   name: string;
   file: string;
@@ -644,7 +327,7 @@ const rejectedEdits: readonly {
     replace: "robots.walk missing_value",
   },
 ];
-Deno.test("budget: retained edits with check errors publish one partial check", async () => {
+Deno.test("budget: retained edits with check errors match fresh diagnostics", async () => {
   await Deno.mkdir(scratchRoot, { recursive: true });
   const directory = await Deno.makeTempDir({
     dir: scratchRoot,
@@ -674,10 +357,6 @@ Deno.test("budget: retained edits with check errors publish one partial check", 
       };
       const rejected = await retained.build({ sources });
       assert(!rejected.success, edit.name);
-      const attempt = rejected.attemptStats as Record<string, unknown>;
-      const fallback = attempt.fallback as Record<string, unknown>;
-      assert.equal(fallback.portable_rejection, true, edit.name);
-      assert.equal(attempt.rebuilt_seed, false, edit.name);
       const fresh = await createZigProjectCompiler(options);
       try {
         const expected = await fresh.build({ sources });

@@ -120,11 +120,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
           sources: { [entry]: source(createdFirst) },
         });
         assert(result.success, JSON.stringify(result));
-        const counters = result.stats.workCounters as Record<string, number>;
-        assert(
-          counters.scoped_created_span_validations_avoided > 0,
-          JSON.stringify(counters),
-        );
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
           const call = async (name: string, input: unknown = null) => {

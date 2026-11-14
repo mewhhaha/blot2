@@ -2,10 +2,10 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-// Retained callers of array, nominal, aliased and imported aggregate constants
-// keep their code only when the current value graph matches; data is always
-// re-serialized in the current owner, so output equals a fresh build.
-Deno.test("retained callers relocate aggregate constants through movement, traps and recovery", async () => {
+// Retained builds of array, nominal, aliased and imported aggregate constants
+// equal a fresh build through moved code, element edits, a trapping constant
+// and recovery. A trapping constant compiles and traps when it is first read.
+Deno.test("retained builds of aggregate constants match fresh builds through movement, traps and recovery", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-aggregate-" });
   const entry = `${directory}/main.blot`;
   await Deno.writeTextFile(
@@ -45,7 +45,6 @@ entry const unrelated = func () => return other
     ["", "31", "3"],
   ];
   const retained = await createZigProjectCompiler(options);
-  let reused = 0;
   try {
     for (const [prefix, tail, other] of revisions) {
       const sources = { [entry]: source(prefix, tail, other) };
@@ -53,24 +52,19 @@ entry const unrelated = func () => return other
       const fresh = await createZigProjectCompiler(options);
       try {
         const expected = await fresh.build({ sources });
-        assert.equal(result.success, expected.success);
-        if (!result.success && !expected.success) {
-          assert(other.includes("div"));
-          assert.deepEqual(result.diagnostics, expected.diagnostics);
-          continue;
-        }
         assert(result.success && expected.success, JSON.stringify(result));
         assert.deepEqual(result.bytes, expected.bytes);
-        assert.equal(result.stats.nativeWorkSteps, expected.stats.nativeWorkSteps);
-        reused += (result.stats.backend as Record<string, number>)
-          .reused_aggregate_constants;
         const guest = await instantiateGuest(result.bytes);
         try {
           assert.equal(guest.call("pick", 2), Number(tail));
           assert.equal(guest.call("first", null), 42);
           assert.equal(guest.call("sum_alias", 1), 40);
           assert.equal(guest.call("from_dep", 2), 3);
-          assert.equal(guest.call("unrelated", null), Number(other));
+          if (other.includes("div")) {
+            assert.throws(() => guest.call("unrelated", null), WebAssembly.RuntimeError);
+          } else {
+            assert.equal(guest.call("unrelated", null), Number(other));
+          }
         } finally {
           guest.dispose();
         }
@@ -78,7 +72,6 @@ entry const unrelated = func () => return other
         await fresh.dispose();
       }
     }
-    assert(reused > 0);
   } finally {
     await retained.dispose();
     await Deno.remove(directory, { recursive: true });

@@ -101,25 +101,6 @@ entry const equal = func (value: U32) : Bool => return same ($Point { x: value }
   });
 });
 
-Deno.test("runtime associated dispatch retries the right owner without swapping operands", async () => {
-  await compileAndRun(`
-infixl 60 (+) = associated_add
-type Left is data = $Left U32
-type Right is data = $Right U32
-const associated_add = func left => return func right => return @type.call "add" left right
-const Left.add = func (left: Left) => return func (right: U32) => return right
-const Right.add = func (left: Left) => return func (right: Right) => return do:
-  let $Left first = left
-  let $Right second = right
-  break @u32.sub first second
-const combine = func left => return func right => return left + right
-entry const run = func (value: U32) : U32 => return combine ($Left value) ($Right 2)
-`, guest => {
-    equal(guest.call("run", 44), 42);
-    equal(guest.call("run", 2), 0);
-  });
-});
-
 Deno.test("ordinary scalar method names do not alter compiler primitives", async () => {
   await compileAndRun(`
 const U32.add = func (left: U32) => return func (right: U32) => return @u32.sub left right

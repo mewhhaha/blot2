@@ -11,6 +11,16 @@ function equal(actual: unknown, expected: unknown): void {
   }
 }
 
+async function traps(run: () => Promise<void>): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (error instanceof WebAssembly.RuntimeError) return;
+    throw error;
+  }
+  throw new Error("Expected a WebAssembly trap");
+}
+
 async function withCompilation(
   source: string,
   run: (bytes: Uint8Array, metrics: Record<string, unknown>) => Promise<void>,
@@ -62,7 +72,7 @@ entry const nested = func () : U32 => return do:
     break 20
   break @u32.add inner 22
 `,
-    async (bytes, metrics) => {
+    async (bytes) => {
       const guest = await instantiateGuest(bytes);
       try {
         equal(guest.read("maximum"), 0xFFFF_FFFF);
@@ -71,7 +81,6 @@ entry const nested = func () : U32 => return do:
         equal(guest.call("capped", 17), 17);
         equal(guest.call("capped", 80), 42);
         equal(guest.call("nested", null), 42);
-        equal((metrics.stats as Record<string, unknown>).code_instances, 4);
       } finally {
         guest.dispose();
       }
@@ -198,47 +207,15 @@ entry const convert = func (value: F32) : U32 => return @f32.to_u32 value
   );
 });
 
-Deno.test("native compilation diagnoses reachable constant traps", async () => {
-  const dir = await Deno.makeTempDir({
-    dir: buildDir,
-    prefix: "zig-native-negative-",
-  });
-  try {
-    for (
-      const [declaration, code] of [
-        ["entry const failure = @u32.div 1 0", "integer_divide_by_zero"],
-      ]
-    ) {
-      const source = `${dir}/invalid.blot`;
-      const output = `${dir}/${code}.wasm`;
-      await Deno.writeTextFile(
-        source,
-        `${declaration}\nentry const answer = func () : U32 => return 42\n`,
-      );
-      const result = await new Deno.Command(compiler, {
-        args: ["build", source, output],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      equal(result.code, 1);
-      const records = decode.decode(result.stdout).trim().split("\n").map((
-        line,
-      ) => JSON.parse(line));
-      equal(records[0].stage, "emit");
-      equal(records[0].code, code);
-      equal(records.at(-1).success, false);
-      equal(records.at(-1).memory.live_bytes, 0);
-      let absent = false;
-      try {
-        await Deno.stat(output);
-      } catch (error) {
-        absent = error instanceof Deno.errors.NotFound;
-      }
-      equal(absent, true);
-    }
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
+// Constants are computed at instantiation, so a trapping entry constant
+// compiles and its module traps when instantiated.
+Deno.test("reachable constant traps compile and trap at instantiation", async () => {
+  await withCompilation(
+    "entry const failure = @u32.div 1 0\nentry const answer = func () : U32 => return 42\n",
+    async (bytes) => {
+      await traps(async () => (await instantiateGuest(bytes)).dispose());
+    },
+  );
 });
 
 Deno.test("typed core evaluates pure recursive functions and branch merges at compile time", async () => {
@@ -274,34 +251,24 @@ entry const safe = if false then @u32.div 1 0 else 42
   );
 });
 
-Deno.test("named constant references in dead branches retain compilation dependencies", async () => {
-  const dir = await Deno.makeTempDir({
-    dir: buildDir,
-    prefix: "zig-native-reachability-",
-  });
-  try {
-    for (
-      const entry of [
-        "entry const value = if false then bad else 42",
-        "entry const value = func () : U32 => return if false then bad else 42",
-      ]
-    ) {
-      const input = `${dir}/invalid.blot`;
-      await Deno.writeTextFile(input, `const bad = @u32.div 1 0\n${entry}\n`);
-      const result = await new Deno.Command(compiler, {
-        args: ["build", input, `${dir}/invalid.wasm`],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      equal(result.code, 1);
-      const records = decode.decode(result.stdout).trim().split("\n").map((
-        line,
-      ) => JSON.parse(line));
-      equal(records[0].code, "integer_divide_by_zero");
-      equal(records.at(-1).memory.live_bytes, 0);
-    }
-  } finally {
-    await Deno.remove(dir, { recursive: true });
+Deno.test("named constant references compile and trap when the program reads them", async () => {
+  for (
+    const [entry, read] of [
+      ["entry const value = if true then bad else 42", true],
+      ["entry const value = func () : U32 => return if true then bad else 42", false],
+    ] as const
+  ) {
+    await withCompilation(`const bad = @u32.div 1 0\n${entry}\n`, async (bytes) => {
+      await traps(async () => {
+        const guest = await instantiateGuest(bytes);
+        try {
+          if (read) guest.read("value");
+          else guest.call("value", null);
+        } finally {
+          guest.dispose();
+        }
+      });
+    });
   }
 });
 

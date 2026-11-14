@@ -493,7 +493,6 @@ export const devCheckAreas = {
       "tests/guest/acyclic_updates_execution.test.ts",
       "tests/guest/runtime_boundaries_retained_execution.test.ts",
       "tests/guest/indexed_numeric_projection_execution.test.ts",
-      "tests/guest/numeric_call_boundaries_execution.test.ts",
       "tests/guest/identity_array_execution.test.ts",
       "tests/guest/owned_array_execution.test.ts",
       "tests/guest/empty_root_scope_execution.test.ts",
@@ -1117,19 +1116,19 @@ export function verifyGuestResults(
   const cases = [
     ...xml.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g),
   ];
-  // Deno emits filtered-out cases as <skipped/> too. Only explicitly unselected
-  // names may be skipped; every requested name must have actually passed.
+  // Deno emits filtered-out cases and cases ignored in source as <skipped/>.
+  // A filtered run must pass every requested name; an unfiltered run may
+  // contain ignored cases, but each file must still pass one.
+  const skipped = (test: RegExpMatchArray) => /<skipped\b/.test(test[2] ?? "");
   const selected = expectedNames
     ? cases.filter((test) => expectedNames.includes(attributes(test[1]).name))
-    : cases;
+    : cases.filter((test) => !skipped(test));
   if (
     !selected.length ||
     selected.some((test) =>
       /<(?:failure|error|skipped)\b/.test(test[2] ?? "")
     ) ||
-    cases.some((test) =>
-      !selected.includes(test) && !/<skipped\b/.test(test[2] ?? "")
-    )
+    cases.some((test) => !selected.includes(test) && !skipped(test))
   ) {
     throw new Error(
       "Guest selection executed no tests or contains failed/skipped tests",

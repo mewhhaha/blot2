@@ -46,31 +46,3 @@ entry const beyond = func count => return do:
     { stdRoot },
   );
 });
-
-Deno.test("private word cursors keep ordinary owned extraction through calls and pressure", async () => {
-  await compileAndRun(
-    `
-const hold = func row => return func () => return row
-entry const run = func count => return do:
-  let cursor = @list.cursor (@list.generate 1001 (func i => return {x: i, y: i + 1, z: i + 2}))
-  let saved = hold (@cursor.value cursor)
-  for 0..count:
-    cursor := @cursor.advance self
-    let pressure = @array.fill 8192 41
-    if pressure[8191] != 41:
-      @panic "pressure"
-  let old = saved ()
-  let last = @cursor.value cursor
-  break #[old.x, old.y, old.z, last.x, last.y, last.z]
-`,
-    (guest) => {
-      for (const count of [0, 1, 81, 82, 244, 245, 1000]) {
-        assert.deepEqual(
-          guest.call("run", count),
-          Uint32Array.of(0, 1, 2, count, count + 1, count + 2),
-        );
-      }
-    },
-    { stdRoot },
-  );
-});

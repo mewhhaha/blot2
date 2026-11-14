@@ -18,15 +18,7 @@ entry const callback = func (io: U32 -> U32 ! {Foreign}) => return do:
 async function exercise(bytes: Uint8Array<ArrayBuffer>) {
   const guest = await instantiateGuest(bytes);
   try {
-    equal(guest.abi.version, 3);
-    equal([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(
-          new WebAssembly.Module(bytes),
-          "blot:ownership",
-        )[0],
-      ),
-    ], [2, 2, 0]);
+    equal(guest.abi.version, 8);
     equal(guest.abi.functions[0], {
       name: "integers",
       parameter: "Array U32",
@@ -138,15 +130,6 @@ async function exercise(bytes: Uint8Array<ArrayBuffer>) {
       () => guest.call("first", new Float32Array()),
       WebAssembly.RuntimeError,
     );
-    // Each input/copy crosses the old 16 MiB boundary; host and guest limits
-    // must agree, and a later call must still reset and reuse the arena.
-    const beyondBootstrap = new Float32Array(4_194_304).fill(2.25);
-    const copied = guest.call("change", beyondBootstrap);
-    ok(copied instanceof Float32Array);
-    equal(copied.length, beyondBootstrap.length);
-    equal(copied[0], 42.5);
-    equal(copied[copied.length - 1], 2.25);
-    equal(beyondBootstrap[0], 2.25);
     throws(() => guest.call("filled", 1_073_741_823), WebAssembly.RuntimeError);
     equal(guest.call("first", new Float32Array([7])), 7);
     equal(

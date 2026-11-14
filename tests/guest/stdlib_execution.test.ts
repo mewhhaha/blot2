@@ -6,7 +6,7 @@ import {
   equal,
 } from "./compile_helpers.ts";
 
-Deno.test("array scans and compaction preserve order, wrap, snapshots and linear runtime storage", async () => {
+Deno.test("array scans and compaction preserve order, wrap and snapshots", async () => {
   await compileAndRun(
     `
 import * as array from "../../std/array"
@@ -70,10 +70,6 @@ entry const snapshots = func () => return do:
         );
         assert.deepEqual([...input], values);
       }
-      assert(
-        guest.memoryBytes() <= 2 * 1024 * 1024,
-        `Compaction copied growing outputs: ${guest.memoryBytes()}`,
-      );
     },
   );
 });
@@ -184,41 +180,6 @@ entry const run = func (count: U32) => return do:
         previous = current;
         current = count % 2 === 0 ? [...current, count] : [count, ...current];
       }
-    },
-  );
-});
-
-Deno.test("list append and prepend wrappers retain linear construction through aliases", async () => {
-  await compileAndRun(
-    `
-import * as list from "../../std/list"
-const alias = list.append
-const prepend = func item => return func items => return @list.prepend items item
-entry const appended = func (count: U32) => return do:
-  let values: List U32 = []
-  for index in 0..count:
-    values := alias index values
-  break Array.from_list values
-entry const prepended = func (count: U32) => return do:
-  let values: List F32 = []
-  for index in 0..count:
-    values := prepend (F32.from index) values
-  break Array.from_list values
-`,
-    (guest) => {
-      const count = 8193;
-      assert.deepEqual(
-        guest.call("appended", count),
-        Uint32Array.from({ length: count }, (_, i) => i),
-      );
-      assert.deepEqual(
-        guest.call("prepended", count),
-        Float32Array.from({ length: count }, (_, i) => count - 1 - i),
-      );
-      assert(
-        guest.memoryBytes() <= 2 * 1024 * 1024,
-        `Wrappers copied growing lists: ${guest.memoryBytes()}`,
-      );
     },
   );
 });

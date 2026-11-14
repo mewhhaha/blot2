@@ -91,7 +91,7 @@ function reduced(
 }
 
 for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`checked row products preserve lane order, slices, traps and snapshots (${codegenTier})`, async () => {
+  Deno.test(`checked row products preserve lane order, slices, traps and aliased writes (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-row-products-" });
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({
@@ -157,9 +157,11 @@ for (const codegenTier of ["optimized", "development"] as const) {
           );
         }
         const original = Float32Array.of(1, 2, 3, 4);
+        // `saved` aliases `rows`, so both read the write of 99
+        // (tasks/LANGUAGE_COHERENCE.md A7).
         assert.deepEqual(
           guest.call("shared", original),
-          Float32Array.of(12.5, 135),
+          Float32Array.of(135, 135),
         );
         const seen: number[] = [];
         const host = guest.capability({

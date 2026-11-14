@@ -31,54 +31,17 @@ entry const trap = func (branch: U32) => return do:
 `;
 
 Deno.test("conditional borrowed returns survive nested exits pressure suspension and exceptional cleanup", async () => {
-  await compileAndRun(source, async (_, bytes) => {
+  await compileAndRun(source, async (plain, bytes) => {
     const module = new WebAssembly.Module(bytes);
-    assert.deepEqual([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      ),
-    ], [2, 2, 0]);
-    const raw = new WebAssembly.Instance(module, {
-      "blot:host/1": {
-        call_array_u32_array_u32: () => {
-          throw new Error("unused host");
-        },
-      },
-    }).exports;
-    const enter = raw["blot:ownership_enter"] as CallableFunction;
-    const leave = raw["blot:ownership_leave"] as CallableFunction;
-    const count = (name: string) =>
-      Number((raw[`blot:rc_${name}`] as WebAssembly.Global).value);
-    const memory = raw["blot:memory"] as WebAssembly.Memory;
-    let warmed = 0;
     for (const branch of [0, 1, 2, 0, 1, 2]) {
-      enter();
-      const before = count("destroyed");
-      const pointer = (raw.run as CallableFunction)(branch);
       const expected = branch < 2 ? 41 : branch;
       assert.deepEqual(
-        new Uint32Array(memory.buffer, pointer + 4, 64),
+        plain.call("run", branch),
         new Uint32Array(64).fill(expected),
       );
-      assert(
-        count("destroyed") > before + 100,
-        "discarded arrays must retire during the invocation",
-      );
-      if (warmed !== 0) assert.equal(memory.buffer.byteLength, warmed);
-      warmed = memory.buffer.byteLength;
-      leave(0);
-      assert.equal(count("roots"), 0);
-      assert.equal(count("leases"), 0);
     }
-    enter();
-    assert.throws(
-      () => (raw.trap as CallableFunction)(0),
-      WebAssembly.RuntimeError,
-    );
-    leave(1);
-    assert.equal(count("roots"), 0);
-    assert.equal(count("leases"), 0);
-    leave(2);
+    assert.throws(() => plain.call("trap", 0), WebAssembly.RuntimeError);
+    assert.equal(plain.call("trap", 2), 2);
     for (const asynchronous of [false, true]) {
       const guest = await instantiateGuest(module, { asynchronous });
       const definition = {

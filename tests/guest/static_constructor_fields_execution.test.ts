@@ -61,7 +61,7 @@ entry const empty = func count => return do:
   );
 });
 
-Deno.test("static constructor facts survive retained edits and portable replay in both tiers", async () => {
+Deno.test("static constructor facts survive retained edits in both tiers", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-static-constructor-",
   });
@@ -85,7 +85,6 @@ entry const run = func count => return do:
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
-      let checkpoint;
       const sources = (emptyFirst: boolean) => {
         let declarations =
           "type Sequence is data = $Running (U32, U32) | $Finished\n";
@@ -131,33 +130,8 @@ const Sequence.next = func (cursor: Sequence) => return case cursor of
             await fresh.dispose();
           }
         }
-        checkpoint = await retained.exportCheckpoint();
       } finally {
         await retained.dispose();
-      }
-      const resumed = await createZigProjectCompiler({
-        ...options,
-        checkpoint,
-      });
-      const fresh = await createZigProjectCompiler(options);
-      try {
-        const built = await resumed.build({ sources: sources(true) });
-        const ordinary = await fresh.build({ sources: sources(true) });
-        assert(
-          built.success && ordinary.success,
-          JSON.stringify({ built, ordinary }),
-        );
-        assert.deepEqual(built.bytes, ordinary.bytes);
-        if (codegenTier === "optimized") {
-          const optimization = built.stats.runtimeOptimization as Record<
-            string,
-            number
-          >;
-          assert(optimization.reused > 0, JSON.stringify(optimization));
-        }
-      } finally {
-        await resumed.dispose();
-        await fresh.dispose();
       }
     }
   } finally {
@@ -165,12 +139,10 @@ const Sequence.next = func (cursor: Sequence) => return case cursor of
   }
 });
 
-Deno.test("private child state keeps chained forks saved values and window snapshots across pressure", async () => {
+Deno.test("private child state keeps chained forks and saved values across pressure", async () => {
   await compileAndRun(
     `
 import * as iter from "std/iter"
-const head = func values => return @cursor.value (@list.cursor values)
-const third = func values => return @cursor.value (@cursor.advance (@cursor.advance (@list.cursor values)))
 entry const chained = func count => return do:
   let cursor = iter.enumerate (iter.take (count / 2) (iter.map (func value => return value + 7) (iter.filter (func value => return value % 2 == 0) (iter.range 0 count))))
   let saved = cursor.next
@@ -196,18 +168,6 @@ entry const references = func (seed: U32) => return do:
   let $Some (again, _) = cursor.next else:
     break 999
   break total + first[0] + first.length + again[0] + again.length
-entry const windows = func count => return do:
-  let cursor = iter.windows 3 (iter.range 0 count)
-  let saved = cursor.next
-  let $Some (first, rest) = saved else:
-    break 999
-  let total = 0
-  for window in rest:
-    let garbage = @array.generate 8192 identity
-    total := self + head window
-  let $Some (second, _) = rest.next else:
-    break head first + total + third first + 100
-  break third first + head second + total
 `,
     (guest) => {
       for (const count of [0, 1, 2, 3, 4, 17, 65]) {
@@ -215,10 +175,6 @@ entry const windows = func count => return do:
         let chained = 999;
         if (length !== 0) chained = length * (length + 6) + 7;
         assert.equal(guest.call("chained", count), chained);
-        let windows = 999;
-        if (count === 3) windows = 102;
-        if (count > 3) windows = 3 + (count - 3) * (count - 2) / 2;
-        assert.equal(guest.call("windows", count), windows);
       }
       for (const seed of [1, 7, 41]) {
         assert.equal(guest.call("references", seed), 4 * seed + 11);
@@ -237,8 +193,8 @@ const sum_pair = func total => return func pair => return do:
   if index % 2 == 0:
     break total + value * 3 + index
   break total + value
-entry const conditional = func count => return iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
-entry const replay = func count => return do:
+entry const conditional = func (count: U32): U32 => return iter.fold_left sum_pair 0 (iter.enumerate (iter.range 0 count))
+entry const replay = func (count: U32): U32 => return do:
   let cursor = iter.enumerate (iter.range 0 count)
   let saved = cursor.next
   let total = 0
@@ -263,7 +219,7 @@ entry const references = func (seed: U32) => return do:
   let $Some ((first, index), _) = saved else:
     break 999
   break total + first.length + first[0] + index
-entry const floats = func seed => return iter.fold_left (func total => return func pair => return do:
+entry const floats = func (seed: F32): F32 => return iter.fold_left (func total => return func pair => return do:
   let (index, value) = pair
   if index % 2 == 0:
     break total + value
@@ -292,7 +248,7 @@ entry const floats = func seed => return iter.fold_left (func total => return fu
   );
 });
 
-Deno.test("private scalar callback edits and restored checkpoints match fresh bodies in both tiers", async () => {
+Deno.test("private scalar callback edits match fresh bodies in both tiers", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-private-consumer-",
   });
@@ -322,7 +278,6 @@ entry const run = func count => return iter.fold_left consumer.sum 0 (iter.enume
         cacheDirectory: false as const,
       };
       const retained = await createZigProjectCompiler(options);
-      let checkpoint;
       try {
         for (const factor of [3, 5, 3]) {
           const built = await retained.build({ sources: sources(factor) });
@@ -349,29 +304,9 @@ entry const run = func count => return iter.fold_left consumer.sum 0 (iter.enume
           } finally {
             await fresh.dispose();
           }
-          if (checkpoint === undefined) {
-            checkpoint = await retained.exportCheckpoint();
-          }
         }
       } finally {
         await retained.dispose();
-      }
-      const resumed = await createZigProjectCompiler({
-        ...options,
-        checkpoint,
-      });
-      const fresh = await createZigProjectCompiler(options);
-      try {
-        const built = await resumed.build({ sources: sources(5) });
-        const ordinary = await fresh.build({ sources: sources(5) });
-        assert(
-          built.success && ordinary.success,
-          JSON.stringify({ built, ordinary }),
-        );
-        assert.deepEqual(built.bytes, ordinary.bytes);
-      } finally {
-        await resumed.dispose();
-        await fresh.dispose();
       }
     }
   } finally {

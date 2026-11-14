@@ -79,12 +79,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         sources = { [entry]: caller, [values]: producer(offset) };
         const result = await compiler.build({ sources });
         assert(result.success, JSON.stringify(result));
-        const counters = result.stats.workCounters as Record<string, number>;
-        assert(counters.scoped_inline_register_calls > 0);
-        assert.equal(
-          counters.scoped_inline_result_owners_avoided,
-          counters.scoped_inline_register_calls,
-        );
         latest = result.bytes;
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
@@ -217,10 +211,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         sources: { [entry]: plannedSource },
       });
       assert(result.success, JSON.stringify(result));
-      const counters = result.stats.workCounters as Record<string, number>;
-      assert(counters.scoped_inline_register_calls > 0);
-      assert(counters.scoped_function_plan_definitions > 0, JSON.stringify(counters));
-      assert(counters.scoped_completed_plan_rollbacks > 0);
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });
         try {

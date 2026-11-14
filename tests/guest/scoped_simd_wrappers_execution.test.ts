@@ -28,7 +28,7 @@ entry const integers = func (values: Array U32): Array U32 => return do:
 `;
 
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`scoped standard SIMD wrappers retain literal selectors and exact lane bits (${codegenTier})`, async () => {
+  Deno.test(`scoped standard SIMD wrappers retain exact lane bits (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
     const entry = `${directory}/main.blot`;
     await Deno.writeTextFile(entry, source);
@@ -108,34 +108,55 @@ for (const codegenTier of ["development", "optimized"] as const) {
           guest.dispose();
         }
       }
-      for (
-        const selection of [
-          "simd.u32_shuffle (0, 8, 2, 7) lanes lanes",
-          "simd.u32_swizzle (0, 4, 2, 3) lanes",
-          "simd.u32_broadcast 4 lanes",
-          "simd.u32_broadcast input lanes",
-        ]
-      ) {
-        const rejected = await compiler.build({
-          sources: {
-            [entry]: `${source}
-entry const invalid = func (input: U32): Array U32 => return do:
-  let lanes = (input, 2, 3, 4)
-  let (a, b, c, d) = ${selection}
-  return #[a, b, c, d]
-`,
-          },
-        });
-        assert(!rejected.success);
-        assert.equal(rejected.diagnostics[0].code, "simd_lane_literal");
-        assert.equal("bytes" in rejected, false);
-      }
-      const recovered = await compiler.build();
-      assert(recovered.success, JSON.stringify(recovered));
-      assert.deepEqual(recovered.bytes, result.bytes);
     } finally {
       await compiler.dispose();
       await Deno.remove(directory, { recursive: true });
     }
   });
 }
+
+// Pending the owner's decision on literal SIMD lane selectors (tasks/DELETE_SCOPED.md).
+Deno.test.ignore("scoped standard SIMD wrappers require literal in-range selectors", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-scoped-simd-" });
+  const entry = `${directory}/main.blot`;
+  await Deno.writeTextFile(entry, source);
+  const compiler = await createZigProjectCompiler({
+    executable,
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+    cacheDirectory: false,
+  });
+  try {
+    const result = await compiler.build();
+    assert(result.success, JSON.stringify(result));
+    for (
+      const selection of [
+        "simd.u32_shuffle (0, 8, 2, 7) lanes lanes",
+        "simd.u32_swizzle (0, 4, 2, 3) lanes",
+        "simd.u32_broadcast 4 lanes",
+        "simd.u32_broadcast input lanes",
+      ]
+    ) {
+      const rejected = await compiler.build({
+        sources: {
+          [entry]: `${source}
+entry const invalid = func (input: U32): Array U32 => return do:
+  let lanes = (input, 2, 3, 4)
+  let (a, b, c, d) = ${selection}
+  return #[a, b, c, d]
+`,
+        },
+      });
+      assert(!rejected.success);
+      assert.equal(rejected.diagnostics[0].code, "simd_lane_literal");
+      assert.equal("bytes" in rejected, false);
+    }
+    const recovered = await compiler.build();
+    assert(recovered.success, JSON.stringify(recovered));
+    assert.deepEqual(recovered.bytes, result.bytes);
+  } finally {
+    await compiler.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});

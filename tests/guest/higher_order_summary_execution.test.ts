@@ -25,7 +25,6 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
   ) {
     lib.push(
       `const ${kind}_0 = func callback => return func value => return do:`,
-      "  let compared = @type.same $Count $Other",
       `  use result <- ${invocation}`,
       "  break result",
     );
@@ -79,25 +78,21 @@ Deno.test("higher order summaries preserve callback captures rows and returned s
     }).output();
     assert(packed.success, new TextDecoder().decode(packed.stdout));
     const producer = await createZigProjectCompiler(options);
-    let checkpoint: Uint8Array<ArrayBuffer>;
     let expected: Uint8Array<ArrayBuffer>;
     try {
       const initial = await producer.build();
       assert(initial.success, JSON.stringify(initial));
       expected = initial.bytes;
-      checkpoint = await producer.exportCheckpoint();
     } finally {
       await producer.dispose();
     }
     const retained = await createZigProjectCompiler({
       ...options,
       dependencies: bundle,
-      checkpoint,
     });
     try {
       const restored = await retained.build();
       assert(restored.success, JSON.stringify(restored));
-      assert(restored.stats.cachedModules > 0);
       assert.deepEqual(restored.bytes, expected);
       for (
         const [provider, invalid] of [

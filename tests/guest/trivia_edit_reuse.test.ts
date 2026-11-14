@@ -7,10 +7,10 @@ const repo = new URL("../../", import.meta.url).pathname;
 const prelude = `${repo}std/prelude.blot`;
 const stdRoot = `${repo}std`;
 
-// Comment and spacing edits that keep tokens and adjacency publish the last
-// output without rebuilding. Real edits, errors and recovery afterwards match
-// fresh builds, including diagnostic positions in the edited text.
-Deno.test("trivia-only edits reuse output and later edits match fresh builds", async () => {
+// Comment and spacing edits, real edits, errors and recovery in a retained
+// project session match fresh builds, including diagnostic positions in the
+// edited text.
+Deno.test("retained trivia and real edits match fresh builds", async () => {
   for (const name of ["ecs", "syntax", "monads"]) {
     const entry = `${repo}examples/${name}.blot`;
     const original = await Deno.readTextFile(entry);
@@ -31,21 +31,20 @@ Deno.test("trivia-only edits reuse output and later edits match fresh builds", a
     const spaced = withComment.replace(" = ", " =   ");
     const added = `${original}\nconst trivia_probe_value: U32 = 1\n`;
     const broken = `${withComment}\nconst broken_trivia_probe: U32 = $Wrong\n`;
-    // [text, expected trivia reuse relative to the last compiled revision]
-    const revisions: [string, boolean][] = [
-      [original, false],
-      [withComment, true],
-      [longerComment, true],
-      [spaced, true],
-      [added, false],
-      [broken, false],
-      [withComment, false],
-      [original, true],
+    const revisions = [
+      original,
+      withComment,
+      longerComment,
+      spaced,
+      added,
+      broken,
+      withComment,
+      original,
     ];
     const options = { executable, entry, prelude, stdRoot };
     const retained = await createZigProjectCompiler(options);
     try {
-      for (const [index, [text, trivia]] of revisions.entries()) {
+      for (const text of revisions) {
         const sources = { [entry]: text };
         const result = await retained.build({ sources });
         const fresh = await createZigProjectCompiler(options);
@@ -58,13 +57,6 @@ Deno.test("trivia-only edits reuse output and later edits match fresh builds", a
           }
           assert(result.success && expected.success, name);
           assert.deepEqual(result.bytes, expected.bytes, name);
-          const attempt = result.stats.attemptStats as Record<string, unknown>;
-          assert.equal(
-            attempt.trivia_only,
-            trivia,
-            `${name} revision ${index}: ${JSON.stringify(attempt).slice(0, 120)}`,
-          );
-          if (trivia) assert.equal(attempt.reused_output, true);
         } finally {
           await fresh.dispose();
         }

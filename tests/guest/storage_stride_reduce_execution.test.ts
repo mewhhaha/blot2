@@ -76,8 +76,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
     try {
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
-      const counters = result.stats.workCounters as Record<string, number>;
-      assert(counters.scoped_stride_reductions > 0, JSON.stringify(counters));
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });
         const call = async (name: string, input: unknown = null) => {

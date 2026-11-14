@@ -1,7 +1,9 @@
+// `before` aliases the updated array, so it reads the write
+// (tasks/LANGUAGE_COHERENCE.md A7).
 export const updateCases = [
   {
     name: "scalar_array_aliases",
-    expected: { folded: 41, run: 41 },
+    expected: { folded: 42, run: 42 },
     arguments: { run: 1 },
     source: `
 const update = func index => return do:
@@ -15,7 +17,7 @@ entry const run = func (index: U32) : U32 => return update index
   },
   {
     name: "mixed_nominal_array_fields",
-    expected: { run: 42 },
+    expected: { run: 44 },
     source: `
 type Point is data = $Point { x: U32, y: U32 }
 type Bucket is data = $Bucket { points: Array Point }
@@ -28,7 +30,7 @@ entry const run = func () : U32 => return do:
   },
   {
     name: "nested_array_indexes",
-    expected: { run: 45 },
+    expected: { run: 84 },
     source: `
 entry const run = func () : U32 => return do:
   let values = #[#[1, 2], #[3, 4]]

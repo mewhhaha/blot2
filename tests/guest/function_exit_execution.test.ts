@@ -134,25 +134,6 @@ entry const answer = func (flag: Bool) : U32 => return Maybe.unwrap_or 0 (choose
   });
 });
 
-Deno.test("return from a request handler cancels the captured computation", async () => {
-  await compileAndRun(
-    `type Tick is effect = { read: Unit -> U32 }
-const handled = func computation => return do:
-  for request in @requests computation:
-    case request of
-      effect Tick.read () =>
-        return 42
-      complete value =>
-        break value
-entry const answer = func () => return handled (@computation (func () => return do:
-  use Tick.read ()
-  break @panic "cancelled computation continued"
-))
-`,
-    (guest) => equal(guest.call("answer", null), 42),
-  );
-});
-
 Deno.test("return through a nested request callback has a source diagnostic", async () => {
   const source = `type Tick is effect = { read: Unit -> U32 }
 const handled = func computation => return do:

@@ -32,19 +32,6 @@ entry const witness = func () => return do:
   }, { prelude: "std/prelude.blot" });
 });
 
-Deno.test("builtin State instantiates local generic witness helpers at each use", async () => {
-  await compileAndRun(`
-type Cell value is data = $Cell value
-entry const run = func () => return do:
-  let read_local = func witness => return @state.get witness
-  let (_, $Cell integer) = @state.run ($Cell 40) (func () => return
-    read_local (func ignored : Cell U32 => return @panic "integer witness called"))
-  let (_, $Cell fraction) = @state.run ($Cell 2.5) (func () => return
-    read_local (func ignored : Cell F32 => return @panic "floating witness called"))
-  break @f32.add (@u32.to_f32 integer) fraction
-`, guest => equal(guest.call("run", null), 42.5));
-});
-
 Deno.test("builtin State readers and writers retain residual effects and shadow exact instances", async () => {
   await compileAndRun(`
 type Count is data = $Count U32

@@ -1,32 +1,6 @@
 import { strict as assert } from "node:assert";
 import { compileAndRun } from "./compile_helpers.ts";
 
-Deno.test("global Lists retain independent payloads through descriptor readers", async () => {
-  await compileAndRun(
-    `
-const source: Array U32 = #[7, 35]
-const saved: List U32 = @list.from_array source
-const literal: List U32 = [20, 22]
-const sum = func (values: List U32): U32 => return do:
-  let total = 0
-  for value in values:
-    total := self + value
-  return total
-entry const answer = func () => return #[sum saved, sum literal]
-entry const change = func (value: U32): U32 => return do:
-  let written = @storage.write (&source[0]) value
-  let copied: Array U32 = @array.from_list saved
-  copied[0] := value
-  return sum saved + copied[0]
-`,
-    (guest) => {
-      assert.deepEqual(guest.call("answer", null), new Uint32Array([42, 42]));
-      assert.equal(guest.call("change", 100), 142);
-      assert.deepEqual(guest.call("answer", null), new Uint32Array([42, 42]));
-    },
-  );
-});
-
 Deno.test("plain global payload copies preserve variant fields and exact scalar bits", async () => {
   await compileAndRun(
     `
@@ -85,7 +59,9 @@ entry const change = func (value: U32) => return do:
   );
 });
 
-Deno.test("failed computed initialization retries without resetting published dependencies", async () => {
+// Constants are computed at instantiation (tasks/DELETE_SCOPED.md), so a
+// failing initializer traps at the first read that needs it.
+Deno.test("failed computed initialization traps at its first read", async () => {
   await compileAndRun(
     `
 const attempts: ResizeArray U32 = #[0]
@@ -99,10 +75,8 @@ entry const answer = func () => return rows[0]
 entry const count = func () => return attempts[0]
 `,
     (guest) => {
-      assert.throws(() => guest.call("answer", null));
-      assert.equal(guest.call("answer", null), 42);
-      assert.equal(guest.call("count", null), 2);
-      assert.equal(guest.call("answer", null), 42);
+      assert.throws(() => guest.call("answer", null), WebAssembly.RuntimeError);
+      assert.equal(guest.call("count", null), 1);
     },
   );
 });

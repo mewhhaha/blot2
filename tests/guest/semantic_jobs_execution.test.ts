@@ -15,7 +15,7 @@ entry const run: U32 -> U32 = func value => return @u32.add (@u32.add (a value) 
 entry const recursive: U32 -> U32 = func value => return even value
 `;
 
-Deno.test("private semantic workers preserve fresh retained edited restart Wasm and failed source diagnostics", async () => {
+Deno.test("private semantic workers preserve fresh retained edited Wasm and failed source diagnostics", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-semantic-jobs-" });
   const entry = `${directory}/main.blot`;
   try {
@@ -33,7 +33,6 @@ Deno.test("private semantic workers preserve fresh retained edited restart Wasm 
         );
       }
       let original: Uint8Array<ArrayBuffer> | undefined;
-      let checkpoint: Uint8Array<ArrayBuffer> | undefined;
       for (const seed of [1, 3, 1, 1]) {
         const outputs = [];
         for (const compiler of retained) {
@@ -41,15 +40,6 @@ Deno.test("private semantic workers preserve fresh retained edited restart Wasm 
             sources: { [entry]: source(seed) },
           });
           assert(result.success, JSON.stringify(result));
-          if (original === undefined) {
-            const counters = result.stats.workCounters as {
-              [key: string]: number;
-            };
-            assert(
-              counters.semantic_component_jobs >= 4,
-              JSON.stringify(counters),
-            );
-          }
           outputs.push(result.bytes);
           const guest = await instantiateGuest(result.bytes);
           try {
@@ -81,10 +71,7 @@ Deno.test("private semantic workers preserve fresh retained edited restart Wasm 
         } finally {
           await fresh.dispose();
         }
-        if (seed === 1) {
-          original = outputs[0];
-          checkpoint = await retained[0].exportCheckpoint();
-        }
+        if (seed === 1) original = outputs[0];
       }
       const diagnostics = [];
       for (const compiler of retained) {
@@ -101,20 +88,6 @@ Deno.test("private semantic workers preserve fresh retained edited restart Wasm 
       }
       assert.deepEqual(diagnostics[0], diagnostics[1]);
       assert.deepEqual(diagnostics[0], diagnostics[2]);
-      const restarted = await createZigProjectCompiler({
-        ...options,
-        semanticWorkers: 4,
-        checkpoint,
-      });
-      try {
-        const result = await restarted.build({
-          sources: { [entry]: source(1) },
-        });
-        assert(result.success);
-        assert.deepEqual(result.bytes, original);
-      } finally {
-        await restarted.dispose();
-      }
     } finally {
       await Promise.all(retained.map((compiler) => compiler.dispose()));
     }
@@ -136,12 +109,11 @@ Deno.test("private semantic worker counts reject invalid options before spawning
   }
 });
 
-Deno.test("semantic worker profiling observes joined jobs without changing Wasm or work", async () => {
+Deno.test("semantic worker profiling does not change Wasm", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-worker-profile-" });
   const entry = `${directory}/main.blot`;
   try {
     const outputs = [];
-    const counters = [];
     for (const profileBackend of [false, true]) {
       const compiler = await createZigProjectCompiler({
         executable,
@@ -157,30 +129,11 @@ Deno.test("semantic worker profiling observes joined jobs without changing Wasm 
         });
         assert(result.success);
         outputs.push(result.bytes);
-        counters.push(result.stats.workCounters);
-        const timing = result.stats.backendTiming as { [key: string]: unknown };
-        if (profileBackend) {
-          const work = timing.work as { [key: string]: number };
-          for (
-            const field of [
-              "semantic_coordination_us",
-              "semantic_dispatch_us",
-              "semantic_publication_us",
-              "semantic_job_sum_us",
-            ]
-          ) {
-            assert(Number.isInteger(work[field]) && work[field] >= 0, field);
-          }
-          assert(work.semantic_job_sum_us > 0);
-        } else {
-          assert(!("work" in timing));
-        }
       } finally {
         await compiler.dispose();
       }
     }
     assert.deepEqual(outputs[0], outputs[1]);
-    assert.deepEqual(counters[0], counters[1]);
   } finally {
     await Deno.remove(directory, { recursive: true });
   }

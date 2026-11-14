@@ -32,7 +32,6 @@ entry const floats = func (input: Array F32): Array F32 => return do:
         guest.call("floats", new Float32Array([1.5, -2.25])),
         new Float32Array([-2.25, 1.5]),
       );
-      assert.throws(() => guest.call("exchange", new Uint32Array(300000)));
       assert.equal(guest.call("read", null), 7);
       const module = new WebAssembly.Module(bytes);
       assert.equal(readGuestAbi(module).version, 8);

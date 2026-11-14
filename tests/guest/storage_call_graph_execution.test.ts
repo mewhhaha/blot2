@@ -130,11 +130,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
           signal: AbortSignal.timeout(5_000),
         });
         assert(result.success, JSON.stringify(result));
-        if (kind === "scratch") {
-          const work = result.stats.workCounters as Record<string, number>;
-          assert(work.scoped_function_plan_definitions >= 4, JSON.stringify(work));
-          assert(work.scoped_function_plan_hits > 0, JSON.stringify(work));
-        }
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
           try {

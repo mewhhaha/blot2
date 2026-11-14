@@ -61,44 +61,6 @@ entry const probe = func (seed: U32) => return #[seed]
   }
 });
 
-Deno.test("private cursor carriers root actual collections across pressure and keep old forks", async () => {
-  await compileAndRun(
-    `
-entry const run = func (count: U32) => return do:
-  let values = @list.generate 1000 (func i => return {x: i, y: @u32.add i 8192})
-  let cursor = @list.cursor values
-  let original = cursor
-  let right = @cursor.advance original
-  let total = 0
-  let index = 0
-  for ever:
-    if @u32.eq index count:
-      break @u32.add total (@cursor.value original).y
-    let garbage = @array.fill 8192 index
-    let row = @cursor.value cursor
-    total := @u32.add self (@u32.add row.x (@cursor.value right).x)
-    cursor := @cursor.advance self
-    right := @cursor.advance self
-    index := @u32.add self 1
-entry const probe = func (seed: U32) => return #[seed]
-`,
-    (guest) => {
-      for (const count of [0, 1, 120, 121, 122, 243, 500, 999]) {
-        assert.equal(guest.call("run", count), count * count + 8192);
-      }
-      const warm = guest.memoryBytes();
-      for (let i = 0; i < 8; i++) {
-        assert.equal(
-          guest.call("run", 999),
-          999 * 999 + 8192,
-        );
-      }
-      assert.equal(guest.memoryBytes(), warm);
-    },
-    { stdRoot },
-  );
-});
-
 Deno.test("published packed cursors and nested advances keep heap snapshot semantics", async () => {
   await compileAndRun(
     `

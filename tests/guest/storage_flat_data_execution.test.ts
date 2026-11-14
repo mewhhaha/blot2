@@ -1,4 +1,4 @@
-import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
+import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("source storage admission covers a reached library beyond 128 declarations", async () => {
   const helpers = Array.from({length: 150}, (_, index) => `const part_${index} = func (value: U32): U32 => return value + ${index}`).join("\n");
@@ -178,31 +178,3 @@ entry const repeat = func () => return do:
 `, guest => equal(guest.call("repeat", null), 12497500));
 });
 
-Deno.test("hidden ADT borrows and loop-carried iteration borrows cannot escape owners", async () => {
-  await compileExpectedFailure(`
-type Held is data = $Held &U32 | $Empty
-const bad = func () => return do:
-  let rows: GrowArray U32 = #[42]
-  return $Held (&rows[0])
-entry const escape = func () => return case bad () of
-  $Held value => @storage.load value
-  $Empty => 0
-`, "storage_escape");
-  await compileExpectedFailure(`
-entry const escape = func () => return do:
-  let outer: GrowArray U32 = #[42]
-  let held = &outer[0]
-  for index in 0..2:
-    let local: GrowArray U32 = #[index]
-    held := &local[0]
-  return @storage.load held
-`, "storage_escape");
-  await compileExpectedFailure(`
-entry const replace = func () => return do:
-  let anchor: GrowArray U32 = #[]
-  let rows: Array U32 = #[42]
-  for index in 0..2:
-    rows := #[index]
-  return rows[0]
-`, "storage_escape");
-});

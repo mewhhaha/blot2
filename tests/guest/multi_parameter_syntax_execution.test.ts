@@ -1,6 +1,5 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
-import { observeGuestAllocations } from "../../benchmarks/tools/guest_heap_observer.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 Deno.test("curried parameter lists retain partial application, generic callbacks, and named record calls", async () => {
@@ -71,19 +70,14 @@ Deno.test("record-style named calls reject duplicate and unknown argument names 
   });
 });
 
-Deno.test("parameter-list sugar and explicit currying have the same generated size and guest allocation traffic in both tiers", async () => {
+Deno.test("parameter-list sugar and explicit currying have the same generated size and results in both tiers", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-curried-parity-" });
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ??
     new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
   try {
     for (const codegenTier of ["development", "optimized"] as const) {
-      const outputs: Array<
-        {
-          bytes: Uint8Array<ArrayBuffer>;
-          allocations: ReturnType<typeof observeGuestAllocations>;
-        }
-      > = [];
+      const outputs: Uint8Array<ArrayBuffer>[] = [];
       for (
         const declaration of [
           "func (first: U32) -> (second: U32) => return @u32.add first second",
@@ -102,35 +96,23 @@ Deno.test("parameter-list sugar and explicit currying have the same generated si
         try {
           const result = await compiler.build({ sources: { [entry]: source } });
           assert(result.success, JSON.stringify(result));
-          outputs.push({
-            bytes: result.bytes,
-            allocations: observeGuestAllocations(result.bytes, [[
-              "answer",
-              41,
-              42,
-            ]]),
-          });
+          outputs.push(result.bytes);
+          const exports =
+            new WebAssembly.Instance(new WebAssembly.Module(result.bytes))
+              .exports;
+          assert.equal((exports.answer as CallableFunction)(41), 42);
         } finally {
           await compiler.dispose();
         }
       }
-      assert.equal(
-        outputs[0].bytes.length,
-        outputs[1].bytes.length,
-        codegenTier,
-      );
-      assert.deepEqual(
-        outputs[0].allocations,
-        outputs[1].allocations,
-        codegenTier,
-      );
+      assert.equal(outputs[0].length, outputs[1].length, codegenTier);
     }
   } finally {
     await Deno.remove(directory, { recursive: true });
   }
 });
 
-Deno.test("named record calls and positional calls expose allocation traffic in both tiers", async () => {
+Deno.test("named record calls and positional calls agree in both tiers", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-named-call-" });
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ??
@@ -145,7 +127,6 @@ entry const answer = func (input: U32) => return calculate { d: 4, c: 3, b: 2, a
   ];
   try {
     for (const codegenTier of ["development", "optimized"] as const) {
-      const traffic = [];
       for (const source of declarations) {
         const compiler = await createZigProjectCompiler({
           executable,
@@ -157,25 +138,14 @@ entry const answer = func (input: U32) => return calculate { d: 4, c: 3, b: 2, a
         try {
           const result = await compiler.build({ sources: { [entry]: source } });
           assert(result.success, JSON.stringify(result));
-          traffic.push(
-            observeGuestAllocations(result.bytes, [["answer", 5, 22]]),
-          );
+          const exports =
+            new WebAssembly.Instance(new WebAssembly.Module(result.bytes))
+              .exports;
+          assert.equal((exports.answer as CallableFunction)(5), 22, codegenTier);
         } finally {
           await compiler.dispose();
         }
       }
-      assert.equal(traffic[0].rounded_allocation_bytes, 0, codegenTier);
-      if (codegenTier === "optimized") {
-        assert.equal(traffic[1].rounded_allocation_bytes, 0, codegenTier);
-      }
-      console.log(
-        JSON.stringify({
-          codegenTier,
-          positional: traffic[0].rounded_allocation_bytes,
-          named_record: traffic[1].rounded_allocation_bytes,
-          calls: traffic[1].calls,
-        }),
-      );
     }
   } finally {
     await Deno.remove(directory, { recursive: true });

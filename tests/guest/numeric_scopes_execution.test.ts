@@ -34,7 +34,7 @@ entry const effectful = func (host: U32 -> U32 ! {Foreign}) => return do:
 `;
 
 for (const codegenTier of ["optimized", "development"] as const) {
-  Deno.test(`numeric helpers with private scopes keep tails, snapshots and scalar fallbacks (${codegenTier})`, async () => {
+  Deno.test(`numeric helpers with private scopes keep tails, aliased writes and scalar fallbacks (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({
       prefix: "blot-numeric-scopes-",
     });
@@ -70,9 +70,12 @@ for (const codegenTier of ["optimized", "development"] as const) {
               )),
           );
           if (count !== 0) {
+            // `saved` aliases `original`, so it reads the write of 99
+            // (tasks/LANGUAGE_COHERENCE.md A7).
+            const last = count === 1 ? 99 : (-(count + 16) + 1) >>> 0;
             assert.deepEqual(
               guest.call("shared", count),
-              Uint32Array.of((-17 + 1) >>> 0, 99, (-(count + 16) + 1) >>> 0),
+              Uint32Array.of(99, 99, last),
             );
           }
         }
@@ -102,7 +105,7 @@ for (const codegenTier of ["optimized", "development"] as const) {
   });
 }
 
-Deno.test("numeric helper admission revalidates retained and checkpoint edits", async () => {
+Deno.test("numeric helper admission revalidates retained edits", async () => {
   const directory = await Deno.makeTempDir({
     prefix: "blot-numeric-revision-",
   });
@@ -111,7 +114,6 @@ Deno.test("numeric helper admission revalidates retained and checkpoint edits", 
     "@u32.mul shifted 4294967295",
     "@u32.div 12 (@u32.sub 4 index)",
   );
-  let checkpoint: Uint8Array<ArrayBuffer> | undefined;
   try {
     const retained = await createZigProjectCompiler({
       executable,
@@ -163,31 +165,8 @@ Deno.test("numeric helper admission revalidates retained and checkpoint edits", 
           guest.dispose();
         }
       }
-      checkpoint = await retained.exportCheckpoint();
     } finally {
       await retained.dispose();
-    }
-    const restarted = await createZigProjectCompiler({
-      executable,
-      entry,
-      prelude: null,
-      cacheDirectory: false,
-      checkpoint,
-    });
-    try {
-      const built = await restarted.build({ sources: { [entry]: changed } });
-      assert(built.success, JSON.stringify(built));
-      const guest = await instantiateGuest(built.bytes);
-      try {
-        assert.throws(
-          () => guest.call("integers", 5),
-          WebAssembly.RuntimeError,
-        );
-      } finally {
-        guest.dispose();
-      }
-    } finally {
-      await restarted.dispose();
     }
   } finally {
     await Deno.remove(directory, { recursive: true });

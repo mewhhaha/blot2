@@ -152,35 +152,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
           guest.dispose();
         }
       }
-      for (const exit of ["", "    continue\n"]) {
-        const rejected = await compiler.build({
-          sources: {
-            [entry]: `${source}
-entry const late = func (count: U32): U32 => return do:
-  let labels: Array U32 = #[65]
-  let rows: ResizeArray Row = #[]
-  let total = 0
-  for index in 0 .. count:
-    if index > 0:
-      for row in rows:
-        for code in row.text:
-          total := self + code
-    append rows (&labels[0..1])
-${exit}  return total
-`,
-          },
-        });
-        assert(!rejected.success);
-        assert.equal(rejected.diagnostics[0].code, "storage_escape");
-        assert.equal(
-          rejected.diagnostics[0].message,
-          "A loop cannot widen stored variants or borrowed roots after reading them; write the complete shape before its first read",
-        );
-        assert.equal("bytes" in rejected, false);
-      }
-      const recovered = await compiler.build();
-      assert(recovered.success, JSON.stringify(recovered));
-      assert.deepEqual(recovered.bytes, result.bytes);
     } finally {
       await compiler.dispose();
       await Deno.remove(directory, { recursive: true });

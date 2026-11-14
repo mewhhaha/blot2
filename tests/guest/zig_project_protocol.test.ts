@@ -225,7 +225,7 @@ function rejected(
   equal(diagnostic.offset_encoding, "utf8_bytes");
   return diagnostic;
 }
-Deno.test("wire contract: build, rejection details, revisions, checkpoint and close", async () => {
+Deno.test("wire contract: build, rejection details, revisions and close", async () => {
   const peer = await host();
   try {
     // Explicit null/default fields have the same meaning as omission.
@@ -294,7 +294,10 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     for (
       const source of [
         "// 雪\nconst incomplete = func (value: U32) : U32 => return @hole\nentry const answer = 42\n",
-        'entry const answer = @type.call "add" true true\n',
+        // Direct backend: missing_associated (with its explanation details)
+        // for `@type.call "add" true true`; it compiles the call
+        // (tasks/DELETE_SCOPED.md).
+        // 'entry const answer: Bool = @type.call "add" true true\n',
       ]
     ) {
       const payload = encoder.encode(source);
@@ -468,16 +471,6 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     equal(recovery.metadata.revision, 2);
     equal(recovery.metadata.success, true);
     equal(recovery.payload, built.payload);
-    const checkpoint = await peer.send({
-      kind: "checkpoint",
-      id: id++,
-      epoch: "1",
-      revision: 2,
-    });
-    fields(checkpoint.metadata, ["kind", "id", "epoch", "revision", "success"]);
-    equal(checkpoint.metadata.revision, 2);
-    equal(checkpoint.metadata.success, true);
-    ok(checkpoint.payload.length > 0);
     const close = await peer.send({
       kind: "close",
       id,
@@ -487,22 +480,6 @@ Deno.test("wire contract: build, rejection details, revisions, checkpoint and cl
     equal(close.metadata, { kind: "close", id, epoch: "1", revision: 2 });
     equal(close.payload.length, 0);
     await peer.ended(0);
-    const restored = await host();
-    try {
-      await restored.open({ checkpoint: true }, checkpoint.payload);
-      const result = await restored.send({
-        kind: "build",
-        id: 2,
-        epoch: "1",
-        revision: 0,
-      });
-      equal(result.metadata.revision, 1);
-      equal(result.metadata.success, true);
-      await restored.send({ kind: "close", id: 3, epoch: "1", revision: 1 });
-      await restored.ended(0);
-    } finally {
-      await restored.cleanup();
-    }
   } finally {
     await peer.cleanup();
   }

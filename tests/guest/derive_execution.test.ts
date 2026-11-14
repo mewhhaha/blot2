@@ -4,7 +4,8 @@ import { decodeText } from "../../host/text.ts";
 import { deriveFile } from "../../host/derive_cli.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
-Deno.test("opt-in derivation executes equality, debug formatting and strict versioned codecs", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("opt-in derivation executes equality, debug formatting and strict versioned codecs", async () => {
   const declarations = `
 type Ticket is data = $Ticket { number: U32, active: Bool } | $Empty
 type Box a is data = $Box { values: Array a } | $Missing
@@ -162,7 +163,8 @@ Deno.test("derivation rejects unsupported fields and unstable schema maps", asyn
   );
 });
 
-Deno.test("explicit schema migration preserves field IDs across source reordering", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("explicit schema migration preserves field IDs across source reordering", async () => {
   const source = "type Ticket is data = $Ticket { active: Bool, number: U32 } | $Empty\n";
   const [ticket] = await dataShapes(source);
   const schema: DeriveSchema = {
@@ -212,7 +214,8 @@ entry const migrate_v1 = func (words: Array U32) : Array U32 => return do:
   );
 });
 
-Deno.test("derive command validates source and generated module before publishing", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("derive command validates source and generated module before publishing", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-derive-" });
   try {
     const source = `${directory}/model.blot`;
@@ -323,7 +326,8 @@ Deno.test("derive command validates source and generated module before publishin
   }
 });
 
-Deno.test("scalar and product payload derivation preserve generic values", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("scalar and product payload derivation preserve generic values", async () => {
   const source = `
 type Token is data = $Token U32
 type Pair [a, b] is data = $Pair (a, b) | $Missing
@@ -359,7 +363,8 @@ entry const run = func () => return do:
   );
 });
 
-Deno.test("scalar codec emission preserves strict words and rejects malformed framing", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("scalar codec emission preserves strict words and rejects malformed framing", async () => {
   const declarations = "type Fixed is data = $Fixed { number: U32, enabled: Bool }\n";
   const [shape] = await dataShapes(declarations);
   const schema = { version: 2, variants: { Fixed: { tag: 9, fields: { number: 20, enabled: 10 } } } };

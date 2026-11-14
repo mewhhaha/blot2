@@ -120,9 +120,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
     try {
       const result = await compiler.build({ sources: { [entry]: source } });
       assert(result.success, JSON.stringify(result));
-      const counters = result.stats.workCounters as Record<string, number>;
-      assert(counters.scoped_bulk_copies > 0, JSON.stringify(counters));
-      assert(counters.scoped_bulk_fills > 0, JSON.stringify(counters));
       for (const asynchronous of [false, true]) {
         const guest = await instantiateGuest(result.bytes, { asynchronous });
         try {

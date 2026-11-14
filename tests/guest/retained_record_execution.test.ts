@@ -82,11 +82,11 @@ entry const answer = func (value: U32) => return do:
   );
 });
 
-Deno.test("constant collections infer concrete callbacks in variants the consumer does not call", async () => {
+Deno.test("constant collections keep concrete callbacks in variants the consumer does not call", async () => {
   await compileAndRun(
     `
 type Action value is data = $Ignored (value -> Unit) | $Chosen (Unit -> U32)
-const unused = func value => return do:
+const unused = func (value: F32): Unit => return do:
   let next = value * 0.25
   break ()
 const actions = #[$Ignored unused, $Chosen (func () => return 42)]

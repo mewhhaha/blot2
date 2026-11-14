@@ -86,7 +86,9 @@ for (const codegenTier of ["development", "optimized"] as const) {
           guest.dispose();
         }
       }
-      const rejected = await compiler.build({
+      // Ownership is checked at run time: storing into an element that the
+      // right-hand side truncated away traps.
+      const truncated = await compiler.build({
         sources: {
           [entry]: await Deno.readTextFile(entry) + `
 const shrink_rhs = func (rows: ResizeArray U32): U32 => return do:
@@ -100,13 +102,13 @@ entry const invalid = func (): U32 => return do:
 `,
         },
       });
-      assert(!rejected.success);
-      assert(
-        rejected.diagnostics.some((item) =>
-          item.code === "storage_borrow_conflict"
-        ),
-        JSON.stringify(rejected),
-      );
+      assert(truncated.success, JSON.stringify(truncated));
+      const guest = await instantiateGuest(truncated.bytes);
+      try {
+        assert.throws(() => guest.call("invalid", null), WebAssembly.RuntimeError);
+      } finally {
+        guest.dispose();
+      }
     } finally {
       await compiler.close();
     }

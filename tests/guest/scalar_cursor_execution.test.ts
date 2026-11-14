@@ -47,15 +47,7 @@ entry const suspend = func (host: U32 -> U32 ! {Foreign}) => return do:
 `;
 
 Deno.test("scalar cursor locals preserve forks branch exits nested activations and heap fallback", async () => {
-  await compileAndRun(source, (guest, bytes) => {
-    assert.deepEqual([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(
-          new WebAssembly.Module(bytes),
-          "blot:ownership",
-        )[0],
-      ),
-    ], [2, 2, 0]);
+  await compileAndRun(source, (guest) => {
     for (const count of [0, 1, 3, 7, 8, 64]) {
       const iterations = Math.min(count, 7);
       assert.deepEqual(

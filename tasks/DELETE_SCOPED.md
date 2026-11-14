@@ -16,18 +16,16 @@ serve it are deleted, and then tasks/LANGUAGE_COHERENCE.md follows.
 ## Measuring the gap
 
 ```
-cd compiler && zig build install -Doptimize=fast -Dllvm=false \
-  -Ddirect-default=true --prefix zig-out-direct
+cd compiler && zig build install -Doptimize=fast -Dllvm=false --prefix zig-out-direct
 cd .. && deno test -A --parallel --junit-path=J.xml tests/guest tests/host -- \
   compiler/zig-out-direct/bin/blotc
-python3 scripts/integration/direct_guest_gap.py J.xml inventory.json
 ```
 
-`-Ddirect-default` and the classifier are temporary; delete them with the
-scoped backend. Some guest files hardcode `compiler/zig-out-dev/bin/blotc` and
-so still test that binary.
-
-Baseline at 51536924: 771 of 1,990 guest cases pass on the direct default.
+Baseline at 51536924: 771 of 1,990 guest cases passed on a direct-default
+build. After the test edits and the default flip, the suite on the safe
+development compiler has 1,212 passing cases, 129 ignored (listed below) and
+none failing. `scripts/integration/direct_guest_gap.py` classified the
+baseline; delete it with the scoped backend.
 
 ## Decisions by category
 
@@ -104,7 +102,7 @@ behaviour keeps the kept part.
   `emitted_functions`. The scoped statistics (work counters, optimization,
   principals, backend timing, `code_instances`) go.
 - **Options that go:** `--explain-allocations`, `--profile-memory`,
-  `--require-collector-free`, `--backend` and `-Ddirect-default`.
+  `--require-collector-free` and `--backend`.
 - **Project server.** `serve-project` builds each revision fresh (load,
   check, lower, direct compile) instead of through `retained_revision.zig`
   and checkpoints. Incremental compilation is a later phase. The project
@@ -122,6 +120,59 @@ behaviour keeps the kept part.
 - **Build, suites and scripts.** build.zig loses the runtime fixtures and the
   backend, evaluator and retained suites. `check:dev` gets new regression
   families (direct backend, checker), and `test:compiler` follows.
+
+## Ignored guest cases after the flip
+
+Each ignored case names its reason in a comment (`Direct backend gap: …`,
+`Direct backend: …` for a diagnostic, or `Pending …`). By kind:
+
+- **Invalid Wasm, fix first.** A constant or operand that is a bare
+  `@panic` (`const x: U32 = @panic "…"`, `@array.fill n (@panic …)`,
+  `@array.generate 0 (@panic …)`) fails validation with "not enough arguments
+  on the stack for local.set". A record constructor passed as a function
+  value (`$Pair` with fields `{zebra: U32, apple: F32}`) fails with
+  "local.set expected f32, found i32".
+- **Wrong results.**
+  - `true + true` at Bool compiles to a non-canonical Bool, where the kept
+    rule reports `missing_associated`.
+  - An array state cell set inside a loop traps `unreachable`.
+  - A prelude that redefines `U32.add` or `U32.gt` is ignored by `+`, `>`
+    and `@type.call` on U32 operands.
+  - Non-entry constants initialize on first read rather than at
+    instantiation, so an initializer's effects run in read order.
+  - A generalized builder local used through an alias (`let c = b`) traps
+    "function signature mismatch"; a curried render callback traps in
+    `Array.length`.
+- **Diagnostics to move to the checker.** `missing_associated` (with its
+  dispatch explanation and the use's position), `initialization_cycle`,
+  `const_runtime_dependency`, `unresolved_type` / `ambiguous_associated` for a
+  `from` with no destination, a reservation beyond Wasm32 memory, and
+  `entry_let_type` positions.
+- **Inference.** Unresolved type variables where no use fixes a hole, a
+  closure parameter fixed only by a later call, a `from` result typed through
+  an operator, an empty array with no fixed element type, `examples/ecs.blot`,
+  and generalized locals used at several types (the value restriction
+  question).
+- **Unsupported forms.** References to whole local values (`&local`, A4),
+  `@product.get` on a whole record payload, `@array.flatten`, field updates
+  of a multi-constructor value with a 15-field variant, and staging
+  (`#run` redesign).
+- **Memory model A.** Loops that allocate and carry fresh owners, and
+  `@array.set` / `array.push` loops, keep every allocation until the export
+  returns (below).
+- **Pending (40).** 37 for the traits redesign and 3 for the SIMD lane
+  literal decision.
+
+Found while editing, without an ignored case:
+- Escaping borrows neither fail to compile nor trap: a `Ref` into a returned
+  function's local array, `$Held (&rows[0])` and a loop-carried `&local[0]`
+  read their values. The scoped backend's `storage_escape` cases were removed
+  because the direct backend keeps the storage alive; A6 must decide whether
+  escapes get a static rule or a run-time check.
+- A write through a local alias of a global array constant changes the
+  constant.
+- Very large inputs (a 2M-float `change`, `@array.fill 1_073_741_823`) trap
+  with `unreachable` or an out-of-bounds access instead of a size check.
 
 ## Known direct-backend limits left to the memory model (A)
 

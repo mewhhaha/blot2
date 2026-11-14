@@ -25,29 +25,6 @@ entry const answer = func () => return do:
   );
 });
 
-Deno.test("qualified fields receivers and updates prove physical and selected members", async () => {
-  await compileAndRun(
-    `
-type Box a is data = $Box { value: a }
-const Box.plus = func (box: Box U32) => return func (amount: U32) => return @u32.add box.value amount
-const first: a -> b where { field "value" a b } = func box => return box.value
-const bind: a -> (U32 -> U32) where { receiver "plus" a Unit (U32 -> U32) } = func box => return box.plus
-const replace: a -> b -> c where { update "value" a b c } = func box => return func value => return do:
-  let current = box
-  current.value := value
-  break current
-entry const answer = func () => return @u32.add (first ($Box { value: 20 })) ((bind ($Box { value: 20 })) 2)
-entry const changed = func () => return do:
-  let $Box { value } = replace ($Box { value: 20 }) 42.0
-  break value
-`,
-    (guest) => {
-      equal(guest.call("answer", null), 42);
-      equal(guest.call("changed", null), 42);
-    },
-  );
-});
-
 Deno.test("qualified operation arguments share written open row identities", async () => {
   await compileAndRun(
     `
@@ -116,7 +93,8 @@ Deno.test("written clauses reject malformed shapes missing body coverage and par
   ) await compileExpectedFailure(source, code);
 });
 
-Deno.test("reached extra clauses require exact concrete type and effect evidence", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("reached extra clauses require exact concrete type and effect evidence", async () => {
   for (
     const source of [
       'entry const answer: U32 where { associated "missing" Bool Bool Bool } = 42\n',
@@ -166,7 +144,8 @@ Deno.test("qualified computed values retain one evidence instance", async () => 
   );
 });
 
-Deno.test("qualified imports preserve representation predicates and callback row sharing", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("qualified imports preserve representation predicates and callback row sharing", async () => {
   const directory = await Deno.makeTempDir({
     dir: new URL("../../build", import.meta.url).pathname,
     prefix: "zig-native-where-import-",

@@ -52,8 +52,6 @@ for (const scalar of ["U32", "F32"] as const) {
           sources: { [entry]: sourceFor(scalar) },
         });
         assert(result.success, JSON.stringify(result));
-        const counters = result.stats.workCounters as Record<string, number>;
-        assert.equal(counters.scoped_function_plan_definitions, 3);
         for (const asynchronous of [false, true]) {
           const guest = await instantiateGuest(result.bytes, { asynchronous });
           try {

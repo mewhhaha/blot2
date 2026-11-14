@@ -1,5 +1,4 @@
-// `--profile` opts in to detailed backend clocks and whole-build phase clocks;
-// deterministic work counters are always reported. Unprofiled stats carry no
+// `--profile` opts in to whole-build phase clocks. Unprofiled stats carry no
 // zero-filled placeholders.
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
@@ -11,18 +10,6 @@ const source = `const twice = func x => return x + x
 const quad = func x => return twice (twice x)
 entry const answer = func (x: U32) : U32 => return quad x + quad 1
 `;
-const counterNames = [
-  "inference_regions",
-  "region_scopes",
-  "max_region_scopes",
-  "call_collections_closed",
-  "call_collections_unresolved",
-  "call_memo_hits",
-  "solver_passes",
-  "solver_constraint_visits",
-  "occurs_steps",
-];
-
 interface Backend {
   prepare_us: number;
   work?: { regions: unknown[]; inference_us: number; lookup_us: number };
@@ -103,29 +90,13 @@ for (const command of ["build", "build-project"]) {
     assert(timing.prepare_us >= 0);
     assert.equal(timing.work, undefined);
     assert(!plain.text.includes('"regions"'), "placeholder regions printed");
-    for (const name of counterNames) {
-      assert(
-        Number.isSafeInteger(plain.metrics.work_counters[name]),
-        `missing counter ${name}`,
-      );
-    }
-    assert(plain.metrics.work_counters.inference_regions > 0);
-    assert(plain.metrics.work_counters.solver_passes > 0);
     assert.deepEqual(plain.metrics.phase_profile, {});
 
     const profiled = await build(command, `${command}-b`, "--profile");
     assert(profiled.success, profiled.text);
-    const detail: Backend = profiled.metrics.backend_timing;
-    assert(Array.isArray(detail.work?.regions));
-    assert(Number.isSafeInteger(detail.work?.inference_us));
-    assert(Number.isSafeInteger(detail.work?.lookup_us));
     assertPhases(profiled.metrics.phase_profile);
-    // Profiling observes; it neither changes code nor the deterministic work.
+    // Profiling observes; it does not change code.
     assert.deepEqual(profiled.wasm, plain.wasm);
-    assert.deepEqual(
-      profiled.metrics.work_counters,
-      plain.metrics.work_counters,
-    );
   });
 }
 
@@ -147,7 +118,7 @@ Deno.test("--profile is rejected where it has no effect", async () => {
   }
 });
 
-Deno.test("project API reports counters always and clocks only when profiled", async () => {
+Deno.test("project API reports clocks only when profiled", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-profile-" });
   const entry = `${directory}/main.blot`;
   await Deno.writeTextFile(entry, source);
@@ -161,16 +132,7 @@ Deno.test("project API reports counters always and clocks only when profiled", a
     const left = await plain.build();
     const right = await profiled.build();
     assert(left.success && right.success);
-    const counters = left.stats.workCounters as Record<string, number>;
-    for (const name of counterNames) {
-      assert(Number.isSafeInteger(counters[name]), `missing counter ${name}`);
-    }
-    assert(counters.inference_regions > 0);
-    assert.deepEqual(right.stats.workCounters, left.stats.workCounters);
     assert.equal((left.stats.backendTiming as unknown as Backend).work, undefined);
-    assert(
-      Array.isArray((right.stats.backendTiming as unknown as Backend).work?.regions),
-    );
     assert.deepEqual(left.stats.phaseProfile, {});
     assertPhases(right.stats.phaseProfile as unknown as Phases);
     assert.deepEqual(left.bytes, right.bytes);

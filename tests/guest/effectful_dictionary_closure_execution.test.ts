@@ -10,7 +10,8 @@ import {
 
 for (const helper of ["func value => return Render.show value", "Render.show"]) {
   for (const asynchronous of [false, true]) {
-    Deno.test(`effectful ${helper} preserves the first application before returned closure calls (${asynchronous})`, async () => {
+    // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+    Deno.test.ignore(`effectful ${helper} preserves the first application before returned closure calls (${asynchronous})`, async () => {
       await compileAndRun(variant(helper), async (guest) => {
         await checkGuest(guest, asynchronous);
       }, { prelude: "none", asynchronous });

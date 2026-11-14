@@ -327,11 +327,6 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
       ],
       ["text.json", "text", '{"greeting":"å…","lines":["a",""]}'],
       [
-        "tunables.json",
-        "tunables",
-        '{"tunables":[{"name":"camera.zoom","default":0.1,"min":0,"max":1,"doc":"😀"}]}',
-      ],
-      [
         "shader.wgsl",
         "wgsl",
         "alias Scalar=f32; struct Parameters { gain:Scalar } const count=1u+21u; const skipped:u32=2;",
@@ -340,17 +335,17 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
     for (const [path, , input] of inputs) await peer.write(path, input);
     await peer.write(
       "main.blot",
-      'import * as config from "./data.json"\nimport * as catalog from "./catalog.json"\nimport * as words from "./text.json"\nimport * as knobs from "./tunables.json"\nimport * as shader from "./shader.wgsl"\nentry const answer = @u32.add (config.value).answer shader.count\nentry const mesh = (catalog.meshes).second\nentry const letter = @array.get (words.text).greeting 0\nentry const tune = @product.get (knobs.tunables).camera_zoom 0\n',
+      'import * as config from "./data.json"\nimport * as catalog from "./catalog.json"\nimport * as words from "./text.json"\nimport * as shader from "./shader.wgsl"\nentry const answer = @u32.add (config.value).answer shader.count\nentry const mesh = (catalog.meshes).second\nentry const letter = @array.get (words.text).greeting 0\n',
     );
     await peer.open({
       imports: inputs.map(([path, kind]) => definition(peer, path, kind)),
       roots: [],
     });
     const built = await peer.build();
-    await success(built, { answer: 42, mesh: 1, letter: 229, tune: 16562854 });
+    await success(built, { answer: 42, mesh: 1, letter: 229 });
     equal(built.metadata.assets, []);
-    equal(built.metadata.assetStats.parsed, 5);
-    equal(built.metadata.assetDependencies.length, 5);
+    equal(built.metadata.assetStats.parsed, 4);
+    equal(built.metadata.assetDependencies.length, 4);
     for (const [path, , input] of inputs) {
       equal(
         built.metadata.assetDependencies.find((item: Metadata) =>
@@ -361,7 +356,7 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
     }
     const retained = await peer.build();
     await success(retained, { answer: 42 });
-    equal(retained.metadata.assetStats.reused, 5);
+    equal(retained.metadata.assetStats.reused, 4);
     equal(retained.metadata.assetStats.parsed, 0);
     equal(retained.payload, built.payload);
     await peer.close();

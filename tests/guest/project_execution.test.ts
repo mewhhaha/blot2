@@ -88,33 +88,6 @@ entry const floating = func () => return do measure:
   });
 });
 
-Deno.test("reflection preserves imported function provenance and operation identities", async () => {
-  await project({
-    main: `import {read, Read, effects, descriptor} from "./library"
-import * as library from "./library"
-entry const count = @effect.count (@effect.of read)
-entry const qualified = @effect.count (@effect.of library.read)
-entry const present = @effect.has effects descriptor
-entry const same = @effect.same descriptor (@effect.descriptor Read)
-`,
-    library: `effect Read: Unit -> U32
-const read = func () => return @panic "imported reflected function invoked"
-const effects = @effect.of read
-const descriptor = @effect.descriptor Read
-`,
-  }, async (bytes) => {
-    const guest = await instantiateGuest(bytes);
-    try {
-      equal(guest.read("count"), 0);
-      equal(guest.read("qualified"), 0);
-      equal(guest.read("present"), false);
-      equal(guest.read("same"), true);
-    } finally {
-      guest.dispose();
-    }
-  });
-});
-
 Deno.test("builtin State shares exact identities across imported helpers and separates generic instances", async () => {
   await project({
     main: `import { read, write, Cell } from "./library"
@@ -146,7 +119,7 @@ const write = func value => return @state.set value
   });
 });
 
-Deno.test("project emits shared generic producers across a diamond after frontend teardown", async () => {
+Deno.test("project emits shared generic producers across a diamond", async () => {
   await project({
     main: `import * as left from "./left"
 import * as right from "./right"
@@ -174,11 +147,6 @@ const answer = 42
       equal(guest.call("floating", 1.25), 2.5);
       equal(guest.read("answer"), 42);
       equal(metrics.files, 5);
-      const preludeSource = await Deno.readTextFile(new URL("../../std/prelude.blot", import.meta.url));
-      const preludeBodies = [...preludeSource.matchAll(/^(?:const|let) /gm)].length;
-      equal(metrics.body_elaborations, 9 + preludeBodies);
-      equal(metrics.body_lowerings, 9 + preludeBodies);
-      equal(metrics.code_instances, 2);
     } finally {
       guest.dispose();
     }

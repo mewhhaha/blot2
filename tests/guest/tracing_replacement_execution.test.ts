@@ -5,7 +5,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
 
-Deno.test("complete journals bound discarded Arrays inside nested collecting loops", async () => {
+Deno.test("discarded Arrays inside nested collecting loops keep the checksum", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const compiler = await createZigProjectCompiler({
@@ -35,46 +35,16 @@ entry const run = func (count: U32) => return do:
       },
     });
     assert(result.success, JSON.stringify(result));
-    const module = new WebAssembly.Module(result.bytes);
-    assert.deepEqual([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      ),
-    ], [2, 2, 0]);
-    const raw = new WebAssembly.Instance(module).exports;
-    const memory = raw["blot:memory"] as WebAssembly.Memory;
-    const enter = raw["blot:ownership_enter"] as CallableFunction;
-    const leave = raw["blot:ownership_leave"] as CallableFunction;
-    const reset = raw["blot:reset"] as CallableFunction;
-    let warmed = 0;
-    let destroyed = Number(
-      (raw["blot:rc_destroyed"] as WebAssembly.Global).value,
-    );
-    for (const count of [8, 8, 40, 200, 8, 200]) {
-      enter();
-      const pointer = (raw.run as CallableFunction)(count);
-      const words = new DataView(memory.buffer);
-      assert.equal(words.getUint32(pointer, true), 3);
-      assert.equal(
-        words.getUint32(pointer + 4, true),
-        90 * count * (count - 1) / 2 + 8100,
-      );
-      assert.equal(words.getUint32(pointer + 8, true), 89);
-      assert.equal(words.getUint32(pointer + 12, true), 90);
-      const retired = Number(
-        (raw["blot:rc_destroyed"] as WebAssembly.Global).value,
-      );
-      assert(
-        retired - destroyed >= 90 * count,
-        "discarded Arrays retire before invocation exit",
-      );
-      destroyed = retired;
-      if (warmed !== 0) assert(memory.buffer.byteLength <= warmed + 65536);
-      if (count === 8 && warmed === 0) warmed = memory.buffer.byteLength;
-      leave(0);
-      reset(0);
-      assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
-      assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      for (const count of [8, 8, 40, 200, 8, 200]) {
+        assert.deepEqual(
+          guest.call("run", count),
+          Uint32Array.of(90 * count * (count - 1) / 2 + 8100, 89, 90),
+        );
+      }
+    } finally {
+      guest.dispose();
     }
   } finally {
     await compiler.dispose();
@@ -95,7 +65,7 @@ Deno.test("unchanged variants preserve erased payload descriptors and aliases", 
     const result = await compiler.build({
       sources: {
         [entry]: `
-const change = func candidate => return Result.map (func value => return value + 1) candidate
+const change = func (candidate: Result [U32, Array U32]) : Result [U32, Array U32] => return Result.map (func value => return value + 1) candidate
 entry const scalar = func (value: U32) => return Result.unwrap_or 42 (change ($Ok value))
 entry const alias = func (value: U32) => return do:
   let child = #[value, value + 1]
@@ -108,39 +78,21 @@ entry const alias = func (value: U32) => return do:
   break case mapped of
     $Ok _ => @panic "changed the variant"
     $Err same => #[same[0], child[1]]
-const adapter = monad Maybe
-const resolve = func () => return do adapter:
-  use value <- $Some 42
-  break value
-entry const resolver = func () => return Maybe.unwrap_or 0 (resolve ())
 `,
       },
     });
     assert(result.success, JSON.stringify(result));
-    const module = new WebAssembly.Module(result.bytes);
-    assert.deepEqual([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      ),
-    ], [2, 2, 0]);
-    const raw = new WebAssembly.Instance(module).exports;
-    const memory = raw["blot:memory"] as WebAssembly.Memory;
-    for (const value of [0, 8192, 0xffff_fffe]) {
-      (raw["blot:ownership_enter"] as CallableFunction)();
-      assert.equal(
-        Number((raw.scalar as CallableFunction)(value)) >>> 0,
-        (value + 1) >>> 0,
-      );
-      assert.equal((raw.resolver as CallableFunction)(0), 42);
-      const pointer = (raw.alias as CallableFunction)(value);
-      const words = new DataView(memory.buffer);
-      assert.equal(words.getUint32(pointer, true), 2);
-      assert.equal(words.getUint32(pointer + 4, true), value);
-      assert.equal(words.getUint32(pointer + 8, true), (value + 1) >>> 0);
-      (raw["blot:ownership_leave"] as CallableFunction)(0);
-      (raw["blot:reset"] as CallableFunction)(0);
-      assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
-      assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      for (const value of [0, 8192, 0xffff_fffe]) {
+        assert.equal(guest.call("scalar", value), (value + 1) >>> 0);
+        assert.deepEqual(
+          guest.call("alias", value),
+          Uint32Array.of(value, (value + 1) >>> 0),
+        );
+      }
+    } finally {
+      guest.dispose();
     }
   } finally {
     await compiler.dispose();
@@ -177,34 +129,13 @@ entry const run = func (count: U32) => return do:
       },
     });
     assert(result.success, JSON.stringify(result));
-    const module = new WebAssembly.Module(result.bytes);
-    assert.deepEqual([
-      ...new Uint8Array(
-        WebAssembly.Module.customSections(module, "blot:ownership")[0],
-      ),
-    ], [2, 2, 0]);
-    const raw = new WebAssembly.Instance(module).exports;
-    const memory = raw["blot:memory"] as WebAssembly.Memory;
-    const enter = raw["blot:ownership_enter"] as CallableFunction;
-    const leave = raw["blot:ownership_leave"] as CallableFunction;
-    const reset = raw["blot:reset"] as CallableFunction;
-    let warmed = 0;
-    for (const count of [8, 200, 8, 200]) {
-      enter();
-      const pointer = (raw.run as CallableFunction)(count);
-      const words = new DataView(memory.buffer);
-      assert.equal(words.getUint32(pointer, true), 5);
-      const values = Array.from(
-        { length: 5 },
-        (_, index) => words.getUint32(pointer + 4 + index * 4, true),
-      );
-      assert.deepEqual(values, [42, 0, 1, 90, 7]);
-      if (warmed !== 0) assert(memory.buffer.byteLength <= warmed + 65536);
-      if (warmed === 0) warmed = memory.buffer.byteLength;
-      leave(0);
-      reset(0);
-      assert.equal((raw["blot:rc_roots"] as WebAssembly.Global).value, 0);
-      assert.equal((raw["blot:rc_leases"] as WebAssembly.Global).value, 0);
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      for (const count of [8, 200, 8, 200]) {
+        assert.deepEqual(guest.call("run", count), Uint32Array.of(42, 0, 1, 90, 7));
+      }
+    } finally {
+      guest.dispose();
     }
   } finally {
     await compiler.dispose();
@@ -265,12 +196,6 @@ entry const floating = func (value: F32) => return do:
             const expected = await fresh.build({ sources });
             assert(result.success && expected.success, JSON.stringify(result));
             assert.deepEqual(result.bytes, expected.bytes);
-            const module = new WebAssembly.Module(result.bytes);
-            assert.deepEqual([
-              ...new Uint8Array(
-                WebAssembly.Module.customSections(module, "blot:ownership")[0],
-              ),
-            ], [2, 2, 0]);
             const guest = await instantiateGuest(result.bytes);
             try {
               for (const mode of [0, 1, 0, 1]) {
@@ -279,9 +204,10 @@ entry const floating = func (value: F32) => return do:
                   [40, 41 + offset, 40, 7, 9],
                 );
               }
+              // `before` aliases `items`, so it sees the write (tasks/LANGUAGE_COHERENCE.md A7).
               assert.deepEqual(
                 Array.from(guest.call("packed", 1) as Uint32Array),
-                [1, 41, 41, 42, 4],
+                [1, 41, 42, 42, 4],
               );
               for (const value of [-0, 0, 1.25, -1.5]) {
                 assert(Object.is(guest.call("floating", value), value));
@@ -302,7 +228,7 @@ entry const floating = func (value: F32) => return do:
   }
 });
 
-Deno.test("complete allocation leaves legacy trace metadata untouched with ordinary and shared machine bodies", async () => {
+Deno.test("allocating loops compute their totals with ordinary and shared machine bodies", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   try {
@@ -330,108 +256,11 @@ entry const memory = func (value: U32) => return #[value]
           },
         });
         assert(result.success, JSON.stringify(result));
-        const module = new WebAssembly.Module(result.bytes);
-        const mode = new Uint8Array(
-          WebAssembly.Module.customSections(module, "blot:ownership")[0],
-        );
-        if (!shareMachineCode) {
-          assert.deepEqual([...mode], [2, 2, 0]);
-          const raw = new WebAssembly.Instance(module).exports;
-          const memory = raw["blot:memory"] as WebAssembly.Memory;
-          new DataView(memory.buffer).setUint32(4, 0xdeadbeef, true);
-          new DataView(memory.buffer).setUint32(12, 0xcafebabe, true);
-          for (let round = 0; round < 10; round++) {
-            (raw["blot:ownership_enter"] as CallableFunction)();
-            assert.equal((raw.run as CallableFunction)(32), 514);
-            (raw["blot:ownership_leave"] as CallableFunction)(0);
-            (raw["blot:reset"] as CallableFunction)(0);
-            assert.equal(
-              new DataView(memory.buffer).getUint32(4, true),
-              0xdeadbeef,
-            );
-            assert.equal(
-              new DataView(memory.buffer).getUint32(12, true),
-              0xcafebabe,
-            );
-          }
-        } else {
-          assert.deepEqual([...mode], [2, 2, 0]);
-          const guest = await instantiateGuest(result.bytes);
-          try {
-            for (let round = 0; round < 10; round++) {
-              assert.equal(guest.call("run", 32), 514);
-            }
-          } finally {
-            guest.dispose();
-          }
-        }
-      } finally {
-        await compiler.dispose();
-      }
-    }
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
-
-Deno.test("List literal publication counts actual leaves and preserves shared children across leaf boundaries", async () => {
-  const directory = await Deno.makeTempDir();
-  const entry = `${directory}/main.blot`;
-  const elements = Array.from({ length: 260 }, () => "child").join(", ");
-  try {
-    for (const codegenTier of ["optimized", "development"] as const) {
-      const compiler = await createZigProjectCompiler({
-        executable,
-        entry,
-        codegenTier,
-        prelude: new URL("../../std/prelude.blot", import.meta.url),
-        cacheDirectory: false,
-      });
-      try {
-        const result = await compiler.build({
-          sources: {
-            [entry]: `
-entry const run = func (value: U32) => return do:
-  let child = #[value, value + 1]
-  let rows = [${elements}]
-  let before = @array.from_list rows
-  let changed = @array.from_list rows
-  let read = func () => return before[259][1]
-  changed[243] := #[self[0] + 40, self[1] + 40]
-  changed[244] := #[self[0] + 41, self[1] + 41]
-  for index in 0..32:
-    let pressure = @array.fill 8192 index
-    if pressure[8191] != index:
-      break #[0]
-  break #[before[243][0], changed[243][0], before[244][0], changed[244][0], read (), child[0]]
-entry const floating = func (value: F32) => return @array.from_list [value, -0.0]
-`,
-          },
-        });
-        assert(result.success, JSON.stringify(result));
-        const module = new WebAssembly.Module(result.bytes);
-        assert.deepEqual([
-          ...new Uint8Array(
-            WebAssembly.Module.customSections(module, "blot:ownership")[0],
-          ),
-        ], [2, 2, 0]);
         const guest = await instantiateGuest(result.bytes);
         try {
-          const floats = guest.call("floating", -0) as Float32Array;
-          assert(Object.is(floats[0], -0) && Object.is(floats[1], -0));
-          const wanted = [7, 47, 7, 48, 8, 7];
-          assert.deepEqual(
-            Array.from(guest.call("run", 7) as Uint32Array),
-            wanted,
-          );
-          const warmed = guest.memoryBytes();
-          for (let round = 0; round < 20; round++) {
-            assert.deepEqual(
-              Array.from(guest.call("run", 7) as Uint32Array),
-              wanted,
-            );
+          for (let round = 0; round < 10; round++) {
+            assert.equal(guest.call("run", 32), 514);
           }
-          assert(guest.memoryBytes() <= warmed + 65536);
         } finally {
           guest.dispose();
         }

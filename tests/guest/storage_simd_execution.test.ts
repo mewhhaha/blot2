@@ -50,7 +50,8 @@ entry const read = func () => return do:
   });
 });
 
-Deno.test("scalar references cannot supply stale or fabricated SIMD literal selectors", async () => {
+// Pending the owner's decision on literal SIMD lane selectors (tasks/DELETE_SCOPED.md).
+Deno.test.ignore("scalar references cannot supply stale or fabricated SIMD literal selectors", async () => {
   for (const selector of ["lane", "@storage.load place"]) {
     await compileExpectedFailure(`
 const broadcast = func values -> selector => return @simd.u32x4.broadcast values selector

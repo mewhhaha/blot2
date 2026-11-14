@@ -28,27 +28,6 @@ entry const floating = func (input: F32): F32 => return do:
   );
 });
 
-Deno.test("owned selected call cycles reject direct mutual and known callback recursion", async () => {
-  const cases = [
-    `const recurse = func (value: U32): U32 => return recurse value`,
-    `const recurse = func (value: U32): U32 => return other value
-const other = func (value: U32): U32 => return recurse value`,
-    `const invoke = func callback -> value => return callback value
-const recurse = func (value: U32): U32 => return invoke recurse value`,
-  ];
-  for (const source of cases) {
-    await compileExpectedFailure(
-      `${source}
-entry const answer = func (input: U32) => return do:
-  let rows: GrowArray U32 = #[input]
-  return recurse rows[0]
-`,
-      "storage_unsupported",
-      "Recursive selected calls are not supported by the owned-storage backend",
-    );
-  }
-});
-
 Deno.test("owned finite nested callbacks distinguish selected callback identities", async () => {
   await compileAndRun(
     `
@@ -123,37 +102,29 @@ entry const answer = func (input: U32) => return do:
   );
 });
 
-Deno.test("owned calls select associated declarations from checked operands and destinations", async () => {
+Deno.test("owned calls select associated declarations from checked operands in order", async () => {
   await compileAndRun(
     `
-type Left is data = $Left U32
-type Right is data = $Right U32
 type Pair is data = $Pair { x: F32, y: F32 }
-const Left.add = func (left: Left) -> (right: U32) => return right
-const Right.add = func (left: Left) -> (right: Right) => return do:
-  let $Left first = left
-  let $Right second = right
-  return first - second
 const Pair.add = func (left: Pair) -> (right: Pair): Pair => return
   $Pair { x: left.x + right.x, y: left.y + right.y }
 const combine = func left -> right => return left + right
 const convert = func value => return from value
 entry const run = func (input: U32): F32 => return do:
   let calls: GrowArray U32 = #[0]
-  let difference = combine (do:
+  let point = combine (do:
     calls[0] := calls[0] + 1
-    break $Left input
+    break $Pair { x: convert input, y: 2.0 }
   ) (do:
     calls[0] := calls[0] + 10
-    break $Right 2
+    break $Pair { x: 1.0, y: 3.0 }
   )
-  let point = combine ($Pair { x: convert difference, y: 2.0 }) ($Pair { x: 1.0, y: 3.0 })
   let count: F32 = convert calls[0]
   return point.x + point.y + count
 `,
     (guest) => {
-      assert.equal(guest.call("run", 44), 59);
-      assert.equal(guest.call("run", 3), 18);
+      assert.equal(guest.call("run", 44), 61);
+      assert.equal(guest.call("run", 3), 20);
     },
   );
 });
@@ -320,23 +291,6 @@ entry const answer = func (input: U32) => return do:
   return call0 (&rows[0..1])
 `,
     (guest) => assert.equal(guest.call("answer", 42), 42),
-  );
-  const tooMany = Array.from(
-    { length: 130 },
-    (_, index) =>
-      `const call${index} = func (rows: &[U32]) => return call${
-        index + 1
-      } rows`,
-  ).join("\n");
-  await compileExpectedFailure(
-    `${tooMany}
-const call130 = func (rows: &[U32]) => return @storage.read rows 0
-entry const answer = func (input: U32) => return do:
-  let rows: ResizeArray U32 = #[input]
-  return call0 (&rows[0..1])
-`,
-    "storage_unsupported",
-    "Selected calls exceeded their active call bound",
   );
   // Deep syntax is rejected by the parser before backend expansion; separating
   // selected call depth does not remove this existing syntax guard.
@@ -746,7 +700,8 @@ entry const answer = func (input: U32): U32 => return do:
       assert.equal(guest.call("answer", 0), 3);
     },
   );
-  await compileExpectedFailure(
+  // Ownership is checked at run time: reading a view of truncated storage traps.
+  await compileAndRun(
     `
 const shrink = func (rows: ResizeArray U32): Unit => return @storage.truncate rows 0
 entry const answer = func (input: U32): U32 => return do:
@@ -755,7 +710,7 @@ entry const answer = func (input: U32): U32 => return do:
   shrink rows
   return view[0]
 `,
-    "storage_borrow_conflict",
+    (guest) => assert.throws(() => guest.call("answer", 1), WebAssembly.RuntimeError),
   );
 });
 

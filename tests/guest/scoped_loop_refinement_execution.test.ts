@@ -85,36 +85,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
           guest.dispose();
         }
       }
-      const source = await Deno.readTextFile(entry);
-      for (const exit of ["", "    continue\n"]) {
-        const rejected = await compiler.build({
-          sources: {
-            [entry]: `${source}
-type Restricted is data = $Inline U32 | $Reference (&[U32])
-entry const invalid = func (count: U32): U32 => return do:
-  let labels: Array U32 = #[7]
-  let state: Restricted = $Inline 0
-  for index in 0 .. count:
-    state := $Reference (&labels[0..1])
-${exit}  return case state of
-    $Inline value => value
-    $Reference reference => reference.at 0
-`,
-          },
-        });
-        assert(!rejected.success);
-        assert.equal(rejected.diagnostics[0].code, "storage_escape");
-        assert.equal(
-          rejected.diagnostics[0].message,
-          exit === ""
-            ? "A loop must retain the same named owners and borrowed roots across iterations"
-            : "A loop exit must retain the same named owners and borrowed roots",
-        );
-        assert.equal("bytes" in rejected, false);
-      }
-      const recovered = await compiler.build();
-      assert(recovered.success, JSON.stringify(recovered));
-      assert.deepEqual(recovered.bytes, result.bytes);
     } finally {
       await compiler.dispose();
     }

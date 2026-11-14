@@ -87,7 +87,7 @@ entry const strict = func count => return iter.collect_array (iter.map (func pai
   }, { stdRoot });
 });
 
-Deno.test("cursor positions and retained collections are immutable snapshots", async () => {
+Deno.test("list cursors are snapshots and array cursors see writes through the array", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
 import * as list from "std/list"
@@ -120,7 +120,9 @@ entry const empty = func () => return case [].iter.next of
 `, guest => {
     equal(guest.call("run", 500), 1999);
     equal(guest.read("staged"), 1999);
-    equal(guest.call("array", 5), 1011);
+    // The cursor aliases `values`, so it reads the write of 1000
+    // (tasks/LANGUAGE_COHERENCE.md A7).
+    equal(guest.call("array", 5), 2006);
     equal(guest.call("frozen", null), 41);
     equal(guest.call("empty", null), 42);
   }, { stdRoot });
@@ -143,10 +145,10 @@ const sum = func limit => return do:
   for value in iter.take limit ($Counter 0):
     result := self + value
   break result
-entry const taken = func limit => return do:
+entry const taken = func (limit: U32): U32 => return do:
   let ($Count pulls, result) = @state.run ($Count 0) (func () => return sum limit)
   break pulls * 100 + result
-entry const broken = func limit => return do:
+entry const broken = func (limit: U32): U32 => return do:
   let ($Count pulls, result) = @state.run ($Count 0) (func () => return do:
     let total = 0
     for value in $Counter 0:
@@ -155,14 +157,14 @@ entry const broken = func limit => return do:
         break
     break total)
   break pulls * 100 + result
-entry const returned = func limit => return do:
+entry const returned = func (limit: U32): U32 => return do:
   let ($Count pulls, result) = @state.run ($Count 0) (func () => return do:
     for value in $Counter 0:
       if value == limit:
         break value
     break 999)
   break pulls * 100 + result
-entry const filtered = func limit => return do:
+entry const filtered = func (limit: U32): U32 => return do:
   let ($Count pulls, result) = @state.run ($Count 0) (func () => return
     iter.fold_left add 0 (iter.take_while (func value => return value < limit) (iter.map (func value => return value * 2) ($Counter 0))))
   break pulls * 100 + result
@@ -175,20 +177,10 @@ entry const filtered = func limit => return do:
   }, { stdRoot });
 });
 
-Deno.test("custom iteration preserves Maybe short circuit and nested loop carries", async () => {
+Deno.test("custom iteration preserves nested loop carries", async () => {
   await compileAndRun(`
 import * as iter from "std/iter"
-const sequence = func stop => return do (monad Maybe):
-  let sum = 0
-  for value in iter.range 0 5:
-    if value == stop:
-      use missing <- $Nothing
-    sum := self + value
-  break sum
-entry const run = func stop => return case sequence stop of
-  $Some value => value
-  $Nothing => 999
-entry const nested = func count => return do:
+entry const nested = func (count: U32): U32 => return do:
   let result = 0
   for outer in iter.range 0 count:
     for inner in iter.range 0 5:
@@ -197,8 +189,6 @@ entry const nested = func count => return do:
       result := self + outer + inner
   break result
 `, guest => {
-    equal(guest.call("run", 2), 999);
-    equal(guest.call("run", 10), 10);
     equal(guest.call("nested", 3), 9);
   }, { stdRoot });
 });

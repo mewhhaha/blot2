@@ -93,7 +93,7 @@ async function observe(bytes: Uint8Array<ArrayBuffer>, changed = false) {
   }
 }
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`numeric finite nested selected closures preserve exact operands unknown effects imports and restart (${codegenTier})`, async () => {
+  Deno.test(`numeric finite nested selected closures preserve exact operands unknown effects and imports (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir();
     const entry = `${directory}/main.blot`;
     const dependency = `${directory}/logic.blot`;
@@ -129,12 +129,10 @@ for (const codegenTier of ["development", "optimized"] as const) {
           if (expected) assert.deepEqual(built.bytes, expected);
           else expected = built.bytes;
           await observe(built.bytes);
-          const checkpoint = await compiler.exportCheckpoint();
           const invalid = await compiler.build({
             sources: { [entry]: source.replace("run index", "run true") },
           });
           assert(!invalid.success);
-          assert.deepEqual(await compiler.exportCheckpoint(), checkpoint);
           const recovered = await compiler.build({
             sources: { [entry]: source },
           });
@@ -164,18 +162,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
           });
           assert(reverted.success, JSON.stringify(reverted));
           assert.deepEqual(reverted.bytes, built.bytes);
-          const restored = await createZigProjectCompiler({
-            ...options,
-            checkpoint,
-          });
-          try {
-            const replayed = await restored.build();
-            assert(replayed.success, JSON.stringify(replayed));
-            assert.deepEqual(replayed.bytes, built.bytes);
-            await observe(replayed.bytes);
-          } finally {
-            await restored.close();
-          }
         } finally {
           await compiler.close();
         }

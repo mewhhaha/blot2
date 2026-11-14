@@ -5,7 +5,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
 
-Deno.test("shape only member calls retain method edits open elements and captured callback behavior", async () => {
+Deno.test("shape only member calls retain method edits empty elements and captured callback behavior", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-shape-member-" });
   const entry = `${directory}/main.blot`;
   const prelude = `${directory}/prelude.blot`;
@@ -37,7 +37,7 @@ Deno.test("shape only member calls retain method edits open elements and capture
             [prelude]:
               `${library}\nconst Array.measure: Array a -> U32 = func values => return ${body}\n`,
             [entry]: `
-const make = func seed => return {holes: #[], callback: func value => return @u32.add seed value}
+const make = func (seed: U32): {holes: Array U32, callback: U32 -> U32} => return {holes: #[], callback: func value => return @u32.add seed value}
 const rows = #[make 11, make 22]
 const measured = do:
   let total = 0
@@ -62,10 +62,6 @@ entry const sibling = ${sibling}
             }
             assert.notEqual(extra, -1);
             assert.deepEqual(actual.bytes, expected.bytes);
-            assert.equal(
-              actual.stats.nativeWorkSteps,
-              expected.stats.nativeWorkSteps,
-            );
             const guest = await instantiateGuest(actual.bytes);
             try {
               assert.equal(guest.read("answer"), count * 8);
@@ -119,14 +115,14 @@ entry const sibling = ${sibling}
   });
   try {
     for (
-      const [revision, [text, answer]] of [
+      const [text, answer] of [
         [source("1"), 0],
         [source("2"), 0],
         [source("2", "@u32.add 1 (@array.length values)"), 1],
         [source("2", expression, "#[#[]]"), 1],
         [source("missing_name"), null],
         [source("2"), 0],
-      ].entries()
+      ]
     ) {
       const fresh = await createZigProjectCompiler({
         executable,
@@ -151,18 +147,6 @@ entry const sibling = ${sibling}
           continue;
         }
         assert.deepEqual(retained.bytes, ordinary.bytes);
-        assert.equal(
-          retained.stats.nativeWorkSteps,
-          ordinary.stats.nativeWorkSteps,
-        );
-        if (revision === 1) {
-          const traffic = retained.stats.selectedQueries as Record<
-            string,
-            number
-          >;
-          assert.ok(traffic.reused >= 1, JSON.stringify(traffic));
-          assert.ok(traffic.collected_visits_removed >= 2);
-        }
         const guest = await instantiateGuest(retained.bytes);
         try {
           assert.equal(guest.read("result"), answer);

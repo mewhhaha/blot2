@@ -8,38 +8,37 @@ model first), then port the result to Goose.
 
 ## Current frontier
 
-- **Direct backend.** Selected by `--backend direct` (CLI, `serve-project`,
-  project open requests, `build_gdev.ts`), or by default on a compiler built
-  with `-Ddirect-default=true`.
+- **Direct backend.** The default since the flip; `--backend scoped`
+  selects the old backend until it is deleted.
 - **Gdev Main.** On a release compiler it builds in 1.15 s against the scoped
   backend's 6.61 s (backend 95 ms against 5,533 ms), producing 2.7 MB of Wasm
   against 9.2 MB. Its first Pen frame is byte-identical (frame.png 19a03f0a…,
-  frames.trace 86d50101…).
+  frames.trace 86d50101…). Its guest frame time is 0.079 ms median against
+  2.45 ms.
 - **Ink.** Ink's suite matches the scoped backend on all 64 modules both
   compile. The direct backend also passes extractions, retained and
   simd-batches, which the scoped backend rejects.
-- **Guest suite.** On a direct-default compiler 855 of 1,985 guest cases pass.
-  The rest are classified in tasks/DELETE_SCOPED.md: scoped internals and
-  tests of dropped features to delete, expectation changes (aliased writes,
-  instantiation-time constants, required signatures), and kept features to
-  implement.
+- **Guest suite.** Tests of scoped internals and dropped features are
+  deleted, expectations follow the approved changes (aliased writes,
+  instantiation-time constants, required signatures), and every remaining
+  case passes or is ignored with its reason. tasks/DELETE_SCOPED.md lists the
+  ignored cases by kind.
 
-**Next:** finish triaging the failing guest files, implement the kept gaps,
-delete dropped-feature and scoped-internal tests, flip the default, then
-delete `backend/`, `eval/`, `runtime/` and the scoped parts of `reuse/`.
+**Next:** delete `backend/`, `eval/`, `runtime/` and the scoped parts of
+`reuse/` (tasks/DELETE_SCOPED.md, "Code deletion plan"), then fix the
+ignored cases that emit invalid Wasm or wrong results.
 
 ## Commands
 
-- **Direct-default compiler:** `zig build install -Doptimize=fast -Dllvm=false -Ddirect-default=true --prefix zig-out-direct`
+- **Fast compiler:** `zig build install -Doptimize=fast -Dllvm=false --prefix zig-out-direct`
   in compiler/, under the heavy lock.
-- **Direct fixtures on both backends:** `deno test -A tests/guest/direct_backend_execution.test.ts -- compiler/zig-out-direct/bin/blotc`
-- **Guest gap:** run the guest suite with `--junit-path`, then
-  `python3 scripts/integration/direct_guest_gap.py J.xml out.json`.
+- **Direct fixtures:** `deno test -A tests/guest/direct_backend_execution.test.ts -- compiler/zig-out-direct/bin/blotc`
+- **Guest suite:** `deno test -A --parallel tests/guest tests/host -- BLOTC`.
 - **Gdev:** `deno run -A scripts/integration/build_gdev.ts --compiler X --backend direct OUT`,
   then `run_pen.py --launch --hardware --compiled-main OUT/main-*/main.wasm --expected-wasm-sha256 …`.
-- **Ink:** copy ../ink, point pen.json's `plugins.blot.run.blotc` at a wrapper
-  that appends `--backend direct`, and run `pen test-blot --project COPY`
-  using ../pen/target/release/pen.
+- **Ink:** copy ../ink, point pen.json's `plugins.blot.run.blotc` at the
+  compiler, and run `pen test-blot --project COPY` using
+  ../pen/target/release/pen.
 
 ## Parked: the Goose port of the old compiler
 

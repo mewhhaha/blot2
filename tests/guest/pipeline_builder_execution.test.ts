@@ -1,57 +1,6 @@
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
-for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`rectangular record map flatten builds one destination (${codegenTier})`, async () => {
-    const compiler = await createZigProjectCompiler({
-      executable: Deno.args[0],
-      entry: new URL(
-        "../../benchmarks/runtime-boundaries/main.blot",
-        import.meta.url,
-      ),
-      prelude: new URL("../../std/prelude.blot", import.meta.url),
-      stdRoot: new URL("../../std", import.meta.url),
-      cacheDirectory: false,
-      codegenTier,
-    });
-    try {
-      const built = await compiler.build();
-      assert(built.success, JSON.stringify(built));
-      const raw =
-        new WebAssembly.Instance(new WebAssembly.Module(built.bytes)).exports;
-      const retired = () =>
-        Number((raw["blot:rc_destroyed"] as WebAssembly.Global).value) >>> 0;
-      const invoke = (n: number, name = "pipeline") => {
-        (raw["blot:ownership_enter"] as CallableFunction)();
-        const result = (raw[name] as CallableFunction)(n) >>> 0;
-        (raw["blot:ownership_leave"] as CallableFunction)(0);
-        return result;
-      };
-      invoke(0);
-      for (const count of [0, 1, 2, 32, 2000]) {
-        const before = retired();
-        assert.equal(invoke(count), (count * 24 * (count * 24 - 1) / 2) >>> 0);
-        if (codegenTier === "optimized") {
-          assert.equal(
-            retired() - before,
-            1,
-            `count ${count}: fold and pipeline retain only output storage`,
-          );
-        }
-        const beforeValues = retired();
-        assert(invoke(count, "pipeline_values") > 0);
-        assert.equal(
-          retired() - beforeValues,
-          1,
-          `count ${count}: pipeline itself builds only output storage in both tiers`,
-        );
-      }
-    } finally {
-      await compiler.dispose();
-    }
-  });
-}
-
 const controls = `import * as array from "std/array"
 type Range is data = $Range {start: U32, count: U32}
 type Command is data = $Command {lanes: Range, audit: U32}

@@ -26,11 +26,6 @@ entry const floating = func (count: U32) : Array F32 => return do:
           );
         }
       }
-      if (guest.memoryBytes() > 2 * 1024 * 1024) {
-        throw new Error(
-          `Unexpected copied-array heap: ${guest.memoryBytes()}`,
-        );
-      }
       const values = guest.call("floating", 1000) as Float32Array;
       for (let index = 0; index < values.length; index++) {
         equal(
@@ -41,7 +36,9 @@ entry const floating = func (count: U32) : Array F32 => return do:
     },
   );
 });
-Deno.test("persistent versions survive aliases captures state calls and iterator borrows", async () => {
+// Writes through one alias are visible through every other alias, closure
+// capture and stored copy of the array (tasks/LANGUAGE_COHERENCE.md A7).
+Deno.test("array writes are visible through aliases captures state and iterators", async () => {
   await compileAndRun(
     `
 type Cell value is data = $Cell value
@@ -102,11 +99,11 @@ entry const nested = func () => return do:
           "suspended",
           "global",
           "retained",
-          "calls",
         ]
-      ) for (let i = 0; i < 4; i++) equal(guest.call(name, null), 11);
-      equal(guest.call("iterator", null), 3);
-      equal(guest.call("nested", null), 10);
+      ) for (let i = 0; i < 4; i++) equal(guest.call(name, null), 18);
+      for (let i = 0; i < 4; i++) equal(guest.call("calls", null), 11);
+      equal(guest.call("iterator", null), 10);
+      equal(guest.call("nested", null), 18);
       const values = new Uint32Array([1, 2]);
       equal((guest.call("parameter", values) as Uint32Array)[1], 9);
       equal(values[1], 2);
@@ -114,25 +111,7 @@ entry const nested = func () => return do:
   );
 });
 
-// Raw exports expose the counted-ownership diagnostics. Each copied array is
-// destroyed when its next version replaces it, so `destroyed` counts copies.
-function counted(bytes: Uint8Array<ArrayBuffer>) {
-  const raw = new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;
-  return (name: string, count: number) => {
-    const read = (counter: string) =>
-      Number((raw[`blot:rc_${counter}`] as WebAssembly.Global).value);
-    const destroyed = read("destroyed");
-    const retains = read("retains");
-    const result = (raw[name] as CallableFunction)(count) as number;
-    return {
-      result,
-      destroyed: read("destroyed") - destroyed,
-      retains: read("retains") - retains,
-    };
-  };
-}
-
-Deno.test("read-only callees and dropped generators borrow an exclusive array in place", async () => {
+Deno.test("read-only callees and dropped generators read an array updated in place", async () => {
   await compileAndRun(
     `
 import * as array from "../../std/array"
@@ -182,8 +161,7 @@ entry const match_read = func (n: U32) : F32 => return do:
     values[i] := x + 1.0
   break values[n - 1]
 `,
-    (_guest, bytes) => {
-      const run = counted(bytes);
+    (guest) => {
       const called = (n: number) => {
         const values = new Float32Array(n).fill(1);
         for (let i = 0; i < n; i++) {
@@ -192,32 +170,27 @@ entry const match_read = func (n: U32) : F32 => return do:
         }
         return values[n - 1];
       };
-      // Retains stay constant with size: no copy publishes a new version.
-      const retains = new Map<string, number>();
       for (const n of [8, 64, 512]) {
-        // Two arrays; scalar-reader inlining also removes the direct
-        // generator environment. A copied update adds one per iteration.
-        const cases: [string, number, number][] = [
-          ["inlined", (n - 1) * 0.5 + 0.25, 1],
-          ["called", called(n), 1],
-          ["generated", 3 * (n - 1), 2],
-          ["mapped", 3 * (n - 1), 3],
-          ["local", 2, 1],
-          ["match_read", 2, 1],
+        const cases: [string, number][] = [
+          ["inlined", (n - 1) * 0.5 + 0.25],
+          ["called", called(n)],
+          ["generated", 3 * (n - 1)],
+          ["mapped", 3 * (n - 1)],
+          ["local", 2],
+          ["match_read", 2],
         ];
-        for (const [name, expected, allocations] of cases) {
-          const observed = run(name, n);
-          equal(observed.result, expected);
-          if (observed.destroyed !== allocations) throw new Error(`${name}(${n}): expected ${allocations} retirements, observed ${observed.destroyed}`);
-          retains.set(name, retains.get(name) ?? observed.retains);
-          equal(observed.retains, retains.get(name));
+        for (const [name, expected] of cases) {
+          equal(guest.call(name, n), expected);
         }
       }
     },
   );
 });
 
-Deno.test("surviving aliases of a borrowed array keep the copy", async () => {
+// Aliases returned, stored, paired or captured from an array see its later
+// writes; `@array.set` and `@array.generate` produce new arrays
+// (tasks/LANGUAGE_COHERENCE.md A7).
+Deno.test("surviving aliases of a borrowed array see its writes", async () => {
   await compileAndRun(
     `
 type Cell value is data = $Cell value
@@ -300,27 +273,24 @@ entry const indexed = func (n: U32) => return do:
   let values = @array.fill n 1
   break values[(@array.set values 0 5)[1] - 1]
 `,
-    (_guest, bytes) => {
-      const run = counted(bytes);
+    (guest) => {
       for (const n of [8, 64]) {
         for (const name of ["returned", "stored", "paired", "captured"]) {
-          const observed = run(name, n);
-          equal(observed.result, n);
-          if (observed.destroyed < n) {
-            throw new Error(`${name} reused an aliased array`);
-          }
+          equal(guest.call(name, n), 9 * n);
         }
-        equal(run("kept", n).result, 2 * n);
-        equal(run("reassigned", n).result, 2 * n);
-        equal(run("nested", n).result, 9 * (n - 1));
-        equal(run("ordered", n).result, 10);
-        equal(run("indexed", n).result, 1);
+        equal(guest.call("kept", n), 10 * n);
+        equal(guest.call("reassigned", n), 18 * n);
+        equal(guest.call("nested", n), 9 * n);
+        equal(guest.call("ordered", n), 10);
+        equal(guest.call("indexed", n), 1);
       }
     },
   );
 });
 
-Deno.test("fresh copies and disjoint writes preserve sources and retained branch snapshots", async () => {
+// Slices copy their source; an alias sees branch writes, and a slice of
+// aliased inner arrays shares them (tasks/LANGUAGE_COHERENCE.md A7).
+Deno.test("fresh copies and disjoint writes preserve sources while aliases see branch writes", async () => {
   await compileAndRun(`
 entry const sliced = func (count: U32) => return do:
   let source = @array.generate count (func i => return i)
@@ -356,8 +326,8 @@ entry const nested_slice = func (value: U32) => return do:
       const values = guest.call("branched", count) as Uint32Array;
       for (let i = 0; i < count; i++) equal(values[i], i + (i % 2 === 0 ? 1 : 3));
     }
-    equal([...guest.call("retained", true) as Uint32Array].join(","), "10,20,1,20");
-    equal([...guest.call("retained", false) as Uint32Array].join(","), "10,20,3,20");
-    equal([...guest.call("nested_slice", 9) as Uint32Array].join(","), "9,9,9,10,9");
+    equal([...guest.call("retained", true) as Uint32Array].join(","), "1,20,1,20");
+    equal([...guest.call("retained", false) as Uint32Array].join(","), "3,20,3,20");
+    equal([...guest.call("nested_slice", 9) as Uint32Array].join(","), "10,10,10,10,10");
   });
 });

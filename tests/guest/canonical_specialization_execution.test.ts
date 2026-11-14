@@ -25,7 +25,7 @@ entry const distinct: U32 -> U32 = func value => return nominal value
 `;
 }
 
-Deno.test("typed specialization and principal queries preserve imported captures through relocation failure and checkpoint restart", async () => {
+Deno.test("typed specialization preserves imported captures through relocation and failure", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
   const dependency = `${directory}/dep.blot`;
@@ -88,19 +88,7 @@ Deno.test("typed specialization and principal queries preserve imported captures
       const corrected = await client.build({ sources: restored });
       ok(corrected.success);
       equal(corrected.bytes, expectedBytes);
-      const checkpoint = await client.exportCheckpoint();
-      const restarted = await createZigProjectCompiler({
-        ...options,
-        checkpoint,
-      });
-      try {
-        const result = await restarted.build({ sources: restored });
-        ok(result.success);
-        equal(result.bytes, expectedBytes);
-        await execute(result.bytes, 20);
-      } finally {
-        await restarted.dispose();
-      }
+      await execute(corrected.bytes, 20);
     }
     equal(diagnostics[0], diagnostics[1]);
   } finally {

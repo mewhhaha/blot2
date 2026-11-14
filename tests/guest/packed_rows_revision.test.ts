@@ -14,9 +14,9 @@ Deno.test("packed array layouts follow dependency edits and failed revision reco
     prelude: `${stdRoot}/prelude.blot`,
   };
   const main = `import { make, score, generated } from "./rows"
-entry const answer = func value => return score (make value)
-entry const listed = func value => return score (@array.from_list (@list.from_array (make value)))
-entry const callback = func count => return (generated count)[count - 1].y
+entry const answer = func (value: U32) : U32 => return score (make value)
+entry const listed = func (value: U32) : U32 => return score (@array.from_list (@list.from_array (make value)))
+entry const callback = func (count: U32) : U32 => return (generated count)[count - 1].y
 `;
   const scalar = `const saved = #[{z: 7, a: 3}]
 const make = func value => return #[{a: value, z: value + 1}, ...saved]

@@ -48,7 +48,7 @@ const dependency_cli = @import("reuse/dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
 /// The backend a build without --backend uses.
 fn defaultPolicy() Policy {
-    return .{ .backend = if (compiler_identity.direct_default) .direct else .scoped };
+    return .{ .backend = .direct };
 }
 const restart_cache = @import("reuse/restart_cache.zig");
 /// A cache that was not saved says why: `over_limit` and

@@ -1,16 +1,16 @@
 import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
-Deno.test("generic exported functions infer numeric evidence through actual closure captures", async () => {
+Deno.test("exported functions with signatures compose through generic closure captures", async () => {
   await compileAndRun(`
-entry const increment = func value => return value + 1
-entry const doubled = func value => return value * 2
-const compose = func outer => return func inner => return func value => return outer (inner value)
-entry const composed = compose doubled increment
-entry const factorial = func value => return do:
+entry const increment = func (value: U32): U32 => return value + 1
+entry const doubled = func (value: U32): U32 => return value * 2
+const compose = func (outer: b -> c) -> (inner: a -> b) -> (value: a): c => return outer (inner value)
+entry const composed: U32 -> U32 = compose doubled increment
+entry const factorial = func (value: U32): U32 => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)
-entry const floating = func value => return value + 1.5
+entry const floating = func (value: F32): F32 => return value + 1.5
 `, guest => {
     for (const value of [0, 1, 20, 41, 0xffffffff]) {
       equal(guest.call("increment", value), (value + 1) >>> 0);
@@ -64,7 +64,8 @@ Deno.test("repository prelude and syntax examples execute their exported functio
     equal(guest.call("matching_example", null), 42);
     equal(guest.call("event_example", null), 42);
     equal(guest.call("vector_example", null), 50);
-    equal(guest.call("array_snapshot", null), 22);
+    // `next` aliases `original`, so both read the write (LANGUAGE_COHERENCE A7).
+    equal(guest.call("array_snapshot", null), 40);
     equal(guest.call("provider_example", null), 42);
   }, { prelude: "std/prelude.blot" });
 });

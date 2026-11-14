@@ -157,7 +157,8 @@ func increment (value: U32) : U32 => return hidden value
   }
 });
 
-Deno.test("qualified named functions and explicit declaration predicates preserve const controls and effects", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("qualified named functions and explicit declaration predicates preserve const controls and effects", async () => {
   for (const declaration of [
     "const eq: a -> a -> Bool where { Eq a } = func left -> right => return Eq.eq left right",
     "func eq (left: a) -> (right: a): Bool where { Eq a } => return Eq.eq left right",

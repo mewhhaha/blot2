@@ -49,7 +49,8 @@ for (const codegenTier of ["development", "optimized"] as const) {
         ) {
           assert.equal(guest.call("array", index), index + 7);
           assert.equal(guest.call("list", index), index + 7);
-          assert.equal(guest.call("snapshot", index), index + 1007);
+          // `old` aliases `values`, so both read the write (tasks/LANGUAGE_COHERENCE.md A7).
+          assert.equal(guest.call("snapshot", index), 2000);
         }
         for (const entry of ["array", "list", "snapshot"]) {
           for (const index of entry === "list" ? [513] : [513, 0xffffffff]) {
@@ -58,7 +59,7 @@ for (const codegenTier of ["development", "optimized"] as const) {
               WebAssembly.RuntimeError,
             );
           }
-          assert.equal(guest.call(entry, 1), entry === "snapshot" ? 1008 : 8);
+          assert.equal(guest.call(entry, 1), entry === "snapshot" ? 2000 : 8);
         }
         assert.throws(
           () => guest.call("checked_index", 0),

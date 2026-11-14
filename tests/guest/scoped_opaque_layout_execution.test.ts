@@ -44,7 +44,7 @@ async function execute(bytes: Uint8Array<ArrayBuffer>, asynchronous: boolean) {
 }
 
 for (const codegenTier of ["development", "optimized"] as const) {
-  Deno.test(`scoped opaque variant layouts preserve private identity and representation edits (${codegenTier})`, async () => {
+  Deno.test(`opaque variant layouts preserve private identity and representation edits (${codegenTier})`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-scoped-opaque-" });
     const entry = `${directory}/main.blot`;
     const tokens = `${directory}/tokens.blot`;
@@ -97,26 +97,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         [
           "entry const invalid = func () => return $token.Handle {kind: (), region: 1, origin: 2, slot: 3, generation: 4}\n",
           "private_access",
-        ],
-        ...["View U32", "Unit -> U32", "unique U32", "a"].map((argument) => [
-          `entry const invalid = func () => return do:
-  let absent: Maybe (token.Handle (${argument})) = $Nothing
-  return case absent of
-    $Some value => 1
-    $Nothing => 0
-`,
-          "storage_unsupported",
-        ]),
-        [
-          `const leak = func () => return do:
-  let wrapped = token.wrap #[42]
-  let $Some kept = if true then $Some wrapped else $Nothing else:
-    return @panic "impossible"
-  let values = token.unwrap kept
-  return &values[0..1]
-entry const invalid = func () => return (leak ())[0]
-`,
-          "storage_escape",
         ],
       ];
       for (const [body, code] of rejections) {

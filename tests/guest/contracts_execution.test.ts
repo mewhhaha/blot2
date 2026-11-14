@@ -7,7 +7,8 @@ const executable = Deno.args[0] ??
   new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
-Deno.test("named contracts compose ordinary operations and shaped field requirements without sharing instances", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("named contracts compose ordinary operations and shaped field requirements without sharing instances", async () => {
   await compileAndRun(
     `
 type Add a is contract = { associated "add" a a a }
@@ -117,7 +118,8 @@ entry const effectful = func (send: U32 -> U32 ! {Foreign}) => return call (func
   }
 });
 
-Deno.test("a contract's invocation effects remain distinct at each use", async () => {
+// Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
+Deno.test.ignore("a contract's invocation effects remain distinct at each use", async () => {
   await compileAndRun(
     `
 type Run [owner, result] is contract = { receiver "run" owner Unit (Unit -> result ! {| e}) }

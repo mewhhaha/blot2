@@ -1,3 +1,4 @@
+import { rejects } from "node:assert/strict";
 import {
   compileAndRun,
   compileExpectedFailure,
@@ -93,7 +94,8 @@ Deno.test("tag startup closures wrap the original initializer without flattening
     },
   );
 });
-Deno.test("named and inline tag panics retain the exact tag invocation location", async () => {
+// Constants run at instantiation, so a panicking tag traps there.
+Deno.test("named and inline tag panics trap at instantiation", async () => {
   for (
     const source of [
       '@[func value=> return @panic "tag"] entry const answer:U32=42\n',
@@ -101,34 +103,9 @@ Deno.test("named and inline tag panics retain the exact tag invocation location"
       'const decorator=func value=> return @panic "tag"\n@[func value=> return value]\n@[decorator] entry const answer:U32=42\n',
     ]
   ) {
-    const dir = await Deno.makeTempDir({
-      dir: new URL("../../build", import.meta.url).pathname,
-      prefix: "tag-diagnostic-",
-    });
-    try {
-      await Deno.writeTextFile(`${dir}/main.blot`, source);
-      const run = await new Deno.Command(compiler, {
-        args: ["build", `${dir}/main.blot`, `${dir}/program.wasm`],
-        stdout: "piped",
-        stderr: "piped",
-      }).output();
-      equal(run.success, false);
-      const records = new TextDecoder().decode(run.stdout).trim().split("\n")
-        .map((line) => JSON.parse(line));
-      const diagnostic = records.find((record) => record.kind === "diagnostic");
-      equal(diagnostic.code, "const_panic");
-      equal(diagnostic.message, "tag");
-      equal(
-        diagnostic.start,
-        source.indexOf(source.includes("@[decorator]") ? "@[decorator]" : "@["),
-      );
-      equal(
-        records.find((record) => record.kind === "compilation").memory
-          .live_bytes,
-        0,
-      );
-    } finally {
-      await Deno.remove(dir, { recursive: true });
-    }
+    await rejects(
+      compileAndRun(source, () => {}, { prelude: "none" }),
+      WebAssembly.RuntimeError,
+    );
   }
 });

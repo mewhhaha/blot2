@@ -174,7 +174,7 @@ for (const direct of [false, true]) {
     }
   });
 
-  Deno.test(`${label} collection steps rederive archived producers retained edits and checkpoint restart`, async () => {
+  Deno.test(`${label} collection steps rederive changed producers through retained edits`, async () => {
     const directory = await Deno.makeTempDir({ prefix: "blot-step-archive-" });
     const entry = `${directory}/main.blot`;
     const dependencies = `${directory}/inputs.blotdep`;
@@ -227,8 +227,6 @@ for (const direct of [false, true]) {
           ...options,
           dependencies,
         });
-        let checkpoint: Uint8Array<ArrayBuffer>;
-        let expected: Uint8Array<ArrayBuffer>;
         try {
           for (const producer of [original, changed, original]) {
             const sources = { [prelude]: producer };
@@ -250,29 +248,9 @@ for (const direct of [false, true]) {
             } finally {
               guest.dispose();
             }
-            expected = built.bytes;
           }
-          checkpoint = await compiler.exportCheckpoint();
         } finally {
           await compiler.dispose();
-        }
-        const restarted = await createZigProjectCompiler({
-          ...options,
-          dependencies,
-          checkpoint: checkpoint!,
-        });
-        try {
-          const built = await restarted.build();
-          assert(built.success, JSON.stringify(built));
-          assert.deepEqual(built.bytes, expected!);
-          const guest = await instantiateGuest(built.bytes);
-          try {
-            assert.equal(guest.call("pull", 41), 41);
-          } finally {
-            guest.dispose();
-          }
-        } finally {
-          await restarted.dispose();
         }
       }
     } finally {

@@ -68,7 +68,6 @@ entry const floating = func () => return @product.get (@effect.run State.get Sta
       try {
         for (const expected of [42, 43, null, 42]) {
           if (expected === null) {
-            const before = await compiler.exportCheckpoint();
             const rejected = await compiler.build({
               sources: {
                 [entry]: main.replace("capture read", "capture missing"),
@@ -76,37 +75,18 @@ entry const floating = func () => return @product.get (@effect.run State.get Sta
             });
             assert(!rejected.success);
             assert.equal(rejected.diagnostics[0].code, "unknown_value");
-            assert.deepEqual(await compiler.exportCheckpoint(), before);
             continue;
           }
           const updated = main.replace("set 42", `set ${expected}`);
           const sources = { [entry]: updated };
           const result = await compiler.build({ sources });
           assert(result.success, JSON.stringify(result));
-          const checkpoint = await compiler.exportCheckpoint();
-          const restored = await createZigProjectCompiler({
-            executable,
-            entry,
-            prelude: null,
-            dependencies,
-            checkpoint,
-            cacheDirectory: false,
-          });
+          const guest = await instantiateGuest(result.bytes);
           try {
-            const rebuilt = await restored.build({ sources });
-            assert(rebuilt.success, JSON.stringify(rebuilt));
-            assert.deepEqual(rebuilt.bytes, result.bytes);
-            for (const bytes of [result.bytes, rebuilt.bytes]) {
-              const guest = await instantiateGuest(bytes);
-              try {
-                assert.equal(guest.call("integer", null), expected);
-                assert.equal(guest.call("floating", null), 1.5);
-              } finally {
-                guest.dispose();
-              }
-            }
+            assert.equal(guest.call("integer", null), expected);
+            assert.equal(guest.call("floating", null), 1.5);
           } finally {
-            await restored.dispose();
+            guest.dispose();
           }
         }
       } finally {
@@ -174,22 +154,6 @@ entry const fraction = func () : F32 => return do (@effect.provider (Signal.get 
             assert.equal(guest.call("fraction", null), 1.5);
           } finally {
             guest.dispose();
-          }
-          const checkpoint = await compiler.exportCheckpoint();
-          const restored = await createZigProjectCompiler({
-            executable,
-            entry,
-            prelude: null,
-            dependencies,
-            cacheDirectory: false,
-            checkpoint,
-          });
-          try {
-            const rebuilt = await restored.build({ sources });
-            assert(rebuilt.success, JSON.stringify(rebuilt));
-            assert.deepEqual(rebuilt.bytes, built.bytes);
-          } finally {
-            await restored.dispose();
           }
         }
       } finally {
