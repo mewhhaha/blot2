@@ -1,119 +1,53 @@
-# Finish the Goose compiler experiment
+# Fast compilation: the direct backend, then the language rewrite
 
-Repair ownership, build the actual complete C/header/native compiler, then qualify
-CLI/server, request OOM/retry and retention against Zig. A whole compiler executable now builds
-([first executable](benchmarks/evidence/qualification/2026-11-12-goose-first-executable.json)); it is not qualified yet. Keep compiler/ as the oracle; never forward Goose requests to it.
+The owner's order (14 November 2026): make the direct backend
+(compiler/src/direct/, [plan](tasks/FAST_COMPILE.md)) the only backend and
+delete the scoped one ([deletion](tasks/DELETE_SCOPED.md)), then carry out
+the approved [language coherence list](tasks/LANGUAGE_COHERENCE.md) (memory
+model first), then port the result to Goose.
 
 ## Current frontier
 
-`python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose
---cc clang-23 --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --inference-budget 1000000
---stage-timeout 900 --total-timeout 1200` (under the heavy lock) checks the full program, emits 224 MB of C
-and links `compiler-goose/build/blotc-goose`: about 430s at 8.8 GiB (emit ~345s, clang -O0 ~80s); `--release`
-(Goose and C -O2) takes about 1290s, mostly clang. The checker is upstream Goose d5ae5bb, still upstream
-HEAD, plus [series](compiler-goose/tools/upstream-32a4f44/series) 01-29, built by
-`GOOSE_PGO=1 sh compiler-goose/tools/upstream-32a4f44/build.sh` (about 510s once).
+- **Direct backend.** Selected by `--backend direct` (CLI, `serve-project`,
+  project open requests, `build_gdev.ts`), or by default on a compiler built
+  with `-Ddirect-default=true`.
+- **Gdev Main.** On a release compiler it builds in 1.15 s against the scoped
+  backend's 6.61 s (backend 95 ms against 5,533 ms), producing 2.7 MB of Wasm
+  against 9.2 MB. Its first Pen frame is byte-identical (frame.png 19a03f0a…,
+  frames.trace 86d50101…).
+- **Ink.** Ink's suite matches the scoped backend on all 64 modules both
+  compile. The direct backend also passes extractions, retained and
+  simd-batches, which the scoped backend rejects.
+- **Guest suite.** On a direct-default compiler 855 of 1,985 guest cases pass.
+  The rest are classified in tasks/DELETE_SCOPED.md: scoped internals and
+  tests of dropped features to delete, expectation changes (aliased writes,
+  instantiation-time constants, required signatures), and kept features to
+  implement.
 
-[Compile speed](benchmarks/evidence/measurements/2026-11-13-goose-compile-speed.json): the release Goose
-compiler builds Gdev Main in about 204s against 54s (Zig native backend) and 7s (Zig LLVM release),
-and small Ink modules at roughly the Zig native backend's speed; the -O0 build is 5-10x slower again.
-A cold Zig native build of the compiler takes about 110s.
+**Next:** finish triaging the failing guest files, implement the kept gaps,
+delete dropped-feature and scoped-internal tests, flip the default, then
+delete `backend/`, `eval/`, `runtime/` and the scoped parts of `reuse/`.
 
-The oracle is compiler/zig-out-native-fast/bin/blotc rebuilt from current source (sha 71ae7ab9…); the
-2026-11-08 binary kept beside it predates `type X is opaque` and cannot read the current std.
+## Commands
 
-[Ink parity](benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json): Ink's Pen test suite
-through the project server matches the oracle on all 73 modules (243 passed, 1 failed, 9 rejected with
-the same diagnostics), 328s at 2 jobs against 121.5s at 4. Getting there fixed three server faults
-(44ee94f4): a 120s request limit, a seed-prefix rebind that rejected entries interning new symbols, and
-parallel codegen sending the module image with every job. To rerun, copy ../ink (without .git/.cache/.pen)
-once per compiler, set pen.json's `plugins.blot.run.blotc` to that compiler and its std paths to absolute
-ones, rebuild Pen and plugins/ from ../pen source, and run `pen test-blot --project COPY`; compare each
-module's diagnostics and test outcomes.
+- **Direct-default compiler:** `zig build install -Doptimize=fast -Dllvm=false -Ddirect-default=true --prefix zig-out-direct`
+  in compiler/, under the heavy lock.
+- **Direct fixtures on both backends:** `deno test -A tests/guest/direct_backend_execution.test.ts -- compiler/zig-out-direct/bin/blotc`
+- **Guest gap:** run the guest suite with `--junit-path`, then
+  `python3 scripts/integration/direct_guest_gap.py J.xml out.json`.
+- **Gdev:** `deno run -A scripts/integration/build_gdev.ts --compiler X --backend direct OUT`,
+  then `run_pen.py --launch --hardware --compiled-main OUT/main-*/main.wasm --expected-wasm-sha256 …`.
+- **Ink:** copy ../ink, point pen.json's `plugins.blot.run.blotc` at a wrapper
+  that appends `--backend direct`, and run `pen test-blot --project COPY`
+  using ../pen/target/release/pen.
 
-Gdev Main compiles on Goose to bytes identical to the oracle's (9,203,613 B, sha c08570f8…; 1666s
-against 110s), and its first frame through Pen is identical too (`run_pen.py --launch --hardware
---compiled-main`, since no software adapter is installed). Getting there fixed `wasm.appendInstruction`
-(each switch between functions recopied a body to the shared array's tail and overflowed a 2 GB data
-stack) and the match/if deferred joins, which took their entry boundary before snapshotting inputs.
-`scripts/integration/build_gdev.ts --compiler X --timeout-ms 3600000` runs it.
+## Parked: the Goose port of the old compiler
 
-[Qualification 3](benchmarks/evidence/qualification/2026-11-12-goose-qualify3.json.gz) (scoped
-functional checks: CLI, executed ABI 8, project lifecycle, request OOM/retry, 16 MiB retention) passed
-on the older binary against the stale oracle; rerun it on the current pair.
-
-Diagnostic roots, each alone: all 20 pass on 44ee94f4 source; compile takes 235s and server 374s (over the
-300s cap). Checking all 20 in one process gives one cross-probe error (assemble), not production.
-
-**Next:** rerun qualification on the current oracle; profile the release Goose compiler on Gdev Main
-(project-server workers and request isolation are the likely gap to the Zig native backend).
-
-
-To find a server fault: capture Pen's serve-project stream with a tee wrapper (frames are u32 metadata
-length, u32 payload length, JSON metadata, payload), replay it into `serve-project`, and build a
-diagnosis-only binary from compiler-goose/build/blot_goose.c (same-line traces at error creation
-sites, or a runtime fault handler that prints a backtrace). gdb loses the request supervisor's
-fork/vfork chain.
-
-Narrow roots (`GOOSE_DIAGNOSTIC_ROOTS=blot_numeric_probe::probe`) type-check one path in seconds to
-minutes; the whole build reports the first full-program error in about 6 minutes.
-
-Repair patterns that cleared the 316–445 errors. Prefer them over one-off rewrites:
-
-- **Shrinking indexes → fixed-bucket indexes.** Replace a dictionary or other
-  grow-shrink index with a fixed bucket table chained through grow-only records
-  that are reused by count. Lookup compares stored keys, and clearing zeroes the
-  heads. Done for numeric terms, plan slots, sinks, runtime operation symbols,
-  substitution keys and provider guard positions.
-- **Held Core/layout/evaluator slices → per-index reads.** Rewrite them as
-  `for i in 0..E.len { let x = E[i]; ... }`, or inline the accessor at each use.
-  Copy small capped runs (call arguments, at most 16) into fixed locals.
-- **`self_` reaches the storage it shrinks (`s == l`) → remove the reachability.**
-  Keep scalar keys or flags instead of references. Examples: `Generator`'s
-  `retained_enabled`, `Owner`'s `frame`, and builders that pass `context` beside
-  them. Analyses tabulate the module facts they need per body instead of holding
-  the module.
-- **References stored in struct fields → owned fields.** The checker loses which
-  array a `T[>..<]&` field refers to and falls back to every same-typed array
-  the caller can reach, so a scratch `clear()` becomes "may shrink module".
-  Give the struct its storage instead: a `root struct` for several resizable
-  fields (`root_borrows.Analysis`), or one final resizable field (`wasm.Wire`).
-  Pass plain `T[>..<]&` arguments to helpers rather than wrapper structs.
-- **Results never read back through a local run.** Write snapshots that hold slices
-  straight into the `Result`, and copy only scalars out of `CompileRun`. Run
-  teardown keeps the grow-only plan payload pool; `resetGenerator` empties it.
-- **Never shrink a pool other code may view.** Reuse records by count (plans, sinks)
-  instead of `pool=[]`; the checker otherwise matches every live view by element type.
-- **Store grow-only copies.** A slice of a `T[>..<]` local may not be stored (§5.2);
-  copy canonical paths and messages into `T[>..]` buffers before storing them.
-- **Callee resets → caller resets.** Callers reset views before they bind module
-  references, and functions avoid reassigning whole structs that contain arrays.
-- **Recursion-cycle functions are declared `recursive fn`.** The checker accepts
-  unneeded `recursive`.
-- **Generated adapters and backing.** `write_compile_workspace_backing.py` has
-  drifted from its checked-in output (eight owners' reset behaviour). Edit both
-  consistently; don't regenerate blindly.
-
-Diagnosis aids:
-
-- **Narrow roots.** Write a temporary `_numeric_probe.goose` exporting a
-  no-argument function, then run
-  `GOOSE_DIAGNOSTIC_ROOTS=<namespace>::<fn> <goose> check <file> --stdlib …`.
-  See [the example](compiler-goose/tools/narrow_root_example.goose). These only
-  reproduce context-free errors, and the file must be removed before full probes.
-- **Return-root trace.** Adding a `GOOSE_RETURN_ROOT_TRACE=<name>` print to the
-  return check in `typecheck_calls.h` (build/goose-port/upstream-d5ae5bb/build-trace)
-  shows which function first returns contents rooted in a parameter.
-- **Reach-trace build.** `build/goose-port/reach-trace-diagnostics/goose` is a
-  diagnosis-only rebuild of the pinned checker source. Running it with
-  `GOOSE_GLOBAL_REACH_TRACE=1 GOOSE_GLOBAL_REACH_HOLDER=<global> GOOSE_GLOBAL_REACH_ARRAY=<array>`
-  prints the store chain behind "global X may hold a reference into Y".
-
-The last complete component inventory passed 36/36 on its pinned source in
-307.14s summed stages. The current 49-law inventory has not run in full. Focused
-receipts qualify only their exact inputs. Rejected prototypes and superseded
-families stay in pinned history and
-[the receipt index](benchmarks/evidence/qualification/2026-11-09-goose-completion-frontier.json).
+compiler-goose/ ports the scoped-backend compiler. It builds a whole
+executable and matched the oracle on Ink and on Gdev Main's frame, but it
+ports code that is now being deleted. Phase 7 ports the rewritten compiler
+instead. The full narrative, commands and evidence are pinned at b9875a88
+(CONTINUE.md there); its evidence files stay under benchmarks/evidence/.
 
 ## Contracts and remaining coverage
 
@@ -138,26 +72,3 @@ families stay in pinned history and
   [the storage task](tasks/STORAGE_REWRITE.md),
   [the language migration](docs/language/NEXT_MIGRATION.md) and the receipt index.
 
-## Tools and next checks
-
-Current checker: upstream Goose d5ae5bb plus the series 01-29 (20-29 are result-preserving speed
-patches), built with PGO by compiler-goose/tools/upstream-32a4f44/build.sh into
-build-precision/goose (sha256 640138a5…). Peak memory is about 9 GiB for the whole program; run heavy
-jobs one at a time under the heavy lock. `GOOSE_SHRINK_ORIGINS=<callee or *>` adds the original shrink
-witness to an error. Installed Goose is unchanged.
-
-Caps: repair 300s on the current checker, final emission 180s, whole 300s; stop 3s after a reported
-error. Never lift caps, relax checks or clear live owners to hide errors.
-
-Once the real executable exists, run compiler-goose/tools/qualify_compiler.ts
-against it and compiler/zig-out-native-fast/bin/blotc. It covers CLI/executed
-ABI 8, project lifecycle, cold and retained-revision request OOM/retry, and
-2 warmup/6 measured edit/restore revisions under a 16MiB process-tree RSS growth
-budget. Allocator live bytes remain unavailable. No ABI fallback.
-
-Zig source for the Goose oracle is unchanged. Its prior full gate remains
-incomplete: all 2974 laws compile without LLVM; release compilation hit its cap.
-No fresh current-port Gdev Main/frame exists. Historical Main 9,203,613 B/5.523s
-belongs to its older release. Subsecond compilation, sub-five-second Main and
-1–2MB remain unmet. Environment publication and upstream messages require
-explicit requests. Use Astra for concrete snags only; never Terra.
