@@ -92,6 +92,36 @@ What the direct backend does beyond the plan above:
 Gdev needed three annotations (the `version` parameters of three codec
 `migrate` functions, committed in ../gdev).
 
+On a release (LLVM) compiler, Gdev Main builds in 1.15 s against 6.61 s. The
+backend's share is 95 ms against 5,533 ms, so the frontend is now 90% of the
+time.
+
+Ink's suite (`pen test-blot` through a `--backend direct` wrapper) matches
+the scoped backend on all 64 modules both compile, with identical outcomes.
+The direct backend also passes extractions, retained and simd-batches, which
+the scoped backend rejects.
+
+## Sequencing (owner, 14 November 2026)
+
+1. Phase 6 first: the direct backend becomes the only backend, and the scoped
+   backend, `eval/`, the scoped `runtime/` and the reuse machinery built
+   around scoped artifacts are deleted.
+   - Tests of scoped internals go with the code.
+   - A test that only exercises a feature on the approved removal list in
+     tasks/LANGUAGE_COHERENCE.md goes with that feature.
+   - Kept features the direct backend lacks are implemented there.
+   - The checker's eight shared `backend/` modules (`collection_ops`,
+     `scalar_ops`, `simd_intrinsics`, `opaque_storage`, `loop_targets`,
+     `function_facts`, `runtime_identity`, `wasm`) move to a neutral place
+     or are cut.
+2. Then tasks/LANGUAGE_COHERENCE.md, memory model (item A) first, together
+   with phase 5's frontend work.
+3. Phase 7 (Goose port) last.
+
+Before a release tier depends on the direct backend alone, measure Gdev's
+run-time frame cost on both backends. Pen's single-frame run has no
+timings, so this needs a multi-frame harness.
+
 ## Phases
 
 1. Scalars, records, tuples, nominal data and `case`, blocks, `if`, loops,
