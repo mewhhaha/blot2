@@ -749,6 +749,8 @@ it cannot, the statement is an error that asks for an explicit copy
 - It stays the owner through its own `:=` updates.
 - It stops owning the array when the array is bound to another name,
   captured by a lambda, placed in another value, or referenced with `&`.
+  It owns the array again after the last use of that other holder
+  **(open)**.
 - Reading an element that holds no array, and taking the length, change
   nothing.
 - Where branches join, a local owns its array only if it does on every
@@ -772,6 +774,10 @@ The signature states it.
   it is an error. Inside the function the parameter is owned, so it can be
   updated in place and returned.
 - Every result is owned by the caller.
+- A result whose type may hold an array cannot be read out of a borrowed
+  parameter: it needs `values.copy`. A type variable may hold an array, so
+  this covers a generic element accessor. A result that holds no array is
+  unaffected.
 - `own` is part of the function's type: `own (Array U32) -> U32 -> Array U32`.
 - A partial application cannot supply an `own` parameter.
 - On a type that holds no array, `own` changes nothing.
@@ -947,10 +953,16 @@ unnecessary.
    count on each array (reuse when the count is one, copy otherwise) and
    silent copies. Open within the proposed rule:
    - a generic function that returns an `a` read out of a borrowed
-     parameter, such as an element accessor, when `a` may hold an array;
-   - whether ownership returns once every other holder has had its last
-     use. The memory model ends it for the rest of the scope, which reuses
-     less;
+     parameter. Section 10.3 takes the implementer's rule: it needs a copy
+     whenever `a` may hold an array;
+   - ownership returning at the other holder's last use. Section 10.3
+     takes it, on the implementer's advice that it is cheap inside one
+     function. The memory model ends ownership for the rest of the scope;
+   - state. With `Cell` and `@effect.state` gone, state shared between
+     calls is passed as an `own` parameter and returned. An effect
+     operation that hands out an array gives a second holder, so a state
+     effect would need an operation that takes over the state and puts the
+     successor back;
    - the memory model says passing an array to any call ends ownership and
      that a call's result is not owned. Section 10.3 says the opposite on
      both, because the signature now carries the fact.
