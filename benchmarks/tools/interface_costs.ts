@@ -242,8 +242,6 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
           stdRoot: `${repo}/std`,
           startupTimeoutMs: 5000,
           profileBackend: true,
-          codegenTier: values.tier,
-          codegenWorkers: workers,
         });
         buildStarted = performance.now();
         const result = await compiler.build({

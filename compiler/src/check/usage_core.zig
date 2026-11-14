@@ -476,7 +476,7 @@ const Walker = struct {
         // requests, resolvers and updates. The redundant capture list is never
         // consulted to establish absence of an affine or borrowed reference.
         var children: CaptureChildren = .{ .walker = self, .found = found, .depth = depth };
-        @import("../eval/body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
+        @import("body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
     }
     noinline fn loanResult(self: *Walker, callback: core.ClosureInfo, depth: usize) Error!void {
         // The result-path owner proves captures, projections, aggregates and
@@ -909,7 +909,7 @@ fn relevant(module: *const core.Module, body: core.Body) Error!bool {
     var storage: [1024 * 1024]u8 align(@alignOf(usize)) = undefined;
     var buffer: std.heap.FixedBufferAllocator = .init(&storage);
     const allocator = buffer.allocator();
-    var walk: @import("../eval/body_recipe.zig").Walk = .{};
+    var walk: @import("body_recipe.zig").Walk = .{};
     defer walk.deinit(allocator);
     walk.append(allocator, body.root) catch return error.InvalidArtifact;
     while (walk.next(allocator) catch return error.InvalidArtifact) |id| {
@@ -927,7 +927,7 @@ fn relevant(module: *const core.Module, body: core.Body) Error!bool {
             const loop = module.requestLoopInfo(id);
             if (loop.computation == 0 or loop.completion_body == 0 or loop.arms.start > module.request_arms.len or loop.arms.len > module.request_arms.len - loop.arms.start) return error.InvalidArtifact;
         }
-        @import("../eval/body_recipe.zig").appendChildren(&walk, allocator, module, id, true) catch return error.InvalidArtifact;
+        @import("body_recipe.zig").appendChildren(&walk, allocator, module, id, true) catch return error.InvalidArtifact;
     }
     return false;
 }

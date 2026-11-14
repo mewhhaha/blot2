@@ -89,37 +89,58 @@ behaviour keeps the kept part.
 - Tests that read the scoped runtime's counters (`blot:rc_*` exports), v128
   locals, boxes or checkpoints are scoped internals.
 
-## Code deletion plan
+## Code deletion (done, 14 November 2026)
 
-- **The compile interface.** Outside `backend/`, code uses five symbols from
-  `backend/core_backend.zig`: `compileWithOptions`, `compile`, `Result`,
-  `Diagnostic` and `CompileOptions`. Replace them with one small module that
-  calls `direct.compile` and returns bytes, a diagnostic (unit, span, code,
-  detail) and the emitted-function count.
-- **main.zig and statistics.** main.zig's `processProject` keeps loading,
-  checking and lowering, and its backend section becomes one direct compile.
-  The compilation record keeps its frontend fields and `wasm_bytes` /
-  `emitted_functions`. The scoped statistics (work counters, optimization,
-  principals, backend timing, `code_instances`) go.
-- **Options that go:** `--explain-allocations`, `--profile-memory`,
-  `--require-collector-free` and `--backend`.
-- **Project server.** `serve-project` builds each revision fresh (load,
-  check, lower, direct compile) instead of through `retained_revision.zig`
-  and checkpoints. Incremental compilation is a later phase. The project
-  protocol and client tests guard the wire format; Pen (Ink's suite, Gdev's
-  frame) guards real use.
-- **Dependency artifacts** (`blotc dependencies`, `--dependencies`,
-  `.blotdep`, host/cli.ts) package semantic and executable artifacts for
-  reuse. Decide before deleting: either they go with the reuse machinery
-  (breaking the host `dependencies` command) or they are cut down to
-  frontend artifacts.
-- **Deleting by reachability.** After that, delete whatever main.zig and the
-  remaining native suites no longer reach: most of `backend/`, all of
-  `eval/` and `runtime/`, and the reuse machinery around scoped artifacts
-  (`scripts/integration`-style import closure).
-- **Build, suites and scripts.** build.zig loses the runtime fixtures and the
-  backend, evaluator and retained suites. `check:dev` gets new regression
-  families (direct backend, checker), and `test:compiler` follows.
+`compiler/src/backend/` (195 files, 80,758 lines), `eval/` (58 files,
+33,064 lines) and `runtime/` (33 files, 5,897 lines) are deleted; `reuse/`
+went from 157 files (67,630 lines) to 74 (24,892). About 160,000 lines left
+`compiler/src`; every remaining file is reached from `main.zig`,
+`bench_declaration_demand.zig` or a native suite.
+
+- **The compile interface** is `compiler/src/compile.zig`: `compile(units,
+  entry)` returns the bytes, one diagnostic (unit, span, code, detail,
+  `message()`) and the emitted-function count. `direct.zig` imports its
+  `Result` from there.
+- **main.zig**: `build` and `build-project` load, check, lower and run one
+  direct compile. The compilation record keeps the frontend fields, the
+  timings, `wasm_bytes` and `emitted_functions`.
+- **Options removed**: `--explain-allocations`, `--profile-memory`,
+  `--require-collector-free`, `--backend`, and in the protocol and
+  host/zig_project_client.ts also `codegenTier`, `codegenWorkers`,
+  `shareMachineCode`, checkpoints and restart caches. `execution_policy.zig`
+  keeps the semantic (lowering) and frontend worker counts. The codegen tier
+  is gone: the direct backend read neither tier.
+- **serve-project** builds each revision fresh. The wire format of open,
+  build, complete and close is kept; `storage` is still accepted and
+  validated (Gdev's Pen settings send it) but unused, and `dependencies`
+  still opens a bundle whose unchanged modules a build takes as checked.
+- **Dependency artifacts** were already frontend artifacts (checked Core and
+  principal interfaces). `blotc dependencies`, `--dependencies` and
+  `.blotdep` stay; the consumer compiles with the direct backend. The
+  retained-snapshot and completed-Core receipts around them are deleted.
+- **Checker modules**: the checker's `eval/` modules (type evidence,
+  implementation admission, given equations and their helpers) moved to
+  `check/`; `scalar_ops` became a small `check/scalar_ops.zig` (operation
+  support and U32 folding); `runtime_identity` moved to `reuse/`; the memory
+  meter to `compiler/src/memory.zig`; native assets to `compiler/src/assets/`.
+  Of the eight shared modules the checker imported only `scalar_ops`,
+  `wasm` (for its `Scalar` enum), `runtime_identity`, and `function_facts`
+  through `primitive_operator`, which only the backend used.
+  `collection_ops`, `simd_intrinsics`, `opaque_storage` and `loop_targets`
+  were already checker modules in `check/`.
+- **Suites**: `syntax`, `types`, `checker` and `project` (`tests.zig` is
+  their union). Native tests that compiled or evaluated programs through the
+  scoped backend or the evaluator lost those cases; guest tests cover
+  execution. Runtime fixtures, the outline replay tool and the
+  `artifact-replay` build option are gone.
+- **check:dev** areas: `direct` (default), `project`, `syntax`,
+  `type-effects`, `body-checking`, `function-syntax`, `staging-surface`,
+  `tasks`.
+
+Still in the tree and dead in practice: the checker's cross-revision reuse
+(body check caches, entry and module frontend cutoffs, binding and reference
+relocation, `runtime_identity`). Nothing offers a previous revision since
+`serve-project` builds fresh; it goes with the incremental redesign.
 
 ## Ignored guest cases after the flip
 

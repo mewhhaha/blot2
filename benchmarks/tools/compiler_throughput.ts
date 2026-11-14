@@ -75,11 +75,9 @@ const report: Record<string, unknown> = {
   requestedMinimumLines: lines,
   statementsPerLeaf: statements,
   requestedModules,
-  codegenWorkers: workers,
   frontendWorkers: workers,
   timeoutMs,
   compilerPath,
-  codegenTier: "optimized",
   profileBackend: values.profile,
   status: "incomplete",
 };
@@ -205,9 +203,7 @@ try {
     executable: compilerPath,
     entry: entryPath,
     prelude: null,
-    codegenTier: "optimized",
     profileBackend: values.profile,
-    codegenWorkers: workers,
     frontendWorkers: workers,
     startupTimeoutMs: timeoutMs,
   });
@@ -227,7 +223,6 @@ try {
   report.wallThroughBuildMs = performance.now() - overallStart;
   if (!result.success) {
     report.diagnostics = result.diagnostics;
-    report.attemptStats = result.attemptStats;
     throw new Error("compilation failed");
   }
   report.stats = result.stats;

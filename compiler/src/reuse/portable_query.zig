@@ -7,7 +7,7 @@
 //! after restart.
 const std = @import("std");
 const queries = @import("semantic_query_table.zig");
-const types = @import("../eval/type_evidence.zig");
+const types = @import("../check/type_evidence.zig");
 
 /// Interpretation of every portable section. Reflected schemas reject shape
 /// changes; bump this when an unchanged shape changes meaning.

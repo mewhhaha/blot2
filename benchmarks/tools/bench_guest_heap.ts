@@ -119,7 +119,6 @@ const compiler = await createZigProjectCompiler({
   executable,
   entry,
   prelude: `${root}std/prelude.blot`,
-  codegenTier: "optimized",
 });
 try {
   const built = await compiler.build({ sources: { [entry]: source } });

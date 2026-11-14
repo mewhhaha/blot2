@@ -2,7 +2,7 @@
 //! Only semantic frontend work is reusable; staging and backend work stay fresh.
 const std = @import("std");
 const project = @import("project.zig");
-const identity = @import("../backend/runtime_identity.zig");
+const identity = @import("runtime_identity.zig");
 const snapshot = @import("dependency_snapshot.zig");
 const PI = @import("principal_interface.zig");
 const core = @import("../check/core.zig");

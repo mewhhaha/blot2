@@ -734,7 +734,7 @@ fn closedVariableCertificateLaw(allocator: std.mem.Allocator) !void {
         variable.* = try store.fresh();
     };
     const marks = [_]Mark{ cached.mark(), oracle.mark() };
-    var proof = try @import("../eval/type_evidence.zig").Store.init(allocator);
+    var proof = try @import("type_evidence.zig").Store.init(allocator);
     defer proof.deinit();
     for (0..16) |step| {
         for ([_]*Store{ &cached, &oracle }, roots) |store, variables| {

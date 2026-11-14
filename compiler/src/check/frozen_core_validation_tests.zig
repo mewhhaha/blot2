@@ -261,48 +261,6 @@ test "portable typed staging validates complete shapes and rejects forged operan
     try verified(a, &m);
 }
 
-fn stagedRoundtrip(allocator: std.mem.Allocator, bytes: []const u8, answer: u32) !void {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try format.decode(core.Module, allocator, bytes, key);
-    defer format.deinit(allocator, &m);
-    try verified(allocator, &m);
-    var session = try @import("../eval/core_eval.zig").Session.init(allocator, &.{m});
-    defer session.deinit();
-    const value = try session.value(.{ .unit = 1, .binding = answer });
-    try std.testing.expectEqual(@as(u32, 42), value.bits);
-}
-
-test "portable typed staging reconstructs named loop carries after producer teardown through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\const sum = func (values: Array U32) => return do:
-            \\  let total = 0
-            \\  for value in values:
-            \\    if @u32.eq value 0:
-            \\      break
-            \\    if @u32.eq value 20:
-            \\      total := @u32.add total value
-            \\    else:
-            \\      total := @u32.add value total
-            \\  break total
-            \\const generated = @code.quote (sum #[20, 22])
-            \\const answer: U32 = @code.run generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging rejects loop carry and merge ownership forgeries" {
     var m = try lower(a,
         \\const sum = func (values: Array U32) => return do:
@@ -335,147 +293,6 @@ test "portable typed staging rejects loop carry and merge ownership forgeries" {
     try verified(a, &m);
 }
 
-test "portable typed staging owns future local scope graphs after producer teardown through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-            \\const local = func (value: U32) => return @effect.scope (func (state: State U32) => return value)
-            \\const generated = @code.quote (local 42)
-            \\const answer = 42
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging owns handled future effects and fresh scope providers through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\effect Read: Unit -> U32
-            \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-            \\const plain = @code.quote (do (@effect.provider Read (func () => return 42)):
-            \\  break Read ())
-            \\const local = func (initial: U32) => return @effect.scope (func (state: State U32) => return do:
-            \\  let pair = do (@effect.state state.get state.set initial):
-            \\    use previous <- state.get ()
-            \\    use state.set (@u32.add previous 2)
-            \\    break state.get ()
-            \\  let (last, result) = pair
-            \\  break result)
-            \\const scoped = @code.quote (local 40)
-            \\const answer: U32 = @code.run plain
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-fn namedProviderRoundtrip(allocator: std.mem.Allocator, consumer_bytes: []const u8, producer_bytes: []const u8) !void {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var producer = try format.decode(core.Module, allocator, producer_bytes, key);
-    defer format.deinit(allocator, &producer);
-    var consumer = try format.decode(core.Module, allocator, consumer_bytes, key);
-    defer format.deinit(allocator, &consumer);
-    try V.validate(allocator, &consumer, .{ .units = &.{&producer} });
-    var session = try @import("../eval/core_eval.zig").Session.init(allocator, &.{ consumer, producer });
-    defer session.deinit();
-    const value = try session.value(.{ .unit = consumer.unit, .binding = consumer.bodies[consumer.bodies.len - 1].binding });
-    try std.testing.expectEqual(@as(u32, 42), value.bits);
-}
-
-test "portable typed staging named provider callbacks retain local and foreign producer principals through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var producer = try lower(a, "const callback = func () => return 42\n");
-    defer producer.deinit(a);
-    producer.unit = 2;
-    var consumer = try lower(a,
-        \\effect Read: Unit -> U32
-        \\const callback = func () => return 42
-        \\const generated = @code.quote (do (@effect.provider Read callback):
-        \\  break Read ())
-        \\const answer: U32 = @code.run generated
-    );
-    defer consumer.deinit(a);
-    try verified(a, &consumer);
-    const implementation = for (consumer.nodes) |node| {
-        if (node.tag == .effect_provider) break node.b;
-    } else return error.TestUnexpectedResult;
-    const reference = &consumer.references[consumer.node(implementation).a];
-    reference.unit = producer.unit;
-    reference.binding = producer.bodies[1].binding;
-    try V.validate(a, &consumer, .{ .units = &.{&producer} });
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &consumer, .{}));
-    const root = producer.bodies[1].root;
-    const saved = producer.nodes[root];
-    producer.nodes[root] = .{ .tag = .constant, .ty = T.boolean, .a = 1 };
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &consumer, .{ .units = &.{&producer} }));
-    producer.nodes[root] = saved;
-    const consumer_bytes = try format.encode(a, key, consumer);
-    defer a.free(consumer_bytes);
-    const producer_bytes = try format.encode(a, key, producer);
-    defer a.free(producer_bytes);
-    try namedProviderRoundtrip(a, consumer_bytes, producer_bytes);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, namedProviderRoundtrip, .{ consumer_bytes, producer_bytes });
-}
-
-test "portable typed staging earlier lift operands retain their actual affine stage owner through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    const sources = [_][]const u8{
-        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
-        \\const make = func (value: unique U32) => return @code.quote (@code.lift (consume value))
-        \\const generated = make 42
-        \\const answer: U32 = @code.run generated
-        ,
-        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
-        \\const make = func (value: unique U32) => return @code.quote (@code.quote (@code.lift (@code.lift (consume value))))
-        \\const generated = @code.run (make 42)
-        \\const answer: U32 = @code.run generated
-        ,
-        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
-        \\const make = func (value: unique U32) => return @code.quote (@code.lift (consume value))
-        \\const spliced = func (value: unique U32) => return @code.quote (@code.splice (make value))
-        \\const answer: U32 = @code.run (spliced 42)
-        ,
-        \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
-        \\const make = func (value: unique U32) => return do:
-        \\  let build: once (Unit -> code [U32, row {}]) = func () => return @code.quote (@code.lift (consume value))
-        \\  break build ()
-        \\const answer: U32 = @code.run (make 42)
-        ,
-    };
-    for (sources) |source| {
-        var m = try lower(a, source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        const bytes = try format.encode(a, key, m);
-        defer a.free(bytes);
-        const answer = m.bodies[m.bodies.len - 1].binding;
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    }
-}
-
 test "portable typed staging rejects a forged repeated earlier affine move across lifts" {
     var m = try lower(a,
         \\const consume = func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan)
@@ -500,76 +317,6 @@ test "portable typed staging rejects a forged repeated earlier affine move acros
     m.references[references[1]].binding = m.references[references[0]].binding;
     try std.testing.expectError(error.InvalidArtifact, @import("usage_core.zig").validate(&m));
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-}
-
-test "portable typed staging future affine parameters keep independent usage owners" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\const generated = @code.quote (func (value: unique U32) => return do:
-        \\  let first = value
-        \\  break first)
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const body = m.closures[0].body;
-    const children = m.children(body);
-    try std.testing.expectEqual(@as(usize, 2), children.len);
-    const binding = m.node(children[0]);
-    const returned = &m.nodes[children[1]];
-    const saved = returned.a;
-    returned.a = binding.b;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    returned.a = saved;
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging future loans retain their lexical callback owner" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    const sources = [_][]const u8{
-        \\const generated = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return @usage.read loan))
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-        ,
-        \\const read: unique U32 -> U32 = func value => return @usage.borrow value (func loan => return @usage.read loan)
-        \\const generated = @code.quote (func (value: unique U32) => return read value)
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-        ,
-        \\const generated = @code.quote (func (value: unique U32) => return @usage.borrow value (func loan => return do:
-        \\  let read = func () => return @usage.read loan
-        \\  break read ()))
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-        ,
-    };
-    for (sources) |source| {
-        var m = try lower(a, source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        const borrowed = for (m.types.nodes) |node| {
-            if (node.tag == .usage and node.b == @backingInt(T.UsageKind.borrow)) break node;
-        } else return error.TestUnexpectedResult;
-        const region = &m.types.nodes[borrowed.c];
-        const owner = region.c;
-        region.c = 0;
-        try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-        region.c = owner;
-        try verified(a, &m);
-        const bytes = try format.encode(a, key, m);
-        defer a.free(bytes);
-        const answer = m.bodies[m.bodies.len - 1].binding;
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    }
 }
 
 test "portable typed staging loan captures reject phantom missing and escaping executable owners" {
@@ -598,183 +345,6 @@ test "portable typed staging loan captures reject phantom missing and escaping e
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
     closure.body = body;
     try verified(a, &m);
-}
-
-test "portable typed staging resource bodies retain cleanup loan and effect owners" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    const sources = [_][]const u8{
-        \\const generated = @code.quote (func () => return @resource.scope (func () => return 42) (func owner => return ()) (func loan => return @usage.read loan))
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-        ,
-        \\const generated = @code.quote (func () => return do:
-        \\  use owner <- @resource.acquire (func () => return 42) (func value => return ())
-        \\  use @resource.release owner
-        \\  break 42)
-        \\const emitted = @code.emit generated
-        \\const answer = 42
-        ,
-    };
-    for (sources) |source| {
-        var m = try lower(a, source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        const cleanup = for (m.types.nodes, 0..) |node, index| {
-            if (node.tag == .usage and node.b == @backingInt(T.UsageKind.cleanup)) break index;
-        } else return error.TestUnexpectedResult;
-        m.types.nodes[cleanup].b = @backingInt(T.UsageKind.once);
-        try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-        m.types.nodes[cleanup].b = @backingInt(T.UsageKind.cleanup);
-        try verified(a, &m);
-        const bytes = try format.encode(a, key, m);
-        defer a.free(bytes);
-        const answer = m.bodies[m.bodies.len - 1].binding;
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-        const quote = for (m.nodes) |node| {
-            if (node.tag == .staging and node.c == @backingInt(@import("typed_staging.zig").Op.quote)) break node;
-        } else return error.TestUnexpectedResult;
-        var remaining: usize = 65536;
-        const saved_types = try a.dupe(T.Node, m.types.nodes);
-        defer a.free(saved_types);
-        for (m.types.nodes) |*node| if (node.tag == .function) {
-            node.c = 0;
-        };
-        try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").quoteEffects(&m, quote, m.bodies[1].closed_rows, &remaining));
-        @memcpy(m.types.nodes, saved_types);
-    }
-}
-
-test "frozen operation declarations own generic argument shapes and signatures through teardown and OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\effect Read: Unit -> U32
-        \\const answer = 42
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    try std.testing.expectEqual(@as(usize, 3), m.operation_names.len);
-    var generic: usize = 0;
-    for (m.operation_names) |header| {
-        try std.testing.expect(header.parameter != 0 and header.result != 0);
-        if (header.variables.len == 0) {
-            try std.testing.expectEqual(T.unit, header.parameter);
-            try std.testing.expectEqual(T.u32_type, header.result);
-        } else {
-            generic += 1;
-            try std.testing.expectEqual(@as(u32, 1), header.variables.len);
-            try std.testing.expectEqual(@as(u32, 1), header.parameters.len);
-            const variable = m.types.list(header.variables)[0];
-            try std.testing.expectEqual(variable, m.types.list(header.parameters)[0]);
-            try std.testing.expect(header.parameter == variable or header.result == variable);
-        }
-    }
-    try std.testing.expectEqual(@as(usize, 2), generic);
-    const saved = m.operation_names[0];
-    m.operation_names[0].parameter = @intCast(m.types.nodes.len);
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.operation_names[0] = saved;
-    m.operation_names[0].result = 0;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.operation_names[0] = saved;
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging request handlers retain independent declared operation signatures through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\effect Read: Unit -> U32
-        \\const generated = @code.quote (do:
-        \\  let calculation = @computation (func () => return Read ())
-        \\  for request in @requests calculation:
-        \\    case request of
-        \\      effect Read () =>
-        \\        yield 42
-        \\      complete value =>
-        \\        break value)
-        \\const answer: U32 = @code.run generated
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const header = &m.operation_names[0];
-    const result_type = header.result;
-    header.result = T.boolean;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    header.result = result_type;
-    const arm = &m.request_arms[0];
-    const operation = arm.operation;
-    arm.operation = T.foreign_operation;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    arm.operation = operation;
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging request clauses retain foreign callback effects through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\effect Read: Unit -> U32
-        \\const generated = @code.quote (func (host: Unit -> U32 ! {Foreign}) => return do:
-        \\  let calculation = @computation (func () => return @u32.add (Read ()) 40)
-        \\  for request in @requests calculation:
-        \\    case request of
-        \\      effect Read () =>
-        \\        yield host ()
-        \\      complete value =>
-        \\        break value)
-        \\const answer = 42
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const action = m.types.node(m.request_loops[0].action_type);
-    try std.testing.expect(std.mem.findScalar(T.Effects.Label, m.types.rowLabels(action.c), T.foreign_operation) != null);
-    m.types.nodes[m.request_loops[0].action_type].c = 0;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.types.nodes[m.request_loops[0].action_type] = action;
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging unused request handlers preserve actual computation row variance through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\effect Read: Unit -> U32
-        \\const generated = @code.quote (do:
-        \\  let calculation = @computation (func () => return 42)
-        \\  for request in @requests calculation:
-        \\    case request of
-        \\      effect Read () =>
-        \\        yield 0
-        \\      complete value =>
-        \\        break value)
-        \\const answer: U32 = @code.run generated
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
 }
 
 test "portable typed staging reconstructs handled callback effects despite coordinated pure headers" {
@@ -812,90 +382,6 @@ test "portable typed staging reconstructs uncalled future closure effects despit
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
 }
 
-test "portable typed staging proves fresh same stage capability captures through owned lifetime edges and OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const generated = @code.quote (@effect.scope (func (state: State U32) => return do:
-        \\  let unused = state
-        \\  let read = func () => return state.get ()
-        \\  let pair = do (@effect.state state.get state.set 42):
-        \\    break read ()
-        \\  let (_, result) = pair
-        \\  break result))
-        \\const answer: U32 = @code.run generated
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    const read = for (m.nodes, 0..) |node, id| {
-        if (node.tag != .closure) continue;
-        const metadata = m.closures[node.a];
-        if (metadata.captures.len == 1 and m.types.node(m.bindings[m.extra[metadata.captures.start]].ty).tag == .scoped) break @as(core.Id, @intCast(id));
-    } else return error.TestUnexpectedResult;
-    const unused = for (m.bindings, 0..) |binding, id| {
-        if (binding.kind == .local and m.types.node(binding.ty).tag == .scoped) break @as(core.BindingId, @intCast(id));
-    } else return error.TestUnexpectedResult;
-    const captures = m.closures[m.node(read).a].captures;
-    const actual = m.extra[captures.start];
-    try std.testing.expect(actual != unused);
-    m.extra[captures.start] = unused;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.extra[captures.start] = actual;
-    try verified(a, &m);
-}
-
-test "portable typed staging named scope helpers retain future local capture row owners" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\type State a is effect = {get: Unit -> a, set: a -> Unit}
-        \\const helper = func (value: U32) => return @effect.scope (func (state: State U32) => return do:
-        \\  let read = func () => return state.get ()
-        \\  let pair = do (@effect.state state.get state.set 40):
-        \\    use previous <- read ()
-        \\    use state.set (@u32.add previous value)
-        \\    break read ()
-        \\  let (_, result) = pair
-        \\  break result)
-        \\const generated = @code.quote (func (value: U32) => return helper value)
-        \\const evaluated: U32 = @code.run (@code.quote (helper 2))
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const local = for (m.closures, 0..) |closure, index| {
-        if (closure.qualifier != 0) break index;
-    } else return error.TestUnexpectedResult;
-    const qualifier = m.closures[local].qualifier;
-    m.closures[local].qualifier = m.bodies[1].binding;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.closures[local].qualifier = qualifier;
-    const owner = &m.bindings[qualifier];
-    const scheme_root = owner.scheme.root;
-    owner.scheme.root = T.u32_type;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    owner.scheme.root = scheme_root;
-    const view = for (m.nodes, 0..) |node, index| {
-        if (node.tag != .reference or m.reference(@intCast(index)).binding != qualifier) continue;
-        if (node.ty != owner.ty) break node.ty;
-    } else return error.TestUnexpectedResult;
-    const row = m.types.nodes[view].c;
-    m.types.nodes[view].c = 0;
-    try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
-    m.types.nodes[view].c = row;
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging reconstructs future local scope effects despite coordinated pure headers" {
     var m = try lower(a,
         \\type State a is effect = {get: Unit -> a, set: a -> Unit}
@@ -918,58 +404,6 @@ test "portable typed staging reconstructs future local scope effects despite coo
     @memcpy(m.types.nodes, saved_types);
     remaining = 1;
     try std.testing.expectError(error.InvalidArtifact, @import("staging_core.zig").quoteEffects(&m, quote, .{}, &remaining));
-}
-
-test "portable typed staging owns roundtrip graphs after producer release through allocation failures" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\const make = func (step: U32) => return @code.quote (do:
-            \\  let value = 40
-            \\  break @u32.add value (@code.lift step))
-            \\const generated = make 2
-            \\const answer: U32 = @code.run generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "typed staging declaration projection retains exact inputs and invalidates same-type quoted edits" {
-    const source =
-        \\const make = func (step: U32) => return @code.quote (do:
-        \\  let value = 40
-        \\  break @u32.add value (@code.lift step))
-        \\const generated = make 2
-        \\const answer: U32 = @code.run generated
-    ;
-    var before = try lower(a, source);
-    defer before.deinit(a);
-    var after = try lower(a, source);
-    defer after.deinit(a);
-    const projection = @import("../reuse/declaration_projection.zig");
-    for (before.bodies[1..]) |body| try std.testing.expect(try projection.definitionEqual(a, &before, &after, body.binding));
-    var edits: usize = 0;
-    for (after.nodes) |*node| {
-        if (node.tag != .constant or node.a != 40) continue;
-        edits += 1;
-        node.a = 41;
-        try verified(a, &after);
-        try std.testing.expect(!try projection.definitionEqual(a, &before, &after, before.bodies[1].binding));
-        // Consumers also read the generator's body through the dependency
-        // fixed point; this local projection grants no transitive admission.
-        node.a = 40;
-    }
-    try std.testing.expect(edits != 0);
-    try std.testing.expect(try projection.definitionEqual(a, &before, &after, before.bodies[1].binding));
 }
 
 test "portable typed staging rejects forged pure rows on quoted operations and invoked callbacks" {
@@ -1030,31 +464,6 @@ test "portable typed staging named calls retain unused declared effects without 
         m.types.nodes[call.callee_type] = selected;
         try verified(a, &m);
     }
-}
-
-test "portable typed staging named operation bodies survive producer release and all allocation failures" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\effect Read: Unit -> U32
-            \\const invoke = func () => return Read ()
-            \\const helper = func () => return @u32.add (invoke ()) 2
-            \\const generated = @code.quote (helper ())
-            \\const provider = @effect.provider Read (func () => return 40)
-            \\const answer: U32 = do provider:
-            \\  break @code.emit generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
 }
 
 test "portable typed staging named operation bodies reject identity result and scope forgeries" {
@@ -1625,22 +1034,6 @@ const named_future_source =
     \\const generated = @code.quote (twice 38)
     \\const answer: U32 = @code.run generated
 ;
-test "portable typed staging admits exact owned monomorphic named future calls after roundtrip and allocation failures" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key_: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, named_future_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key_, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
 test "portable typed staging named calls reject forged signatures foreign parameters and unrelated row certificates" {
     var m = try lower(a,
         \\const decoy = func (value: U32) => return value
@@ -1696,37 +1089,6 @@ test "portable typed staging named calls reconstruct effects despite coordinated
     try V.validateBounds(&m, .{});
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
 }
-test "portable typed staging row polymorphic calls reconstruct owned principals through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    const cases = [_][]const u8{
-        "const apply = func (callback: U32 -> U32) => return callback 42\nconst generated = @code.quote (apply (func (value: U32) => return value))\nconst answer: U32 = @code.run generated\n",
-        "const apply = func callback => return callback 42\nconst generated = @code.quote (apply (func (value: U32) => return value))\nconst answer: U32 = @code.run generated\n",
-        \\effect Read: Unit -> U32
-        \\const apply = func callback => return callback ()
-        \\const generated = @code.quote (do (@effect.provider Read (func () => return 42)):
-        \\  break apply (func () => return Read ()))
-        \\const answer: U32 = @code.run generated
-        ,
-        \\effect Read: Unit -> U32
-        \\const apply: (Unit -> U32 ! {| e}) -> U32 ! {| e} = func callback => return callback ()
-        \\const generated = @code.quote (do (@effect.provider Read (func () => return 42)):
-        \\  break apply (func () => return Read ()))
-        \\const answer: U32 = @code.run generated
-        ,
-    };
-    for (cases) |source| {
-        var m = try lower(a, source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        const bytes = try format.encode(a, key, m);
-        defer a.free(bytes);
-        const answer = m.bodies[m.bodies.len - 1].binding;
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    }
-}
-
 test "portable typed staging row polymorphic calls reject erased effects and foreign row owners" {
     var m = try lower(a,
         \\effect Read: Unit -> U32
@@ -1760,42 +1122,6 @@ test "portable typed staging row polymorphic calls reject erased effects and for
     try verified(a, &m);
 }
 
-test "portable typed staging explicitly typed higher order helpers keep future callback principals" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\const apply: (U32 -> U32 ! {}) -> U32 ! {} = func callback => return callback 42
-        \\const generated = @code.quote (apply (func (value: U32) : U32 => return value))
-        \\const answer: U32 = @code.run generated
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
-test "portable typed staging retains sealed package identities and stored operations" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var m = try lower(a,
-        \\type Item = exists [a] => (a, a -> U32)
-        \\const make: Unit -> Item = func () => return pack [U32] (42, func value => return value) as Item
-        \\const generated = @code.quote (make ())
-        \\const read: Item -> U32 = func item => return unpack item as [a] value in (@product.get value 1) (@product.get value 0)
-        \\const answer: U32 = read (@code.run generated)
-    );
-    defer m.deinit(a);
-    try verified(a, &m);
-    const bytes = try format.encode(a, key, m);
-    defer a.free(bytes);
-    const answer = m.bodies[m.bodies.len - 1].binding;
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging higher order global arguments prove their actual producer bodies" {
     var m = try lower(a,
         \\const identity: U32 -> U32 ! {} = func value => return value
@@ -1814,28 +1140,6 @@ test "portable typed staging higher order global arguments prove their actual pr
     try std.testing.expectError(error.InvalidArtifact, V.validate(a, &m, .{}));
     m.references[original.a] = reference;
     try verified(a, &m);
-}
-
-test "portable typed staging generic helpers own repeated and nested substitutions through allocation failures" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\const identity = func value => return value
-            \\const pair = func value => return (identity value, identity value)
-            \\const generated = @code.quote (@u32.add (@product.get (pair 40) 0) (@f32.to_u32 (identity 2.0)))
-            \\const answer: U32 = @code.run generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
 }
 
 test "portable typed staging generic helpers reject inconsistent and unowned substitutions" {
@@ -1884,30 +1188,6 @@ test "portable typed staging generic helpers reject inconsistent and unowned sub
     try verified(a, &m);
 }
 
-test "portable typed staging named helpers reconstruct pure producer data through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\const identity = func value => return value
-            \\const original = {amount: identity 40}
-            \\const config = original
-            \\const helper = func (value: U32) => return @u32.add config.amount value
-            \\const generated = @code.quote (helper 2)
-            \\const answer: U32 = @code.run generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging producer data rejects runtime foreign and cyclic owners" {
     var m = try lower(a,
         \\const seed = @u32.add 39 1
@@ -1951,22 +1231,6 @@ const nominal_descriptor_source =
     \\const scalar = (@code.describe (@code.quote 1)).result
     \\const answer = if @descriptor.same packet.payload scalar then if @descriptor.same choice.shared scalar then 42 else 0 else 0
 ;
-test "portable typed staging nominal descriptors reconstruct constructor substitutions through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, nominal_descriptor_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
 test "portable typed staging nominal descriptors reject private owners forged fields and missing binders" {
     var m = try lower(a, nominal_descriptor_source);
     defer m.deinit(a);
@@ -2005,36 +1269,6 @@ test "portable typed staging nominal descriptors reject private owners forged fi
     }
     try std.testing.expect(changed);
     try verified(a, &m);
-}
-
-test "portable typed staging helper blocks own nested locals and generic calls through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a,
-            \\const identity = func value => return do:
-            \\  let kept = value
-            \\  let nested = do:
-            \\    let value = kept
-            \\    break value
-            \\  break nested
-            \\const pair = func value => return do:
-            \\  let left = identity value
-            \\  let right = identity value
-            \\  break (left, right)
-            \\const generated = @code.quote (@u32.add (@product.get (pair 40) 0) (@f32.to_u32 (identity 2.0)))
-            \\const answer: U32 = @code.run generated
-        );
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
 }
 
 test "portable typed staging helper locals reject future reads caller capture duplicate owners and foreign returns" {
@@ -2189,22 +1423,6 @@ const nominal_helper_source =
     \\const constructors = @code.quote {packet: positional 42, single: single 42, option: present 42}
     \\const answer: U32 = (@code.run chosen).shared
 ;
-test "portable typed staging nominal helper bodies reconstruct payloads through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, nominal_helper_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
 test "portable typed staging nominal helpers retain private producer rights and reject foreign owners" {
     var m = try lower(a, nominal_helper_source);
     defer m.deinit(a);
@@ -2362,23 +1580,6 @@ const collection_helper_source =
     \\const answer: U32 = @code.run generated
 ;
 
-test "portable typed staging collection helper bodies retain exact shapes through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, collection_helper_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging collection helpers reject forged inputs outputs and operations" {
     var m = try lower(a, collection_helper_source);
     defer m.deinit(a);
@@ -2428,23 +1629,6 @@ const nominal_read_source =
     \\const generated = @code.quote (add 40)
     \\const answer: U32 = @code.run generated
 ;
-
-test "portable typed staging nominal readers retain common field owners through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, nominal_read_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
 
 test "portable typed staging nominal readers reject wrong physical fields variants and families" {
     var m = try lower(a, nominal_read_source);
@@ -2499,23 +1683,6 @@ const statement_if_source =
     \\const unit_value = @code.run unit_generated
     \\const answer: U32 = @code.run generated
 ;
-test "portable typed staging statement if suites retain branch locals and return owners through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, statement_if_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging statement if rejects foreign return owners branch leaks and fallthrough" {
     var m = try lower(a, statement_if_source);
     defer m.deinit(a);
@@ -2591,23 +1758,6 @@ const boolean_case_source =
     \\const generated = @code.quote (helper false 1)
     \\const answer: U32 = @code.run generated
 ;
-test "portable typed staging Boolean case reconstructs arm owners after producer teardown through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    var bytes: []u8 = undefined;
-    var answer: u32 = 0;
-    {
-        var m = try lower(a, boolean_case_source);
-        defer m.deinit(a);
-        try verified(a, &m);
-        answer = m.bodies[m.bodies.len - 1].binding;
-        bytes = try format.encode(a, key, m);
-    }
-    defer a.free(bytes);
-    try stagedRoundtrip(a, bytes, answer);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-}
-
 test "portable typed staging Boolean case rejects missing overlapping forged and leaked arm owners" {
     var m = try lower(a, boolean_case_source);
     defer m.deinit(a);
@@ -2776,25 +1926,6 @@ const data_case_sources = [_][]const u8{
     \\const answer: U32 = @code.run generated
     ,
 };
-test "portable typed staging scalar and product case helpers own complete arm binders through OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    for (data_case_sources) |source| {
-        var bytes: []u8 = undefined;
-        var answer: u32 = 0;
-        {
-            var m = try lower(a, source);
-            defer m.deinit(a);
-            try verified(a, &m);
-            answer = m.bodies[m.bodies.len - 1].binding;
-            bytes = try format.encode(a, key, m);
-        }
-        defer a.free(bytes);
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    }
-}
-
 test "portable typed staging scalar and product cases reject missing coverage forged literals and leaked arm locals" {
     var m = try lower(a, data_case_sources[0]);
     defer m.deinit(a);
@@ -2930,25 +2061,6 @@ const named_composition_sources = [_][]const u8{
     \\const generated = @code.quote (checked (@computation (func () => return Read 42)))
     \\const answer = @code.run generated
 };
-test "portable named request and resolver composition survives producer teardown and complete OOM" {
-    const format = @import("../reuse/dependency_format.zig");
-    const key: format.Key = .{ .compiler = @splat(7), .settings = @splat(8), .source = @splat(9), .dependencies = @splat(10) };
-    for (named_composition_sources) |source| {
-        var bytes: []u8 = undefined;
-        var answer: u32 = 0;
-        {
-            var m = try lower(a, source);
-            defer m.deinit(a);
-            try verified(a, &m);
-            answer = m.bodies[m.bodies.len - 1].binding;
-            bytes = try format.encode(a, key, m);
-        }
-        defer a.free(bytes);
-        try stagedRoundtrip(a, bytes, answer);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, stagedRoundtrip, .{ bytes, answer });
-    }
-}
-
 fn rejectedNamedComposition(allocator: std.mem.Allocator, module: *const core.Module) !void {
     V.validate(allocator, module, .{}) catch |err| switch (err) {
         error.OutOfMemory => return err,

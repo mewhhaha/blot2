@@ -4,7 +4,7 @@ const std = @import("std");
 const C = @import("core.zig");
 const T = @import("types.zig");
 const A = std.mem.Allocator;
-const E = @import("../eval/type_evidence.zig");
+const E = @import("type_evidence.zig");
 pub const Id = u32;
 pub const Error = A.Error || error{ InvalidArtifact, LifetimeEscape, AnalysisLimit, Unsupported };
 pub const Site = struct { unit: u32 = 0, binding: u32 = 0, node: C.Id = 0 };

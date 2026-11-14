@@ -1,16 +1,9 @@
 import { fileURLToPath } from "node:url";
 
-import {
-  type CompilerFixture,
-  compilerFixtures,
-  parseCompilerFixtures,
-} from "./compiler_fixtures.ts";
-
 const directory = new URL("../compiler/", import.meta.url);
 let development = false;
 let incremental = false;
 let timeReport = false;
-let fixtures: CompilerFixture[] | undefined;
 let jobs: number | undefined;
 for (let index = 0; index < Deno.args.length; index++) {
   const argument = Deno.args[index];
@@ -20,18 +13,6 @@ for (let index = 0; index < Deno.args.length; index++) {
     incremental = true;
   } else if (argument === "--time-report") {
     timeReport = true;
-  } else if (argument.startsWith("--fixtures=")) {
-    fixtures ??= [];
-    fixtures.push(
-      ...parseCompilerFixtures(argument.slice("--fixtures=".length)),
-    );
-  } else if (argument === "--fixtures") {
-    const value = Deno.args[++index];
-    if (value === undefined) {
-      throw new Error("--fixtures requires a comma-separated list");
-    }
-    fixtures ??= [];
-    fixtures.push(...parseCompilerFixtures(value));
   } else if (argument.startsWith("--jobs=")) {
     jobs = Number(argument.slice("--jobs=".length));
     if (!Number.isInteger(jobs) || jobs < 1) {
@@ -42,8 +23,6 @@ for (let index = 0; index < Deno.args.length; index++) {
 if (incremental && !development) {
   throw new Error("--incremental requires --dev");
 }
-fixtures ??= [...compilerFixtures];
-fixtures = [...new Set(fixtures)];
 const version = await new Deno.Command("zig", {
   args: ["version"],
   stdout: "piped",
@@ -53,7 +32,7 @@ if (!version.success || !/^0\.17\.0(?:-|$)/.test(installed)) {
   throw new Error(`Blot requires Zig 0.17.0 (installed: ${installed})`);
 }
 console.log(`Building Blot with Zig ${installed}`);
-const args = ["build", "install", "compiler-identity", ...fixtures];
+const args = ["build", "install", "compiler-identity"];
 if (development) {
   args.push(
     "-Doptimize=safe",

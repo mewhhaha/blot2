@@ -69,7 +69,6 @@ for (
     prelude: null,
     startupTimeoutMs: 5000,
     profileBackend: true,
-    codegenTier: "optimized",
   });
   try {
     const start = performance.now();

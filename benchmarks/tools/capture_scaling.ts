@@ -238,8 +238,6 @@ for (const width of widths) {
                 executable,
                 entry,
                 prelude: null,
-                codegenTier: "optimized",
-                codegenWorkers: 1,
                 frontendWorkers: 1,
                 profileBackend: true,
                 startupTimeoutMs: deadline,

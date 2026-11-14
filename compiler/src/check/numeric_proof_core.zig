@@ -321,8 +321,11 @@ const Checker = struct {
         const lhs = try self.values.view().get(left.operand);
         const rhs = try self.values.view().get(right.operand);
         if (lhs.tag == .literal and rhs.tag == .literal) {
-            const value = @import("../backend/scalar_ops.zig").evaluate(op, .{ .scalar = .u32, .bits = lhs.a }, .{ .scalar = .u32, .bits = rhs.a }) catch return self.version(self.module.typeOf(id), 0);
-            if (value.scalar == .u32) return .{ .operand = try self.values.intern(self.allocator, .{ .tag = .literal, .a = value.bits }) };
+            switch (@import("scalar_ops.zig").foldU32(op, lhs.a, rhs.a)) {
+                .value => |bits| return .{ .operand = try self.values.intern(self.allocator, .{ .tag = .literal, .a = bits }) },
+                .none => return self.version(self.module.typeOf(id), 0),
+                .not_u32 => {},
+            }
         }
         const identity = try self.arithmeticIdentity(op, left.operand, right.operand);
         if (identity != 0) return .{ .operand = identity };

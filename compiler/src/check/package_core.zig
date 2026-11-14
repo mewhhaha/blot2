@@ -24,7 +24,6 @@ pub const SourceProofCache = struct {
     };
     allocator: std.mem.Allocator,
     units: []const *const core.Module,
-    work: ?*@import("../work_counters.zig").Counters = null,
     completed: std.AutoHashMapUnmanaged(core.BindingRef, void) = .empty,
     targets: std.AutoHashMapUnmanaged(TargetKey, std.ArrayList(core.BindingId)) = .empty,
     indexed_catalogs: std.AutoHashMapUnmanaged(u32, void) = .empty,
@@ -123,28 +122,6 @@ pub const SourceProofCache = struct {
     fn publish(self: *SourceProofCache, module: *const core.Module, binding: core.BindingId) void {
         std.debug.assert(self.owns(module));
         self.completed.putAssumeCapacity(.{ .unit = module.unit, .binding = binding }, {});
-    }
-    /// Only the closed source checker/lowerer can provide this opaque receipt.
-    /// All-unit bounds/Core validation precedes admission; call instances,
-    /// effect rows and storage ownership remain the caller's responsibility.
-    pub fn admitCompletedSource(self: *SourceProofCache, receipt: @import("../reuse/source_completion.zig").Borrow, units: []const core.Module, entry: u32, names: @import("../backend/runtime_identity.zig").View) Equations.Error!void {
-        if (units.len != self.units.len) return error.InvalidArtifact;
-        for (units, self.units) |*unit, owner| if (unit != owner) return error.InvalidArtifact;
-        const count = receipt.covered(units, entry, names);
-        var bodies: usize = 0;
-        for (units[0..count]) |*unit| {
-            for (unit.bindings, 0..) |binding, id| {
-                if (id != 0 and binding.kind == .global and unit.body(@intCast(id)) != null) bodies += 1;
-            }
-        }
-        // Publish no partial authority on allocation failure.
-        try self.reserve(bodies);
-        for (units[0..count]) |*unit| {
-            for (unit.bindings, 0..) |binding, id| {
-                if (id != 0 and binding.kind == .global and unit.body(@intCast(id)) != null) self.publish(unit, @intCast(id));
-            }
-        }
-        if (self.work) |work| work.scoped_source_completed_bodies +|= bodies;
     }
     /// Immutable negative metadata, never an instantiated predicate receipt.
     /// A possible header still requires the ordinary body/type/row proof.
@@ -1707,15 +1684,7 @@ const Walker = struct {
         var memo: ?Equations.SharedGoal = null;
         if (wanted == null) {
             memo = self.sharedGoalKey(solver, owner, binding, given) catch |err| return solver.readerError(err);
-            if (memo) |key| if (solver.sharedGoalHit(key, depth)) {
-                if (self.context.source_proofs) |cache| if (cache.work) |work| {
-                    work.scoped_source_proof_hits += 1;
-                };
-                return true;
-            };
-            if (self.context.source_proofs) |cache| if (cache.work) |work| {
-                work.scoped_source_proof_instances += 1;
-            };
+            if (memo) |key| if (solver.sharedGoalHit(key, depth)) return true;
         }
         const parts = solver.store.allocator.dupe(T.Id, self.module.types.list(.{ .start = product.a, .len = product.b })) catch {
             solver.oom = true;
@@ -2524,17 +2493,12 @@ const Walker = struct {
         if (unary) arity = 1;
         try require(inputs.len == arity);
         const input = self.module.types.node(inputs[0]).tag;
-        var machine: @import("../backend/wasm.zig").Scalar = .u32;
         switch (input) {
-            .u32 => {},
-            .f32 => machine = .f32,
-            .boolean => {
-                try require(operation == .equal or operation == .not_equal);
-                machine = .bool;
-            },
+            .u32, .f32 => {},
+            .boolean => try require(operation == .equal or operation == .not_equal),
             else => return error.InvalidArtifact,
         }
-        try require(@import("../backend/scalar_ops.zig").opcode(operation, machine) != null);
+        try require(@import("scalar_ops.zig").supported(operation, input == .f32));
         if (inputs.len == 2) try self.same(inputs[0], inputs[1]);
         var expected = inputs[0];
         switch (operation) {
@@ -2916,7 +2880,7 @@ const Walker = struct {
             return false;
         }
         var children: CaptureChildren = .{ .walker = self, .return_target = target_, .depth = depth };
-        @import("../eval/body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
+        @import("body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
         return children.found;
     }
     fn patternCaptures(self: *Self, id: core.PatternId, depth: usize) Error!bool {
@@ -2956,7 +2920,7 @@ const Walker = struct {
         if (node.tag == .operation_value) {
             const operation = self.module.operationValue(source);
             children.appendSlice(undefined, &.{ operation.capability, operation.witness }) catch return error.InvalidArtifact;
-        } else @import("../eval/body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
+        } else @import("body_recipe.zig").appendChildren(&children, undefined, self.module, source, false) catch return error.InvalidArtifact;
         return children.found;
     }
     const Definitions = struct {
@@ -3158,7 +3122,7 @@ const Walker = struct {
                     work.appendSlice(std.heap.page_allocator, &.{ operation.capability, operation.witness }) catch return error.InvalidArtifact;
                 } else if (node.tag == .package_pack) {
                     work.appendSlice(std.heap.page_allocator, self.module.children(source)) catch return error.InvalidArtifact;
-                } else @import("../eval/body_recipe.zig").appendChildren(&work, std.heap.page_allocator, self.module, source, false) catch return error.InvalidArtifact;
+                } else @import("body_recipe.zig").appendChildren(&work, std.heap.page_allocator, self.module, source, false) catch return error.InvalidArtifact;
                 return node.tag == .return_ or node.tag == .break_ or node.ty == T.never;
             },
         }

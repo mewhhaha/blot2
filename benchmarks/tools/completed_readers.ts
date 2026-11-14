@@ -163,8 +163,6 @@ for (const callers of [1, 4, 8]) {
           stdRoot: resolve(root, "std"),
           prelude: resolve(root, "std/prelude.blot"),
           profileBackend: true,
-          codegenTier: values.tier,
-          codegenWorkers: 1,
           startupTimeoutMs: 5000,
         });
         const buildStarted = performance.now();

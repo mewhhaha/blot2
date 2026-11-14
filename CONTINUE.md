@@ -2,35 +2,40 @@
 
 The owner's order (14 November 2026): make the direct backend
 (compiler/src/direct/, [plan](tasks/FAST_COMPILE.md)) the only backend and
-delete the scoped one ([deletion](tasks/DELETE_SCOPED.md)), then carry out
-the approved [language coherence list](tasks/LANGUAGE_COHERENCE.md) (memory
-model first), then port the result to Goose.
+delete the scoped one ([deletion](tasks/DELETE_SCOPED.md), done), then carry
+out the approved [language coherence list](tasks/LANGUAGE_COHERENCE.md)
+(memory model first), then port the result to Goose.
 
 ## Current frontier
 
-- **Direct backend.** The only code generator `blotc` runs; the CLI and the
-  project protocol no longer select a backend or a codegen tier.
+- **Direct backend.** The only code generator. `compiler/src/compile.zig` is
+  its interface; `backend/`, `eval/` and `runtime/` and the scoped parts of
+  `reuse/` are deleted (about 160,000 lines; tasks/DELETE_SCOPED.md). The CLI
+  and the project protocol no longer select a backend or a codegen tier.
   `serve-project` builds each revision fresh (load, check, lower, compile),
   taking a dependency bundle's unchanged modules as checked; checkpoints,
-  restart caches and retained candidates are gone from the protocol. The
-  scoped backend's code is still in the tree until its deletion lands.
+  restart caches and retained candidates are gone.
 - **Gdev Main.** On a release compiler it builds in 1.15 s against the scoped
   backend's 6.61 s (backend 95 ms against 5,533 ms), producing 2.7 MB of Wasm
   against 9.2 MB. Its first Pen frame is byte-identical (frame.png 19a03f0a…,
   frames.trace 86d50101…). Its guest frame time is 0.079 ms median against
   2.45 ms.
-- **Ink.** Ink's suite matches the scoped backend on all 64 modules both
-  compile. The direct backend also passes extractions, retained and
-  simd-batches, which the scoped backend rejects.
+- **Ink.** Ink's suite (`pen test-blot`) matches the scoped backend's last
+  results on all 64 modules both compiled; the direct backend also passes
+  extractions, retained and simd-batches, which the scoped backend rejected.
 - **Guest suite.** Tests of scoped internals and dropped features are
   deleted, expectations follow the approved changes (aliased writes,
   instantiation-time constants, required signatures), and every remaining
   case passes or is ignored with its reason. tasks/DELETE_SCOPED.md lists the
   ignored cases by kind.
+- **Native suites.** `syntax`, `types`, `checker` and `project`
+  (`-Dtest-suite`); `check:dev` defaults to the `direct` area. Two checker
+  laws fail at ca3aa93c already (`numeric proof headers reject hidden kinds
+  ...` and `value and effect quantifiers freshen independently ...`).
 
-**Next:** delete `backend/`, `eval/`, `runtime/` and the scoped parts of
-`reuse/` (tasks/DELETE_SCOPED.md, "Code deletion plan"), then fix the
-ignored cases that emit invalid Wasm or wrong results.
+**Next:** fix the ignored cases that emit invalid Wasm or wrong results
+(tasks/DELETE_SCOPED.md), and remove the checker's now-unused cross-revision
+reuse (body check caches, frontend cutoffs) with the incremental redesign.
 
 ## Commands
 

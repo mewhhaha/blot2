@@ -14,7 +14,7 @@ const format = @import("dependency_format.zig");
 const ast = @import("../parse/ast.zig");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
-const native_assets = @import("../backend/native_assets.zig");
+const native_assets = @import("../assets/native_assets.zig");
 const phase_profile = @import("../phase_profile.zig");
 const Policy = @import("../execution_policy.zig").Policy;
 
@@ -35,10 +35,26 @@ const Request = struct {
     profileBackend: bool = false,
     profileTrace: bool = false,
     /// Accepted and validated; the direct backend lays out its own regions.
-    storage: ?@import("../backend/storage_plan.zig").Budgets = null,
+    storage: ?StorageBudgets = null,
     sources: []const SourceRange = &.{},
     nativeAssets: ?native_assets.Options = null,
     assetSources: []const SourceRange = &.{},
+};
+/// Pen forwards these from a program's settings. Byte budgets are positive
+/// multiples of 16 and the owner capacity is positive.
+const StorageBudgets = struct {
+    temporaryBytes: u32 = 1024 * 1024,
+    growerBytes: u32 = 1024 * 1024,
+    persistentBytes: u32 = 1024 * 1024,
+    transportBytes: u32 = 2 * 1024 * 1024,
+    ownerCapacity: u32 = 4096,
+    fn valid(self: StorageBudgets) bool {
+        inline for (.{ "temporaryBytes", "growerBytes", "persistentBytes", "transportBytes" }) |field| {
+            const value = @field(self, field);
+            if (value == 0 or value % 16 != 0) return false;
+        }
+        return self.ownerCapacity != 0;
+    }
 };
 const request_parse_options: std.json.ParseOptions = .{ .allocate = .alloc_always, .duplicate_field_behavior = .@"error", .ignore_unknown_fields = false };
 const SourceRange = struct { path: []const u8, start: u32, length: u32, deleted: bool = false };
@@ -162,7 +178,7 @@ const OpenProject = struct {
             };
             defer canonical.deinit(a);
             if (!std.mem.eql(u8, &self.seed_settings, &dep_cli.settings(canonical.view(snapshot.options)))) break :seeded;
-            const reuse = (try snapshot.libraryModules(io, seed)) orelse break :seeded;
+            const reuse = (try snapshot.reusableModules(io, seed)) orelse break :seeded;
             defer a.free(reuse);
             var source = project.loadCompiledMixedReadOnly(a, io, self.entry, snapshot.options, seed, snapshot.provider(), reuse) catch |err| {
                 if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -195,42 +211,8 @@ const Diagnostic = struct {
     message: []const u8,
     offset_encoding: []const u8 = "utf8_bytes",
     utf16: ?ast.Span = null,
-    details: ?IssueDetails = null,
-    related: ?@import("../check/diagnostic_location.zig").Location = null,
-    origins: []const @import("../check/diagnostic_location.zig").Origin = &.{},
-
-    pub fn jsonStringify(self: Diagnostic, stream: *std.json.Stringify) std.Io.Writer.Error!void {
-        try stream.beginObject();
-        inline for (@typeInfo(Diagnostic).@"struct".field_names) |name| {
-            if (comptime std.mem.eql(u8, name, "related")) {
-                if (self.related) |related| {
-                    try stream.objectField(name);
-                    try stream.write(related);
-                }
-            } else if (comptime std.mem.eql(u8, name, "origins")) {
-                if (self.origins.len != 0) {
-                    try stream.objectField(name);
-                    try stream.write(self.origins);
-                }
-            } else {
-                try stream.objectField(name);
-                try stream.write(@field(self, name));
-            }
-        }
-        try stream.endObject();
-    }
-};
-/// Forwarded diagnostic details: a frontend publication's JSON or the
-/// backend's dispatch explanation.
-const IssueDetails = union(enum) {
-    bytes: []const u8,
-    explanation: *const @import("dispatch_explanation.zig").Explanation,
-    pub fn jsonStringify(self: IssueDetails, writer: anytype) !void {
-        switch (self) {
-            .bytes => |bytes| try (@import("dependency_consumer.zig").Details{ .bytes = bytes }).jsonStringify(writer),
-            .explanation => |explanation| try writer.write(.{ .explanation = explanation.* }),
-        }
-    }
+    /// A frontend publication's forwarded JSON details.
+    details: ?@import("dependency_consumer.zig").Details = null,
 };
 fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
     const filename = result.diagnostic_filename orelse entry;
@@ -247,13 +229,10 @@ fn issue(result: *const partial.Result, entry: []const u8) !Diagnostic {
     if (result.result.compiled.diagnostic) |d| return .{
         .filename = filename,
         .stage = "emit",
-        .related = if (d.related) |location| @import("../check/diagnostic_location.zig").Location.init(result.related_filename orelse return error.MissingRelatedFilename, location.span) else null,
-        .origins = result.origins.entries,
         .code = @tagName(d.code),
         .start = d.span.start,
         .end = d.span.end,
         .message = d.message(),
-        .details = if (result.result.compiled.explanation) |*explanation| .{ .explanation = explanation } else null,
     };
     return error.MissingRejectionDiagnostic;
 }
@@ -325,7 +304,7 @@ fn build(a: Allocator, io: Io, writer: *Io.Writer, opened: *OpenProject, id: u32
     var result = emitted: {
         const timing = phase_profile.enter(.backend);
         defer timing.exit();
-        break :emitted try ready.emitWithOptions(session, .{ .policy = .{ .backend = .direct } });
+        break :emitted try ready.emit(session);
     };
     defer result.deinit(session);
     if (result.result.compiled.diagnostic != null) return reject(a, writer, id, opened.revisions, try issue(&result, opened.entry));

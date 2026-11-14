@@ -1,21 +1,8 @@
-//! Execution choices are owned by a compilation/session. They never grant
-//! cache validity; source, evidence, executable and value checks remain distinct.
-//! Compiler behavior is not policy: fresh and retained builds run the same
-//! implementation, and artifact retention follows the retained session.
-pub const Backend = enum { scoped, direct };
+//! Execution choices owned by one compilation or session. They never change
+//! the emitted bytes.
 pub const Policy = struct {
-    storage: @import("backend/storage_plan.zig").Budgets = .{},
-    codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
-    /// The modular direct backend (tasks/FAST_COMPILE.md) or the scoped one.
-    backend: Backend = .scoped,
-    share_machine_code: bool = false,
-    /// Diagnostic final-Wasm counters; absent from ordinary release output.
-    memory_profile: bool = false,
-    /// Reject unless the complete module has a checked collector-free certificate.
-    require_collector_free: bool = false,
-    codegen_workers: u8 = 1,
+    /// Workers lowering independent modules to Core.
     semantic_workers: u8 = 1,
+    /// Workers checking independent modules.
     frontend_workers: u8 = 4,
-    /// Run the same private component path with one worker for qualification.
-    semantic_components: bool = false,
 };

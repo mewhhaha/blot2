@@ -9,11 +9,10 @@ transport from [PROJECT_PROTOCOL.md](PROJECT_PROTOCOL.md).
 ## Native request
 
 Extend protocol version 1 with optional capability `editor-completion-v1` and
-request kind `complete` (numeric enum tag 4; existing tags do not change). A
+request kind `complete` (numeric enum tag 3). A
 host must see that capability before sending the request; existing servers
 cannot parse it. Existing requests and replies keep their shapes. A completion
-query never emits Wasm, runs const initializers, advances `revision`, replaces
-the retained build, or saves a restart cache.
+query never emits Wasm, runs const initializers or advances `revision`.
 
 | Field      | Type                   | Rule                                                            |
 | ---------- | ---------------------- | --------------------------------------------------------------- |
@@ -27,7 +26,7 @@ the retained build, or saves a restart cache.
 | `sources`  | array of source ranges | optional, default `[]`; same fields and payload rules as build  |
 
 Open-only fields must remain at their protocol defaults. `snapshot`, `filename`
-and `position` must be absent or null on open/build/close/checkpoint; a non-null
+and `position` must be absent or null on open/build/close; a non-null
 value there is InvalidRequest. On complete, missing/null snapshot, filename or
 position is terminal InvalidCompletionRequest. Canonical JSON types are required
 of hosts; native parsing preserves version 1's documented integer and enum
@@ -224,7 +223,7 @@ matches, with the real syntax diagnostics. Syntax after an earlier error must
 not manufacture bindings or expected types. Inside comments, strings and import
 path strings, return success with empty items, context null, empty diagnostics
 and an empty edit span. No query requires an entry export or guest-ABI-valid
-result. No source repair or synthetic declaration reaches a build/checkpoint.
+result. No source repair or synthetic declaration reaches a build.
 
 Limits are fixed for completion v1:
 

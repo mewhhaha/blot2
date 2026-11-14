@@ -12,7 +12,6 @@ import {
   nativeToolchainFiles,
   recentFailures,
 } from "./compiler_gate_state.ts";
-import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
 import { compilerLease } from "./compiler_lease.ts";
 import { nativeExecutionArtifacts } from "./run_native_tests.ts";
 export { cacheStatus, runPhase } from "./compiler_phase.ts";
@@ -123,7 +122,7 @@ async function main() {
   if (values.help) {
     console.log(
       "test:compiler [--resume] [--serial] [--jobs 1..4] [--build-jobs N] [--native-shards 1..4] [--oom-profile] [--force-native]\n" +
-        "test:compiler:dev [--native-suite all|syntax|types|runtime|checker|evaluator|backend|retained] [--native-filter NAME] [--filter NAME] [FILES...]\n" +
+        "test:compiler:dev [--native-suite all|syntax|types|checker|project] [--native-filter NAME] [--filter NAME] [FILES...]\n" +
         "test:guest [--jobs 1..4] [--filter NAME] [FILES...]\n" +
         "All modes: [--budget-seconds N] [--phase-seconds N] [--heartbeat-seconds N] [--timings-dir PATH]\n" +
         "Full gate: [--preflight FILE] repeats recent failed guest files before LLVM builds.\n" +
@@ -185,16 +184,7 @@ async function main() {
       "Native unit tests use Zig's backend; LLVM is reserved for the release compiler",
     );
   }
-  const suites = [
-    "all",
-    "syntax",
-    "types",
-    "runtime",
-    "checker",
-    "evaluator",
-    "backend",
-    "retained",
-  ];
+  const suites = ["all", "syntax", "types", "checker", "project"];
   if (!suites.includes(values["native-suite"])) {
     throw new Error(`--native-suite must be ${suites.join(", ")}`);
   }
@@ -431,7 +421,7 @@ async function main() {
       await flush();
     }
   };
-  const build = (dev: boolean, files: string[]) => {
+  const build = (dev: boolean) => {
     const args = [
       Deno.execPath(),
       "run",
@@ -441,10 +431,7 @@ async function main() {
       "scripts/build_compiler.ts",
     ];
     if (dev) args.push("--dev");
-    args.push(
-      `--fixtures=${fixturesForGuestFiles(files).join(",")}`,
-      `--jobs=${buildJobs}`,
-    );
+    args.push(`--jobs=${buildJobs}`);
     return args;
   };
   const guests = (
@@ -479,13 +466,7 @@ async function main() {
     let developmentFiles = positionals;
     if (!developmentFiles.length) developmentFiles = smokeFiles;
     if (smoke || (values.dev && requestedGuests)) {
-      let name = "development-build";
-      let files = developmentFiles;
-      if (smoke) {
-        name = "smoke-build";
-        files = [...smokeFiles, ...preflightFiles];
-      }
-      await phase(name, build(true, files));
+      await phase(smoke ? "smoke-build" : "development-build", build(true));
     } else if (values.dev && requestedNative) {
       const version = await phase("zig-version", ["zig", "version"]);
       const installed = (await Deno.readTextFile(version.stdout)).trim();
@@ -541,7 +522,6 @@ async function main() {
           "tests/tooling/bench_compile.test.ts",
           "tests/tooling/compiler_gate_state.test.ts",
           "tests/tooling/compiler_fingerprint.test.ts",
-          "tests/tooling/compiler_fixtures.test.ts",
           "tests/tooling/build_compiler.test.ts",
           "tests/tooling/native_test_runner.test.ts",
           "tests/tooling/run_native_tests.test.ts",
@@ -556,7 +536,7 @@ async function main() {
             "test-compile",
             ...nativeOptions,
           ], native);
-        const release = () => phase("release-build", build(false, files));
+        const release = () => phase("release-build", build(false));
         const laws = () =>
           phase(
             "native-run",

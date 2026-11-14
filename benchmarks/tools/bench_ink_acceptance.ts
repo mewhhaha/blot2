@@ -27,8 +27,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
     imports: { "ink/": `${ink}/lib/` },
     stdRoot: `${root}/std/`,
     prelude: `${root}/std/prelude.blot`,
-    codegenTier,
-    codegenWorkers: 1,
   });
   try {
     const built = await compiler.build();
@@ -59,7 +57,6 @@ for (const codegenTier of ["development", "optimized"] as const) {
         );
       }
       rows.push({
-        codegenTier,
         calls: 3000,
         guest_memory_bytes: warmed,
         wasm_sha256: await hash(built.bytes),

@@ -8,7 +8,6 @@ import {
   nativeInputs,
 } from "./compiler_gate_state.ts";
 import { compilerLease } from "./compiler_lease.ts";
-import { fixturesForGuestFiles } from "./compiler_fixtures.ts";
 import {
   devCheckAreas,
   type NativeTestRecord,
@@ -36,7 +35,7 @@ async function main() {
   const { values } = parseArgs({
     args: Deno.args,
     options: {
-      area: { type: "string", default: "static-sharing" },
+      area: { type: "string", default: "direct" },
       "budget-seconds": { type: "string", default: "300" },
       "timings-dir": { type: "string", default: "build/bench/check-dev" },
       help: { type: "boolean", default: false },
@@ -183,7 +182,6 @@ async function main() {
       "--allow-run=zig",
       "scripts/build_compiler.ts",
       "--dev",
-      `--fixtures=${fixturesForGuestFiles(area.guests).join(",")}`,
       "--jobs=2",
     ], (buildDeadline - performance.now()) / 1000);
     await phase(

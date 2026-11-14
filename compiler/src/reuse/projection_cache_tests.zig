@@ -1,6 +1,6 @@
 const std = @import("std");
 const T = @import("../check/types.zig");
-const E = @import("../eval/type_evidence.zig");
+const E = @import("../check/type_evidence.zig");
 const Cache = @import("projection_cache.zig").Cache;
 const Allocator = std.mem.Allocator;
 fn compare(cache: *Cache, source: *T.Store, target: *E.Store, root: u32) !u32 {

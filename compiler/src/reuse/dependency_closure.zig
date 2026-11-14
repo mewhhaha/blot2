@@ -6,10 +6,8 @@ const project = @import("project.zig");
 const project_check = @import("project_check.zig");
 const core = @import("../check/core.zig");
 const core_builder = @import("../check/core_builder.zig");
-const partial = @import("partial_dependency.zig");
 const PI = @import("principal_interface.zig");
 const D = @import("frozen_dependency.zig");
-const retained = @import("retained_dependency.zig");
 const snapshot = @import("dependency_snapshot.zig");
 const format = @import("dependency_format.zig");
 const relink = @import("dependency_relink.zig");
@@ -17,7 +15,6 @@ const core_validation = @import("../check/frozen_core_validation.zig");
 const principal_validation = @import("dependency_interface_validation.zig");
 const phase_profile = @import("../phase_profile.zig");
 const parallel_lowering = @import("../check/parallel_lowering.zig");
-const completed = @import("completed_core_validation.zig");
 pub const Error = std.mem.Allocator.Error || error{ InvalidArtifact, DependencyLimit, CoreLimit };
 
 fn ordinal(source: *const project.Project, unit: u32) Error!u32 {
@@ -142,10 +139,6 @@ fn copyCoreValue(a: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!@
 const Cores = union(enum) {
     /// Lower afresh from the checked source.
     lower,
-    /// Copy prepared Core that its preparation keeps owning.
-    copy: []const core.Module,
-    /// Move fresh Core out of its preparation instead of copying it.
-    take: *partial.Prepared,
     /// Take Core that workers lowered afresh from the checked source.
     lowered: *parallel_lowering.Batch,
 };
@@ -179,8 +172,6 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
             defer timing.exit();
             break :lowered try core_builder.lowerWithOrigins(a, &src.tree, &source.symbols, &typed.checked, .{ .context = source, .lookup = project_check.diagnosticModuleOrigin });
         },
-        .copy => |prepared| try copyCoreValue(a, prepared[unit - 1]),
-        .take => |prepared| try prepared.takeCore(unit - 1),
         .lowered => |batch| try batch.take(unit - 1),
     };
     errdefer ir.deinit(a);
@@ -238,83 +229,9 @@ fn freezeOne(a: std.mem.Allocator, source: *const project.Project, checked: *con
 /// Returned slices exclusively own their storage and use artifact unit IDs.
 /// Release with dependency_format.deinit(allocator, &result).
 pub fn freeze(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject) Error!D.FrozenDependency {
-    return freezeMode(a, source, checked, .lower, null);
+    return freezeMode(a, source, checked, .lower);
 }
 
-/// Private same-captured-project path. The caller must retain the successful
-/// fresh Prepared and the CheckedProject transferred from that same prepare.
-/// Executable Core moves out of `prepared` without a copy: once the guards
-/// pass, its nonentry units are left empty, safe only to release, whether or
-/// not freezing succeeds. Principal interfaces are frozen afresh from the
-/// exact checked source. No solver or caller evidence is admitted here.
-pub fn freezeFromCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared) Error!D.FrozenDependency {
-    return freezeCheckedCore(a, source, checked, prepared, null);
-}
-pub fn freezeFromCheckedCoreSnapshot(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared) Error!*retained.Snapshot {
-    var receipt: ?*completed.Receipt = null;
-    const value = try freezeCheckedCore(a, source, checked, prepared, &receipt);
-    return adoptCompleted(a, value, receipt.?);
-}
-fn freezeCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared, receipt: ?*?*completed.Receipt) Error!D.FrozenDependency {
-    const timing = phase_profile.enter(.freeze);
-    defer timing.exit();
-    try require(prepared.cached == 0 and !prepared.source_mode and prepared.entry == source.entry and prepared.prelude == source.prelude_unit);
-    try require(prepared.units.len == source.units.items.len and prepared.paths.len == source.units.items.len);
-    const identity = prepared.identity.view();
-    try require(identity.owners.len == source.units.items.len and identity.symbols.len == source.symbols.entries.items.len + 1);
-    for (source.symbols.entries.items, 1..) |_, id| {
-        const spelling = identity.symbol(@intCast(id)) orelse return error.InvalidArtifact;
-        try require(std.mem.eql(u8, spelling, source.symbols.get(@intCast(id))));
-    }
-    for (prepared.units, prepared.paths, 1..) |*ir, path, id| {
-        const owner = identity.owner(@intCast(id)) orelse return error.InvalidArtifact;
-        try require(ir.unit == id and ir.diagnostics.len == 0);
-        try require(std.mem.eql(u8, path, source.filename(@intCast(id))) and std.mem.eql(u8, owner, path));
-    }
-    return freezeMode(a, source, checked, .{ .take = prepared }, receipt);
-}
-
-/// Private population path: the entry of this exact captured Project is still
-/// deferred (project_check.checkProjectDeferringEntry), so nothing about it is
-/// read. Every dependency is lowered and frozen exactly as freeze does.
-pub fn freezeDeferringEntry(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject) Error!D.FrozenDependency {
-    return freezeDeferred(a, source, checked, null);
-}
-pub fn freezeDeferringEntrySnapshot(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject) Error!*retained.Snapshot {
-    var receipt: ?*completed.Receipt = null;
-    const value = try freezeDeferred(a, source, checked, &receipt);
-    return adoptCompleted(a, value, receipt.?);
-}
-fn adoptCompleted(a: std.mem.Allocator, value: D.FrozenDependency, receipt: *completed.Receipt) Error!*retained.Snapshot {
-    var moved = value;
-    errdefer format.deinit(a, &moved);
-    errdefer receipt.deinit(a);
-    const owner = try retained.Snapshot.adopt(a, value);
-    owner.validated = true;
-    owner.core_validation = receipt;
-    return owner;
-}
-fn freezeDeferred(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, receipt: ?*?*completed.Receipt) Error!D.FrozenDependency {
-    const timing = phase_profile.enter(.freeze);
-    defer timing.exit();
-    try require(checked.deferred_entry != null and source.compiled_modules.len == 0);
-    return freezeMode(a, source, checked, .lower, receipt);
-}
-
-pub fn freezeFromMixedCheckedCore(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *const partial.Prepared) Error!D.FrozenDependency {
-    const timing = phase_profile.enter(.freeze);
-    defer timing.exit();
-    try checkMixed(source, prepared);
-    return freezeMode(a, source, checked, .{ .copy = prepared.units }, null);
-}
-fn checkMixed(source: *const project.Project, prepared: *const partial.Prepared) Error!void {
-    try require(source.compiled_reuse.len == source.compiled_modules.len and source.entry == source.units.items.len);
-    try require(source.compiled_modules.len + 1 == source.units.items.len and prepared.entry == source.entry and prepared.prelude == source.prelude_unit and !prepared.source_mode);
-    try require(prepared.units.len == source.units.items.len and prepared.paths.len == source.units.items.len);
-    for (prepared.units, prepared.paths, 1..) |ir, path, id| {
-        try require(ir.unit == id and ir.diagnostics.len == 0 and std.mem.eql(u8, path, source.filename(@intCast(id))));
-    }
-}
 fn checkChecked(source: *const project.Project, checked: *const project_check.CheckedProject) Error!void {
     try require(source.diagnostics.items.len == 0 and checked.diagnostics.len == 0);
     try require(source.entry != 0 and source.entry <= source.units.items.len and checked.modules.len == source.units.items.len);
@@ -323,182 +240,7 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
         try require(m != null and m.?.valid);
     };
 }
-
-/// Retained entry-last preparation. The supplied snapshot exclusively controls
-/// the lifetime of its immutable module payloads. Sharing grants storage and
-/// structural validation reuse only; source/check admission already completed.
-/// Fresh modules' Core moves out of `prepared` as in freezeFromCheckedCore.
-pub fn freezeSharedFromMixed(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, prepared: *partial.Prepared, previous: *const retained.Snapshot, stats: *retained.Stats) Error!*retained.Snapshot {
-    const timing = phase_profile.enter(.freeze);
-    defer timing.exit();
-    try checkMixed(source, prepared);
-    try checkChecked(source, checked);
-    try require(previous.initialized == previous.modules.len and source.compiled_modules.ptr == previous.value.modules.ptr and source.compiled_modules.len == previous.value.modules.len);
-    const symbols = try a.alloc(D.Symbol, source.symbols.entries.items.len + 1);
-    @memset(symbols, .{ .text = &.{} });
-    var owned_symbols = true;
-    defer if (owned_symbols) {
-        for (symbols) |symbol| a.free(symbol.text);
-        a.free(symbols);
-    };
-    for (symbols[1..], 1..) |*symbol, id| symbol.text = try a.dupe(u8, source.symbols.get(@intCast(id)));
-    const result = try retained.Snapshot.create(a, symbols, source.compiled_modules.len);
-    owned_symbols = false;
-    errdefer result.deinit();
-    const units = try a.alloc(u32, source.units.items.len);
-    defer a.free(units);
-    for (units, 1..) |*id, index| id.* = if (index == source.entry) 0 else @intCast(index);
-    for (0..source.compiled_modules.len) |index| {
-        const id: u32 = @intCast(index + 1);
-        if (checked.compiledModule(source, id)) |module| {
-            if (module == &previous.value.modules[index]) {
-                try result.appendShared(previous, index);
-                stats.shared_modules += 1;
-            } else {
-                try result.appendOwned(try copyModule(a, module));
-                stats.fresh_modules += 1;
-            }
-        } else {
-            try result.appendOwned(try freezeOne(a, source, checked, id, units, .{ .take = prepared }));
-            stats.fresh_modules += 1;
-        }
-    }
-    _ = try validateMode(a, &result.value, result, previous, stats, false);
-    try validateSources(&result.value, source);
-    result.validated = true;
-    return result;
-}
-/// What the entry-switch lane froze: `seed` is the entry's dependency
-/// closure, numbered and ordered as a fresh load of the program numbers it;
-/// `library`, when it could be kept, holds every module of the previous
-/// library with this lane's fresh modules in place or appended.
-pub const Relocation = struct {
-    seed: *retained.Snapshot,
-    library: ?*retained.Snapshot,
-    /// Library modules reused in the seed without checking them again.
-    relocated: usize = 0,
-};
-
-/// Freezes a project loaded by project.loadLibraryReadOnly whose dependencies
-/// were checked with the entry deferred. `order` is project.freshOrder of the
-/// same project. Seed modules are copies of library modules, renumbered as a
-/// fresh load numbers them, so the seed equals the closure a fresh load would
-/// freeze up to symbol IDs (whose dictionary keeps the library's spellings,
-/// as every retained seed keeps its earlier ones). The library is dropped when
-/// a changed library module stayed unreached, because a library entry is
-/// reused only while its source and its imports' entries are current, or when
-/// it outgrows `library_budget` source bytes.
-pub fn freezeLibrary(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, library: *const retained.Snapshot, order: []const u32, library_budget: usize, stats: *retained.Stats) Error!Relocation {
-    const timing = phase_profile.enter(.freeze);
-    defer timing.exit();
-    const count = library.value.modules.len;
-    try require(source.input_mode == .project and source.diagnostics.items.len == 0 and checked.diagnostics.len == 0 and checked.deferred_entry != null);
-    try require(library.initialized == count and source.compiled_modules.ptr == library.value.modules.ptr and source.compiled_modules.len == count);
-    try require(source.compiled_reuse.len == count and source.entry == count + 1 and checked.modules.len == source.units.items.len);
-    try require(source.prelude_unit == 0 or (source.prelude_unit <= count and source.compiledModule(source.prelude_unit) != null));
-    const units = source.units.items.len;
-    // Library numbering: library modules keep theirs, the entry leaves.
-    const library_units = try a.alloc(u32, units);
-    defer a.free(library_units);
-    for (library_units, 1..) |*id, unit| id.* = if (unit <= count) @intCast(unit) else if (unit == source.entry) 0 else @intCast(unit - 1);
-    const reached = try a.alloc(bool, units);
-    defer a.free(reached);
-    @memset(reached, false);
-    for (order) |unit| {
-        try require(unit != 0 and unit <= units and unit != source.entry and !reached[unit - 1]);
-        reached[unit - 1] = true;
-        if (source.compiledModule(unit) == null) {
-            const typed = if (checked.modules[unit - 1]) |*module| module else return error.InvalidArtifact;
-            try require(typed.valid and typed.checked.diagnostics.len == 0);
-        }
-    }
-    for (count + 1..units) |index| try require(index + 1 == source.entry or reached[index]);
-    var keep = true;
-    for (0..count) |index| keep = keep and (reached[index] or source.compiledModule(index + 1) != null);
-
-    const next = try createSnapshot(a, source, units - 1);
-    var next_alive = true;
-    defer if (next_alive) next.deinit();
-    var lowered = try lowerFresh(a, source, checked, library_units);
-    defer if (lowered) |*batch| batch.deinit();
-    for (1..units + 1) |unit| {
-        if (unit == source.entry) continue;
-        if (unit <= count and (source.compiledModule(unit) != null or !reached[unit - 1])) {
-            try next.appendShared(library, unit - 1);
-            stats.shared_modules += 1;
-            continue;
-        }
-        const module = fresh: {
-            var module = try freezeOne(a, source, checked, @intCast(unit), library_units, if (lowered) |*batch| .{ .lowered = batch } else .lower);
-            errdefer format.deinit(a, &module);
-            if (units != count + 1) {
-                try relink.moduleUnits(&module.core, library_units);
-                try relink.interfaceUnits(&module.interface, library_units);
-                for (module.exports) |*exported| exported.target.unit = try mapped(library_units, exported.target.unit);
-                for (module.fixities) |*f| f.producer.unit = try mapped(library_units, f.producer.unit);
-            }
-            break :fresh module;
-        };
-        try next.appendOwned(module);
-        stats.fresh_modules += 1;
-    }
-
-    // Seed numbering: the fresh load's order over the library's modules.
-    const seed_units = try a.alloc(u32, units - 1);
-    defer a.free(seed_units);
-    @memset(seed_units, 0);
-    for (order, 1..) |unit, id| seed_units[library_units[unit - 1] - 1] = @intCast(id);
-    const seed = try createSnapshot(a, source, order.len);
-    var seed_alive = true;
-    defer if (seed_alive) seed.deinit();
-    var relocated: usize = 0;
-    var seed_bytes: usize = 0;
-    for (order) |unit| {
-        const module = copied: {
-            var module = try copyCoreValue(a, next.value.modules[library_units[unit - 1] - 1]);
-            errdefer format.deinit(a, &module);
-            try relink.moduleUnits(&module.core, seed_units);
-            try relink.interfaceUnits(&module.interface, seed_units);
-            for (module.exports) |*exported| exported.target.unit = try mapped(seed_units, exported.target.unit);
-            for (module.fixities) |*f| f.producer.unit = try mapped(seed_units, f.producer.unit);
-            for (module.imports) |*target| target.* = try mapped(seed_units, target.*);
-            for (module.source_imports) |*request| request.target = try mapped(seed_units, request.target);
-            break :copied module;
-        };
-        seed_bytes += module.identity.source_bytes;
-        try seed.appendOwned(module);
-        relocated += @intFromBool(source.compiledModule(unit) != null);
-    }
-    _ = try validateMode(a, &seed.value, null, null, stats, false);
-    try validateSourcesWith(a, &seed.value, source, order);
-    seed.validated = true;
-
-    var library_bytes: usize = 0;
-    for (next.value.modules) |module| library_bytes += module.identity.source_bytes;
-    if (library_bytes > @max(library_budget, seed_bytes *| 4)) keep = false;
-    seed_alive = false;
-    next_alive = false;
-    if (!keep) next.deinit();
-    // Every library module was validated as a member of the seed that first
-    // froze it (this one for the fresh modules); the library is loader input
-    // only, never published, so it is not marked validated as a closure.
-    return .{ .seed = seed, .library = if (keep) next else null, .relocated = relocated };
-}
-/// An empty snapshot owning a copy of the project's dictionary.
-fn createSnapshot(a: std.mem.Allocator, source: *const project.Project, count: usize) Error!*retained.Snapshot {
-    const symbols = try a.alloc(D.Symbol, source.symbols.entries.items.len + 1);
-    @memset(symbols, .{ .text = &.{} });
-    var owned = true;
-    defer if (owned) {
-        for (symbols) |symbol| a.free(symbol.text);
-        a.free(symbols);
-    };
-    for (symbols[1..], 1..) |*symbol, id| symbol.text = try a.dupe(u8, source.symbols.get(@intCast(id)));
-    const result = try retained.Snapshot.create(a, symbols, count);
-    owned = false;
-    return result;
-}
-fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, cores: Cores, receipt: ?*?*completed.Receipt) Error!D.FrozenDependency {
+fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *const project_check.CheckedProject, cores: Cores) Error!D.FrozenDependency {
     try checkChecked(source, checked);
     var result: D.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
     const units = try a.alloc(u32, source.units.items.len);
@@ -547,13 +289,8 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
             for (m.fixities) |*f| f.producer.unit = try mapped(units, f.producer.unit);
         }
     }
-    var proof: ?*completed.Receipt = null;
-    errdefer if (proof) |owned| owned.deinit(a);
-    if (receipt != null) {
-        proof = try completedCoreValidation(a, &result);
-    } else try validate(a, &result);
+    try validate(a, &result);
     try validateSources(&result, source);
-    if (receipt) |output| output.* = proof;
     return result;
 }
 
@@ -566,10 +303,6 @@ fn external(value: *const D.FrozenDependency, current: usize, target: PI.Externa
 /// Complete owner validation of a decoded closure before numeric relocation.
 /// Provenance/key verification is performed by dependency_format.decode first.
 pub fn validate(a: std.mem.Allocator, value: *const D.FrozenDependency) Error!void {
-    var stats: retained.Stats = .{};
-    _ = try validateMode(a, value, null, null, &stats, false);
-}
-fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current: ?*const retained.Snapshot, previous: ?*const retained.Snapshot, stats: *retained.Stats, padded_entry: bool) Error!usize {
     const trace_space = phase_profile.enterSpace(.core);
     defer trace_space.restore();
     if (phase_profile.currentTrace() != null) {
@@ -578,86 +311,41 @@ fn validateMode(a: std.mem.Allocator, value: *const D.FrozenDependency, current:
     const timing = phase_profile.enter(.validation);
     defer timing.exit();
     try require(value.symbols.len != 0 and value.symbols[0].text.len == 0);
-    const view_count = std.math.add(usize, value.modules.len, @intFromBool(padded_entry)) catch return error.OutOfMemory;
-    const views = try a.alloc(*const core.Module, view_count);
+    const views = try a.alloc(*const core.Module, value.modules.len);
     defer a.free(views);
-    var entry: core.Module = undefined;
-    if (padded_entry) {
-        try require(view_count < std.math.maxInt(u32));
-        entry = emptyCore(@intCast(view_count));
-        views[value.modules.len] = &entry;
-    }
-    const closure_views = views[0..value.modules.len];
-    for (value.modules, closure_views, 1..) |*m, *view, id| {
+    for (value.modules, views, 1..) |*m, *view, id| {
         try require(m.core.unit == id and m.interface.unit == id);
         view.* = &m.core;
     }
     const Run = struct {
-        pub fn run(args: anytype, batch: *const core_validation.Batch) Error!usize {
+        pub fn run(args: anytype, batch: *const core_validation.Batch) Error!void {
             return @call(.auto, validateModules, args ++ .{batch});
         }
     };
-    return core_validation.withBatch(.{ .units = views, .symbol_count = value.symbols.len, .forbidden_owner = if (padded_entry) entry.unit else null }, .{ a, value, current, previous, stats, views, padded_entry }, Run);
+    return core_validation.withBatch(.{ .units = views, .symbol_count = value.symbols.len }, .{ a, value, views }, Run);
 }
-fn validateModules(a: std.mem.Allocator, value: *const D.FrozenDependency, current: ?*const retained.Snapshot, previous: ?*const retained.Snapshot, stats: *retained.Stats, views: []const *const core.Module, padded_entry: bool, batch: *const core_validation.Batch) Error!usize {
+fn validateModules(a: std.mem.Allocator, value: *const D.FrozenDependency, views: []const *const core.Module, batch: *const core_validation.Batch) Error!void {
     var paths: std.StringHashMapUnmanaged(void) = .empty;
     defer paths.deinit(a);
     var prelude_count: usize = 0;
     const prelude_unit: u32 = for (value.modules, 1..) |m, id| {
         if (m.identity.prelude) break @intCast(id);
     } else 0;
-    const closure_views = views[0..value.modules.len];
-    const saved = if (previous) |old| if (old.validated) old else null else null;
-    const previous_views: []*const core.Module = if (saved) |old| try a.alloc(*const core.Module, old.value.modules.len) else &.{};
-    defer a.free(previous_views);
-    if (saved) |old| {
-        for (old.value.modules, previous_views) |*module, *view| view.* = &module.core;
-    }
-    // Validation reads foreign modules only through unit references, so a
-    // shared module whose transitive owners are all shared validates exactly
-    // as before when the module count is unchanged: symbol IDs are only ever
-    // bounded above by the dictionary, which is append-only across revisions.
-    // A shared interface reads nothing foreign and keeps its receipt likewise.
-    const owner_bounds = if (saved) |old| value.modules.len == old.value.modules.len and value.symbols.len >= old.value.symbols.len else false;
-    var exact_owners: ?@import("dependency_core_inputs.zig").Owners = null;
-    var owners_examined = false;
-    defer if (exact_owners) |*owners| owners.deinit(a);
     var resolution_remaining: usize = 1_000_000;
     var associated_remaining: usize = 1_000_000;
     for (value.modules, 0..) |*m, id| {
-        const shared = if (saved) |old| if (current) |owner| owner.shares(old, id) else false else false;
         try require(std.Io.Dir.path.isAbsolute(m.identity.normalized_path));
         const path = try paths.getOrPut(a, m.identity.normalized_path);
         try require(!path.found_existing);
         prelude_count += @intFromBool(m.identity.prelude);
         try require(prelude_count <= 1);
-        if (shared and owner_bounds) {
-            stats.interface_reused += 1;
-        } else {
-            try principal_validation.validate(&m.interface, value.symbols.len, value.modules.len);
-            try principal_validation.validateGraphWithBudget(a, &m.interface, &associated_remaining);
-            stats.interface_checked += 1;
-        }
-        const context: core_validation.Context = .{ .units = views, .symbol_count = value.symbols.len, .source_length = m.identity.source_bytes, .forbidden_owner = if (padded_entry) @intCast(views.len) else null };
-        const same_core_context = if (shared and !m.core.has_numeric_proofs) core_validation.equivalentContext(.{ .units = previous_views, .symbol_count = saved.?.value.symbols.len, .source_length = saved.?.value.modules[id].identity.source_bytes }, context, &.{&saved.?.value.modules[id].core}, &.{&m.core}) else false;
-        var same_owned_context = false;
-        if (shared and !same_core_context) {
-            if (!owners_examined) {
-                owners_examined = true;
-                if (owner_bounds) exact_owners = try @import("dependency_core_inputs.zig").Owners.init(a, current.?, saved.?);
-            }
-            if (exact_owners) |owners| same_owned_context = owners.stable[id];
-        }
-        if (same_core_context or same_owned_context) {
-            stats.core_reused += 1;
-        } else {
-            try batch.validateWithBudget(a, &m.core, m.identity.source_bytes, &associated_remaining);
-            for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
-            stats.core_checked += 1;
-        }
+        try principal_validation.validate(&m.interface, value.symbols.len, value.modules.len);
+        try principal_validation.validateGraphWithBudget(a, &m.interface, &associated_remaining);
+        try batch.validateWithBudget(a, &m.core, m.identity.source_bytes, &associated_remaining);
+        for (m.core.field_names) |field| try require(std.mem.eql(u8, m.core.name(field.spelling), value.symbols[field.symbol].text));
         try @import("module_abstraction_validation.zig").publicView(a, &m.interface);
         try @import("../check/associated_admission.zig").publicCoreWithBudget(a, &m.interface, &m.core, &associated_remaining);
-        try @import("../eval/implementation_admission.zig").publicCore(a, &m.interface, &m.core, &associated_remaining);
+        try @import("../check/implementation_admission.zig").publicCore(a, &m.interface, &m.core, &associated_remaining);
         for (m.core.bodies) |body| try require(!body.exported);
         for (m.imports) |unit| try require(unit != 0 and unit <= value.modules.len and unit != id + 1);
         try require(m.imports.len == m.source_imports.len + @intFromBool(m.implicit_prelude));
@@ -702,10 +390,9 @@ fn validateModules(a: std.mem.Allocator, value: *const D.FrozenDependency, curre
         }
     }
     try validateImportGraph(a, value);
-    try @import("module_abstraction_validation.zig").storageClosure(a, value.modules, closure_views);
+    try @import("module_abstraction_validation.zig").storageClosure(a, value.modules, views);
     try @import("../check/associated_admission.zig").originalProducersWithBudget(a, value.modules, &associated_remaining);
-    try @import("../eval/implementation_admission.zig").originalProducers(a, value.modules, &associated_remaining);
-    return views.len;
+    try @import("../check/implementation_admission.zig").originalProducers(a, value.modules, &associated_remaining);
 }
 
 fn forwardedOwners(a: std.mem.Allocator, value: *const D.FrozenDependency, current: usize, remaining: *usize) Error![]bool {
@@ -773,21 +460,6 @@ pub fn validateSources(value: *const D.FrozenDependency, source: *const project.
         if (source_id == source.entry) continue;
         try validateSource(value, source, @intCast(source_id), try ordinal(source, @intCast(source_id)), Ordinals{ .source = source });
     }
-}
-/// validateSources for a closure that holds only the units of `order`, in
-/// its order (freezeLibrary's seed): unit `order[i]` is module i + 1.
-fn validateSourcesWith(a: std.mem.Allocator, value: *const D.FrozenDependency, source: *const project.Project, order: []const u32) Error!void {
-    const timing = phase_profile.enter(.validation);
-    defer timing.exit();
-    try require(value.modules.len == order.len);
-    const ids = try a.alloc(u32, source.units.items.len);
-    defer a.free(ids);
-    @memset(ids, 0);
-    for (order, 1..) |unit, id| {
-        try require(unit != 0 and unit <= ids.len and unit != source.entry and ids[unit - 1] == 0);
-        ids[unit - 1] = @intCast(id);
-    }
-    for (order, 1..) |unit, id| try validateSource(value, source, unit, @intCast(id), Ordinals{ .source = source, .ids = ids });
 }
 const Ordinals = struct {
     source: *const project.Project,
@@ -912,151 +584,4 @@ pub fn payloadKey(compiler: [32]u8, settings: [32]u8, value: *const D.FrozenDepe
     content.final(&source_digest);
     edges.final(&dependency_digest);
     return .{ .compiler = compiler, .settings = settings, .source = source_digest, .dependencies = dependency_digest };
-}
-
-// The constructor stays private to the final closure-validation owner.
-const CompletedCoreState = struct {
-    graph: D.FrozenDependency,
-    validated_context_units: usize,
-    modules: []core.Module,
-    source_lengths: []u32,
-};
-
-pub const CoreValidationBorrow = struct {
-    receipt: *const CoreValidationReceipt,
-    graph: *const D.FrozenDependency,
-    pub fn prefix(self: CoreValidationBorrow, units: []const core.Module, entry: u32, identity: @import("../backend/runtime_identity.zig").View) usize {
-        return self.receipt.prefix(self.graph, units, entry, identity);
-    }
-};
-
-pub const CoreValidationReceipt = opaque {
-    pub fn borrow(self: *const CoreValidationReceipt, graph: *const D.FrozenDependency) CoreValidationBorrow {
-        return .{ .receipt = self, .graph = graph };
-    }
-    pub fn deinit(self: *CoreValidationReceipt, a: std.mem.Allocator) void {
-        const state: *CompletedCoreState = @ptrCast(@alignCast(self));
-        a.free(state.modules);
-        a.free(state.source_lengths);
-        a.destroy(state);
-    }
-
-    /// Returns a proved prefix only for shallow borrows of this exact live
-    /// graph. A fresh entry stays unproved and receives ordinary validation.
-    /// The backend must complete its bounds barrier for ALL units first.
-    fn prefix(self: *const CoreValidationReceipt, graph_owner: *const D.FrozenDependency, units: []const core.Module, entry: u32, identity: @import("../backend/runtime_identity.zig").View) usize {
-        const state: *const CompletedCoreState = @ptrCast(@alignCast(self));
-        const graph = state.graph;
-        if (graph_owner.modules.ptr != graph.modules.ptr or graph_owner.modules.len != graph.modules.len or graph_owner.symbols.ptr != graph.symbols.ptr or graph_owner.symbols.len != graph.symbols.len) return 0;
-        if (units.len != state.validated_context_units or units.len != state.modules.len + 1 or entry != units.len or identity.symbols.len < graph.symbols.len) return 0;
-        if (units[entry - 1].unit != entry) return 0;
-        for (graph.symbols[1..], 1..) |symbol, id| {
-            const spelling = identity.symbol(@intCast(id)) orelse return 0;
-            if (!std.mem.eql(u8, symbol.text, spelling)) return 0;
-        }
-        // These two validators have whole-context activation gates, rather
-        // than looking up only a referenced producer. A new entry cannot add
-        // either gate to a graph licensed by this receipt.
-        for (units[entry - 1].bindings) |binding| {
-            if (binding.capability_flow == .spawn_task or binding.capability_parameters.inputInvokes()) return 0;
-        }
-        for (state.modules, graph.modules, units[0..state.modules.len], state.source_lengths, 1..) |saved, owner, current, source_length, id| {
-            if (current.unit != id or owner.identity.source_bytes != source_length) return 0;
-            if (!sameDescriptors(saved, owner.core) or !sameDescriptors(saved, current)) return 0;
-        }
-        return state.modules.len;
-    }
-};
-
-// Never expose an unchecked constructor. The only minting operation executes
-// the complete dependency validator before recording immutable descriptors.
-fn completedCoreValidation(a: std.mem.Allocator, graph: *const D.FrozenDependency) Error!*CoreValidationReceipt {
-    var stats: retained.Stats = .{};
-    const validated_context_units = try validateMode(a, graph, null, null, &stats, true);
-    const state = try a.create(CompletedCoreState);
-    errdefer a.destroy(state);
-    const modules = try a.alloc(core.Module, graph.modules.len);
-    errdefer a.free(modules);
-    const lengths = try a.alloc(u32, graph.modules.len);
-    for (graph.modules, modules, lengths) |owner, *module, *length| {
-        module.* = owner.core;
-        length.* = owner.identity.source_bytes;
-    }
-    state.* = .{ .graph = graph.*, .validated_context_units = validated_context_units, .modules = modules, .source_lengths = lengths };
-    return @ptrCast(state);
-}
-
-fn sameDescriptors(before: anytype, after: @TypeOf(before)) bool {
-    @setEvalBranchQuota(20000);
-    const T = @TypeOf(before);
-    switch (@typeInfo(T)) {
-        .pointer => |pointer| {
-            if (comptime pointer.size != .slice) @compileError("Core descriptors must own slices");
-            return before.ptr == after.ptr and before.len == after.len;
-        },
-        .@"struct" => |structure| {
-            inline for (structure.field_names) |name| {
-                if (!sameDescriptors(@field(before, name), @field(after, name))) return false;
-            }
-            return true;
-        },
-        else => return std.meta.eql(before, after),
-    }
-}
-
-// The dummy is never an executable producer. Restricted bounds reject every
-// reference to its ordinal; its presence charges full validation's owner scans
-// exactly as the final entry does, without introducing global binding gates.
-fn emptyCore(unit: u32) core.Module {
-    return .{ .unit = unit, .types = .{ .nodes = &.{}, .extra = &.{} }, .nodes = &.{}, .spans = &.{}, .extra = &.{}, .bindings = &.{}, .bodies = &.{}, .parameters = &.{}, .references = &.{}, .calls = &.{}, .merges = &.{}, .merge_ranges = &.{}, .names = &.{}, .obligations = &.{}, .diagnostics = &.{}, .body_lowerings = 0 };
-}
-
-test "completed Core receipt validates rich scopes in final-sized context and rejects entry references" {
-    const a = std.testing.allocator;
-    var dir = std.testing.tmpDir(.{});
-    defer dir.cleanup();
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data = "import {answer} from \"./producer\"\nentry const result = func () => return answer ()\n" });
-    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "producer.blot", .data = "type State a is effect = {get: Unit -> a, set: a -> Unit}\n" ++
-        "const unused_scope = func () => return @effect.scope (func (s: State U32) => return do:\n  let ignored = s\n  break 42\n)\n" ++
-        "const answer = func () => return do:\n  let items: GrowArray U32 = #[41]\n  break items[0]\n" });
-    const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
-    defer a.free(path);
-    var source = try project.load(a, std.testing.io, path, .{});
-    defer source.deinit(a);
-    try std.testing.expectEqual(0, source.diagnostics.items.len);
-    var checked = try project_check.checkProjectDeferringEntryToFirstDiagnostic(a, &source, null);
-    defer checked.deinit(a);
-    try std.testing.expectEqual(0, checked.diagnostics.len);
-    var frozen = try freezeDeferringEntry(a, &source, &checked);
-    defer format.deinit(a, &frozen);
-    var scopes: usize = 0;
-    for (frozen.modules) |module| for (module.core.nodes) |node| {
-        if (node.tag == .effect_scope) scopes += 1;
-    };
-    try std.testing.expect(scopes != 0);
-    {
-        const receipt = try completedCoreValidation(a, &frozen);
-        defer receipt.deinit(a);
-        // The recorded count comes from the validator's actual view, rather
-        // than inferring an unvalidated extra owner when the receipt is read.
-        const state: *const CompletedCoreState = @ptrCast(@alignCast(receipt));
-        try std.testing.expectEqual(frozen.modules.len + 1, state.validated_context_units);
-        var consumer = try partial.prepareReadOnly(a, std.testing.io, path, null, .{}, &frozen, null);
-        defer consumer.deinit(a);
-        try std.testing.expect(consumer == .ready);
-        var result = try consumer.ready.emitWithOptions(a, .{ .completed_core_validation = receipt.borrow(&frozen) });
-        defer result.deinit(a);
-        try std.testing.expect(result.result.compiled.diagnostic == null);
-        try std.testing.expectEqual(frozen.modules.len, result.result.compiled.counters.scoped_core_validation_reused);
-        try std.testing.expectEqual(1, result.result.compiled.counters.scoped_core_validation_fresh);
-    }
-    // No receipt is live while deliberately damaging the otherwise owned
-    // fixture. The mint must not admit even a numerically plausible new unit.
-    for (frozen.modules) |*module| for (module.core.references) |*reference| {
-        if (reference.binding == 0) continue;
-        reference.unit = @intCast(frozen.modules.len + 1);
-        try std.testing.expectError(error.InvalidArtifact, completedCoreValidation(a, &frozen));
-        return;
-    };
-    return error.MissingFixtureReference;
 }

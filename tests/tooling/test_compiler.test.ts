@@ -171,7 +171,7 @@ Deno.test("native-only development rejects incompatible Zig before building", as
     const result = await simulatedGate([
       "--dev",
       "--native-suite",
-      "runtime",
+      "checker",
     ], { version });
     assert.notEqual(result.code, 0);
     assert.equal(result.report.success, false);

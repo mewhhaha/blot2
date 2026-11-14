@@ -137,8 +137,6 @@ for (const count of [1, 4, 8]) {
     stdRoot,
     prelude: resolve(stdRoot, "prelude.blot"),
     profileBackend: true,
-    codegenTier: values.tier,
-    codegenWorkers: workers,
     startupTimeoutMs: timeoutMs,
   });
   try {

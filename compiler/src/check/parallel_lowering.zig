@@ -9,7 +9,7 @@ const symbols = @import("../parse/symbols.zig");
 const check = @import("check.zig");
 const core = @import("core.zig");
 const core_builder = @import("core_builder.zig");
-const LockedAllocator = @import("../eval/parallel_allocator.zig").LockedAllocator;
+const LockedAllocator = @import("parallel_allocator.zig").LockedAllocator;
 const A = std.mem.Allocator;
 
 pub const Error = @typeInfo(@typeInfo(@TypeOf(core_builder.lowerWithOrigins)).@"fn".return_type.?).error_union.error_set;

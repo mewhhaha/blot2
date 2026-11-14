@@ -4,8 +4,6 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const checker = @import("../check/check.zig");
 const core = @import("../check/core.zig");
-const eval = @import("../eval/core_eval.zig");
-const backend = @import("../backend/core_backend.zig");
 const a = std.testing.allocator;
 
 const declarations =
@@ -42,122 +40,6 @@ fn target(module: *const core.Module, name: []const u8) !core.BindingRef {
     for (module.bodies[1..]) |body| if (std.mem.eql(u8, module.name(body.export_name), name)) return .{ .unit = 1, .binding = body.binding };
     return error.TestUnexpectedResult;
 }
-fn missingScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var result = try backend.compile(allocator, &.{module.*}, 1);
-    defer result.deinit(allocator);
-    try std.testing.expectEqual(backend.Code.entry_type, result.diagnostic.?.code);
-    try std.testing.expectEqual(@as(u32, 161), result.diagnostic.?.span.start);
-    try std.testing.expectEqual(@as(u32, 161), result.diagnostic.?.span.end);
-    try std.testing.expectEqualStrings(generic_message, result.diagnostic.?.message());
-    try std.testing.expectEqual(@as(usize, 0), result.constant_steps);
-    try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
-}
-
-test "entry phase rejected residual method template reports absent selection under every allocation failure" {
-    var module = try lower(missing_entry);
-    defer module.deinit(a);
-    try missingScenario(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, missingScenario, .{&module});
-    var retained = owned: {
-        var owner = try lower(missing_entry);
-        defer owner.deinit(a);
-        break :owned try backend.compile(a, &.{owner}, 1);
-    };
-    defer retained.deinit(a);
-    try std.testing.expectEqualStrings(generic_message, retained.diagnostic.?.message());
-}
-
-test "entry phase complete pure and literal nominal interfaces remain selected" {
-    for ([_][]const u8{ pure_entry, literal_entry }) |source| {
-        var module = try lower(source);
-        defer module.deinit(a);
-        const units = [_]core.Module{module};
-        var session = try eval.Session.init(a, &units);
-        defer session.deinit();
-        const interface = try session.sourceInterface(try target(&module, "selected"));
-        try std.testing.expect(interface.selected);
-        try std.testing.expect(!interface.generic);
-        try std.testing.expectEqual(@as(usize, 0), interface.pending);
-        try std.testing.expect(interface.evidence != 0);
-        const arrow = session.storage.evidence.node(interface.evidence);
-        try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.function, arrow.tag);
-        try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.nominal, session.storage.evidence.node(arrow.a).tag);
-        try std.testing.expectEqual(@import("../eval/type_evidence.zig").Tag.u32, session.storage.evidence.node(arrow.b).tag);
-        try std.testing.expectEqual(@as(usize, 0), session.steps);
-    }
-}
-fn attemptThenDemand(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    const units = [_]core.Module{module.*};
-    var session = try eval.Session.init(allocator, &units);
-    defer session.deinit();
-    session.retain_specialization_receipts = true;
-    const first = try session.sourceInterface(try target(module, "selected"));
-    try std.testing.expect(!first.selected);
-    try std.testing.expectEqual(@as(u32, 0), first.evidence);
-    try std.testing.expectEqual(@as(usize, 0), first.pending);
-    try std.testing.expect(session.diagnostic == null);
-    try std.testing.expectEqual(@as(usize, 0), session.owned_diagnostic_message.len);
-    try std.testing.expectEqual(@as(usize, 1), session.storage.values.items.len);
-    inline for (.{ "children", "closures", "type_mappings", "row_mappings" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.storage, field).items.len);
-    inline for (.{"specialization_receipts"}) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.retained, field).items.len);
-    try std.testing.expectEqual(@as(usize, 0), session.pending.items.len);
-    inline for (.{ "validated_calls", "plain_nominals" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.specializations, field).count());
-    inline for (.{ "typed_views", "specialized_closures" }) |field| try std.testing.expectEqual(@as(usize, 0), @field(session.storage, field).count());
-    for (session.slots) |slot| {
-        try std.testing.expect(slot.state == .unseen);
-        try std.testing.expect(!slot.traced);
-        try std.testing.expectEqual(@as(u32, 0), slot.value);
-    }
-    try std.testing.expectEqual(@as(usize, 0), session.traced_bodies);
-    try std.testing.expectEqual(@as(usize, 0), session.traced_nodes);
-    try std.testing.expectEqual(@as(usize, 0), session.steps);
-    if (session.sourceInterface(try target(module, "answer"))) |_| return error.TestUnexpectedResult else |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        else => try std.testing.expectEqual(error.Declined, err),
-    }
-    try std.testing.expectEqual(eval.Code.effect_mismatch, session.diagnostic.?.code);
-    try std.testing.expectEqual(@as(usize, 0), session.steps);
-}
-
-test "entry phase discarded nominal attempt publishes no facts and valid caller rechecks its effect" {
-    var module = try lower(called_entry);
-    defer module.deinit(a);
-    try attemptThenDemand(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, attemptThenDemand, .{&module});
-    for ([_][]const u8{ abi_caller, called_entry, declarations ++ "entry const ignored: Box -> U32 = func value => return 42\nentry const selected: Unit -> U32 = func () => return ($Box 1).read\n" }) |source| {
-        var caller = try lower(source);
-        defer caller.deinit(a);
-        var result = try backend.compile(a, &.{caller}, 1);
-        defer result.deinit(a);
-        try std.testing.expectEqual(backend.Code.effect_mismatch, result.diagnostic.?.code);
-        try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
-        try std.testing.expectEqual(@as(usize, 0), result.constant_steps);
-    }
-}
-
-test "entry phase type witnesses and physical collection limits remain authoritative" {
-    var witness = try lower("type Box is data = $Box U32\nentry const selected: Box -> Bool = func value => return @type.same (@panic \"left\") (@panic \"right\")\nentry const answer = 42\n");
-    defer witness.deinit(a);
-    var result = try backend.compile(a, &.{witness}, 1);
-    defer result.deinit(a);
-    try std.testing.expectEqual(backend.Code.invalid_annotation, result.diagnostic.?.code);
-    var module = try lower(missing_entry);
-    defer module.deinit(a);
-    const units = [_]core.Module{module};
-    for (0..2) |mode| for (0..12) |limit| {
-        var session = try eval.Session.init(a, &units);
-        defer session.deinit();
-        if (mode == 0) session.options.max_values = limit else session.options.max_type_depth = limit;
-        const interface = session.sourceInterface(try target(&module, "selected")) catch |err| {
-            try std.testing.expectEqual(error.Declined, err);
-            try std.testing.expectEqual(eval.Code.constant_fuel, session.diagnostic.?.code);
-            continue;
-        };
-        try std.testing.expect(!interface.selected);
-        try std.testing.expectEqual(@as(usize, 0), session.steps);
-    };
-}
-
 test "entry phase ordinary initial type failures survive unsupported nominal entry shape" {
     const source = "type Box is data = $Box U32\nentry const selected: Box -> U32 = func value => return @u32.add 1 1.0\nentry const answer = 42\n";
     var tokens = try lexer.lex(a, source);
@@ -170,35 +52,4 @@ test "entry phase ordinary initial type failures survive unsupported nominal ent
     defer checked.deinit(a);
     try std.testing.expectEqual(@as(usize, 1), checked.diagnostics.len);
     try std.testing.expectEqual(checker.Code.type_mismatch, checked.diagnostics[0].code);
-}
-
-test "entry phase source identity and forward declaration order determine discarded selection" {
-    const controls = [_]struct { source: []const u8, point: u32, message: []const u8 }{
-        .{ .source = "type Box is data = $Box U32\ntype Tick is effect = Unit -> Unit\nentry const selected: Box -> U32 = func value => return value.read\nconst Box.read: Box -> U32 ! {Tick} where {} = func (value: Box) => return value.read\nentry const answer = 42\n", .point = 75, .message = "entry `selected` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
-        .{ .source = "type Parcel is data = $Parcel F32\ntype Move is effect = Unit -> Unit\nentry const unpack: Parcel -> F32 = func parcel => return parcel.unpack\nconst Parcel.unpack: Parcel -> F32 ! {Move} where {} = func (parcel: Parcel) => return parcel.unpack\nentry const answer = 42\n", .point = 81, .message = "entry `unpack` has a generic type, so it cannot be a Wasm export: entry functions take or return Unit, U32, F32, Bool, Array U32, Array F32, or unique/shared owners of closed data; one exact Foreign scalar/numeric-array callback or synchronous cleanup descriptor is also accepted as input; every other effect must be handled; entry values are Unit, U32, F32 or Bool" },
-    };
-    for (controls) |control| {
-        var module = try lower(control.source);
-        defer module.deinit(a);
-        var result = try backend.compile(a, &.{module}, 1);
-        defer result.deinit(a);
-        try std.testing.expectEqual(backend.Code.entry_type, result.diagnostic.?.code);
-        try std.testing.expectEqual(control.point, result.diagnostic.?.span.start);
-        try std.testing.expectEqual(control.point, result.diagnostic.?.span.end);
-        try std.testing.expectEqualStrings(control.message, result.diagnostic.?.message());
-        try std.testing.expectEqual(@as(usize, 0), result.constant_steps);
-    }
-}
-
-test "source interface inference does not consume the executed expression depth budget" {
-    var module = try lower("const leaf = func value => return @u32.add value 1\nconst middle = func value => return leaf value\nentry const answer = func (value: U32) => return middle value\n");
-    defer module.deinit(a);
-    var session = try eval.Session.init(a, &.{module});
-    defer session.deinit();
-    session.options.max_depth = 0;
-    session.options.max_steps = 0;
-    const interface = try session.sourceInterface(try target(&module, "answer"));
-    try std.testing.expect(interface.selected);
-    try std.testing.expect(session.diagnostic == null);
-    try std.testing.expectEqual(@as(usize, 0), session.steps);
 }

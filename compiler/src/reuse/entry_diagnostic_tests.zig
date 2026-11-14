@@ -4,13 +4,10 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const checker = @import("../check/check.zig");
 const core = @import("../check/core.zig");
-const evaluator = @import("../eval/core_eval.zig");
-const scalar_ops = @import("../backend/scalar_ops.zig");
 const project = @import("project.zig");
 const project_check = @import("project_check.zig");
-const code_expectation = @import("code_expectation.zig");
 const types = @import("../check/types.zig");
-const type_evidence = @import("../eval/type_evidence.zig");
+const type_evidence = @import("../check/type_evidence.zig");
 const a = std.testing.allocator;
 
 fn lower(source: []const u8) !core.Module {
@@ -58,82 +55,6 @@ const generic_source =
     \\  let deferred = func owner => return owner.missing
     \\  break (deferred value, value)
 ;
-fn entryInferenceScenario(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var session = try evaluator.Session.init(allocator, &.{module.*});
-    defer session.deinit();
-    for ([_][]const u8{ "direct", "alias", "update" }) |name| {
-        const raw = try session.richValue(target(module, name));
-        const evidence = session.valueEvidence(raw);
-        const before = session.steps;
-        const value_count = session.storage.values.items.len;
-        const cached_count = session.storage.specialized_closures.count();
-        try std.testing.expectEqual(@as(?evaluator.ValueId, null), try session.inferEntryClosure(raw));
-        try std.testing.expectEqual(before, session.steps);
-        try std.testing.expectEqual(evidence, session.valueEvidence(raw));
-        try std.testing.expectEqual(value_count, session.storage.values.items.len);
-        try std.testing.expectEqual(cached_count, session.storage.specialized_closures.count());
-        try std.testing.expectEqual(@as(?evaluator.ValueId, null), try session.inferEntryClosure(raw));
-        try std.testing.expect(session.diagnostic == null);
-        if (session.inferClosure(raw)) |_| return error.TestUnexpectedResult else |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.Declined => try std.testing.expectEqual(evaluator.Code.unsupported, session.diagnostic.?.code),
-            error.RequestUnwind => return error.TestUnexpectedResult,
-        }
-        session.diagnostic = null;
-    }
-    for ([_][]const u8{ "selected", "closed" }) |name| {
-        const raw = try session.richValue(target(module, name));
-        const before = session.steps;
-        const selected = (try session.inferEntryClosure(raw)) orelse return error.TestUnexpectedResult;
-        try std.testing.expectEqual(before, session.steps);
-        // An entry interface is not the complete demand-body inquiry. Each
-        // mode caches its own result while retaining the same semantic arrow
-        // and actual capture aliases.
-        const complete = try session.inferClosure(raw);
-        try std.testing.expectEqual(session.valueEvidence(selected), session.valueEvidence(complete));
-        try std.testing.expectEqualSlices(evaluator.ValueId, session.valueChildren(selected), session.valueChildren(complete));
-        try std.testing.expectEqual(complete, try session.inferClosure(raw));
-        try std.testing.expectEqual(selected, (try session.inferEntryClosure(raw)).?);
-        const arrow = session.evidenceView().node(session.valueEvidence(selected));
-        try std.testing.expectEqual(type_evidence.Tag.function, arrow.tag);
-        try std.testing.expectEqual(types.u32_type, arrow.a);
-        try std.testing.expectEqual(types.u32_type, arrow.b);
-        try std.testing.expectEqual(@as(u32, 0), arrow.c);
-    }
-    for ([_][]const u8{ "unclosed_capture", "unresolved_body" }) |name| {
-        const raw = try session.richValue(target(module, name));
-        const before = session.steps;
-        if (session.inferEntryClosure(raw)) |selected| {
-            std.debug.print("unexpected entry proof {s}: {?d}\n", .{ name, selected });
-            return error.TestUnexpectedResult;
-        } else |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.Declined => try std.testing.expectEqual(evaluator.Code.unsupported, session.diagnostic.?.code),
-            error.RequestUnwind => return error.TestUnexpectedResult,
-        }
-        try std.testing.expectEqual(before, session.steps);
-        session.diagnostic = null;
-    }
-}
-test "generic export interfaces preserve strict body and captured proofs without publishing headers" {
-    var module = try lowerWithOptions(generic_source, .{ .builtin_catalog = true });
-    defer module.deinit(a);
-    const nodes = try a.dupe(core.Node, module.nodes);
-    defer a.free(nodes);
-    const bindings = try a.dupe(core.Binding, module.bindings);
-    defer a.free(bindings);
-    const type_nodes = try a.dupe(types.Node, module.types.nodes);
-    defer a.free(type_nodes);
-    const rows = try a.dupe(types.Effects.Row, module.types.effects.rows);
-    defer a.free(rows);
-    try entryInferenceScenario(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, entryInferenceScenario, .{&module});
-    try std.testing.expectEqualDeep(nodes, module.nodes);
-    try std.testing.expectEqualDeep(bindings, module.bindings);
-    try std.testing.expectEqualDeep(type_nodes, module.types.nodes);
-    try std.testing.expectEqualDeep(rows, module.types.effects.rows);
-}
-
 fn anonymousRecordScenario(allocator: std.mem.Allocator) !void {
     for ([_][]const u8{
         "entry const x = { lower: 0 }\n",

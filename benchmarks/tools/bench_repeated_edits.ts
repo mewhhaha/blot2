@@ -149,7 +149,6 @@ for (let round = 0; round < rounds; round++) {
   for (const { variant, measurementMode } of schedule) {
     const options = {
       ...sessionOptions(executables[variant], workload),
-      codegenWorkers: 1,
       semanticWorkers: 1,
       profileBackend: measurementMode === "profile",
     };

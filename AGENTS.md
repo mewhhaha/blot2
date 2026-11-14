@@ -28,13 +28,14 @@
   `docs/compiler/CONTRACT.md` for ownership rules.
 - Always use Zig's native backend without LLVM (`-Dllvm=false`) for development
   builds and all native unit-test compilation, including the full gate. Use
-  `deno task check:dev --area static-sharing` for a five-minute development
-  cycle. It compiles the complete native inventory once, runs an explicit
+  `deno task check:dev` (its default `direct` area) for a five-minute
+  development cycle. It compiles the complete native inventory once, runs an explicit
   regression family with sampled allocation faults, guests and local checks. It
   reports full qualification as pending. An incomplete run is not a pass.
-- Use `deno task check:dev --list-areas` to choose `syntax`, `type-effects`,
-  `body-checking` or `static-sharing`. These are explicit regression families,
-  not whole-subsystem qualification. Add the affected laws when expanding scope.
+- Use `deno task check:dev --list-areas` to choose `direct`, `project`,
+  `syntax`, `type-effects` or `body-checking`. These are explicit regression
+  families, not whole-subsystem qualification. Add the affected laws when
+  expanding scope.
 - Reserve LLVM (`-Dllvm=true`) for the actual final release compiler and release
   performance measurements. Use `deno task build:compiler` for releases; qualify
   the final candidate with `deno task test:compiler`.

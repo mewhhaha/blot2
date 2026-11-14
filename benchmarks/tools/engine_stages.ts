@@ -276,7 +276,6 @@ for (let repetition = 0; repetition < repetitions; repetition++) {
         imports: { "ink/": resolve(repo, "../ink/lib") },
         profileBackend: !values["no-profile"],
         frontendWorkers: version.frontendWorkers ?? frontendWorkers,
-        codegenWorkers: 1,
         startupTimeoutMs: timeoutMs,
       };
       if (!values["no-profile"] && (version.trace || values.world)) {

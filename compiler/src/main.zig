@@ -528,7 +528,7 @@ fn run(init: std.process.Init) !bool {
         var dependency_path: ?[]const u8 = null;
         var profile = false;
         var semantic_workers = false;
-        var policy: Policy = .{ .backend = .direct };
+        var policy: Policy = .{};
         var at = first_option;
         while (at < args.len) {
             // The profiling flag takes no value.
@@ -566,7 +566,7 @@ fn run(init: std.process.Init) !bool {
         options.aliases = aliases.items;
         if (command == .dependencies or dependency_path != null) {
             if (profile or semantic_workers) return false;
-            const success = try dependency_cli.processWithOptions(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity, .{ .compiler_identity = configured_identity, .policy = policy });
+            const success = try dependency_cli.process(init.io, backing, &output.interface, command == .dependencies, args[2], args[3], dependency_path, options, configured_identity);
             try output.interface.flush();
             return success;
         }

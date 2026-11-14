@@ -67,9 +67,7 @@ const options: ZigProjectCompilerOptions = {
   inferenceBudget: settings.inferenceBudget,
   profileTrace: true,
   profileBackend: true,
-  codegenTier: "optimized",
   frontendWorkers: 4,
-  codegenWorkers: 4,
   startupTimeoutMs: Math.min(timeoutMs, 5000),
 };
 const filePins = Object.fromEntries(

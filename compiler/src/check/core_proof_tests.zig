@@ -242,51 +242,6 @@ test "numeric proof universal imported aliases retain exact operands without loc
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, importedUniversalProofAliases, .{});
 }
 
-test "numeric proof guards lower to executable checks with erased named inputs" {
-    const allocator = std.testing.allocator;
-    var module = try lowerSource(allocator,
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
-        \\entry const lookup = func (index: U32) => return do:
-        \\  let values = #[8, 13]
-        \\  let valid = @proof.index values index
-        \\  break at values index valid
-        \\entry const invalid = func (value: U32) => return do:
-        \\  let impossible = @proof.lt value 0
-        \\  break 1
-    );
-    defer module.deinit(allocator);
-    var remaining: usize = 65_536;
-    try @import("numeric_proof_core.zig").validate(allocator, &module, &.{}, &remaining);
-    var result = try @import("../backend/core_backend.zig").compile(allocator, &.{module}, 1);
-    defer result.deinit(allocator);
-    if (result.diagnostic) |diagnostic| std.debug.print("proof emission {s} at {}\n", .{ @tagName(diagnostic.code), diagnostic.span.start });
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-
-test "numeric proof semantic and physical kinds never bridge through Unit or data" {
-    const allocator = std.testing.allocator;
-    var source_types = try @import("types.zig").Store.init(allocator);
-    defer source_types.deinit();
-    const proof = try source_types.proofKind();
-    var evidence = try @import("../eval/type_evidence.zig").Store.init(allocator);
-    defer evidence.deinit();
-    const semantic = try evidence.project(&source_types, proof, &.{});
-    var mappings: std.ArrayList(@import("../eval/type_evidence.zig").Mapping) = .empty;
-    defer mappings.deinit(allocator);
-    try std.testing.expect(try evidence.match(&source_types, proof, semantic, &mappings));
-    try std.testing.expect(!try evidence.match(&source_types, @import("types.zig").unit, semantic, &mappings));
-    try std.testing.expect(!try evidence.match(&source_types, try source_types.fresh(), semantic, &mappings));
-    try std.testing.expectError(error.TypeMismatch, evidence.intern(.array, semantic, 0, &.{}));
-    try std.testing.expectError(error.TypeMismatch, evidence.intern(.product, 0, 0, &.{semantic}));
-    var layouts = try @import("../backend/layout.zig").Store.init(allocator);
-    defer layouts.deinit();
-    const physical = try layouts.fromEvidence(evidence.view(), semantic);
-    try std.testing.expectEqual(@import("../backend/layout.zig").Tag.erased_proof, layouts.node(physical).tag);
-    try std.testing.expect(layouts.abi(physical) == null);
-    try std.testing.expectEqual(semantic, try layouts.toEvidence(&evidence, physical));
-}
-
 test "numeric proof portable admission rejects coordinated result claims guard erasure and hidden feature markers" {
     const allocator = std.testing.allocator;
     var module = try lowerSource(allocator,
@@ -578,58 +533,6 @@ test "numeric proof preserves exact collection identity through opaque reference
     try std.testing.expectEqual(@as(usize, 1), retained);
 }
 
-fn emittedChecks(allocator: std.mem.Allocator, input: []const u8) !usize {
-    var module = try lowerSource(allocator, input);
-    defer module.deinit(allocator);
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .inline_named = false, .retain_artifacts = true, .policy = .{ .codegen_tier = .development } });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    const captured = result.capture orelse return error.MissingProofEmission;
-    var checks: usize = 0;
-    var bodies: usize = 0;
-    for (captured.emission.functions) |function| {
-        if (function.role != .job) continue;
-        bodies += 1;
-        for (captured.emission.instructions[function.instructions.start..][0..function.instructions.len]) |instruction| if (instruction.op == .i32_ge_u) {
-            checks += 1;
-        };
-    }
-    try std.testing.expect(bodies != 0);
-    return checks;
-}
-test "numeric proof lowering removes only the admitted bounds comparison in development IR" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = func (index: U32) => return @array.get #[8, 13] index"));
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] index else 0"));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@u32.add index 1) else 0"));
-}
-test "numeric proof selected Boolean bodies remove the outer check and retain required checks" {
-    const allocator = std.testing.allocator;
-    const body = "\nentry const run = func (index: U32) => return if choose (@u32.lt index 2) (@u32.eq index 0) then @array.get #[8, 13] index else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return left and right" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return true" ++ body));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const choose = func (left: Bool) => return func (right: Bool) => return left or right" ++ body));
-    try checkPlan(allocator,
-        \\const opposite = func (value: Bool) => return if value then false else true
-        \\entry const run = func (values: Array U32) => return func (index: U32) => return if opposite (@u32.lt index (@array.length values)) then 0 else @array.get values index
-    , true, .{});
-}
-test "numeric proof selected local aliases remove only the exact access check in development IR" {
-    const allocator = std.testing.allocator;
-    const caller = "\nentry const run = func (index: U32) => return if within index 2 then @array.get #[8, 13] index else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator,
-        \\const within = func (index: U32) => return func (length: U32) => return do:
-        \\  let copied = index
-        \\  let valid = @u32.lt copied length
-        \\  break valid
-    ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\const within = func (index: U32) => return func (length: U32) => return do:
-        \\  let copied = @u32.add index 1
-        \\  let valid = @u32.lt copied length
-        \\  break valid
-    ++ caller));
-}
 const list_runtime_inputs = [_][]const u8{
     \\entry const run = func (index: U32) => return @array.get #[8, 13] index
     ,
@@ -647,85 +550,6 @@ const list_runtime_inputs = [_][]const u8{
     \\  break 0
     ,
 };
-fn listRuntimeProofs(allocator: std.mem.Allocator, input: []const u8, case_: usize) !void {
-    var module = try lowerSource(allocator, input);
-    defer module.deinit(allocator);
-    // List's indexing operations are private Core. Use the ordinary
-    // checked body, changing only its collection representation.
-    for (module.types.nodes) |*node| if (node.tag == .array) {
-        node.tag = .list;
-    };
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development } });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    const capture = result.capture orelse return error.MissingProofEmission;
-    const runtime = capture.emission.lists orelse return error.MissingListRuntime;
-    try std.testing.expectEqual(case_ != 0, runtime.address_unchecked != null);
-    try std.testing.expectEqual(case_ == 2, runtime.set_unchecked != null);
-    for (capture.emission.functions, 0..) |function, id| {
-        const function_id: u32 = @intCast(id);
-        if (function_id != runtime.address and function_id != runtime.address_unchecked and function_id != runtime.set_unchecked) continue;
-        var traps: usize = 0;
-        for (capture.emission.instructions[function.instructions.start..][0..function.instructions.len]) |instruction| if (instruction.op == .unreachable_) {
-            traps += 1;
-        };
-        var expected: usize = 0;
-        if (id == runtime.address) expected = 1;
-        try std.testing.expectEqual(expected, traps);
-    }
-    var replayed = try capture.emission.materialize(allocator);
-    defer replayed.deinit();
-    const replayed_runtime = replayed.lists orelse return error.MissingListRuntime;
-    try std.testing.expectEqual(runtime.address_unchecked != null, replayed_runtime.address_unchecked != null);
-    try std.testing.expectEqual(runtime.set_unchecked != null, replayed_runtime.set_unchecked != null);
-}
-test "numeric proof List checks remain required unless exact accesses admit unchecked runtime and replay" {
-    for (list_runtime_inputs, 0..) |input, case_| {
-        try listRuntimeProofs(std.testing.allocator, input, case_);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, listRuntimeProofs, .{ input, case_ });
-    }
-}
-test "numeric proof lowering erases result signatures argument words and witness locals" {
-    const allocator = std.testing.allocator;
-    var module = try lowerSource(allocator,
-        \\const witness: (values: Array U32) -> (index: U32) -> @proof.Index values index = func values => return func index => return @proof.index values index
-        \\const at: (values: Array U32) -> (index: U32) -> (@proof.Index values index) -> U32 = func values => return func index => return func proof => return @array.get values index
-        \\const stop: (index: U32) -> @proof.U32Le 0 index = func index => return @panic "stop"
-        \\entry const run = func (index: U32) => return do:
-        \\  let values = #[8, 13]
-        \\  let valid = witness values index
-        \\  let repeated = @proof.index values index
-        \\  break at values index repeated
-    );
-    defer module.deinit(allocator);
-    try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .inline_named = false, .retain_artifacts = true, .policy = .{ .codegen_tier = .development } });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    const captured = result.capture orelse return error.MissingProofEmission;
-    var witness: usize = 0;
-    var uses: usize = 0;
-    for (captured.emission.functions) |function| {
-        if (function.role != .job or function.owner == 0) continue;
-        const job = captured.metadata.jobs.items[function.owner - 1];
-        if (job.request != .named) continue;
-        const header = @import("numeric_proof_core.zig").contract(&module, job.request.named.target.binding) orelse continue;
-        for (captured.emission.records.items) |record| if (record.event == .signature and record.event.signature.id == function.signature) {
-            const signature = record.event.signature;
-            try std.testing.expectEqual(@as(u32, 3), signature.parameters.len);
-            if (header.result != null) {
-                try std.testing.expectEqual(@import("../backend/wasm.zig").ValueType.none, signature.result);
-                witness += 1;
-            } else {
-                try std.testing.expectEqual(@as(u32, 2), function.locals.len);
-                uses += 1;
-            }
-        };
-    }
-    try std.testing.expectEqual(@as(usize, 1), witness);
-    try std.testing.expectEqual(@as(usize, 1), uses);
-}
-
 const selected_operand =
     \\const selected = func (unused: U32) => return func (index: U32) => return do:
     \\  let copied = index
@@ -799,13 +623,6 @@ test "numeric proof selected result operands decline forged owners substitutions
         \\entry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (selected index) else 0
     , false, .{});
 }
-test "numeric proof selected result operands remove only their exact bounds comparison in development IR" {
-    const allocator = std.testing.allocator;
-    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = func (index: U32) => return do:\n  let copied = index\n  break copied" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = func (index: U32) => return @u32.add index 1" ++ caller));
-}
-
 test "numeric proof selected conditional results preserve only identities common to both paths" {
     const allocator = std.testing.allocator;
     const caller = "\nentry const run = func (values: Array U32) => return func (index: U32) => return if @u32.lt index (@array.length values) then @array.get values (selected index) else 0";
@@ -813,13 +630,6 @@ test "numeric proof selected conditional results preserve only identities common
     try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then index else @u32.add index 1" ++ caller, false, .{});
     try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then @u32.add index 1 else index" ++ caller, false, .{});
     try checkPlan(allocator, "const selected = func (index: U32) => return if @u32.lt index 4 then index else index" ++ caller, false, .{ .visits = 2 });
-}
-
-test "numeric proof selected conditional identity removes one check and preserves wrapping alternatives" {
-    const allocator = std.testing.allocator;
-    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (selected index) else 0";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "const selected = func (index: U32) => return if @u32.eq index 0 then index else index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "const selected = func (index: U32) => return if @u32.eq index 0 then index else @u32.add index 1" ++ caller));
 }
 
 const prepared_associated_operand =
@@ -899,55 +709,6 @@ test "numeric proof prepared selected targets decline forged body owners and for
     std.mem.swap(core.Parameter, &module.parameters[start], &module.parameters[start + 1]);
     try preparedOperandPlan(allocator, &module, targets, true, .{});
 }
-test "numeric proof prepared selected operand removes only its exact bounds comparison in development IR" {
-    const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return @u32.add index 1" ++ caller));
-}
-
-fn emittedPreparedOperand(allocator: std.mem.Allocator) !void {
-    var module = try lowerSource(allocator, prepared_associated_operand);
-    defer module.deinit(allocator);
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "numeric proof prepared selected body emission releases every allocation and preserves journal replay" {
-    try emittedPreparedOperand(std.testing.allocator);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, emittedPreparedOperand, .{});
-}
-
-test "numeric proof prepared associated bodies retain reusable code when ordinary facts already admit the check" {
-    const allocator = std.testing.allocator;
-    var module = try lowerSource(allocator,
-        \\type Probe is data = $Probe U32
-        \\const Probe.bump = func (unused: Probe) => return func (index: U32) => return @u32.add index 1
-        \\const lookup = func probe => return func (index: U32) => return do:
-        \\  let unused = @type.call "bump" probe index
-        \\  if @u32.lt index 2:
-        \\    break @array.get #[8, 13] index
-        \\  break 0
-        \\entry const run = func (index: U32) => return lookup ($Probe 42) index
-    );
-    defer module.deinit(allocator);
-    const lookup = for (module.bodies[1..]) |body| {
-        if (body.parameters.len == 2 and module.node(body.root).tag == .block) break body.binding;
-    } else return error.MissingSelectedOperand;
-    try expectOperandPlan(allocator, &module, true, .{});
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development } });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    const capture = result.capture orelse return error.MissingProofEmission;
-    var checked: usize = 0;
-    for (capture.metadata.jobs.items) |job| if (job.request == .named and job.request.named.target.binding == lookup) {
-        try std.testing.expect(job.reusable);
-        checked += 1;
-    };
-    try std.testing.expect(checked != 0);
-}
-
 const identity_operand_helpers =
     \\const identity = func (index: U32) => return do:
     \\  let zero = @u32.sub index index
@@ -996,42 +757,6 @@ test "numeric proof selected arithmetic identities decline forged primitives typ
     try checkPlan(allocator, "const identity = func (index: U32) => return @u32.add index 1" ++ caller, false, .{});
     try checkPlan(allocator, "const identity = func (index: U32) => return @u32.sub index 1" ++ caller, false, .{});
 }
-test "numeric proof selected arithmetic identities remove only the exact access comparison in development IR" {
-    const allocator = std.testing.allocator;
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
-    const head = "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return ";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add index 0" ++ caller));
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.add 0 index" ++ caller));
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, head ++ "@u32.sub index 0" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, head ++ "@u32.add index 1" ++ caller));
-}
-fn emittedIdentityOperands(allocator: std.mem.Allocator) !void {
-    var module = try lowerSource(allocator,
-        \\const identity = func (index: U32) => return do:
-        \\  let zero = @u32.sub index index
-        \\  let copied = @u32.add 0 index
-        \\  break @u32.sub (@u32.add copied zero) zero
-        \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
-    );
-    defer module.deinit(allocator);
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "numeric proof selected arithmetic identity emission releases every allocation and preserves journal replay" {
-    try emittedIdentityOperands(std.testing.allocator);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, emittedIdentityOperands, .{});
-}
-
-test "numeric proof prepared curried methods preserve caller identities through owned returned closures" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, curried_associated_operand));
-    const caller = "\nconst lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (@type.call \"choose\" probe index) else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 0\n  break func (index: U32) => return @u32.add index copied" ++ caller));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return do:\n  let copied = 1\n  break func (index: U32) => return @u32.add index copied" ++ caller));
-}
-
 const curried_associated_operand =
     \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return do:
@@ -1065,19 +790,6 @@ test "numeric proof prepared returned closures retain exact captures and bounded
     try ownedCurriedOperand(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownedCurriedOperand, .{});
 }
-fn emittedCurriedOperand(allocator: std.mem.Allocator) !void {
-    var module = try lowerSource(allocator, curried_associated_operand);
-    defer module.deinit(allocator);
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "numeric proof prepared returned closure emission preserves replay and complete OOM cleanup" {
-    try emittedCurriedOperand(std.testing.allocator);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, emittedCurriedOperand, .{});
-}
-
 const bit_identity_helpers =
     \\const identity = func (index: U32) => return do:
     \\  let multiplied = @u32.mul index 1
@@ -1087,51 +799,6 @@ const bit_identity_helpers =
     \\  break @u32.div (@u32.bit_or shifted zero) 1
     \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0
 ;
-fn ownedBitIdentities(allocator: std.mem.Allocator) !void {
-    var original = try lowerSource(allocator, bit_identity_helpers);
-    var module = block: {
-        defer original.deinit(allocator);
-        break :block try @import("../reuse/dependency_closure.zig").copyCore(allocator, &original);
-    };
-    defer module.deinit(allocator);
-    try expectOperandPlan(allocator, &module, true, .{});
-    try expectOperandPlan(allocator, &module, false, .{ .visits = 2 });
-    try expectOperandPlan(allocator, &module, false, .{ .terms = 1 });
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "numeric proof exact U32 bit identities survive owned copies budgets replay and complete OOM" {
-    try ownedBitIdentities(std.testing.allocator);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownedBitIdentities, .{});
-}
-test "numeric proof exact U32 identities remove bounds checks but preserve changed bit operands" {
-    const allocator = std.testing.allocator;
-    const head = "const identity = func (index: U32) => return ";
-    const caller = "\nentry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] (identity index) else 0";
-    for ([_][]const u8{
-        "@u32.mul index 1",              "@u32.mul 1 index",              "@u32.div index 1",
-        "@u32.bit_and index 0xffffffff", "@u32.bit_and 0xffffffff index", "@u32.bit_and index index",
-        "@u32.bit_or index 0",           "@u32.bit_or 0 index",           "@u32.bit_or index index",
-        "@u32.bit_xor index 0",          "@u32.bit_xor 0 index",          "@u32.shl index 32",
-        "@u32.shr index 0xffffffe0",
-    }) |expression| {
-        const input = try std.mem.concat(allocator, u8, &.{ head, expression, caller });
-        defer allocator.free(input);
-        try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, input));
-    }
-    for ([_][]const u8{
-        "@u32.mul index 2",              "@u32.div index 2",    "@u32.div 1 index",     "@u32.div index 0",
-        "@u32.bit_and index 0xfffffffe", "@u32.bit_or index 1", "@u32.bit_xor index 1", "@u32.shl index 33",
-        "@u32.shr index 31",
-    }) |expression| {
-        const input = try std.mem.concat(allocator, u8, &.{ head, expression, caller });
-        defer allocator.free(input);
-        try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, input));
-    }
-}
-
 const remaining_associated_arguments =
     \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (last: Unit) => return index
@@ -1142,16 +809,6 @@ const remaining_associated_arguments =
     \\  break 0
     \\entry const run = func (index: U32) => return lookup ($Probe 42) index
 ;
-test "numeric proof prepared methods preserve operands through remaining application arguments" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, remaining_associated_arguments));
-    const method = "type Probe is data = $Probe U32\nconst Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta\n";
-    const prefix = "const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call \"choose\" probe index) ";
-    const suffix = ") else 0\nentry const run = func (index: U32) => return lookup ($Probe 42) index";
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, method ++ prefix ++ "0" ++ suffix));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, method ++ prefix ++ "1" ++ suffix));
-}
-
 fn ownedRemainingArguments(allocator: std.mem.Allocator) !void {
     var original = try lowerSource(allocator, remaining_associated_arguments);
     var module = copied: {
@@ -1170,44 +827,11 @@ test "numeric proof remaining method arguments own exact plans and bounded fallb
     try ownedRemainingArguments(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownedRemainingArguments, .{});
 }
-fn emittedRemainingArguments(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var result = try @import("../backend/core_backend.zig").compileWithOptions(allocator, &.{module.*}, 1, .{ .retain_artifacts = true, .policy = .{ .codegen_tier = .development }, .artifact_replay = true });
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "numeric proof remaining method arguments preserve emission replay through complete OOM" {
-    var module = try lowerSource(std.testing.allocator, remaining_associated_arguments);
-    defer module.deinit(std.testing.allocator);
-    try emittedRemainingArguments(std.testing.allocator, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, emittedRemainingArguments, .{&module});
-}
-
 const literal_associated_operand =
     \\type Probe is data = $Probe U32
     \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func (delta: U32) => return @u32.add index delta
     \\entry const run = func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" ($Probe 42) index) 0) else 0
 ;
-test "numeric literal selected dispatch preserves remaining applications" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, literal_associated_operand));
-    const changed = try std.mem.replaceOwned(u8, allocator, literal_associated_operand, "index) 0)", "index) 1)");
-    defer allocator.free(changed);
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, changed));
-}
-test "numeric literal selected partial applications preserve replay through complete OOM" {
-    const allocator = std.testing.allocator;
-    var original = try lowerSource(allocator, literal_associated_operand);
-    var module = owned: {
-        defer original.deinit(allocator);
-        break :owned try @import("../reuse/dependency_closure.zig").copyCore(allocator, &original);
-    };
-    defer module.deinit(allocator);
-    try @import("frozen_core_validation.zig").validate(allocator, &module, .{});
-    try emittedRemainingArguments(allocator, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(allocator, emittedRemainingArguments, .{&module});
-}
-
 const nested_finite_selected =
     \\type Probe is data = $Probe U32
     \\const copy = func (value: U32) => return value
@@ -1249,28 +873,6 @@ fn ownedNestedFiniteSelected(allocator: std.mem.Allocator) !void {
 test "numeric finite nested helper and returned closure summaries own portable exact operands through OOM" {
     try ownedNestedFiniteSelected(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, ownedNestedFiniteSelected, .{});
-}
-
-test "numeric finite nested helper checks distinguish exact identity changed operands and unknown calls" {
-    const allocator = std.testing.allocator;
-    try std.testing.expectEqual(@as(usize, 0), try emittedChecks(allocator, nested_finite_selected));
-    const changed = try std.mem.replaceOwned(u8, allocator, nested_finite_selected, "probe index) 0)", "probe index) 1)");
-    defer allocator.free(changed);
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator, changed));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\type Probe is data = $Probe U32
-        \\const invoke = func callback => return func (index: U32) => return callback index
-        \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
-        \\const lookup = func probe => return func (index: U32) => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) (func (value: U32) => return value)) else 0
-        \\entry const run = func (index: U32) => return lookup ($Probe 42) index
-    ));
-    try std.testing.expectEqual(@as(usize, 1), try emittedChecks(allocator,
-        \\type Probe is data = $Probe U32
-        \\const invoke = func (callback: U32 -> U32 ! {Foreign}) => return func (index: U32) => return callback index
-        \\const Probe.choose = func (unused: Probe) => return func (index: U32) => return func callback => return invoke callback index
-        \\const lookup = func probe => return func (index: U32) => return func callback => return if @u32.lt index 2 then @array.get #[8, 13] ((@type.call "choose" probe index) callback) else 0
-        \\entry const run = func (callback: U32 -> U32 ! {Foreign}) => return lookup ($Probe 42) 1 callback
-    ));
 }
 
 fn finitePlanMeasurement(allocator: std.mem.Allocator, label: []const u8, input: []const u8, limits: terms.Limits, expected: bool, prepared: bool) !void {

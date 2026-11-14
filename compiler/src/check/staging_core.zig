@@ -1885,7 +1885,7 @@ const TaskCallSite = struct {
             }
         };
         var visitor: Visitor = .{ .site = self, .depth = depth + 1 };
-        @import("../eval/body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, m, id, false) catch return error.InvalidArtifact;
+        @import("body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, m, id, false) catch return error.InvalidArtifact;
     }
 };
 pub fn taskNamedContext(m: *const core.Module, units: []const *const core.Module, id: core.Id, reference: bool, remaining: *usize) Error!void {

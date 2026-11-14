@@ -165,7 +165,6 @@ async function sampleRun(
   try {
     compiler = await createZigProjectCompiler({
       ...sessionOptions(wrapper, workload),
-      codegenWorkers,
       profileBackend: true,
     });
     const project = compiler;

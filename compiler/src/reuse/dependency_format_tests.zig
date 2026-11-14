@@ -5,7 +5,6 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const checker = @import("../check/check.zig");
 const core = @import("../check/core.zig");
-const backend = @import("../backend/core_backend.zig");
 const a = std.testing.allocator;
 const key: format.Key = .{ .compiler = @as([32]u8, @splat(1)), .settings = @as([32]u8, @splat(2)), .source = @as([32]u8, @splat(3)), .dependencies = @as([32]u8, @splat(4)) };
 const Payload = struct { symbols: []const []const u8, modules: []core.Module };
@@ -132,29 +131,6 @@ test "dependency format preserves every frozen Core table of the unmodified stan
     try std.testing.expectEqualSlices(u8, bytes, again);
     try std.testing.expectEqual(original.body_lowerings, loaded.body_lowerings);
     try std.testing.expect(loaded.types.nodes.ptr != original.types.nodes.ptr);
-}
-
-test "dependency format loads owned generic Core after frontend teardown and preserves Wasm" {
-    var original = try lower(a);
-    defer original.deinit(a);
-    var modules = [_]core.Module{original};
-    const borrowed: Payload = .{ .symbols = &.{ "identity", "answer", "values", "π😀" }, .modules = &modules };
-    const bytes = try format.encode(a, key, borrowed);
-    defer a.free(bytes);
-    var loaded = try format.decode(Payload, a, bytes, key);
-    defer format.deinit(a, &loaded);
-    const again = try format.encode(a, key, loaded);
-    defer a.free(again);
-    try std.testing.expectEqualSlices(u8, bytes, again);
-    try std.testing.expectEqualStrings("π😀", loaded.symbols[3]);
-    try std.testing.expect(loaded.modules[0].nodes.ptr != original.nodes.ptr);
-    var expected = try backend.compile(a, &modules, 1);
-    defer expected.deinit(a);
-    var observed = try backend.compile(a, loaded.modules, 1);
-    defer observed.deinit(a);
-    try std.testing.expect(expected.diagnostic == null);
-    try std.testing.expect(observed.diagnostic == null);
-    try std.testing.expectEqualSlices(u8, expected.bytes, observed.bytes);
 }
 
 const Simple = struct { strings: []const []const u8, tail: union(enum) { closed, variable: u32 }, annotation: ?[]const u8, bits: f32, count: usize, valid: bool };

@@ -428,7 +428,7 @@ pub fn validateGraphWithBudget(allocator: std.mem.Allocator, owner: *const PI.In
     remaining.* -= @min(remaining.*, proof_budget.visits);
     try @import("../check/associated_admission.zig").interfaceWithBudget(allocator, owner, remaining);
     const source = @import("../check/associated_admission.zig").typesView(&owner.graph);
-    try @import("../eval/implementation_admission.zig").scopes(allocator, &source, owner, owner.implementation_predicates, remaining);
+    try @import("../check/implementation_admission.zig").scopes(allocator, &source, owner, owner.implementation_predicates, remaining);
     // Reuse one symbol-stamp lane across every source record. Arbitrary
     // declaration order is legal; duplicate fields reject in linear work.
     var symbol_limit: usize = 0;

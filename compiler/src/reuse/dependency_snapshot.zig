@@ -629,7 +629,7 @@ fn freezeMode(allocator: Allocator, tree: *const ast.Tree, checked: *const check
         value.* = old;
         for (checked.implementations) |implementation| {
             if (index < implementation.predicates.start or index - implementation.predicates.start >= implementation.predicates.len) continue;
-            if (@import("../eval/implementation_predicates.zig").inferredCarrier(&checked.types, old, implementation.row_parameters)) value.signature = 0;
+            if (@import("../check/implementation_predicates.zig").inferredCarrier(&checked.types, old, implementation.row_parameters)) value.signature = 0;
             break;
         }
         inline for (.{ "ty", "other", "result", "signature" }) |field| @field(value, field) = try projector.projectType(@field(value.*, field), 0);

@@ -2,7 +2,6 @@ const std = @import("std");
 const project = @import("project.zig");
 const checker = @import("project_check.zig");
 const publication = @import("dependency_consumer.zig");
-const consumer = @import("dependency_project_consumer.zig");
 const cli = @import("dependency_cli.zig");
 const D = @import("frozen_dependency.zig");
 const symbols = @import("../parse/symbols.zig");
@@ -35,51 +34,6 @@ fn ordinary(allocator: std.mem.Allocator, path: []const u8) !publication.Diagnos
     const issue = checked.diagnostics[0];
     const detail = issue.numeric_literal orelse return error.TestUnexpectedResult;
     return publication.publishedDiagnostic(allocator, issue.unit, "check-project", loaded.unit(issue.unit).source, .{ .cause = .native_detail, .code = issue.codeName(), .span = issue.span, .message = issue.message(), .actual_token = detail.actual_token }, @as([]const ast.NumericFault, &.{detail}));
-}
-fn snapshotFail(allocator: std.mem.Allocator, path: []const u8, source_text: []const u8) !void {
-    var expected = try ordinary(allocator, path);
-    defer expected.deinit(allocator);
-    var result = result_scope: {
-        const source = try allocator.dupe(u8, source_text);
-        defer allocator.free(source);
-        var pool: symbols.Pool = .{};
-        defer pool.deinit(allocator);
-        var bundle: D.FrozenDependency = .{ .symbols = &.{}, .modules = &.{} };
-        // Fresh entry frontend and its source/pool are all destroyed before
-        // inspecting or rendering the returned failure snapshot.
-        break :result_scope try consumer.compileOwned(allocator, io, path, source, .{}, &pool, &bundle);
-    };
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic != null and result.compiled.bytes.len == 0);
-    const actual = result.diagnostic.?;
-    try std.testing.expectEqualStrings(expected.stage, actual.stage);
-    try std.testing.expectEqualStrings(expected.code, actual.code);
-    try std.testing.expectEqualStrings(expected.message, actual.message);
-    try std.testing.expectEqual(expected.start, actual.start);
-    try std.testing.expectEqual(expected.end, actual.end);
-    try std.testing.expectEqual(expected.publication.?.utf16, actual.publication.?.utf16);
-    try std.testing.expectEqual(expected.publication.?.cause, actual.publication.?.cause);
-    try std.testing.expectEqual(expected.publication.?.actual_token, actual.publication.?.actual_token);
-    try std.testing.expectEqual(expected.publication.?.expected_token, actual.publication.?.expected_token);
-    try std.testing.expectEqualStrings(expected.publication.?.details_json, actual.publication.?.details_json);
-    var rendered: std.Io.Writer.Allocating = .init(allocator);
-    defer rendered.deinit();
-    actual.write(&rendered.writer, path) catch return error.OutOfMemory;
-    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, rendered.written(), .{});
-    defer parsed.deinit();
-    try std.testing.expect(parsed.value.object.get("details").? == .array);
-}
-test "cached frontend publication equals ordinary project evidence after frontend teardown and OOM" {
-    var dir = std.testing.tmpDir(.{});
-    defer dir.cleanup();
-    try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = sources[0] });
-    const path = try dir.dir.realPathFileAlloc(io, "main.blot", a);
-    defer a.free(path);
-    for (sources) |source| {
-        try dir.dir.writeFile(io, .{ .sub_path = "main.blot", .data = source });
-        try snapshotFail(a, path, source);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, snapshotFail, .{ path, source });
-    }
 }
 test "creation frontend envelopes preserve earlier complete output and match ordinary public evidence" {
     var dir = std.testing.tmpDir(.{});

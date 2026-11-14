@@ -127,7 +127,7 @@ read disk; null/deleted paths hide the input for that build. Previous overrides
 are never inherited. Neither source nor asset overlays write to disk.
 
 `assetSources` with nonempty ranges requires a native session. Native options
-cannot be changed on `build`. `close` and `checkpoint` accept no source or asset
+cannot be changed on `build`. `close` accepts no source or asset
 ranges. Range failures are terminal `InvalidSources`; too many ranges are
 terminal `SourceLimit`, as in the base protocol. Configuration objects follow
 the base protocol's explicit unknown/duplicate-field rejection and Zig parsing
@@ -179,8 +179,8 @@ counted once. `generatedBytes` sums generated Blot modules. Resources are
 included only by the reference reader; catalog indexes are unrelated.
 
 The payload owns Wasm and captured resource bytes. A host copies the slices it
-retains before reusing its read buffers. Later builds, failed builds, checkpoint
-operations, and process disposal cannot mutate an already copied snapshot.
+retains before reusing its read buffers. Later builds, failed builds and process
+disposal cannot mutate an already copied snapshot.
 Content upload uses these bytes rather than reopening the reported path.
 
 ## Reader interfaces

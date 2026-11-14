@@ -113,8 +113,6 @@ for (
       startupTimeoutMs: timeoutMs,
       profileBackend: true,
       profileTrace: values.trace,
-      codegenTier: values.tier,
-      codegenWorkers: workers,
     });
     started = performance.now();
     const result = await compiler.build({

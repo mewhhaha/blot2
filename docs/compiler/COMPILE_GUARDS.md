@@ -29,15 +29,13 @@ do not enter the gate. Every ratio is retained in `cpu_guard`.
 
 Timing is opt-in so single-run profiles and synthetic-only measurements remain
 available. Qualification commands must explicitly include `--guard-cpu`.
-`--codegen-workers` pins both compilers equally and records the value in the
-result; its default remains four. For this cloud machine, reduce scheduling
-noise with an allowed CPU and one codegen worker:
+For this cloud machine, reduce scheduling noise with an allowed CPU:
 
 ```sh
 BLOT_BENCH_CPU=$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')
 taskset --cpu-list "$BLOT_BENCH_CPU" deno task bench:compile \
   --baseline OLD_BLOTC --candidate NEW_BLOTC --workload game \
-  --runs 7 --no-retained --codegen-workers 1 --guard-cpu
+  --runs 7 --no-retained --guard-cpu
 ```
 
 Use the environment's shared memory/serialization wrapper for heavy commands.

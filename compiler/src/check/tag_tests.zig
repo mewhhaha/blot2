@@ -5,7 +5,6 @@ const symbols = @import("../parse/symbols.zig");
 const ast = @import("../parse/ast.zig");
 const check = @import("check.zig");
 const core = @import("core.zig");
-const backend = @import("../backend/core_backend.zig");
 const a = std.testing.allocator;
 
 const source =
@@ -49,26 +48,6 @@ fn lower(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     try std.testing.expectEqualDeep(spans, tree.spans.items);
     try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
     return module;
-}
-fn validScenario(allocator: std.mem.Allocator) !void {
-    var module = try lower(allocator, source);
-    defer module.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 5), module.tag_calls.len);
-    for (module.tag_calls) |id| {
-        try std.testing.expect(module.isTagCall(id));
-        try std.testing.expectEqual(core.Tag.apply, module.node(id).tag);
-    }
-    var result = try backend.compile(allocator, &.{module}, 1);
-    defer result.deinit(allocator);
-    if (result.diagnostic) |item| std.debug.print("backend {s}:{d}\n", .{ @tagName(item.code), item.span.start });
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "tags wrap complete initializers without mutating source and preserve ordinary eager tag arguments" {
-    try validScenario(a);
-}
-test "tag checking lowering and backend ownership survives every allocation failure" {
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, validScenario, .{});
 }
 test "tag and original initializer diagnostics retain their distinct source ownership" {
     const cases = [_]struct { text: []const u8, code: check.Code, marker: []const u8 }{

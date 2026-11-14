@@ -3,7 +3,7 @@
 //! checked, including declarations not reachable from an entrypoint.
 const std = @import("std");
 const storage_types = @import("storage_types.zig");
-const region_arena = @import("../eval/region_arena.zig");
+const region_arena = @import("region_arena.zig");
 const ast = @import("../parse/ast.zig");
 const symbols = @import("../parse/symbols.zig");
 const T = @import("types.zig");
@@ -36,7 +36,7 @@ pub const ModuleOrigins = struct {
     context: ?*const anyopaque = null,
     lookup: ?*const fn (?*const anyopaque, Allocator, u32) T.Error![]u8 = null,
     source_available: ?*const fn (?*const anyopaque, u32) bool = null,
-    pub fn name(self: ModuleOrigins, allocator: Allocator, unit: u32, current_unit: u32) @import("../eval/purity_type_key.zig").OriginError![]u8 {
+    pub fn name(self: ModuleOrigins, allocator: Allocator, unit: u32, current_unit: u32) @import("purity_type_key.zig").OriginError![]u8 {
         if (self.lookup) |lookup| return lookup(self.context, allocator, unit);
         if (unit != current_unit) return error.SourceIdentityUnavailable;
         return allocator.dupe(u8, "main");
@@ -143,7 +143,7 @@ pub const Contract = PI.Contract;
 pub const ContractMember = PI.ContractMember;
 pub const Implementation = PI.Implementation;
 pub const ImplementationMember = PI.ImplementationMember;
-const implementation_patterns = @import("../eval/implementation_patterns.zig");
+const implementation_patterns = @import("implementation_patterns.zig");
 pub const Constructor = PI.Constructor;
 pub const Associated = PI.Associated;
 pub const EffectFamily = PI.EffectFamily;
@@ -854,7 +854,7 @@ const Engine = struct {
     dependency_owner: ?BindingId = null,
     /// Evidence heads use the ordinary value type before covariant row widening.
     exact_argument_types: bool = false,
-    implementation_trace: @import("../eval/implementation_trace.zig").Record = .{},
+    implementation_trace: @import("implementation_trace.zig").Record = .{},
     proved_predicate_target: ExternalTarget = .{ .unit = 0, .binding = 0 },
     proved_predicate_prerequisites: T.List = .{},
     active_predicates: std.ArrayList(struct { binding: BindingId, value: T.Obligation }) = .empty,
@@ -1927,7 +1927,7 @@ const Engine = struct {
     }
     fn rewriteGiven(self: *Engine, root: T.Id, depth: usize) T.Error!T.Id {
         if (depth >= 256) return error.TypeLimit;
-        const Given = @import("../eval/given_equations.zig");
+        const Given = @import("given_equations.zig");
         var equations: std.ArrayList(Given.Equation) = .empty;
         defer equations.deinit(self.allocator);
         for (self.qualifications.items) |boundary| {
@@ -3329,7 +3329,7 @@ const Engine = struct {
     }
     const LegacyProof = struct {
         engine: *Engine,
-        evidence: *@import("../eval/type_evidence.zig").Store,
+        evidence: *@import("type_evidence.zig").Store,
         source: ast.Id,
         remaining: usize,
         observed: usize,
@@ -3343,10 +3343,10 @@ const Engine = struct {
             self.remaining = self.engine.types.projection_limit - self.engine.types.projection_steps;
             self.observed = self.remaining;
         }
-        fn resolve(raw: *anyopaque, identity: Identity, member: u32, arguments: []const @import("../eval/type_evidence.zig").Id) @import("../eval/type_evidence.zig").Error!@import("../eval/type_evidence.zig").Id {
+        fn resolve(raw: *anyopaque, identity: Identity, member: u32, arguments: []const @import("type_evidence.zig").Id) @import("type_evidence.zig").Error!@import("type_evidence.zig").Id {
             const self: *LegacyProof = @ptrCast(@alignCast(raw));
             self.sync() catch |err| return convert(err);
-            var copy: @import("../eval/closed_evidence_import.zig").Importer = .{ .allocator = self.engine.allocator, .source = self.evidence.view(), .destination = &self.engine.types };
+            var copy: @import("closed_evidence_import.zig").Importer = .{ .allocator = self.engine.allocator, .source = self.evidence.view(), .destination = &self.engine.types };
             defer copy.deinit();
             var roots: std.ArrayList(T.Id) = .empty;
             defer roots.deinit(self.engine.allocator);
@@ -3356,17 +3356,17 @@ const Engine = struct {
             self.refresh();
             return self.evidence.projectWithBudget(&self.engine.types, result, &.{}, &.{}, &self.remaining);
         }
-        fn convert(err: T.Error) @import("../eval/type_evidence.zig").Error {
+        fn convert(err: T.Error) @import("type_evidence.zig").Error {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             if (err == error.TypeLimit) return error.EvidenceLimit;
             return error.TypeMismatch;
         }
-        fn resolver(self: *LegacyProof) @import("../eval/type_evidence.zig").ProjectionResolver {
+        fn resolver(self: *LegacyProof) @import("type_evidence.zig").ProjectionResolver {
             return .{ .context = self, .remaining = &self.remaining, .resolve = resolve };
         }
     };
     fn proveLegacy(self: *Engine, predicate: *T.Obligation, source: ast.Id) T.Error!bool {
-        const E = @import("../eval/type_evidence.zig");
+        const E = @import("type_evidence.zig");
         var evidence = E.Store.init(self.allocator) catch |err| return legacyError(err);
         defer evidence.deinit();
         var state: LegacyProof = .{ .engine = self, .evidence = &evidence, .source = source, .remaining = self.types.projection_limit - self.types.projection_steps, .observed = self.types.projection_limit - self.types.projection_steps };
@@ -3376,7 +3376,7 @@ const Engine = struct {
         return result;
     }
     fn proveLegacyState(self: *Engine, state: *LegacyProof, predicate: *T.Obligation, source: ast.Id) T.Error!bool {
-        const E = @import("../eval/type_evidence.zig");
+        const E = @import("type_evidence.zig");
         const evidence = state.evidence;
         var operands: [4]E.Id = @splat(0);
         for ([_]T.Id{ predicate.ty, predicate.other, predicate.result, predicate.signature }, &operands, 0..) |root, *operand, ordinal| {
@@ -3475,12 +3475,12 @@ const Engine = struct {
         };
         for (candidates, 0..) |candidate, side| {
             if (side == 1 and predicate.kind == .dispatch and predicate.name == 0) {
-                if (@import("../eval/implementation_predicates.zig").primitiveResult(evidence, predicate.operator, operands[0], operands[1])) |result| {
+                if (@import("implementation_predicates.zig").primitiveResult(evidence, predicate.operator, operands[0], operands[1])) |result| {
                     if (result != operands[2]) return false;
                     var carrier = operands[3];
                     if (carrier == 0) carrier = evidence.intern(.function, T.unit, T.unit, &.{}) catch |err| return legacyError(err);
                     try state.sync();
-                    var copy: @import("../eval/closed_evidence_import.zig").Importer = .{ .allocator = self.allocator, .source = evidence.view(), .destination = &self.types };
+                    var copy: @import("closed_evidence_import.zig").Importer = .{ .allocator = self.allocator, .source = evidence.view(), .destination = &self.types };
                     defer copy.deinit();
                     predicate.signature = try copy.ty(carrier, 0);
                     return true;
@@ -3521,13 +3521,13 @@ const Engine = struct {
             for (local_clauses) |*clause| {
                 inline for (.{ "ty", "other", "result", "signature" }) |field| @field(clause, field) = try self.types.resolve(@field(clause, field), 0);
             }
-            @import("../eval/implementation_rows.zig").reconstruct(evidence, @as(*const T.Store, &self.types), local_clauses, certificates.items, self.types.list(principal.variables), &mappings, &rows, state.resolver()) catch |err| switch (err) {
+            @import("implementation_rows.zig").reconstruct(evidence, @as(*const T.Store, &self.types), local_clauses, certificates.items, self.types.list(principal.variables), &mappings, &rows, state.resolver()) catch |err| switch (err) {
                 error.TypeMismatch, error.UnresolvedType => return false,
                 else => return legacyError(err),
             };
             for (rows.items) |mapping| if (!inList(self.types.list(principal.row_variables), mapping.variable)) return false;
             try state.sync();
-            var copy: @import("../eval/closed_evidence_import.zig").Importer = .{ .allocator = self.allocator, .source = evidence.view(), .destination = &self.types };
+            var copy: @import("closed_evidence_import.zig").Importer = .{ .allocator = self.allocator, .source = evidence.view(), .destination = &self.types };
             defer copy.deinit();
             if (predicate.kind != .resolver_dispatch) predicate.signature = try copy.ty(carrier, 0);
             if (self.active_evidence.items.len >= 256 or self.active_predicates.items.len >= 256 - self.active_evidence.items.len) {
@@ -3584,7 +3584,7 @@ const Engine = struct {
         }
         return false;
     }
-    fn legacyError(err: @import("../eval/type_evidence.zig").Error) T.Error {
+    fn legacyError(err: @import("type_evidence.zig").Error) T.Error {
         if (err == error.OutOfMemory) return error.OutOfMemory;
         if (err == error.EvidenceLimit) return error.TypeLimit;
         return error.TypeMismatch;
@@ -3822,7 +3822,7 @@ const Engine = struct {
             const child = try self.proveAndSavePredicate(&predicate, source);
             if (child == null) {
                 self.implementation_trace.candidate(declaration.identity, .requires_evidence);
-                self.implementation_trace.setOutcome(trace_step, @import("../eval/implementation_predicates.zig").failureOutcome(predicate.kind));
+                self.implementation_trace.setOutcome(trace_step, @import("implementation_predicates.zig").failureOutcome(predicate.kind));
                 if (trace_step) |step| self.implementation_trace.steps[step].ty = predicate.ty;
                 try self.diagnostic(.incompatible_implementation, source);
                 return null;
@@ -10400,7 +10400,7 @@ const Engine = struct {
         defer substitution.deinit(self.types.allocator);
         try self.appendInstance(principal.obligations, &substitution, use.value.source, expansion);
     }
-    fn purityIdentity(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("../eval/purity_type_key.zig").Kind) @import("../eval/purity_type_key.zig").OriginError!@import("../eval/purity_type_key.zig").Identity {
+    fn purityIdentity(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("purity_type_key.zig").Kind) @import("purity_type_key.zig").OriginError!@import("purity_type_key.zig").Identity {
         const self: *Engine = @ptrCast(@alignCast(context));
         const module_name = try self.purity_origins.name(allocator, identity.unit, self.unit);
         errdefer allocator.free(module_name);
@@ -10419,7 +10419,7 @@ const Engine = struct {
         };
         return .{ .module = module_name, .declaration = declaration };
     }
-    fn purityArguments(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("../eval/purity_type_key.zig").Kind, actual: []const T.Id) @import("../eval/purity_type_key.zig").OriginError![]T.Id {
+    fn purityArguments(context: *anyopaque, allocator: Allocator, identity: Identity, kind: @import("purity_type_key.zig").Kind, actual: []const T.Id) @import("purity_type_key.zig").OriginError![]T.Id {
         const self: *Engine = @ptrCast(@alignCast(context));
         const Formal = struct { patterns: P.List, variables: T.List };
         const formal: Formal = switch (kind) {
@@ -10500,8 +10500,8 @@ const Engine = struct {
                 witness.compound = !family.callable;
             }
         }
-        const key_context: @import("../eval/purity_type_key.zig").Context = .{ .allocator = self.allocator, .types = &self.types, .source = self, .origin = purityIdentity, .arguments = purityArguments };
-        const identity: ?@import("../eval/purity_type_key.zig").Identity = key_context.operation(labels[0], 65536) catch |err| switch (err) {
+        const key_context: @import("purity_type_key.zig").Context = .{ .allocator = self.allocator, .types = &self.types, .source = self, .origin = purityIdentity, .arguments = purityArguments };
+        const identity: ?@import("purity_type_key.zig").Identity = key_context.operation(labels[0], 65536) catch |err| switch (err) {
             error.SourceIdentityUnavailable => null,
             error.AmbiguousTypeKey, error.SpecializationLimit => return error.TypeLimit,
             else => |failure| return failure,

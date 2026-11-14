@@ -2,7 +2,6 @@ const std = @import("std");
 const project = @import("project.zig");
 const semantic = @import("project_check.zig");
 const core = @import("../check/core.zig");
-const backend = @import("../backend/core_backend.zig");
 const check = @import("../check/check.zig");
 const a = std.testing.allocator;
 
@@ -130,49 +129,4 @@ test "prelude dependency closure bootstraps once and failed declarations remain 
     defer bad.deinit(a);
     try std.testing.expect(bad.diagnostics.len != 0);
     try std.testing.expect(!bad.module(invalid.prelude_unit).valid);
-}
-
-fn completePipeline(allocator: std.mem.Allocator, entry: []const u8, prelude: []const u8) !void {
-    var loaded = try project.load(allocator, std.testing.io, entry, .{ .prelude_path = prelude });
-    var source_live = true;
-    defer if (source_live) loaded.deinit(allocator);
-    var checked = try semantic.checkProject(allocator, &loaded);
-    var checked_live = true;
-    defer if (checked_live) checked.deinit(allocator);
-    try valid(&loaded, &checked);
-    const entry_unit = loaded.entry;
-    const units = try allocator.alloc(core.Module, loaded.units.items.len);
-    var initialized: usize = 0;
-    defer {
-        for (units[0..initialized]) |*unit| unit.deinit(allocator);
-        allocator.free(units);
-    }
-    for (loaded.units.items, 0..) |*source_unit, index| {
-        const unit: u32 = @intCast(index + 1);
-        units[index] = try core.lower(allocator, &source_unit.tree, &loaded.symbols, &checked.module(unit).checked);
-        initialized += 1;
-        units[index].unit = unit;
-        try std.testing.expectEqual(@as(usize, 0), units[index].diagnostics.len);
-    }
-    checked.deinit(allocator);
-    checked_live = false;
-    loaded.deinit(allocator);
-    source_live = false;
-    var result = try backend.compile(allocator, units, entry_unit);
-    defer result.deinit(allocator);
-    if (result.diagnostic) |item| std.debug.print("prelude backend {d}: {s}\n", .{ item.unit, item.message() });
-    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
-    try std.testing.expect(result.bytes.len > 8);
-}
-test "complete implicit-prelude pipeline releases all owners at every allocation failure" {
-    var tmp = std.testing.tmpDir(.{});
-    defer tmp.cleanup();
-    try write(tmp.dir, "prelude.blot", prelude_source);
-    try write(tmp.dir, "main.blot", entry_source);
-    try write(tmp.dir, "helper.blot", "const answer = identity 22\n");
-    const entry = try path(tmp.dir, "main.blot");
-    defer a.free(entry);
-    const prelude = try path(tmp.dir, "prelude.blot");
-    defer a.free(prelude);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, completePipeline, .{ entry, prelude });
 }

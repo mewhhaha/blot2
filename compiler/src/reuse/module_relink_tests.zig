@@ -9,7 +9,7 @@ const format = @import("dependency_format.zig");
 const relink = @import("dependency_relink.zig");
 const consumer = @import("dependency_consumer.zig");
 const types = @import("../check/types.zig");
-const evidence = @import("../eval/type_evidence.zig");
+const evidence = @import("../check/type_evidence.zig");
 const Allocator = std.mem.Allocator;
 const key: format.Key = .{ .compiler = @as([32]u8, @splat(1)), .settings = @as([32]u8, @splat(2)), .source = @as([32]u8, @splat(3)), .dependencies = @as([32]u8, @splat(4)) };
 
@@ -90,55 +90,6 @@ fn prefill(a: Allocator, pool: *symbols.Pool, dictionary: []const D.Symbol, mode
         },
         else => return error.InvalidMode,
     }
-}
-
-fn compileSmall(a: Allocator, bytes: []const u8, mode: usize) !consumer.Result {
-    var frozen = try format.decode(D.FrozenDependency, a, bytes, key);
-    defer format.deinit(a, &frozen);
-    var pool: symbols.Pool = .{};
-    defer pool.deinit(a);
-    try prefill(a, &pool, frozen.symbols, mode);
-    const before = try format.encode(a, key, frozen);
-    defer a.free(before);
-    const pool_before = try a.dupe(u8, pool.bytes.items);
-    defer a.free(pool_before);
-    const pool_count = pool.entries.items.len;
-    const positions = try a.dupe(u32, frozen.modules[0].core.extra);
-    defer a.free(positions);
-    relink.relink(a, &frozen, &pool, &.{2}) catch |err| {
-        try std.testing.expectEqual(pool_count, pool.entries.items.len);
-        try std.testing.expectEqualSlices(u8, pool_before, pool.bytes.items);
-        const observations = if (@import("builtin").is_test) std.testing.allocator else std.heap.smp_allocator;
-        const after = try format.encode(observations, key, frozen);
-        defer observations.free(after);
-        try std.testing.expectEqualSlices(u8, before, after);
-        return err;
-    };
-    try std.testing.expectEqualSlices(u32, positions, frozen.modules[0].core.extra);
-    var result = try consumer.compile(a, application, &pool, &frozen.modules[0]);
-    errdefer result.deinit(a);
-    if (result.diagnostic) |issue| std.debug.print("mode{d}: {s} {d} {s}\n", .{ mode, issue.code, issue.start, issue.message });
-    if (result.compiled.diagnostic) |issue| std.debug.print("mode{d} emit: {s} {d}\n", .{ mode, @tagName(issue.code), issue.span.start });
-    try std.testing.expect(result.diagnostic == null and result.compiled.diagnostic == null);
-    return result;
-}
-
-test "arbitrary dependency dictionary keeps record slots associated identities and shaped operation arguments" {
-    const a = std.testing.allocator;
-    const bytes = try artifact(a);
-    defer a.free(bytes);
-    var baseline = try compileSmall(a, bytes, 0);
-    defer baseline.deinit(a);
-    for (1..4) |mode| {
-        var result = try compileSmall(a, bytes, mode);
-        defer result.deinit(a);
-        try std.testing.expectEqualSlices(u8, baseline.compiled.bytes, result.compiled.bytes);
-    }
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, compileSmallDiscard, .{ bytes, @as(usize, 2) });
-}
-fn compileSmallDiscard(a: Allocator, bytes: []const u8, mode: usize) !void {
-    var result = try compileSmall(a, bytes, mode);
-    defer result.deinit(a);
 }
 
 test "mapped record names unify semantically across opposite physical field orders" {

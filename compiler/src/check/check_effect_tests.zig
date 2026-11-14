@@ -788,45 +788,6 @@ test "reader witnesses do not invent result links and forwarding implementations
     }
 }
 
-test "a handled inferred operation closes the exported reader principal and complete entry layout" {
-    const core = @import("core.zig");
-    const layout = @import("../backend/layout.zig");
-    const text =
-        \\type State state is effect = { get:Unit -> state, set:state -> Unit }
-        \\entry const answer = func () : U32 => return @effect.reader State.get (func () : U32 => return @panic "witness called") (func () => return 42) (func () : U32 => return State.get ())
-    ;
-    var tokens = try lexer.lex(a, text);
-    defer tokens.deinit(a);
-    var pool: symbols.Pool = .{};
-    defer pool.deinit(a);
-    var tree = try parser.parse(a, text, tokens.tokens.items, &pool);
-    defer tree.deinit(a);
-    var checked = try check.check(a, &tree, &pool);
-    defer checked.deinit(a);
-    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
-    var binding_id: check.BindingId = 0;
-    for (checked.bindings, 0..) |binding, index| if (binding.name == pool.lookup("answer").?) {
-        binding_id = @intCast(index);
-        const principal = checked.types.node(binding.scheme.root);
-        try std.testing.expectEqual(T.u32_type, principal.b);
-        try std.testing.expectEqual(@as(u32, 0), principal.c);
-        for (checked.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |predicate| try std.testing.expect(predicate.kind != .effect_operation);
-    };
-    try std.testing.expect(binding_id != 0);
-    var module = try core.lower(a, &tree, &pool, &checked);
-    defer module.deinit(a);
-    try std.testing.expectEqual(@as(usize, 0), module.diagnostics.len);
-    var layouts = try layout.Store.init(a);
-    defer layouts.deinit();
-    const body = module.body(binding_id).?;
-    const complete = try layouts.fromType(&module, body.scheme.root, &.{});
-    const function = layouts.node(complete);
-    try std.testing.expectEqual(layout.Tag.function, function.tag);
-    try std.testing.expectEqual(layout.Tag.unit, layouts.node(function.a).tag);
-    try std.testing.expectEqual(layout.Tag.u32, layouts.node(function.b).tag);
-    try std.testing.expectEqual(@as(u32, 0), try layouts.rowFromType(&module, module.types.node(body.scheme.root).c, &.{}, &.{}, false));
-}
-
 fn foreignAnnotations(allocator: std.mem.Allocator) !void {
     const text =
         \\effect Read: Unit -> U32

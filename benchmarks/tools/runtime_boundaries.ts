@@ -110,7 +110,6 @@ for (let round = 0; round < 3; round++) {
     const compiler = await createZigProjectCompiler({
       executable: executable[side],
       entry,
-      codegenTier: "optimized",
       prelude: resolve(libraries[side], "prelude.blot"),
       stdRoot: libraries[side],
     });

@@ -242,7 +242,7 @@ fn spawnUses(module: *const C.Module, units: []const *const C.Module, id: C.Id, 
         }
     };
     var visitor: Visitor = .{ .module = module, .units = units, .node = node, .remaining = remaining };
-    @import("../eval/body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, module, id, false) catch return error.InvalidArtifact;
+    @import("body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, module, id, false) catch return error.InvalidArtifact;
 }
 pub fn receiveType(module: *const C.Module, input: T.Id, output: T.Id, remaining: *usize) Error!void {
     const shape = module.types.node(input);
@@ -297,7 +297,7 @@ fn inside(module: *const C.Module, root: C.Id, target: C.Id, remaining: *usize, 
     };
     var visitor: Visitor = .{ .module = module, .target = target, .remaining = remaining, .depth = depth + 1 };
     // The sink visits each edge immediately; the allocator is never used.
-    @import("../eval/body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, module, root, false) catch return error.InvalidArtifact;
+    @import("body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, module, root, false) catch return error.InvalidArtifact;
     return visitor.found;
 }
 fn groupOwner(module: *const C.Module, units: []const *const C.Module, source: C.Id, remaining: *usize) Error!C.Id {
@@ -619,7 +619,7 @@ const Captures = struct {
             }
         };
         var visitor: Visitor = .{ .scanner = self, .depth = depth };
-        @import("../eval/body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, self.module, id, false) catch return error.InvalidArtifact;
+        @import("body_recipe.zig").appendChildren(&visitor, std.heap.page_allocator, self.module, id, false) catch return error.InvalidArtifact;
     }
     fn check(self: *Captures, closure: C.Id) Error!void {
         try self.definitions(closure, 0);

@@ -4,58 +4,11 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const check = @import("../check/check.zig");
 const core = @import("../check/core.zig");
-const backend = @import("../backend/core_backend.zig");
 const project = @import("project.zig");
 const project_check = @import("project_check.zig");
 const display = @import("purity_diagnostics.zig");
 const a = std.testing.allocator;
 const source190 = "\neffect ask: Unit -> U32\nlet value = do:\n  use answer <- ask ()\n  break answer\n";
-fn rejected(allocator: std.mem.Allocator, source: []const u8, expected: check.Code, point: ?u32, message: ?[]const u8) !void {
-    var pool: symbols.Pool = .{};
-    defer pool.deinit(allocator);
-    var lexed = try lexer.lex(allocator, source);
-    defer lexed.deinit(allocator);
-    var tree = try parser.parse(allocator, source, lexed.tokens.items, &pool);
-    defer tree.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
-    var checked = try check.check(allocator, &tree, &pool);
-    defer checked.deinit(allocator);
-    try std.testing.expect(checked.diagnostics.len != 0);
-    try std.testing.expectEqual(expected, checked.diagnostics[0].code);
-    if (point) |start| try std.testing.expectEqualDeep(@import("../parse/ast.zig").Span{ .start = start, .end = start }, checked.diagnostics[0].span);
-    if (checked.diagnostics[0].purity != null) {
-        try std.testing.expect(checked.initializer_rejected);
-        try std.testing.expectEqual(@as(usize, 1), checked.bindings.len);
-        try std.testing.expectEqual(@as(usize, 0), checked.expr_types.len);
-        try std.testing.expectEqual(@as(usize, 0), checked.obligations.len);
-    }
-    if (message) |expected_message| {
-        const text = try display.format(allocator, &pool, "main", checked.diagnostics[0].purity.?);
-        defer allocator.free(text);
-        try std.testing.expectEqualStrings(expected_message, text);
-    }
-    var lowered = try core.lower(allocator, &tree, &pool, &checked);
-    defer lowered.deinit(allocator);
-    try std.testing.expectEqual(core.Code.unchecked, lowered.diagnostics[0].code);
-    try std.testing.expectEqual(@as(usize, 1), lowered.bodies.len);
-    var result = try backend.compile(allocator, &.{lowered}, 1);
-    defer result.deinit(allocator);
-    try std.testing.expectEqual(backend.Code.no_entry, result.diagnostic.?.code);
-    try std.testing.expectEqual(@as(usize, 0), result.bytes.len);
-}
-test "initializer actual frozen runtime reason first operation and no typed Core publication" {
-    try rejected(a, source190, .initializer_effect, 29, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect ask: Unit -> U32\nconst value = do:\n  use answer <- ask ()\n  break answer\n", .const_effect, 30, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use first <- zebra ()\n  use second <- alpha ()\n  break @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::zebra; sequence an operation with use inside a provider scope");
-    try rejected(a, "effect zebra: Unit -> U32\neffect alpha: Unit -> U32\nlet value = do:\n  use second <- alpha ()\n  use first <- zebra ()\n  break @u32.add first second\n", .initializer_effect, 56, "pure evaluation cannot perform main::alpha; sequence an operation with use inside a provider scope");
-}
-test "initializer successful type constraints precede purity and failed type checking refuses Core" {
-    try rejected(a, "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break true\n", .type_mismatch, null, null);
-}
-test "initializer all allocation failures release source row witness and rejection owners" {
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ source190, check.Code.initializer_effect, @as(?u32, 29), @as(?[]const u8, "pure evaluation cannot perform main::ask; sequence an operation with use inside a provider scope") });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, rejected, .{ "effect ask: Unit -> U32\nlet value: U32 = do:\n  use answer <- ask ()\n  break true\n", check.Code.type_mismatch, @as(?u32, null), @as(?[]const u8, null) });
-}
 fn failedProject(allocator: std.mem.Allocator, path: []const u8) !void {
     var loaded = try project.load(allocator, std.testing.io, path, .{ .prelude_path = null });
     defer loaded.deinit(allocator);

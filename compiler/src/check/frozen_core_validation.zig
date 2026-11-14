@@ -2117,8 +2117,8 @@ fn validateBatchWithBudget(allocator: std.mem.Allocator, module: *const core.Mod
     try @import("storage_core.zig").validate(module);
     try stagingScopes(graph, context, .{ .colors = colors, .path = path }, allocator, &equations);
     try associatedScopes(graph, .{ .colors = colors, .path = path }, remaining);
-    try @import("../eval/implementation_admission.zig").scopes(allocator, &module.types, module, module.obligations, remaining);
-    try @import("../eval/selected_implementation_admission.zig").core(allocator, module, remaining);
+    try @import("implementation_admission.zig").scopes(allocator, &module.types, module, module.obligations, remaining);
+    try @import("selected_implementation_admission.zig").core(allocator, module, remaining);
     try @import("numeric_proof_core.zig").validate(allocator, module, context.units, remaining);
     try @import("rank_portable.zig").executableWorkspace(module, context, &equations);
     try @import("capability_invocations.zig").validate(allocator, module, context.units);

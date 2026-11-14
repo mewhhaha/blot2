@@ -1124,7 +1124,7 @@ const Builder = struct {
                     walk.stage = parent_stage;
                     walk.depth = parent_depth;
                 }
-                @import("../eval/body_recipe.zig").appendChildren(walk, walk.builder.allocator, walk.graph, id, false) catch |err| return switch (err) {
+                @import("body_recipe.zig").appendChildren(walk, walk.builder.allocator, walk.graph, id, false) catch |err| return switch (err) {
                     error.OutOfMemory => error.OutOfMemory,
                     error.PlanLimit => error.CoreLimit,
                 };
@@ -2858,7 +2858,7 @@ const Builder = struct {
             const predicates: u32 = @intCast(self.tables.obligations.items.len);
             for (self.source.checked.implementation_predicates[old.predicates.start..][0..old.predicates.len]) |old_predicate| {
                 var value = old_predicate;
-                if (@import("../eval/implementation_predicates.zig").inferredCarrier(&self.source.checked.types, value, old.row_parameters)) value.signature = 0;
+                if (@import("implementation_predicates.zig").inferredCarrier(&self.source.checked.types, value, old.row_parameters)) value.signature = 0;
                 try self.tables.obligations.append(self.allocator, .{ .ty = try self.projectType(value.ty, 0), .kind = value.kind, .span = self.source.checked.diagnosticSpan(self.source.tree, value.source), .name = value.name, .result = try self.projectType(value.result, 0), .other = try self.projectType(value.other, 0), .signature = try self.projectType(value.signature, 0), .operator = value.operator, .identity = value.identity, .explicit = true, .qualification_span = value.qualification_span, .qualification_unit = value.qualification_unit });
             }
             declaration.predicates = .{ .start = predicates, .len = old.predicates.len };

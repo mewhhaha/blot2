@@ -39,7 +39,6 @@ if (expected.manifest !== await fileDigest(values.manifest!)) {
 const binary = resolve(values.binary!);
 const compiler = await createZigProjectCompiler({
   ...sessionOptions(binary, workload),
-  codegenWorkers: 4,
   profileBackend: false,
 });
 const pins = {

@@ -178,9 +178,6 @@ fn existingOutput(a: std.mem.Allocator, io: Io, output: []const u8) !?[:0]u8 {
 }
 
 pub fn work(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: bool, entry_path: []const u8, output: []const u8, artifact: ?[]const u8, raw_options: project.Options, compiler: [32]u8, metrics: *Metrics) !bool {
-    return workWithOptions(io, a, writer, create, entry_path, output, artifact, raw_options, compiler, metrics, .{});
-}
-fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: bool, entry_path: []const u8, output: []const u8, artifact: ?[]const u8, raw_options: project.Options, compiler: [32]u8, metrics: *Metrics, backend_options: @import("../backend/core_backend.zig").CompileOptions) !bool {
     var canonical = try CanonicalOptions.init(a, io, raw_options);
     defer canonical.deinit(a);
     const options = canonical.view(raw_options);
@@ -296,7 +293,7 @@ fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: boo
     const protected_output = try existingOutput(a, io, output);
     defer if (protected_output) |path| a.free(path);
     at = Io.Clock.awake.now(io);
-    var composed = try partial.compileOwnedWithOptions(a, io, entry_identity, protected_output, options, &frozen, backend_options);
+    var composed = try partial.compileOwned(a, io, entry_identity, protected_output, options, &frozen);
     defer composed.deinit(a);
     const result = &composed.result;
     metrics.source_bytes = composed.source_bytes;
@@ -312,9 +309,7 @@ fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: boo
         rejected = true;
     }
     if (result.compiled.diagnostic) |issue| {
-        const related = if (issue.related) |location| @import("../check/diagnostic_location.zig").Location.init(composed.related_filename orelse return error.MissingRelatedFilename, location.span) else null;
-        const payload = .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message(), .related = related, .details = if (result.compiled.explanation) |explanation| .{ .explanation = explanation } else null };
-        try emit(writer, @import("../check/diagnostic_location.zig").WithOrigins(@TypeOf(payload)){ .payload = payload, .origins = composed.origins.entries });
+        try emit(writer, .{ .kind = "diagnostic", .filename = composed.diagnostic_filename orelse entry_identity, .stage = "emit", .unit = issue.unit, .code = @tagName(issue.code), .start = issue.span.start, .end = issue.span.end, .message = issue.message() });
         rejected = true;
     }
     if (rejected) return false;
@@ -325,14 +320,11 @@ fn workWithOptions(io: Io, a: std.mem.Allocator, writer: *Io.Writer, create: boo
 /// All owners from work are gone on success, diagnostic rejection and I/O/OOM
 /// failure before the final metrics record. No implicit source fallback occurs.
 pub fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, create: bool, entry: []const u8, output: []const u8, artifact: ?[]const u8, options: project.Options, compiler: [32]u8) !bool {
-    return processWithOptions(io, backing, writer, create, entry, output, artifact, options, compiler, .{});
-}
-pub fn processWithOptions(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, create: bool, entry: []const u8, output: []const u8, artifact: ?[]const u8, options: project.Options, compiler: [32]u8, backend_options: @import("../backend/core_backend.zig").CompileOptions) !bool {
     var tracked: memory.TrackedAllocator = .{ .backing = backing };
     var metrics: Metrics = .{};
     const started = Io.Clock.awake.now(io);
     var failure: ?anyerror = null;
-    const success = workWithOptions(io, tracked.allocator(), writer, create, entry, output, artifact, options, compiler, &metrics, backend_options) catch |err| blk: {
+    const success = work(io, tracked.allocator(), writer, create, entry, output, artifact, options, compiler, &metrics) catch |err| blk: {
         failure = err;
         break :blk false;
     };

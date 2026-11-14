@@ -143,48 +143,6 @@ test "deferred fields and associated operators remain principal across distinct 
     try std.testing.expectEqual(@as(usize, 1), f.checked.associated.len);
     try std.testing.expectEqualStrings("add", f.pool.get(f.checked.associated[0].member));
 }
-test "associated binary admission checks ordered operands and does not backtrack on chosen result" {
-    var admitted = try Fixture.init(
-        \\infixl 60 (+) = _fixity_add
-        \\type Left is data = $Left U32
-        \\type Right is data = $Right U32
-        \\const Left.add = func (left:Left) => return func (right:Left) => return 1
-        \\const Right.add = func (left:Left) => return func (right:Right) => return 42
-        \\entry const answer = $Left 1 + $Right 2
-        \\const _fixity_add = func left => return func right => return @type.call "add" left right
-    );
-    defer admitted.deinit();
-    try admitted.valid();
-    // Operator syntax calls the ordinary fixity function. Verify the selected
-    // implementation through evaluation, after preserving principal evidence.
-    var lowered = try @import("core.zig").lower(a, &admitted.tree, &admitted.pool, &admitted.checked);
-    defer lowered.deinit(a);
-    lowered.unit = 1;
-    var session = try @import("../eval/core_eval.zig").Session.init(a, &.{lowered});
-    defer session.deinit();
-    var selected = false;
-    for (admitted.checked.bindings, 0..) |binding, id| {
-        if (binding.kind == .global and std.mem.eql(u8, admitted.pool.get(binding.name), "answer")) {
-            try std.testing.expectEqual(@as(u32, 42), (try session.value(.{ .unit = 1, .binding = @intCast(id) })).bits);
-            selected = true;
-        }
-    }
-    try std.testing.expect(selected);
-    var rejected = try Fixture.init(
-        \\infixl 60 (+) = _fixity_add
-        \\type Left is data = $Left U32
-        \\type Right is data = $Right U32
-        \\const Left.add = func (left:Left) => return func (right:Right) => return 1
-        \\const Right.add = func (left:Left) => return func (right:Right) => return 42.0
-        \\entry const answer:F32 = $Left 1 + $Right 2
-        \\const _fixity_add = func left => return func right => return @type.call "add" left right
-    );
-    defer rejected.deinit();
-    var mismatch = false;
-    for (rejected.checked.diagnostics) |diagnostic| mismatch = mismatch or diagnostic.code == .type_mismatch;
-    try std.testing.expect(mismatch);
-}
-
 test "authoritative binary primitive admits nominal evidence and rejects missing builtin providers" {
     for ([_]struct { source: []const u8, code: ?check.Code }{
         .{ .source = @import("fixtures").source("nominal/generic-fields-and-associated.blot"), .code = null },
@@ -240,85 +198,6 @@ test "nominal catalogs deferred evidence and immutable field updates release eve
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, nominalAllocationScenario, .{});
 }
 
-test "latent staged callback intermediates are fresh per scalar evidence use" {
-    // This fixture declares the ordinary scalar methods normally imported
-    // from std/prelude, so admit it as a prelude catalog producer.
-    var f = try Fixture.initWithOptions(
-        \\infixl 60 (+) = _fixity_add
-        \\const U32.add = func left => return func right => return @u32.add left right
-        \\const F32.add = func left => return func right => return @f32.add left right
-        \\type Builder callback is data = $Builder {run:callback}
-        \\const add_step = func amount => return func builder => return do:
-        \\  let $Builder {run:previous} = builder
-        \\  break $Builder {run:func value => return previous value + amount}
-        \\const make = func amount => return do:
-        \\  let builder = $Builder {run:func value => return value}
-        \\  builder := add_step amount self
-        \\  builder := add_step amount self
-        \\  break builder
-        \\entry const integer = func () => return do:
-        \\  let $Builder {run} = make 10
-        \\  break run 22
-        \\entry const floating = func () => return do:
-        \\  let $Builder {run} = make 1.5
-        \\  break run 39.0
-        \\const _fixity_add = func left => return func right => return @type.call "add" left right
-        \\entry const integer_result: U32 = integer ()
-        \\entry const floating_result: F32 = floating ()
-    , .{ .builtin_catalog = true });
-    defer f.deinit();
-    try f.valid();
-    var found: usize = 0;
-    for (f.checked.bindings[1..]) |binding| {
-        if (binding.kind != .global) continue;
-        const name = f.pool.get(binding.name);
-        if (std.mem.eql(u8, name, "integer") or std.mem.eql(u8, name, "floating")) {
-            // Principal callback results may retain deferred dispatch evidence.
-            // Concrete scalar results are checked at their instantiated uses below.
-            try std.testing.expectEqual(T.Tag.function, f.checked.types.node(binding.scheme.root).tag);
-            found += 1;
-        }
-        const quantified = f.checked.types.list(binding.scheme.variables);
-        // No private predicate variable may escape a principal scheme. Such
-        // variables connect closure inputs to final outputs without appearing
-        // directly in the published callback signature.
-        for (f.checked.obligations[binding.scheme.obligations.start..][0..binding.scheme.obligations.len]) |constraint| {
-            for ([_]T.Id{ constraint.ty, constraint.other, constraint.result }) |part| {
-                if (part == 0) continue;
-                const free = try f.checked.types.freeVariables(part);
-                defer a.free(free);
-                for (free) |variable| {
-                    var present = false;
-                    for (quantified) |candidate| present = present or candidate == variable;
-                    try std.testing.expect(present);
-                }
-            }
-        }
-    }
-    try std.testing.expectEqual(@as(usize, 2), found);
-    var lowered = try @import("core.zig").lower(a, &f.tree, &f.pool, &f.checked);
-    defer lowered.deinit(a);
-    lowered.unit = 1;
-    var session = try @import("../eval/core_eval.zig").Session.init(a, &.{lowered});
-    defer session.deinit();
-    var results: usize = 0;
-    for (f.checked.bindings, 0..) |binding, id| {
-        if (binding.kind != .global) continue;
-        const name = f.pool.get(binding.name);
-        if (std.mem.eql(u8, name, "integer_result")) {
-            const result = try session.value(.{ .unit = 1, .binding = @intCast(id) });
-            try std.testing.expectEqual(.u32, result.scalar);
-            try std.testing.expectEqual(@as(u32, 42), result.bits);
-            results += 1;
-        } else if (std.mem.eql(u8, name, "floating_result")) {
-            const result = try session.value(.{ .unit = 1, .binding = @intCast(id) });
-            try std.testing.expectEqual(.f32, result.scalar);
-            try std.testing.expectEqual(@as(u32, @bitCast(@as(f32, 42))), result.bits);
-            results += 1;
-        }
-    }
-    try std.testing.expectEqual(@as(usize, 2), results);
-}
 test "missing named dispatch remains an owned predicate in an unreachable typed function" {
     var f = try Fixture.init(
         \\const unused = func () : U32 => return @type.call "add" true false
@@ -406,37 +285,6 @@ const generic_indexed_field_source =
     \\    $Edit => 1
     \\    $Play => 0
 ;
-
-fn genericIndexedFieldScenario(allocator: std.mem.Allocator) !void {
-    var tokens = try lexer.lex(allocator, generic_indexed_field_source);
-    defer tokens.deinit(allocator);
-    var pool: symbols.Pool = .{};
-    defer pool.deinit(allocator);
-    var tree = try parser.parse(allocator, generic_indexed_field_source, tokens.tokens.items, &pool);
-    defer tree.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 0), tree.diagnostics.items.len);
-    var checked = try check.checkModuleWithOptions(allocator, &tree, &pool, &.{}, &.{}, 1, .{});
-    defer checked.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
-    var module = try @import("core.zig").lower(allocator, &tree, &pool, &checked);
-    defer module.deinit(allocator);
-    module.unit = 1;
-    var remaining: usize = 1_000_000;
-    const units = [_]*const @import("core.zig").Module{&module};
-    for (module.bodies) |body| {
-        if (module.binding(body.binding).kind != .global) continue;
-        try @import("package_core.zig").checkedInterfaceBody(&module, body.binding, .{ .units = &units }, &remaining, allocator);
-    }
-    var emitted = try @import("../backend/scoped_backend.zig").compile(allocator, &.{module}, 1);
-    defer emitted.deinit(allocator);
-    try std.testing.expect(emitted.diagnostic == null);
-    try std.testing.expect(emitted.bytes.len > 8);
-}
-
-test "generic indexed fields retain invariant source equations through allocation failure" {
-    try genericIndexedFieldScenario(a);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, genericIndexedFieldScenario, .{});
-}
 
 test "indexed field invariance rejects incompatible writes while ordinary rebinding changes types" {
     var invalid = try Fixture.init(

@@ -380,7 +380,6 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "run_native_tests.ts",
         "native_test_partitions.ts",
         "dev_check_areas.ts",
-        "compiler_fixtures.ts",
         "build_compiler.ts",
       ]
     ) {
@@ -397,7 +396,6 @@ Deno.test("full runner resumes native qualification after a guest repair and inv
         "bench_compile",
         "compiler_gate_state",
         "compiler_fingerprint",
-        "compiler_fixtures",
         "build_compiler",
         "native_test_runner",
         "run_native_tests",

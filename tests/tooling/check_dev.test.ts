@@ -99,12 +99,10 @@ Deno.test("development results reject omissions, skips, duplicates, wrong fault 
   ) {
     assert.throws(() => verifyNativeSelection(records, ["law"], "sampled"));
   }
-  // Keep the positive executable-reuse contract that rejected the earlier fix.
+  // The default family keeps the project server's wire laws.
   assert(
-    devCheckAreas["static-sharing"].native.some((name) =>
-      name.includes(
-        "static captured value graphs admit executable closure replay independently of principal mappings",
-      )
+    devCheckAreas.direct.native.some((name) =>
+      name.startsWith("reuse.zig_project_server.test.")
     ),
   );
 });

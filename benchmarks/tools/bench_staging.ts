@@ -81,8 +81,6 @@ const build = func (value: U32) => return ${
           executable,
           entry,
           prelude: null,
-          codegenTier,
-          codegenWorkers: 1,
           dependencies: archive ? bundle : undefined,
         };
         let retained;
@@ -144,7 +142,6 @@ const build = func (value: U32) => return ${
             };
             fixturePins[`${variant}/${phase}`] = JSON.stringify(inputs);
             samples.push({
-              codegenTier,
               archive,
               run,
               variant,

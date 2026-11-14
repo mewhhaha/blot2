@@ -127,8 +127,6 @@ for (const tier of ["development", "optimized"] as const) {
         entry,
         stdRoot: new URL("../../std", import.meta.url),
         prelude: new URL("../../std/prelude.blot", import.meta.url),
-        codegenTier: tier,
-        codegenWorkers: 1,
       };
       const compiler = await createZigProjectCompiler(options);
       try {

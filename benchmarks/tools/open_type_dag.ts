@@ -59,7 +59,6 @@ for (const depth of depths) {
       entry,
       stdRoot: `${repo}/std`,
       prelude: `${repo}/std/prelude.blot`,
-      codegenTier: "development",
       startupTimeoutMs: timeoutMs,
       profileBackend: true,
     });

@@ -5,7 +5,6 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const check = @import("check.zig");
 const core = @import("core.zig");
-const backend = @import("../backend/core_backend.zig");
 const T = @import("types.zig");
 const a = std.testing.allocator;
 const Case = struct { name: []const u8, source: []const u8, code: ?check.Code };
@@ -167,13 +166,6 @@ fn publication(allocator: std.mem.Allocator, source: []const u8) !void {
     }
     try std.testing.expect(found and later);
 }
-fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var emitted = try backend.compile(allocator, &.{module.*}, 1);
-    defer emitted.deinit(allocator);
-    if (emitted.diagnostic) |d| std.debug.print("emit {s}\n", .{@tagName(d.code)});
-    try std.testing.expectEqual(@as(?backend.Diagnostic, null), emitted.diagnostic);
-    try std.testing.expect(emitted.bytes.len > 8);
-}
 test "eager bottom flow keeps every later type effect annotation and qualified requirement" {
     for (cases) |case| try checking(a, case);
     for ([_][]const u8{ "guard-product-first", "guard-array-last", "rebind-type-change", "monad-rebind", "provider-rebind", "call-scalar-later-invalid", "aggregate-prefix-later-type-error", "explicit-annotation-after-bottom", "guard-call-generate-zero-body" }) |name|
@@ -184,22 +176,5 @@ test "Never applications retain owned arguments and exact result types through e
         const source = named(name).source;
         try publication(a, source);
         try @import("../allocation_failures.zig").checkAllAllocationFailures(a, publication, .{source});
-    }
-}
-test "bottom aggregate and callee emission preserve frozen Core after frontend teardown and failed allocations" {
-    for ([_][]const u8{ "guard-product-first", "guard-array-last", "runtime-never-local", "call-callee-panic", "never-constructor-scrutinee", "generic-bottom-f32", "generic-bottom-array-f32", "generic-bottom-nominal", "generic-bottom-captured" }) |name| {
-        var module = try lower(a, named(name).source);
-        defer module.deinit(a);
-        const nodes = try a.dupe(core.Node, module.nodes);
-        defer a.free(nodes);
-        const types = try a.dupe(T.Node, module.types.nodes);
-        defer a.free(types);
-        const extra = try a.dupe(T.Id, module.types.extra);
-        defer a.free(extra);
-        try emit(a, &module);
-        try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-        try std.testing.expectEqualSlices(core.Node, nodes, module.nodes);
-        try std.testing.expectEqualSlices(T.Node, types, module.types.nodes);
-        try std.testing.expectEqualSlices(T.Id, extra, module.types.extra);
     }
 }

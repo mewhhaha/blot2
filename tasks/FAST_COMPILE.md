@@ -75,7 +75,7 @@ Phases 1–3 are done behind `--backend direct` (CLI, project protocol,
 backend's (frame.png 19a03f0a…, frames.trace 86d50101…). On one native
 (`-Dllvm=false -Doptimize=fast`) compiler the backend takes 1.2 s against
 43.5 s; checking now dominates. `tests/guest/direct_backend_execution.test.ts`
-runs every fixture in `compiler/fixtures/direct/` on both backends.
+runs every fixture in `compiler/fixtures/direct/`.
 
 What the direct backend does beyond the plan above:
 
@@ -103,9 +103,10 @@ the scoped backend rejects.
 
 ## Sequencing (owner, 14 November 2026)
 
-1. Phase 6 first: the direct backend becomes the only backend, and the scoped
-   backend, `eval/`, the scoped `runtime/` and the reuse machinery built
-   around scoped artifacts are deleted.
+1. Phase 6 first (done 14 November 2026, tasks/DELETE_SCOPED.md): the direct
+   backend becomes the only backend, and the scoped backend, `eval/`, the
+   scoped `runtime/` and the reuse machinery built around scoped artifacts
+   are deleted.
    - Tests of scoped internals go with the code.
    - A test that only exercises a feature on the approved removal list in
      tasks/LANGUAGE_COHERENCE.md goes with that feature.

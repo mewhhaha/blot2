@@ -441,7 +441,7 @@ const Engine = struct {
         defer ready.deinit(self.allocator);
         var work_order: std.ArrayList(u32) = .empty;
         defer work_order.deinit(self.allocator);
-        var locked: @import("../eval/parallel_allocator.zig").LockedAllocator = .{ .backing = self.allocator, .io = io };
+        var locked: @import("../check/parallel_allocator.zig").LockedAllocator = .{ .backing = self.allocator, .io = io };
         while (remaining != 0) {
             ready.clearRetainingCapacity();
             for (self.source.order.items) |unit| {

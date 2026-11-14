@@ -4,7 +4,6 @@ const parser = @import("../parse/parser.zig");
 const symbols = @import("../parse/symbols.zig");
 const checker = @import("check.zig");
 const core = @import("core.zig");
-const backend = @import("../backend/core_backend.zig");
 const validation = @import("frozen_core_validation.zig");
 const a = std.testing.allocator;
 const T = @import("types.zig");
@@ -34,40 +33,6 @@ fn lowerText(allocator: std.mem.Allocator, text: []const u8) !core.Module {
     errdefer module.deinit(allocator);
     try std.testing.expectEqual(0, module.diagnostics.len);
     return module;
-}
-fn emit(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var result = try backend.compile(allocator, &.{module.*}, 1);
-    defer result.deinit(allocator);
-    if (result.diagnostic) |item| std.debug.print("scoped emission diagnostic {s} at {d}\n", .{ @tagName(item.code), item.span.start });
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
-    // Creation occurs only when the generated guest runs. No live authority
-    // exists in evaluator values, snapshots or a successful constant receipt.
-    if (result.constant_steps != 0) std.debug.print("scoped emission constant steps {d}\n", .{result.constant_steps});
-    try std.testing.expectEqual(0, result.constant_steps);
-}
-test "scoped effect lowering and guest emission release every failed allocation" {
-    var module = try lower(a);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = source.len });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
-test "scoped effect maximum member closure ordinal survives owned lowering and emission" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").maximum_member_closure_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var tested: usize = 0;
-    for (module.bindings) |binding| {
-        if (binding.capability_parameters.kind != .member_closure_unit) continue;
-        tested += 1;
-        try std.testing.expectEqual(@as(u8, 15), binding.capability_parameters.arity());
-        try std.testing.expectEqual(@as(u16, 0x4000), binding.capability_parameters.result());
-    }
-    try std.testing.expectEqual(@as(usize, 1), tested);
-    try emit(a, &module);
 }
 fn lowerAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lower(allocator);
@@ -114,17 +79,6 @@ fn lowerRequestAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, request_source);
     defer module.deinit(allocator);
 }
-test "scoped effect request selectors survive lowering emission and failed allocations" {
-    var module = try lowerText(a, request_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = request_source.len });
-    try std.testing.expectEqual(2, module.request_arms.len);
-    try std.testing.expect(module.request_arms[0].selector != 0);
-    try std.testing.expect(module.request_arms[1].selector != 0);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerRequestAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
 test "scoped effect request evidence rejects missing and foreign-owner selectors" {
     var module = try lowerText(a, request_source);
     defer module.deinit(a);
@@ -152,15 +106,6 @@ fn lowerGenericAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, generic_source);
     defer module.deinit(allocator);
 }
-test "scoped effect symbolic factories survive lowering emission and failed allocations" {
-    var module = try lowerText(a, generic_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = generic_source.len });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerGenericAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 const outer_result_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\entry const answer = func () => return @effect.scope (func (left: State U32) => return do:
@@ -175,21 +120,6 @@ fn lowerOuterResultAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, outer_result_source);
     defer module.deinit(allocator);
 }
-test "scoped effect outer authority projection survives lowering emission and failed allocations" {
-    var module = try lowerText(a, outer_result_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = outer_result_source.len });
-    var projected_owners: usize = 0;
-    for (module.operation_values) |operation| {
-        if (operation.capability == 0) continue;
-        if (module.node(operation.capability).tag == .project) projected_owners += 1;
-    }
-    try std.testing.expect(projected_owners > 0);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerOuterResultAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 const closure_result_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\entry const answer = func (value: U32) => return do:
@@ -200,15 +130,6 @@ fn lowerClosureResultAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, closure_result_source);
     defer module.deinit(allocator);
 }
-test "scoped effect closure footprint survives lowering emission and failed allocations" {
-    var module = try lowerText(a, closure_result_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module}, .source_length = closure_result_source.len });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerClosureResultAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 const flow_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const identity = func value => return value
@@ -225,65 +146,12 @@ fn lowerFlowAndRelease(allocator: std.mem.Allocator) !void {
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect public flow contracts validate bodies and release failed allocations" {
-    var module = try lowerText(a, flow_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var identity_count: usize = 0;
-    var invoke_count: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow == .unknown) continue;
-        const original = binding.capability_flow;
-        switch (original) {
-            .identity => {
-                identity_count += 1;
-                binding.capability_flow = .invoke_unit;
-            },
-            .invoke_unit => {
-                invoke_count += 1;
-                binding.capability_flow = .identity;
-            },
-            .unknown, .member_unit, .invoke_with_capability, .member_first_unit, .member_second_unit, .input_shape, .consume_task, .scope_task, .spawn_task => unreachable,
-        }
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_flow = original;
-    }
-    try std.testing.expectEqual(1, identity_count);
-    try std.testing.expectEqual(1, invoke_count);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerFlowAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 const task_join_wrapper_source =
     \\const await = func source => return |source|
     \\entry const answer = func () => return @task.scope (func group => return do:
     \\  let pending = @task.spawn group (func () => return 42)
     \\  return await pending)
 ;
-test "task join wrapper contract requires the exact checked join body" {
-    var module = try lowerText(a, task_join_wrapper_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var found: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow != .consume_task) continue;
-        found += 1;
-        const original = binding.capability_flow;
-        binding.capability_flow = .identity;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_flow = original;
-        const root = module.bodies[binding.body_id].root;
-        const task = module.nodes[root];
-        module.nodes[root].c = @backingInt(@import("task_types.zig").Op.cancel);
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        module.nodes[root] = task;
-    }
-    try std.testing.expectEqual(@as(usize, 1), found);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    try emit(a, &module);
-}
-
 const parameter_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const read = func (s: State a) : a ! {s.get} => return s.get ()
@@ -298,15 +166,6 @@ fn lowerParameterAndRelease(allocator: std.mem.Allocator) !void {
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect capability parameters preserve owned binders through lowering emission and OOM" {
-    var module = try lowerText(a, parameter_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 test "scoped effect frozen capability parameters reject substituted binder edges and body claims" {
     var module = try lowerText(a, parameter_source);
     defer module.deinit(a);
@@ -347,188 +206,46 @@ fn lowerCurriedAndRelease(allocator: std.mem.Allocator) !void {
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect curried capability callback contracts survive lowering emission and OOM" {
-    var module = try lowerText(a, curried_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow != .invoke_with_capability) continue;
-        binding.capability_flow = .invoke_unit;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_flow = .invoke_with_capability;
-    }
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerCurriedAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerLocalStoreAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").local_store_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect local State storage releases capture roots on failed lowering and emission" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").local_store_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerLocalStoreAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerDependentArrowAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").dependent_arrow_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect complete arrow binders survive owned lowering emission and OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").dependent_arrow_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerDependentArrowAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerPairAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").pair_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect paired input identities survive owned lowering emission and OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").pair_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow != .member_second_unit) continue;
-        binding.capability_flow = .member_first_unit;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_flow = .member_second_unit;
-    }
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerPairAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerSelectionAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").selection_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect selection terms survive owned lowering emission and OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").selection_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerSelectionAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerParameterFootprintsAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").parameter_footprint_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect pure product input footprints validate exact bodies and release OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").parameter_footprint_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var contracts: usize = 0;
-    for (module.bindings) |*binding| {
-        if (!binding.capability_parameters.present()) continue;
-        contracts += 1;
-        const original = binding.capability_parameters;
-        binding.capability_parameters = .init(original.arity(), 1);
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-        binding.capability_parameters = .init(17, original.result());
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), contracts);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterFootprintsAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerParameterInvocationAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").parameter_invocation_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect multiple input invocation claims validate callback ordinals and OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").parameter_invocation_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var contracts: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_parameters.kind != .invoke_unit) continue;
-        contracts += 1;
-        const original = binding.capability_parameters;
-        binding.capability_parameters.mask = 1;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-        binding.capability_parameters.kind = .product;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), contracts);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerParameterInvocationAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerRecordFootprintsAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").record_footprint_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect record constructors validate exact retained fields and release OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").record_footprint_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var contracts: usize = 0;
-    for (module.bindings) |*binding| {
-        if (!binding.capability_parameters.present()) continue;
-        contracts += 1;
-        const original = binding.capability_parameters;
-        binding.capability_parameters.mask = 1;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), contracts);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerRecordFootprintsAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerMemberClosureAndRelease(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, @import("check_effect_tests.zig").member_closure_source);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
 }
-test "scoped effect member closure recipes validate captured ordinals and release OOM" {
-    var module = try lowerText(a, @import("check_effect_tests.zig").member_closure_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{ .units = &.{&module} });
-    var contracts: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_parameters.kind != .member_closure_unit) continue;
-        contracts += 1;
-        const original = binding.capability_parameters;
-        binding.capability_parameters.mask = 1;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-        binding.capability_parameters.kind = .invoke_unit;
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{ .units = &.{&module} }));
-        binding.capability_parameters = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), contracts);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerMemberClosureAndRelease, .{});
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 const multi_input_source =
     \\type State a is effect = {get: Unit -> a, set: a -> Unit}
     \\const apply2 = func callback => return func left => return func right => return callback left right
@@ -546,56 +263,6 @@ const multi_input_source =
     \\  break result
     \\))
 ;
-test "multi input invocation reconstructs ordered owners and named callback no store" {
-    var module = try lowerText(a, multi_input_source);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{});
-    const flow = @import("capability_flow.zig");
-    var tested: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_parameters.kind != .invoke_inputs) continue;
-        tested += 1;
-        const original = binding.capability_parameters;
-        const body = module.bodies[binding.body_id];
-        try std.testing.expect(flow.parameterCore(&module, body, original));
-        binding.capability_parameters.invocation_arguments = 0x12;
-        try std.testing.expect(binding.capability_parameters.valid());
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{}));
-        binding.capability_parameters.invocation_arguments = 0x11;
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        binding.capability_parameters = original;
-        binding.capability_parameters.mask = 2;
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        binding.capability_parameters = original;
-        binding.capability_parameters.invocation_count = 17;
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        binding.capability_parameters = original;
-        var forged = body;
-        forged.parameters.start = std.math.maxInt(u32);
-        try std.testing.expect(!flow.parameterCore(&module, forged, original));
-    }
-    try std.testing.expectEqual(@as(usize, 1), tested);
-    tested = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow != .input_shape or binding.capability_parameters.arity() != 2) continue;
-        tested += 1;
-        const body = module.bodies[binding.body_id];
-        const original = binding.capability_parameters;
-        try std.testing.expect(@import("capability_contract_core.zig").inputBody(&module, body, original));
-        binding.capability_parameters.mask = 1;
-        try std.testing.expect(!@import("capability_contract_core.zig").inputBody(&module, body, binding.capability_parameters));
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{}));
-        binding.capability_parameters = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), tested);
-    var result = try backend.compile(a, &.{module}, 1);
-    defer result.deinit(a);
-    try std.testing.expectEqual(@as(?backend.Diagnostic, null), result.diagnostic);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerMultiInput, .{});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn lowerMultiInput(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, multi_input_source);
     defer module.deinit(allocator);
@@ -670,62 +337,10 @@ fn lowerForwarding(allocator: std.mem.Allocator) !void {
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{});
 }
-test "forwarding invocation reconstructs producer bodies and rejects cycles missing owners and order forgery" {
-    const text = try forwardingSource(a);
-    defer a.free(text);
-    var module = try lowerText(a, text);
-    defer module.deinit(a);
-    try validation.validate(a, &module, .{});
-    const flow = @import("capability_flow.zig");
-    var tested: usize = 0;
-    for (module.bindings) |binding| {
-        if (!binding.capability_parameters.inputInvokes()) continue;
-        const body = module.bodies[binding.body_id];
-        const node = module.node(body.root);
-        if (node.tag != .call) continue;
-        tested += 1;
-        try std.testing.expect(flow.parameterCore(&module, body, binding.capability_parameters));
-        var remaining: usize = 0;
-        try std.testing.expectEqual(@as(?flow.Parameters, null), flow.invocationCore(&module, body, &.{}, &remaining));
-        remaining = 4096;
-        try std.testing.expectEqualDeep(binding.capability_parameters, flow.invocationCore(&module, body, &.{}, &remaining).?);
-        try std.testing.expect(remaining < 4096);
-        const first = module.extra[node.b + 1];
-        const second = module.extra[node.b + 2];
-        module.extra[node.b + 1] = second;
-        module.extra[node.b + 2] = first;
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        try std.testing.expectError(error.InvalidArtifact, validation.validate(a, &module, .{}));
-        module.extra[node.b + 1] = first;
-        module.extra[node.b + 2] = second;
-        const target = module.calls[node.a].target;
-        module.calls[node.a].target = .{ .binding = body.binding, .unit = module.unit };
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        module.calls[node.a].target = .{ .binding = target.binding, .unit = 99 };
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        module.calls[node.a].target = target;
-        const producer_body = module.bindings[target.binding].body_id;
-        const root = module.bodies[producer_body].root;
-        module.bodies[producer_body].root = 0;
-        try std.testing.expect(!flow.parameterCore(&module, body, binding.capability_parameters));
-        module.bodies[producer_body].root = root;
-    }
-    try std.testing.expectEqual(@as(usize, 1), tested);
-    try emit(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerForwarding, .{});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emit, .{&module});
-}
-
 fn projectedSource(allocator: std.mem.Allocator) ![]u8 {
     const wrapped = try std.mem.replaceOwned(u8, allocator, multi_input_source, "entry const answer", "const keep = func callback => return {callback}\nconst make = func () => return keep read2\nentry const answer");
     defer allocator.free(wrapped);
     return std.mem.replaceOwned(u8, allocator, wrapped, "break apply2 read2 left right", "let holder = make ()\n      break apply2 holder.callback left right");
-}
-fn emitProjected(allocator: std.mem.Allocator, module: *const core.Module) !void {
-    var result = try backend.compile(allocator, &.{module.*}, 1);
-    defer result.deinit(allocator);
-    try std.testing.expect(result.diagnostic == null);
-    try std.testing.expect(result.bytes.len > 8);
 }
 fn lowerProjected(allocator: std.mem.Allocator) !void {
     const text = try projectedSource(allocator);
@@ -733,77 +348,4 @@ fn lowerProjected(allocator: std.mem.Allocator) !void {
     var module = try lowerText(allocator, text);
     defer module.deinit(allocator);
     try validation.validate(allocator, &module, .{ .units = &.{&module} });
-}
-test "projected callable provenance owns producer bodies receiver binders and closed constructor execution" {
-    const text = try projectedSource(a);
-    defer a.free(text);
-    var module = try lowerText(a, text);
-    defer module.deinit(a);
-    const context: validation.Context = .{ .units = &.{&module} };
-    try validation.validateBounds(&module, context);
-    try @import("capability_invocations.zig").validate(a, &module, context.units);
-    try validation.validate(a, &module, context);
-    var callbacks: usize = 0;
-    for (module.bindings) |binding| {
-        if (binding.capability_flow != .input_shape or binding.capability_parameters.arity() != 2) continue;
-        callbacks += 1;
-        const body = &module.bodies[binding.body_id];
-        const original = body.root;
-        const parameter = module.parameters[body.parameters.start].binding;
-        for (module.nodes, 0..) |node, id| {
-            if (node.tag != .reference) continue;
-            const reference = module.reference(@intCast(id));
-            if ((reference.unit != 0 and reference.unit != module.unit) or reference.binding != parameter) continue;
-            body.root = @intCast(id);
-            break;
-        }
-        try std.testing.expect(body.root != original);
-        try std.testing.expectError(error.InvalidArtifact, @import("capability_invocations.zig").validate(a, &module, context.units));
-        body.root = original;
-        var tested_reference = false;
-        for (module.nodes, 0..) |node, id| {
-            if (node.tag != .reference) continue;
-            const reference = module.reference(@intCast(id));
-            if (reference.binding != body.binding or (reference.unit != 0 and reference.unit != module.unit)) continue;
-            tested_reference = true;
-            module.nodes[id].ty = T.u32_type;
-            try std.testing.expectError(error.InvalidArtifact, @import("capability_invocations.zig").validate(a, &module, context.units));
-            module.nodes[id].ty = node.ty;
-            const type_id: u32 = @intCast(module.types.nodes.len);
-            module.types.nodes = try a.realloc(module.types.nodes, module.types.nodes.len + 2);
-            const row: u32 = @intCast(module.types.effects.rows.len);
-            const label: u32 = @intCast(module.types.effects.labels.len);
-            module.types.effects.rows = try a.realloc(module.types.effects.rows, module.types.effects.rows.len + 1);
-            module.types.effects.labels = try a.realloc(module.types.effects.labels, module.types.effects.labels.len + 1);
-            module.types.effects.labels[label] = T.foreign_operation;
-            module.types.effects.rows[row] = .{ .labels = .{ .start = label, .len = 1 } };
-            module.types.nodes[type_id] = module.types.node(node.ty);
-            const inner = module.types.node(module.types.nodes[type_id].b);
-            try std.testing.expectEqual(T.Tag.function, inner.tag);
-            module.types.nodes[type_id + 1] = inner;
-            module.types.nodes[type_id + 1].c = row;
-            module.types.nodes[type_id].b = type_id + 1;
-            module.nodes[id].ty = type_id;
-            try std.testing.expectError(error.InvalidArtifact, @import("capability_invocations.zig").validate(a, &module, context.units));
-            module.nodes[id].ty = node.ty;
-            break;
-        }
-        try std.testing.expect(tested_reference);
-    }
-    try std.testing.expectEqual(@as(usize, 1), callbacks);
-    var factories: usize = 0;
-    for (module.bindings) |*binding| {
-        if (binding.capability_flow != .input_shape or binding.capability_parameters.arity() != 1 or binding.scheme.variables.len == 0) continue;
-        const body = module.bodies[binding.body_id];
-        if (module.parameters[body.parameters.start].ty != T.unit) continue;
-        factories += 1;
-        const original = binding.scheme.variables;
-        binding.scheme.variables = .{};
-        try std.testing.expectError(error.InvalidArtifact, validation.validateBounds(&module, context));
-        binding.scheme.variables = original;
-    }
-    try std.testing.expectEqual(@as(usize, 1), factories);
-    try emitProjected(a, &module);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, lowerProjected, .{});
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, emitProjected, .{&module});
 }

@@ -3,16 +3,7 @@ import { fileURLToPath } from "node:url";
 
 // Qualification command: compile each subsystem independently and compare the
 // exact discovered test names with the complete gate, including inline laws.
-const suites = [
-  "all",
-  "syntax",
-  "types",
-  "runtime",
-  "checker",
-  "evaluator",
-  "backend",
-  "retained",
-];
+const suites = ["all", "syntax", "types", "checker", "project"];
 const zig = Deno.env.get("ZIG") ?? "zig";
 const version = await new Deno.Command(zig, { args: ["version"] }).output();
 assert.equal(new TextDecoder().decode(version.stdout).trim(), "0.17.0");

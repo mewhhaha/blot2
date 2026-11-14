@@ -47,8 +47,6 @@ for (const tier of ["development", "optimized"] as const) {
       entry,
       stdRoot: `${root}/std`,
       prelude: `${root}/std/prelude.blot`,
-      codegenTier: tier,
-      codegenWorkers: 1,
     });
     try {
       const result = await compiler.build({ sources });

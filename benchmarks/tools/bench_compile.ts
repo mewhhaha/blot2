@@ -61,7 +61,7 @@ const repo = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   [--runs 5] [--workload all|gdev|game|devtools|tests|synthetic|review|NAME,...]
   [--test-runs 1] [--no-retained] [--profile] [--out DIR] [--snapshot DIR]
-  [--allow-wasm-diff] [--write-hashes] [--write-manifest] [--restart-cache]
+  [--allow-wasm-diff] [--write-hashes] [--write-manifest]
   [--shared-session] [--guard-cpu]
   [--candidate-profile] [--manifest FILE] [--hashes FILE] [--scenarios NAMES]
   [--semantic-workers N] [--candidate-semantic-workers N]
@@ -86,7 +86,6 @@ const usage = `Usage: deno task bench:compile --baseline BLOTC --candidate BLOTC
   --write-hashes          record the candidate's fresh gdev Wasm hashes (and
                           expected rejections) for the measured entries in
                           benchmarks/tools/gdev-wasm.json.
-  --restart-cache         measure isolated cold cache population and process restarts.
   --shared-session        also build the selected test entries in turn in one
                           session per variant and run, overlaying each at
                           src/test_fixture.blot as pen's test workers do; each
@@ -119,7 +118,6 @@ const { values: args } = parseArgs({
     "allow-wasm-diff": { type: "boolean", default: false },
     "write-manifest": { type: "boolean", default: false },
     "write-hashes": { type: "boolean", default: false },
-    "restart-cache": { type: "boolean", default: false },
     "shared-session": { type: "boolean", default: false },
     "guard-cpu": { type: "boolean", default: false },
     "semantic-workers": { type: "string" },
@@ -329,7 +327,6 @@ interface Session {
 async function openSession(
   variant: Variant,
   workload: Workload,
-  cacheDirectory: string | false = false,
 ): Promise<Session> {
   const compiler = await createZigProjectCompiler({
     ...sessionOptions(variant.executable, workload),
@@ -339,7 +336,6 @@ async function openSession(
     semanticWorkers: variant.name === "candidate"
       ? candidateSemanticWorkers
       : semanticWorkers,
-    cacheDirectory,
     ...((args.profile ||
         (args["candidate-profile"] && variant.name === "candidate"))
       ? { profileBackend: true }
@@ -382,7 +378,7 @@ async function measuredBuild(
       wasm_bytes: 0,
       wasm_sha256: `failure:${failure.code}`,
       failure,
-      stats: (result.attemptStats ?? {}) as Record<string, unknown>,
+      stats: {},
     };
   }
   return {
@@ -398,9 +394,8 @@ async function freshBuild(
   variant: Variant,
   workload: Workload,
   sources: Record<string, string> = {},
-  cacheDirectory: string | false = false,
 ): Promise<Measured> {
-  const session = await openSession(variant, workload, cacheDirectory);
+  const session = await openSession(variant, workload);
   try {
     return await measuredBuild(session, sources);
   } finally {
@@ -683,27 +678,13 @@ async function main(): Promise<number> {
     for (const workload of workloads) {
       if (run >= runsOf(workload)) continue;
       for (const variant of order) {
-        const cacheDirectory = args["restart-cache"]
-          ? `${out}/cache/${variant.name}/${workload.name}/${run}`
-          : false;
-        if (cacheDirectory) {
-          await Deno.mkdir(cacheDirectory, { recursive: true });
-        }
         const base = { workload: workload.name, variant: variant.name, run };
         await record({
           kind: "fresh",
           phase: "fresh",
           ...base,
-          ...await freshBuild(variant, workload, {}, cacheDirectory),
+          ...await freshBuild(variant, workload, {}),
         });
-        if (cacheDirectory) {
-          await record({
-            kind: "restart",
-            phase: "restart",
-            ...base,
-            ...await freshBuild(variant, workload, {}, cacheDirectory),
-          });
-        }
       }
       if (!args["no-retained"] && workload.retained) {
         for (const variant of order) {

@@ -67,7 +67,6 @@ const editSources = (revision: number): Promise<Record<string, string>> =>
 const open = (binary: string) =>
   createZigProjectCompiler({
     ...sessionOptions(resolve(binary), workload),
-    codegenWorkers: 4,
     profileBackend: values.profile,
   });
 const digest = async (bytes: Uint8Array<ArrayBuffer>) =>
