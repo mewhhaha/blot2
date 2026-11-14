@@ -24,6 +24,8 @@ rewrite scope.
 ## Documentation
 
 - [Language](language/guide.md): syntax and programming model.
+  [The specification draft](language/spec.md) states the expected syntax
+  once the approved language changes land.
 - [Compiler](compiler/ARCHITECTURE.md): architecture, ownership and
   implementation contracts. [Compiler status](compiler/STATUS.md) tracks current
   design state.
