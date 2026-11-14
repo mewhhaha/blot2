@@ -569,10 +569,6 @@ pub const DictionaryGiven = struct { opening: BindingId, introduction: ast.Id = 
 pub const DictionaryProof = union(enum) { selected: u32, given: DictionaryGiven };
 pub const DictionarySelection = struct { source: ast.Id, quantifier: T.Id, goal: u32, proof: DictionaryProof };
 pub const RankImplementation = struct { scope: u32, quantified: T.Id, node: ast.Id = 0 };
-/// A source requirement proven by a written clause of its own scope.
-/// Coverage can solve clause-local parts, such as a method row closed by an
-/// empty ambient, so body replay covers the same requirement again.
-pub const CoveredRequirement = struct { scope: ast.Id, value: T.Obligation };
 pub const Checked = struct {
     function_exit_lambdas: []ast.Id = &.{},
     usage_loans: []UsageLoan = &.{},
@@ -593,7 +589,6 @@ pub const Checked = struct {
     reflections: []Reflection = &.{},
     tag_origins: []TagOrigin = &.{},
     effect_scopes: []EffectScope = &.{},
-    effect_scope_ids: []u32 = &.{},
     effect_runners: []EffectRunner = &.{},
     effect_runner_ids: []u32 = &.{},
     provider_blocks: []ProviderBlock = &.{},
@@ -601,7 +596,6 @@ pub const Checked = struct {
     body_closed_rows: []ClosedRow = &.{},
     lambda_closed_rows: []T.List = &.{},
     dispatch_signatures: []T.Id = &.{},
-    covered_requirements: []CoveredRequirement = &.{},
     effect_families: []EffectFamily = &.{},
     effect_templates: []EffectTemplate = &.{},
     operation_uses: []OperationUse = &.{},
@@ -682,7 +676,6 @@ pub const Checked = struct {
         allocator.free(self.reflections);
         allocator.free(self.tag_origins);
         allocator.free(self.effect_scopes);
-        allocator.free(self.effect_scope_ids);
         allocator.free(self.effect_runners);
         allocator.free(self.effect_runner_ids);
         allocator.free(self.provider_blocks);
@@ -695,7 +688,6 @@ pub const Checked = struct {
         allocator.free(self.usage_loans);
         allocator.free(self.lambda_closed_rows);
         allocator.free(self.dispatch_signatures);
-        allocator.free(self.covered_requirements);
         allocator.free(self.effect_families);
         allocator.free(self.effect_templates);
         allocator.free(self.operation_uses);
@@ -883,7 +875,6 @@ const Engine = struct {
     provider_blocks: std.ArrayList(ProviderBlock) = .empty,
     provider_block_ids: []u32 = &.{},
     body_closed_rows: std.ArrayList(ClosedRow) = .empty,
-    covered_requirements: std.ArrayList(CoveredRequirement) = .empty,
     rank_implementations: std.ArrayList(RankImplementation) = .empty,
     dictionary_selections: std.ArrayList(DictionarySelection) = .empty,
     dictionary_uses: std.ArrayList(DictionaryUse) = .empty,
@@ -9860,7 +9851,6 @@ const Engine = struct {
                     break;
                 };
             } else {
-                try self.covered_requirements.append(self.allocator, .{ .scope = boundary.scope, .value = pending.value });
                 self.pending.items[i].covered = true;
                 self.pending.items[i].suspended = true;
             }
@@ -14609,11 +14599,6 @@ const Engine = struct {
             if (predicate.other != 0) predicate.other = try self.types.resolve(predicate.other, 0);
             if (predicate.signature != 0) predicate.signature = try self.types.resolve(predicate.signature, 0);
         }
-        for (self.covered_requirements.items) |*requirement| {
-            inline for (.{ "ty", "other", "result", "signature" }) |field| {
-                if (@field(requirement.value, field) != 0) @field(requirement.value, field) = try self.types.resolve(@field(requirement.value, field), 0);
-            }
-        }
         if (self.diagnostics.items.len == 0) for (self.cases.items) |id| try self.checkCoverage(id);
     }
     fn normalizeList(self: *Engine, list: T.List) T.Error!void {
@@ -15128,7 +15113,6 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
     engine.dictionary_uses.deinit(allocator);
     engine.dictionary_selections.deinit(allocator);
     engine.rank_implementations.deinit(allocator);
-    engine.covered_requirements.deinit(allocator);
     engine.body_closed_rows.deinit(allocator);
     engine.operation_uses.deinit(allocator);
     engine.effect_templates.deinit(allocator);
@@ -15143,9 +15127,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         allocator.free(engine.provider_block_ids);
     }
     engine.effect_scopes.deinit(allocator);
-    if (!published) {
-        allocator.free(engine.effect_scope_ids);
-    }
+    allocator.free(engine.effect_scope_ids);
     engine.generative_bindings.deinit(allocator);
     engine.capability_roots.deinit(allocator);
     engine.capability_store.deinit(allocator);
@@ -15323,7 +15305,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         .editor = engine.editor_capture,
         .iterator_bodies = engine.iterator_bodies,
         .tag_origins = engine.tag_origins,
-        .effect_scope_ids = engine.effect_scope_ids,
         .effect_runner_ids = engine.effect_runner_ids,
         .provider_block_ids = engine.provider_block_ids,
         .lambda_closed_rows = engine.lambda_closed_rows,
@@ -15403,7 +15384,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     checked.dictionary_selections = try engine.dictionary_selections.toOwnedSlice(allocator);
     checked.rank_implementations = try engine.rank_implementations.toOwnedSlice(allocator);
     checked.body_closed_rows = try engine.body_closed_rows.toOwnedSlice(allocator);
-    checked.covered_requirements = try engine.covered_requirements.toOwnedSlice(allocator);
     checked.merges = try engine.merges.toOwnedSlice(allocator);
     std.mem.sortUnstable(@import("capability_contracts.zig").Binding, engine.capability_roots.items, {}, struct {
         fn less(_: void, left: @import("capability_contracts.zig").Binding, right: @import("capability_contracts.zig").Binding) bool {

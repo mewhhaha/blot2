@@ -35,7 +35,6 @@ const Tables = struct {
     parameters: std.ArrayList(core.Parameter) = .empty,
     runtime_names: std.ArrayList(core.RuntimeName) = .empty,
     source_names: std.ArrayList(core.RuntimeName) = .empty,
-    erased_declaration_references: std.ArrayList(core.ErasedDeclarationReference) = .empty,
     references: std.ArrayList(core.BindingRef) = .empty,
     calls: std.ArrayList(core.CallInfo) = .empty,
     merges: std.ArrayList(core.Merge) = .empty,
@@ -113,7 +112,7 @@ const Tables = struct {
         for (self.nominals.items) |nominal| if (nominal.has_usage) {
             result.has_usage_contracts = true;
         };
-        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "erased_declaration_references", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "contracts", "contract_members", "implementations", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges", "selected_uses", "dictionary_selections", "dictionary_uses", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(allocator);
+        inline for (.{ "request_loops", "request_arms", "runtime_names", "source_names", "tag_calls", "nodes", "spans", "extra", "bindings", "bodies", "parameters", "references", "calls", "merges", "merge_ranges", "obligations", "diagnostics", "nominals", "operation_names", "constructors", "projections", "projection_variants", "patterns", "pattern_rows", "match_arms", "matches", "updates", "update_steps", "closures", "associated", "contracts", "contract_members", "implementations", "implementation_members", "member_templates", "selected_proofs", "selected_members", "selected_edges", "selected_uses", "dictionary_selections", "dictionary_uses", "primitives", "loops", "loop_carries", "resolver_ops", "operation_values", "handle_effects", "dispatch_signatures" }) |field| @field(result, field) = try @field(self, field).toOwnedSlice(allocator);
         for (result.dictionary_uses) |*use| {
             if (use.introduction == 0) continue;
             const mapped = ast_map[use.introduction];
@@ -1301,7 +1300,6 @@ const Builder = struct {
             };
             const right = if (reflection.right == 0) 0 else try self.expression(reflection.right, depth + 1);
             const result = try self.make(source, .{ .tag = .effect_reflection, .ty = ty, .a = @backingInt(reflection.kind), .b = left, .c = right });
-            if (reflection.kind == .of) try self.tables.erased_declaration_references.append(self.allocator, .{ .node = result, .target = self.target(reflection.binding) });
             self.scratch.ast_map[source] = result;
             return result;
         }

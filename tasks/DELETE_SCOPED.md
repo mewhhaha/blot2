@@ -141,7 +141,7 @@ went from 157 files (67,630 lines) to 74 (24,892). About 160,000 lines left
 
 Nothing offered a previous revision once `serve-project` built fresh, so the
 checker's cross-revision reuse is deleted too: 14 files and about 10,200
-lines; `reuse/` went from 74 files (24,892 lines) to 60 (15,383). Every build
+lines; `reuse/` went from 74 files (24,892 lines) to 60 (15,382). Every build
 checks every module from source, except the modules a dependency bundle
 provides as checked. Incremental compilation will be designed afresh.
 
@@ -155,17 +155,19 @@ provides as checked. Incremental compilation will be designed afresh.
   checker tests use moved to `check/type_evidence.zig`.
 - **Checker**: `ModuleOptions` lost `body_source`, `retained_bodies`,
   `previous_bodies` and `body_external_names`; body replay and numeric proof
-  debits are gone. The scheme copier lost the private-namespace relocation
-  only replay used.
+  debits are gone, and `Checked` no longer publishes covered requirements or
+  effect scope IDs, which only the body cache read. The scheme copier lost
+  the private-namespace relocation only replay used.
 - **Project checking**: `checkProject`, `checkProjectWithPrivateExecution`,
   `checkProjectForEditor` and `checkProjectToFirstDiagnostic(allocator,
   source)` remain. `CheckedProject` keeps the modules, diagnostics and
   counters; the cutoff statistics, interface colors, binding maps, relocated
   modules, body caches and the deferred entry are gone.
 - **Core** no longer carries declaration dependencies
-  (`declaration_dependencies`, `dependency_references`, `dependency_members`),
-  which lowering captured for every module but only the cutoffs read. The
-  bundle format's schema digest changes with it.
+  (`declaration_dependencies`, `dependency_references`, `dependency_members`,
+  `erased_declaration_references`), which lowering captured for every module
+  but only the cutoffs read. The bundle format's schema digest changes with
+  it.
 - **Revision inputs** keep the snapshot (memoized reads, overlays and the
   bundle's `reusableModules`); the frozen record, previous-revision
   comparison, trivia equality and persisted restart record are gone, as is
@@ -173,9 +175,10 @@ provides as checked. Incremental compilation will be designed afresh.
 - **check:dev**: `body-checking` keeps its scheduling and shared-scheme laws
   without the body cache laws.
 - **Effect on Gdev Main** (fast native-backend compiler): identical Wasm and
-  first Pen frame. Lowering requests 1.8 MB less in 2,232 fewer allocations;
-  checking's allocations are unchanged, because `serve-project` never
-  retained bodies. Build time stays within the host's noise.
+  first Pen frame. Lowering requests 1.8 MB less in 2,232 fewer allocations
+  and took about 5% less time (850 against 890 ms); checking requests 14 KB
+  less in 10 fewer allocations, because `serve-project` never retained
+  bodies. The whole build stays within the host's noise (6.1 to 6.4 s).
 
 ## Ignored guest cases
 

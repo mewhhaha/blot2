@@ -67,7 +67,6 @@ pub const Node = struct { tag: Tag, op: Op = .none, ty: T.Id = 0, a: u32 = 0, b:
 pub const Parameter = struct { binding: BindingId, ty: T.Id, span: Span, inferred: bool = false };
 pub const Binding = struct { capability_flow: checked_types.CapabilityFlow = .unknown, capability_parameters: @import("capability_flow.zig").Parameters = .{}, private: bool = false, initializer: Id = 0, kind: checked_types.Kind, ty: T.Id, scheme: T.Scheme, public_variables: T.List = .{}, public_rows: T.List = .{}, has_explicit: bool = false, body_id: BodyId = 0, target: BindingRef, span: Span };
 pub const RuntimeName = struct { binding: BindingId, point: u32 };
-pub const ErasedDeclarationReference = struct { node: Id, target: BindingRef };
 pub const Body = struct { binding: BindingId = 0, root: Id = 0, parameters: List = .{}, scheme: T.Scheme = .{}, closed_rows: T.List = .{}, span: Span = .{ .start = 0, .end = 0 }, declaration_name: Name = .{}, export_name: Name = .{}, exported: bool = false, runtime: bool = false, is_function: bool = false };
 pub const CallInfo = struct { target: BindingRef, callee_type: T.Id };
 pub const DictionaryUse = struct { node: Id, binding: BindingId, opening: BindingId, introduction: Id = 0, quantifier: T.Id, goal: u32, member: u32 };
@@ -257,7 +256,6 @@ pub const Module = struct {
     field_names: []FieldName = &.{},
     runtime_names: []RuntimeName = &.{},
     source_names: []RuntimeName = &.{},
-    erased_declaration_references: []ErasedDeclarationReference = &.{},
     request_loops: []RequestLoopInfo = &.{},
     request_arms: []RequestArm = &.{},
     tag_calls: []Id = &.{},
@@ -315,7 +313,6 @@ pub const Module = struct {
         allocator.free(self.field_names);
         allocator.free(self.runtime_names);
         allocator.free(self.source_names);
-        allocator.free(self.erased_declaration_references);
         allocator.free(self.request_loops);
         allocator.free(self.request_arms);
         allocator.free(self.types.nodes);

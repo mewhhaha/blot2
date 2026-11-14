@@ -1065,13 +1065,6 @@ const Bounds = struct {
             try range(self.m.loop_carries.len, value.carries.start, value.carries.len);
             try self.control(value.return_target, false, true);
         }
-        var last_erased: core.Id = 0;
-        for (self.m.erased_declaration_references) |value| {
-            try self.node(value.node, false);
-            try require(value.node > last_erased and self.m.nodes[value.node].tag == .effect_reflection);
-            try self.bindingRef(value.target, false);
-            last_erased = value.node;
-        }
         var last_source: u32 = 0;
         for (self.m.source_names) |value| {
             try self.binding(value.binding, false);
