@@ -337,7 +337,7 @@ test "value and effect quantifiers freshen independently without accidental nume
     try store.unifyEffects(store.node(one).c, label);
     try std.testing.expectEqual(Effects.Tail.variable, std.meta.activeTag(store.effects.node(try store.resolveEffects(store.node(two).c, 0)).tail));
     const one_result = store.node(store.node(try store.resolve(one, 0)).b);
-    try std.testing.expectEqual(u32_type, one_result.a);
+    try std.testing.expectEqual(u32_type, one_result.b);
     try std.testing.expectEqualSlices(u32, &.{ foreign_operation, foreign_operation }, store.effects.list(store.effects.node(one_result.c).labels));
 }
 

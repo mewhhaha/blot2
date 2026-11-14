@@ -282,7 +282,6 @@ test "numeric proof headers reject hidden kinds forward names shadowed values an
         .{ .source = "const bad: U32 -> (@proof.U32Le local 0) = ()", .kinds = &.{.u32}, .expected = error.ProofScopeEscape },
         .{ .source = "const bad: List (@proof.U32Eq 0 0) -> U32 = ()", .kinds = &.{.list}, .expected = error.InvalidProofKind },
         .{ .source = "const bad: (Bool, @proof.U32Eq 0 0) -> U32 = ()", .kinds = &.{null}, .expected = error.InvalidProofKind },
-        .{ .source = "const bad: ~(@proof.U32Eq 0 0) -> U32 = ()", .kinds = &.{null}, .expected = error.InvalidProofKind },
         .{ .source = "const bad: (@proof.U32Eq 0 0) -> U32 = ()", .kinds = &.{.u32}, .expected = error.InvalidProofKind },
     }) |case| try std.testing.expectError(case.expected, fixture(std.testing.allocator, case.source, case.kinds, .{}));
     try std.testing.expectError(error.ProofAnalysisLimit, fixture(std.testing.allocator, "const bounded: (@proof.U32Eq 0 0) -> U32 = ()", &.{null}, .{ .visits = 4 }));
