@@ -82,14 +82,15 @@ summary.
   successor, and aliases keep the old root.
 - **No hidden copies.** A `:=` through an array is done in place when the
   local owns it, otherwise it is an error that asks for `values.copy`.
-- **`own` parameters** (approved): parameters are borrowed unless marked
+- **`own` parameters**, approved as "Approve, with owning modify": parameters are borrowed unless marked
   `own`; an `own` argument spends the caller's name until rebound; call
   results are owned by the caller; a state `modify` hands the state over as
   `own`.
 - **Value restriction.** A local is generalized only when its value is a
   syntactic `func`.
-- **Transition.** The `=` store that landed before this decision stays,
-  unspecified, until Ink and Gdev are rewritten to the `own` style.
+- **Transition**, chosen as "Keep `=` until apps move": the `=` store that
+  landed before this decision stays, unspecified, until Ink and Gdev are
+  rewritten to the `own` style.
 
 ## B. Effects: keep the small core
 

@@ -3,9 +3,14 @@
 The owner's direction (14 November 2026): "Just immutable and then our goal
 is to reuse as much memory as possible", aiming at "efficient immutability.
 Maybe even more efficient than mutable languages." The syntax is in
-docs/language/spec.md (section 10). The owner approved:
-- the `own` parameter design, together with an owning state `modify`;
-- keeping the `=` store as a transitional form until the apps move off it.
+docs/language/spec.md (sections 6.5 and 10). Asked in this session (14
+November 2026), the owner chose:
+- "Approve, with owning modify": the `own` parameter design (parameters
+  borrowed by default, `own` takes over, call results owned by the caller),
+  plus a state `modify` that hands the state over as `own`.
+- "Keep `=` until apps move": the `=` store that landed before the
+  immutable decision stays, unspecified, until Ink and Gdev are rewritten,
+  and is then deleted.
 
 This replaces the earlier plan for a store statement, `Cell` and `is root`.
 App code spells intrinsics as round 2, item 2 approved (`values.copy`,
