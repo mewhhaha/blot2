@@ -37,6 +37,12 @@ pub fn build(b: *std.Build) void {
         .error_tracing = error_tracing,
     });
     module.addOptions("compiler_identity", identity);
+    // Profiling only: keep frame pointers and link libc dynamically, so a
+    // preloaded sampling library can run inside the compiler and walk its stacks.
+    if (b.option(bool, "profiling", "Build a dynamically linked compiler with frame pointers for sampling profilers") orelse false) {
+        module.omit_frame_pointer = false;
+        module.link_libc = true;
+    }
     const exe = b.addExecutable(.{ .name = "blotc", .root_module = module, .use_llvm = use_llvm, .use_lld = if (use_llvm == true) true else null });
     b.installArtifact(exe);
     const suite = b.option(TestSuite, "test-suite", "Native test subsystem (all, syntax, types, runtime, checker, evaluator, backend, retained)") orelse .all;
