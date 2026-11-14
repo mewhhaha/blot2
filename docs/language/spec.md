@@ -1,6 +1,6 @@
 # Blot language specification: syntax
 
-Draft of 14 November 2026.
+Draft of 14 November 2026, second revision.
 
 This document states what Blot source text is expected to look like and mean:
 what a compiler must accept, what it must reject, and the meaning a reader may
@@ -24,11 +24,13 @@ Each rule has one of three statuses:
 - **Unmarked.** The language does this today and keeps it.
 - **(approved)** The owner approved it. The compiler may not implement it yet.
 - **(open)** Approved in substance, but a spelling or detail is undecided. The
-  text uses the illustrative spelling, and [Annex B](#annex-b-open-spellings-and-questions)
-  lists the question.
+  text uses an illustrative spelling, and
+  [Annex B](#annex-b-open-spellings-and-questions) lists the question.
 
-Proposals the owner has not approved appear only in
-[Annex C](#annex-c-proposals) and are not part of the specification.
+The second revision adds the twelve changes the owner approved after reading
+the first draft. [Annex A](#annex-a-removed-forms) labels them "round 2".
+[Annex C](#annex-c-considered-and-declined) lists ideas that were considered
+and declined.
 
 Terms:
 
@@ -112,26 +114,27 @@ UpperName = [A-Z] [A-Za-z0-9_]*
 
 A `LowerName` names a value, a function, a field, a module alias or a type
 variable. An `UpperName` names a type, a trait, an effect or a constructor. A
-constructor is always written with its marker: `$Some`.
+constructor is always written with its marker: `$Some`. `_` alone is not a
+name: it is the wildcard in a pattern and a hole in an expression.
 
 ### 4.5 Keywords
 
 Reserved everywhere:
 
 ```
-and  as  break  case  const  continue  data  do  effect  else  ever  false
-for  func  if  import  in  is  let  not  of  or  return  then  true  type
+and  as  break  case  const  continue  data  effect  else  ever  false  for
+func  if  import  in  is  let  not  of  or  return  then  true  type  with
 ```
 
-`not` is **(approved)**.
+`not` and `with` are **(approved)**.
 
 Reserved only in the position that gives them meaning, and ordinary names
-elsewhere: `opaque`, `trait` and `root` after `is`;
-`private`, `entry` and `export` at the start of a module item; `from` in an
-import; `where` after a signature; `self` on the right of `:=`.
+elsewhere: `opaque`, `trait` and `root` after `is`; `private`, `entry` and
+`export` at the start of a module item; `from` in an import; `where` after a
+signature; `self` on the right of `:=`.
 
-These words stop being keywords **(approved)**: `use`, `yield`, `complete`,
-`infix`, `infixl`, `infixr`, `contract`, `impl`.
+These words stop being keywords **(approved)**: `do`, `use`, `yield`,
+`complete`, `infix`, `infixl`, `infixr`, `contract`, `impl`.
 
 ### 4.6 Literals
 
@@ -143,12 +146,13 @@ String  = '"' (Character | Escape)* '"'
 Escape  = '\"' | "\\" | "\n" | "\r" | "\t"
 ```
 
-- An integer literal has type `U32` and a float literal has type `F32`. A
-  literal outside its type's range is an error.
+- **(approved)** An integer literal takes the integer type expected where it
+  appears, and `U32` when nothing expects one. A float literal takes the
+  expected float type, and `F32` otherwise. An integer literal is never a
+  float.
+- A literal outside its type's range is an error.
 - A string literal stays on one line and has type `Text`.
 - `true` and `false` have type `Bool`. `()` is the one value of type `Unit`.
-- There is no negative literal. `-` is the prefix operator of section 9.1, so
-  a negative argument needs parentheses: `F32.abs (-2.0)`.
 
 ### 4.7 Punctuation
 
@@ -158,11 +162,10 @@ Each mark has one role in each of the three grammars.
 | --- | --- | --- | --- |
 | `.` | member of a module, type or value | member of a type | |
 | `..` | range | | |
-| `...` | spread in an array literal | | |
 | `:` | suite opener; annotation; field | annotation; field | field |
-| `=` | definition; store | definition | |
+| `=` | definition; store | definition; default | |
 | `:=` | rebinding | | |
-| `->` | parameter separator | function type; trait outputs | |
+| `->` | parameter separator | function type | |
 | `=>` | body | | arm body |
 | `<-` | generator | | |
 | `$` | constructor | | constructor |
@@ -171,8 +174,8 @@ Each mark has one role in each of the three grammars.
 | `\|` | bitwise or; comprehension bar | row tail; data alternative | alternative |
 | `!` | | effect row | |
 | `#` | compile-time form | | |
-| `@` | intrinsic (std only); tag | | |
-| `_` | | | wildcard |
+| `@` | intrinsic (std only) | tag | |
+| `_` | hole | | wildcard |
 
 ### 4.8 Adjacency
 
@@ -183,6 +186,10 @@ Whitespace is significant in exactly these places:
 - A prefix `&` or `^` touches its operand.
 - `[` that touches the expression before it is an index: `rows[i]`. After a
   space it starts an array literal, so `f rows [i]` passes two arguments.
+- **(approved)** A `-` that follows an operand is subtraction, except when it
+  has whitespace before it and none after. Then it starts a new, negated
+  argument: `f -1.0` is `f (-1.0)`, and `a - b`, `a-b` and `a -  b` are
+  subtractions.
 - A line that starts with `.name` continues the expression above it
   (section 9.4). A space before a dot in the middle of a line means nothing.
 
@@ -260,19 +267,25 @@ TypeDecl   = "type" TypeHead "=" Type
            | "type" TypeHead "is" "data" "=" "|"? Constructor ("|" Constructor)*
            | "type" TypeHead "is" "opaque" "=" Type
            | "type" TraitHead "is" "trait" "=" RecordType
-           | "type" TypeHead "is" "effect" "=" (RecordType | Type)
+           | "type" TypeHead "is" "effect" "=" RecordType
            | "type" UpperName "is" "root" "=" "{" RootField,+ "}"
 TypeHead   = TypeName TypeParams?
 TypeName   = (UpperName ".")* UpperName
 TypeParams = LowerName | "[" LowerName,+ "]"
-Constructor = "$" UpperName TypeAtom?
+Constructor = Tag* "$" UpperName (TypeAtom | "{" DataField,* "}")?
+DataField  = Tag* LowerName ":" Type ("=" Expression)?
 RootField  = LowerName ":" Type "=" Expression
 ```
 
 - **Alias.** `type Name = Type` adds a name and nothing else. A recursive
   alias is an error.
 - **Data.** A nominal type with one or more constructors. A constructor has
-  no payload or one; several values go in a tuple or a record.
+  no payload or one; several values go in a tuple or in named fields.
+- **Field defaults (approved).** A named field may have a default:
+  `$Config { volume: F32 = 1.0, muted: Bool = false }`. A construction may
+  leave such a field out, and the default is then evaluated at that
+  construction. A default has no effects and may name only module-level
+  declarations, never a sibling field or a local.
 - **Opaque.** A nominal type with one private constructor of the same name.
   Only the declaring module can construct or match it.
 - **Type parameters (approved).** One name, or a bracketed list of names:
@@ -283,40 +296,51 @@ RootField  = LowerName ":" Type "=" Expression
 
 ### 6.4 Traits
 
-**(approved; spellings open)**
+**(approved)**
 
 ```
-TraitHead = UpperName LowerName ("->" TraitOutputs)?
-TraitOutputs = LowerName | "[" LowerName,+ "]"
-Where     = "where" "{" Predicate,+ "}"
-Predicate = TypePath TypeAtom ("->" TypeArg)?
+TraitHead   = UpperName LowerName ("{" LowerName,+ "}")?
+Where       = "where" "{" Predicate,+ "}"
+Predicate   = TypePath TypeAtom OutputTypes?
+OutputTypes = "{" OutputType,+ "}"
+OutputType  = LowerName ":" Type
 ```
 
 ```blot
 type Eq a is trait = { eq: a -> a -> Bool }
-type Collection c -> item is trait = { length: c -> U32, at: c -> U32 -> item }
+type Collection c { item } is trait = { length: c -> U32, at: c -> U32 -> item }
+type Mul left { right, out } is trait = { mul: left -> right -> out }
 
 const U32.Eq: Eq U32 = { eq: U32.eq }
 const Array.Eq: Eq (Array a) where { Eq a } = { eq: equal_array }
-const Array.Collection: Collection (Array a) -> a = { length: Array.length, at: Array.at }
+const Array.Collection: Collection (Array a) { item: a } =
+  { length: Array.length, at: Array.at }
+const Vec3.Mul: Mul Vec3 { right: F32, out: Vec3 } = { mul: Vec3.scale }
 
 func member (values: Array a) -> (wanted: a): Bool where { Eq a } => ...
 func first (values: c): Maybe c.item where { Collection c } => ...
+func square (value: a): a where { Mul a { right: a, out: a } } => value * value
 ```
 
-- A trait is a nominal record type. Its first parameter is the type it
-  dispatches on. Parameters after `->` are outputs: the first parameter
-  determines them.
-- The implementation of trait `T` for type `X` is the constant `X.T`, of
-  type `T X`. There is no other way to implement a trait, so a type has at
-  most one implementation of each trait.
+- A trait is a nominal record type. Its parameter is the type it dispatches
+  on. The names in braces are its outputs: the dispatch type determines
+  them. Outputs are written by name wherever the trait is applied, so a
+  trait application never contains `->`.
+- The implementation of trait `T` for type `X` is the constant `X.T`. Its
+  type is `T X`, with every output given. There is no other way to implement
+  a trait, so a type has at most one implementation of each trait.
 - `X.T` may be declared in the module that declares `X` or the module that
   declares `T`. Anywhere else is an error.
+- **Identity.** The name after the dot is resolved as a trait in the
+  declaring module's scope, and the implementation is recorded under that
+  trait, not under its spelling. Two traits that share a name do not collide.
+  A module that imports both renames one in its import and uses that name.
 - An implementation for a generic type may have its own `where` clause.
 - `where { T a }` on a function is an argument the compiler supplies. At
   each use it must find `X.T` for the concrete `X`, or the same predicate in
   the caller's own `where` clause. Otherwise the use is an error.
-- A predicate is a trait applied to a type and nothing else.
+- A predicate is a trait applied to a type, with any outputs it wants to
+  fix, and nothing else.
 - On a type variable `c` with `where { Collection c }`, `c.item` names the
   trait's output. If two predicates on `c` offer the same output name, the
   name must be qualified: `Collection.item c`.
@@ -325,16 +349,34 @@ func first (values: c): Maybe c.item where { Collection c } => ...
 
 ### 6.5 Effects
 
+**(approved)**
+
 ```blot
+type Log is effect = { write: Text -> Unit }
 type State a is effect = { get: Unit -> a, set: a -> Unit }
-type Get a is effect = Unit -> a
+
+func report (count: U32): Unit ! {Log} =>
+  Log.write "started"
+
+const quiet: Log = { write: func text => () }
+
+entry func main (): Unit =>
+  with quiet:
+    report 3
 ```
 
-- An effect declares operations and grants nothing. The single-operation
-  form uses the effect's name as the operation's name.
-- An operation is called like a function: `State.get U32 ()`. Its effect
-  appears in the row of every function that calls it without a provider in
-  scope.
+- An effect is a nominal record type whose fields are functions, called its
+  operations. Declaring one grants nothing.
+- A **provider** is any value of the effect's type. It is built like any
+  record and may be a constant, a local or a parameter.
+- `Log.write text` calls the `write` of the provider in scope. A function
+  that calls an operation with no provider installed around the call has the
+  effect in its row: `! {Log}`.
+- `with provider:` installs a provider for its suite (section 10.9).
+- A trait is a record the compiler finds by type at compile time. An effect
+  is a record the program finds by scope at run time. Both have the same
+  explicit form: take the record as a parameter and call its fields, as in
+  `log.write text`, which needs no row.
 - `Foreign` is the one built-in effect. It marks host callbacks. Source
   cannot declare or provide it.
 
@@ -345,34 +387,44 @@ type Get a is effect = Unit -> a
 ```blot
 type World is root = {
   entities: ResizeArray Entity = [],
-  viewport: Cell Viewport = @cell viewport.default,
+  viewport: Cell Viewport = Cell.new viewport.default,
 }
-let world = @root World
+let world = World.new ()
 ```
 
 - A root is storage made of a fixed group of storage components. Every
   component has an initial value.
-- `@cell` and `@root` are the memory model's spellings **(open)**.
-- Creating a root creates all of its components, and they share one
-  lifetime.
+- `World.new ()` creates a root and all of its components, and they share
+  one lifetime.
 - Replacing a component (`world.entities := …`) is an error. Writing into
   one (`world.entities[i] = entity`) is a store.
 
 ### 6.7 Tags
 
+**(approved)**
+
 ```
 Tag = "@[" Expression "]"
 ```
 
-A tag before a module-level `const`, `let` or `func` applies its expression,
-as a function, to the declared value. With several tags, the nearest applies
-first. A tag on any other declaration is an error.
+```blot
+type Save is data = $Save {
+  @[codec.since 3] stamina: F32 = 1.0,
+  position: Vec3,
+}
+```
+
+- A tag attaches a compile-time constant to the type declaration,
+  constructor or field that follows it.
+- `#type` shows the tags of what it describes (section 11). A tag changes
+  nothing else about the program.
+- A tag anywhere else is an error, because nothing could read it.
 
 ## 7. Types
 
 ```
 Type       = TypeApply ("->" Type ("!" EffectRow)?)?
-TypeApply  = TypePrefix TypeArg?
+TypeApply  = TypePrefix (TypeArg OutputTypes?)?
 TypeArg    = TypePrefix | "[" Type,+ "]"
 TypePrefix = "&" TypePrefix | "&" "[" Type "]" | "^" TypePrefix | TypeAtom
 TypeAtom   = TypePath
@@ -384,22 +436,30 @@ TypePath   = (LowerName ".")? UpperName ("." UpperName)*
 RecordType = "{" FieldType,* "}"
 FieldType  = LowerName ":" Type
 EffectRow  = "{" EffectLabel,* ("|" LowerName)? "}"
-EffectLabel = TypePath ("." LowerName)? TypeArg?
+EffectLabel = TypePath TypeArg?
 ```
 
 - `->` associates to the right. A function type as a parameter needs
   parentheses.
 - `! {…}` follows the result of the arrow it belongs to and lists the
-  effects of calling that function. No `!` means no effects.
-  `{Foreign | e}` leaves the rest of the row open, and `e` is a row variable.
-  A name used as both a type variable and a row variable in one signature is
-  an error.
+  effects of calling that function. No `!` means no effects. A label is an
+  effect applied to its argument: `{Log, State U32}`. `{Foreign | e}` leaves
+  the rest of the row open, and `e` is a row variable. A name used as both a
+  type variable and a row variable in one signature is an error.
 - A lowercase name is a type variable, shared across one declaration's
   signature.
 - A type takes one argument or a bracketed list, matching its declaration.
+  Braces after the argument give a trait's outputs (section 6.4); braces in
+  place of the argument are a record type.
 - Record types are structural, and field order does not matter. Records are
   closed: a function cannot abstract over "any record with field `x`"
   **(approved)**.
+- **Numbers (approved).** The integer types are `U8`, `U16`, `U32`, `U64`,
+  `I8`, `I16`, `I32` and `I64`. The float types are `F32` and `F64`. No
+  value converts to another numeric type unless the program calls a
+  conversion.
+- **Text (approved).** `Text` is `Array U8` holding UTF-8. Its length counts
+  bytes.
 - **Storage types.** `Array a` has a fixed length, `GrowArray a` can append,
   and `ResizeArray a` can also shrink. `Cell a` holds one value
   **(approved)**. A root type is storage.
@@ -423,7 +483,8 @@ ValueName    = (Name ".")* LowerName
 ```
 
 - A lowercase name binds a new local. `^name` instead compares against an
-  existing `U32` or `Bool` local, parameter or constant.
+  existing integer or `Bool` local, parameter or constant.
+- An integer pattern has the integer type of the value it matches.
 - A constructor pattern with a payload must be parenthesized when it is
   itself a payload: `$Some ($Pair (a, b))`.
 - A record pattern may leave fields out and list them in any order.
@@ -432,8 +493,12 @@ ValueName    = (Name ".")* LowerName
 ## 9. Expressions
 
 ```
-Expression = Lambda | IfExpr | CaseExpr | Block | RunExpr | Operators
+Expression = Lambda | IfExpr | CaseExpr | RunExpr | Operators
 ```
+
+An expression never contains statements, except in the body of a lambda
+**(approved)**. A value that takes several statements to compute is computed
+by a function.
 
 ### 9.1 Operators
 
@@ -460,10 +525,16 @@ change precedence. Weakest first:
   needed. `not` takes a `Bool`. None of the three can be redefined.
 - `not a == b` is `not (a == b)` **(open)**.
 - The other operators call the member of a trait implemented for the left
-  operand's type **(approved)**. The right operand's type is the trait's
-  output, so one type has one meaning for `*`.
-- `U32` arithmetic wraps. `U32` division or remainder by zero traps. Shift
-  counts wrap modulo 32.
+  operand's type **(approved)**. The right operand's type is an output of
+  the trait, so one type has one meaning for `*`.
+- A prefix `-` at the start of an expression negates the application that
+  follows: `-f x` is `-(f x)`. In argument position it follows the rule of
+  section 4.8. It is defined for signed integers and floats.
+- **Integers (approved).** `+`, `-` and `*` wrap at the type's width in
+  every build. Division or remainder by zero traps, and so does dividing the
+  smallest signed value by `-1`. A shift count wraps modulo the width, and
+  `>>` copies the sign bit of a signed operand.
+- **Floats.** Arithmetic follows IEEE 754 and can give infinity or NaN.
 
 ### 9.2 Application
 
@@ -482,22 +553,24 @@ Postfix     = Primary ("." Name | "[" Expression "]")*
 - **Type arguments (approved).** A type may be passed where inference cannot
   choose: `State.get U32 ()`. A type argument is a type name, or a
   parenthesized type application such as `(Maybe U32)`.
+- **Conversions (approved).** A numeric conversion is a member call on the
+  value, such as `count.to_f32`. A conversion that can lose information is
+  named for what it loses.
 
 ### 9.3 Primary expressions
 
 ```
 Primary = Integer | Float | String | "true" | "false" | "()"
-        | LowerName | UpperName | "self"
+        | LowerName | UpperName | "self" | "_"
         | "$" CtorPath
         | "(" Expression ")"
         | "(" Expression "," Expression,+ ")"
         | "{" Field,* "}"
-        | "[" ArrayItem,* "]"
+        | "[" Expression,* "]"
         | "[" Expression "|" Qualifier,+ "]"
         | "&" Postfix | "&" Postfix "[" Range "]" | "^" Postfix
         | "#type" TypeAtom | "#quote" Primary | "#(" Expression ")"
 Field     = LowerName (":" Expression)?
-ArrayItem = Expression | "..." Expression
 Qualifier = Pattern "<-" (Range | Expression) | "let" Pattern "=" Expression
           | Expression
 Range     = Expression ".." Expression
@@ -506,18 +579,17 @@ Range     = Expression ".." Expression
 - **Constructors.** `$Some 42` applies a constructor. A constructor alone is
   a function, or a value when it has no payload.
 - **Records.** `{ x: 1, y }` builds a record; `y` alone means `y: y`. Fields
-  are evaluated in written order. A missing, unknown or repeated field is an
-  error.
+  are evaluated in written order. An unknown or repeated field is an error,
+  and so is a missing field that has no default.
 - **Tuples.** `(a, b)` has two or more parts. They are read with patterns.
 - **Arrays (approved).** `[1, 2, 3]` builds an array. The expected type
   chooses `Array`, `GrowArray` or `ResizeArray`; without one it is `Array`.
-  An empty literal needs an expected type. One `...values` item copies the
-  elements of another array into the new one.
+  An empty literal needs an expected type.
 - **Comprehensions.** `[x * x | x <- values, x > 1]` builds an array.
   Qualifiers run left to right, the leftmost outermost. A `Bool` qualifier
-  skips the rest when false. A generator may draw from a range
-  **(approved)**: `[i * 2 | i <- 0..count]`. A bitwise `|` before the bar
-  needs parentheses.
+  skips the rest when false. A generator draws from whatever `for` accepts
+  (section 10.5), including a range **(approved)**: `[i * 2 | i <- 0..count]`.
+  A bitwise `|` before the bar needs parentheses.
 - **Ranges.** `start..end` counts up from `start` and stops before `end`.
   It is syntax, not a value: it appears in `for`, in a generator and in a
   range reference.
@@ -592,7 +664,8 @@ LambdaParam = LowerName | "_" | "(" ")" | "(" Pattern (":" Type)? ")"
 ```
 IfExpr   = "if" Expression "then" Expression "else" Expression
 CaseExpr = "case" Expression,+ "of" NEWLINE INDENT Arm+ DEDENT
-Arm      = PatternRow ("|" PatternRow)* ("if" Expression)? "=>" Body
+Arm      = PatternRow ("|" PatternRow)* ("if" Expression)? "=>"
+           (Expression | Suite)
 PatternRow = Pattern ("," Pattern)*
 ```
 
@@ -604,34 +677,22 @@ PatternRow = Pattern ("," Pattern)*
   coverage.
 - The arms must cover every value of the inputs. A match that is not
   exhaustive is an error.
-- When the value of a `case` is used, every arm has the same type.
+- When the value of a `case` is used, every arm is an expression and all
+  have the same type. An arm with a suite is allowed only in a `case` used
+  as a statement, and a `return` in it leaves the function.
 
-### 9.7 Blocks
+### 9.7 Holes
 
-```
-Block = "do" Expression? ":" Suite
-```
-
-- `do:` runs its suite. `break value` finishes the nearest enclosing `do`
-  with that value, even from inside a loop. Reaching the end gives `()`.
-- `do provider:` also installs a provider for the effect operations called
-  inside the suite, including those called by the functions it calls. A
-  provider is a function that implements one operation. It runs when the
-  operation is called and returns its result.
-- A function that is exported must provide every effect except `Foreign`.
-
-### 9.8 Typed holes
-
-A hole stands for an expression not yet written. A module with a hole is an
-error, and the error reports the type expected there and the locals in
-scope. The hole is spelled `@hole` **(open)**.
+**(approved; spelling open)** `_` in an expression stands for one not yet
+written. A module with a hole is an error, and the error reports the type
+expected there and the locals in scope.
 
 ## 10. Statements
 
 ```
-Statement = LetStmt | Rebind | Store | IfStmt | CaseExpr | ForStmt | Block
+Statement = LetStmt | Rebind | Store | IfStmt | CaseExpr | ForStmt | WithStmt
           | "return" Expression
-          | "break" Expression?
+          | "break"
           | "continue"
           | Expression
 ```
@@ -647,6 +708,10 @@ LetStmt = "let" Pattern (":" Type)? "=" Expression ("else" ":" Suite)?
   `break`, `continue` or a trap.
 - The names are in scope for the rest of the enclosing suite.
 - Any call may be bound with `let`, whatever its effects **(approved)**.
+- **(approved)** `let` introduces new names. A `let` or `if let` that binds
+  a name already in scope as a local or parameter of the function is an
+  error. A new value for an old name is written with `:=`. Lambda
+  parameters, `case` arms and loop patterns may reuse a name.
 
 ### 10.2 Rebinding: `:=`
 
@@ -668,7 +733,7 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
   the old storage. The compiler must prove that within the one function,
   using the rules in [the memory model](../../tasks/MEMORY_MODEL.md).
   Otherwise the statement is an error, and the program must say what it
-  means: a store with `=`, or an explicit copy first.
+  means: a store with `=`, or an explicit copy first (`values.copy`).
 
 ### 10.3 Stores: `=`
 
@@ -705,10 +770,12 @@ ForStmt = "for" "ever" ":" Suite
         | "for" Pattern "in" (Range | Expression) ":" Suite
 ```
 
-- A range's bounds are `U32` and are evaluated once. An empty or reversed
-  range runs no iterations.
-- `for pattern in values:` visits the elements of an array in order. The
-  pattern must match every element.
+- A range's bounds have one integer type and are evaluated once. An empty
+  or reversed range runs no iterations.
+- **(approved)** `for pattern in values:` accepts an array, a range
+  reference, or a value of any type that implements `Collection`. It
+  evaluates `values` and its length once, then reads each element by index
+  in order. The pattern must match every element.
 - `break` leaves the nearest loop. `continue` starts its next iteration.
 
 ### 10.6 Scope and joins
@@ -716,23 +783,43 @@ ForStmt = "for" "ever" ":" Suite
 - A name bound by `let`, a pattern or a loop is visible to the end of its
   suite and not outside it.
 - A rebinding of an outer local inside an `if`, an `if let`, a `case` used as
-  a statement, or a loop carries out to the statements that follow.
+  a statement, a `with` or a loop carries out to the statements that follow.
 - Where branches join, a rebound name has the same type on every branch that
   reaches the join. A branch that leaves contributes nothing.
 - In a loop, a rebound outer local keeps one type across iterations.
 
 ### 10.7 Leaving
 
+**(approved)** Each word has one target.
+
 - `return value` leaves the innermost function.
-- `break value` finishes the innermost `do`. `break` alone leaves the
-  innermost loop.
+- `break` leaves the innermost loop.
 - `continue` starts the next iteration of the innermost loop.
+- `break` or `continue` outside a loop is an error.
 
 ### 10.8 Expression statements
 
 **(approved)** An expression used as a statement must have type `Unit`. To
 discard another value, bind it: `let _ = expression`. This rejects a call
 that is missing an argument.
+
+### 10.9 Providers: `with`
+
+**(approved)**
+
+```
+WithStmt = "with" Expression,+ ":" Suite
+```
+
+- Each expression is a provider (section 6.5). The statement installs them
+  for its suite and for every function called from it. The innermost
+  provider of an effect is the one an operation reaches.
+- A lambda uses the providers in scope where it is called, not where it was
+  created.
+- The effects of a provider's own functions are effects of the `with`
+  statement **(open)**.
+- A `return` in the suite leaves the function.
+- An exported function must provide every effect except `Foreign`.
 
 ## 11. Compile-time evaluation
 
@@ -746,10 +833,10 @@ RunExpr = "#run" Expression
   give. It cannot perform `Foreign` operations or read a module-level `let`.
 - A trap during compile-time evaluation is an error.
 - **Reflection (approved; spellings open).** `#type T` gives a plain data
-  description of a type: its constructors, field names and field types.
-  `#quote e` gives a code value, and `#( e )` inside a quote inserts one. A
-  code value has no type until `#run` places it, and it is checked there
-  against the type the declaration wrote.
+  description of a type: its constructors, field names, field types,
+  defaults and tags. `#quote e` gives a code value, and `#( e )` inside a
+  quote inserts one. A code value has no type until `#run` places it, and it
+  is checked there against the type the declaration wrote.
 - `#run` cannot produce a declaration, a name or a type (rule 2).
 
 ```blot
@@ -762,20 +849,22 @@ const Robot.Eq: Eq Robot = #run derive.eq (#type Robot)
 The language defines these traps:
 
 - an index outside an array, or a range outside it;
-- `U32` division or remainder by zero;
+- integer division or remainder by zero, and the smallest signed value
+  divided by `-1`;
 - use of a reference or link whose storage is gone or has been reused;
 - appending beyond the capacity planned for a `GrowArray` or `ResizeArray`;
-- an explicit panic;
+- `panic "message"`;
 - calling a host callback after the invocation that supplied it has ended;
 - running out of memory or call stack.
 
-Arithmetic overflow is not an error: `U32` wraps and `F32` follows IEEE 754
-binary32.
+Arithmetic overflow is not an error: integers wrap and floats follow
+IEEE 754.
 
 ## Annex A. Removed forms
 
-A conforming compiler rejects these. All are **(approved)**; the last column
-names the item in the coherence list.
+A conforming compiler rejects these. All are **(approved)**. The last column
+names the item in the coherence list, or "round 2" for the changes approved
+with this revision.
 
 | Removed | Write instead | Item |
 | --- | --- | --- |
@@ -785,7 +874,7 @@ names the item in the coherence list.
 | `value \|> f`, `f $ x` | `value.f`, parentheses | E4 |
 | `@name` outside std | the std function | E5 |
 | `#[…]` arrays, `[…]` lists, `List`, `[head \| tail]` | `[…]` arrays | E6 |
-| `Ref a`, `View a`, `Link a`, `for let x in`, `#do:` | `&a`, `&[a]`, `^a`, `for x in`, `#run do:` | E8 |
+| `Ref a`, `View a`, `Link a`, `for let x in` | `&a`, `&[a]`, `^a`, `for x in` | E8 |
 | `infix`, `infixl`, `infixr`, symbolic operators | named functions | E9 |
 | Record, tuple and curried type parameters | one name or a list | E10 |
 | `use x <- call`, `use call` | `let x = call`, `call` | B2 |
@@ -799,86 +888,61 @@ names the item in the coherence list.
 | `forall`, `exists`, `pack`, `unpack`, `@code.*`, `@proof.*`, `@usage.*` | `#run` with `#type` for staging; none for the rest | C8 |
 | `@storage.write` and writes through `&a` | `place = value` on the storage | A |
 | `[x]` with `[0]` as a one-value cell | `Cell a` | A |
+| `Trait T -> out`, `Trait T -> [a, b]` | `Trait T { out: … }` | round 2 |
+| `@cell x`, `@root World`, `@storage.copy values`, `@panic "…"`, `@hole` | `Cell.new x`, `World.new ()`, `values.copy`, `panic "…"`, `_` | round 2 |
+| `@effect.provider`, `@effect.state`, `@effect.run`, `@effect.reader`, `@effect.writer`; `type Get a is effect = Unit -> a`; operation labels in rows | a provider record; a `Cell`; a record-form effect; effect labels | round 2 |
+| `do:` with `break value`, `#run do:`, `#do:` | a function that returns the value; `#run` of a call | round 2 |
+| `do provider:` | `with provider:` | round 2 |
+| `let` over a local or parameter in scope | `:=`, or a new name | round 2 |
+| `@[f]` applying a function to a declaration | `const x = f value` | round 2 |
+| `iter` / `next` members, `@cursor.*`, `std/iter` | `Collection`, or an index loop | round 2 |
+| `[...values, value]` | an append, or a named copy | round 2 |
+| `Text` as `Array U32` of scalar values | UTF-8 in `Array U8` | round 2 |
+
+`(-1.0)` stays valid; the rule of section 4.8 only makes the parentheses
+unnecessary.
 
 ## Annex B. Open spellings and questions
 
-Writing the grammar out found these. Each needs the owner's decision.
-
-1. **The trait output arrow reads as a function type.**
-   `const Array.Collection: Collection (Array a) -> a` parses as a function
-   from `Collection (Array a)` to `a`, and only knowing that `Collection` is
-   a trait says otherwise. That breaks rule 1. Naming the outputs would
-   avoid it and match `c.item`: `Collection (Array a) { item: a }`.
-2. **Output names.** Lowercase like type variables, or `UpperName` like
-   other types.
-3. **Two traits with one name.** Two modules may each declare a trait
-   `Format` and both want `U32.Format`. The slot could be keyed by the trait
-   itself instead of its spelling: each module then writes the
-   implementation under the name it imports the trait by, and a module that
-   imports both renames one.
-4. **Intrinsics in user code.** E5 keeps `@name` inside std, but the memory
-   model writes `@cell x`, `@root World` and `@storage.copy` in application
-   code. `@panic` (179 uses in Gdev and Ink) and `@hole` are in the same
-   position. Each needs a public spelling.
-5. **E8 pairs.** The review suggested the first of each pair and the owner
+1. **Spellings chosen by this document.** The owner approved the changes and
+   has not seen these spellings: `with`; `Cell.new`, `World.new ()`,
+   `values.copy`, `panic`; `_` for a hole; the braces for trait outputs;
+   `#quote` and `#( )`; the names of the description and code types.
+2. **Output names.** Lowercase like type variables, as written here, or
+   `UpperName` like other types.
+3. **Providers with effects of their own.** A host callback used as an
+   operation has `Foreign` in its type, while the effect declares the
+   operation without it. Section 10.9 says where the effect goes. How the
+   record type admits such a provider is undecided.
+4. **Conversion names.** Section 9.2 gives the rule and names no functions.
+   Gdev and Ink call `to_f32`, `to_u32` and `from` on about 1,200 lines.
+5. **ABI.** UTF-8 text and the new numeric types change what crosses the
+   host boundary. The repository's instructions say to preserve ABI 8.
+6. **E8 pairs.** The review suggested the first of each pair and the owner
    has not chosen. This document uses the first.
-6. **`not` precedence.** This document puts it below comparison.
-7. **Backtick infix** (`` a `add` b ``). E9 removes fixity declarations and
+7. **`not` precedence.** This document puts it below comparison.
+8. **Backtick infix** (`` a `add` b ``). E9 removes fixity declarations and
    does not name backticks. This document leaves them out. Gdev and Ink do
    not use them.
-8. **Effect bodies.** Operations are separated by line breaks today. This
-   document uses commas, as in every other record type.
-9. **Effect rows.** A label is an operation today (`State.get U32`). The
-   alternative is the effect itself (`State U32`).
-10. **Not covered by any decision:** `@effect.state`, `@effect.run`,
-    `@effect.reader`, `@effect.writer`; the single-operation effect form;
-    tags; spreads; module-level `let`. They are specified as they are today
-    or left out, and none has a use in Gdev or Ink.
-11. **Numbers.** Only `U32` and `F32` exist. The numeric set is undecided
-    (D1).
-12. **`#quote`, `#( )`** and the names of the description and code types.
-13. **`let` over an existing local.** `let value = 1` followed by
-    `let value = value + 41` in one suite compiles today. Section 10.1 does
-    not say whether it should.
+9. **Module-level `let`.** Specified as today. Gdev and Ink do not use it.
+10. **Tags on functions and constants.** Section 6.7 allows tags only where
+    `#type` can read them.
 
-## Annex C. Proposals
+## Annex C. Considered and declined
 
-Not approved and not part of the specification. Counts are grep
-approximations over Gdev (`src`, `devtools`) and Ink (`lib`), about 56,000
-lines.
+Counts are grep approximations over Gdev (`src`, `devtools`) and Ink (`lib`),
+about 56,000 lines.
 
-1. **Effects built like traits.** An effect is a nominal record type of
-   operations, and a provider is an ordinary record value of that type,
-   installed for a suite. A trait is then a record found by type at compile
-   time, and an effect a record found by scope at run time. This removes
-   `@effect.provider`, the four `@effect.state` forms and the
-   single-operation form. Evidence: no user effect is declared, and
-   `Foreign` appears on 8 lines.
-2. **One target for each leaving word.** Remove value blocks (`do:` with
-   `break value`). `return` leaves a function, and `break` and `continue`
-   act on loops. Today `break` and `break ()` leave different things. After
-   E1, 8 value blocks remain. A provider block then needs its own word, such
-   as `with provider:`.
-3. **Negative literals without parentheses.** A `-` with a space before it
-   and none after is negation, so `f -1.0` passes `-1.0`. Evidence: 537
-   lines with a parenthesized negative number.
-4. **Numbers.** `U8` to `U64`, `I8` to `I64`, `F32` and `F64`. A literal
-   takes the expected type and defaults to `U32` or `F32`. Integers wrap in
-   every build. Conversions are members named for what they lose
-   (`count.to_f32`, `value.wrap_u8`). `Text` becomes UTF-8 bytes. Evidence:
-   1,212 conversion sites.
-5. **No `let` over an existing local.** `let` introduces a new name and
-   `:=` gives an old one a new value. A `let` that reuses a local's or
-   parameter's name is an error.
-6. **Tags as data.** `@[…]` attaches constant data to a declaration,
-   constructor or field. `#type` shows it and it changes nothing else. A
-   derived codec needs per-field information such as a version. Applying a
-   function is written as a call. Tags have no uses today.
-7. **Field defaults in data.** Roots already give each component an initial
-   value. Allow the same on a record constructor's fields, and let a
-   construction leave those fields out.
-8. **`for` over a trait.** `for` accepts ranges, arrays and any type with
-   `Collection`, as an index loop. Remove the `iter` / `next` cursor
-   protocol, `@cursor.*` and `std/iter`. None has a use.
-9. **Remove spreads.** `[...values, value]` copies an array. It has no
-   uses, and an append or a named copy says the same.
+- **A `?` or `try` operator.** `Result` appears on 20 lines, and
+  `let $Some … else` (191 uses) covers early exit.
+- **`while`.** `for ever` has 12 uses.
+- **String interpolation.** There are 9 formatting calls.
+- **`defer`.** Storage is released by scope, so nothing needs cleaning up.
+- **In-language tests.** Ink's tests return reports that are compared with
+  Rust references, which a `test` form would not replace.
+- **Goose's `const for` over fields.** It needs a generic body checked again
+  for each instance. `#run` with `#type` covers the same ground.
+
+Two Goose features are worth another look once roots exist: index types,
+which move a bounds check to where the index is made, and verified byte
+images of arrays for snapshots.
