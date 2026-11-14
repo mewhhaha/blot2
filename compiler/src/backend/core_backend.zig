@@ -2378,6 +2378,7 @@ pub fn compileWithEvidenceNoise(allocator: Allocator, units: []const core.Module
 pub fn compileWithOptions(allocator: Allocator, units: []const core.Module, entry: u32, options: CompileOptions) Error!Result {
     const trace_space = @import("../phase_profile.zig").enterSpace(.core);
     defer trace_space.restore();
+    if (options.policy.backend == .direct) return @import("../direct/direct.zig").compile(allocator, units, entry);
     if (try @import("scoped_backend.zig").required(allocator, units, entry)) return @import("scoped_backend.zig").compileWithOptions(allocator, units, entry, .{
         .identity = options.identity,
         .storage = options.storage orelse options.policy.storage.config(),

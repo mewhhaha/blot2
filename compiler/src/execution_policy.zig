@@ -2,9 +2,12 @@
 //! cache validity; source, evidence, executable and value checks remain distinct.
 //! Compiler behavior is not policy: fresh and retained builds run the same
 //! implementation, and artifact retention follows the retained session.
+pub const Backend = enum { scoped, direct };
 pub const Policy = struct {
     storage: @import("backend/storage_plan.zig").Budgets = .{},
     codegen_tier: @import("compilation_tier.zig").Tier = .optimized,
+    /// The modular direct backend (tasks/FAST_COMPILE.md) or the scoped one.
+    backend: Backend = .scoped,
     share_machine_code: bool = false,
     /// Diagnostic final-Wasm counters; absent from ordinary release output.
     memory_profile: bool = false,
