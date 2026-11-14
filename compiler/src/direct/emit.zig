@@ -13,7 +13,10 @@ const A = std.mem.Allocator;
 /// Diverged: an operand never produced a value; its user diverges too.
 pub const Error = A.Error || error{ Unsupported, Diverged };
 
-pub const Failure = struct { unit: u32, span: core.Span, message: []u8 };
+/// `code` is storage_unsupported for a form the direct backend lacks; any
+/// other code is an error in the program itself.
+pub const Failure = struct { unit: u32, span: core.Span, message: []u8, code: Code = .storage_unsupported };
+pub const Code = @import("../check/diagnostic_code.zig").Code;
 
 /// A value: one Wasm local per word of its type's layout.
 pub const Val = struct {
@@ -128,6 +131,9 @@ pub const Generator = struct {
     /// One failure summarizing every distinct unsupported form, if any.
     pub fn summary(self: *Generator) Error!?Failure {
         if (self.failures.items.len == 0) return null;
+        // An error in the program outranks forms the backend lacks.
+        for (self.failures.items) |item| if (item.failure.code != .storage_unsupported)
+            return .{ .unit = item.failure.unit, .span = item.failure.span, .message = try self.allocator.dupe(u8, item.failure.message), .code = item.failure.code };
         var text: std.ArrayList(u8) = .empty;
         errdefer text.deinit(self.allocator);
         try text.print(self.allocator, "Direct backend: {d} unsupported form(s): ", .{self.failures.items.len});
@@ -158,6 +164,14 @@ pub const Generator = struct {
         if (self.failure == null) {
             const message = try self.allocator.print("Direct backend: " ++ format, arguments);
             self.failure = .{ .unit = m.unit, .span = if (id < m.spans.len) m.span(id) else .{ .start = 0, .end = 0 }, .message = message };
+        }
+        return error.Unsupported;
+    }
+    /// An error in the program, reported with its own diagnostic code.
+    pub fn failCode(self: *Generator, m: *const core.Module, id: core.Id, code: Code, comptime format: []const u8, arguments: anytype) error{ Unsupported, OutOfMemory } {
+        if (self.failure == null) {
+            const message = try self.allocator.print(format, arguments);
+            self.failure = .{ .unit = m.unit, .span = if (id < m.spans.len) m.span(id) else .{ .start = 0, .end = 0 }, .message = message, .code = code };
         }
         return error.Unsupported;
     }

@@ -31,7 +31,7 @@ entry const lazy_fallback = func () => return do:
   let empty: Array U32 = #[]
   break unwrap_or_else ($Some 42) (func () => return empty[0])
 
-entry const factorial = func value => return do:
+entry const factorial = func (value: U32) : U32 => return do:
   if value <= 1:
     break 1
   break value * factorial (value - 1)

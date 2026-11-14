@@ -1,8 +1,8 @@
 // This file is executable: just compile examples/prelude.blot
 // std/prelude.blot supplies Maybe, Result, combinators, and numeric operators.
 
-entry const increment = func value => return value + 1
-entry const doubled = func value => return value * 2
+entry const increment = func (value: U32) : U32 => return value + 1
+entry const doubled = func (value: U32) : U32 => return value * 2
 
 // A closure captures its immutable argument; functions are ordinary values.
 entry const add_two = U32.add 2

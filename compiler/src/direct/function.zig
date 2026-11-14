@@ -129,6 +129,15 @@ pub const Fn = struct {
                         return found;
                     } else |_| {};
                 }
+                // Variables no use can reach take Unit, consistently for the
+                // rest of this instance: no value of such a part exists.
+                if (try self.holesUnused(ty, 0)) {
+                    try self.defaultUnused(ty, 0);
+                    if (self.g.types.lower(self.m, ty, self.env)) |found| {
+                        self.g.dropFailure();
+                        return found;
+                    } else |_| {}
+                }
                 return self.g.typeFailure(self.m, id);
             },
             else => return err,
@@ -405,6 +414,26 @@ pub const Fn = struct {
                 return true;
             },
             else => return false,
+        }
+    }
+    /// Binds every unbound variable of Core type `ty` to Unit.
+    fn defaultUnused(self: *Fn, ty: T.Id, depth: usize) Error!void {
+        if (ty <= T.never or depth > 64) return;
+        const n = self.m.types.node(ty);
+        switch (n.tag) {
+            .variable => {
+                const key: types.VarKey = .{ .unit = self.m.unit, .ty = ty };
+                if (!self.env.contains(key)) try self.env.put(self.g.allocator, key, types.unit);
+            },
+            .usage, .forall, .array, .list, .cursor => try self.defaultUnused(n.a, depth + 1),
+            .function => {
+                try self.defaultUnused(n.a, depth + 1);
+                try self.defaultUnused(n.b, depth + 1);
+            },
+            .product => for (self.m.types.list(.{ .start = n.a, .len = n.b })) |child| try self.defaultUnused(child, depth + 1),
+            .record => for (0..n.b) |index| try self.defaultUnused(self.m.types.recordField(n, index).ty, depth + 1),
+            .nominal => for (self.m.types.nominalArguments(n)) |argument| try self.defaultUnused(argument, depth + 1),
+            else => {},
         }
     }
     /// Whether no hole (`never`) of `ty` affects its layout: holes may sit
@@ -2326,7 +2355,7 @@ pub const Fn = struct {
             return self.pop(result orelse scalarResult(n.op, left.ty), id);
         }
         const identity = self.g.receiverIdentity(left.ty) orelse return self.g.fail(self.m, id, "associated member on a {s}", .{@tagName(tag)});
-        const target = self.g.dispatchTarget(self.m, identity, n.c, .none) orelse return self.g.fail(self.m, id, "no associated member for this receiver", .{});
+        const target = self.g.dispatchTarget(self.m, identity, n.c, .none) orelse return self.g.failCode(self.m, id, .missing_associated, "no associated member for this receiver", .{});
         const arguments: []const Val = if (right) |value| &.{ left, value } else &.{left};
         const owned = try self.arena.dupe(Val, arguments);
         const callee = if (result) |known| try self.curried(owned, known) else try self.g.calleeFromArguments(target, owned, self.m, id);
@@ -2514,6 +2543,11 @@ pub const Fn = struct {
         const result = if (signature.tag == .function) signature.b else declared.scheme.root;
         const ty = try self.g.types.lowerHoles(owner, result, &env);
         try self.refine(self.m.typeOf(id), ty);
+        // Parts the payload leaves open and no use can reach take Unit.
+        if (try self.holesUnused(self.m.typeOf(id), 0)) {
+            try self.defaultUnused(self.m.typeOf(id), 0);
+            if (self.g.types.lower(self.m, self.m.typeOf(id), self.env)) |found| return found else |_| {}
+        }
         return ty;
     }
     fn variantPosition(self: *Fn, cases: types.Variants, tag: u32, id: core.Id) Error!usize {
@@ -3181,11 +3215,11 @@ pub fn hostImport(g: *Generator, kinds: [2]Abi) Error!u32 {
 pub fn emitConstantExport(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes) Error!u32 {
     var empty: types.Env = .empty;
     const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
-        error.Unsupported => return g.typeFailure(m, body.root),
+        error.Unsupported => return g.failCode(m, body.root, .entry_type, "an exported binding needs a concrete type", .{}),
         else => return err,
     };
-    const kind = abiKind(g, ty) orelse return g.fail(m, body.root, "exported constants of type {s} are not supported", .{@tagName(g.types.node(ty).tag)});
-    if (isArray(kind)) return g.fail(m, body.root, "exported constants must be scalars", .{});
+    const kind = abiKind(g, ty) orelse return g.failCode(m, body.root, .entry_type, "exported constants of type {s} are not supported", .{@tagName(g.types.node(ty).tag)});
+    if (isArray(kind)) return g.failCode(m, body.root, .entry_type, "exported constants must be scalars", .{});
     const instance_id = try g.named(.{ .unit = m.unit, .binding = body.binding }, ty, m, body.root);
     const instance = g.instance(instance_id);
     const machine = abiMachine(kind);
@@ -3240,7 +3274,7 @@ pub fn startFunction(g: *Generator, m: *const core.Module, inits: []const u32) E
 pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes) Error!void {
     var empty: types.Env = .empty;
     const ty = g.types.lower(m, m.binding(body.binding).ty, &empty) catch |err| switch (err) {
-        error.Unsupported => return g.typeFailure(m, body.root),
+        error.Unsupported => return g.failCode(m, body.root, .entry_type, "an exported binding needs a concrete type", .{}),
         else => return err,
     };
     const instance_id = try g.named(.{ .unit = m.unit, .binding = body.binding }, ty, m, body.root);
@@ -3253,8 +3287,8 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     const parameter = if (via_closure) arrow.a else instance.parameters[0];
     const result_ty = if (via_closure) arrow.b else instance.result;
     const callback = callbackAbi(g, parameter);
-    const parameter_abi: Abi = if (callback != null) .unit else abiKind(g, parameter) orelse return g.fail(m, body.root, "entry parameters of type {s} are not supported", .{@tagName(g.types.node(parameter).tag)});
-    const result_abi = abiKind(g, result_ty) orelse return g.fail(m, body.root, "entry results of type {s} are not supported", .{@tagName(g.types.node(result_ty).tag)});
+    const parameter_abi: Abi = if (callback != null) .unit else abiKind(g, parameter) orelse return g.failCode(m, body.root, .entry_type, "entry parameters of type {s} are not supported", .{@tagName(g.types.node(parameter).tag)});
+    const result_abi = abiKind(g, result_ty) orelse return g.failCode(m, body.root, .entry_type, "entry results of type {s} are not supported", .{@tagName(g.types.node(result_ty).tag)});
     const machine: W.ValType = if (callback != null) .externref else abiMachine(parameter_abi);
     const signature = try g.module.signature(&.{machine}, &.{abiMachine(result_abi)});
     const function = try g.module.addFunction(signature);

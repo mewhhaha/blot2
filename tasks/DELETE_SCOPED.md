@@ -66,6 +66,21 @@ removes the parser and checker support. Until then the direct backend reports
 those forms as unsupported. A test that mixes a dropped feature with kept
 behaviour keeps the kept part.
 
+## Changes that land with the default flip
+
+- `array_snapshot` expects 40, not 22, in tests/guest/entry_execution.test.ts
+  and tests/guest/development_tier.test.ts. Writes through an alias are
+  visible (LANGUAGE_COHERENCE A7); the scoped backend still returns 22.
+- `const_panic`: constants are computed at instantiation, so a panicking
+  constant traps there. Tests expecting the compile-time diagnostic change to
+  expect an instantiation trap.
+- Exports without complete signatures (numeric-literal defaulting, as in
+  `entry const increment = func value => return value + 1`) are `entry_type`
+  errors on the direct backend (FAST_COMPILE decision 2). The examples are
+  annotated; tests that rely on the defaulting are rewritten with signatures.
+- Mixed-operand dispatch (`@type.call` falling back to the right operand's
+  owner) goes with the traits redesign: a trait dispatches on one type.
+
 ## Order
 
 1. Implement the kept gaps in the direct backend: constant exports, entry ABI
