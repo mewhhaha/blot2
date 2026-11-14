@@ -1,6 +1,6 @@
 # Blot language specification: syntax
 
-Draft of 14 November 2026, second revision.
+Draft of 14 November 2026, third revision.
 
 This document states what Blot source text is expected to look like and mean:
 what a compiler must accept, what it must reject, and the meaning a reader may
@@ -32,12 +32,19 @@ the first draft. [Annex A](#annex-a-removed-forms) labels them "round 2".
 [Annex C](#annex-c-considered-and-declined) lists ideas that were considered
 and declined.
 
+The third revision removes mutation. The owner's instruction: "remove 'real'
+mutation from the spec. Just immutable and then our goal is to reuse as much
+memory as possible." The store statement `place = value`, `Cell` and
+`is root` are gone, and section 10.3 states the reuse rules. The memory model
+file predates this decision, and here this document is the newer one.
+
 Terms:
 
 - **Error**: the compiler rejects the module and produces no output.
 - **Trap**: execution of the current host invocation stops. A program cannot
   catch a trap.
-- **Storage**: arrays, cells and roots. Everything else is a **value**.
+- **Owns**: a local owns an array when no other name, value or lambda holds
+  that array (section 10.3).
 
 ## 2. Rules the syntax obeys
 
@@ -51,11 +58,12 @@ A change to the language must keep these.
    Compile-time evaluation fills in bodies and never produces a name or a
    type.
 3. **One spelling per meaning.**
-4. **Mutation is visible.** A statement shows whether it rebinds a local
-   (`:=`) or writes storage (`=`), and a parameter's type shows whether the
-   function may write through it.
-5. **Cost is visible.** No implicit copy of storage and no implicit numeric
-   conversion.
+4. **Nothing is mutated.** Every value is immutable, arrays included. `:=`
+   gives a name a new value, and no code can observe another piece of code
+   changing a value it holds.
+5. **Cost is visible.** The compiler reuses memory and never copies an array
+   on its own: an update it cannot make in place is an error. There is no
+   implicit numeric conversion.
 6. **One meaning per program.** A program behaves the same in every build
    mode. Checks that trap are part of the meaning.
 
@@ -129,9 +137,9 @@ func  if  import  in  is  let  not  of  or  return  then  true  type  with
 `not` and `with` are **(approved)**.
 
 Reserved only in the position that gives them meaning, and ordinary names
-elsewhere: `opaque`, `trait` and `root` after `is`; `private`, `entry` and
-`export` at the start of a module item; `from` in an import; `where` after a
-signature; `self` on the right of `:=`.
+elsewhere: `opaque` and `trait` after `is`; `private`, `entry` and `export`
+at the start of a module item; `from` in an import; `where` after a
+signature; `self` on the right of `:=`; `own` before a parameter's type.
 
 These words stop being keywords **(approved)**: `do`, `use`, `yield`,
 `complete`, `infix`, `infixl`, `infixr`, `contract`, `impl`.
@@ -163,7 +171,7 @@ Each mark has one role in each of the three grammars.
 | `.` | member of a module, type or value | member of a type | |
 | `..` | range | | |
 | `:` | suite opener; annotation; field | annotation; field | field |
-| `=` | definition; store | definition; default | |
+| `=` | definition | definition; default | |
 | `:=` | rebinding | | |
 | `->` | parameter separator | function type | |
 | `=>` | body | | arm body |
@@ -228,11 +236,12 @@ Declaration = FuncDecl | ConstDecl | LetDecl | TypeDecl
 FuncDecl  = "func" ValuePath Param ("->" Param)* ":" Type ("!" EffectRow)?
             Where? "=>" Body
 ValuePath = (UpperName ".")* LowerName
-Param     = "(" ")" | "(" Pattern ":" Type ")"
+Param     = "(" ")" | "(" Pattern ":" "own"? Type ")"
 Body      = Expression | Suite
 ```
 
 - Every parameter and the result are annotated **(approved)**.
+- `own` marks a parameter the function takes over (section 10.3) **(open)**.
 - `->` separates parameters. A function takes them one at a time:
   `func add (left: U32) -> (right: U32): U32` has type `U32 -> U32 -> U32`,
   and `add 2` is a function.
@@ -268,13 +277,11 @@ TypeDecl   = "type" TypeHead "=" Type
            | "type" TypeHead "is" "opaque" "=" Type
            | "type" TraitHead "is" "trait" "=" RecordType
            | "type" TypeHead "is" "effect" "=" RecordType
-           | "type" UpperName "is" "root" "=" "{" RootField,+ "}"
 TypeHead   = TypeName TypeParams?
 TypeName   = (UpperName ".")* UpperName
 TypeParams = LowerName | "[" LowerName,+ "]"
 Constructor = Tag* "$" UpperName (TypeAtom | "{" DataField,* "}")?
 DataField  = Tag* LowerName ":" Type ("=" Expression)?
-RootField  = LowerName ":" Type "=" Expression
 ```
 
 - **Alias.** `type Name = Type` adds a name and nothing else. A recursive
@@ -380,26 +387,7 @@ entry func main (): Unit =>
 - `Foreign` is the one built-in effect. It marks host callbacks. Source
   cannot declare or provide it.
 
-### 6.6 Roots
-
-**(approved)**
-
-```blot
-type World is root = {
-  entities: ResizeArray Entity = [],
-  viewport: Cell Viewport = Cell.new viewport.default,
-}
-let world = World.new ()
-```
-
-- A root is storage made of a fixed group of storage components. Every
-  component has an initial value.
-- `World.new ()` creates a root and all of its components, and they share
-  one lifetime.
-- Replacing a component (`world.entities := …`) is an error. Writing into
-  one (`world.entities[i] = entity`) is a store.
-
-### 6.7 Tags
+### 6.6 Tags
 
 **(approved)**
 
@@ -423,7 +411,7 @@ type Save is data = $Save {
 ## 7. Types
 
 ```
-Type       = TypeApply ("->" Type ("!" EffectRow)?)?
+Type       = "own"? TypeApply "->" Type ("!" EffectRow)? | TypeApply
 TypeApply  = TypePrefix (TypeArg OutputTypes?)?
 TypeArg    = TypePrefix | "[" Type,+ "]"
 TypePrefix = "&" TypePrefix | "&" "[" Type "]" | "^" TypePrefix | TypeAtom
@@ -460,12 +448,14 @@ EffectLabel = TypePath TypeArg?
   conversion.
 - **Text (approved).** `Text` is `Array U8` holding UTF-8. Its length counts
   bytes.
-- **Storage types.** `Array a` has a fixed length, `GrowArray a` can append,
-  and `ResizeArray a` can also shrink. `Cell a` holds one value
-  **(approved)**. A root type is storage.
+- `own` before a parameter's type is part of the function type
+  (section 10.3) **(open)**.
+- **Arrays.** `Array a` has a fixed length, `GrowArray a` can append, and
+  `ResizeArray a` can also shrink. All three are immutable values: an
+  append, like any update, gives a successor **(approved)**.
 - **References.** `&a` refers to one value and `&[a]` to a range of an
-  array. Both are read-only **(approved)**. `^a` is a link to an element of a
-  stable pool. A function that writes takes the storage itself.
+  array, without copying it. `^a` is a link to an element of a stable pool.
+  While a reference to an array is in use, the array has another holder.
 
 ## 8. Patterns
 
@@ -593,7 +583,7 @@ Range     = Expression ".." Expression
 - **Ranges.** `start..end` counts up from `start` and stops before `end`.
   It is syntax, not a value: it appears in `for`, in a generator and in a
   range reference.
-- **References.** `&place` refers to one value in storage,
+- **References.** `&place` refers to one value in an array,
   `&items[start..end]` to a range, and `^items[i]` to an element of a stable
   pool.
 - `self` is defined only on the right of `:=` (section 10.2).
@@ -654,7 +644,8 @@ LambdaParam = LowerName | "_" | "(" ")" | "(" Pattern (":" Type)? ")"
 
 - A lambda's types are inferred where they are not written.
 - A lambda captures the values of the locals it names at the point where it
-  is created. Captured storage is the same storage.
+  is created. A captured array is shared with the lambda, not copied, so
+  the local no longer owns it.
 - The body follows the rules of section 6.1.
 - A local bound to a lambda may be generic (section 10.1).
 
@@ -689,7 +680,7 @@ expected there and the locals in scope.
 ## 10. Statements
 
 ```
-Statement = LetStmt | Rebind | Store | IfStmt | CaseExpr | ForStmt | WithStmt
+Statement = LetStmt | Rebind | IfStmt | CaseExpr | ForStmt | WithStmt
           | "return" Expression
           | "break"
           | "continue"
@@ -725,33 +716,73 @@ Place  = LowerName ("." LowerName | "[" Expression "]")*
 - `name := value` gives an existing local or parameter a new value for the
   rest of its scope. The name must already be bound in the function.
 - `name.path := value` builds the successor of the local's value with that
-  one leaf replaced, and rebinds the local to it. The root and each index
+  one leaf replaced, and rebinds the local to it. The name and each index
   are evaluated once, left to right.
 - On the right, `self` is the old value of the place.
 - Nothing outside the function observes a rebinding. A closure created
   earlier keeps the value it captured.
-- **Through storage (approved).** When the path passes through storage, the
-  update happens in place, which is correct only if nothing else can observe
-  the old storage. The compiler must prove that within the one function,
-  using the rules in [the memory model](../../tasks/MEMORY_MODEL.md).
-  Otherwise the statement is an error, and the program must say what it
-  means: a store with `=`, or an explicit copy first (`values.copy`).
+- This is the only way a program changes anything **(approved)**. There is
+  no statement that writes into a value another name holds.
 
-### 10.3 Stores: `=`
+### 10.3 Reuse
 
-**(approved)**
+**(approved; the rules across calls are open)**
 
+The owner's goal: "efficient immutability. Maybe even more efficient than
+mutable languages." An immutable program must cost no more than the same
+program written with writes, and the compiler may use what immutability
+guarantees, that no two names ever share an array that changes.
+
+The meaning of a program never depends on reuse: `:=` always gives the
+successor. This section fixes the cost.
+
+**In place or not at all.** An update whose path passes through an array
+changes that array in place. Nothing can observe that only if the local owns
+the array, so the compiler must prove ownership inside the one function. If
+it cannot, the statement is an error that asks for an explicit copy
+(`values.copy`). The compiler never copies an array on its own.
+
+**Owning inside a function.**
+
+- A local owns an array from the point it is bound to a new one: an array
+  literal, a comprehension, a copy, or the result of a call.
+- It stays the owner through its own `:=` updates.
+- It stops owning the array when the array is bound to another name,
+  captured by a lambda, placed in another value, or referenced with `&`.
+- Reading an element that holds no array, and taking the length, change
+  nothing.
+- Where branches join, a local owns its array only if it does on every
+  branch. A local carried round a loop owns its array only if it does on
+  entry and at the end of every iteration.
+- A record owns the arrays in its fields in the same way, so
+  `world.entities[i].health := 3` is in place when `world` owns `entities`.
+
+[The memory model](../../tasks/MEMORY_MODEL.md) lists these rules in full
+under "Uniqueness".
+
+**Across calls (open).** No fact about ownership is inferred across a call.
+The signature states it.
+
+- A parameter is **borrowed** unless marked. The function may read it and
+  lend it on. It may not update it in place, return it, or return anything
+  that holds it. Lending an array to a call does not end the caller's
+  ownership.
+- A parameter marked `own` is **taken over**. The argument must be owned at
+  the call, and the caller's name is spent: using it again before rebinding
+  it is an error. Inside the function the parameter is owned, so it can be
+  updated in place and returned.
+- Every result is owned by the caller.
+- `own` is part of the function's type: `own (Array U32) -> U32 -> Array U32`.
+- A partial application cannot supply an `own` parameter.
+- On a type that holds no array, `own` changes nothing.
+
+```blot
+func damage (world: own World) -> (index: U32): World =>
+  world.entities[index].health := self - 1
+  return world
+
+world := world.damage 3
 ```
-Store = Postfix "=" Expression
-```
-
-- A store writes storage in place, and every alias sees the new value.
-- The place must end in a field or an index and must reach storage: an
-  element `rows[i]`, a field of an element `rows[i].x`, a cell's value
-  `cell.value`, or any of these through a root's component.
-- A store to a place that never reaches storage is an error: use `:=`.
-- A store through `&a` or `&[a]` is an error.
-- Replacing a root's component is an error.
 
 ### 10.4 `if`
 
@@ -853,7 +884,7 @@ The language defines these traps:
 - an index outside an array, or a range outside it;
 - integer division or remainder by zero, and the smallest signed value
   divided by `-1`;
-- use of a reference or link whose storage is gone or has been reused;
+- use of a reference or link whose array is gone or has been reused;
 - appending beyond the capacity planned for a `GrowArray` or `ResizeArray`;
 - `panic "message"`;
 - calling a host callback after the invocation that supplied it has ended;
@@ -888,11 +919,12 @@ with this revision.
 | `is contract`, `impl`, and the predicates `associated`, `result`, `receiver`, `update`, `field`, `type_eq`, `operation`, `type_rep`, `effect_rep` | `is trait` and `const X.Trait` | C |
 | `@record.merge`, updates that change a field's type, `std/path` | closed records | C7 |
 | `forall`, `exists`, `pack`, `unpack`, `@code.*`, `@proof.*`, `@usage.*` | `#run` with `#type` for staging; none for the rest | C8 |
-| `@storage.write` and writes through `&a` | `place = value` on the storage | A |
-| `[x]` with `[0]` as a one-value cell | `Cell a` | A |
+| `@storage.write`, writes through `&a`, and any write that an alias can see | `:=` on an array the function owns | round 3 |
+| `place = value`, `Cell a`, `is root` (approved earlier on 14 November) | `:=`; a local or a record field; data with field defaults | round 3 |
+| `[x]` with `[0]` as a one-value cell | a local, or a field of a record that is passed and returned | round 3 |
 | `Trait T -> out`, `Trait T -> [a, b]` | `Trait T { out: … }` | round 2 |
-| `@cell x`, `@root World`, `@storage.copy values`, `@panic "…"`, `@hole` | `Cell.new x`, `World.new ()`, `values.copy`, `panic "…"`, `_` | round 2 |
-| `@effect.provider`, `@effect.state`, `@effect.run`, `@effect.reader`, `@effect.writer`; `type Get a is effect = Unit -> a`; operation labels in rows | a provider record; a `Cell`; a record-form effect; effect labels | round 2 |
+| `@storage.copy values`, `@panic "…"`, `@hole` | `values.copy`, `panic "…"`, `_` | round 2 |
+| `@effect.provider`, `@effect.state`, `@effect.run`, `@effect.reader`, `@effect.writer`; `type Get a is effect = Unit -> a`; operation labels in rows | a provider record; a local; a record-form effect; effect labels | round 2 |
 | `do:` with `break value`, `#run do:`, `#do:` | a function that returns the value; `#run` of a call | round 2 |
 | `do provider:` | `with provider:` | round 2 |
 | `let` over a local or parameter in scope | `:=`, or a new name | round 2 |
@@ -906,10 +938,26 @@ unnecessary.
 
 ## Annex B. Open spellings and questions
 
+0. **Ownership across calls.** The owner removed mutation and asked for as
+   much reuse as possible. Three standing decisions shape what that can
+   mean: no ownership facts are inferred across calls, signatures are
+   complete, and an array is never copied silently. Section 10.3 meets all
+   three with one mark, `own`. Without some rule here, a function could not
+   update an array it was passed. The alternatives are a run-time reference
+   count on each array (reuse when the count is one, copy otherwise) and
+   silent copies. Open within the proposed rule:
+   - a generic function that returns an `a` read out of a borrowed
+     parameter, such as an element accessor, when `a` may hold an array;
+   - whether ownership returns once every other holder has had its last
+     use. The memory model ends it for the rest of the scope, which reuses
+     less;
+   - the memory model says passing an array to any call ends ownership and
+     that a call's result is not owned. Section 10.3 says the opposite on
+     both, because the signature now carries the fact.
 1. **Spellings chosen by this document.** The owner approved the changes and
-   has not seen these spellings: `with`; `Cell.new`, `World.new ()`,
-   `values.copy`, `panic`; `_` for a hole; the braces for trait outputs;
-   `#quote` and `#( )`; the names of the description and code types.
+   has not seen these spellings: `own`; `with`; `values.copy`, `panic`; `_`
+   for a hole; the braces for trait outputs; `#quote` and `#( )`; the names
+   of the description and code types.
 2. **Output names.** Lowercase like type variables, as written here, or
    `UpperName` like other types.
 3. **Providers with effects of their own.** A host callback used as an
@@ -927,8 +975,10 @@ unnecessary.
    does not name backticks. This document leaves them out. Gdev and Ink do
    not use them.
 9. **Module-level `let`.** Specified as today. Gdev and Ink do not use it.
-10. **Tags on functions and constants.** Section 6.7 allows tags only where
+10. **Tags on functions and constants.** Section 6.6 allows tags only where
     `#type` can read them.
+11. **`Cell` and `is root`.** Both existed to share writes, so this revision
+    removes them. A group of arrays is a data type with field defaults.
 
 ## Annex C. Considered and declined
 
@@ -939,12 +989,12 @@ about 56,000 lines.
   `let $Some … else` (191 uses) covers early exit.
 - **`while`.** `for ever` has 12 uses.
 - **String interpolation.** There are 9 formatting calls.
-- **`defer`.** Storage is released by scope, so nothing needs cleaning up.
+- **`defer`.** Memory is released by scope, so nothing needs cleaning up.
 - **In-language tests.** Ink's tests return reports that are compared with
   Rust references, which a `test` form would not replace.
 - **Goose's `const for` over fields.** It needs a generic body checked again
   for each instance. `#run` with `#type` covers the same ground.
 
-Two Goose features are worth another look once roots exist: index types,
+Two Goose features are worth another look later: index types,
 which move a bounds check to where the index is made, and verified byte
 images of arrays for snapshots.
