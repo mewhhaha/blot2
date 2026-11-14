@@ -1034,8 +1034,16 @@ pub const Fn = struct {
     }
 
     fn arrayLiteral(self: *Fn, id: core.Id) Error!Val {
-        const ty = try self.typeOf(id);
         const children = self.m.children(id);
+        // An empty literal whose element type no use can fix holds no
+        // element: its unused variables are Unit.
+        const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => if (children.len == 0 and try self.holesUnused(self.m.typeOf(id), 0))
+                try self.g.types.lowerFilled(self.m, self.m.typeOf(id), self.env, types.unit)
+            else
+                return self.g.typeFailure(self.m, id),
+            else => return err,
+        };
         const values = try self.arena.alloc(Val, children.len);
         for (children, values) |child, *slot| slot.* = try self.expr(child);
         const handle = try self.create(ty, try self.constLocal(@intCast(children.len)), id);

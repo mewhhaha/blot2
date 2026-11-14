@@ -1,0 +1,5 @@
+import * as array from "std/array"
+func count_of values => return values.length
+func longer left -> right => return if left.length > right.length then left.length else right.length
+entry func empty_generic (n: U32): U32 => return count_of #[] + n
+entry func mixed (n: U32): U32 => return longer #[n, n] #[] + (array.concat #[n] #[]).length

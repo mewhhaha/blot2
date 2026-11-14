@@ -68,6 +68,8 @@ pub const Types = struct {
     /// The Core type that last failed to lower, for diagnostics.
     failure: ?VarKey = null,
     holes: bool = false,
+    /// What an unbound variable lowers to while `holes` is set.
+    hole_fill: Ty = never,
     failure_reason: []const u8 = "",
 
     pub fn init(allocator: A, units: []const core.Module) Error!Types {
@@ -210,8 +212,16 @@ pub const Types = struct {
     /// Like lower, but unbound variables become `never` holes, which
     /// `match` skips: an expected type known only in part.
     pub fn lowerHoles(self: *Types, m: *const core.Module, ty: T.Id, env: *const Env) Error!Ty {
+        return self.lowerFilled(m, ty, env, never);
+    }
+    /// Like lowerHoles, with `fill` in place of each unbound variable.
+    pub fn lowerFilled(self: *Types, m: *const core.Module, ty: T.Id, env: *const Env, fill: Ty) Error!Ty {
         self.holes = true;
-        defer self.holes = false;
+        self.hole_fill = fill;
+        defer {
+            self.holes = false;
+            self.hole_fill = never;
+        }
         var open = false;
         return self.lowerInner(m, ty, env, &open, 0);
     }
@@ -232,7 +242,7 @@ pub const Types = struct {
         const result: Ty = switch (n.tag) {
             .variable, .bound => blk: {
                 child_open = true;
-                break :blk env.get(key) orelse (if (self.holes) never else return self.fail(m, ty, "unresolved type variable"));
+                break :blk env.get(key) orelse (if (self.holes) self.hole_fill else return self.fail(m, ty, "unresolved type variable"));
             },
             .usage, .forall => try self.lowerInner(m, n.a, env, &child_open, depth + 1),
             .function => try self.function(try self.lowerInner(m, n.a, env, &child_open, depth + 1), try self.lowerInner(m, n.b, env, &child_open, depth + 1)),

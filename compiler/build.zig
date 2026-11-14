@@ -13,11 +13,20 @@ pub fn build(b: *std.Build) void {
     const identity = b.addOptions();
     identity.addOption(bool, "artifact_replay", artifact_replay);
     identity.addOption(usize, "inference_budget", 1_000_000);
+    // Temporary while the scoped backend is deleted (tasks/FAST_COMPILE.md).
+    const direct_default = b.option(bool, "direct-default", "Default to the direct backend") orelse false;
+    identity.addOption(bool, "direct_default", direct_default);
     var compiler_digest = @import("compiler_fingerprint.zig").digest(b, target, optimize, use_llvm) catch @panic("Cannot read compiler source identity");
     if (artifact_replay) {
         var hash = std.crypto.hash.sha2.Sha256.init(.{});
         hash.update(&compiler_digest);
         hash.update("artifact-replay=true");
+        hash.final(&compiler_digest);
+    }
+    if (direct_default) {
+        var hash = std.crypto.hash.sha2.Sha256.init(.{});
+        hash.update(&compiler_digest);
+        hash.update("direct-default=true");
         hash.final(&compiler_digest);
     }
     if (error_tracing) |enabled| {

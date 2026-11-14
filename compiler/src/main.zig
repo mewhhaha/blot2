@@ -46,6 +46,10 @@ const usage =
 ;
 const dependency_cli = @import("reuse/dependency_cli.zig");
 const compiler_identity = @import("compiler_identity");
+/// The backend a build without --backend uses.
+fn defaultPolicy() Policy {
+    return .{ .backend = if (compiler_identity.direct_default) .direct else .scoped };
+}
 const restart_cache = @import("reuse/restart_cache.zig");
 /// A cache that was not saved says why: `over_limit` and
 /// `semantic_over_limit` report growth past the cache's limits.
@@ -273,7 +277,7 @@ fn process(io: Io, backing: std.mem.Allocator, writer: *Io.Writer, command: Comm
         allocator.free(source);
         source_live = false;
         const emit_start = now(io);
-        var compiled = try backend.compileWithOptions(allocator, &.{lowered}, 1, .{ .identity = if (identity) |*owned| owned.view() else null, .diagnostic_source_mode = true, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null, .artifact_replay = compiler_defaults.artifact_replay, .artifact_dump = compiler_defaults.artifact_replay });
+        var compiled = try backend.compileWithOptions(allocator, &.{lowered}, 1, .{ .policy = defaultPolicy(), .identity = if (identity) |*owned| owned.view() else null, .diagnostic_source_mode = true, .checkpoint = if (checkpoint) |*candidate| candidate else null, .retain_artifacts = cache_file != null, .artifact_replay = compiler_defaults.artifact_replay, .artifact_dump = compiler_defaults.artifact_replay });
         defer compiled.deinit(allocator);
         stats.emit_us = elapsed(emit_start, io);
         // A declined backend still owns measured work. Preserve it before
@@ -609,7 +613,7 @@ fn run(init: std.process.Init) !bool {
         return true;
     }
     if (std.mem.eql(u8, args[1], "serve-project")) {
-        var policy: Policy = .{};
+        var policy: Policy = defaultPolicy();
         var at: usize = 2;
         while (at < args.len) : (at += 2) {
             if (at + 1 >= args.len) return error.InvalidServeArguments;
@@ -664,7 +668,7 @@ fn run(init: std.process.Init) !bool {
         var dependency_path: ?[]const u8 = null;
         var profile = false;
         var explain_allocations = false;
-        var policy: Policy = .{};
+        var policy: Policy = defaultPolicy();
         var at = first_option;
         while (at < args.len) {
             // Profiling and explanation flags take no value.

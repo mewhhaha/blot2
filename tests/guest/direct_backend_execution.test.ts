@@ -59,6 +59,7 @@ const cases: Record<string, Call[]> = {
     ["shifted", 65536, 65856],
   ],
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
+  "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
   "generic_comprehensions.blot": [
     ["annotated_count", 4, 3],
     ["generic_count", 4, 3],

@@ -294,7 +294,10 @@ pub const Generator = struct {
                 while (grew) {
                     grew = false;
                     for (&obligations) |span| for (m.obligations[span.start..][0..span.len]) |goal| {
-                        if (!try self.touches(m, goal.ty, &reach, 0)) continue;
+                        // Exactly what solveObligations can derive: a field or
+                        // element of a receiver whose variables are all reachable.
+                        if (goal.result == 0 or (goal.kind != .field and goal.kind != .collection)) continue;
+                        if (!try self.within(m, goal.ty, &reach)) continue;
                         const before = reach.count();
                         for ([_]T.Id{ goal.result, goal.other, goal.signature }) |part| try self.mentions(m, part, &reach, 0);
                         if (reach.count() != before) grew = true;
@@ -323,15 +326,14 @@ pub const Generator = struct {
             else => {},
         }
     }
-    /// Whether `ty` is closed or mentions a variable of `reach`.
-    fn touches(self: *Generator, m: *const core.Module, ty: T.Id, reach: *const std.AutoHashMapUnmanaged(T.Id, void), depth: usize) Error!bool {
+    /// Whether every variable of `ty` is in `reach`.
+    fn within(self: *Generator, m: *const core.Module, ty: T.Id, reach: *const std.AutoHashMapUnmanaged(T.Id, void)) Error!bool {
         var found: std.AutoHashMapUnmanaged(T.Id, void) = .empty;
         defer found.deinit(self.allocator);
-        try self.mentions(m, ty, &found, depth);
-        if (found.count() == 0) return true;
+        try self.mentions(m, ty, &found, 0);
         var it = found.keyIterator();
-        while (it.next()) |key| if (reach.contains(key.*)) return true;
-        return false;
+        while (it.next()) |key| if (!reach.contains(key.*)) return false;
+        return true;
     }
 
     /// The instance of a named function at concrete function type `ty`.
