@@ -1,0 +1,24 @@
+const texts: Array U32 = #[1, 2, 3, 4, 5, 6]
+func part (index: U32) => return &texts[index..index + 2]
+func node (id: U32) -> (label: &[U32]) => return { id, size: label.length }
+func declare (item: { id: U32, size: U32 }) -> (labels: GrowArray U32) => return do:
+  @storage.push labels (item.id + item.size)
+  return ()
+func declare_all access -> (open: Bool) => return do:
+  declare (node 1 (part 0)) access.labels
+  if open:
+    declare (node 2 (part 1)) access.labels
+    for index in 0 .. 3:
+      let label = part index
+      if index > 0:
+        declare (node index label) access.labels
+      else:
+        declare (node 9 (part 2)) access.labels
+  return ()
+entry func run (n: U32): U32 => return do:
+  let labels: GrowArray U32 = #[]
+  declare_all { labels } (n > 0)
+  let total = 0
+  for v in labels:
+    total := self + v
+  break total

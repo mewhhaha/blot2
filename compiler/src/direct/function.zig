@@ -30,6 +30,8 @@ const Label = struct {
     /// `continue` already released to them.
     release: ?[2]u32 = null,
     used: bool = false,
+    /// Carries held in loop slots (boxed values copied in place).
+    slots: []const bool = &.{},
 };
 
 pub const Fn = struct {
@@ -40,6 +42,10 @@ pub const Fn = struct {
     env: *types.Env,
     arena: A,
     instance_id: u32 = 0,
+    /// The call node whose arguments are being typed.
+    current_call: core.Id = 0,
+    /// Set while evaluating a direct field value of a record literal.
+    field_value: bool = false,
     code: W.Bytes = .{},
     locals: std.ArrayList(W.ValType) = .empty,
     parameter_words: u32 = 0,
@@ -153,6 +159,10 @@ pub const Fn = struct {
     /// unsupported form is recorded and compiled as a trap, so one build
     /// reports every missing form; the compilation still fails.
     pub fn stmt(self: *Fn, id: core.Id) Error!Val {
+        // Only the field's own reference node may see the field flag.
+        const field_value = self.field_value;
+        defer self.field_value = field_value;
+        if (id == 0 or self.m.node(id).tag != .reference) self.field_value = false;
         const depth = self.depth;
         const labels = self.labels.items.len;
         const value = self.exprInner(id) catch |err| switch (err) {
@@ -198,6 +208,9 @@ pub const Fn = struct {
                 // use's types; its captures are already immutable values.
                 const deferred = switch (self.m.node(n.b).tag) {
                     .closure, .constructor_function, .primitive_function, .reference => true,
+                    // A pure partial application, rebuilt at each use's types.
+                    .call => self.partialCall(n.b),
+                    .apply => self.partialApply(n.b),
                     else => false,
                 };
                 if (deferred and self.m.binding(n.a).scheme.variables.len != 0) {
@@ -254,8 +267,10 @@ pub const Fn = struct {
                 const target = self.g.resolve(self.m, self.m.reference(id));
                 const tm = self.g.unitModule(target.unit);
                 if (tm.body(target.binding)) |body| if (self.g.failure) |failure| if (std.mem.find(u8, failure.message, "unresolved type variable") != null) {
+                    const cause = try self.a().dupe(u8, failure.message);
+                    defer self.a().free(cause);
                     self.g.dropFailure();
-                    return self.g.fail(self.m, id, "value of `{s}` (unit {d}) has a type its uses leave open", .{ tm.name(body.declaration_name), target.unit });
+                    return self.g.fail(self.m, id, "value of `{s}` (unit {d}) has a type its uses leave open [{s}]", .{ tm.name(body.declaration_name), target.unit, cause });
                 };
                 return err;
             },
@@ -285,7 +300,24 @@ pub const Fn = struct {
             .local, .parameter => return self.g.fail(self.m, id, "unbound local reference", .{}),
             else => {},
         }
-        const ty = try self.typeOf(id);
+        var holed = false;
+        const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => blk: {
+                // Variables no use here determines may only sit inside
+                // function types: such a function can never be called here.
+                const partial_ty = try self.g.types.lowerHoles(self.m, self.m.typeOf(id), self.env);
+                if (!self.holesOnlyInFunctions(partial_ty)) return self.g.typeFailure(self.m, id);
+                holed = true;
+                break :blk partial_ty;
+            },
+            else => return err,
+        };
+        if (holed and self.tagOf(ty) == .function) {
+            // Only a function stored as a field of a literal record can go
+            // unused at a type no use fixes; anything else is a missing type.
+            if (!self.field_value) return self.g.typeFailure(self.m, id);
+            return self.trapClosure(ty, id);
+        }
         if (primitiveAlias(tm, target.binding) != null) return self.partial(.primitive, target, ty, &.{}, id);
         if (tm.body(target.binding)) |body| {
             if (body.is_function) return self.partial(.partial, target, ty, &.{}, id);
@@ -299,6 +331,39 @@ pub const Fn = struct {
             return self.received(ty, id);
         }
         return self.g.fail(self.m, id, "reference to a {s} binding without a value", .{@tagName(binding.kind)});
+    }
+    /// Whether no hole (`never`) of `ty` affects its layout: holes may sit
+    /// under function and container types, whose layouts are fixed.
+    fn holesOnlyInFunctions(self: *Fn, ty: Ty) bool {
+        return self.layoutFree(ty, 0);
+    }
+    fn layoutFree(self: *Fn, ty: Ty, depth: usize) bool {
+        if (depth > 32) return false;
+        const n = self.g.types.node(ty);
+        return switch (n.tag) {
+            .never => false,
+            .function, .array, .list, .cursor, .grow, .resize, .ref, .view, .link => true,
+            .tuple => for (self.g.types.tupleItems(ty)) |item| {
+                if (!self.layoutFree(item, depth + 1)) break false;
+            } else true,
+            .record => for (0..n.b) |index| {
+                if (!self.layoutFree(self.g.types.recordField(ty, index).ty, depth + 1)) break false;
+            } else true,
+            .nominal => blk: {
+                const cases = self.g.types.variants(ty) catch break :blk false;
+                for (cases.payloads) |payload| if (payload != ty and !self.layoutFree(payload, depth + 1)) break :blk false;
+                break :blk true;
+            },
+            else => true,
+        };
+    }
+    /// A closure of a type no use determines: calling it traps.
+    fn trapClosure(self: *Fn, ty: Ty, id: core.Id) Error!Val {
+        // Never called, so one shared `(env) -> ()` body serves every type.
+        const key: emit.InstanceKey = .{ .kind = .trap, .unit = self.m.unit, .id = 0, .ty = types.unit };
+        const instance = self.g.find(key) orelse try self.g.addInstanceWith(key, .empty, try self.g.arena.allocator().dupe(Ty, &.{types.unit}), types.unit, true, &.{}, self.m, id);
+        self.g.trap_closures += 1;
+        return self.makeClosure(instance, ty, &.{}, id);
     }
     /// Pops a call result; a result that may refer to scope memory makes
     /// this body responsible for releasing it.
@@ -490,6 +555,8 @@ pub const Fn = struct {
     fn applyClosure(self: *Fn, callee: Val, argument: Val, id: core.Id) Error!Val {
         const arrow = self.g.types.node(callee.ty);
         if (arrow.tag != .function or callee.words.len != 2) return self.g.fail(self.m, id, "application of a non-function value", .{});
+        if ((try self.layout(arrow.a, id)).len != argument.words.len)
+            return self.g.fail(self.m, id, "closure argument of {d} words for a {s} parameter of {d} words", .{ argument.words.len, @tagName(self.tagOf(arrow.a)), (try self.layout(arrow.a, id)).len });
         try self.opIndex(.local_get, callee.words[1]);
         try self.push(argument);
         try self.opIndex(.local_get, callee.words[0]);
@@ -670,14 +737,95 @@ pub const Fn = struct {
 
     // ----- storage -----------------------------------------------------
 
+    fn isBoxed(self: *Fn, ty: Ty, id: core.Id) Error!bool {
+        return self.g.types.boxed(ty) catch |err| switch (err) {
+            error.Unsupported => return self.g.typeFailure(self.m, id),
+            else => return err,
+        };
+    }
+    fn flatBytes(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
+        return self.g.types.flatBytes(ty) catch |err| switch (err) {
+            error.Unsupported => return self.g.typeFailure(self.m, id),
+            else => return err,
+        };
+    }
+    /// A fresh scope block holding one boxed value of `ty`.
+    fn newBlock(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
+        return self.allocate(try self.flatBytes(ty, id));
+    }
+    fn memoryCopy(self: *Fn, to: u32, to_offset: u32, from: u32, bytes: u32) Error!void {
+        try self.opIndex(.local_get, to);
+        if (to_offset != 0) {
+            try self.i32Const(to_offset);
+            try self.op(.i32_add);
+        }
+        try self.opIndex(.local_get, from);
+        try self.i32Const(bytes);
+        try self.op(.prefix_fc);
+        try self.code.uleb(self.a(), 10);
+        try self.code.byte(self.a(), 0);
+        try self.code.byte(self.a(), 0);
+    }
+    /// Writes `value` in flat form at `base + offset`.
+    fn writeFlat(self: *Fn, base: u32, offset: u32, value: Val, id: core.Id) Error!void {
+        if (value.ty == types.never) return;
+        if (try self.isBoxed(value.ty, id)) return self.memoryCopy(base, offset, value.words[0], try self.flatBytes(value.ty, id));
+        try self.storeAt(base, offset, value);
+    }
+    /// Reads a value of `ty` at `base + offset` of an immutable block: a
+    /// boxed value shares the block, others load into locals.
+    fn readFlat(self: *Fn, base: u32, offset: u32, ty: Ty, id: core.Id) Error!Val {
+        if (try self.isBoxed(ty, id)) {
+            const pointer = try self.local(.i32);
+            try self.opIndex(.local_get, base);
+            try self.i32Const(offset);
+            try self.op(.i32_add);
+            try self.opIndex(.local_set, pointer);
+            return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{pointer}) };
+        }
+        return self.loadAt(base, offset, ty, id);
+    }
+    /// Element reads copy: storage elements change through their owner.
+    fn loadElement(self: *Fn, address: u32, offset: u32, ty: Ty, id: core.Id) Error!Val {
+        if (try self.isBoxed(ty, id)) {
+            const memory_block = try self.newBlock(ty, id);
+            try self.memoryCopy(memory_block, 0, address, try self.flatBytes(ty, id));
+            if (offset != 0) return self.g.fail(self.m, id, "offset boxed element read", .{});
+            return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
+        }
+        return self.loadAt(address, offset, ty, id);
+    }
+    /// Byte offset of record field `index` in flat form.
+    fn fieldOffset(self: *Fn, ty: Ty, index: usize, id: core.Id) Error!u32 {
+        var offset: u32 = 0;
+        for (0..index) |before| offset += try self.flatBytes(self.g.types.recordField(ty, before).ty, id);
+        return offset;
+    }
+    fn itemOffset(self: *Fn, ty: Ty, index: usize, id: core.Id) Error!u32 {
+        var offset: u32 = 0;
+        for (self.g.types.tupleItems(ty)[0..index]) |item| offset += try self.flatBytes(item, id);
+        return offset;
+    }
+    /// Field `position` of a record value, boxed or not.
+    fn recordField(self: *Fn, record: Val, position: usize, id: core.Id) Error!Val {
+        const field_ty = self.g.types.recordField(record.ty, position).ty;
+        if (try self.isBoxed(record.ty, id)) return self.readFlat(record.words[0], try self.fieldOffset(record.ty, position, id), field_ty, id);
+        const slice = try self.fieldSlice(record.ty, position, id);
+        return .{ .ty = field_ty, .words = record.words[slice.start..][0..slice.len] };
+    }
+    fn tupleItem(self: *Fn, tuple: Val, index: usize, id: core.Id) Error!Val {
+        const items = self.g.types.tupleItems(tuple.ty);
+        if (try self.isBoxed(tuple.ty, id)) return self.readFlat(tuple.words[0], try self.itemOffset(tuple.ty, index, id), items[index], id);
+        var start: usize = 0;
+        for (items[0..index]) |item| start += (try self.layout(item, id)).len;
+        return .{ .ty = items[index], .words = tuple.words[start..][0..(try self.layout(items[index], id)).len] };
+    }
     fn wordBytes(kind: W.ValType) u32 {
         return if (kind == .v128) 16 else 4;
     }
     /// Bytes per element of a container holding `element`.
     fn stride(self: *Fn, element: Ty, id: core.Id) Error!u32 {
-        var bytes: u32 = 0;
-        for (try self.layout(element, id)) |kind| bytes += wordBytes(kind);
-        return @max(bytes, 4);
+        return @max(try self.flatBytes(element, id), 4);
     }
     fn storeAt(self: *Fn, address: u32, offset: u32, value: Val) Error!void {
         var at = offset;
@@ -808,7 +956,7 @@ pub const Fn = struct {
     }
     fn readElement(self: *Fn, container: Val, index: u32, id: core.Id) Error!Val {
         const address = try self.elementAddress(container, index, id);
-        return self.loadAt(address, 0, try self.elementOf(container.ty, id), id);
+        return self.loadElement(address, 0, try self.elementOf(container.ty, id), id);
     }
     fn constLocal(self: *Fn, value: u32) Error!u32 {
         const local_ = try self.local32();
@@ -826,7 +974,7 @@ pub const Fn = struct {
         if (children.len == 0) return handle;
         const base = try self.baseOf(handle);
         const step = try self.stride(try self.elementOf(ty, id), id);
-        for (values, 0..) |value, index| try self.storeAt(base, @intCast(index * step), value);
+        for (values, 0..) |value, index| try self.writeFlat(base, @intCast(index * step), value, id);
         return handle;
     }
 
@@ -871,7 +1019,7 @@ pub const Fn = struct {
                 try self.op(.i32_mul);
                 try self.op(.i32_add);
                 try self.opIndex(.local_set, address);
-                try self.storeAt(address, 0, value);
+                try self.writeFlat(address, 0, value, id);
                 try self.opIndex(.local_get, index);
                 try self.i32Const(1);
                 try self.op(.i32_add);
@@ -974,7 +1122,7 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(element, id));
                 try self.opIndex(.call, rt.address);
                 try self.opIndex(.local_set, address);
-                return self.loadAt(address, 0, element, id);
+                return self.loadElement(address, 0, element, id);
             },
             .simd_load, .simd_store => {
                 // Four consecutive elements, all in bounds.
@@ -1059,7 +1207,7 @@ pub const Fn = struct {
                 try self.opIndex(.local_get, at);
                 try self.opIndex(.local_get, count);
             } else {
-                try self.storeAt(try self.elementAddress(handle, at, id), 0, part);
+                try self.writeFlat(try self.elementAddress(handle, at, id), 0, part, id);
                 try self.opIndex(.local_get, at);
                 try self.i32Const(1);
             }
@@ -1104,7 +1252,7 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(try self.elementOf(container.ty, id), id));
                 try self.opIndex(.call, rt.push);
                 try self.opIndex(.local_set, address);
-                try self.storeAt(address, 0, value);
+                try self.writeFlat(address, 0, value, id);
                 return unitVal();
             },
             .pop => {
@@ -1115,7 +1263,7 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(try self.elementOf(container.ty, id), id));
                 try self.opIndex(.call, rt.pop);
                 try self.opIndex(.local_set, address);
-                return self.loadAt(address, 0, ty, id);
+                return self.loadElement(address, 0, ty, id);
             },
             .truncate => {
                 const container = try self.expr(children[0]);
@@ -1191,9 +1339,9 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(element, id));
                 try self.opIndex(.call, rt.address);
                 try self.opIndex(.local_set, address);
-                if (operation == .load) return self.loadAt(address, 0, element, id);
+                if (operation == .load) return self.loadElement(address, 0, element, id);
                 const value = try self.expr(children[1]);
-                try self.storeAt(address, 0, value);
+                try self.writeFlat(address, 0, value, id);
                 return unitVal();
             },
             .ref => return self.g.fail(self.m, id, "references to whole values are not supported yet", .{}),
@@ -1219,15 +1367,18 @@ pub const Fn = struct {
         const ty = try self.typeOf(id);
         if (self.tagOf(ty) != .record) return self.g.fail(self.m, id, "record merge of a non-record type", .{});
         var words: std.ArrayList(u32) = .empty;
+        const boxed = try self.isBoxed(ty, id);
+        const memory_block: u32 = if (boxed) try self.newBlock(ty, id) else 0;
         for (0..self.g.types.node(ty).b) |index| {
             const name = self.g.types.recordField(ty, index).name;
             const source = for ([_]Val{ right, left }) |side| {
                 if (self.tagOf(side.ty) != .record) continue;
                 if (self.g.types.findField(side.ty, name)) |position| break .{ side, position };
             } else return self.g.fail(self.m, id, "merged field missing from both records", .{});
-            const slice = try self.fieldSlice(source[0].ty, source[1], id);
-            try words.appendSlice(self.arena, source[0].words[slice.start..][0..slice.len]);
+            const field = try self.recordField(source[0], source[1], id);
+            if (boxed) try self.writeFlat(memory_block, try self.fieldOffset(ty, index, id), field, id) else try words.appendSlice(self.arena, field.words);
         }
+        if (boxed) return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
         return .{ .ty = ty, .words = words.items };
     }
 
@@ -1264,17 +1415,42 @@ pub const Fn = struct {
             for (0..position) |before| offset += try self.byteWidth(self.g.types.recordField(record, before).ty, id);
             ty = self.g.types.recordField(record, position).ty;
         }
-        const old = try self.loadAt(address, offset, ty, id);
+        const old = if (offset == 0) try self.loadElement(address, 0, ty, id) else try self.loadAt(address, offset, ty, id);
+        if (offset != 0 and try self.isBoxed(ty, id)) return self.g.fail(self.m, id, "update of a boxed field inside an element", .{});
         try self.bindings.put(self.a(), info.self_binding, old);
         const replacement = try self.stmt(info.value);
         if (replacement.ty == types.never) return replacement;
-        try self.storeAt(address, offset, replacement);
+        try self.writeFlat(address, offset, replacement, id);
         return container;
     }
     fn byteWidth(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
-        var bytes: u32 = 0;
-        for (try self.layout(ty, id)) |kind| bytes += wordBytes(kind);
-        return bytes;
+        return self.flatBytes(ty, id);
+    }
+    /// A boxed record (or one-constructor wrapper of one) with field
+    /// `name` replaced: a fresh copy of the block, then the field written.
+    fn updateBoxed(self: *Fn, id: core.Id, value: Val, name: u32, at: usize) Error!Val {
+        var record_ty = value.ty;
+        if (self.tagOf(value.ty) == .nominal) {
+            const cases = self.g.types.variants(value.ty) catch |err| switch (err) {
+                error.Unsupported => return self.g.typeFailure(self.m, id),
+                else => return err,
+            };
+            if (cases.payloads.len != 1) return self.g.fail(self.m, id, "update of a multi-constructor value", .{});
+            record_ty = cases.payloads[0];
+        }
+        if (self.tagOf(record_ty) != .record) return self.g.fail(self.m, id, "update of a boxed {s}", .{@tagName(self.tagOf(record_ty))});
+        const position = self.g.types.findField(record_ty, name) orelse return self.g.fail(self.m, id, "updated field missing", .{});
+        // A one-constructor wrapper's payload starts at its block's start.
+        const offset = try self.fieldOffset(record_ty, position, id);
+        const field_ty = self.g.types.recordField(record_ty, position).ty;
+        const old = try self.readFlat(value.words[0], offset, field_ty, id);
+        const replacement = try self.updateAt(id, old, at + 1);
+        if (replacement.ty == types.never) return replacement;
+        if (replacement.ty != field_ty) return self.g.fail(self.m, id, "an update that changes a boxed field's type", .{});
+        const memory_block = try self.newBlock(value.ty, id);
+        try self.memoryCopy(memory_block, 0, value.words[0], try self.flatBytes(value.ty, id));
+        try self.writeFlat(memory_block, offset, replacement, id);
+        return .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
     }
     fn updateAt(self: *Fn, id: core.Id, value: Val, at: usize) Error!Val {
         const info = self.m.updateInfo(id);
@@ -1289,6 +1465,7 @@ pub const Fn = struct {
         const projection = self.m.projection(if (selectors.len != 0) selectors[at].projection else path[at]);
         const spelling = self.m.fieldSpelling(projection.field) orelse return self.g.fail(self.m, id, "updated field without a spelling", .{});
         const name = try self.g.types.fieldName(spelling);
+        if (try self.isBoxed(value.ty, id)) return self.updateBoxed(id, value, name, at);
         var record = value;
         var wrapped: ?u32 = null;
         if (self.g.types.node(value.ty).tag == .nominal) {
@@ -1530,6 +1707,9 @@ pub const Fn = struct {
     }
 
     fn call(self: *Fn, id: core.Id) Error!Val {
+        const previous_call = self.current_call;
+        self.current_call = id;
+        defer self.current_call = previous_call;
         const info = self.m.call(id);
         const target = self.g.resolve(self.m, info.target);
         const values = try self.arena.alloc(Val, info.arguments.len);
@@ -1578,8 +1758,70 @@ pub const Fn = struct {
             if (at == index) parameter = n.a else if (value.ty != types.never) try self.g.types.match(tm, n.a, value.ty, &env);
             arrow = n.b;
         }
-        if (tm.body(target.binding)) |body| try self.g.solveObligationsPublic(tm, body.scheme.obligations, &env);
-        return try self.g.types.lowerHoles(tm, parameter orelse return null, &env);
+        const body = tm.body(target.binding);
+        if (body) |b| try self.g.solveObligationsPublic(tm, b.scheme.obligations, &env);
+        const formal = parameter orelse return null;
+        const expected = try self.g.types.lowerHoles(tm, formal, &env);
+        if (self.tagOf(expected) != .never) return expected;
+        // The parameter is a bare variable: its field constraints and the
+        // argument's own nominal type give the argument's type arguments.
+        const b = body orelse return null;
+        return self.fromFieldConstraints(tm, b.scheme.obligations, formal, &env, values[index], index, target);
+    }
+    fn fromFieldConstraints(self: *Fn, tm: *const core.Module, goals_span: T.List, formal: T.Id, env: *types.Env, _: Val, index: usize, target: core.BindingRef) Error!?Ty {
+        _ = target;
+        const info = self.m.call(self.current_call);
+        const argument_type = self.m.typeOf(info.arguments[index]);
+        const shape = self.m.types.node(argument_type);
+        if (shape.tag != .nominal) return null;
+        const identity: T.NominalIdentity = .{ .unit = shape.a, .decl = shape.b };
+        const owner = self.g.types.module(identity.unit) orelse return null;
+        const ordinal = self.g.types.nominalOrdinal(owner, identity) catch return null;
+        const nominal = owner.nominal(ordinal);
+        const constructors = owner.nominalConstructors(ordinal);
+        if (constructors.len != 1) return null;
+        const payload = owner.types.node(owner.constructor(constructors[0]).payload);
+        if (payload.tag != .record) return null;
+        var params_env: types.Env = .empty;
+        defer params_env.deinit(self.a());
+        const goals = tm.obligations[goals_span.start..][0..goals_span.len];
+        for (goals) |goal| {
+            if (goal.kind != .field or goal.ty != formal or goal.result == 0) continue;
+            const spelling = tm.fieldSpelling(goal.name) orelse continue;
+            const wanted = try self.g.types.lowerHoles(tm, goal.result, env);
+            for (0..payload.b) |field_index| {
+                const field = owner.types.recordField(payload, field_index);
+                const name = owner.fieldSpelling(field.name) orelse continue;
+                if (std.mem.eql(u8, name, spelling)) try self.g.types.match(owner, field.ty, wanted, &params_env);
+            }
+        }
+        const parameters = owner.types.list(nominal.parameters);
+        const words = try self.arena.alloc(u32, parameters.len + 2);
+        words[0] = identity.unit;
+        words[1] = identity.decl;
+        for (parameters, words[2..]) |parameter, *slot| slot.* = params_env.get(.{ .unit = owner.unit, .ty = parameter }) orelse types.never;
+        return try self.g.types.intern(.nominal, words);
+    }
+    /// Whether call node `id` applies a named function to fewer arguments
+    /// than its parameters.
+    fn partialCall(self: *Fn, id: core.Id) bool {
+        const info = self.m.call(id);
+        const target = self.g.resolve(self.m, info.target);
+        const tm = self.g.unitModule(target.unit);
+        const body = tm.body(target.binding) orelse return false;
+        return body.is_function and info.arguments.len < tm.bodyParameters(body).len;
+    }
+    /// Whether an apply chain applies a named function to fewer arguments
+    /// than its parameters (with pure arguments).
+    fn partialApply(self: *Fn, id: core.Id) bool {
+        var head = id;
+        var count: usize = 0;
+        while (self.m.node(head).tag == .apply) : (count += 1) head = self.m.node(head).a;
+        if (self.m.node(head).tag != .reference) return false;
+        const target = self.g.resolve(self.m, self.m.reference(head));
+        const tm = self.g.unitModule(target.unit);
+        const body = tm.body(target.binding) orelse return false;
+        return body.is_function and count < tm.bodyParameters(body).len;
     }
     fn pureFunctionValue(self: *Fn, id: core.Id) bool {
         return switch (self.m.node(id).tag) {
@@ -1606,6 +1848,10 @@ pub const Fn = struct {
             var value = (try self.forward(tm, body, direct, callee, after, id)) orelse blk: {
                 const instance = try self.g.named(target, callee, self.m, id);
                 if (self.g.instance(instance).inferring) return self.g.fail(self.m, id, "recursion through a function whose result type its body determines", .{});
+                for (direct, self.g.instance(instance).parameters) |argument, parameter| {
+                    if ((try self.layout(parameter, id)).len != argument.words.len)
+                        return self.g.fail(self.m, id, "argument of {d} words for a {s} parameter of {d} words", .{ argument.words.len, @tagName(self.tagOf(parameter)), (try self.layout(parameter, id)).len });
+                }
                 for (direct) |argument| try self.push(argument);
                 const function = self.g.instance(instance);
                 try self.opIndex(.call, function.function);
@@ -1811,15 +2057,23 @@ pub const Fn = struct {
 
     fn product(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
-        const ty = try self.typeOf(id);
         const children = self.m.children(id);
         const values = try self.arena.alloc(Val, children.len);
-        for (children, values) |child, *slot| slot.* = try self.expr(child);
+        for (children, values) |child, *slot| slot.* = try self.fieldValue(child);
+        // The literal's type, or the one its fields' values give it.
+        const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => try self.productType(id, values),
+            else => return err,
+        };
         const shape = self.g.types.node(ty);
         var words: std.ArrayList(u32) = .empty;
+        const boxed = try self.isBoxed(ty, id);
+        const memory_block: u32 = if (boxed) try self.newBlock(ty, id) else 0;
         switch (shape.tag) {
             .unit => return unitVal(),
-            .tuple => for (values) |value| try words.appendSlice(self.arena, value.words),
+            .tuple => for (values, 0..) |value, index| {
+                if (boxed) try self.writeFlat(memory_block, try self.itemOffset(ty, index, id), value, id) else try words.appendSlice(self.arena, value.words);
+            },
             .record => {
                 const ordered = try self.arena.alloc(?Val, shape.b);
                 @memset(ordered, null);
@@ -1836,19 +2090,75 @@ pub const Fn = struct {
                     const position = self.g.types.findField(ty, try self.g.types.fieldName(spelling)) orelse return self.g.fail(self.m, id, "record field missing from its type", .{});
                     ordered[position] = value;
                 }
-                for (ordered) |value| try words.appendSlice(self.arena, (value orelse return self.g.fail(self.m, id, "record literal misses a field", .{})).words);
+                for (ordered, 0..) |slot, index| {
+                    const value = slot orelse return self.g.fail(self.m, id, "record literal misses a field", .{});
+                    if (boxed) try self.writeFlat(memory_block, try self.fieldOffset(ty, index, id), value, id) else try words.appendSlice(self.arena, value.words);
+                }
             },
             else => return self.g.fail(self.m, id, "product of type {s}", .{@tagName(shape.tag)}),
         }
+        if (boxed) return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
         return .{ .ty = ty, .words = words.items };
     }
 
+    /// A literal's field value: a reference here may be a trap closure.
+    fn fieldValue(self: *Fn, id: core.Id) Error!Val {
+        const previous = self.field_value;
+        self.field_value = self.m.node(id).tag == .reference;
+        defer self.field_value = previous;
+        return self.expr(id);
+    }
+    fn productType(self: *Fn, id: core.Id, values: []const Val) Error!Ty {
+        const n = self.m.node(id);
+        const source = self.m.types.node(self.m.typeOf(id));
+        if (source.tag == .product) {
+            const items = try self.arena.alloc(Ty, values.len);
+            for (values, items) |value, *item| item.* = value.ty;
+            return self.g.types.tuple(items);
+        }
+        if (source.tag != .record or n.tag != .record) return self.g.typeFailure(self.m, id);
+        const fields = try self.arena.alloc(types.Field, values.len);
+        for (values, self.m.recordDestinations(id), fields) |value, destination, *field| {
+            const spelling = self.m.fieldSpelling(self.m.types.recordField(source, destination).name) orelse return self.g.typeFailure(self.m, id);
+            field.* = .{ .name = try self.g.types.fieldName(spelling), .ty = value.ty };
+        }
+        const ty = try self.g.types.record(fields);
+        try self.refine(self.m.typeOf(id), ty);
+        return ty;
+    }
     fn construct(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
-        const ty = try self.typeOf(id);
         const constructor = self.m.constructor(n.a);
         const payload = if (n.b != 0) try self.expr(n.b) else unitVal();
+        // The node's type, or the one the payload's value gives the nominal.
+        const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
+            error.Unsupported => try self.constructedType(constructor, payload, id),
+            else => return err,
+        };
         return self.wrapVariant(ty, constructor.tag, payload, id);
+    }
+    fn constructedType(self: *Fn, constructor: core.Constructor, payload: Val, id: core.Id) Error!Ty {
+        const shape = self.m.types.node(self.m.typeOf(id));
+        if (shape.tag != .nominal) return self.g.typeFailure(self.m, id);
+        const identity: T.NominalIdentity = .{ .unit = shape.a, .decl = shape.b };
+        const owner = self.g.types.module(identity.unit) orelse return self.g.typeFailure(self.m, id);
+        const ordinal = self.g.types.nominalOrdinal(owner, identity) catch return self.g.typeFailure(self.m, id);
+        const nominal = owner.nominal(ordinal);
+        // The declaring unit's constructor of the same tag gives the payload in its parameters.
+        const declared = for (owner.nominalConstructors(ordinal)) |candidate| {
+            if (owner.constructor(candidate).tag == constructor.tag) break owner.constructor(candidate);
+        } else return self.g.typeFailure(self.m, id);
+        _ = nominal;
+        // The payload binds the constructor's scheme variables; its result
+        // type in them is the nominal type.
+        var env: types.Env = .empty;
+        defer env.deinit(self.a());
+        if (declared.payload != 0) try self.g.types.match(owner, declared.payload, payload.ty, &env);
+        const signature = owner.types.node(declared.scheme.root);
+        const result = if (signature.tag == .function) signature.b else declared.scheme.root;
+        const ty = try self.g.types.lowerHoles(owner, result, &env);
+        try self.refine(self.m.typeOf(id), ty);
+        return ty;
     }
     fn variantPosition(self: *Fn, cases: types.Variants, tag: u32, id: core.Id) Error!usize {
         for (cases.tags, 0..) |candidate, position| if (candidate == tag) return position;
@@ -1860,9 +2170,21 @@ pub const Fn = struct {
             else => return err,
         };
         if (payload.ty == types.never) return neverVal();
+        if (try self.isBoxed(ty, id)) {
+            const memory_block = try self.newBlock(ty, id);
+            if (cases.payloads.len > 1) {
+                try self.opIndex(.local_get, memory_block);
+                try self.i32Const(tag);
+                try self.op(.i32_store);
+                try self.code.uleb(self.a(), 2);
+                try self.code.uleb(self.a(), 0);
+            }
+            try self.writeFlat(memory_block, if (cases.payloads.len > 1) 4 else 0, payload, id);
+            return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
+        }
         const position_ = try self.variantPosition(cases, tag, id);
         if ((try self.layout(cases.payloads[position_], id)).len != payload.words.len)
-            return self.g.fail(self.m, id, "constructor payload of type {s} does not match its declared {s}", .{ @tagName(self.tagOf(payload.ty)), @tagName(self.tagOf(cases.payloads[position_])) });
+            return self.g.fail(self.m, id, "constructor payload of type {s} ({d} words) does not match its declared {s} ({d} words)", .{ @tagName(self.tagOf(payload.ty)), payload.words.len, @tagName(self.tagOf(cases.payloads[position_])), (try self.layout(cases.payloads[position_], id)).len });
         if (cases.payloads.len == 1) return .{ .ty = ty, .words = payload.words };
         const result = try self.fresh(ty, id);
         try self.i32Const(tag);
@@ -1885,6 +2207,7 @@ pub const Fn = struct {
         };
         const position = try self.variantPosition(cases, tag, id);
         const payload_ty = cases.payloads[position];
+        if (try self.isBoxed(value.ty, id)) return self.readFlat(value.words[0], if (cases.payloads.len > 1) 4 else 0, payload_ty, id);
         if (cases.payloads.len == 1) return .{ .ty = payload_ty, .words = value.words };
         const slots = try self.layout(value.ty, id);
         const words = try self.layout(payload_ty, id);
@@ -1910,12 +2233,8 @@ pub const Fn = struct {
         // Constructor fields are named by the projecting unit's catalog.
         var name_symbol = projection.field;
         if (variants.len == 1 and projection.nominal.decl == 0 and self.g.types.node(value.ty).tag == .tuple) {
-            const items = self.g.types.tupleItems(value.ty);
-            if (variants[0].field >= items.len) return self.g.fail(self.m, id, "tuple projection out of range", .{});
-            var start: usize = 0;
-            for (items[0..variants[0].field]) |item| start += (try self.layout(item, id)).len;
-            const item = items[variants[0].field];
-            return .{ .ty = item, .words = value.words[start..][0..(try self.layout(item, id)).len] };
+            if (variants[0].field >= self.g.types.tupleItems(value.ty).len) return self.g.fail(self.m, id, "tuple projection out of range", .{});
+            return self.tupleItem(value, variants[0].field, id);
         }
         const nominal_field = variants.len != 0 and projection.nominal.decl != 0;
         if (nominal_field) {
@@ -1942,10 +2261,7 @@ pub const Fn = struct {
                 record = try self.unwrapVariant(value, variants[0].tag, id);
             }
         }
-        if (self.g.types.findField(record.ty, name)) |position| {
-            const slice = try self.fieldSlice(record.ty, position, id);
-            return .{ .ty = self.g.types.recordField(record.ty, position).ty, .words = record.words[slice.start..][0..slice.len] };
-        }
+        if (self.g.types.findField(record.ty, name)) |position| return self.recordField(record, position, id);
         if (nominal_field) return self.g.fail(self.m, id, "projected field missing", .{});
         // Not a data field: a receiver member, called with the value.
         if (self.tagOf(value.ty) == .record) return self.g.fail(self.m, id, "projected field missing", .{});
@@ -2052,14 +2368,7 @@ pub const Fn = struct {
                 const children = self.m.patternChildren(pattern_id);
                 const shape = self.g.types.node(value.ty);
                 switch (shape.tag) {
-                    .tuple => {
-                        var start: usize = 0;
-                        for (children, self.g.types.tupleItems(value.ty)) |child, item| {
-                            const width = (try self.layout(item, id)).len;
-                            try self.test_(child, .{ .ty = item, .words = value.words[start..][0..width] }, fail, id);
-                            start += width;
-                        }
-                    },
+                    .tuple => for (children, 0..) |child, index| try self.test_(child, try self.tupleItem(value, index, id), fail, id),
                     .unit => {},
                     // Children follow the pattern's Core record type order.
                     .record => try self.recordPattern(children, self.m.types.node(pattern.ty), value, fail, id),
@@ -2074,6 +2383,12 @@ pub const Fn = struct {
                 };
                 if (cases.payloads.len > 1) {
                     try self.opIndex(.local_get, value.words[0]);
+                    // A boxed value's tag is the first word of its block.
+                    if (try self.isBoxed(value.ty, id)) {
+                        try self.op(.i32_load);
+                        try self.code.uleb(self.a(), 2);
+                        try self.code.uleb(self.a(), 0);
+                    }
                     try self.i32Const(constructor.tag);
                     try self.op(.i32_ne);
                     try self.failIf(fail, id);
@@ -2096,8 +2411,7 @@ pub const Fn = struct {
             const field = self.m.types.recordField(storage, index);
             const spelling = self.m.fieldSpelling(field.name) orelse return self.g.fail(self.m, id, "record pattern field without a spelling", .{});
             const position = self.g.types.findField(value.ty, try self.g.types.fieldName(spelling)) orelse return self.g.fail(self.m, id, "record pattern field missing", .{});
-            const slice = try self.fieldSlice(value.ty, position, id);
-            try self.test_(child, .{ .ty = self.g.types.recordField(value.ty, position).ty, .words = value.words[slice.start..][0..slice.len] }, fail, id);
+            try self.test_(child, try self.recordField(value, position, id), fail, id);
         }
     }
     fn failIf(self: *Fn, fail: ?u32, id: core.Id) Error!void {
@@ -2122,6 +2436,21 @@ pub const Fn = struct {
             };
         }
         for (staged, targets) |value, target| try self.copy(value, target, id);
+    }
+    /// assign, but a boxed carry's new value is copied into its slot.
+    fn assignCarries(self: *Fn, values: []const Val, targets: []const Val, slots: []const bool, id: core.Id) Error!void {
+        var plain_values: std.ArrayList(Val) = .empty;
+        var plain_targets: std.ArrayList(Val) = .empty;
+        for (values, targets, slots) |value, target, slot| {
+            if (!slot) {
+                try plain_values.append(self.arena, value);
+                try plain_targets.append(self.arena, target);
+                continue;
+            }
+            if (value.ty == types.never or value.words[0] == target.words[0]) continue;
+            try self.memoryCopy(target.words[0], 0, value.words[0], try self.flatBytes(value.ty, id));
+        }
+        try self.assign(plain_values.items, plain_targets.items, id);
     }
     fn holdsClosure(self: *Fn, ty: Ty) Error!bool {
         const n = self.g.types.node(ty);
@@ -2153,11 +2482,15 @@ pub const Fn = struct {
         for (carries, incoming) |carry, *slot| slot.* = self.bindings.get(carry.incoming) orelse return self.g.fail(self.m, id, "loop carry without an incoming value", .{});
         const iteration = try self.arena.alloc(Val, carries.len);
         const outgoing = try self.arena.alloc(Val, carries.len);
-        for (incoming, iteration, outgoing) |value, *current, *after| {
-            current.* = try self.fresh(value.ty, id);
+        // A boxed carry lives in a slot reserved before the loop, so each
+        // iteration can release what it allocated.
+        const slots = try self.arena.alloc(bool, carries.len);
+        for (incoming, iteration, outgoing, slots) |value, *current, *after, *slot| {
+            slot.* = try self.isBoxed(value.ty, id);
+            current.* = if (slot.*) .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{try self.newBlock(value.ty, id)}) } else try self.fresh(value.ty, id);
             after.* = try self.fresh(value.ty, id);
         }
-        try self.assign(incoming, iteration, id);
+        try self.assignCarries(incoming, iteration, slots, id);
         for (carries, iteration) |carry, value| try self.bindings.put(self.a(), carry.iteration, value);
         var index: ?u32 = null;
         var end: ?Val = null;
@@ -2207,13 +2540,13 @@ pub const Fn = struct {
         const allocations = self.allocations;
         const unused = try self.arena.create(?Val);
         unused.* = null;
-        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .result = unused, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null });
+        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .result = unused, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null, .slots = slots });
         const body = try self.stmt(info.body);
         const label = self.labels.pop().?;
         if (body.ty != types.never) {
             const backedge = try self.arena.alloc(Val, carries.len);
             for (carries, backedge) |carry, *slot| slot.* = self.bindings.get(carry.backedge) orelse return self.g.fail(self.m, id, "loop carry without a backedge value", .{});
-            try self.assign(backedge, iteration, id);
+            try self.assignCarries(backedge, iteration, slots, id);
             if (label.release) |pair| if (self.allocations != allocations) try self.releaseTo(pair[0], pair[1]);
             try self.br(.br, top);
         }
@@ -2242,7 +2575,7 @@ pub const Fn = struct {
             if (label.target != n.a or label.kind != .loop) continue;
             if (values.len != label.iteration.len) return self.g.fail(self.m, id, "break carries the wrong number of values", .{});
             if (n.op == .continue_) {
-                try self.assign(values, label.iteration, id);
+                try self.assignCarries(values, label.iteration, label.slots, id);
                 if (label.release) |pair| {
                     try self.releaseTo(pair[0], pair[1]);
                     self.labels.items[at].used = true;
@@ -2369,7 +2702,7 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
             try f.bindings.put(g.allocator, info.parameter.binding, inputs[0]);
             root = info.body;
         },
-        .partial, .primitive, .constructor, .host, .pool => {},
+        .partial, .primitive, .constructor, .host, .pool, .trap => {},
     }
     const slot = try f.arena.create(?Val);
     slot.* = if (instance.inferring) null else try f.fresh(instance.result, root);
@@ -2380,6 +2713,10 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
         .partial, .primitive, .constructor => try f.adapterBody(instance, captures, inputs[0]),
         .host => try f.hostBody(instance, captures, inputs[0]),
         .pool => try f.poolBody(instance),
+        .trap => blk: {
+            try f.op(.unreachable_);
+            break :blk Val{ .ty = types.never };
+        },
     };
     f.deliver(value, slot, root) catch |err| switch (err) {
         error.Unsupported => try g.recordFailure(m, root),

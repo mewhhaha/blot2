@@ -1,0 +1,8 @@
+type Rows r is data = $Rows { items: r, count: U32 }
+func encode (rows: Rows r) : Array F32 => return #[U32.to_f32 rows.count]
+const codec = { key: 7, encode }
+func restore codec_ -> (n: U32) => return codec_.key + n
+entry func run (n: U32): U32 => return restore codec n
+entry func written (n: U32): F32 => return do:
+  let lanes = codec.encode ($Rows { items: n, count: 3 })
+  break lanes[0]

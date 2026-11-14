@@ -100,7 +100,8 @@ try {
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,
     codegenTier: values.tier,
-    backend: values.backend,
+    // Older compilers predate the field; scoped is their only backend.
+    ...(values.backend === "direct" ? { backend: "direct" as const } : {}),
     codegenWorkers: workers,
     frontendWorkers,
   });

@@ -1,0 +1,32 @@
+type Wide is data = $Wide { a: U32, b: U32, c: U32, d: U32, e: U32, f: U32, g: U32, h: U32, i: U32, j: U32, k: U32, l: U32, m: U32, n: U32, o: U32, p: U32, q: F32, r: U32 }
+type Outer is data = $Outer { left: Wide, right: Wide, tag: U32 }
+type Choice is data = $Big Wide | $Small U32
+func wide (base: U32) : Wide => return $Wide { a: base, b: base + 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7, i: 8, j: 9, k: 10, l: 11, m: 12, n: 13, o: 14, p: 15, q: 1.5, r: base * 2 }
+func sum (w: Wide) : U32 => return w.a + w.b + w.r + F32.to_u32 w.q
+entry func fields (n: U32): U32 => return do:
+  let w = wide n
+  let w2 = w
+  w2.b := 100
+  break sum w + sum w2
+entry func nested (n: U32): U32 => return do:
+  let o = $Outer { left: wide n, right: wide (n + 10), tag: 3 }
+  o.left.a := 50
+  break o.left.a + o.right.a + o.tag + o.left.r
+entry func stored (n: U32): U32 => return do:
+  let items: GrowArray Wide = #[wide 1]
+  @storage.push items (wide n)
+  items[0].a := 77
+  let first = items[0]
+  let second = items[1]
+  break first.a + second.r + items.length
+entry func carried (n: U32): U32 => return do:
+  let w = wide 0
+  for i in 0..n:
+    w.a := self + i
+    w.r := self + 1
+  break w.a * 10 + w.r
+entry func chosen (n: U32): U32 => return do:
+  let c = if n > 3 then $Big (wide n) else $Small n
+  break case c of
+    $Big w => w.r
+    $Small s => s + 1000

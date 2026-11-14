@@ -167,6 +167,8 @@ pub const Module = struct {
     data_offset: u32 = 0,
     data: std.ArrayList(u8) = .empty,
     customs: std.ArrayList(struct { name: []const u8, payload: []const u8 }) = .empty,
+    /// Function names for the standard `name` section, by function index.
+    names: std.AutoHashMapUnmanaged(u32, []const u8) = .empty,
 
     pub fn init(allocator: A) Module {
         return .{ .allocator = allocator, .arena = std.heap.ArenaAllocator.init(allocator) };
@@ -182,6 +184,7 @@ pub const Module = struct {
         self.table.deinit(a);
         self.data.deinit(a);
         self.customs.deinit(a);
+        self.names.deinit(a);
         self.arena.deinit();
     }
     pub fn signature(self: *Module, params: []const ValType, results: []const ValType) A.Error!u32 {
@@ -339,6 +342,25 @@ pub const Module = struct {
         for (self.customs.items) |item| {
             try payload.name(a, item.name);
             try payload.raw(a, item.payload);
+            try section(a, &out, 0, &payload);
+        }
+        if (self.names.count() != 0) {
+            var map: Bytes = .{};
+            defer map.deinit(a);
+            const total: u32 = @intCast(self.imports.items.len + self.functions.items.len);
+            var count: u32 = 0;
+            for (0..total) |index| if (self.names.contains(@intCast(index))) {
+                count += 1;
+            };
+            try map.uleb(a, count);
+            for (0..total) |index| if (self.names.get(@intCast(index))) |text| {
+                try map.uleb(a, index);
+                try map.name(a, text);
+            };
+            try payload.name(a, "name");
+            try payload.byte(a, 1);
+            try payload.uleb(a, map.list.items.len);
+            try payload.raw(a, map.list.items);
             try section(a, &out, 0, &payload);
         }
         return out.list.toOwnedSlice(a);

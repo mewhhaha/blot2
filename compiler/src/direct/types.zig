@@ -359,7 +359,9 @@ pub const Types = struct {
             var env: Env = .empty;
             defer env.deinit(self.allocator);
             try self.match(owner, result, ty, &env);
-            payload.* = if (constructor.payload == 0) unit else try self.lower(owner, constructor.payload, &env);
+            // A hole argument (a type no use determines) leaves holes.
+            const holed = std.mem.findScalar(Ty, self.nominalArguments(ty), never) != null;
+            payload.* = if (constructor.payload == 0) unit else if (holed) try self.lowerHoles(owner, constructor.payload, &env) else try self.lower(owner, constructor.payload, &env);
         }
         const value: Variants = .{ .tags = tags, .payloads = payloads };
         try self.variant_cache.put(self.allocator, ty, value);
@@ -376,8 +378,29 @@ pub const Types = struct {
         return error.Unsupported;
     }
 
-    /// The flattened machine words of a value of type `ty`.
+    /// Values wider than this many words are passed and held as a pointer
+    /// to an immutable copy (decision 5: one fixed layout per type).
+    pub const box_words = 16;
+    /// Whether values of `ty` are boxed: a pointer to their flat words.
+    pub fn boxed(self: *Types, ty: Ty) Error!bool {
+        const tag = self.node(ty).tag;
+        if (tag != .tuple and tag != .record and tag != .nominal) return false;
+        return (try self.flat(ty)).len > box_words;
+    }
+    /// A value's register words: its flat words, or one pointer if boxed.
     pub fn layout(self: *Types, ty: Ty) Error![]const W.ValType {
+        if (try self.boxed(ty)) return &.{.i32};
+        return self.flat(ty);
+    }
+    /// Bytes of a value's flat form in memory.
+    pub fn flatBytes(self: *Types, ty: Ty) Error!u32 {
+        var bytes: u32 = 0;
+        for (try self.flat(ty)) |kind| bytes += if (kind == .v128) 16 else 4;
+        return bytes;
+    }
+    /// The flattened machine words of a value of type `ty`: nested values
+    /// inline, as stored in memory.
+    pub fn flat(self: *Types, ty: Ty) Error![]const W.ValType {
         if (self.layouts.items[ty]) |hit| return hit;
         if (self.in_layout.contains(ty)) {
             self.failure_reason = "recursive data type needs an indirection";
@@ -392,20 +415,20 @@ pub const Types = struct {
             .unit, .never => {},
             .boolean, .u32 => try words.append(self.allocator, .i32),
             .f32 => try words.append(self.allocator, .f32),
-            .tuple => for (self.list(n.a, n.b)) |item| try words.appendSlice(self.allocator, try self.layout(item)),
-            .record => for (0..n.b) |index| try words.appendSlice(self.allocator, try self.layout(self.recordField(ty, index).ty)),
+            .tuple => for (self.list(n.a, n.b)) |item| try words.appendSlice(self.allocator, try self.flat(item)),
+            .record => for (0..n.b) |index| try words.appendSlice(self.allocator, try self.flat(self.recordField(ty, index).ty)),
             .function => try words.appendSlice(self.allocator, &.{ .i32, .i32 }),
             .nominal => {
                 const cases = try self.variants(ty);
                 if (cases.payloads.len == 1) {
-                    try words.appendSlice(self.allocator, try self.layout(cases.payloads[0]));
+                    try words.appendSlice(self.allocator, try self.flat(cases.payloads[0]));
                 } else if (cases.payloads.len > 1) {
                     try words.append(self.allocator, .i32);
                     const payload_layouts = try self.allocator.alloc([]const W.ValType, cases.payloads.len);
                     defer self.allocator.free(payload_layouts);
                     var width: usize = 0;
                     for (cases.payloads, payload_layouts) |payload, *slot| {
-                        slot.* = try self.layout(payload);
+                        slot.* = try self.flat(payload);
                         width = @max(width, slot.len);
                     }
                     for (0..width) |position| {

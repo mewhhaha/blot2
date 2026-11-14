@@ -27,7 +27,8 @@ pub const Val = struct {
 /// constructor: a constructor (catalog index `id`) as a function value.
 /// host: a Foreign callback adapter calling import `id`; pool: the
 /// lazily initialized persistent owner of a global array constant.
-pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor, host, pool };
+/// trap: a closure of a type no use determines, which traps if called.
+pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor, host, pool, trap };
 pub const InstanceKey = struct { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 };
 pub const Instance = struct {
     key: InstanceKey,
@@ -58,6 +59,8 @@ pub const Generator = struct {
     queue: std.ArrayList(u32) = .empty,
     failure: ?Failure = null,
     solve_depth: u32 = 0,
+    /// Closures built for function values no use determines (they trap).
+    trap_closures: u32 = 0,
     failures: std.ArrayList(struct { failure: Failure, count: u32 = 1, samples: [48]core.Span = undefined, sample_units: [48]u32 = undefined }) = .empty,
     /// The storage runtime, emitted on first use.
     rt: ?runtime.Runtime = null,
@@ -228,6 +231,11 @@ pub const Generator = struct {
     /// Whether a value of `ty` can refer to scope-allocated memory.
     pub fn holdsMemory(self: *Generator, ty: Ty) Error!bool {
         if (self.holds_memory.get(ty)) |hit| return hit;
+        // A boxed value is a pointer into scope memory.
+        if (self.types.boxed(ty) catch false) {
+            try self.holds_memory.put(self.allocator, ty, true);
+            return true;
+        }
         const n = self.types.node(ty);
         const result = switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => false,
@@ -289,6 +297,7 @@ pub const Generator = struct {
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
         owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .inferring = true, .emitted = true };
+        try self.nameFunction(function, key);
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);
         try @import("function.zig").emitInstance(self, id);
@@ -313,12 +322,27 @@ pub const Generator = struct {
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
         owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = result, .closure = closure, .captures = captures, .slot = if (closure) try self.module.tableSlot(function) else 0 };
+        try self.nameFunction(function, key);
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);
         try self.queue.append(self.allocator, id);
         return id;
     }
 
+    /// Names the function after its source binding, for the name section.
+    pub fn nameFunction(self: *Generator, function: u32, key: InstanceKey) Error!void {
+        const m = self.types.module(key.unit) orelse return;
+        const base: []const u8 = switch (key.kind) {
+            .named, .partial, .pool => if (m.body(key.id)) |body| m.name(body.declaration_name) else "binding",
+            .lambda => "lambda",
+            .primitive => "primitive",
+            .constructor => "constructor",
+            .host => "host",
+            .trap => "trap",
+        };
+        const text = try self.module.arena.allocator().print("{s}.{s}#{d}", .{ @tagName(key.kind), base, function });
+        try self.module.names.put(self.allocator, function, text);
+    }
     /// The concrete type of `target` when applied to `arguments`: its
     /// parameter types fix its variables, obligations the dependent ones.
     pub fn calleeFromArguments(self: *Generator, target: core.BindingRef, arguments: []const Val, site: *const core.Module, site_id: core.Id) Error!Ty {
@@ -395,6 +419,7 @@ pub const Generator = struct {
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
         owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = types.never, .closure = true, .captures = captures, .slot = try self.module.tableSlot(function), .inferring = true, .emitted = true };
+        try self.nameFunction(function, key);
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);
         try @import("function.zig").emitInstance(self, id);

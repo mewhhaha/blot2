@@ -1,0 +1,6 @@
+type Policy [f, g] is data = $Policy { f, g, k: U32 }
+func double (x: U32) : U32 => return x * 2
+func generic_id v => return v
+const policy = $Policy { f: double, g: generic_id, k: 7 }
+func run_policy p -> (n: U32) => return p.f n + p.k
+entry func run (n: U32): U32 => return run_policy policy n

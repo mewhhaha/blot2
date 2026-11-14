@@ -33,6 +33,17 @@ const cases: Record<string, Call[]> = {
   "inferred_types.blot": [["run", 5, 7], ["loopuse", 4, 9]],
   "dispatch.blot": [["ids", 3, 1], ["ids", 4, 0], ["vec", 1, 79]],
   "iterators.blot": [["chained", 1, 31], ["taken", 2, 26]],
+  "open_codec.blot": [["run", 5, 12], ["written", 1, 3]],
+  "policy_record.blot": [["run", 5, 17]],
+  "boxed_records.blot": [
+    ["fields", 5, 138],
+    ["nested", 2, 69],
+    ["stored", 4, 87],
+    ["carried", 5, 105],
+    ["chosen", 7, 14],
+    ["chosen", 1, 1001],
+  ],
+  "view_calls.blot": [["run", 1, 25], ["run", 0, 3]],
   "closures.blot": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],
@@ -91,8 +102,12 @@ for (const backend of ["direct", "scoped"] as const) {
   });
 }
 
+// Generic function values left open by every use: the scoped backend
+// requires concrete representation evidence for these.
+const directOnly = new Set(["open_codec.blot", "policy_record.blot"]);
 for (const [fixture, calls] of Object.entries(cases)) {
   for (const backend of ["direct", "scoped"] as const) {
+    if (backend === "scoped" && directOnly.has(fixture)) continue;
     Deno.test(`${fixture} entries run on the ${backend} backend`, async () => {
       const guest = await build(fixture, backend);
       for (const [name, argument, expected] of calls) {
