@@ -3340,7 +3340,7 @@ const primitive_node_bit: u32 = 0x8000_0000;
 
 pub fn emitInstance(g: *Generator, id: u32) Error!void {
     const instance = g.instance(id);
-    const m = g.unitModule(instance.key.unit);
+    const m = g.types.module(instance.key.unit) orelse instance.site.?;
     var arena = std.heap.ArenaAllocator.init(g.allocator);
     defer arena.deinit();
     var env: types.Env = .empty;

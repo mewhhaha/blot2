@@ -52,6 +52,9 @@ pub const Instance = struct {
     /// Every hole (`never`) of the key is a part no use reaches, so the
     /// instance's unbound scheme variables are unused too.
     unused_holes: bool = false,
+    /// The module that created a compiler-owned instance (unit zero: effect
+    /// operations and state accessors), whose body names no source unit.
+    site: ?*const core.Module = null,
 };
 const runtime = @import("runtime.zig");
 
@@ -458,7 +461,7 @@ pub const Generator = struct {
         const function = try self.module.addFunction(signature);
         const id: u32 = @intCast(self.instances.items.len);
         const owned = try self.arena.allocator().create(Instance);
-        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = result, .closure = closure, .captures = captures, .slot = if (closure) try self.module.tableSlot(function) else 0 };
+        owned.* = .{ .key = key, .env = env, .function = function, .parameters = parameters, .result = result, .closure = closure, .captures = captures, .slot = if (closure) try self.module.tableSlot(function) else 0, .site = site };
         try self.nameFunction(function, key);
         try self.instances.append(self.allocator, owned);
         try self.instance_index.put(self.allocator, key, id);

@@ -15,11 +15,12 @@ pub const f32_: Ty = 3;
 pub const never: Ty = 4;
 
 pub const Tag = enum(u8) { unit, boolean, u32, f32, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link, provider, state_provider };
-/// tuple/record: a = extra start, b = count (records store name/type pairs in
-/// spelling order); nominal: a = extra start ([unit, decl, arguments...]), b =
+/// tuple/record: a = list start, b = count (records store name/type pairs in
+/// spelling order); nominal: a = list start ([unit, decl, arguments...]), b =
 /// argument count; function: a = parameter, b = result; containers: a = element.
 pub const Node = struct { tag: Tag, a: u32 = 0, b: u32 = 0 };
 pub const Field = struct { name: u32, ty: Ty };
+const chunk_words = 1 << 16;
 
 pub const VarKey = struct { unit: u32, ty: T.Id };
 /// Bindings of Core type variables (by unit and type node) to concrete types.
@@ -53,7 +54,11 @@ pub const Types = struct {
     arena: std.heap.ArenaAllocator,
     units: []const core.Module,
     nodes: std.ArrayList(Node) = .empty,
-    extra: std.ArrayList(u32) = .empty,
+    /// Interned type lists in fixed-size chunks that never move, so a slice
+    /// from `list` stays valid while more types are interned. A list never
+    /// spans two chunks; its start is chunk * chunk_words + offset.
+    chunks: std.ArrayList([]u32) = .empty,
+    chunk_used: u32 = chunk_words,
     keys: std.ArrayList(core.List) = .empty,
     encodings: std.ArrayList(u32) = .empty,
     index: std.HashMapUnmanaged(core.List, Ty, Words, 80) = .empty,
@@ -84,7 +89,7 @@ pub const Types = struct {
     pub fn deinit(self: *Types) void {
         const a = self.allocator;
         self.nodes.deinit(a);
-        self.extra.deinit(a);
+        self.chunks.deinit(a);
         self.keys.deinit(a);
         self.encodings.deinit(a);
         self.index.deinit(a);
@@ -102,7 +107,21 @@ pub const Types = struct {
         return self.nodes.items[ty];
     }
     pub fn list(self: *const Types, start: u32, len: u32) []const u32 {
-        return self.extra.items[start..][0..len];
+        if (len == 0) return &.{};
+        return self.chunks.items[start / chunk_words][start % chunk_words ..][0..len];
+    }
+    fn storeList(self: *Types, payload: []const u32) Error!u32 {
+        if (payload.len == 0) return 0;
+        if (payload.len > chunk_words) return error.Unsupported;
+        if (self.chunk_used + payload.len > chunk_words) {
+            try self.chunks.append(self.allocator, try self.arena.allocator().alloc(u32, chunk_words));
+            self.chunk_used = 0;
+        }
+        const chunk = self.chunks.items.len - 1;
+        @memcpy(self.chunks.items[chunk][self.chunk_used..][0..payload.len], payload);
+        const start: u32 = @intCast(chunk * chunk_words + self.chunk_used);
+        self.chunk_used += @intCast(payload.len);
+        return start;
     }
     pub fn tupleItems(self: *const Types, ty: Ty) []const Ty {
         const n = self.node(ty);
@@ -112,12 +131,14 @@ pub const Types = struct {
     pub fn recordField(self: *const Types, ty: Ty, index: usize) Field {
         const n = self.node(ty);
         std.debug.assert(n.tag == .record);
-        return .{ .name = self.extra.items[n.a + index * 2], .ty = self.extra.items[n.a + index * 2 + 1] };
+        const pair = self.list(n.a + @as(u32, @intCast(index * 2)), 2);
+        return .{ .name = pair[0], .ty = pair[1] };
     }
     pub fn nominalIdentity(self: *const Types, ty: Ty) T.NominalIdentity {
         const n = self.node(ty);
         std.debug.assert(n.tag == .nominal);
-        return .{ .unit = self.extra.items[n.a], .decl = self.extra.items[n.a + 1] };
+        const pair = self.list(n.a, 2);
+        return .{ .unit = pair[0], .decl = pair[1] };
     }
     pub fn nominalArguments(self: *const Types, ty: Ty) []const Ty {
         const n = self.node(ty);
@@ -140,7 +161,6 @@ pub const Types = struct {
         const span: core.List = .{ .start = @intCast(self.encodings.items.len), .len = @intCast(encoding.len) };
         try self.encodings.appendSlice(a, encoding);
         const id: Ty = @intCast(self.nodes.items.len);
-        const start: u32 = @intCast(self.extra.items.len);
         const arity: ?usize = switch (tag) {
             .function => 2,
             .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => 1,
@@ -150,6 +170,8 @@ pub const Types = struct {
         };
         if (arity) |count| if (payload.len != count) return error.Unsupported;
         if (tag == .nominal and payload.len < 2) return error.Unsupported;
+        const listed = tag == .tuple or tag == .record or tag == .nominal or tag == .state_provider;
+        const start: u32 = if (listed) try self.storeList(payload) else 0;
         const value: Node = switch (tag) {
             .unit, .boolean, .u32, .f32, .never => .{ .tag = tag },
             .tuple, .state_provider => .{ .tag = tag, .a = start, .b = @intCast(payload.len) },
@@ -158,7 +180,6 @@ pub const Types = struct {
             .function => if (payload.len == 2) .{ .tag = tag, .a = payload[0], .b = payload[1] } else unreachable,
             .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => if (payload.len == 1) .{ .tag = tag, .a = payload[0] } else unreachable,
         };
-        if (tag == .tuple or tag == .record or tag == .nominal or tag == .state_provider) try self.extra.appendSlice(a, payload);
         try self.nodes.append(a, value);
         try self.keys.append(a, span);
         try self.layouts.append(a, null);
