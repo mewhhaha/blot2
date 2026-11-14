@@ -1228,6 +1228,107 @@ pub const Store = struct {
     }
 };
 
+fn validSpan(len: usize, start: usize, count: usize) bool {
+    return start <= len and count <= len - start;
+}
+/// Structural evidence graph check. Every type edge names an earlier node, as
+/// hash-consed publication does; rows and operations stay in bounds. Nominal
+/// and operation identities may be builtin (unit `maxInt(u32)`); importers
+/// validate them against the receiving units, bound depth and work across the
+/// type/row spaces and reject unsupported identities.
+pub fn validEvidence(evidence: View) bool {
+    evidence.validateGoalTables() catch return false;
+    var has_quantifiers = false;
+    const primitives = [_]Tag{ .absent, .unit, .boolean, .u32, .f32, .never };
+    if (evidence.nodes.len < primitives.len) return false;
+    for (evidence.nodes[0..primitives.len], primitives) |node, tag| if (!std.meta.eql(node, Node{ .tag = tag })) return false;
+    const effects = evidence.effects;
+    if (effects.operations.len == 0 or effects.rows.len == 0 or effects.rows[0].len != 0 or effects.rows[0].formal != 0) return false;
+    for (effects.operations[1..]) |operation| {
+        if (!validSpan(effects.arguments.len, operation.arguments.start, operation.arguments.len)) return false;
+        for (effects.arguments[operation.arguments.start..][0..operation.arguments.len]) |argument| if (argument == 0 or argument >= evidence.nodes.len) return false;
+    }
+    for (effects.rows[1..]) |row| {
+        if (row.formal != 0) {
+            if (row.formal >= evidence.nodes.len) return false;
+            const formal = evidence.node(row.formal);
+            if (formal.tag != .bound or formal.b != 1) return false;
+        }
+        if (!validSpan(effects.labels.len, row.start, row.len)) return false;
+        for (effects.labels[row.start..][0..row.len]) |label| if (label == 0 or label >= effects.operations.len) return false;
+    }
+    const rows = effects.rows.len;
+    for (evidence.nodes[primitives.len..], primitives.len..) |node, id| {
+        const child = struct {
+            fn valid(value: u32, parent: usize) bool {
+                return value != 0 and value < parent;
+            }
+        }.valid;
+        switch (node.tag) {
+            .forall, .existential => {
+                if (!child(node.a, id) or node.b == 0 or node.b > 128 or !validSpan(evidence.extra.len, node.c, node.b)) return false;
+                for (evidence.children(@intCast(id)), 0..) |binder, ordinal| {
+                    if (!child(binder, id)) return false;
+                    const leaf = evidence.node(binder);
+                    if (leaf.tag != .bound or leaf.a != ordinal or leaf.b > 2 or leaf.c != 0) return false;
+                    if (node.tag == .existential and leaf.b != 0) return false;
+                }
+                has_quantifiers = true;
+            },
+            .bound => if (node.a >= 128 or node.b > 2 or node.c >= 128) return false,
+            .scoped => return false,
+            .absent, .unit, .boolean, .u32, .f32, .never, .erased_proof => return false,
+            .usage => {
+                if (!child(node.a, id) or node.b > @backingInt(types.UsageKind.cleanup)) return false;
+                const Usage = types.UsageKind;
+                const loan = node.b == @backingInt(Usage.borrow) or node.b == @backingInt(Usage.borrow_mut);
+                if (loan != (node.c != 0) or (loan and !child(node.c, id))) return false;
+            },
+            .array, .list, .cursor, .resolver => if (!child(node.a, id) or node.b != 0 or node.c != 0) return false,
+            .provider => if (!child(node.a, id) or node.b != 0 or node.c >= rows) return false,
+            .function => if (!child(node.a, id) or !child(node.b, id) or node.c >= rows) return false,
+            .state_provider => if (!child(node.a, id) or !child(node.b, id) or !child(node.c, id)) return false,
+            .type_constructor => if (node.a == 0 or node.b == 0 or node.c != 0) return false,
+            .product, .record => {
+                const width: usize = if (node.tag == .record) 2 else 1;
+                const count = std.math.mul(usize, node.b, width) catch return false;
+                if (node.c != 0 or !validSpan(evidence.extra.len, node.a, count)) return false;
+                for (evidence.extra[node.a..][0..count], 0..) |value, index| {
+                    if (node.tag == .record and index % 2 == 0) {
+                        if (value == 0) return false;
+                    } else if (!child(value, id)) return false;
+                }
+            },
+            .projection => {
+                const start = @as(usize, node.c) + 1;
+                if (node.a == 0 or node.b == 0 or node.c >= evidence.extra.len or !validSpan(evidence.extra.len, start, evidence.extra[node.c]) or evidence.extra.len - start - evidence.extra[node.c] < 3) return false;
+                for (evidence.children(@intCast(id))) |value| if (!child(value, id)) return false;
+                const descriptor = evidence.projection(@intCast(id));
+                if (descriptor.member == 0 or descriptor.scope >= 128 or descriptor.goal >= 4096) return false;
+            },
+            .nominal => {
+                const start = @as(usize, node.c) + 1;
+                if (node.a == 0 or node.c >= evidence.extra.len or !validSpan(evidence.extra.len, start, evidence.extra[node.c])) return false;
+                for (evidence.extra[start..][0..evidence.extra[node.c]]) |value| if (!child(value, id)) return false;
+            },
+        }
+    }
+    if (has_quantifiers) {
+        @import("package_evidence.zig").validate(evidence) catch return false;
+        return true;
+    }
+    for (evidence.nodes) |node| if (node.tag == .bound or node.tag == .projection) return false;
+    return true;
+}
+
+/// Graph validity owns ordinal slots inside forall bodies. Published value and
+/// substitution roots must additionally be closed in their consumer context.
+pub fn closedEvidence(evidence: View, root: Id) bool {
+    var remaining: usize = 65_536;
+    evidence.closed(root, 0, &remaining) catch return false;
+    return true;
+}
+
 fn providerEvidenceScenario(allocator: Allocator) !void {
     var source = try types.Store.init(allocator);
     defer source.deinit();
@@ -1561,9 +1662,9 @@ fn quantifierOwnershipScenario(allocator: Allocator) !void {
     const loan = semantic.node(fields[1]);
     try std.testing.expectEqual(@as(u32, 1), semantic.node(loan.c).c);
     try std.testing.expectEqual(@as(u32, 2), semantic.node(loan.c).b);
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(semantic.view()));
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(semantic.view(), root));
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(semantic.view(), semantic.node(owner.a).b));
+    try std.testing.expect(validEvidence(semantic.view()));
+    try std.testing.expect(closedEvidence(semantic.view(), root));
+    try std.testing.expect(!closedEvidence(semantic.view(), semantic.node(owner.a).b));
     var snapshot = try semantic.copyOwned(allocator);
     defer snapshot.deinit(allocator);
     var destination = try Store.init(allocator);
@@ -1572,7 +1673,7 @@ fn quantifierOwnershipScenario(allocator: Allocator) !void {
     var transfer: @import("semantic_evidence_import.zig").Importer = .{ .allocator = allocator, .source = snapshot.view(), .destination = &destination, .max_depth = 128 };
     defer transfer.deinit();
     const copied = try transfer.ty(root, 0);
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(destination.view()));
+    try std.testing.expect(validEvidence(destination.view()));
     var solver = try types.Store.init(allocator);
     defer solver.deinit();
     var importer: @import("closed_evidence_import.zig").Importer = .{ .allocator = allocator, .source = destination.view(), .destination = &solver };
@@ -1581,11 +1682,11 @@ fn quantifierOwnershipScenario(allocator: Allocator) !void {
     try std.testing.expectEqual(root, try semantic.project(&solver, imported, &.{}));
     const saved = snapshot.nodes[loan.c];
     snapshot.nodes[loan.c].c += 1;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), root));
+    try std.testing.expect(!validEvidence(snapshot.view()));
+    try std.testing.expect(!closedEvidence(snapshot.view(), root));
     snapshot.nodes[loan.c] = saved;
     snapshot.nodes[binders[1]].b = 0;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
+    try std.testing.expect(!validEvidence(snapshot.view()));
 }
 
 test "canonical quantifiers preserve phantom sorts nested owners and formal loans through every allocation failure" {
@@ -1602,7 +1703,7 @@ fn formalRowRecipe(allocator: Allocator) !void {
     var evidence = try Store.init(allocator);
     defer evidence.deinit();
     const recipe = try evidence.project(&source, root, &.{});
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(evidence.view(), recipe));
+    try std.testing.expect(closedEvidence(evidence.view(), recipe));
     try @import("package_evidence.zig").validate(evidence.view());
     const body = evidence.node(recipe).a;
     const row = evidence.node(evidence.node(body).a).c;
@@ -1636,10 +1737,10 @@ fn formalRowRecipe(allocator: Allocator) !void {
     // The same row descriptor interpreted under a different sorted owner
     // cannot borrow a type binder or a forged outer scope.
     snapshot.nodes[formal].b = 0;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), recipe));
+    try std.testing.expect(!closedEvidence(snapshot.view(), recipe));
     snapshot.nodes[formal].b = 1;
     snapshot.nodes[formal].c = 1;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), recipe));
+    try std.testing.expect(!closedEvidence(snapshot.view(), recipe));
 }
 
 test "formal row evidence retains sorted lexical ownership across snapshots and independent imports through OOM" {
@@ -1677,10 +1778,10 @@ fn canonicalGoalsScenario(allocator: Allocator) !void {
     var changed = identity_copy;
     changed.identity.decl += 1;
     try std.testing.expect(actual != try evidence.internQuantifiedWithGoals(.existential, evidence.node(actual).a, evidence.children(actual), &.{changed}));
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(evidence.view()));
+    try std.testing.expect(validEvidence(evidence.view()));
     var snapshot = try evidence.copyOwned(allocator);
     defer snapshot.deinit(allocator);
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
+    try std.testing.expect(validEvidence(snapshot.view()));
     var clone = try evidence.clone(allocator);
     defer clone.deinit();
     try std.testing.expectEqualDeep(snapshot.quantifier_goals, clone.quantifier_goals.items);
@@ -1692,7 +1793,7 @@ fn canonicalGoalsScenario(allocator: Allocator) !void {
     defer importer.deinit();
     const copied = try importer.ty(actual, 0);
     try std.testing.expectEqual(contract, target.view().quantifierGoals(copied)[0].identity);
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(target.view()));
+    try std.testing.expect(validEvidence(target.view()));
     var solver = try types.Store.init(allocator);
     defer solver.deinit();
     var closed: @import("closed_evidence_import.zig").Importer = .{ .allocator = allocator, .source = target.view(), .destination = &solver };
@@ -1707,14 +1808,14 @@ fn canonicalGoalsScenario(allocator: Allocator) !void {
     const ordinal = snapshot.quantifier_goals.len - 2;
     const stored = snapshot.quantifier_goals[ordinal];
     snapshot.quantifier_goals[ordinal].owner = types.unit;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
+    try std.testing.expect(!validEvidence(snapshot.view()));
     snapshot.quantifier_goals[ordinal] = stored;
     snapshot.quantifier_goals[ordinal].goals.start += 1;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
+    try std.testing.expect(!validEvidence(snapshot.view()));
     snapshot.quantifier_goals[ordinal] = stored;
     const original = snapshot.quantifier_obligations[0];
     snapshot.quantifier_obligations[0].ty = actual;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").validEvidence(snapshot.view()));
+    try std.testing.expect(!validEvidence(snapshot.view()));
     snapshot.quantifier_obligations[0] = original;
     var tiny: usize = 1;
     try std.testing.expectError(error.EvidenceLimit, snapshot.view().closed(actual, 0, &tiny));
@@ -1741,8 +1842,8 @@ fn associatedProjectionScenario(allocator: Allocator) !void {
     var semantic = try Store.init(allocator);
     defer semantic.deinit();
     const actual = try semantic.project(&source, root, &.{});
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(semantic.view()));
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(semantic.view(), actual));
+    try std.testing.expect(validEvidence(semantic.view()));
+    try std.testing.expect(closedEvidence(semantic.view(), actual));
     const inner_actual = semantic.node(semantic.node(actual).a).b;
     const associated = semantic.node(semantic.node(inner_actual).a).b;
     try std.testing.expectEqual(Tag.projection, semantic.node(associated).tag);
@@ -1755,7 +1856,7 @@ fn associatedProjectionScenario(allocator: Allocator) !void {
     var transfer: @import("semantic_evidence_import.zig").Importer = .{ .allocator = allocator, .source = snapshot.view(), .destination = &destination, .max_depth = 128 };
     defer transfer.deinit();
     const copied = try transfer.ty(actual, 0);
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(destination.view(), copied));
+    try std.testing.expect(closedEvidence(destination.view(), copied));
     var solver = try types.Store.init(allocator);
     defer solver.deinit();
     var importer: @import("closed_evidence_import.zig").Importer = .{ .allocator = allocator, .source = destination.view(), .destination = &solver };
@@ -1765,19 +1866,46 @@ fn associatedProjectionScenario(allocator: Allocator) !void {
     const node = snapshot.nodes[associated];
     const tail = node.c + 1 + snapshot.extra[node.c];
     snapshot.extra[tail + 1] = 0;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), actual));
+    try std.testing.expect(!closedEvidence(snapshot.view(), actual));
     snapshot.extra[tail + 1] = 1;
     snapshot.extra[tail + 2] = 1;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), actual));
+    try std.testing.expect(!closedEvidence(snapshot.view(), actual));
     snapshot.extra[tail + 2] = 0;
     snapshot.nodes[associated].b += 1;
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), actual));
+    try std.testing.expect(!closedEvidence(snapshot.view(), actual));
     snapshot.nodes[associated] = node;
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(snapshot.view(), actual));
+    try std.testing.expect(closedEvidence(snapshot.view(), actual));
     var exhausted: usize = 1;
     try std.testing.expectError(error.EvidenceLimit, snapshot.view().closed(actual, 0, &exhausted));
 }
 test "associated projection evidence preserves exact lexical goals through nested owners snapshots solver imports and complete OOM" {
     try associatedProjectionScenario(std.testing.allocator);
     try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, associatedProjectionScenario, .{});
+}
+
+test "identity evidence validity distinguishes canonical sharing from foreign owner and free root claims" {
+    const a = std.testing.allocator;
+    var store = try Store.init(a);
+    defer store.deinit();
+    const bound = try store.intern(.bound, 0, 0, &.{});
+    const body = try store.intern(.function, bound, bound, &.{});
+    const universal = try store.intern(.forall, body, 1, &.{});
+    try std.testing.expectEqual(universal, try store.intern(.forall, body, 1, &.{}));
+    try std.testing.expect(validEvidence(store.view()));
+    try std.testing.expect(closedEvidence(store.view(), universal));
+    try std.testing.expect(!closedEvidence(store.view(), bound));
+    try std.testing.expect(!closedEvidence(store.view(), body));
+    for (0..3) |mutation| {
+        var snapshot = try store.copyOwned(a);
+        defer snapshot.deinit(a);
+        switch (mutation) {
+            0 => snapshot.nodes[bound].a = 1,
+            1 => {
+                snapshot.nodes[universal].c = @intCast(snapshot.extra.len);
+            },
+            2 => snapshot.nodes[bound].b = 2,
+            else => unreachable,
+        }
+        try std.testing.expect(!validEvidence(snapshot.view()));
+    }
 }

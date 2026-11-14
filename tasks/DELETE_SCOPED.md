@@ -137,10 +137,45 @@ went from 157 files (67,630 lines) to 74 (24,892). About 160,000 lines left
   `type-effects`, `body-checking`, `function-syntax`, `staging-surface`,
   `tasks`.
 
-Still in the tree and dead in practice: the checker's cross-revision reuse
-(body check caches, entry and module frontend cutoffs, binding and reference
-relocation, `runtime_identity`). Nothing offers a previous revision since
-`serve-project` builds fresh; it goes with the incremental redesign.
+## Checker reuse deletion (done, 14 November 2026)
+
+Nothing offered a previous revision once `serve-project` built fresh, so the
+checker's cross-revision reuse is deleted too: 14 files and about 10,200
+lines; `reuse/` went from 74 files (24,892 lines) to 60 (15,383). Every build
+checks every module from source, except the modules a dependency bundle
+provides as checked. Incremental compilation will be designed afresh.
+
+- **Deleted modules**: `body_check_cache` and its tests, `body_auxiliary`,
+  `entry_frontend_cutoff`, `module_frontend_cutoff`,
+  `frontend_binding_relocation`, `frontend_reference_relocation`,
+  `frontend_graph_correspondence`, `frontend_method_sources`,
+  `runtime_identity`, `declaration_dependencies`, `module_frontend_tests`,
+  and the restart-cache records `semantic_query_table` and `portable_query`.
+  The evidence-graph validators `validEvidence` and `closedEvidence` that
+  checker tests use moved to `check/type_evidence.zig`.
+- **Checker**: `ModuleOptions` lost `body_source`, `retained_bodies`,
+  `previous_bodies` and `body_external_names`; body replay and numeric proof
+  debits are gone. The scheme copier lost the private-namespace relocation
+  only replay used.
+- **Project checking**: `checkProject`, `checkProjectWithPrivateExecution`,
+  `checkProjectForEditor` and `checkProjectToFirstDiagnostic(allocator,
+  source)` remain. `CheckedProject` keeps the modules, diagnostics and
+  counters; the cutoff statistics, interface colors, binding maps, relocated
+  modules, body caches and the deferred entry are gone.
+- **Core** no longer carries declaration dependencies
+  (`declaration_dependencies`, `dependency_references`, `dependency_members`),
+  which lowering captured for every module but only the cutoffs read. The
+  bundle format's schema digest changes with it.
+- **Revision inputs** keep the snapshot (memoized reads, overlays and the
+  bundle's `reusableModules`); the frozen record, previous-revision
+  comparison, trivia equality and persisted restart record are gone, as is
+  the unused `inputs` profile phase.
+- **check:dev**: `body-checking` keeps its scheduling and shared-scheme laws
+  without the body cache laws.
+- **Effect on Gdev Main** (fast native-backend compiler): identical Wasm and
+  first Pen frame. Lowering requests 1.8 MB less in 2,232 fewer allocations;
+  checking's allocations are unchanged, because `serve-project` never
+  retained bodies. Build time stays within the host's noise.
 
 ## Ignored guest cases
 

@@ -11,16 +11,12 @@ pub const Introduction = struct {
 };
 pub const Parameter = struct { binding: u32, contract: u32, proposition: terms.Proposition };
 pub const Use = struct { source: u32, callee: u32, witness: u32, proposition: terms.Proposition };
-pub const Frontier = struct { headers: u32, terms: u32, introductions: u32, parameters: u32, uses: u32, aliases: u32, expressions: u32 };
-pub const Debit = struct { binding: u32, visits: u32, frontier: Frontier, output: Frontier };
 pub const Owned = struct {
-    debits: []const Debit = &.{},
     operands: []const terms.Term = &.{},
     introductions: []const Introduction = &.{},
     parameters: []const Parameter = &.{},
     uses: []const Use = &.{},
     pub fn deinit(self: *Owned, allocator: A) void {
-        allocator.free(self.debits);
         allocator.free(self.operands);
         allocator.free(self.introductions);
         allocator.free(self.parameters);
@@ -30,7 +26,6 @@ pub const Owned = struct {
 };
 pub const Builder = struct {
     values: terms.Store = .{},
-    debits: std.ArrayList(Debit) = .empty,
     // Lexical aliases are checked bindings, never spelling-based identities.
     sources: std.AutoHashMapUnmanaged(u32, u32) = .empty,
     introductions: std.ArrayList(Introduction) = .empty,
@@ -39,7 +34,6 @@ pub const Builder = struct {
     uses: std.ArrayList(Use) = .empty,
     pub fn deinit(self: *Builder, allocator: A) void {
         self.values.deinit(allocator);
-        self.debits.deinit(allocator);
         self.sources.deinit(allocator);
         self.introductions.deinit(allocator);
         self.expressions.deinit(allocator);
@@ -76,13 +70,9 @@ pub const Builder = struct {
         if (!self.sources.contains(binding) and self.sources.count() >= self.values.limits.terms) return error.ProofAnalysisLimit;
         try self.sources.put(allocator, binding, source);
     }
-    pub fn frontier(self: *const Builder, headers: usize) Frontier {
-        return .{ .headers = @intCast(headers), .terms = @intCast(self.values.terms.items.len), .introductions = @intCast(self.introductions.items.len), .parameters = @intCast(self.parameters.items.len), .uses = @intCast(self.uses.items.len), .aliases = self.sources.count(), .expressions = self.expressions.count() };
-    }
     pub fn take(self: *Builder, allocator: A) A.Error!Owned {
         var result: Owned = .{};
         errdefer result.deinit(allocator);
-        result.debits = try self.debits.toOwnedSlice(allocator);
         result.operands = try self.values.terms.toOwnedSlice(allocator);
         result.introductions = try self.introductions.toOwnedSlice(allocator);
         result.parameters = try self.parameters.toOwnedSlice(allocator);

@@ -262,19 +262,13 @@ fn sharedHeaderPublication(allocator: std.mem.Allocator, fixture: *const Fixture
     for (0..4) |i| {
         const binding = module.binding(fixture.binding(i));
         try std.testing.expect(binding.has_explicit);
-        const dependencies = module.declaration_dependencies[binding.body_id];
-        var found = false;
-        for (module.dependency_members[dependencies.members.start..][0..dependencies.members.len]) |member| {
-            if (member.name != 0 and std.mem.eql(u8, fixture.pool.get(member.name), "add")) found = true;
-        }
-        try std.testing.expect(found);
     }
     const factory = module.body(fixture.binding(2)).?;
     try std.testing.expect(!factory.is_function);
     try std.testing.expectEqual(types.ObligationKind.callee_use, module.obligations[factory.scheme.obligations.start].kind);
 }
 
-test "shared written headers retain factory requirements and declaration candidates after publication" {
+test "shared written headers retain factory requirements after publication" {
     var fixture = try Fixture.init(
         \\const twice: a -> a where { associated "add" a a a } = func value => return @type.call "add" value value
         \\const alias = func value => return twice value

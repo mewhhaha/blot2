@@ -57,28 +57,6 @@ pub const builtin_state_read: NominalIdentity = .{ .unit = std.math.maxInt(u32),
 pub fn isReflectionIdentity(unit_: u32, decl: u32) bool {
     return unit_ == std.math.maxInt(u32) and (decl == 3 or decl == 4);
 }
-/// Compiler-owned nominal constructors have no Source declaration recipe.
-/// Their schema belongs to this compiler image, including each type argument.
-pub fn compilerNominalArity(identity: NominalIdentity) ?u32 {
-    if (identity.unit != std.math.maxInt(u32)) return null;
-    return switch (identity.decl) {
-        3, 4 => 0, // EffectSet, EffectDescriptor
-        5 => 1, // Computation[action]
-        6 => 3, // Decision[reply, state, result]
-        8 => 2, // Code[result, latent effects]
-        9 => 1, // Descriptor[target]
-        20...24 => 1, // Storage mode, reference, view and relative link.
-        16 => 0, // Task group (scoped)
-        17, 18 => 2, // Task[group, thunk], View[array, instance version]
-        else => null,
-    };
-}
-/// The version argument is a source binding identity, rather than a type or
-/// an AST point. It is part of View's compiler-owned constructor schema.
-pub fn compilerNominalVersionArgument(identity: NominalIdentity) ?u32 {
-    if (identity.unit == std.math.maxInt(u32) and identity.decl == 18) return 1;
-    return null;
-}
 pub const effect_set_identity: NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 3 };
 pub const effect_descriptor_identity: NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 4 };
 pub const builtin_state_write: NominalIdentity = .{ .unit = std.math.maxInt(u32), .decl = 2 };

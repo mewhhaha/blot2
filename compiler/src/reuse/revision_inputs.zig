@@ -4,14 +4,8 @@
 const std = @import("std");
 const project = @import("project.zig");
 const D = @import("frozen_dependency.zig");
-const closure = @import("dependency_closure.zig");
-const queries = @import("semantic_query_table.zig");
-const lexer = @import("../parse/lexer.zig");
 const Allocator = std.mem.Allocator;
 pub const overlays = @import("source_overlays.zig");
-comptime {
-    if (@typeInfo(project.Options).@"struct".field_names.len != 7 or @typeInfo(project.Alias).@"struct".field_names.len != 2) @compileError("Extend exact unchanged-input option comparison before adding project options or alias fields");
-}
 const Outcome = union(enum) {
     bytes: []u8,
     failure: anyerror,
@@ -44,140 +38,6 @@ const Resolution = struct {
     }
 };
 pub const Counts = struct { canonical_reads: usize = 0, source_reads: usize = 0, resolutions: usize = 0 };
-
-/// Successful source acquisition has a different owner from the mutable
-/// provider. These records describe inputs only; no semantic or emitted result
-/// can be obtained from their validation claim.
-const Settings = struct {
-    options: project.Options,
-    pub fn deinit(self: *Settings, a: Allocator) void {
-        freeOptions(a, self.options);
-    }
-};
-const Observations = struct {
-    paths: std.ArrayList(Entry),
-    files: std.ArrayList(Entry),
-    imports: std.ArrayList(Resolution),
-    pub fn deinit(self: *Observations, a: Allocator) void {
-        for (self.paths.items) |entry| entry.deinit(a);
-        self.paths.deinit(a);
-        for (self.files.items) |entry| entry.deinit(a);
-        self.files.deinit(a);
-        for (self.imports.items) |entry| entry.deinit(a);
-        self.imports.deinit(a);
-    }
-};
-const Acquired = struct {
-    counts: Counts,
-    pub fn deinit(_: *Acquired, _: Allocator) void {}
-};
-pub const Record = queries.OwnedRecord(.source_validation, Settings, Observations, Acquired);
-
-/// A single revision owns exactly one input record, so it needs no bucket or
-/// optional cache capacity. Freezing moves the original buffers without copying
-/// bytes or allocating. Auxiliary failed observations remain explicit and make
-/// unchanged-input admission decline, just as they do on the mutable provider.
-pub const Frozen = struct {
-    allocator: Allocator,
-    record: Record,
-    sources: ?overlays.Set,
-
-    pub fn deinit(self: *Frozen) void {
-        self.record.deinit(self.allocator);
-        if (self.sources) |*sources| sources.deinit();
-        self.* = undefined;
-    }
-    pub fn view(self: *const Frozen) View {
-        return .{ .options = self.record.key.options, .paths = self.record.dependencies.paths.items, .files = self.record.dependencies.files.items, .imports = self.record.dependencies.imports.items, .counts = self.record.value.counts };
-    }
-    pub fn capturedSource(self: *const Frozen, canonical_path: []const u8) ?[]const u8 {
-        return self.view().capturedSource(canonical_path);
-    }
-};
-
-/// Borrowed exact input projection shared by acquisition and frozen records.
-/// It deliberately exposes no mutable provider or filesystem operations.
-pub const View = struct {
-    options: project.Options,
-    paths: []const Entry,
-    files: []const Entry,
-    imports: []const Resolution,
-    counts: Counts,
-    pub fn capturedSource(self: View, canonical_path: []const u8) ?[]const u8 {
-        return switch (Snapshot.get(self.files, canonical_path) orelse return null) {
-            .bytes => |bytes| bytes,
-            .failure => null,
-        };
-    }
-};
-
-/// A frozen record's observations in portable form, for a later process. Only
-/// records whose every observation succeeded persist: unchanged-input
-/// admission declines a failed observation anyway.
-pub const Persisted = struct {
-    pub const Pair = struct { key: []const u8, value: []const u8 };
-    pub const Import = struct { source: []const u8, request: []const u8, value: []const u8 };
-    /// Encoded by `dependency_format`. `capture` borrows every byte slice.
-    pub const Wire = struct { options: project.Options, paths: []const Pair, files: []const Pair, imports: []const Import };
-
-    allocator: Allocator,
-    wire: Wire,
-    /// Views of `wire` in the frozen record's own types.
-    paths: []Entry,
-    files: []Entry,
-    imports: []Resolution,
-
-    /// Null when an observation failed. Free with `release`.
-    pub fn capture(a: Allocator, record: View) Allocator.Error!?Wire {
-        const paths = try a.alloc(Pair, record.paths.len);
-        errdefer a.free(paths);
-        const files = try a.alloc(Pair, record.files.len);
-        errdefer a.free(files);
-        const imports = try a.alloc(Import, record.imports.len);
-        errdefer a.free(imports);
-        for (record.paths, paths) |entry, *pair| pair.* = .{ .key = entry.key, .value = success(entry.result) orelse return release(a, paths, files, imports) };
-        for (record.files, files) |entry, *pair| pair.* = .{ .key = entry.key, .value = success(entry.result) orelse return release(a, paths, files, imports) };
-        for (record.imports, imports) |entry, *import| import.* = .{ .source = entry.source, .request = entry.request, .value = success(entry.result) orelse return release(a, paths, files, imports) };
-        return .{ .options = record.options, .paths = paths, .files = files, .imports = imports };
-    }
-    pub fn releaseWire(a: Allocator, wire: Wire) void {
-        _ = release(a, wire.paths, wire.files, wire.imports);
-    }
-    fn release(a: Allocator, paths: []const Pair, files: []const Pair, imports: []const Import) ?Wire {
-        a.free(paths);
-        a.free(files);
-        a.free(imports);
-        return null;
-    }
-    fn success(result: Outcome) ?[]const u8 {
-        return switch (result) {
-            .bytes => |bytes| bytes,
-            .failure => null,
-        };
-    }
-    /// Takes a decoded `wire`; on success the owner frees it.
-    pub fn adopt(a: Allocator, wire: Wire) Allocator.Error!Persisted {
-        const paths = try a.alloc(Entry, wire.paths.len);
-        errdefer a.free(paths);
-        const files = try a.alloc(Entry, wire.files.len);
-        errdefer a.free(files);
-        const imports = try a.alloc(Resolution, wire.imports.len);
-        for (wire.paths, paths) |pair, *entry| entry.* = .{ .key = @constCast(pair.key), .result = .{ .bytes = @constCast(pair.value) } };
-        for (wire.files, files) |pair, *entry| entry.* = .{ .key = @constCast(pair.key), .result = .{ .bytes = @constCast(pair.value) } };
-        for (wire.imports, imports) |import, *entry| entry.* = .{ .source = @constCast(import.source), .request = @constCast(import.request), .result = .{ .bytes = @constCast(import.value) } };
-        return .{ .allocator = a, .wire = wire, .paths = paths, .files = files, .imports = imports };
-    }
-    pub fn deinit(self: *Persisted) void {
-        self.allocator.free(self.paths);
-        self.allocator.free(self.files);
-        self.allocator.free(self.imports);
-        @import("dependency_format.zig").deinit(self.allocator, &self.wire);
-        self.* = undefined;
-    }
-    pub fn view(self: *const Persisted) View {
-        return .{ .options = self.wire.options, .paths = self.paths, .files = self.files, .imports = self.imports, .counts = .{} };
-    }
-};
 
 fn freeOptions(a: Allocator, options: project.Options) void {
     if (options.prelude_path) |path| a.free(path);
@@ -222,18 +82,6 @@ pub const Snapshot = struct {
     import_index: std.HashMapUnmanaged(ImportKey, u32, ImportKey.Context, std.hash_map.default_max_load_percentage) = .empty,
     /// Digests of successful reads by `files` position, each computed once.
     digests: std.AutoHashMapUnmanaged(u32, [32]u8) = .empty,
-
-    pub fn view(self: *const Snapshot) View {
-        return .{ .options = self.options, .paths = self.paths.items, .files = self.files.items, .imports = self.imports.items, .counts = self.counts };
-    }
-    /// Call only after successful compilation. The provider is invalid after
-    /// this ownership transfer; rejected attempts retain their Snapshot.
-    pub fn freeze(self: *Snapshot) Frozen {
-        self.deinitIndexes();
-        const frozen: Frozen = .{ .allocator = self.allocator, .record = .{ .key = .{ .options = self.options }, .dependencies = .{ .paths = self.paths, .files = self.files, .imports = self.imports }, .value = .{ .counts = self.counts } }, .sources = self.sources };
-        self.* = undefined;
-        return frozen;
-    }
 
     /// The complete overlay set is copied before any admission or compilation.
     /// Published revisions never borrow the request or caller's source buffers.
@@ -290,10 +138,6 @@ pub const Snapshot = struct {
         self.file_index.deinit(a);
         self.import_index.deinit(a);
         self.digests.deinit(a);
-    }
-    fn get(entries: []const Entry, key: []const u8) ?Outcome {
-        for (entries) |entry| if (std.mem.eql(u8, entry.key, key)) return entry.result;
-        return null;
     }
     fn lookup(entries: []const Entry, index: *const std.StringHashMapUnmanaged(u32), key: []const u8) ?Outcome {
         const position = index.get(key) orelse return null;
@@ -407,11 +251,6 @@ pub const Snapshot = struct {
         return .{ .context = self, .canonical = canonicalInput, .read = readInput, .resolve = resolveInput };
     }
 
-    fn optionalTextEqual(left: ?[]const u8, right: ?[]const u8) bool {
-        if (left) |text| return if (right) |other| std.mem.eql(u8, text, other) else false;
-        return right == null;
-    }
-
     /// Borrow a successful source read already owned by this immutable snapshot.
     pub fn capturedSource(self: *const Snapshot, canonical_path: []const u8) ?[]const u8 {
         return switch (lookup(self.files.items, &self.file_index, canonical_path) orelse return null) {
@@ -419,108 +258,6 @@ pub const Snapshot = struct {
             .failure => null,
         };
     }
-    /// The requested entry resolves to the previous canonical entry path; its
-    /// contents are compared with the other sources.
-    pub fn entryPathEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8) Allocator.Error!bool {
-        const actual_path = self.canonical(io, requested) catch |err| {
-            if (err == error.OutOfMemory) return error.OutOfMemory;
-            return false;
-        };
-        return std.mem.eql(u8, actual_path, old_canonical);
-    }
-    pub fn entryEqualsPrevious(self: *Snapshot, io: std.Io, requested: []const u8, old_canonical: []const u8, previous: View) Allocator.Error!bool {
-        if (!try self.entryPathEqualsPrevious(io, requested, old_canonical)) return false;
-        const actual_path = old_canonical;
-        const expected = switch (get(previous.files, old_canonical) orelse return false) {
-            .bytes => |bytes| bytes,
-            .failure => return false,
-        };
-        const actual = self.read(io, actual_path) catch |err| {
-            if (err == error.OutOfMemory) return error.OutOfMemory;
-            return false;
-        };
-        return std.mem.eql(u8, expected, actual);
-    }
-
-    /// Validate all facts consumed by a successful revision against current
-    /// reads. Exact source bytes and resolution outcomes are required. Unknown
-    /// or failed old observations decline; this is not timestamp admission.
-    pub fn equalsPrevious(self: *Snapshot, io: std.Io, previous: View) Allocator.Error!bool {
-        return self.matchesPrevious(io, previous, false);
-    }
-    /// Like `equalsPrevious`, but a source may also differ only in trivia
-    /// (`sameTokens`): it then parses to the same program at other positions.
-    pub fn triviaEqualsPrevious(self: *Snapshot, io: std.Io, previous: View) Allocator.Error!bool {
-        return self.matchesPrevious(io, previous, true);
-    }
-    fn matchesPrevious(self: *Snapshot, io: std.Io, previous: View, trivia: bool) Allocator.Error!bool {
-        const left = self.options;
-        const right = previous.options;
-        if (left.input_mode != right.input_mode or left.max_source_bytes != right.max_source_bytes or left.max_total_source_bytes != right.max_total_source_bytes or left.max_files != right.max_files or !optionalTextEqual(left.prelude_path, right.prelude_path) or !optionalTextEqual(left.std_root, right.std_root) or left.aliases.len != right.aliases.len) return false;
-        for (left.aliases, right.aliases) |actual, old| {
-            if (!std.mem.eql(u8, actual.prefix, old.prefix) or !std.mem.eql(u8, actual.root, old.root)) return false;
-        }
-        if (previous.files.len == 0) return false;
-        var total: usize = 0;
-        for (previous.paths) |entry| {
-            const expected = switch (entry.result) {
-                .bytes => |bytes| bytes,
-                .failure => return false,
-            };
-            const actual = self.canonical(io, entry.key) catch |err| {
-                if (err == error.OutOfMemory) return error.OutOfMemory;
-                return false;
-            };
-            if (!std.mem.eql(u8, expected, actual)) return false;
-        }
-        for (previous.files) |entry| {
-            const expected = switch (entry.result) {
-                .bytes => |bytes| bytes,
-                .failure => return false,
-            };
-            const actual = self.read(io, entry.key) catch |err| {
-                if (err == error.OutOfMemory) return error.OutOfMemory;
-                return false;
-            };
-            if (!std.mem.eql(u8, expected, actual)) {
-                // Trivia can change sizes; the source limits still apply.
-                if (!trivia or actual.len > self.options.max_source_bytes) return false;
-                if (!try sameTokens(self.allocator, expected, actual)) return false;
-            }
-            total +|= actual.len;
-        }
-        if (total > self.options.max_total_source_bytes) return false;
-        for (previous.imports) |entry| {
-            const expected = switch (entry.result) {
-                .bytes => |bytes| bytes,
-                .failure => return false,
-            };
-            const actual = self.resolve(entry.source, entry.request) catch |err| {
-                if (err == error.OutOfMemory) return error.OutOfMemory;
-                return false;
-            };
-            if (!std.mem.eql(u8, expected, actual)) return false;
-        }
-        return true;
-    }
-
-    /// Both sources lex cleanly to the same token tags and spellings, with the
-    /// same adjacency between consecutive tokens. The parser reads only those
-    /// facts and the relative order of positions, so the parse is identical
-    /// except for source positions; comments and other spacing are trivia.
-    pub fn sameTokens(a: Allocator, left: []const u8, right: []const u8) Allocator.Error!bool {
-        var before = lexer.lex(a, left) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        defer before.deinit(a);
-        var after = lexer.lex(a, right) catch |err| return if (err == error.OutOfMemory) error.OutOfMemory else false;
-        defer after.deinit(a);
-        if (before.diagnostics.items.len != 0 or after.diagnostics.items.len != 0 or before.tokens.items.len != after.tokens.items.len) return false;
-        for (before.tokens.items, after.tokens.items, 0..) |old, new, index| {
-            if (old.tag != new.tag or !std.mem.eql(u8, old.text(left), new.text(right))) return false;
-            if (index != 0 and (before.tokens.items[index - 1].end == old.start) != (after.tokens.items[index - 1].end == new.start)) return false;
-        }
-        return true;
-    }
-
     /// Exact raw-input admission plus transitive import invalidation: which
     /// of the seed's modules are unchanged. The returned mask belongs to the
     /// caller; null means the seed cannot be used at all.
@@ -596,95 +333,4 @@ pub const Snapshot = struct {
         transferred = true;
         return reuse;
     }
-
-    /// This validation consumes exactly the facts later given to the loader.
-    /// Missing/invalid changed inputs select fresh loading for its ordinary
-    /// diagnostics. Allocation failure aborts; no changed seed is published.
-    pub fn admits(self: *Snapshot, io: std.Io, seed: *const D.FrozenDependency) Allocator.Error!bool {
-        if (self.options.input_mode != .project) return false;
-        if (seed.modules.len >= self.options.max_files) return false;
-        var total: usize = 0;
-        var found_prelude = false;
-        for (seed.modules) |*module| {
-            const canonical_path = self.canonical(io, module.identity.normalized_path) catch |err| {
-                if (err == error.OutOfMemory) return error.OutOfMemory;
-                return false;
-            };
-            const bytes = self.read(io, canonical_path) catch |err| {
-                if (err == error.OutOfMemory) return error.OutOfMemory;
-                return false;
-            };
-            closure.validateProducerDigest(module, canonical_path, bytes.len, try self.sourceDigest(canonical_path, bytes)) catch return false;
-            if (bytes.len > self.options.max_source_bytes or bytes.len > self.options.max_total_source_bytes -| total) return false;
-            total += bytes.len;
-            if (module.identity.prelude) {
-                const raw_prelude = self.options.prelude_path orelse return false;
-                const prelude = self.canonical(io, raw_prelude) catch |err| {
-                    if (err == error.OutOfMemory) return error.OutOfMemory;
-                    return false;
-                };
-                if (!std.mem.eql(u8, prelude, canonical_path)) return false;
-                found_prelude = true;
-            }
-            for (module.source_imports) |request| {
-                if (request.target == 0 or request.target > seed.modules.len) return false;
-                const resolved = self.resolve(canonical_path, request.path) catch |err| switch (err) {
-                    error.OutOfMemory => return error.OutOfMemory,
-                    error.InvalidPath => return false,
-                };
-                const target = self.canonical(io, resolved) catch |err| {
-                    if (err == error.OutOfMemory) return error.OutOfMemory;
-                    return false;
-                };
-                if (!std.mem.eql(u8, target, seed.modules[request.target - 1].identity.normalized_path)) return false;
-            }
-        }
-        return found_prelude == (self.options.prelude_path != null);
-    }
 };
-
-fn persistedRoundTrip(a: Allocator, record: View) !void {
-    const format = @import("dependency_format.zig");
-    const wire = (try Persisted.capture(a, record)).?;
-    defer Persisted.releaseWire(a, wire);
-    const key: format.Key = .{ .compiler = @splat(1), .settings = @splat(2), .source = @splat(3), .dependencies = @splat(4) };
-    const bytes = try format.encode(a, key, wire);
-    defer a.free(bytes);
-    var decoded = try format.decode(Persisted.Wire, a, bytes, key);
-    var owner = Persisted.adopt(a, decoded) catch |err| {
-        format.deinit(a, &decoded);
-        return err;
-    };
-    defer owner.deinit();
-    const view = owner.view();
-    try std.testing.expectEqualStrings(record.options.prelude_path.?, view.options.prelude_path.?);
-    try std.testing.expectEqualStrings(record.options.aliases[0].root, view.options.aliases[0].root);
-    for ([_][2][]const Entry{ .{ record.paths, view.paths }, .{ record.files, view.files } }) |pair| {
-        try std.testing.expectEqual(pair[0].len, pair[1].len);
-        for (pair[0], pair[1]) |old, new| {
-            try std.testing.expectEqualStrings(old.key, new.key);
-            try std.testing.expectEqualStrings(old.result.bytes, new.result.bytes);
-        }
-    }
-    try std.testing.expectEqualStrings(record.imports[0].request, view.imports[0].request);
-    try std.testing.expectEqualStrings(record.imports[0].result.bytes, view.imports[0].result.bytes);
-}
-
-test "restart cache: persisted input records round-trip successful observations and decline failed ones" {
-    var key = "/p/main.blot".*;
-    var canonical = "/real/main.blot".*;
-    var source = "entry const x = 1\n".*;
-    var request = "./dep".*;
-    var resolved = "/real/dep.blot".*;
-    const paths = [_]Entry{.{ .key = &key, .result = .{ .bytes = &canonical } }};
-    const files = [_]Entry{.{ .key = &canonical, .result = .{ .bytes = &source } }};
-    const imports = [_]Resolution{.{ .source = &canonical, .request = &request, .result = .{ .bytes = &resolved } }};
-    const options: project.Options = .{ .prelude_path = "/std/prelude.blot", .aliases = &.{.{ .prefix = "ink/", .root = "/ink" }} };
-    const record: View = .{ .options = options, .paths = &paths, .files = &files, .imports = &imports, .counts = .{} };
-    try persistedRoundTrip(std.testing.allocator, record);
-    try @import("../allocation_failures.zig").checkAllAllocationFailures(std.testing.allocator, persistedRoundTrip, .{record});
-    const failed = [_]Entry{.{ .key = &canonical, .result = .{ .failure = error.FileNotFound } }};
-    var declined = record;
-    declined.files = &failed;
-    try std.testing.expect(try Persisted.capture(std.testing.allocator, declined) == null);
-}

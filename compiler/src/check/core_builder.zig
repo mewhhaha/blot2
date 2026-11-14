@@ -3073,8 +3073,6 @@ pub fn lowerWithOrigins(allocator: Allocator, tree: *const ast.Tree, names: *con
     var result = try builder.finish();
     errdefer result.deinit(allocator);
     result.unit = checked.unit;
-    // Capture before source/checker teardown. All arrays publish together.
-    try @import("../reuse/declaration_dependencies.zig").capture(allocator, &result);
     return result;
 }
 

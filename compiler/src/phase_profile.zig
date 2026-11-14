@@ -15,8 +15,6 @@ pub const Phase = enum(u8) {
     other,
     /// Native asset capture and generated asset modules.
     assets,
-    /// Revision input capture and comparison against the previous revision.
-    inputs,
     /// File reading, import resolution and project assembly.
     load,
     lex,

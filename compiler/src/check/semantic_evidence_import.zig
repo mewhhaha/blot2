@@ -211,7 +211,7 @@ fn packageRecipeTransferLaw(allocator: A) !void {
     const foreign = try source.intern(.bound, 1, 0, &.{});
     try std.testing.expectError(error.TypeMismatch, source.intern(.existential, foreign, 1, &.{}));
     const nested = try source.intern(.existential, package, 1, &.{});
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(source.view(), nested));
+    try std.testing.expect(@import("type_evidence.zig").closedEvidence(source.view(), nested));
     var copy: Importer = .{ .allocator = allocator, .source = source.view(), .destination = &destination, .max_depth = 128 };
     defer copy.deinit();
     const transported = try copy.ty(package, 0);

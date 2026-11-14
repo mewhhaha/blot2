@@ -63,12 +63,14 @@ test "forbidden Core owner restricts bounds, captured contexts and equation work
     try std.testing.expect(!restricted_image.matches(ordinary, &.{&module}));
     const equations = @import("scheme_equations.zig");
     // Keep the executable identity body and its inferred parameter contract
-    // intact. A foreign declaration dependency is independently legal here.
-    try std.testing.expectEqual(0, module.dependency_references.len);
-    var references = [_]core.BindingRef{.{ .unit = 2, .binding = 1 }};
-    const previous = module.dependency_references;
-    module.dependency_references = &references;
-    defer module.dependency_references = previous;
+    // intact. An unused foreign reference is independently legal here.
+    const previous = module.references;
+    const references = try a.alloc(core.BindingRef, previous.len + 1);
+    defer a.free(references);
+    @memcpy(references[0..previous.len], previous);
+    references[previous.len] = .{ .unit = 2, .binding = 1 };
+    module.references = references;
+    defer module.references = previous;
     try V.validateBounds(&module, ordinary);
     try std.testing.expectError(error.InvalidArtifact, V.validateBounds(&module, restricted));
     var workspace: equations.Workspace = .{ .allocator = a };

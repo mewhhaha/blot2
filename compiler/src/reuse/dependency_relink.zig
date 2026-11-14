@@ -193,9 +193,7 @@ fn moduleWith(owner: *core.Module, map: anytype) void {
     };
     for (owner.bindings) |*binding| target(map, &binding.target);
     for (owner.references) |*reference| target(map, reference);
-    for (owner.dependency_references) |*reference| target(map, reference);
     for (owner.erased_declaration_references) |*reference| target(map, &reference.target);
-    for (owner.dependency_members) |*member| member.name = map.symbol(member.name);
     for (owner.calls) |*call| target(map, &call.target);
     for (owner.obligations) |*obligation| {
         obligation.name = map.symbol(obligation.name);

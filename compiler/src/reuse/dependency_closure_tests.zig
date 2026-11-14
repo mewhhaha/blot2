@@ -451,3 +451,28 @@ test "entry-only project freezes an owned empty closure without treating its nam
     try std.testing.expectEqualDeep(try key(&source), closure.payloadKey(compiler, settings, &value));
     try @import("../allocation_failures.zig").checkAllAllocationFailures(a, freezeFail, .{ &source, &checked });
 }
+
+test "principal reference bounds preserve quantified row project dependencies" {
+    var dir = std.testing.tmpDir(.{});
+    defer dir.cleanup();
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "changed.blot", .data =
+        \\const apply: forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e} = func pair => return (@product.get pair 0) (@product.get pair 1)
+        \\const both: (forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}) -> U32 -> (U32, F32) = func apply => return func value => return (apply ((func item => return item), value), apply ((func item => return item), @u32.to_f32 value))
+        \\const foreign_apply: ((forall [a, row e] => ((a -> a ! {|e}), a) -> a ! {|e}), (U32 -> U32 ! {Foreign})) -> U32 ! {Foreign} = func pair => return (@product.get pair 0) (@product.get pair 1, 42)
+    });
+    try dir.dir.writeFile(std.testing.io, .{ .sub_path = "main.blot", .data =
+        \\import {apply, both, foreign_apply} from "./changed"
+        \\entry const whole = func (value: U32) => return @product.get (both apply value) 0
+        \\entry const fraction = func (value: U32) => return @product.get (both apply value) 1
+        \\entry const host = func (callback: U32 -> U32 ! {Foreign}) => return foreign_apply (apply, callback)
+    });
+    const path = try dir.dir.realPathFileAlloc(std.testing.io, "main.blot", a);
+    defer a.free(path);
+    var source = try project.load(a, std.testing.io, path, .{});
+    defer source.deinit(a);
+    var checked = try checker.checkProject(a, &source);
+    defer checked.deinit(a);
+    try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
+    try freezeFail(a, &source, &checked);
+    try @import("../allocation_failures.zig").checkAllAllocationFailures(a, freezeFail, .{ &source, &checked });
+}

@@ -118,7 +118,7 @@ pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []cons
         if (std.mem.eql(u8, output, source.symbols.get(unit.filename))) return error.OutputIsSource;
     };
     // Checking stops at the first module that reports a diagnostic.
-    var checked = try checker.checkProjectToFirstDiagnostic(a, source, null, false);
+    var checked = try checker.checkProjectToFirstDiagnostic(a, source);
     defer checked.deinit(a);
     if (checked.diagnostics.len != 0) return rejectChecked(a, source, entry_path, checked.diagnostics[0]);
     const units = try a.alloc(core.Module, source.units.items.len);
@@ -146,11 +146,9 @@ pub fn prepareProject(a: Allocator, source: *project.Project, entry_path: []cons
     for (source.units.items, units, paths, 1..) |*unit, *ir, *path, id| {
         path.* = try a.dupe(u8, source.filename(@intCast(id)));
         paths_initialized += 1;
-        if (checked.compiledModule(source, id)) |module| {
-            if (module == &source.compiled_modules[id - 1]) {
-                ir.* = module.core;
-                borrowed[id - 1] = true;
-            } else ir.* = try @import("dependency_closure.zig").copyCore(a, &module.core);
+        if (source.compiledModule(id)) |module| {
+            ir.* = module.core;
+            borrowed[id - 1] = true;
         } else {
             const timing = @import("../phase_profile.zig").enter(.lower);
             defer timing.exit();
@@ -200,7 +198,7 @@ fn lowerFresh(a: Allocator, source: *const project.Project, checked: *const chec
     const inputs = try a.alloc(?parallel_lowering.Input, source.units.items.len);
     defer a.free(inputs);
     for (inputs, source.units.items, 1..) |*input, *unit, id| {
-        const fresh = checked.compiledModule(source, id) == null;
+        const fresh = source.compiledModule(id) == null;
         input.* = if (fresh) .{ .tree = &unit.tree, .checked = &checked.module(@intCast(id)).checked } else null;
     }
     const timing = @import("../phase_profile.zig").enter(.lower);

@@ -96,9 +96,6 @@ fn plain(comptime T: type) bool {
 pub fn copyCore(a: std.mem.Allocator, value: *const core.Module) std.mem.Allocator.Error!core.Module {
     return copyCoreValue(a, value.*);
 }
-pub fn copyModule(a: std.mem.Allocator, value: *const D.Module) std.mem.Allocator.Error!D.Module {
-    return copyCoreValue(a, value.*);
-}
 fn copyCoreValue(a: std.mem.Allocator, value: anytype) std.mem.Allocator.Error!@TypeOf(value) {
     @setEvalBranchQuota(20000);
     const T = @TypeOf(value);
@@ -152,7 +149,7 @@ fn lowerFresh(a: std.mem.Allocator, source: *const project.Project, checked: *co
     defer a.free(inputs);
     for (inputs, units, 1..) |*input, id, source_id| {
         input.* = null;
-        if (id == 0 or checked.compiledModule(source, source_id) != null) continue;
+        if (id == 0 or source.compiledModule(source_id) != null) continue;
         const typed = if (checked.modules[source_id - 1]) |*module| module else continue;
         if (!typed.valid or typed.checked.diagnostics.len != 0 or typed.checked.unit != source_id) continue;
         input.* = .{ .tree = &source.unit(@intCast(source_id)).tree, .checked = &typed.checked };
@@ -236,7 +233,7 @@ fn checkChecked(source: *const project.Project, checked: *const project_check.Ch
     try require(source.diagnostics.items.len == 0 and checked.diagnostics.len == 0);
     try require(source.entry != 0 and source.entry <= source.units.items.len and checked.modules.len == source.units.items.len);
     try require(source.units.items.len <= std.math.maxInt(u32));
-    for (checked.modules, 1..) |m, id| if (checked.compiledModule(source, id) == null and !(id == source.entry and (checked.entry_cutoff.reused != 0 or checked.deferred_entry != null))) {
+    for (checked.modules, 1..) |m, id| if (source.compiledModule(id) == null) {
         try require(m != null and m.?.valid);
     };
 }
@@ -268,7 +265,7 @@ fn freezeMode(a: std.mem.Allocator, source: *const project.Project, checked: *co
     var lowered = if (cores == .lower) try lowerFresh(a, source, checked, units) else null;
     defer if (lowered) |*batch| batch.deinit();
     for (units, 1..) |id, source_id| if (id != 0) {
-        result.modules[initialized] = if (checked.compiledModule(source, source_id)) |previous|
+        result.modules[initialized] = if (source.compiledModule(source_id)) |previous|
             try copyCoreValue(a, previous.*)
         else
             try freezeOne(a, source, checked, @intCast(source_id), units, if (lowered) |*batch| .{ .lowered = batch } else cores);

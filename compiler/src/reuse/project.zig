@@ -115,7 +115,7 @@ pub const Project = struct {
     /// How this project's fresh units are lowered. An execution choice only:
     /// Core, diagnostics and every cache key are the same for any value.
     lowering: Lowering = .{},
-    /// Independent frontend module jobs; retained edits keep serial cutoffs.
+    /// Independent frontend module jobs.
     checking: Lowering = .{},
 
     pub const Lowering = struct { io: ?Io = null, workers: u8 = 1 };

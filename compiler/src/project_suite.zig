@@ -4,7 +4,6 @@ comptime {
     _ = @import("assets/native_asset_readers.zig");
     _ = @import("assets/native_asset_wgsl.zig");
     _ = @import("assets/native_assets.zig");
-    _ = @import("reuse/module_frontend_tests.zig");
     _ = @import("reuse/module_relink_tests.zig");
     _ = @import("reuse/entry_diagnostic_tests.zig");
     _ = @import("reuse/contextual_pattern_tests.zig");
@@ -16,10 +15,6 @@ comptime {
     _ = @import("reuse/completion_probe.zig");
     _ = @import("reuse/completion_fit.zig");
     _ = @import("reuse/completion_check_tests.zig");
-    _ = @import("reuse/semantic_query_table.zig");
-    _ = @import("reuse/portable_query.zig");
-    _ = @import("reuse/body_check_cache_tests.zig");
-    _ = @import("reuse/body_check_cache.zig");
     _ = @import("reuse/revision_inputs.zig");
     _ = @import("reuse/zig_project_frames_tests.zig");
     _ = @import("reuse/parallel_lowering_tests.zig");

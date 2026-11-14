@@ -1065,19 +1065,6 @@ const Bounds = struct {
             try range(self.m.loop_carries.len, value.carries.start, value.carries.len);
             try self.control(value.return_target, false, true);
         }
-        try require(self.m.declaration_dependencies.len == self.m.bodies.len);
-        for (self.m.declaration_dependencies) |value| {
-            try range(self.m.dependency_references.len, value.references.start, value.references.len);
-            try range(self.m.dependency_members.len, value.members.start, value.members.len);
-            try self.node(value.runtime_metadata, true);
-            if (value.runtime_metadata != 0) try require(self.m.nodes[value.runtime_metadata].tag == .effect_reflection);
-        }
-        for (self.m.dependency_references) |value| try self.bindingRef(value, false);
-        for (self.m.dependency_members) |value| {
-            try self.symbol(value.name, true);
-            try enumValue(T.Operator, value.operator);
-            try require(value.name != 0 or value.operator != .none);
-        }
         var last_erased: core.Id = 0;
         for (self.m.erased_declaration_references) |value| {
             try self.node(value.node, false);

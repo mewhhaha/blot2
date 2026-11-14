@@ -611,11 +611,11 @@ test "canonical package ordinal sharing reconstructs each enclosing recipe" {
     const one = try store.intern(.existential, product, 1, &.{});
     const two = try store.intern(.existential, pair, 2, &.{});
     try std.testing.expect(one != two);
-    try std.testing.expect(@import("../reuse/portable_query.zig").validEvidence(store.view()));
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(store.view(), one));
-    try std.testing.expect(@import("../reuse/portable_query.zig").closedEvidence(store.view(), two));
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(store.view(), first));
-    try std.testing.expect(!@import("../reuse/portable_query.zig").closedEvidence(store.view(), arrow));
+    try std.testing.expect(@import("type_evidence.zig").validEvidence(store.view()));
+    try std.testing.expect(@import("type_evidence.zig").closedEvidence(store.view(), one));
+    try std.testing.expect(@import("type_evidence.zig").closedEvidence(store.view(), two));
+    try std.testing.expect(!@import("type_evidence.zig").closedEvidence(store.view(), first));
+    try std.testing.expect(!@import("type_evidence.zig").closedEvidence(store.view(), arrow));
     try @import("package_evidence.zig").validate(store.view());
     const original = store.nodes.items[two];
     store.nodes.items[two].b = 1;
