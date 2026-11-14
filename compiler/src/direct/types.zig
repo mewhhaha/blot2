@@ -14,7 +14,7 @@ pub const u32_: Ty = 2;
 pub const f32_: Ty = 3;
 pub const never: Ty = 4;
 
-pub const Tag = enum(u8) { unit, boolean, u32, f32, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link };
+pub const Tag = enum(u8) { unit, boolean, u32, f32, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link, provider, state_provider };
 /// tuple/record: a = extra start, b = count (records store name/type pairs in
 /// spelling order); nominal: a = extra start ([unit, decl, arguments...]), b =
 /// argument count; function: a = parameter, b = result; containers: a = element.
@@ -139,7 +139,8 @@ pub const Types = struct {
         const start: u32 = @intCast(self.extra.items.len);
         const arity: ?usize = switch (tag) {
             .function => 2,
-            .array, .list, .cursor, .grow, .resize, .ref, .view, .link => 1,
+            .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => 1,
+            .state_provider => 3,
             .nominal => null,
             else => null,
         };
@@ -147,13 +148,13 @@ pub const Types = struct {
         if (tag == .nominal and payload.len < 2) return error.Unsupported;
         const value: Node = switch (tag) {
             .unit, .boolean, .u32, .f32, .never => .{ .tag = tag },
-            .tuple => .{ .tag = tag, .a = start, .b = @intCast(payload.len) },
+            .tuple, .state_provider => .{ .tag = tag, .a = start, .b = @intCast(payload.len) },
             .record => .{ .tag = tag, .a = start, .b = @intCast(payload.len / 2) },
             .nominal => .{ .tag = tag, .a = start, .b = @intCast(payload.len - 2) },
             .function => if (payload.len == 2) .{ .tag = tag, .a = payload[0], .b = payload[1] } else unreachable,
-            .array, .list, .cursor, .grow, .resize, .ref, .view, .link => if (payload.len == 1) .{ .tag = tag, .a = payload[0] } else unreachable,
+            .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => if (payload.len == 1) .{ .tag = tag, .a = payload[0] } else unreachable,
         };
-        if (tag == .tuple or tag == .record or tag == .nominal) try self.extra.appendSlice(a, payload);
+        if (tag == .tuple or tag == .record or tag == .nominal or tag == .state_provider) try self.extra.appendSlice(a, payload);
         try self.nodes.append(a, value);
         try self.keys.append(a, span);
         try self.layouts.append(a, null);
@@ -285,6 +286,12 @@ pub const Types = struct {
                 for (arguments, payload[2..]) |argument, *slot| slot.* = try self.lowerInner(m, argument, env, &child_open, depth + 1);
                 break :blk try self.intern(.nominal, payload);
             },
+            .provider => try self.intern(.provider, &.{try self.operation(m, n.a, env, &child_open, depth + 1)}),
+            .state_provider => try self.intern(.state_provider, &.{
+                try self.operation(m, n.a, env, &child_open, depth + 1),
+                try self.operation(m, n.b, env, &child_open, depth + 1),
+                try self.lowerInner(m, n.c, env, &child_open, depth + 1),
+            }),
             .array, .list, .cursor => blk: {
                 const element = try self.lowerInner(m, n.a, env, &child_open, depth + 1);
                 break :blk try self.intern(switch (n.tag) {
@@ -299,6 +306,19 @@ pub const Types = struct {
         return result;
     }
 
+    /// An effect operation's nominal type: only an identity, so compiler-owned
+    /// operations (the builtin State family) lower like declared ones.
+    fn operation(self: *Types, m: *const core.Module, ty: T.Id, env: *const Env, open: *bool, depth: usize) Error!Ty {
+        const n = m.types.node(ty);
+        if (n.tag != .nominal) return self.lowerInner(m, ty, env, open, depth);
+        const arguments = m.types.nominalArguments(n);
+        const payload = try self.allocator.alloc(u32, arguments.len + 2);
+        defer self.allocator.free(payload);
+        payload[0] = n.a;
+        payload[1] = n.b;
+        for (arguments, payload[2..]) |argument, *slot| slot.* = try self.lowerInner(m, argument, env, open, depth + 1);
+        return self.intern(.nominal, payload);
+    }
     /// Binds the variables of `pattern` (a Core type of `m`) so that it
     /// lowers to `actual`. Already bound variables keep their binding.
     pub fn match(self: *Types, m: *const core.Module, pattern: T.Id, actual: Ty, env: *Env) Error!void {
@@ -344,6 +364,10 @@ pub const Types = struct {
                 }
             },
             .array, .list, .cursor => if (isContainer(have.tag)) try self.matchInner(m, n.a, have.a, env, depth + 1),
+            .provider => if (have.tag == .provider) try self.matchInner(m, n.a, have.a, env, depth + 1),
+            .state_provider => if (have.tag == .state_provider) {
+                for ([_]T.Id{ n.a, n.b, n.c }, self.list(have.a, have.b)) |child, item| try self.matchInner(m, child, item, env, depth + 1);
+            },
             else => {},
         }
     }
@@ -427,7 +451,10 @@ pub const Types = struct {
             .f32 => try words.append(self.allocator, .f32),
             .tuple => for (self.list(n.a, n.b)) |item| try words.appendSlice(self.allocator, try self.flat(item)),
             .record => for (0..n.b) |index| try words.appendSlice(self.allocator, try self.flat(self.recordField(ty, index).ty)),
-            .function => try words.appendSlice(self.allocator, &.{ .i32, .i32 }),
+            // A provider is its implementation closure; a state provider is
+            // its initial state.
+            .function, .provider => try words.appendSlice(self.allocator, &.{ .i32, .i32 }),
+            .state_provider => try words.appendSlice(self.allocator, try self.flat(self.list(n.a, n.b)[2])),
             .nominal => {
                 const cases = try self.variants(ty);
                 if (cases.payloads.len == 1) {

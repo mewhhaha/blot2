@@ -48,6 +48,9 @@ pub const Fn = struct {
     field_value: bool = false,
     /// Reference counts of this unit's local bindings, built on first use.
     use_counts: ?std.AutoHashMapUnmanaged(core.BindingId, u32) = null,
+    /// Installed providers, outermost first: the local holding the effect
+    /// context from before each, and the block depth it was installed at.
+    handles: std.ArrayList(struct { saved: u32, depth: u32 }) = .empty,
     code: W.Bytes = .{},
     locals: std.ArrayList(W.ValType) = .empty,
     parameter_words: u32 = 0,
@@ -271,6 +274,10 @@ pub const Fn = struct {
             .storage => self.storageOp(id),
             .record_merge => self.recordMerge(id),
             .result_associated => self.resultAssociated(id),
+            .operation_value => self.operationValue(id),
+            .effect_provider => self.effectProvider(id),
+            .state_provider => self.stateProvider(id),
+            .handle => self.handleNode(id),
             .break_ => self.breakNode(id),
             .panic => blk: {
                 try self.op(.unreachable_);
@@ -619,6 +626,178 @@ pub const Fn = struct {
         try self.refine(self.m.typeOf(id), ty);
         return self.makeClosure(instance, ty, captures, id);
     }
+    /// An effect operation as a function value: a closure over its
+    /// trampoline, which finds the newest provider frame for it.
+    fn operationValue(self: *Fn, id: core.Id) Error!Val {
+        const info = self.m.operationValue(id);
+        const operation = try self.operationType(info.identity, self.m.operationValueArguments(id), id);
+        const signature = try self.lower(info.signature, id);
+        const arrow = self.g.types.node(signature);
+        if (arrow.tag != .function) return self.g.fail(self.m, id, "operation of a non-function type", .{});
+        const operation_id = try self.g.operationId(operation);
+        const key: emit.InstanceKey = .{ .kind = .operation, .unit = 0, .id = operation_id, .ty = signature };
+        const instance = self.g.find(key) orelse try self.g.addInstanceWith(key, .empty, try self.g.arena.allocator().dupe(Ty, &.{arrow.a}), arrow.b, true, &.{}, self.m, id);
+        return self.makeClosure(instance, signature, &.{}, id);
+    }
+    /// The lowered nominal type naming an effect operation and its arguments,
+    /// as a provider's type names it.
+    fn operationType(self: *Fn, identity: T.NominalIdentity, arguments: []const T.Id, id: core.Id) Error!Ty {
+        const payload = try self.arena.alloc(u32, arguments.len + 2);
+        payload[0] = identity.unit;
+        payload[1] = identity.decl;
+        for (arguments, payload[2..]) |argument, *slot| slot.* = try self.lower(argument, id);
+        return self.g.types.intern(.nominal, payload);
+    }
+    /// The trampoline body: run the newest frame for this operation in the
+    /// context it was installed in.
+    fn operationBody(self: *Fn, instance: *const emit.Instance, argument: Val) Error!Val {
+        const rt = try self.g.runtime_();
+        const frame = try self.local32();
+        try self.opIndex(.global_get, rt.effect_context);
+        try self.opIndex(.local_set, frame);
+        const found = try self.open(.block);
+        const search = try self.open(.loop);
+        // An unhandled operation: the checker rejects these in exports.
+        try self.opIndex(.local_get, frame);
+        try self.op(.i32_eqz);
+        try self.op(.if_);
+        try self.code.byte(self.a(), 0x40);
+        try self.op(.unreachable_);
+        try self.op(.end);
+        try self.opIndex(.local_get, frame);
+        try self.memoryOp(.i32_load, 0);
+        try self.i32Const(instance.key.id);
+        try self.op(.i32_eq);
+        try self.br(.br_if, found);
+        try self.opIndex(.local_get, frame);
+        try self.memoryOp(.i32_load, 12);
+        try self.opIndex(.local_set, frame);
+        try self.br(.br, search);
+        try self.close();
+        try self.close();
+        const saved = try self.local32();
+        try self.opIndex(.global_get, rt.effect_context);
+        try self.opIndex(.local_set, saved);
+        try self.opIndex(.local_get, frame);
+        try self.memoryOp(.i32_load, 12);
+        try self.opIndex(.global_set, rt.effect_context);
+        const slot = try self.local32();
+        const env = try self.local32();
+        try self.opIndex(.local_get, frame);
+        try self.memoryOp(.i32_load, 4);
+        try self.opIndex(.local_set, slot);
+        try self.opIndex(.local_get, frame);
+        try self.memoryOp(.i32_load, 8);
+        try self.opIndex(.local_set, env);
+        const signature = instance.key.ty;
+        const result = try self.applyClosure(.{ .ty = signature, .words = try self.arena.dupe(u32, &.{ slot, env }) }, argument, 0);
+        try self.opIndex(.local_get, saved);
+        try self.opIndex(.global_set, rt.effect_context);
+        return result;
+    }
+    /// `@effect.provider Operation implementation`: the implementation closure.
+    fn effectProvider(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const ty = try self.typeOf(id);
+        const implementation = try self.expr(n.b);
+        if (implementation.ty == types.never) return implementation;
+        return .{ .ty = ty, .words = implementation.words };
+    }
+    /// `@effect.state Read Write initial`: the initial state.
+    fn stateProvider(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const ty = try self.typeOf(id);
+        const initial = try self.expr(n.c);
+        if (initial.ty == types.never) return initial;
+        return .{ .ty = ty, .words = initial.words };
+    }
+    /// `do provider: inner`: installs the provider's frames around `inner`.
+    /// A state provider's block yields (final state, inner result).
+    fn handleNode(self: *Fn, id: core.Id) Error!Val {
+        const n = self.m.node(id);
+        const provider = try self.expr(n.a);
+        if (provider.ty == types.never) return provider;
+        const rt = try self.g.runtime_();
+        const saved = try self.local32();
+        try self.opIndex(.global_get, rt.effect_context);
+        try self.opIndex(.local_set, saved);
+        const shape = self.g.types.node(provider.ty);
+        var cell: ?u32 = null;
+        var state: Ty = types.unit;
+        switch (shape.tag) {
+            .provider => try self.pushFrame(try self.g.operationId(shape.a), provider.words[0], provider.words[1], saved),
+            .state_provider => {
+                const items = self.g.types.list(shape.a, shape.b);
+                state = items[2];
+                const address = try self.allocate(try self.g.types.flatBytes(state));
+                try self.writeFlat(address, 0, .{ .ty = state, .words = provider.words }, id);
+                cell = address;
+                const get = try self.stateAccessor(.state_get, state, id);
+                const set = try self.stateAccessor(.state_set, state, id);
+                const frame = try self.local32();
+                try self.pushFrame(try self.g.operationId(items[0]), get, address, saved);
+                try self.opIndex(.global_get, rt.effect_context);
+                try self.opIndex(.local_set, frame);
+                try self.pushFrame(try self.g.operationId(items[1]), set, address, frame);
+            },
+            else => return self.g.fail(self.m, id, "handling a value of type {s}", .{@tagName(shape.tag)}),
+        }
+        try self.handles.append(self.arena, .{ .saved = saved, .depth = self.depth });
+        const inner = try self.expr(n.b);
+        _ = self.handles.pop();
+        if (inner.ty == types.never) return inner;
+        try self.opIndex(.local_get, saved);
+        try self.opIndex(.global_set, rt.effect_context);
+        const address = cell orelse return inner;
+        const final = try self.readFlat(address, 0, state, id);
+        const words = try self.arena.alloc(u32, final.words.len + inner.words.len);
+        @memcpy(words[0..final.words.len], final.words);
+        @memcpy(words[final.words.len..], inner.words);
+        const ty = try self.g.types.tuple(&.{ state, inner.ty });
+        try self.refine(self.m.typeOf(id), ty);
+        return .{ .ty = ty, .words = words };
+    }
+    /// A 4-byte-aligned load or store at constant `offset`.
+    fn memoryOp(self: *Fn, code: W.Op, offset: u32) Error!void {
+        try self.op(code);
+        try self.code.uleb(self.a(), 2);
+        try self.code.uleb(self.a(), offset);
+    }
+    /// Pushes a frame {operation, slot, environment, previous} and makes it
+    /// the effect context. `slot` and `environment` are locals.
+    fn pushFrame(self: *Fn, operation_id: u32, slot: u32, environment: u32, previous: u32) Error!void {
+        const rt = try self.g.runtime_();
+        const frame = try self.allocate(16);
+        for ([_]?u32{ null, slot, environment, previous }, 0..) |source, index| {
+            try self.opIndex(.local_get, frame);
+            if (source) |value| try self.opIndex(.local_get, value) else try self.i32Const(operation_id);
+            try self.memoryOp(.i32_store, @intCast(index * 4));
+        }
+        try self.opIndex(.local_get, frame);
+        try self.opIndex(.global_set, rt.effect_context);
+    }
+    /// A local holding the table slot of a state cell accessor closure.
+    fn stateAccessor(self: *Fn, kind: emit.InstanceKind, state: Ty, id: core.Id) Error!u32 {
+        const key: emit.InstanceKey = .{ .kind = kind, .unit = 0, .id = 0, .ty = state };
+        const parameter = if (kind == .state_get) types.unit else state;
+        const result = if (kind == .state_get) state else types.unit;
+        const instance = self.g.find(key) orelse try self.g.addInstanceWith(key, .empty, try self.g.arena.allocator().dupe(Ty, &.{parameter}), result, true, &.{}, self.m, id);
+        const slot = try self.local32();
+        try self.i32Const(self.g.instance(instance).slot);
+        try self.opIndex(.local_set, slot);
+        return slot;
+    }
+    /// Restores the effect context when control leaves installed providers
+    /// for a block at `depth` or outside.
+    fn leaveHandles(self: *Fn, depth: u32) Error!void {
+        for (self.handles.items) |installed| if (installed.depth >= depth) {
+            const rt = try self.g.runtime_();
+            try self.opIndex(.local_get, installed.saved);
+            try self.opIndex(.global_set, rt.effect_context);
+            return;
+        };
+    }
+
     /// Calls the closure `callee` with one argument.
     fn applyClosure(self: *Fn, callee: Val, argument: Val, id: core.Id) Error!Val {
         const arrow = self.g.types.node(callee.ty);
@@ -1082,6 +1261,15 @@ pub const Fn = struct {
                 const value = try self.expr(children[0]);
                 if (operation == .identity) return .{ .ty = ty, .words = value.words };
                 return self.copyContainer(value, ty, id);
+            },
+            .set => {
+                // A new array with one element replaced; the input is unchanged.
+                const container = try self.expr(children[0]);
+                const index = try self.scalarLocal(try self.expr(children[1]), id);
+                const value = try self.expr(children[2]);
+                const replaced = try self.copyContainer(container, ty, id);
+                try self.writeFlat(try self.elementAddress(replaced, index, id), 0, value, id);
+                return replaced;
             },
             .fill, .generate => {
                 const count = try self.scalarLocal(try self.expr(children[0]), id);
@@ -2209,6 +2397,7 @@ pub const Fn = struct {
             const label = self.labels.items[at];
             if ((label.target != n.b and label.kind != .function) or label.kind == .loop) continue;
             try self.deliver(value, label.result, id);
+            try self.leaveHandles(label.depth);
             try self.br(.br, label.depth);
             return neverVal();
         }
@@ -2746,6 +2935,7 @@ pub const Fn = struct {
             const label = self.labels.items[at];
             if (label.target != n.a or label.kind != .loop) continue;
             if (values.len != label.iteration.len) return self.g.fail(self.m, id, "break carries the wrong number of values", .{});
+            try self.leaveHandles(label.depth);
             if (n.op == .continue_) {
                 try self.assignCarries(values, label.iteration, label.slots, id);
                 if (label.release) |pair| {
@@ -2874,7 +3064,7 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
             try f.bindings.put(g.allocator, info.parameter.binding, inputs[0]);
             root = info.body;
         },
-        .partial, .primitive, .constructor, .host, .pool, .trap => {},
+        .partial, .primitive, .constructor, .host, .pool, .trap, .operation, .state_get, .state_set => {},
     }
     const slot = try f.arena.create(?Val);
     slot.* = if (instance.inferring) null else try f.fresh(instance.result, root);
@@ -2885,6 +3075,12 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
         .partial, .primitive, .constructor => try f.adapterBody(instance, captures, inputs[0]),
         .host => try f.hostBody(instance, captures, inputs[0]),
         .pool => try f.poolBody(instance),
+        .operation => try f.operationBody(instance, inputs[0]),
+        .state_get => try f.readFlat(0, 0, instance.result, root),
+        .state_set => blk: {
+            try f.writeFlat(0, 0, inputs[0], root);
+            break :blk Fn.unitVal();
+        },
         .trap => blk: {
             try f.op(.unreachable_);
             break :blk Val{ .ty = types.never };
@@ -3007,6 +3203,8 @@ pub fn emitConstantExport(g: *Generator, m: *const core.Module, body: *const cor
     try f.opIndex(.call, rt.release);
     try f.i32Const(rt.layout.stack_base);
     try f.opIndex(.global_set, rt.stack_pointer);
+    try f.i32Const(0);
+    try f.opIndex(.global_set, rt.effect_context);
     try f.opIndex(.call, instance.function);
     const value = try f.pop(ty, body.root);
     if (ty == types.unit) try f.i32Const(0) else try f.push(value);
@@ -3072,11 +3270,13 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     // The host requires the storage exports exactly when packets cross.
     const packets = isArray(parameter_abi) or isArray(result_abi) or (if (callback) |kinds| isArray(kinds[0]) or isArray(kinds[1]) else false);
     const rt = try g.runtime_();
-    // Recover temporaries a trapped earlier call may have left behind.
+    // Recover temporaries and providers a trapped earlier call left behind.
     try f.i32Const(1);
     try f.opIndex(.call, rt.release);
     try f.i32Const(rt.layout.stack_base);
     try f.opIndex(.global_set, rt.stack_pointer);
+    try f.i32Const(0);
+    try f.opIndex(.global_set, rt.effect_context);
     var argument: Val = .{ .ty = types.unit };
     if (callback) |kinds| {
         const slot = g.module.host_slots;

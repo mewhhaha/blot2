@@ -57,6 +57,9 @@ pub const Runtime = struct {
     heap_top: u32,
     persistent_top: u32,
     transport_top: u32,
+    /// The installed providers: the newest frame of
+    /// {operation id, closure slot, closure environment, previous frame}.
+    effect_context: u32,
     open: u32,
     open_persistent: u32,
     release: u32,
@@ -190,6 +193,7 @@ pub fn emit(a: A, module: *W.Module, budgets: Budgets) A.Error!Runtime {
         .heap_top = try module.addGlobal(.i32, true, layout.heap_base),
         .persistent_top = try module.addGlobal(.i32, true, layout.persistent_base),
         .transport_top = try module.addGlobal(.i32, true, layout.transport_base),
+        .effect_context = try module.addGlobal(.i32, true, 0),
         .open = try module.addFunction(try sig(module, 3, 2)),
         .open_persistent = try module.addFunction(try sig(module, 3, 2)),
         .release = try module.addFunction(try sig(module, 1, 0)),
@@ -806,7 +810,7 @@ pub fn emit(a: A, module: *W.Module, budgets: Budgets) A.Error!Runtime {
     // Helper names for traces; the globals share this struct.
     const info = @typeInfo(Runtime).@"struct";
     inline for (info.field_names, info.field_types) |name, ty| {
-        if (ty == u32 and !std.mem.endsWith(u8, name, "top") and !std.mem.eql(u8, name, "persistent_bottom") and !std.mem.eql(u8, name, "stack_pointer"))
+        if (ty == u32 and !std.mem.endsWith(u8, name, "top") and !std.mem.eql(u8, name, "persistent_bottom") and !std.mem.eql(u8, name, "stack_pointer") and !std.mem.eql(u8, name, "effect_context"))
             try module.names.put(a, @field(r, name), "runtime." ++ name);
     }
     return r;

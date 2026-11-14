@@ -28,7 +28,9 @@ pub const Val = struct {
 /// host: a Foreign callback adapter calling import `id`; pool: the
 /// lazily initialized persistent owner of a global array constant.
 /// trap: a closure of a type no use determines, which traps if called.
-pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor, host, pool, trap };
+/// operation: an effect operation's trampoline (id = operation id, ty = its
+/// signature); state_get / state_set: a state provider's cell accessors.
+pub const InstanceKind = enum(u8) { named, lambda, partial, primitive, constructor, host, pool, trap, operation, state_get, state_set };
 pub const InstanceKey = struct { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 };
 pub const Instance = struct {
     key: InstanceKey,
@@ -64,6 +66,8 @@ pub const Generator = struct {
     solve_depth: u32 = 0,
     /// Closures built for function values no use determines (they trap).
     trap_closures: u32 = 0,
+    /// Effect operations (lowered operation types) and their frame ids.
+    operation_ids: std.AutoHashMapUnmanaged(Ty, u32) = .empty,
     /// Type variables some scheme quantifies, per unit (built on demand).
     quantified: std.AutoHashMapUnmanaged(types.VarKey, void) = .empty,
     quantified_units: std.AutoHashMapUnmanaged(u32, void) = .empty,
@@ -93,6 +97,7 @@ pub const Generator = struct {
         self.host_imports.deinit(self.allocator);
         self.pool_globals.deinit(self.allocator);
         self.quantified.deinit(self.allocator);
+        self.operation_ids.deinit(self.allocator);
         self.quantified_units.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         for (self.failures.items) |item| self.allocator.free(item.failure.message);
@@ -247,7 +252,8 @@ pub const Generator = struct {
         const n = self.types.node(ty);
         const result = switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => false,
-            .function, .array, .list, .cursor, .grow, .resize, .ref, .view, .link => true,
+            .function, .provider, .array, .list, .cursor, .grow, .resize, .ref, .view, .link => true,
+            .state_provider => try self.holdsMemory(self.types.list(n.a, n.b)[2]),
             .tuple => blk: {
                 for (self.types.tupleItems(ty)) |item| if (try self.holdsMemory(item)) break :blk true;
                 break :blk false;
@@ -276,6 +282,12 @@ pub const Generator = struct {
 
     /// Whether a scheme of `m` quantifies variable `ty`. A variable none
     /// quantifies is one the checker left ambiguous: no use fixes it.
+    /// The provider frame id of effect operation `operation` (from 1).
+    pub fn operationId(self: *Generator, operation: Ty) Error!u32 {
+        const entry = try self.operation_ids.getOrPut(self.allocator, operation);
+        if (!entry.found_existing) entry.value_ptr.* = @intCast(self.operation_ids.count());
+        return entry.value_ptr.*;
+    }
     /// Only variables an instance key can reach count: ones the binding's
     /// type mentions, or obligations on reachable variables determine. A
     /// scheme may also quantify variables its body alone leaves open.
@@ -418,6 +430,9 @@ pub const Generator = struct {
             .constructor => "constructor",
             .host => "host",
             .trap => "trap",
+            .operation => "operation",
+            .state_get => "state_get",
+            .state_set => "state_set",
         };
         const text = try self.module.arena.allocator().print("{s}.{s}#{d}", .{ @tagName(key.kind), base, function });
         try self.module.names.put(self.allocator, function, text);

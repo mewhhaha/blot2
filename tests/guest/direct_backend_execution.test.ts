@@ -60,6 +60,12 @@ const cases: Record<string, Call[]> = {
   ],
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
+  "providers.blot": [
+    ["nested", 1, 120],
+    ["counted", 1, 42082],
+    ["returned", 9, 799],
+    ["returned", 1, 2099],
+  ],
   "generic_comprehensions.blot": [
     ["annotated_count", 4, 3],
     ["generic_count", 4, 3],
