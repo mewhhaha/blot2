@@ -61,6 +61,13 @@ const cases: Record<string, Call[]> = {
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
   "shared_fields.blot": [["first", 5, 314]],
+  "miscompiles.blot": [
+    ["lazy_and", false, false],
+    ["lazy_or", true, true],
+    ["alternatives", 38, 40],
+    ["alternatives", 1, 103],
+    ["positional", 7, 157],
+  ],
   "recursive_data.blot": [["tree", 1, 100010], ["chain", 10, 45]],
   "nested_updates_indexed.blot": [["grid", 10, 20], ["fields", 5, 22]],
   "simd_conversions.blot": [["lanes", 9, 253], ["signed", -7.9, -7170]],

@@ -2097,10 +2097,12 @@ pub const Fn = struct {
         const result = try self.fresh(types.boolean, id);
         const left = try self.expr(n.a);
         try self.push(left);
+        // The right operand runs only on one branch, so it may diverge there
+        // without making the whole expression diverge.
         if (n.op == .and_) {
             _ = try self.open(.if_);
-            const right = try self.expr(n.b);
-            try self.copy(right, result, id);
+            const right = try self.stmt(n.b);
+            if (right.ty != types.never) try self.copy(right, result, id);
             try self.op(.else_);
             try self.i32Const(0);
             try self.opIndex(.local_set, result.words[0]);
@@ -2109,8 +2111,8 @@ pub const Fn = struct {
             try self.i32Const(1);
             try self.opIndex(.local_set, result.words[0]);
             try self.op(.else_);
-            const right = try self.expr(n.b);
-            try self.copy(right, result, id);
+            const right = try self.stmt(n.b);
+            if (right.ty != types.never) try self.copy(right, result, id);
         }
         try self.close();
         return result;
@@ -2595,13 +2597,43 @@ pub const Fn = struct {
     fn construct(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
         const constructor = self.m.constructor(n.a);
-        const payload = if (n.b != 0) try self.expr(n.b) else unitVal();
+        // Positional arguments of a record-bodied constructor follow its
+        // declared field order; the record itself is in canonical order.
+        const declared = if (constructor.payload != 0 and self.m.types.node(constructor.payload).tag == .record) constructor.payload else 0;
+        const payload = if (n.b == 0)
+            unitVal()
+        else if (declared != 0 and self.m.node(n.b).tag == .product)
+            try self.positionalRecord(n.b, declared)
+        else
+            try self.expr(n.b);
         // The node's type, or the one the payload's value gives the nominal.
         const ty = self.g.types.lower(self.m, self.m.typeOf(id), self.env) catch |err| switch (err) {
             error.Unsupported => try self.constructedType(constructor, payload, id),
             else => return err,
         };
         return self.wrapVariant(ty, constructor.tag, payload, id);
+    }
+    /// A record from positional product node `id`, whose children follow
+    /// the declared record type `declared` (Core, this unit) field by field.
+    fn positionalRecord(self: *Fn, id: core.Id, declared: T.Id) Error!Val {
+        const shape = self.m.types.node(declared);
+        const children = self.m.children(id);
+        if (children.len != shape.b) return self.expr(id);
+        const fields = try self.arena.alloc(types.Field, children.len);
+        const parts = try self.arena.alloc(Val, children.len);
+        for (children, fields, parts, 0..) |child, *field, *part, index| {
+            part.* = try self.expr(child);
+            const spelling = self.m.fieldSpelling(self.m.types.recordField(shape, index).name) orelse return self.g.fail(self.m, id, "record field without a spelling", .{});
+            field.* = .{ .name = try self.g.types.fieldName(spelling), .ty = part.ty };
+        }
+        // record() sorts the slice it is given; keep `fields` beside `parts`.
+        const record = try self.g.types.record(try self.arena.dupe(types.Field, fields));
+        var words: std.ArrayList(u32) = .empty;
+        for (0..children.len) |position| {
+            const name = self.g.types.recordField(record, position).name;
+            for (fields, parts) |field, part| if (field.name == name) try words.appendSlice(self.arena, part.words);
+        }
+        return .{ .ty = record, .words = words.items };
     }
     fn constructedType(self: *Fn, constructor: core.Constructor, payload: Val, id: core.Id) Error!Ty {
         const shape = self.m.types.node(self.m.typeOf(id));
@@ -2635,12 +2667,13 @@ pub const Fn = struct {
         for (cases.tags, 0..) |candidate, position| if (candidate == tag) return position;
         return self.g.fail(self.m, id, "constructor tag missing from its type", .{});
     }
-    fn wrapVariant(self: *Fn, ty: Ty, tag: u32, payload: Val, id: core.Id) Error!Val {
+    fn wrapVariant(self: *Fn, ty: Ty, tag: u32, payload_: Val, id: core.Id) Error!Val {
         const cases = self.g.types.variants(ty) catch |err| switch (err) {
             error.Unsupported => return self.g.typeFailure(self.m, id),
             else => return err,
         };
-        if (payload.ty == types.never) return neverVal();
+        if (payload_.ty == types.never) return neverVal();
+        const payload = payload_;
         if (try self.isBoxed(ty, id)) {
             const memory_block = try self.newBlock(ty, id);
             if (cases.payloads.len > 1) {
@@ -2801,15 +2834,20 @@ pub const Fn = struct {
                     var before = try self.bindings.clone(self.a());
                     defer before.deinit(self.a());
                     for (self.m.rowPatterns(row), values) |pattern, value| try self.test_(pattern, value, row_fail, id);
-                    var it = self.bindings.iterator();
-                    while (it.next()) |entry| {
-                        const prior = before.get(entry.key_ptr.*);
-                        if (prior != null and std.mem.eql(u32, prior.?.words, entry.value_ptr.words)) continue;
-                        if (row_index == 0) {
+                    if (row_index == 0) {
+                        var it = self.bindings.iterator();
+                        while (it.next()) |entry| {
+                            const prior = before.get(entry.key_ptr.*);
+                            if (prior != null and std.mem.eql(u32, prior.?.words, entry.value_ptr.words)) continue;
                             const owned = try self.fresh(entry.value_ptr.ty, id);
                             try self.copy(entry.value_ptr.*, owned, id);
                             try first.put(self.arena, entry.key_ptr.*, owned);
-                        } else if (first.get(entry.key_ptr.*)) |target| try self.copy(entry.value_ptr.*, target, id);
+                        }
+                    } else {
+                        // Every name the first row binds: a later row's payload
+                        // may sit in the same locals as the first row's.
+                        var it = first.iterator();
+                        while (it.next()) |entry| if (self.bindings.get(entry.key_ptr.*)) |value| try self.copy(value, entry.value_ptr.*, id);
                     }
                     try self.br(.br, matched);
                     try self.close();

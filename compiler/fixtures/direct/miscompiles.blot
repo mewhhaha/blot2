@@ -1,0 +1,12 @@
+type Pick is data = $First U32 | $Second U32 | $Third F32
+type Position is data = $Position {z: U32, x: F32}
+entry func lazy_and (value: Bool): Bool => return value and (@panic "and")
+entry func lazy_or (value: Bool): Bool => return value or (@panic "or")
+entry func alternatives (n: U32): U32 => return do:
+  let value = if n > 5 then $Second n else $First (n + 100)
+  return case value of
+    $First v | $Second v => v + 2
+    $Third _ => 0
+entry func positional (n: U32): F32 => return do:
+  let p = $Position (n, 1.5)
+  return p.x * 100.0 + U32.to_f32 p.z
