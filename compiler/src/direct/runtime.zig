@@ -803,5 +803,11 @@ pub fn emit(a: A, module: *W.Module, budgets: Budgets) A.Error!Runtime {
     }
     r.layout = layout;
     module.memory_pages = (layout.total + 0xffff) / 0x10000;
+    // Helper names for traces; the globals share this struct.
+    const info = @typeInfo(Runtime).@"struct";
+    inline for (info.field_names, info.field_types) |name, ty| {
+        if (ty == u32 and !std.mem.endsWith(u8, name, "top") and !std.mem.eql(u8, name, "persistent_bottom") and !std.mem.eql(u8, name, "stack_pointer"))
+            try module.names.put(a, @field(r, name), "runtime." ++ name);
+    }
     return r;
 }

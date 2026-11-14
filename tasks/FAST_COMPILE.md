@@ -67,6 +67,31 @@ development tier currently emits identical bytes in the same time (6.9 s).
   the instance table, so it can run on all cores; final indices are assigned in
   a deterministic order at link time.
 
+## Status (14 November 2026)
+
+Phases 1–3 are done behind `--backend direct` (CLI, project protocol,
+`serve-project`, `build_gdev.ts`). Gdev Main compiles to 2,741,651 bytes
+(scoped: 9,203,490) and its first Pen frame is byte-identical to the scoped
+backend's (frame.png 19a03f0a…, frames.trace 86d50101…). On one native
+(`-Dllvm=false -Doptimize=fast`) compiler the backend takes 1.2 s against
+43.5 s; checking now dominates. `tests/guest/direct_backend_execution.test.ts`
+runs every fixture in `compiler/fixtures/direct/` on both backends.
+
+What the direct backend does beyond the plan above:
+
+- Generic bodies are typed from their values: each instance's environment is
+  refined by matching every expression's Core type against the type it
+  produced; a callee or lambda whose result only its body fixes is emitted
+  first; function-valued arguments are typed by what the callee expects,
+  including its field constraints on a still-unknown argument.
+- Values wider than 16 words are boxed (a pointer to an immutable copy).
+- A function stored in a literal record at a type no use fixes (a codec's
+  `encode` at a restore site) becomes a closure that traps if called.
+- Unsupported forms are listed together with counts and sample locations.
+
+Gdev needed three annotations (the `version` parameters of three codec
+`migrate` functions, committed in ../gdev).
+
 ## Phases
 
 1. Scalars, records, tuples, nominal data and `case`, blocks, `if`, loops,

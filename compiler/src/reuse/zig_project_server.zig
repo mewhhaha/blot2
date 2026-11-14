@@ -39,7 +39,8 @@ const Request = struct {
     profileTrace: bool = false,
     explainAllocations: bool = false,
     codegenTier: @import("../compilation_tier.zig").Tier = .optimized,
-    backend: @import("../execution_policy.zig").Backend = .scoped,
+    /// Absent keeps the server's --backend (default scoped).
+    backend: ?@import("../execution_policy.zig").Backend = null,
     storage: ?@import("../backend/storage_plan.zig").Budgets = null,
     shareMachineCode: bool = false,
     profileMemory: bool = false,
@@ -154,7 +155,7 @@ const OpenProject = struct {
         session.profile_backend = request.profileBackend;
         session.explain_allocations = request.explainAllocations;
         session.policy.codegen_tier = request.codegenTier;
-        session.policy.backend = request.backend;
+        if (request.backend) |backend| session.policy.backend = backend;
         session.policy.storage = request.storage orelse .{};
         session.policy.share_machine_code = request.shareMachineCode;
         session.policy.memory_profile = request.profileMemory;
@@ -650,12 +651,13 @@ pub fn runWithPolicy(a: Allocator, io: Io, reader: *Io.Reader, writer: *Io.Write
                 opened.?.allocation_counter = allocation_counter;
                 opened.?.session.policy.semantic_workers = policy.semantic_workers;
                 opened.?.session.policy.frontend_workers = policy.frontend_workers;
+                if (request.backend == null) opened.?.session.policy.backend = policy.backend;
                 opened.?.session.policy.semantic_components = policy.semantic_components;
                 try reply(a, writer, .{ .kind = "open", .id = request.id, .epoch = epoch, .revision = 0 }, &.{});
             },
             .build, .close, .checkpoint, .complete => {
                 const owner = if (opened) |*value| value else return error.NotOpen;
-                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainAllocations or request.codegenTier != .optimized or request.backend != .scoped or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
+                if (request.storage != null or request.nativeAssets != null or request.version != null or request.entry != null or request.prelude != null or request.stdRoot != null or request.imports.len != 0 or request.dependencies != null or request.profileBackend or request.profileTrace or request.explainAllocations or request.codegenTier != .optimized or request.backend != null or request.shareMachineCode or request.profileMemory or request.requireCollectorFree or request.codegenWorkers != default_codegen_workers or request.checkpoint) return error.InvalidRequest;
                 if (request.epoch == null or !std.mem.eql(u8, request.epoch.?, epoch) or request.revision == null or request.revision.? != owner.session.revisions) return error.RevisionMismatch;
                 if (request.kind == .complete) {
                     if (request.snapshot == null or request.filename == null or request.position == null or request.filename.?.len > 4096 or !validPath(request.filename.?)) return error.InvalidCompletionRequest;

@@ -44,6 +44,7 @@ const cases: Record<string, Call[]> = {
     ["chosen", 1, 1001],
   ],
   "view_calls.blot": [["run", 1, 25], ["run", 0, 3]],
+  "comprehensions.blot": [["comp", 10, 45], ["simple", 2, 15]],
   "closures.blot": [
     ["offset_twice", 2, 6],
     ["partials", 1, 123],

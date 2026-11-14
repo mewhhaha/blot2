@@ -36,7 +36,7 @@ const usage =
     \\       --require-collector-free rejects modules without a whole-arena certificate.
     \\       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.
     \\       --inference-budget STEPS sets a process-local inference limit (default: 1000000).
-    \\       --backend scoped|direct (build, build-project) selects the code generator (default: scoped).
+    \\       --backend scoped|direct (build, build-project, serve-project) selects the code generator (default: scoped).
     \\       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.
     \\       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.
     \\
@@ -621,6 +621,8 @@ fn run(init: std.process.Init) !bool {
                 policy.frontend_workers = (semanticPolicy(args[at + 1]) orelse return error.InvalidServeArguments).semantic_workers;
             } else if (std.mem.eql(u8, args[at], "--inference-budget")) {
                 try configureInferenceBudget(args[at + 1]);
+            } else if (std.mem.eql(u8, args[at], "--backend")) {
+                policy.backend = std.meta.stringToEnum(@import("execution_policy.zig").Backend, args[at + 1]) orelse return error.InvalidServeArguments;
             } else return error.InvalidServeArguments;
         }
         var input_buffer: [4096]u8 = undefined;

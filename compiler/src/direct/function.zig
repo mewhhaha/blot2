@@ -46,6 +46,8 @@ pub const Fn = struct {
     current_call: core.Id = 0,
     /// Set while evaluating a direct field value of a record literal.
     field_value: bool = false,
+    /// Reference counts of this unit's local bindings, built on first use.
+    use_counts: ?std.AutoHashMapUnmanaged(core.BindingId, u32) = null,
     code: W.Bytes = .{},
     locals: std.ArrayList(W.ValType) = .empty,
     parameter_words: u32 = 0,
@@ -215,6 +217,10 @@ pub const Fn = struct {
                 };
                 if (deferred and self.m.binding(n.a).scheme.variables.len != 0) {
                     try self.polymorphic.put(self.a(), n.a, n.b);
+                    break :blk unitVal();
+                }
+                if (try self.linearAppend(n.b)) |grown| {
+                    try self.bindings.put(self.a(), n.a, grown);
                     break :blk unitVal();
                 }
                 const value = try self.stmt(n.b);
@@ -1766,10 +1772,11 @@ pub const Fn = struct {
         // The parameter is a bare variable: its field constraints and the
         // argument's own nominal type give the argument's type arguments.
         const b = body orelse return null;
-        return self.fromFieldConstraints(tm, b.scheme.obligations, formal, &env, values[index], index, target);
+        return self.fromFieldConstraints(tm, b.scheme.obligations, formal, &env, index);
     }
-    fn fromFieldConstraints(self: *Fn, tm: *const core.Module, goals_span: T.List, formal: T.Id, env: *types.Env, _: Val, index: usize, target: core.BindingRef) Error!?Ty {
-        _ = target;
+    /// The nominal type of argument `index` of the current call, with its
+    /// type arguments taken from the callee's field constraints on it.
+    fn fromFieldConstraints(self: *Fn, tm: *const core.Module, goals_span: T.List, formal: T.Id, env: *types.Env, index: usize) Error!?Ty {
         const info = self.m.call(self.current_call);
         const argument_type = self.m.typeOf(info.arguments[index]);
         const shape = self.m.types.node(argument_type);
@@ -1777,10 +1784,10 @@ pub const Fn = struct {
         const identity: T.NominalIdentity = .{ .unit = shape.a, .decl = shape.b };
         const owner = self.g.types.module(identity.unit) orelse return null;
         const ordinal = self.g.types.nominalOrdinal(owner, identity) catch return null;
-        const nominal = owner.nominal(ordinal);
         const constructors = owner.nominalConstructors(ordinal);
         if (constructors.len != 1) return null;
-        const payload = owner.types.node(owner.constructor(constructors[0]).payload);
+        const constructor = owner.constructor(constructors[0]);
+        const payload = owner.types.node(constructor.payload);
         if (payload.tag != .record) return null;
         var params_env: types.Env = .empty;
         defer params_env.deinit(self.a());
@@ -1795,12 +1802,49 @@ pub const Fn = struct {
                 if (std.mem.eql(u8, name, spelling)) try self.g.types.match(owner, field.ty, wanted, &params_env);
             }
         }
-        const parameters = owner.types.list(nominal.parameters);
-        const words = try self.arena.alloc(u32, parameters.len + 2);
-        words[0] = identity.unit;
-        words[1] = identity.decl;
-        for (parameters, words[2..]) |parameter, *slot| slot.* = params_env.get(.{ .unit = owner.unit, .ty = parameter }) orelse types.never;
-        return try self.g.types.intern(.nominal, words);
+        // The payload's fields bind the constructor's scheme variables.
+        const signature = owner.types.node(constructor.scheme.root);
+        const result = if (signature.tag == .function) signature.b else constructor.scheme.root;
+        return try self.g.types.lowerHoles(owner, result, &params_env);
+    }
+    /// `acc := @list.append acc x` (a comprehension's accumulator) where the
+    /// old `acc` has no other use: grow the same owner in place, so the loop
+    /// carries an owner created before it instead of a fresh one.
+    fn linearAppend(self: *Fn, id: core.Id) Error!?Val {
+        const n = self.m.node(id);
+        if (n.tag != .array_op or self.m.arrayOperation(id) != .append) return null;
+        const children = self.m.children(id);
+        if (children.len != 2 or self.m.node(children[0]).tag != .reference) return null;
+        const ref = self.m.reference(children[0]);
+        if (ref.unit != 0 and ref.unit != self.m.unit) return null;
+        const list = self.bindings.get(ref.binding) orelse return null;
+        if (self.tagOf(list.ty) != .list) return null;
+        if (try self.uses(ref.binding) != 1) return null;
+        const value = try self.expr(children[1]);
+        const rt = try self.g.runtime_();
+        const address = try self.local32();
+        try self.opIndex(.local_get, list.words[0]);
+        try self.opIndex(.local_get, list.words[1]);
+        try self.i32Const(try self.stride(try self.elementOf(list.ty, id), id));
+        try self.opIndex(.call, rt.push);
+        try self.opIndex(.local_set, address);
+        try self.writeFlat(address, 0, value, id);
+        return .{ .ty = list.ty, .words = list.words };
+    }
+    /// References to local `binding` in this body, counted once per body.
+    fn uses(self: *Fn, binding: core.BindingId) Error!u32 {
+        if (self.use_counts == null) {
+            var counts: std.AutoHashMapUnmanaged(core.BindingId, u32) = .empty;
+            for (self.m.nodes, 0..) |node, index| if (node.tag == .reference) {
+                const target = self.m.references[node.a];
+                if (target.unit != 0 and target.unit != self.m.unit) continue;
+                const entry = try counts.getOrPut(self.arena, target.binding);
+                entry.value_ptr.* = if (entry.found_existing) entry.value_ptr.* + 1 else 1;
+                _ = index;
+            };
+            self.use_counts = counts;
+        }
+        return self.use_counts.?.get(binding) orelse 0;
     }
     /// Whether call node `id` applies a named function to fewer arguments
     /// than its parameters.

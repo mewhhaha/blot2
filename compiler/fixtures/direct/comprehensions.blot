@@ -1,0 +1,10 @@
+func pair (a: Array U32) -> (b: Array U32) => return a[0] + b[0]
+entry func comp (n: U32): U32 => return do:
+  let rows = #[pair #[t] #[t + n] | t <- #[1, 2, 3]]
+  let total = 0
+  for r in rows:
+    total := self + r
+  break total + rows.length
+entry func simple (n: U32): U32 => return do:
+  let rows = #[t * n | t <- #[1, 2, 3]]
+  break rows[0] + rows[1] + rows[2] + rows.length
