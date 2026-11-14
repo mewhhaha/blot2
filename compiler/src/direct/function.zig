@@ -53,6 +53,8 @@ pub const Fn = struct {
     field_value: bool = false,
     /// Reference counts of this unit's local bindings, built on first use.
     use_counts: ?std.AutoHashMapUnmanaged(core.BindingId, u32) = null,
+    /// Nested forwarding resolutions in progress (bounded against cycles).
+    forward_depth: u32 = 0,
     /// Stores of memory-holding values: a loop body that makes one cannot
     /// release per iteration, since older storage may now refer to it.
     memory_stores: u32 = 0,
@@ -1035,7 +1037,23 @@ pub const Fn = struct {
     }
     /// A fresh scope block holding one boxed value of `ty`.
     fn newBlock(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
-        return self.allocate(try self.flatBytes(ty, id));
+        return self.allocate(try self.blockBytes(ty, id));
+    }
+    /// Bytes of a boxed value's block.
+    fn blockBytes(self: *Fn, ty: Ty, id: core.Id) Error!u32 {
+        return self.g.types.blockBytes(ty) catch |err| switch (err) {
+            error.Unsupported => return self.g.typeFailure(self.m, id),
+            else => return err,
+        };
+    }
+    /// Whether `ty` is boxed and copied by contents (recursive types are
+    /// held by their pointer, which is their flat form).
+    fn copiedBox(self: *Fn, ty: Ty, id: core.Id) Error!bool {
+        if (!try self.isBoxed(ty, id)) return false;
+        return !(self.g.types.isRecursive(ty) catch |err| switch (err) {
+            error.Unsupported => return self.g.typeFailure(self.m, id),
+            else => return err,
+        });
     }
     fn memoryCopy(self: *Fn, to: u32, to_offset: u32, from: u32, bytes: u32) Error!void {
         try self.opIndex(.local_get, to);
@@ -1053,13 +1071,13 @@ pub const Fn = struct {
     /// Writes `value` in flat form at `base + offset`.
     fn writeFlat(self: *Fn, base: u32, offset: u32, value: Val, id: core.Id) Error!void {
         if (value.ty == types.never) return;
-        if (try self.isBoxed(value.ty, id)) return self.memoryCopy(base, offset, value.words[0], try self.flatBytes(value.ty, id));
+        if (try self.copiedBox(value.ty, id)) return self.memoryCopy(base, offset, value.words[0], try self.blockBytes(value.ty, id));
         try self.storeAt(base, offset, value);
     }
     /// Reads a value of `ty` at `base + offset` of an immutable block: a
     /// boxed value shares the block, others load into locals.
     fn readFlat(self: *Fn, base: u32, offset: u32, ty: Ty, id: core.Id) Error!Val {
-        if (try self.isBoxed(ty, id)) {
+        if (try self.copiedBox(ty, id)) {
             const pointer = try self.local(.i32);
             try self.opIndex(.local_get, base);
             try self.i32Const(offset);
@@ -1071,9 +1089,9 @@ pub const Fn = struct {
     }
     /// Element reads copy: storage elements change through their owner.
     fn loadElement(self: *Fn, address: u32, offset: u32, ty: Ty, id: core.Id) Error!Val {
-        if (try self.isBoxed(ty, id)) {
+        if (try self.copiedBox(ty, id)) {
             const memory_block = try self.newBlock(ty, id);
-            try self.memoryCopy(memory_block, 0, address, try self.flatBytes(ty, id));
+            try self.memoryCopy(memory_block, 0, address, try self.blockBytes(ty, id));
             if (offset != 0) return self.g.fail(self.m, id, "offset boxed element read", .{});
             return .{ .ty = ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
         }
@@ -1780,7 +1798,7 @@ pub const Fn = struct {
         if (replacement.ty == types.never) return replacement;
         if (replacement.ty != field_ty) return self.g.fail(self.m, id, "an update that changes a boxed field's type", .{});
         const memory_block = try self.newBlock(value.ty, id);
-        try self.memoryCopy(memory_block, 0, value.words[0], try self.flatBytes(value.ty, id));
+        try self.memoryCopy(memory_block, 0, value.words[0], try self.blockBytes(value.ty, id));
         try self.writeFlat(memory_block, offset, replacement, id);
         return .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{memory_block}) };
     }
@@ -2281,7 +2299,14 @@ pub const Fn = struct {
             if (arguments.len < parameters.len) return self.partial(.partial, target, try self.restType(callee, arguments.len, id), arguments, id);
             const direct = arguments[0..parameters.len];
             const after = try self.restType(callee, parameters.len, id);
-            var value = (try self.forward(tm, body, direct, callee, after, id)) orelse blk: {
+            // Forwarding chains are short; a cycle (a function that forwards to
+            // itself) ends in an ordinary call.
+            const forwarded = if (self.forward_depth < 8) forwarded: {
+                self.forward_depth += 1;
+                defer self.forward_depth -= 1;
+                break :forwarded try self.forward(tm, body, direct, callee, after, id);
+            } else null;
+            var value = forwarded orelse blk: {
                 const instance = try self.g.named(target, callee, self.m, id);
                 if (self.g.instance(instance).inferring) return self.g.fail(self.m, id, "recursion through a function whose result type its body determines", .{});
                 for (direct, self.g.instance(instance).parameters) |argument, parameter| {
@@ -2454,7 +2479,11 @@ pub const Fn = struct {
         const depth = try self.open(.block);
         try self.labels.append(self.a(), .{ .target = id, .depth = depth, .result = result });
         var last = unitVal();
-        for (self.m.children(id)) |child| last = try self.stmt(child);
+        for (self.m.children(id)) |child| {
+            // Statements after one that always diverges are unreachable.
+            if (last.ty == types.never) break;
+            last = try self.stmt(child);
+        }
         _ = self.labels.pop();
         try self.close();
         if (result.*) |value| return value;
@@ -2687,7 +2716,7 @@ pub const Fn = struct {
                 if (payload.tag != .record or variants[0].field >= payload.b) return self.g.fail(self.m, id, "constructor field projection", .{});
                 break self.m.types.recordField(payload, variants[0].field).name;
             } else return self.g.fail(self.m, id, "projected constructor missing from the catalog", .{});
-            if (variants.len > 1) return self.g.fail(self.m, id, "field shared by several constructors", .{});
+            if (variants.len > 1) return self.sharedField(value, variants, name_symbol, id);
         }
         const spelling = self.m.fieldSpelling(name_symbol) orelse return self.g.fail(self.m, id, "projected field without a spelling", .{});
         const name = try self.g.types.fieldName(spelling);
@@ -2714,6 +2743,35 @@ pub const Fn = struct {
         return self.callTarget(target, arguments, callee, try self.restType(callee, 1, id), id);
     }
 
+    /// A field several constructors declare: select the variant by its tag
+    /// and read the field from its payload. Other constructors trap.
+    fn sharedField(self: *Fn, value: Val, variants: []const core.ProjectionVariant, field: u32, id: core.Id) Error!Val {
+        const spelling = self.m.fieldSpelling(field) orelse return self.g.fail(self.m, id, "projected field without a spelling", .{});
+        const name = try self.g.types.fieldName(spelling);
+        const tag = try self.local32();
+        try self.opIndex(.local_get, value.words[0]);
+        if (try self.isBoxed(value.ty, id)) try self.memoryOp(.i32_load, 0);
+        try self.opIndex(.local_set, tag);
+        var result: ?Val = null;
+        const exit = try self.open(.block);
+        for (variants) |variant| {
+            const next = try self.open(.block);
+            try self.opIndex(.local_get, tag);
+            try self.i32Const(variant.tag);
+            try self.op(.i32_ne);
+            try self.br(.br_if, next);
+            const payload = try self.unwrapVariant(value, variant.tag, id);
+            const position = self.g.types.findField(payload.ty, name) orelse return self.g.fail(self.m, id, "shared field missing from a constructor", .{});
+            const item = try self.recordField(payload, position, id);
+            if (result == null) result = try self.fresh(item.ty, id);
+            try self.copy(item, result.?, id);
+            try self.br(.br, exit);
+            try self.close();
+        }
+        try self.op(.unreachable_);
+        try self.close();
+        return result orelse neverVal();
+    }
     fn match(self: *Fn, id: core.Id) Error!Val {
         const info = self.m.matchInfo(id);
         const inputs = self.m.matchInputs(id);
@@ -2895,7 +2953,7 @@ pub const Fn = struct {
                 continue;
             }
             if (value.ty == types.never or value.words[0] == target.words[0]) continue;
-            try self.memoryCopy(target.words[0], 0, value.words[0], try self.flatBytes(value.ty, id));
+            try self.memoryCopy(target.words[0], 0, value.words[0], try self.blockBytes(value.ty, id));
         }
         try self.assign(plain_values.items, plain_targets.items, id);
     }
@@ -2915,7 +2973,7 @@ pub const Fn = struct {
         // iteration can release what it allocated.
         const slots = try self.arena.alloc(bool, carries.len);
         for (incoming, iteration, outgoing, slots) |value, *current, *after, *slot| {
-            slot.* = try self.isBoxed(value.ty, id);
+            slot.* = try self.copiedBox(value.ty, id);
             current.* = if (slot.*) .{ .ty = value.ty, .words = try self.arena.dupe(u32, &.{try self.newBlock(value.ty, id)}) } else try self.fresh(value.ty, id);
             after.* = try self.fresh(value.ty, id);
         }
@@ -3387,7 +3445,8 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     const arrow = g.types.node(ty);
     if (via_closure and arrow.tag != .function) return g.fail(m, body.root, "exported constant of a non-function type", .{});
     const parameter = if (via_closure) arrow.a else instance.parameters[0];
-    const result_ty = if (via_closure) arrow.b else instance.result;
+    // The declared result: a body that always diverges has result never.
+    const result_ty = if (via_closure or instance.result == types.never) arrow.b else instance.result;
     const callback = callbackAbi(g, parameter);
     const parameter_abi: Abi = if (callback != null) .unit else abiKind(g, parameter) orelse return g.failCode(m, body.root, .entry_type, "entry parameters of type {s} are not supported", .{@tagName(g.types.node(parameter).tag)});
     const result_abi = abiKind(g, result_ty) orelse return g.failCode(m, body.root, .entry_type, "entry results of type {s} are not supported", .{@tagName(g.types.node(result_ty).tag)});
@@ -3435,6 +3494,13 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
         try f.opIndex(.call, instance.function);
         break :blk try f.pop(instance.result, body.root);
     };
+    if (result.ty == types.never or (result.ty != result_ty and g.types.node(result.ty).tag == .never)) {
+        // The body always diverges: the export traps with it.
+        try f.op(.unreachable_);
+        try f.op(.end);
+        try finish(g, function, &f);
+        return exportEntry(g, m, body, abi, function, callback, parameter_abi, result_abi, packets);
+    }
     if (isArray(result_abi)) {
         const packet = try f.toPacket(result, body.root);
         try f.i32Const(1);
@@ -3447,6 +3513,10 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     }
     try f.op(.end);
     try finish(g, function, &f);
+    return exportEntry(g, m, body, abi, function, callback, parameter_abi, result_abi, packets);
+}
+/// Exports `function` under the body's name and writes its ABI entry.
+fn exportEntry(g: *Generator, m: *const core.Module, body: *const core.Body, abi: *W.Bytes, function: u32, callback: ?[2]Abi, parameter_abi: Abi, result_abi: Abi, packets: bool) Error!void {
     const name = m.name(body.export_name);
     try g.module.exportItem(name, .function, function);
     try abi.name(g.allocator, name);
@@ -3457,6 +3527,7 @@ pub fn emitExport(g: *Generator, m: *const core.Module, body: *const core.Body, 
     } else try abi.byte(g.allocator, @backingInt(parameter_abi));
     try abi.byte(g.allocator, @backingInt(result_abi));
     if (packets and !g.exported_storage) {
+        const rt = try g.runtime_();
         g.exported_storage = true;
         try g.module.exportItem("blot:memory", .memory, 0);
         try g.module.exportItem("blot:allocate", .function, rt.allocate);

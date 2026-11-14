@@ -262,6 +262,8 @@ pub const Generator = struct {
     /// or slot-held value is copied flat.
     pub fn contentsHoldMemory(self: *Generator, ty: Ty) Error!bool {
         if (self.contents_memory.get(ty)) |hit| return hit;
+        // A recursive type's flat form is a pointer into scope memory.
+        if (self.types.isRecursive(ty) catch false) return true;
         const n = self.types.node(ty);
         const result = switch (n.tag) {
             .unit, .boolean, .u32, .f32, .never => false,

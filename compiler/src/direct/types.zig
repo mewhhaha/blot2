@@ -65,6 +65,9 @@ pub const Types = struct {
     closed: std.AutoHashMapUnmanaged(VarKey, Ty) = .empty,
     nominal_positions: std.AutoHashMapUnmanaged(T.NominalIdentity, u32) = .empty,
     in_layout: std.AutoHashMapUnmanaged(Ty, void) = .empty,
+    /// Nominal types that contain themselves: always one pointer to an
+    /// immutable block, even inside other values; `contents` is the block.
+    recursive: std.AutoHashMapUnmanaged(Ty, []const W.ValType) = .empty,
     /// The Core type that last failed to lower, for diagnostics.
     failure: ?VarKey = null,
     holes: bool = false,
@@ -92,6 +95,7 @@ pub const Types = struct {
         self.closed.deinit(a);
         self.nominal_positions.deinit(a);
         self.in_layout.deinit(a);
+        self.recursive.deinit(a);
         self.arena.deinit();
     }
     pub fn node(self: *const Types, ty: Ty) Node {
@@ -419,7 +423,25 @@ pub const Types = struct {
     pub fn boxed(self: *Types, ty: Ty) Error!bool {
         const tag = self.node(ty).tag;
         if (tag != .tuple and tag != .record and tag != .nominal) return false;
-        return (try self.flat(ty)).len > box_words;
+        const words = try self.flat(ty);
+        return self.recursive.contains(ty) or words.len > box_words;
+    }
+    /// Whether `ty` contains itself and so is always held by pointer.
+    pub fn isRecursive(self: *Types, ty: Ty) Error!bool {
+        if (self.node(ty).tag != .nominal) return false;
+        _ = try self.flat(ty);
+        return self.recursive.contains(ty);
+    }
+    /// The machine words of a boxed value's block: a recursive type's
+    /// contents, otherwise its flat form.
+    pub fn blockFlat(self: *Types, ty: Ty) Error![]const W.ValType {
+        const words = try self.flat(ty);
+        return self.recursive.get(ty) orelse words;
+    }
+    pub fn blockBytes(self: *Types, ty: Ty) Error!u32 {
+        var bytes: u32 = 0;
+        for (try self.blockFlat(ty)) |kind| bytes += if (kind == .v128) 16 else 4;
+        return bytes;
     }
     /// A value's register words: its flat words, or one pointer if boxed.
     pub fn layout(self: *Types, ty: Ty) Error![]const W.ValType {
@@ -437,6 +459,11 @@ pub const Types = struct {
     pub fn flat(self: *Types, ty: Ty) Error![]const W.ValType {
         if (self.layouts.items[ty]) |hit| return hit;
         if (self.in_layout.contains(ty)) {
+            // A nominal reached from its own layout is held by pointer.
+            if (self.node(ty).tag == .nominal) {
+                if (!self.recursive.contains(ty)) try self.recursive.put(self.allocator, ty, &.{});
+                return &.{.i32};
+            }
             self.failure_reason = "recursive data type needs an indirection";
             return error.Unsupported;
         }
@@ -491,6 +518,11 @@ pub const Types = struct {
             .cursor => try words.appendSlice(self.allocator, &.{ .i32, .i32, .i32, .i32 }),
         }
         const owned = try self.arena.allocator().dupe(W.ValType, words.items);
+        if (self.recursive.getPtr(ty)) |contents| {
+            contents.* = owned;
+            self.layouts.items[ty] = &.{.i32};
+            return &.{.i32};
+        }
         self.layouts.items[ty] = owned;
         return owned;
     }

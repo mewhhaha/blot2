@@ -1,0 +1,6 @@
+type Packet is data = $Packet {head: U32, tail: Array U32} | $Alternate {tail: Array U32, head: U32}
+func read (value: Packet) => return value.tail
+entry func first (n: U32): U32 => return do:
+  let a = $Packet {head: 1, tail: #[n, 2]}
+  let b = $Alternate {tail: #[30, 40, 50], head: 9}
+  return read(a)[0] + read(b).length * 100 + b.head
