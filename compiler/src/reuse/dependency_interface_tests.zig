@@ -553,7 +553,7 @@ test "module abstraction compiled principal has no opaque representation or priv
     const producer = &owner.modules[0];
     for (producer.interface.nominals) |nominal| if (nominal.is_opaque) {
         try std.testing.expectEqual(@as(u32, 0), nominal.constructors.len);
-        try std.testing.expectEqual(@import("../backend/opaque_storage.zig").Storage{ .kind = .u32 }, nominal.storage);
+        try std.testing.expectEqual(@import("../check/opaque_storage.zig").Storage{ .kind = .u32 }, nominal.storage);
     };
     for (producer.interface.constructors) |constructor| if (constructor.private) {
         try std.testing.expectEqual(@as(u32, 0), constructor.name);

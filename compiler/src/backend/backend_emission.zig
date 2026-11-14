@@ -6,7 +6,7 @@ const core = @import("../check/core.zig");
 const types = @import("../check/types.zig");
 const wasm = @import("wasm.zig");
 const scalar_ops = @import("scalar_ops.zig");
-const simd_intrinsics = @import("simd_intrinsics.zig");
+const simd_intrinsics = @import("../check/simd_intrinsics.zig");
 const core_eval = @import("../eval/core_eval.zig");
 const type_evidence = @import("../eval/type_evidence.zig");
 const substitution_keys = @import("../reuse/substitution_keys.zig");
@@ -4865,7 +4865,7 @@ pub const Owner = struct {
         const input_collection = if (input_node.tag == .cursor) input_node.a else input_layout;
         const row_words = try g.collectionRowWords(input_collection);
         const stride = packed_layout.stride(row_words);
-        const expected = @import("collection_ops.zig").arity(op);
+        const expected = @import("../check/collection_ops.zig").arity(op);
         if (locals.len == 0 or locals.len != expected or machines.len != expected) return g.fail(self.unit_id, id, .unsupported);
         switch (op) {
             .flatten => try self.arrayFlatten(locals[0], g.representations.store.node(result_layout).a),

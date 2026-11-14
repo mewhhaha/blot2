@@ -4909,7 +4909,7 @@ pub const Session = struct {
         const module = &self.units[owner];
         const operation = module.arrayOperation(id);
         const arguments = module.children(id);
-        const arity = @import("../backend/collection_ops.zig").arity(operation);
+        const arity = @import("../check/collection_ops.zig").arity(operation);
         if (arguments.len != arity) return self.failNode(owner, id, .unsupported);
         var values: [3]ValueId = undefined;
         for (arguments, 0..) |argument, index| {
@@ -5076,7 +5076,7 @@ pub const Session = struct {
     /// Each lane follows its scalar kernel exactly. Min/max use the prelude's
     /// ordered selection; relaxed multiply-add is evaluated fused here.
     fn simdValue(self: *Session, owner: usize, id: core.Id, op: core.Op, left: ValueId, right: ValueId) Error!ValueId {
-        const simd = @import("../backend/simd_intrinsics.zig");
+        const simd = @import("../check/simd_intrinsics.zig");
         const a = try self.simdLanes(owner, id, left);
         var lanes: [4]Value = undefined;
         switch (op) {

@@ -6,7 +6,7 @@
 //! actual arguments are still evaluated in their written order.
 const core = @import("../check/core.zig");
 const known_call = @import("known_call.zig");
-const simd = @import("simd_intrinsics.zig");
+const simd = @import("../check/simd_intrinsics.zig");
 pub const Plan = struct {
     target: core.BindingRef,
     op: core.Op,

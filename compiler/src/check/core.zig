@@ -18,11 +18,11 @@ pub const Name = struct { start: u32 = 0, len: u32 = 0 };
 /// Physical layouts use spelling, never the incidental interning order.
 pub const FieldName = struct { symbol: u32, spelling: Name };
 pub const Tag = enum(u8) { invalid, constant, reference, scalar, logical, call, if_value, block, suite, bind, return_, if_stmt, product, record, construct, project, match, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage };
-pub const ArrayOp = @import("../backend/collection_ops.zig").Op;
+pub const ArrayOp = @import("collection_ops.zig").Op;
 pub const PrimitiveKind = enum(u8) { scalar, array };
 pub const Primitive = struct { kind: PrimitiveKind, op: Op = .none, array_op: ArrayOp = .length, arity: u8 };
 /// Operations after convert_f32_u32 apply only to four-lane products; see
-/// `backend/simd_intrinsics.zig` for their operand shapes.
+/// `check/simd_intrinsics.zig` for their operand shapes.
 pub const Op = enum(u8) { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_ };
 /// constant a=bits; reference a=references index; scalar a=left,b=right(0 unary),
 /// c=1 for associated operator dispatch, c=0 for authoritative compiler primitives.
@@ -81,7 +81,7 @@ pub const Call = struct { target: BindingRef, callee_type: T.Id, arguments: []co
 pub const Merge = struct { node: Id, result: BindingId, then_binding: BindingId, else_binding: BindingId };
 pub const Obligation = struct { ty: T.Id, kind: T.ObligationKind, span: Span, name: u32 = 0, result: T.Id = 0, other: T.Id = 0, signature: T.Id = 0, operator: T.Operator = .none, identity: T.NominalIdentity = .{ .unit = 0, .decl = 0 }, explicit: bool = false, qualification_span: ?Span = null, qualification_unit: u32 = 0, diagnostic_name: Name = .{} };
 pub const Associated = struct { identity: T.NominalIdentity, member: u32, operator: T.Operator, target: BindingRef };
-pub const Nominal = struct { affine: bool = false, has_usage: bool = false, closed_storage: bool = false, private: bool = false, is_opaque: bool = false, storage: @import("../backend/opaque_storage.zig").Storage = .{}, diagnostic_name: Name = .{}, diagnostic_origin: Name = .{}, identity: T.NominalIdentity, parameters: T.List, variables: T.List, constructors: List };
+pub const Nominal = struct { affine: bool = false, has_usage: bool = false, closed_storage: bool = false, private: bool = false, is_opaque: bool = false, storage: @import("opaque_storage.zig").Storage = .{}, diagnostic_name: Name = .{}, diagnostic_origin: Name = .{}, identity: T.NominalIdentity, parameters: T.List, variables: T.List, constructors: List };
 /// Source operation names survive frontend teardown; identities still select
 /// effects independently of these owned diagnostic strings.
 pub const OperationName = struct {

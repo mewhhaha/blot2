@@ -455,7 +455,7 @@ pub const ScalarAdmission = struct {
                 if (kind != .local and kind != .parameter) return null;
             },
             .scalar, .logical => {
-                if (n.tag == .scalar and (n.c != 0 or @import("simd_intrinsics.zig").literalLanes(n.op))) return null;
+                if (n.tag == .scalar and (n.c != 0 or @import("../check/simd_intrinsics.zig").literalLanes(n.op))) return null;
                 children = operands[0..2];
             },
             .bind => children = operands[1..2],
@@ -737,7 +737,7 @@ fn leafBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usiz
             if (kind != .local and kind != .parameter) return false;
         },
         .scalar, .logical => {
-            if (n.tag == .scalar and (n.c != 0 or @import("simd_intrinsics.zig").literalLanes(n.op))) return false;
+            if (n.tag == .scalar and (n.c != 0 or @import("../check/simd_intrinsics.zig").literalLanes(n.op))) return false;
             if (!leafBody(m, n.a, remaining, depth + 1, readers, calls) or !leafBody(m, n.b, remaining, depth + 1, readers, calls)) return false;
         },
         .bind, .construct => return leafBody(m, n.b, remaining, depth + 1, readers, calls),
@@ -786,7 +786,7 @@ fn leafBody(m: *const core.Module, root: core.Id, remaining: *usize, depth: usiz
         },
         .array_op => {
             if (!readers) return false;
-            const op: @import("collection_ops.zig").Op = @fromBackingInt(@intCast(n.c));
+            const op: @import("../check/collection_ops.zig").Op = @fromBackingInt(@intCast(n.c));
             switch (op) {
                 .length, .get, .identity, .cursor, .cursor_has, .cursor_value, .cursor_advance => {},
                 else => return false,

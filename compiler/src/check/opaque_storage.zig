@@ -1,7 +1,7 @@
 //! An opaque value has one guest word. The public storage recipe describes
 //! only its machine type and ownership, with no source payload graph or names.
-const T = @import("../check/types.zig");
-const F = @import("../check/frozen_types.zig");
+const T = @import("types.zig");
+const F = @import("frozen_types.zig");
 pub const Storage = struct {
     kind: enum { unknown, unit, boolean, u32, f32, reference, parameter } = .unknown,
     parameter: u32 = 0,

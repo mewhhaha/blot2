@@ -211,7 +211,7 @@ fn scalarArity(op: core.Op) BoundsError!u8 {
 }
 fn arrayArity(op: core.ArrayOp) BoundsError!u8 {
     try enumValue(core.ArrayOp, op);
-    return @import("../backend/collection_ops.zig").arity(op);
+    return @import("collection_ops.zig").arity(op);
 }
 
 const Bounds = struct {

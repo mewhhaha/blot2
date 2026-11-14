@@ -11,7 +11,7 @@ comptime {
     _ = @import("check/core_case_statement_tests.zig");
     _ = @import("check/core_update_tests.zig");
     _ = @import("check/core_monad_tests.zig");
-    _ = @import("backend/loop_targets_tests.zig");
+    _ = @import("check/loop_targets_tests.zig");
     _ = @import("eval/core_eval.zig");
     _ = @import("eval/core_eval_tests.zig");
     _ = @import("eval/scope_components.zig");

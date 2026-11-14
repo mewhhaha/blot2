@@ -9,7 +9,7 @@ const symbols = @import("../parse/symbols.zig");
 const T = @import("types.zig");
 const dispatch_explanation = @import("../reuse/dispatch_explanation.zig");
 const P = @import("parameter_patterns.zig");
-const loop_targets = @import("../backend/loop_targets.zig");
+const loop_targets = @import("loop_targets.zig");
 const source_operators = @import("../parse/source_operators.zig");
 const global_references = @import("../reuse/global_references.zig");
 const proof_headers = @import("numeric_proof_headers.zig");
@@ -301,7 +301,7 @@ pub const ProducerCapabilities = struct {
 /// reusable forwarding catalog may still carry its previous physical recipe.
 pub const ProducerStorage = struct {
     context: *const anyopaque,
-    lookup: *const fn (context: *const anyopaque, identity: Identity) ?@import("../backend/opaque_storage.zig").Storage,
+    lookup: *const fn (context: *const anyopaque, identity: Identity) ?@import("opaque_storage.zig").Storage,
 };
 pub fn sourceDeclaration(binding: Binding) SourceDeclaration {
     return .{ .private = binding.private, .name = binding.name, .declaration = binding.declaration, .kind = binding.kind, .capability_flow = binding.capability_flow, .capability_parameters = binding.capability_parameters, .named_function = binding.named_function, .external = binding.external };
@@ -2570,7 +2570,7 @@ const Engine = struct {
         var remaining: usize = 1_000_000;
         for (self.nominals.items, 0..) |nominal, index| {
             if (!nominal.is_opaque or nominal.identity.unit != self.unit) continue;
-            self.nominals.items[index].storage = @import("../backend/opaque_storage.zig").infer(.{ .store = &self.types }, self.nominals.items, self.constructors.items, @intCast(index), &remaining);
+            self.nominals.items[index].storage = @import("opaque_storage.zig").infer(.{ .store = &self.types }, self.nominals.items, self.constructors.items, @intCast(index), &remaining);
         }
     }
     fn validateVisibility(self: *Engine) T.Error!void {
@@ -11713,7 +11713,7 @@ const Engine = struct {
         if (@import("task_types.zig").lookup(name)) |operation| return @import("task_types.zig").arity(operation);
         if (staging.lookup(name)) |op| return staging.arity(op);
         if (proof_terms.constructor(name) != null) return 2;
-        if (@import("../backend/simd_intrinsics.zig").lookup(name)) |op| return op.arity;
+        if (@import("simd_intrinsics.zig").lookup(name)) |op| return op.arity;
         if (std.mem.eql(u8, name, "@hole")) return 0;
         if (std.mem.eql(u8, name, "@resource.scope")) return 3;
         if (std.mem.eql(u8, name, "@resource.acquire")) return 2;
@@ -11721,7 +11721,7 @@ const Engine = struct {
         if (std.mem.eql(u8, name, "@usage.share") or std.mem.eql(u8, name, "@usage.read") or std.mem.eql(u8, name, "@usage.length")) return 1;
         if (std.mem.eql(u8, name, "@usage.borrow") or std.mem.eql(u8, name, "@usage.borrow_mut")) return 2;
         if (std.mem.eql(u8, name, "@record.merge")) return 2;
-        if (@import("../backend/collection_ops.zig").lookup(name)) |op| return op.arity;
+        if (@import("collection_ops.zig").lookup(name)) |op| return op.arity;
         if (std.mem.eql(u8, name, "@state.get") or std.mem.eql(u8, name, "@state.set")) return 1;
         if (std.mem.eql(u8, name, "@effect.of") or std.mem.eql(u8, name, "@effect.descriptor") or std.mem.eql(u8, name, "@effect.count")) return 1;
         if (std.mem.eql(u8, name, "@effect.has") or std.mem.eql(u8, name, "@effect.same")) return 2;
@@ -11751,7 +11751,7 @@ const Engine = struct {
     fn intrinsic(self: *Engine, id: ast.Id, name: symbols.Symbol) T.Error!T.Id {
         const text = self.pool.get(name);
         if (self.editorAt(id)) return self.captureEditor(id, 0, 0);
-        if (@import("../backend/simd_intrinsics.zig").lookup(text)) |op| {
+        if (@import("simd_intrinsics.zig").lookup(text)) |op| {
             const element = if (op.floating) T.f32_type else T.u32_type;
             const vector = try self.types.product(&.{ element, element, element, element });
             const lanes = try self.types.product(&.{ T.u32_type, T.u32_type, T.u32_type, T.u32_type });
@@ -11805,7 +11805,7 @@ const Engine = struct {
             if (scalar == T.u32_type and std.mem.eql(u8, member, "to_f32")) return self.types.function(T.u32_type, T.f32_type);
             if (scalar == T.f32_type and std.mem.eql(u8, member, "to_u32")) return self.types.function(T.f32_type, T.u32_type);
         }
-        if (@import("../backend/collection_ops.zig").lookup(text)) |primitive| {
+        if (@import("collection_ops.zig").lookup(text)) |primitive| {
             const element = try self.types.fresh();
             if (primitive.op == .cursor_has or primitive.op == .cursor_value or primitive.op == .cursor_advance) {
                 const collection = try self.types.fresh();

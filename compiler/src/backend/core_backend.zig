@@ -1657,7 +1657,7 @@ pub const Generator = struct {
             switch (metadata.kind) {
                 .scalar => if (self.representations.store.node(parameters[0]).tag == .product) {
                     // A callable value cannot carry literal lane selectors.
-                    const simd = @import("simd_intrinsics.zig");
+                    const simd = @import("../check/simd_intrinsics.zig");
                     if (simd.literalLanes(metadata.op)) return self.fail(key.unit, 0, .simd_lane_literal);
                     var operands: [3]u32 = undefined;
                     operands[0] = locals[0];

@@ -9,7 +9,7 @@ pub const Kind = enum { global, local, parameter, external };
 pub const ExternalTarget = struct { unit: u32, binding: u32 };
 /// An alias participates in the same named type catalog, but expands to this
 /// owned type root and never introduces a runtime nominal identity.
-pub const Nominal = struct { affine: bool = false, has_usage: bool = false, closed_storage: bool = false, private: bool = false, is_opaque: bool = false, storage: @import("../backend/opaque_storage.zig").Storage = .{}, declaration: u32 = 0, identity: Identity, name: u32, parameters: T.List, variables: T.List, patterns: T.List = .{}, parameter_names: T.List = .{}, constructors: T.List = .{}, alias: T.Id = 0, alias_rows: T.List = .{} };
+pub const Nominal = struct { affine: bool = false, has_usage: bool = false, closed_storage: bool = false, private: bool = false, is_opaque: bool = false, storage: @import("../check/opaque_storage.zig").Storage = .{}, declaration: u32 = 0, identity: Identity, name: u32, parameters: T.List, variables: T.List, patterns: T.List = .{}, parameter_names: T.List = .{}, constructors: T.List = .{}, alias: T.Id = 0, alias_rows: T.List = .{} };
 pub const Constructor = struct { private: bool = false, identity: Identity, nominal: u32, tag: u32, name: u32, scheme: T.Scheme = .{}, payload: T.Id = 0, declared_record: bool = false };
 pub const Associated = struct { identity: Identity, member: u32, operator: T.Operator, binding: u32 };
 pub const EffectFamily = struct { private: bool = false, identity: Identity, name: u32, callable: bool = false, parameters: T.List = .{}, variables: T.List = .{}, patterns: T.List = .{}, parameter_names: T.List = .{}, operations: T.List = .{} };

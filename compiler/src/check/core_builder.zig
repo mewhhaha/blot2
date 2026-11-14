@@ -3093,11 +3093,11 @@ fn memberOp(text: []const u8) core.Op {
 const Intrinsic = struct { op: core.Op, arity: u8 };
 const ArrayIntrinsic = struct { op: core.ArrayOp, arity: u8 };
 fn arrayIntrinsic(text: []const u8) ?ArrayIntrinsic {
-    const value = @import("../backend/collection_ops.zig").lookup(text) orelse return null;
+    const value = @import("collection_ops.zig").lookup(text) orelse return null;
     return .{ .op = value.op, .arity = value.arity };
 }
 fn intrinsic(text: []const u8) ?Intrinsic {
-    if (@import("../backend/simd_intrinsics.zig").lookup(text)) |op| return .{ .op = op.op, .arity = op.arity };
+    if (@import("simd_intrinsics.zig").lookup(text)) |op| return .{ .op = op.op, .arity = op.arity };
     const entries = .{
         .{ "@u32.add", core.Op.add, 2 },        .{ "@u32.sub", core.Op.sub, 2 },         .{ "@u32.mul", core.Op.mul, 2 },                .{ "@u32.div", core.Op.div, 2 },       .{ "@u32.rem", core.Op.rem, 2 },
         .{ "@u32.eq", core.Op.equal, 2 },       .{ "@u32.lt", core.Op.less, 2 },         .{ "@u32.bit_and", core.Op.bit_and, 2 },        .{ "@u32.bit_or", core.Op.bit_or, 2 }, .{ "@u32.bit_xor", core.Op.bit_xor, 2 },

@@ -622,7 +622,7 @@ const Engine = struct {
             },
         }
     }
-    fn producerStorage(context: *const anyopaque, identity_: check.Identity) ?@import("../backend/opaque_storage.zig").Storage {
+    fn producerStorage(context: *const anyopaque, identity_: check.Identity) ?@import("../check/opaque_storage.zig").Storage {
         const self: *const Engine = @ptrCast(@alignCast(context));
         if (identity_.unit == 0 or identity_.unit > self.source.units.items.len) return null;
         const module = self.catalogModule(identity_.unit) orelse return null;

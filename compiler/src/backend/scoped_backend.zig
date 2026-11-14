@@ -3216,7 +3216,7 @@ const Generator = struct {
                 // Reusable word parameters discard literal selector evidence.
                 // Keep lane-sensitive wrappers on the checked inline path,
                 // just as leafBody does before this numeric fallback.
-                if (n.tag == .scalar and @import("simd_intrinsics.zig").literalLanes(n.op)) return false;
+                if (n.tag == .scalar and @import("../check/simd_intrinsics.zig").literalLanes(n.op)) return false;
                 if (!try self.numericExpression(m, n.a, remaining, active, used, readers, depth + 1) or !try self.numericExpression(m, n.b, remaining, active, used, readers, depth + 1)) return false;
             },
             .bind => {
@@ -6737,7 +6737,7 @@ const Generator = struct {
     }
     fn vectorPrimitive(self: *Generator, m: *const core.Module, id: core.Id, left: Value, right: Value) Error!Value {
         const n = m.node(id);
-        const catalog = @import("simd_intrinsics.zig");
+        const catalog = @import("../check/simd_intrinsics.zig");
         const pair = catalog.pairs(n.op);
         if (pair and (right.tag != .aggregate or right.fields.len != 2)) return self.unsupported(m, id);
         const operand = if (pair) right.fields[0] else if (n.op == .swizzle) right else left;

@@ -613,7 +613,7 @@ const Walk = struct {
         return selected orelse error.Incomplete;
     }
     fn arrayValues(self: *Walk, operation: core.ArrayOp, arguments: []const ValueId, site: Site, weak: bool, observe: bool) Error!ValueId {
-        const arity = @import("collection_ops.zig").arity(operation);
+        const arity = @import("../check/collection_ops.zig").arity(operation);
         if (arguments.len != arity) return error.Incomplete;
         // Aggregate emission retains every member, including those a
         // length/get operation does not read at runtime.

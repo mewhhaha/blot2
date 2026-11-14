@@ -140,7 +140,7 @@ pub fn validate(module: *const core.Module) error{InvalidArtifact}!void {
             if (!validList(&module.types, nominal.parameters) or nominal.constructors.len != 1 or nominal.constructors.start >= module.extra.len) return error.InvalidArtifact;
             const id = module.extra[nominal.constructors.start];
             if (id == 0 or id >= module.constructors.len or module.constructors[id].nominal != index) return error.InvalidArtifact;
-            const inferred = @import("../backend/opaque_storage.zig").inferPayload(.{ .frozen = &graph }, proved, module.constructors, module.constructors[id].payload, nominal.parameters, &work.remaining);
+            const inferred = @import("opaque_storage.zig").inferPayload(.{ .frozen = &graph }, proved, module.constructors, module.constructors[id].payload, nominal.parameters, &work.remaining);
             if (work.remaining == 0) return error.InvalidArtifact;
             if (!@import("std").meta.eql(inferred, nominal.storage)) {
                 nominal.storage = inferred;

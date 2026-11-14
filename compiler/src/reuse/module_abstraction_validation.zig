@@ -7,7 +7,7 @@ const F = @import("../check/frozen_types.zig");
 const core = @import("../check/core.zig");
 const T = @import("../check/types.zig");
 const visibility = @import("module_visibility.zig");
-const storage = @import("../backend/opaque_storage.zig");
+const storage = @import("../check/opaque_storage.zig");
 const Error = std.mem.Allocator.Error || error{InvalidArtifact};
 fn require(condition: bool) Error!void {
     if (!condition) return error.InvalidArtifact;

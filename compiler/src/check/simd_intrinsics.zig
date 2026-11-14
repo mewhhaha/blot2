@@ -3,7 +3,7 @@
 //! Every operation's first operand is a four-lane product, so a product left
 //! operand distinguishes a SIMD application from its scalar counterpart.
 const std = @import("std");
-const core = @import("../check/core.zig");
+const core = @import("core.zig");
 pub const Lane = enum { u32, f32 };
 /// Operand and result shapes, with V the namespace's lane vector:
 /// unary V -> V; convert V -> W; binary V -> V -> V; compare V -> V -> U32x4;

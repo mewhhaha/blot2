@@ -55,5 +55,5 @@ comptime {
     _ = @import("backend/wasm_vectorize.zig");
     _ = @import("backend/unit_index_tests.zig");
     _ = @import("backend/layout_memo_tests.zig");
-    _ = @import("backend/simd_intrinsics.zig");
+    _ = @import("check/simd_intrinsics.zig");
 }

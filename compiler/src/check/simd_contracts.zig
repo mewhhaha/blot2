@@ -2,7 +2,7 @@
 //! comes from the source intrinsic catalog; unrelated products never coerce.
 const core = @import("core.zig");
 const T = @import("types.zig");
-const simd = @import("../backend/simd_intrinsics.zig");
+const simd = @import("simd_intrinsics.zig");
 const Error = error{InvalidArtifact};
 fn scalar(types: *const core.Types, id: T.Id, tag: T.Tag) bool {
     return id < types.nodes.len and types.node(id).tag == tag;

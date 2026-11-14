@@ -304,7 +304,7 @@ fn nominalDigestAt(source: F.Source, catalog: Catalog, index: usize, depth: usiz
     var storage = nominal.storage;
     if (nominal.is_opaque and storage.kind == .unknown) {
         var storage_budget: usize = 4096;
-        storage = @import("../backend/opaque_storage.zig").infer(source, catalog.nominals, catalog.constructors, @intCast(index), &storage_budget);
+        storage = @import("../check/opaque_storage.zig").infer(source, catalog.nominals, catalog.constructors, @intCast(index), &storage_budget);
     }
     if (nominal.is_opaque and storage.kind == .unknown) return null;
     var hash: std.crypto.hash.Blake3 = .init(.{});

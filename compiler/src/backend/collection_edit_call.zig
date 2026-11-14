@@ -87,7 +87,7 @@ pub fn analyze(units: []const core.Module, owner: u32, id: core.Id) ?Plan {
         const op = source.arrayOperation(edit);
         if (op != .set and op != .append and op != .prepend and op != .simd_store) return null;
         const operands = source.children(edit);
-        const count = @import("collection_ops.zig").arity(op);
+        const count = @import("../check/collection_ops.zig").arity(op);
         if (operands.len != count or call.count != count) return null;
         var positions: [3]usize = @splat(0);
         var used: u8 = 0;

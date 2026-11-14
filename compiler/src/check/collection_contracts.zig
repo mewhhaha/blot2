@@ -7,7 +7,7 @@ fn require(ok: bool) Error!void {
 }
 pub fn validate(types: *const core.Types, operation: core.ArrayOp, inputs: []const T.Id, output_: T.Id, proof: anytype) Error!void {
     if (inputs.len == 0) return error.InvalidArtifact;
-    try require(inputs.len == @import("../backend/collection_ops.zig").arity(operation));
+    try require(inputs.len == @import("collection_ops.zig").arity(operation));
     if (operation == .get) if (@import("storage_types.zig").info(types, inputs[0]) != null) {
         const element = @import("storage_types.zig").readableElement(types, inputs[0]) orelse return error.InvalidArtifact;
         try proof.same(T.u32_type, inputs[1]);
