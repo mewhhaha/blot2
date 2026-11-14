@@ -8,13 +8,16 @@ const symbols = @import("../parse/symbols.zig");
 const check = @import("check.zig");
 const V = @import("frozen_core_validation.zig");
 const a = std.testing.allocator;
+// The closure writes a captured parameter's array, which a `:=` may not do
+// (`aliased_update`, tasks/MEMORY_MODEL.md rule 4); the store `=` writes it in
+// place, as the `:=` already did, and lowers to the same mixed update.
 const mixed_source =
     \\type Point is data = $Point { x: U32 }
     \\type Bucket is data = $Bucket { points: Array Point }
     \\const make = func (initial: Bucket) => return do:
     \\  let bucket = initial
     \\  break func (index: U32) => return do:
-    \\    bucket.points[index].x := do:
+    \\    bucket.points[index].x = do:
     \\      let other = #[40]
     \\      other[0] := @u32.add self 2
     \\      break other[0]

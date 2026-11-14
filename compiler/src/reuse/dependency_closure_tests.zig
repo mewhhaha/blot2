@@ -360,7 +360,11 @@ test "principal publication keeps reusable globals and Core retains later-constr
     try std.testing.expectEqual(@as(usize, 0), checked.diagnostics.len);
     var old = try @import("dependency_snapshot.zig").freeze(a, &source.unit(2).tree, &checked.module(2).checked);
     defer @import("dependency_snapshot.zig").deinit(a, &old);
-    try std.testing.expectError(error.InvalidArtifact, @import("dependency_interface_validation.zig").validate(&old, source.symbols.entries.items.len + 1, 2));
+    // The value restriction keeps `found`, an array whose element type is
+    // still open, monomorphic. Its type is fixed later in the body rather than
+    // quantified, so even this unfiltered snapshot of every binding is a valid
+    // interface; before the restriction its quantified type was rejected here.
+    try @import("dependency_interface_validation.zig").validate(&old, source.symbols.entries.items.len + 1, 2);
     var value = try closure.freeze(a, &source, &checked);
     defer format.deinit(a, &value);
     const found = source.symbols.lookup("found").?;
