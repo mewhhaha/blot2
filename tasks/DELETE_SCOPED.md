@@ -91,6 +91,38 @@ behaviour keeps the kept part.
 - Tests that read the scoped runtime's counters (`blot:rc_*` exports), v128
   locals, boxes or checkpoints are scoped internals.
 
+## Code deletion plan
+
+- **The compile interface.** Outside `backend/`, code uses five symbols from
+  `backend/core_backend.zig`: `compileWithOptions`, `compile`, `Result`,
+  `Diagnostic` and `CompileOptions`. Replace them with one small module that
+  calls `direct.compile` and returns bytes, a diagnostic (unit, span, code,
+  detail) and the emitted-function count.
+- **main.zig and statistics.** main.zig's `processProject` keeps loading,
+  checking and lowering, and its backend section becomes one direct compile.
+  The compilation record keeps its frontend fields and `wasm_bytes` /
+  `emitted_functions`. The scoped statistics (work counters, optimization,
+  principals, backend timing, `code_instances`) go.
+- **Options that go:** `--explain-allocations`, `--profile-memory`,
+  `--require-collector-free`, `--backend` and `-Ddirect-default`.
+- **Project server.** `serve-project` builds each revision fresh (load,
+  check, lower, direct compile) instead of through `retained_revision.zig`
+  and checkpoints. Incremental compilation is a later phase. The project
+  protocol and client tests guard the wire format; Pen (Ink's suite, Gdev's
+  frame) guards real use.
+- **Dependency artifacts** (`blotc dependencies`, `--dependencies`,
+  `.blotdep`, host/cli.ts) package semantic and executable artifacts for
+  reuse. Decide before deleting: either they go with the reuse machinery
+  (breaking the host `dependencies` command) or they are cut down to
+  frontend artifacts.
+- **Deleting by reachability.** After that, delete whatever main.zig and the
+  remaining native suites no longer reach: most of `backend/`, all of
+  `eval/` and `runtime/`, and the reuse machinery around scoped artifacts
+  (`scripts/integration`-style import closure).
+- **Build, suites and scripts.** build.zig loses the runtime fixtures and the
+  backend, evaluator and retained suites. `check:dev` gets new regression
+  families (direct backend, checker), and `test:compiler` follows.
+
 ## Known direct-backend limits left to the memory model (A)
 
 - `values := @array.set values i v` in a loop copies the array each
