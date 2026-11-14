@@ -50,37 +50,17 @@ its first diagnostic. Cancellation terminates the process group; failed stages
 preserve existing cached objects and the previous executable.
 `--identity-only` writes a source-only fingerprint without starting a compiler;
 that is not a qualified build identity. Active payload, retained pool capacity and scratch metrics stay null with
-explicit unavailable coverage. The optional private `--runtime-observer` build
-reports pool operation totals and virtual region reservations separately.
-[The component receipt](../benchmarks/evidence/qualification/2026-11-08-goose-runtime-observer.json)
-pins the hook coverage and tests; these counters are not current live memory.
+explicit unavailable coverage.
 
-An optional private bootstrap-checker experiment is reproducible with
-`python3 compiler-goose/tools/build_goose_checker.py`. It requires the pinned
-sibling Goose source/build and Clang 23.1.4, copies and patches privately, and
-prints its cached binary path as JSON. Pass that path explicitly to `--goose`;
-the installed compiler and ordinary toolchain remain unchanged. The default
-cumulative expansion bound stays 100,000 cloned nodes. The explicit
-`--expansion-node-limit 1000000` candidate raises that bound for this large port;
-the separate tail-shape traversal bound stays 100,000. Its measured
-improvement is for an older failing prefix, not completed compiler builds; see
-the compilation frontier for exact evidence and limits.
-
-Batch production diagnostics with `python3 compiler-goose/tools/check_engines.py`.
-It checks five real entry paths in parallel (`--jobs N` controls concurrency),
-collecting independent frontiers in one pass. `--engines check lower` selects a
-subset. The diagnostic tool is built automatically when absent; its explicit
-partial mode emits no compiler and never replaces the normal full build gate.
+The port builds with plain upstream Goose
+([github.com/aardappel/goose](https://github.com/aardappel/goose)), without
+patches. `python3 compiler-goose/tools/build_upstream_goose.py` clones or
+reuses `build/goose-upstream`, checks out the pinned commit (`--commit` picks
+another), builds it with CMake and prints the compiler and standard library
+paths as JSON for `--goose` and `--stdlib`.
 
 Run the checked engine laws with
 `python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning, scalar owner-frame and parser sources
 to C and execute them using cached runtime/platform objects.
 Commands, source hashes and timings are saved under
 `build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.
-
-Private build experiments are opt-in. `--reachable-program` skips standalone
-checking of unused Goose bodies while preserving signatures, externs, executable
-roots and final lifetime checks. `--stable-closures` reuses successful complete
-type-graph walks; cold synthetic queries regress 2.54x, while descendant reuse
-improves. No completed compiler speedup is claimed. `GOOSE_CHECKER_PROFILE=1`
-reports phase and cache work. These modes preserve installed/sibling tools.

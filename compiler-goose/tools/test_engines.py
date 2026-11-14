@@ -51,8 +51,9 @@ def inputs(entry: Path, stdlib: Path) -> list[dict]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("tests", nargs="*", choices=["coalesce", "expectation", "package_owner_frames", "parser", "proof_leases", "source_sort", "diagnostic_ownership", "body_freeze", "immutable_readers", "import_arena", "source_validation_ownership", "editor_budget", "cache_root_frames", "native_asset_metadata", "completion_probe", "completion_project_load", "dependency_ownership", "empty_session", "archive_capture", "resolved_body", "wasm_scope_outline", "core_validation_borrow", "retained_seed", "executor_frame", "footprint_owner", "effect_evidence_owner", "worker_runtime_pins", "semantic_outcomes", "server_session", "storage_call_cache", "function_plan_input", "wasm_pipeline_scope", "record_order", "identity_owner", "module_stamps", "result_diagnostic", "declaration_scheme_cycles", "layout_bridge_words", "layout_intern_leaf", "layout_frame_store", "effect_evidence_handles", "layout_fixed_stacks", "code_expectation_leaf", "unit_uses_identity", "closed_local_identity", "owned_arrays_seen", "layout_owner_traversal", "emission_owner_reads", "emission_owner_prepare", "evaluator_field_probe", "evaluator_parameter_reacquire"])
-    parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", str(ROOT.parent.parent / "goose-to-wasm/build/native/goose")))
-    parser.add_argument("--stdlib", type=Path, default=ROOT.parent.parent / "goose-to-wasm/build/source/stdlib")
+    # Plain upstream Goose, built by tools/build_upstream_goose.py.
+    parser.add_argument("--goose", default=os.environ.get("GOOSE_BIN", str(ROOT.parent / "build/goose-upstream/build/goose")))
+    parser.add_argument("--stdlib", type=Path, default=ROOT.parent / "build/goose-upstream/stdlib")
     parser.add_argument("--cc", default=os.environ.get("CC", "clang"))
     parser.add_argument("--timeout", type=float, default=30)
     args = parser.parse_args()
