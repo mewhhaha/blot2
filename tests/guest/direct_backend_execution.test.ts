@@ -60,6 +60,7 @@ const cases: Record<string, Call[]> = {
   ],
   "generated_from_filter.blot": [["run", 4, 308], ["run", 10, 508]],
   "empty_literals.blot": [["empty_generic", 5, 5], ["mixed", 3, 3]],
+  "carried_owners.blot": [["plain", 10, 40], ["callbacks", 0, 12], ["stored", 5, 20]],
   "providers.blot": [
     ["nested", 1, 120],
     ["counted", 1, 42082],
@@ -144,6 +145,7 @@ const directOnly = new Set([
   "policy_record.blot",
   "generic_comprehensions.blot",
   "generated_from_filter.blot",
+  "carried_owners.blot",
 ]);
 for (const [fixture, calls] of Object.entries(cases)) {
   for (const backend of ["direct", "scoped"] as const) {

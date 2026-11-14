@@ -69,6 +69,7 @@ pub const Generator = struct {
     solve_depth: u32 = 0,
     /// Closures built for function values no use determines (they trap).
     trap_closures: u32 = 0,
+    contents_memory: std.AutoHashMapUnmanaged(Ty, bool) = .empty,
     /// Effect operations (lowered operation types) and their frame ids.
     operation_ids: std.AutoHashMapUnmanaged(Ty, u32) = .empty,
     /// Type variables some scheme quantifies, per unit (built on demand).
@@ -101,6 +102,7 @@ pub const Generator = struct {
         self.pool_globals.deinit(self.allocator);
         self.quantified.deinit(self.allocator);
         self.operation_ids.deinit(self.allocator);
+        self.contents_memory.deinit(self.allocator);
         self.quantified_units.deinit(self.allocator);
         if (self.failure) |failure| self.allocator.free(failure.message);
         for (self.failures.items) |item| self.allocator.free(item.failure.message);
@@ -254,6 +256,34 @@ pub const Generator = struct {
     pub fn runtime_(self: *Generator) Error!*const runtime.Runtime {
         if (self.rt == null) self.rt = try runtime.emit(self.allocator, &self.module, .{});
         return &self.rt.?;
+    }
+    /// Whether the flat contents of `ty` refer to scope memory: an owner,
+    /// view or closure, inline or nested. Boxing is ignored, since a stored
+    /// or slot-held value is copied flat.
+    pub fn contentsHoldMemory(self: *Generator, ty: Ty) Error!bool {
+        if (self.contents_memory.get(ty)) |hit| return hit;
+        const n = self.types.node(ty);
+        const result = switch (n.tag) {
+            .unit, .boolean, .u32, .f32, .never => false,
+            .function, .provider, .array, .list, .cursor, .grow, .resize, .ref, .view, .link => true,
+            .state_provider => try self.contentsHoldMemory(self.types.list(n.a, n.b)[2]),
+            .tuple => blk: {
+                for (self.types.tupleItems(ty)) |item| if (try self.contentsHoldMemory(item)) break :blk true;
+                break :blk false;
+            },
+            .record => blk: {
+                for (0..n.b) |index| if (try self.contentsHoldMemory(self.types.recordField(ty, index).ty)) break :blk true;
+                break :blk false;
+            },
+            .nominal => blk: {
+                try self.contents_memory.put(self.allocator, ty, false); // recursion guard
+                const cases = try self.types.variants(ty);
+                for (cases.payloads) |payload| if (try self.contentsHoldMemory(payload)) break :blk true;
+                break :blk false;
+            },
+        };
+        try self.contents_memory.put(self.allocator, ty, result);
+        return result;
     }
     /// Whether a value of `ty` can refer to scope-allocated memory.
     pub fn holdsMemory(self: *Generator, ty: Ty) Error!bool {

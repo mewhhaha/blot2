@@ -30,6 +30,11 @@ const Label = struct {
     /// `continue` already released to them.
     release: ?[2]u32 = null,
     used: bool = false,
+    /// The local that allows iteration releases (no memory-holding value was
+    /// stored during the body), and the carried owner slots that must
+    /// predate the iteration for a release to be safe.
+    allow: u32 = 0,
+    guards: []const u32 = &.{},
     /// Carries held in loop slots (boxed values copied in place).
     slots: []const bool = &.{},
 };
@@ -48,6 +53,9 @@ pub const Fn = struct {
     field_value: bool = false,
     /// Reference counts of this unit's local bindings, built on first use.
     use_counts: ?std.AutoHashMapUnmanaged(core.BindingId, u32) = null,
+    /// Stores of memory-holding values: a loop body that makes one cannot
+    /// release per iteration, since older storage may now refer to it.
+    memory_stores: u32 = 0,
     /// Installed providers, outermost first: the local holding the effect
     /// context from before each, and the block depth it was installed at.
     handles: std.ArrayList(struct { saved: u32, depth: u32 }) = .empty,
@@ -1563,6 +1571,7 @@ pub const Fn = struct {
                 try self.i32Const(try self.stride(try self.elementOf(container.ty, id), id));
                 try self.opIndex(.call, rt.push);
                 try self.opIndex(.local_set, address);
+                try self.noteStore(value);
                 try self.writeFlat(address, 0, value, id);
                 return unitVal();
             },
@@ -1652,6 +1661,7 @@ pub const Fn = struct {
                 try self.opIndex(.local_set, address);
                 if (operation == .load) return self.loadElement(address, 0, element, id);
                 const value = try self.expr(children[1]);
+                try self.noteStore(value);
                 try self.writeFlat(address, 0, value, id);
                 return unitVal();
             },
@@ -1731,6 +1741,7 @@ pub const Fn = struct {
         try self.bindings.put(self.a(), info.self_binding, old);
         const replacement = try self.stmt(info.value);
         if (replacement.ty == types.never) return replacement;
+        try self.noteStore(replacement);
         try self.writeFlat(address, offset, replacement, id);
         return container;
     }
@@ -2163,6 +2174,7 @@ pub const Fn = struct {
         try self.i32Const(try self.stride(try self.elementOf(list.ty, id), id));
         try self.opIndex(.call, rt.push);
         try self.opIndex(.local_set, address);
+        try self.noteStore(value);
         try self.writeFlat(address, 0, value, id);
         return .{ .ty = list.ty, .words = list.words };
     }
@@ -2847,24 +2859,6 @@ pub const Fn = struct {
         }
         try self.assign(plain_values.items, plain_targets.items, id);
     }
-    fn holdsClosure(self: *Fn, ty: Ty) Error!bool {
-        const n = self.g.types.node(ty);
-        return switch (n.tag) {
-            .function => true,
-            .tuple => for (self.g.types.tupleItems(ty)) |item| {
-                if (try self.holdsClosure(item)) break true;
-            } else false,
-            .record => for (0..n.b) |index| {
-                if (try self.holdsClosure(self.g.types.recordField(ty, index).ty)) break true;
-            } else false,
-            .nominal => blk: {
-                const cases = self.g.types.variants(ty) catch break :blk true;
-                for (cases.payloads) |payload| if (payload != ty and try self.holdsClosure(payload)) break :blk true;
-                break :blk false;
-            },
-            else => false,
-        };
-    }
     fn carryVals(self: *Fn, carries: []const core.LoopCarry, comptime field: []const u8, id: core.Id) Error![]Val {
         const out = try self.arena.alloc(Val, carries.len);
         for (carries, out) |carry, *slot| slot.* = try self.fresh(try self.lower(self.m.binding(@field(carry, field)).ty, id), id);
@@ -2924,25 +2918,30 @@ pub const Fn = struct {
             const item: Val = if (source) |container| try self.readElement(container, current, id) else .{ .ty = types.u32_, .words = try self.arena.dupe(u32, &.{current}) };
             if (info.pattern != 0) try self.test_(info.pattern, item, null, id);
         }
-        // An iteration releases what it allocated unless a carried value is
-        // a closure; fresh owners cannot be carried, and a stale one traps.
+        // An iteration may release what it allocated when no carry can refer
+        // to it: carries are plain values or owners of plain elements, each
+        // carried owner predates the iteration (checked at run time), and
+        // the body stored no memory-holding value into older storage.
         var release = true;
-        for (iteration) |value| if (try self.holdsClosure(value.ty)) {
+        var guards: std.ArrayList(u32) = .empty;
+        for (iteration) |value| if (!try self.ownerSlots(value.ty, value.words, &guards)) {
             release = false;
         };
         const marks: [2]u32 = .{ try self.local(.i32), try self.local(.i32) };
+        const allow = try self.local(.i32);
         const mark_at = self.code.list.items.len;
         const allocations = self.allocations;
+        const stores = self.memory_stores;
         const unused = try self.arena.create(?Val);
         unused.* = null;
-        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .result = unused, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null, .slots = slots });
+        try self.labels.append(self.a(), .{ .target = id, .depth = exit, .result = unused, .kind = .loop, .top = top, .iteration = iteration, .outgoing = outgoing, .release = if (release) marks else null, .slots = slots, .allow = allow, .guards = guards.items });
         const body = try self.stmt(info.body);
         const label = self.labels.pop().?;
         if (body.ty != types.never) {
             const backedge = try self.arena.alloc(Val, carries.len);
             for (carries, backedge) |carry, *slot| slot.* = self.bindings.get(carry.backedge) orelse return self.g.fail(self.m, id, "loop carry without a backedge value", .{});
             try self.assignCarries(backedge, iteration, slots, id);
-            if (label.release) |pair| if (self.allocations != allocations) try self.releaseTo(pair[0], pair[1]);
+            if (label.release != null and self.allocations != allocations) try self.releaseIteration(label);
             try self.br(.br, top);
         }
         if (release and (self.allocations != allocations or label.used)) {
@@ -2950,6 +2949,10 @@ pub const Fn = struct {
             var prefix: W.Bytes = .{};
             defer prefix.deinit(self.a());
             try self.markInto(&prefix, marks[0], marks[1]);
+            try prefix.byte(self.a(), @backingInt(W.Op.i32_const));
+            try prefix.sleb(self.a(), @intFromBool(self.memory_stores == stores));
+            try prefix.byte(self.a(), @backingInt(W.Op.local_set));
+            try prefix.uleb(self.a(), allow);
             try self.code.list.insertSlice(self.a(), mark_at, prefix.items());
         }
         try self.close();
@@ -2957,6 +2960,64 @@ pub const Fn = struct {
         for (carries, outgoing) |carry, value| try self.bindings.put(self.a(), carry.outgoing, value);
         if (info.kind == .forever and !info.can_exit) return neverVal();
         return unitVal();
+    }
+    /// Records a store into an existing owner, which may predate this scope.
+    fn noteStore(self: *Fn, value: Val) Error!void {
+        if (value.ty != types.never and try self.g.contentsHoldMemory(value.ty)) self.memory_stores += 1;
+    }
+    /// Releases an iteration's allocations when its loop allows it and every
+    /// carried owner predates the iteration.
+    fn releaseIteration(self: *Fn, label: Label) Error!void {
+        const marks = label.release.?;
+        try self.opIndex(.local_get, label.allow);
+        for (label.guards) |slot| {
+            try self.opIndex(.local_get, slot);
+            try self.opIndex(.local_get, marks[0]);
+            try self.op(.i32_lt_u);
+            try self.op(.i32_and);
+        }
+        try self.op(.if_);
+        try self.code.byte(self.a(), 0x40);
+        self.depth += 1;
+        try self.releaseTo(marks[0], marks[1]);
+        try self.close();
+    }
+    /// Appends the owner-slot locals of a carried value of `ty` and returns
+    /// whether releasing around it can be made safe: plain values and owners
+    /// of plain elements qualify; closures and memory-holding sums do not.
+    fn ownerSlots(self: *Fn, ty: Ty, words: []const u32, out: *std.ArrayList(u32)) Error!bool {
+        if (!try self.g.contentsHoldMemory(ty)) return true;
+        // A boxed carry is copied into its reserved slot; owners inside it
+        // are not checked word by word.
+        if (try self.g.types.boxed(ty)) return false;
+        const n = self.g.types.node(ty);
+        switch (n.tag) {
+            .array, .list, .grow, .resize, .view, .ref, .link, .cursor => {
+                if (try self.g.contentsHoldMemory(n.a)) return false;
+                try out.append(self.arena, words[0]);
+                return true;
+            },
+            .tuple => {
+                var at: usize = 0;
+                for (self.g.types.tupleItems(ty)) |item| {
+                    const width = (try self.g.types.layout(item)).len;
+                    if (!try self.ownerSlots(item, words[at..][0..width], out)) return false;
+                    at += width;
+                }
+                return true;
+            },
+            .record => {
+                var at: usize = 0;
+                for (0..n.b) |index| {
+                    const field = self.g.types.recordField(ty, index).ty;
+                    const width = (try self.g.types.layout(field)).len;
+                    if (!try self.ownerSlots(field, words[at..][0..width], out)) return false;
+                    at += width;
+                }
+                return true;
+            },
+            else => return false,
+        }
     }
     fn breakNode(self: *Fn, id: core.Id) Error!Val {
         const n = self.m.node(id);
@@ -2972,8 +3033,8 @@ pub const Fn = struct {
             try self.leaveHandles(label.depth);
             if (n.op == .continue_) {
                 try self.assignCarries(values, label.iteration, label.slots, id);
-                if (label.release) |pair| {
-                    try self.releaseTo(pair[0], pair[1]);
+                if (label.release != null) {
+                    try self.releaseIteration(label);
                     self.labels.items[at].used = true;
                 }
                 try self.br(.br, label.top);
@@ -3128,7 +3189,8 @@ pub fn emitInstance(g: *Generator, id: u32) Error!void {
     // An inferred result is the type of the first value the body delivers.
     if (instance.inferring) instance.result = if (slot.*) |delivered| delivered.ty else types.never;
     const result: Val = slot.* orelse .{ .ty = types.never };
-    const release = f.allocates and !try g.holdsMemory(instance.result);
+    // Stored memory-holding values may now be reachable from older storage.
+    const release = f.allocates and !try g.holdsMemory(instance.result) and f.memory_stores == 0;
     if (release) try f.releaseTo(owner_mark, stack_mark);
     if (result.ty == types.never) try f.op(.unreachable_) else try f.push(result);
     try f.op(.end);

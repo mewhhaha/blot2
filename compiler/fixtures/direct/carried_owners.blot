@@ -1,0 +1,18 @@
+entry func plain (n: U32): U32 => return do:
+  let xs = #[0, 0, 0]
+  for i in 0..3:
+    xs := @array.set self i (i + n)
+  let ys = #[7, 7, 7, 7]
+  break xs[0] + xs[1] + xs[2] + ys[0]
+entry func callbacks (n: U32): U32 => return do:
+  let fs = @array.fill 3 (func () => return 0)
+  for index in 0..3:
+    fs := @array.set self index (func () => return index + n)
+  break (@array.get fs 0) () * 100 + (@array.get fs 1) () * 10 + (@array.get fs 2) ()
+func put (rows: Array (Array U32)) -> (n: U32) => return do:
+  rows[0] := #[n, n + 1]
+entry func stored (n: U32): U32 => return do:
+  let rows = #[#[0, 0]]
+  put rows n
+  let filler = #[9, 9, 9]
+  break rows[0][0] + rows[0][1] + filler[0]
