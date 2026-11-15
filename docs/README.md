@@ -7,8 +7,11 @@ rewrite scope.
 
 ## Code and tests
 
-- [compiler/](../compiler/README.md) is the sole compiler: Zig parses, checks,
-  evaluates and emits WebAssembly.
+- [compiler-goose/](../compiler-goose/README.md) is the compiler, written in
+  Goose: it parses, checks, lowers to Core, serves projects and emits
+  WebAssembly. [tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md) has its state.
+- [compiler/](../compiler/README.md) is the Zig compiler it was ported from.
+  It is deprecated and still the one the scripts and CI run.
 - [host/](../host/README.md) contains Deno clients and tools, including the
   formatter, CLI, package manager, editor integration and guest ABI runtime.
 - [tests/guest](../tests/guest) exercises compiled guest behavior;

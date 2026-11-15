@@ -1,9 +1,16 @@
 # Blot
 
-Blot is a functional language whose sole compiler is written in Zig and emits
-WebAssembly. Deno provides the CLI, project client, formatter and guest host.
-See the [repository map](docs/README.md) for code, tests, documentation and
-evidence.
+Blot is a functional language that compiles to WebAssembly. Deno provides the
+CLI, project client, formatter and guest host. See the
+[repository map](docs/README.md) for code, tests, documentation and evidence.
+
+There are two compilers, and they produce the same bytes:
+
+- [compiler-goose/](compiler-goose/README.md), written in Goose, is the one
+  that gets new work.
+- [compiler/](compiler/README.md), written in Zig, is deprecated. The scripts,
+  CI and the sibling checkouts still run it until the switch that
+  [tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) describes.
 
 The owned-storage rewrite and backend cutover are unfinished. One real Gdev
 frame has passed native Pen with an inspected screenshot; broader compiler and

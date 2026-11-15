@@ -21,9 +21,9 @@ state, the steps and the measurements are in
 
 ## Build
 
-`sh compiler-goose/build.sh` writes `compiler-goose/build/blotc-goose`
-(debug, about a minute and a half); `--release` optimizes it (about seven
-minutes). It needs clang, cmake, ninja and Python 3. A rebuilt compiler
+`sh compiler-goose/build.sh` (`deno task build:goose:dev`) writes
+`compiler-goose/build/blotc-goose` (debug, about a minute and a half);
+`--release` (`deno task build:goose`) optimizes it (about seven minutes). It needs clang, cmake, ninja and Python 3. A rebuilt compiler
 has a new identity, so dependency bundles made by the previous build are
 declined as stale.
 
@@ -49,9 +49,8 @@ python3 compiler-goose/tools/write_dependency_owned_headers.py
 ## Tests
 
 - The guest and host suite takes the compiler as its argument:
-  `deno test -A --parallel tests/guest tests/host -- compiler-goose/build/blotc-goose`.
-  One test fails: tests/guest/worker_determinism.test.ts requires parallel
-  module checks, and this compiler checks serially.
+  `deno task test:goose` runs it against `compiler-goose/build/blotc-goose`
+  (1,054 pass, 101 ignored, as for Zig).
 - `python3 compiler-goose/tools/test_direct.py` runs each law in
   `tests/direct/` against the Zig source of the direct backend and requires
   the same bytes.

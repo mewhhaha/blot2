@@ -175,6 +175,10 @@ so we can retire zig." The plan and the measured state are in
   tests/host/lsp.test.ts ("Completion was never sent", its wait is now
   10 s) and tests/guest/zig_project_transport.test.ts ("startup timed
   out" after 2 s, seen once). Neither runs the checker.
+- In the same file, "completion reaps a malformed peer" failed once with
+  "Text file busy" when it spawned the fake compiler it had just written
+  (15 November, under `--parallel`). The compiler under test is not
+  involved.
 
 ## The Goose port
 
@@ -187,15 +191,19 @@ build and the tests.
 - `sh compiler-goose/build.sh` builds compiler-goose/build/blotc-goose
   (and, the first time, the patched Goose it needs). `--release` optimizes.
 - The Goose compiler has every command of `blotc`, `serve-project`
-  included. Against it the guest and host suite gives 1,053 passed, 1
-  failed, 101 ignored; Wasm is byte-identical to Zig's on the direct
-  fixtures and on Ink's tests. GOOSE_PORT.md has Ink through Pen, Gdev and
-  the speed.
-- The failing test (tests/guest/worker_determinism.test.ts) requires
-  parallel module checks. The Goose compiler checks serially; restoring
-  the worker processes is the first item of the compile-time work.
-- Zig is still what the scripts, CI and the sibling pen.json files run.
-  GOOSE_PORT.md lists the switch under "What is left before Zig can go".
+  included. Against it the guest and host suite gives 1,054 passed, 0
+  failed, 101 ignored, as it does for Zig (`deno task test:goose`). Wasm
+  is byte-identical to Zig's on the direct fixtures, Ink's tests and Gdev
+  Main; Ink's suite through Pen gives the same log.
+- `--frontend-workers` checks modules in forked copies of the process.
+  That is correct and slower than one checker, so the Goose compiler
+  defaults to one.
+- Zig is deprecated: it gets no new work, and it stays until the tooling
+  is switched. The scripts, CI and the sibling pen.json files still run
+  it. GOOSE_PORT.md lists the switch under "What is left before Zig can
+  go"; the sibling pen.json change waits for the owner.
+- Next, by the owner's order: compile times. The Goose compiler builds
+  Gdev Main in 1.9 s where Zig takes 0.9 s.
 
 ## Contracts
 

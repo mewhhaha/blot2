@@ -25,7 +25,7 @@ Against the Zig release compiler:
 
 | What | Result |
 | --- | --- |
-| Guest and host suite (`deno test -A --parallel tests/guest tests/host -- blotc-goose`) | 1,053 pass, 1 fails, 101 ignored. Zig: 1,054, 0, 101 |
+| Guest and host suite (`deno task test:goose`) | 1,054 pass, 0 fail, 101 ignored, as for Zig |
 | compiler/fixtures/direct, 33 programs | Wasm and records byte-identical |
 | Ink's 112 test programs, `build-project` | Wasm byte-identical |
 | Ink's suite through Pen (`pen test-blot`) | Same log line for line, timings aside: 268 passed, 1 failed, 3 did not compile, in 73 modules |
@@ -33,10 +33,8 @@ Against the Zig release compiler:
 | `migrate-stores` on compiler-goose/tests/uniqueness (73 programs, 78 sites) and a dry run on Gdev | Same output and same rewritten files |
 | Dependency bundles | Same size as Zig's; only the 63 header bytes that hold the compiler identity differ. Each compiler declines the other's bundle (SchemaMismatch) |
 
-The one failing test is tests/guest/worker_determinism.test.ts. It
-requires that `--frontend-workers` checks modules in parallel
-(`parallel_jobs >= modules`). The Goose compiler accepts the option and
-checks serially. See "What is left".
+The same holds with four forked checkers (see "Parallel checks"): the
+suite, Gdev Main's Wasm and Ink's log through Pen.
 
 compiler-goose/source-correspondence.json lists every Zig file with where
 its Goose module is.
@@ -49,7 +47,7 @@ its Goose module is.
    it.
 3. **Projects.** Done: the project pipeline of main.zig, `serve-project`
    (each revision built fresh), dependency bundles, `migrate-stores`,
-   native assets and editor completion. Checking is serial.
+   native assets, editor completion and parallel module checks.
 4. **Parity.** The table above.
 5. **Deprecate Zig.** Not started. See "What is left".
 
@@ -57,25 +55,47 @@ Then compile times, as the owner ordered.
 
 ## What is left before Zig can go
 
-- **Parallel module checks.** Zig checks modules on worker threads when
-  `--frontend-workers` is above 1, and one guest test requires it. Goose
-  threads cannot share the checker's pools (each thread gets its own copy
-  of every global, and a pool is not a flat value), so this needs worker
-  processes that exchange packets, as the 12 November port had. The packet
-  codecs (src/support/project_packet_codecs.goose) and the native worker
-  host (native/platform.c) are still there; the driver for them was
-  deleted in the cut. Until then `build_gdev.ts` and Pen run the Goose
-  compiler with one checker.
+Nothing in the compiler. What remains is around it:
+
 - **Switch the tooling.** scripts/build_compiler.ts, test_compiler.ts and
-  pack_native.ts, the default compiler path in the tests, deno.json's
-  tasks, CI, editor/helix and the `blotc` path in the sibling pen.json
-  files all name the Zig compiler.
+  pack_native.ts, the default compiler path in the tests, CI,
+  editor/helix and the `blotc` path in the sibling pen.json files
+  (../ink, ../gdev) all name the Zig compiler. `deno task build:goose`
+  and `deno task test:goose` build and test the Goose compiler meanwhile.
+  Switching a sibling's pen.json makes its builds need
+  compiler-goose/build/blotc-goose on that machine (clang, cmake, ninja
+  and a 7-minute release build), so that step waits for the owner.
+- **CI.** The workflow fails on main for a reason that predates the port:
+  a guest test needs ../ink, and the owner has not yet chosen between
+  fetching Ink in CI and marking the test. A Goose job would fail the same
+  way, so none is added yet.
 - **Zig's own tests.** `zig build test` (the native suite) tests the Zig
   source. The port has laws for the direct backend and the uniqueness pass
   only; compiler-goose/pending/tests holds 13 laws written for the 12
-  November interfaces, and they are not run.
+  November interfaces, and they are not run. Deleting Zig deletes that
+  suite.
 - **Speed.** A release build of the Goose compiler is slower than Zig
   (see "Speed" below).
+
+## Parallel checks
+
+`--frontend-workers N` checks ready modules in up to N forked copies of
+the compiler process (src/reuse/project_check_workers.goose).
+
+- A copy has the whole compiler state as it stood at the fork. Only its
+  answer crosses a pipe: the checked module, in the packet encoding the
+  port already had.
+- A module with a diagnostic, and one whose copy fails, is checked again
+  in the parent. Diagnostics therefore never depend on N.
+- Zig uses threads that share the checker's memory. Goose threads cannot:
+  each gets its own copy of every global, and the checker's pools are not
+  flat values.
+- It is correct and slow. On Gdev Main four checkers take 3.8 s and two
+  take 4.3 s where one takes 1.9 s: 264 forks, and each checked module is
+  encoded, piped and decoded. So the Goose compiler defaults to one
+  checker (Zig defaults to four). Pen does not pass the option, and
+  scripts/integration/build_gdev.ts passes it only when given, so both
+  run one.
 
 ## Speed
 
@@ -84,11 +104,13 @@ development container. Each row is the same work; the Wasm is the same.
 
 | What | Zig | Goose |
 | --- | ---: | ---: |
-| Gdev Main through `serve-project` (264 modules, 2.5 MB of source) | 0.9 s with 4 checkers, 1.37 s with 1 | 1.7 s |
+| Gdev Main through `serve-project` (264 modules, 2.5 MB of source) | 0.9 s with 4 checkers, 1.37 s with 1 | 1.9 s with 1 checker, 3.8 s with 4 |
 | Ink tests/six-more-physics, `build-project` (best of 7) | 127 ms | 200 ms |
 | Ink tests/app-words, `build-project` (best of 7) | 62 ms | 89 ms |
-| Ink's suite through Pen | 3.3 s | 4.3 s |
-| Guest and host suite | 21 s | 26 s |
+| Ink's suite through Pen | 3.3 s | 4.7 s |
+| Guest and host suite | 21 s | 28 s |
+
+The Goose column is with one checker, its default.
 
 A server that builds the same Ink test 30 times stays at 37 MB: the
 compiler returns its memory after each build.

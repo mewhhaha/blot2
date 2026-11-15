@@ -11,13 +11,18 @@ const { values, positionals } = parseArgs({
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
     trace: { type: "boolean", default: false },
-    "frontend-workers": { type: "string", default: "4" },
+    // Without it the compiler chooses: Zig checks on four threads, the Goose
+    // compiler on one.
+    "frontend-workers": { type: "string" },
   },
 });
-const frontendWorkers = Number(values["frontend-workers"]);
+const frontendWorkers = values["frontend-workers"] === undefined
+  ? undefined
+  : Number(values["frontend-workers"]);
 if (
-  !Number.isInteger(frontendWorkers) || frontendWorkers < 1 ||
-  frontendWorkers > 16
+  frontendWorkers !== undefined &&
+  (!Number.isInteger(frontendWorkers) || frontendWorkers < 1 ||
+    frontendWorkers > 16)
 ) {
   throw new Error("--frontend-workers must be an integer from 1 to 16");
 }

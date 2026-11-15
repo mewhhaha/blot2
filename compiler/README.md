@@ -1,6 +1,12 @@
 # Zig compiler
 
-This directory contains Blot's sole compiler. Zig owns parsing, type and effect
+**Deprecated (15 November 2026).** [compiler-goose/](../compiler-goose/README.md)
+has every command of this compiler, passes the same guest and host suite and
+produces the same bytes; new work goes there. This compiler stays, unchanged,
+until the scripts, CI and the sibling checkouts are switched
+([tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md)).
+
+This directory contains the Zig compiler. Zig owns parsing, type and effect
 checking, lowering to Core, the project server and WebAssembly emission. The
 direct backend (`src/direct/`, [plan](../tasks/FAST_COMPILE.md)) is the only
 code generator; `src/compile.zig` is its interface. The Deno client and host

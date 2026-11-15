@@ -7,12 +7,12 @@
     "c_flags": [
       "-std=gnu11",
       "-D_GNU_SOURCE",
-      "-O0",
+      "-O2",
       "-pthread"
     ],
     "cc_sha256": "8ef402d453d1ba4902e4ee0f0f847f6cfa01400c95aa43c24e97818b9c0e3f45",
     "entry": "src/main.goose",
-    "goose_inline": "-O0",
+    "goose_inline": "-O2",
     "goose_sha256": "4b97033d64b41b71a2a2892caa3ad53be967f161576b86e32385df860812c7af",
     "host": "linux",
     "host_entry": "blot_goose_main",
@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "db8b0a4c44413aee2acf053d04d4017838ac718d3293737347a4c1b0ce509948",
+  "digest": "9979f735cc7faa1c01e8bc943364cd819ea26e8891aa4ed4aeccce397206b7ea",
   "goose": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -792,9 +792,9 @@
       "sha256": "b912f6f7b840a76cd3d35ecce05447130d34de691ead6c39f48735cbd2548571"
     },
     {
-      "bytes": 308,
+      "bytes": 551,
       "path": "src/execution_policy.goose",
-      "sha256": "fa8cc8c7e4200b435597be324713dfb66004efaeeeb529acdb5a032f169d457e"
+      "sha256": "2777fcbdb2d173dd6ab139fde60262fe50a70c3294becbcd08efb482c85d738b"
     },
     {
       "bytes": 325,
