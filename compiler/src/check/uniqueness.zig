@@ -22,15 +22,19 @@ const storage_ops = @import("storage_ops.zig");
 const body_recipe = @import("body_recipe.zig");
 const Allocator = std.mem.Allocator;
 
-/// `none`: something else may observe it. `shell`: its own storage is unique,
-/// but storage held by its elements may be shared. `deep`: it and all storage
-/// reachable inside it are unique. Larger values name record facts, whose
-/// fields have facts of their own. `top` only seeds a meet.
+/// `none`: something else in this function may observe it. `shell`: its own
+/// storage is unique (through record fields too), but storage held by its
+/// elements may be shared. `deep`: it and all storage reachable inside it are
+/// unique. `borrowed`: it may hold storage this function does not own (a
+/// parameter, a capture or a constant), which must not escape. Larger values
+/// name record facts, whose fields have facts of their own. `top` only seeds
+/// a meet.
 const Fact = u32;
 const none: Fact = 0;
 const shell: Fact = 1;
 const deep: Fact = 2;
-const first_record: Fact = 3;
+const borrowed: Fact = 3;
+const first_record: Fact = 4;
 const top: Fact = std.math.maxInt(u32);
 
 const Entry = struct { field: u32, fact: Fact };
@@ -41,27 +45,31 @@ const Change = struct { binding: core.BindingId, old: Fact };
 /// storage it may alias. `exits` means control only leaves the function.
 const Value = struct { fact: Fact = none, origin: core.BindingId = 0, exits: bool = false };
 /// A loop being visited: its carries' continue facts, then their break facts,
-/// at `start` in the shared `carried` buffer.
+/// at `start` in the shared `carry_facts` buffer.
 const LoopFrame = struct { id: core.Id, start: usize, len: usize };
 const BlockFrame = struct { id: core.Id, fact: Fact = top, broken: bool = false };
-const Rejection = struct { node: core.Id, span: core.Span };
+const Rejection = struct { node: core.Id, span: core.Span, code: core.Code };
 /// A nominal being expanded, with whether each type argument holds storage.
 const Expansion = struct { identity: T.NominalIdentity, arguments: [16]bool, len: usize };
 
 pub const Error = Allocator.Error;
 
-/// Appends one `aliased_update` diagnostic per rejected `:=` in `module`.
+/// Appends one diagnostic per rejected `:=` (`aliased_update`) and per
+/// escape of borrowed storage (`borrowed_escape`) in `module`.
 pub fn check(allocator: Allocator, module: *const core.Module, out: *std.ArrayList(core.Diagnostic)) Error!void {
-    if (module.updates.len == 0) return;
     var analyzer: Analyzer = .{ .allocator = allocator, .m = module };
     defer analyzer.deinit();
     analyzer.facts = try allocator.alloc(Fact, module.bindings.len);
     @memset(analyzer.facts, none);
     for (module.bodies, 0..) |body, index| {
         if (index == 0 or body.root == 0) continue;
+        const mark = analyzer.trail.items.len;
+        for (module.bodyParameters(&body)) |parameter| try analyzer.lent(parameter.binding);
         try analyzer.function_roots.append(allocator, body.root);
-        try analyzer.escape(try analyzer.visit(body.root));
+        const result = try analyzer.visit(body.root);
+        if (body.is_function) try analyzer.returned(body.root, result);
         _ = analyzer.function_roots.pop();
+        analyzer.undo(mark);
     }
     const found = analyzer.rejections.items;
     std.mem.sortUnstable(Rejection, found, {}, struct {
@@ -73,7 +81,7 @@ pub fn check(allocator: Allocator, module: *const core.Module, out: *std.ArrayLi
     for (found) |rejection| {
         if (rejection.node == previous) continue;
         previous = rejection.node;
-        try out.append(allocator, .{ .code = .aliased_update, .span = rejection.span });
+        try out.append(allocator, .{ .code = rejection.code, .span = rejection.span });
     }
 }
 
@@ -88,7 +96,7 @@ const Analyzer = struct {
     nominal_index: std.AutoHashMapUnmanaged(T.NominalIdentity, u32) = .empty,
     expanding: std.ArrayList(Expansion) = .empty,
     loops: std.ArrayList(LoopFrame) = .empty,
-    carried: std.ArrayList(Fact) = .empty,
+    carry_facts: std.ArrayList(Fact) = .empty,
     blocks: std.ArrayList(BlockFrame) = .empty,
     function_roots: std.ArrayList(core.Id) = .empty,
     rejections: std.ArrayList(Rejection) = .empty,
@@ -106,7 +114,7 @@ const Analyzer = struct {
         self.nominal_index.deinit(a);
         self.expanding.deinit(a);
         self.loops.deinit(a);
-        self.carried.deinit(a);
+        self.carry_facts.deinit(a);
         self.blocks.deinit(a);
         self.function_roots.deinit(a);
         self.rejections.deinit(a);
@@ -124,8 +132,55 @@ const Analyzer = struct {
         self.facts[binding] = fact;
     }
     fn kill(self: *Analyzer, binding: core.BindingId) Error!void {
-        try self.set(binding, none);
+        if (!self.local(binding)) return;
+        try self.set(binding, try self.demote(self.facts[binding]));
     }
+    /// `fact` once something else also holds the value: nothing stays
+    /// unique, and borrowed storage stays borrowed.
+    fn demote(self: *Analyzer, fact: Fact) Error!Fact {
+        if (fact < first_record) return if (fact == borrowed) borrowed else none;
+        const value = self.record(fact);
+        var scratch: std.ArrayList(Entry) = .empty;
+        defer scratch.deinit(self.allocator);
+        try scratch.appendSlice(self.allocator, self.recordEntries(value));
+        for (scratch.items) |*entry| entry.fact = try self.demote(entry.fact);
+        return self.makeRecord(try self.demote(value.default), scratch.items);
+    }
+    fn containsBorrowed(self: *const Analyzer, fact: Fact) bool {
+        if (fact < first_record) return fact == borrowed;
+        const value = self.record(fact);
+        if (self.containsBorrowed(value.default)) return true;
+        for (self.recordEntries(value)) |entry| if (self.containsBorrowed(entry.fact)) return true;
+        return false;
+    }
+    /// The fact a value keeps when it is bound or placed: an alias of a
+    /// version holds the same storage, so it owns none of it.
+    fn carried(self: *Analyzer, value: Value) Error!Fact {
+        return if (value.origin != 0) self.demote(value.fact) else value.fact;
+    }
+    fn reject(self: *Analyzer, id: core.Id, code: core.Code) Error!void {
+        if (self.probing == 0) try self.rejections.append(self.allocator, .{ .node = id, .span = self.m.span(id), .code = code });
+    }
+    /// A parameter or capture: its storage is lent by the caller.
+    fn lent(self: *Analyzer, binding: core.BindingId) Error!void {
+        if (!self.local(binding)) return;
+        try self.set(binding, if (try self.holds(self.m.binding(binding).ty)) borrowed else none);
+    }
+    /// A function's result is owned by its caller, so it may not hold
+    /// storage the function only borrowed.
+    fn returned(self: *Analyzer, id: core.Id, value: Value) Error!void {
+        if (self.containsBorrowed(try self.carried(value))) try self.reject(id, .borrowed_escape);
+    }
+    /// The fact of a call's result, which the caller owns.
+    fn owned(self: *Analyzer, ty: T.Id) Error!Fact {
+        if (!try self.holds(ty)) return none;
+        if (self.element(ty) != null) return self.freshContainer(ty, false);
+        return shell;
+    }
+    fn elementFact(fact: Fact) Fact {
+        return if (fact == deep or fact == borrowed) fact else none;
+    }
+
     fn escape(self: *Analyzer, value: Value) Error!void {
         if (value.origin != 0) try self.kill(value.origin);
     }
@@ -145,7 +200,7 @@ const Analyzer = struct {
         return self.entries.items[value.start..][0..value.len];
     }
     fn field(self: *const Analyzer, fact: Fact, symbol: u32) Fact {
-        if (fact < first_record) return if (fact == deep) deep else none;
+        if (fact < first_record) return fact;
         const value = self.record(fact);
         for (self.recordEntries(value)) |entry| if (entry.field == symbol) return entry.fact;
         return value.default;
@@ -163,7 +218,7 @@ const Analyzer = struct {
     fn withField(self: *Analyzer, fact: Fact, symbol: u32, replacement: Fact) Error!Fact {
         var scratch: std.ArrayList(Entry) = .empty;
         defer scratch.deinit(self.allocator);
-        var default: Fact = if (fact == deep) deep else none;
+        var default: Fact = fact;
         if (fact >= first_record) {
             const value = self.record(fact);
             default = value.default;
@@ -188,14 +243,15 @@ const Analyzer = struct {
         if (left == top) return right;
         if (right == top) return left;
         if (left == right) return left;
+        if (left == borrowed or right == borrowed) return borrowed;
         if (left == none or right == none) return none;
         if (left < first_record and right < first_record) return @min(left, right);
-        // A record meets `deep` as itself; a record never has a `shell`.
+        // A record meets `deep` as itself; any other plain fact meets each
+        // of its fields.
         if (left == deep) return right;
         if (right == deep) return left;
-        if (left == shell or right == shell) return none;
-        const l = self.record(left);
-        const r = self.record(right);
+        const l: Record = if (left < first_record) .{ .default = left, .start = 0, .len = 0 } else self.record(left);
+        const r: Record = if (right < first_record) .{ .default = right, .start = 0, .len = 0 } else self.record(right);
         var merged: std.ArrayList(Entry) = .empty;
         defer merged.deinit(self.allocator);
         var i: usize = 0;
@@ -395,8 +451,15 @@ const Analyzer = struct {
             .panic => return .{ .exits = true },
             .reference => {
                 const ref = self.m.reference(id);
-                if (ref.unit != 0 and ref.unit != self.m.unit) return .{};
-                return .{ .origin = if (self.local(ref.binding)) ref.binding else 0 };
+                const is_local = (ref.unit == 0 or ref.unit == self.m.unit) and self.local(ref.binding) and
+                    self.m.binding(ref.binding).kind != .global and self.m.binding(ref.binding).kind != .external;
+                if (!is_local) {
+                    // A constant is shared by every caller. A named function
+                    // captures nothing.
+                    const function = n.ty < self.m.types.nodes.len and self.m.types.node(n.ty).tag == .function;
+                    return .{ .fact = if (!function and try self.holds(n.ty)) borrowed else none };
+                }
+                return .{ .origin = ref.binding, .fact = self.facts[ref.binding] };
             },
             .suite => {
                 var exits = false;
@@ -408,15 +471,20 @@ const Analyzer = struct {
                 const value = self.m.node(n.b);
                 if (value.tag == .update and !self.m.updateInfo(n.b).store) return self.update(n.b, n.a);
                 const result = if (value.tag == .array_op) try self.arrayOp(n.b, true) else try self.visit(n.b);
+                const fact = try self.carried(result);
                 try self.escape(result);
-                try self.set(n.a, if (result.origin != 0) none else result.fact);
+                try self.set(n.a, fact);
                 return .{ .exits = result.exits };
             },
             .update => return self.update(id, 0),
             .return_ => {
-                const result = try self.visitEscaping(n.a);
-                const fact = if (result.origin != 0) none else result.fact;
-                if (self.function_roots.items.len != 0 and n.b == self.function_roots.items[self.function_roots.items.len - 1]) return .{ .exits = true };
+                const result = try self.visit(n.a);
+                const fact = try self.carried(result);
+                try self.escape(result);
+                if (self.function_roots.items.len != 0 and n.b == self.function_roots.items[self.function_roots.items.len - 1]) {
+                    if (self.containsBorrowed(fact)) try self.reject(id, .borrowed_escape);
+                    return .{ .exits = true };
+                }
                 var at = self.blocks.items.len;
                 while (at != 0) {
                     at -= 1;
@@ -431,7 +499,8 @@ const Analyzer = struct {
             .if_value, .if_stmt => return self.conditional(id),
             .match => return self.match(id),
             .pattern_bind => {
-                _ = try self.visitEscaping(n.b);
+                const input = try self.visitEscaping(n.b);
+                try self.patternFrom(n.a, try self.carried(input));
                 if (n.c != 0) {
                     const mark = self.trail.items.len;
                     if ((try self.visit(n.c)).exits) self.undo(mark);
@@ -441,46 +510,132 @@ const Analyzer = struct {
             .loop => return self.loop(id),
             .break_ => return self.breakNode(id),
             .closure => {
-                for (self.m.closureCaptures(id)) |captured| try self.kill(captured);
-                const body = self.m.closure(id).body;
-                try self.function_roots.append(self.allocator, body);
-                defer _ = self.function_roots.pop();
-                try self.escape(try self.visit(body));
-                return .{};
+                // A closure holds what it captures; it is borrowed when any
+                // of that is. Inside it, captures and the parameter are lent.
+                var fact: Fact = none;
+                for (self.m.closureCaptures(id)) |captured| {
+                    if (self.local(captured) and self.containsBorrowed(self.facts[captured])) fact = borrowed;
+                    try self.kill(captured);
+                }
+                const info = self.m.closure(id);
+                const mark = self.trail.items.len;
+                for (self.m.closureCaptures(id)) |captured| try self.lent(captured);
+                try self.lent(info.parameter.binding);
+                try self.function_roots.append(self.allocator, info.body);
+                const result = self.visit(info.body) catch |err| {
+                    _ = self.function_roots.pop();
+                    return err;
+                };
+                try self.returned(info.body, result);
+                _ = self.function_roots.pop();
+                self.undo(mark);
+                return .{ .fact = fact };
             },
             .project => {
                 if (try self.memberCopy(id)) |fact| {
                     // `values.copy` is the prelude's spelling of `@storage.copy`.
                     const value = try self.visit(n.a);
-                    if (try self.elementHolds(n.ty)) try self.escape(value);
-                    return .{ .fact = fact, .exits = value.exits };
+                    if (!try self.elementHolds(n.ty)) return .{ .fact = fact, .exits = value.exits };
+                    const held = try self.carried(value);
+                    try self.escape(value);
+                    return .{ .fact = if (self.containsBorrowed(held)) borrowed else fact, .exits = value.exits };
                 }
                 const value = try self.visit(n.a);
+                // A member selected by dispatch is a call on its receiver.
+                if (self.m.dispatchSignature(id) != 0) return .{ .fact = if (self.functionType(n.ty)) none else try self.owned(n.ty), .exits = value.exits };
                 if (!try self.holds(n.ty)) return .{ .exits = value.exits };
-                return .{ .origin = value.origin, .exits = value.exits };
+                return .{ .origin = value.origin, .fact = self.field(value.fact, self.m.projection(n.b).field), .exits = value.exits };
             },
             .array => {
                 var elements_deep = true;
+                var lends = false;
                 var exits = false;
                 for (self.m.children(id)) |child| {
-                    const value = try self.visitEscaping(child);
+                    const value = try self.visit(child);
+                    const fact = try self.carried(value);
+                    try self.escape(value);
                     exits = exits or value.exits;
-                    elements_deep = elements_deep and value.origin == 0 and value.fact == deep;
+                    elements_deep = elements_deep and fact == deep;
+                    lends = lends or self.containsBorrowed(fact);
                 }
+                if (lends) return .{ .fact = borrowed, .exits = exits };
                 return .{ .fact = try self.freshContainer(n.ty, elements_deep), .exits = exits };
             },
             .record => return self.recordLiteral(id),
             .construct => {
-                const payload = try self.visitEscaping(n.b);
+                const payload = try self.visit(n.b);
+                const fact = try self.carried(payload);
+                try self.escape(payload);
                 const literal = n.b != 0 and self.m.node(n.b).tag == .record;
-                return .{ .fact = if (literal and payload.origin == 0) payload.fact else none, .exits = payload.exits };
+                if (literal and payload.origin == 0) return .{ .fact = fact, .exits = payload.exits };
+                return .{ .fact = if (self.containsBorrowed(fact)) borrowed else none, .exits = payload.exits };
             },
+            .product => {
+                var fact: Fact = none;
+                var exits = false;
+                for (self.m.children(id)) |child| {
+                    const value = try self.visit(child);
+                    if (self.containsBorrowed(try self.carried(value))) fact = borrowed;
+                    try self.escape(value);
+                    exits = exits or value.exits;
+                }
+                return .{ .fact = fact, .exits = exits };
+            },
+            .call => return self.call(id),
+            .apply => return self.apply(id),
             .array_op => return self.arrayOp(id, false),
             .storage => return self.storageOp(id),
             else => return .{ .exits = try self.visitChildren(id) },
         }
     }
 
+    /// Names a pattern binds out of a value holding lent storage hold it too.
+    fn patternFrom(self: *Analyzer, id: core.PatternId, fact: Fact) Error!void {
+        if (id == 0 or id >= self.m.patterns.len or !self.containsBorrowed(fact)) return;
+        const pattern = self.m.pattern(id);
+        switch (pattern.tag) {
+            .bind => if (try self.holds(pattern.ty)) try self.set(pattern.a, borrowed),
+            .product => for (self.m.patternChildren(id)) |child| try self.patternFrom(child, fact),
+            .constructor, .record_payload => try self.patternFrom(pattern.b, fact),
+            else => {},
+        }
+    }
+    /// A call lends its arguments for the call only, and its caller owns the
+    /// result. A result that is itself a function may hold the arguments.
+    fn call(self: *Analyzer, id: core.Id) Error!Value {
+        const n = self.m.node(id);
+        const holder = self.functionType(n.ty);
+        var fact: Fact = none;
+        var exits = false;
+        for (self.m.children(id)) |child| {
+            const value = try self.visit(child);
+            exits = exits or value.exits;
+            if (!holder) continue;
+            if (self.containsBorrowed(try self.carried(value))) fact = borrowed;
+            try self.escape(value);
+        }
+        if (holder) return .{ .fact = fact, .exits = exits };
+        return .{ .fact = try self.owned(n.ty), .exits = exits };
+    }
+    fn apply(self: *Analyzer, id: core.Id) Error!Value {
+        const n = self.m.node(id);
+        // An effect operation's handler may keep its argument.
+        const operation = self.m.node(n.a).tag == .operation_value;
+        const holder = operation or self.functionType(n.ty);
+        const callee = try self.visit(n.a);
+        const argument = try self.visit(n.b);
+        const exits = callee.exits or argument.exits;
+        if (!holder) return .{ .fact = try self.owned(n.ty), .exits = exits };
+        const fact: Fact = if (self.containsBorrowed(try self.carried(callee)) or self.containsBorrowed(try self.carried(argument))) borrowed else none;
+        try self.escape(callee);
+        try self.escape(argument);
+        return .{ .fact = if (operation) try self.owned(n.ty) else fact, .exits = exits };
+    }
+    fn functionType(self: *const Analyzer, ty: T.Id) bool {
+        if (ty == 0 or ty >= self.m.types.nodes.len) return false;
+        const tag = self.m.types.node(ty).tag;
+        return tag == .function or tag == .variable;
+    }
     /// The fresh fact of `values.copy` on an array, which only the prelude
     /// can define; null for every other projection.
     fn memberCopy(self: *Analyzer, id: core.Id) Error!?Fact {
@@ -506,17 +661,21 @@ const Analyzer = struct {
         var scratch: std.ArrayList(Entry) = .empty;
         defer scratch.deinit(self.allocator);
         var exits = false;
+        var lends = false;
         for (children, 0..) |child, index| {
-            const value = try self.visitEscaping(child);
+            const value = try self.visit(child);
+            const fact = try self.carried(value);
+            try self.escape(value);
             exits = exits or value.exits;
+            lends = lends or self.containsBorrowed(fact);
             if (shape.tag != .record) continue;
             const destination = self.m.recordDestinations(id)[index];
             if (destination >= shape.b) continue;
             const declared = self.m.types.recordField(shape, destination);
             if (!try self.holds(declared.ty)) continue;
-            try scratch.append(self.allocator, .{ .field = declared.name, .fact = if (value.origin != 0) none else value.fact });
+            try scratch.append(self.allocator, .{ .field = declared.name, .fact = fact });
         }
-        if (shape.tag != .record) return .{ .exits = exits };
+        if (shape.tag != .record) return .{ .fact = if (lends) borrowed else none, .exits = exits };
         std.mem.sortUnstable(Entry, scratch.items, {}, entryLess);
         return .{ .fact = try self.makeRecord(none, scratch.items), .exits = exits };
     }
@@ -530,13 +689,18 @@ const Analyzer = struct {
         for (selectors) |step| if (step.kind == .index) {
             _ = try self.visitEscaping(step.index);
         };
-        const value = try self.visitEscaping(info.value);
-        const replacement = if (value.origin != 0) none else value.fact;
+        const value = try self.visit(info.value);
+        const replacement = try self.carried(value);
+        try self.escape(value);
         var through_storage = false;
         for (selectors) |step| through_storage = through_storage or step.kind == .index;
         const leaf = if (selectors.len != 0) selectors[selectors.len - 1].result_type else self.m.typeOf(info.value);
-        const shared = try self.holds(leaf) and replacement != deep;
+        const leaf_holds = try self.holds(leaf);
+        const shared = leaf_holds and replacement != deep;
+        const lends = leaf_holds and self.containsBorrowed(replacement);
         if (info.store) {
+            // Storage outlives the call, so it may not keep lent storage.
+            if (lends) try self.reject(id, .borrowed_escape);
             if (shared) try self.sharedInto(info.root, selectors);
             return .{};
         }
@@ -552,14 +716,16 @@ const Analyzer = struct {
             try self.set(successor, try self.replace(old, fields.items, replacement));
             return .{ .exits = value.exits };
         }
-        if (!try self.accepts(old, selectors) and self.probing == 0) try self.rejections.append(self.allocator, .{ .node = id, .span = self.m.span(id) });
+        if (!try self.accepts(old, selectors)) try self.reject(id, .aliased_update);
         var prefix: std.ArrayList(u32) = .empty;
         defer prefix.deinit(self.allocator);
         for (selectors) |step| {
             if (step.kind == .index) break;
             try prefix.append(self.allocator, self.m.projection(step.projection).field);
         }
-        try self.set(successor, if (shared) try self.weaken(old, prefix.items) else old);
+        // An array holding lent storage holds it as a whole.
+        const next = if (lends) try self.replace(old, prefix.items, borrowed) else if (shared) try self.weaken(old, prefix.items) else old;
+        try self.set(successor, next);
         return .{ .exits = value.exits };
     }
     fn replace(self: *Analyzer, fact: Fact, fields: []const u32, replacement: Fact) Error!Fact {
@@ -594,7 +760,7 @@ const Analyzer = struct {
                 const container = try self.visit(children[0]);
                 const index = try self.visitEscaping(children[1]);
                 const exits = container.exits or index.exits;
-                if (operation == .get and try self.holds(n.ty)) return .{ .origin = container.origin, .exits = exits };
+                if (operation == .get and try self.holds(n.ty)) return .{ .origin = container.origin, .fact = elementFact(container.fact), .exits = exits };
                 return .{ .exits = exits };
             },
             .identity => return self.visit(children[0]),
@@ -602,7 +768,7 @@ const Analyzer = struct {
                 // Writes four elements in place and returns the same storage.
                 const container = try self.visit(children[0]);
                 for (children[1..]) |child| _ = try self.visitEscaping(child);
-                return .{ .origin = container.origin, .exits = container.exits };
+                return .{ .origin = container.origin, .fact = container.fact, .exits = container.exits };
             },
             .set, .concat, .slice, .flatten, .convert, .prepend, .append => {
                 // A new container whose elements are copies of the inputs'.
@@ -650,23 +816,31 @@ const Analyzer = struct {
                 const container = try self.visit(children[0]);
                 const index = try self.visitEscaping(children[1]);
                 const exits = container.exits or index.exits;
-                if (try self.holds(n.ty)) return .{ .origin = container.origin, .exits = exits };
+                if (try self.holds(n.ty)) return .{ .origin = container.origin, .fact = elementFact(container.fact), .exits = exits };
                 return .{ .exits = exits };
             },
             .push => {
                 const container = try self.visit(children[0]);
-                const value = try self.visitEscaping(children[1]);
-                if (try self.elementHolds(self.m.typeOf(children[0])) and (value.origin != 0 or value.fact != deep)) try self.sharedInto(children[0], &.{});
+                const value = try self.visit(children[1]);
+                const fact = try self.carried(value);
+                try self.escape(value);
+                if (try self.elementHolds(self.m.typeOf(children[0]))) {
+                    if (self.containsBorrowed(fact)) try self.reject(id, .borrowed_escape);
+                    if (fact != deep) try self.sharedInto(children[0], &.{});
+                }
                 return .{ .exits = container.exits or value.exits };
             },
             .copy => {
+                // A shallow copy: its elements are the original's.
                 const container = try self.visit(children[0]);
-                if (try self.elementHolds(n.ty)) try self.escape(container);
-                return .{ .fact = try self.freshContainer(n.ty, false), .exits = container.exits };
+                if (!try self.elementHolds(n.ty)) return .{ .fact = deep, .exits = container.exits };
+                const fact = try self.carried(container);
+                try self.escape(container);
+                return .{ .fact = if (self.containsBorrowed(fact)) borrowed else shell, .exits = container.exits };
             },
             .freeze => {
                 const container = try self.visit(children[0]);
-                return .{ .origin = container.origin, .exits = container.exits };
+                return .{ .origin = container.origin, .fact = container.fact, .exits = container.exits };
             },
             // References, views and links alias the storage they name.
             .ref, .at, .link, .view, .load => return .{ .exits = try self.visitChildren(id) },
@@ -687,10 +861,19 @@ const Analyzer = struct {
     fn match(self: *Analyzer, id: core.Id) Error!Value {
         const info = self.m.matchInfo(id);
         var exits = false;
-        for (self.m.matchInputs(id)) |input| exits = (try self.visitEscaping(input)).exits or exits;
+        const inputs = self.m.matchInputs(id);
+        const facts = try self.allocator.alloc(Fact, inputs.len);
+        defer self.allocator.free(facts);
+        for (inputs, facts) |input, *fact| {
+            const value = try self.visit(input);
+            fact.* = try self.carried(value);
+            try self.escape(value);
+            exits = value.exits or exits;
+        }
         var join: Join = .{ .base = self.trail.items.len, .merges = self.m.branchMerges(id) };
         defer join.deinit(self.allocator);
         for (self.m.matchArms(id), 0..) |arm, index| {
+            for (self.m.armRows(arm)) |row| for (self.m.rowPatterns(row), facts) |pattern, fact| try self.patternFrom(pattern, fact);
             var guard_exits = false;
             if (arm.guard != 0) guard_exits = (try self.visitEscaping(arm.guard)).exits;
             var body = if (arm.body != 0) try self.visit(arm.body) else Value{};
@@ -718,6 +901,7 @@ const Analyzer = struct {
                 // starts as the source is observed by every iteration.
                 const source = try self.visit(info.first);
                 exits = source.exits;
+                try self.patternFrom(info.pattern, elementFact(try self.carried(source)));
                 if (try self.elementHolds(self.m.typeOf(info.first))) try self.escape(source) else iterated = source.origin;
             },
         }
@@ -766,17 +950,17 @@ const Analyzer = struct {
     fn loopPass(self: *Analyzer, id: core.Id, carries: []const core.LoopCarry, assumed: []const Fact, result: []Fact, outgoing: []Fact) Error!void {
         const info = self.m.loopInfo(id);
         for (carries, assumed) |carry, fact| try self.set(carry.iteration, fact);
-        const start = self.carried.items.len;
-        defer self.carried.shrinkRetainingCapacity(start);
-        try self.carried.appendNTimes(self.allocator, top, carries.len * 2);
+        const start = self.carry_facts.items.len;
+        defer self.carry_facts.shrinkRetainingCapacity(start);
+        try self.carry_facts.appendNTimes(self.allocator, top, carries.len * 2);
         try self.loops.append(self.allocator, .{ .id = id, .start = start, .len = carries.len });
         const body = self.visit(info.body) catch |err| {
             _ = self.loops.pop();
             return err;
         };
         _ = self.loops.pop();
-        const continues = self.carried.items[start..][0..carries.len];
-        const breaks = self.carried.items[start + carries.len ..][0..carries.len];
+        const continues = self.carry_facts.items[start..][0..carries.len];
+        const breaks = self.carry_facts.items[start + carries.len ..][0..carries.len];
         for (carries, continues, breaks, result, outgoing) |carry, continued, broken, *next, *out| {
             const backedge = if (body.exits) top else if (self.local(carry.backedge)) self.facts[carry.backedge] else none;
             next.* = try self.meet(backedge, continued);
@@ -799,13 +983,13 @@ const Analyzer = struct {
             if (self.m.node(child).tag == .reference and value.origin != 0) {
                 fact = self.facts[value.origin];
             } else {
+                fact = try self.carried(value);
                 try self.escape(value);
-                if (value.origin != 0) fact = none;
             }
             const target = frame orelse continue;
             if (position >= target.len) continue;
             const slot = target.start + position + (if (n.op == .continue_) 0 else target.len);
-            self.carried.items[slot] = try self.meet(self.carried.items[slot], fact);
+            self.carry_facts.items[slot] = try self.meet(self.carry_facts.items[slot], fact);
         }
         return .{};
     }
@@ -836,7 +1020,7 @@ const Join = struct {
             try analyzer.escape(result);
             self.exits = false;
             self.falls += 1;
-            self.value = try analyzer.meet(self.value, if (result.origin != 0) none else result.fact);
+            self.value = try analyzer.meet(self.value, try analyzer.carried(result));
             if (index < 2) for (self.merges, self.merged.items) |merge, *slot| {
                 const binding = if (index == 0) merge.then_binding else merge.else_binding;
                 slot.* = try analyzer.meet(slot.*, if (analyzer.local(binding)) analyzer.facts[binding] else none);

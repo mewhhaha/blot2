@@ -153,7 +153,7 @@ pub const LoopCarry = struct { incoming: BindingId, iteration: BindingId, backed
 /// Range bounds and array expressions are evaluated exactly once before the
 /// body. A forever loop has no first/end expression and no iterator pattern.
 pub const LoopInfo = struct { kind: LoopKind, first: Id = 0, end: Id = 0, pattern: PatternId = 0, body: Id, carries: List = .{}, can_exit: bool = false };
-pub const Code = enum { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update };
+pub const Code = enum { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, borrowed_escape };
 pub const Diagnostic = struct {
     code: Code,
     span: Span,
@@ -165,6 +165,7 @@ pub const Diagnostic = struct {
             .invalid_call => "Typed core requires a resolved named call or compiler primitive",
             .complexity => "Typed core exceeds its nesting or table limit",
             .aliased_update => "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value",
+            .borrowed_escape => "This returns or keeps an array the function only borrows (a parameter, a capture or a constant), which its caller still owns; take that parameter own, or return values.copy",
         };
     }
 };

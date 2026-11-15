@@ -99,7 +99,9 @@ fn migrateEntry(a: A, io: Io, writer: *Io.Writer, request: Request, entry: []con
         defer lowered.deinit(a);
         for (lowered.diagnostics) |item| {
             if (item.code != .aliased_update) {
+                // A dry run reports every other lowering diagnostic too.
                 try diagnostic(writer, loaded.filename(id), "lower", @tagName(item.code), item.span.start, item.span.end, item.message());
+                if (request.dry_run) continue;
                 return .{ .failed = true };
             }
             try sites.append(a, .{ .unit = id, .start = item.span.start });
