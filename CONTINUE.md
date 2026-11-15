@@ -178,29 +178,24 @@ so we can retire zig." The plan and the measured state are in
 
 ## The Goose port
 
-[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state and the steps;
-compiler-goose/README.md has the layout and the build.
+[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state, the comparison
+with Zig and what is left; compiler-goose/README.md has the layout, the
+build and the tests.
 
 - The owner's order: a working Goose compiler, then Zig deprecated, then
   compile times.
-- compiler-goose/src is now a lean frontend (166 modules). The scoped
-  backend, the evaluator, retained revisions and the checker's
-  cross-revision reuse are deleted from the port, as they are from Zig.
-- `sh compiler-goose/tools/upstream-32a4f44/build.sh` builds the patched
-  Goose (136 s). Then
-  `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 1500 --total-timeout 2400`
-  links compiler-goose/build/blotc-goose in 49 s.
-- The frontend is at today's Zig: store statement, uniqueness pass,
-  lazy associated import, `parse-project` and `check-project`. Its records
-  match Zig's on the direct fixtures and on Ink's tests (GOOSE_PORT.md has
-  the counts and the one known difference).
-- The direct backend's writer and runtime are ported and byte-identical
-  (`python3 compiler-goose/tools/test_direct.py`). The rest of the backend
-  and the project server are in progress on branches `wip/goose-direct`
-  and `wip/goose-server` (local worktrees under ../blot2-wt/, not pushed).
-- Next: merge those two, compare Wasm on compiler/fixtures/direct, run the
-  guest suite, Ink through Pen and the Gdev frame against `blotc-goose`,
-  then switch the tooling and deprecate Zig.
+- `sh compiler-goose/build.sh` builds compiler-goose/build/blotc-goose
+  (and, the first time, the patched Goose it needs). `--release` optimizes.
+- The Goose compiler has every command of `blotc`, `serve-project`
+  included. Against it the guest and host suite gives 1,053 passed, 1
+  failed, 101 ignored; Wasm is byte-identical to Zig's on the direct
+  fixtures and on Ink's tests. GOOSE_PORT.md has Ink through Pen, Gdev and
+  the speed.
+- The failing test (tests/guest/worker_determinism.test.ts) requires
+  parallel module checks. The Goose compiler checks serially; restoring
+  the worker processes is the first item of the compile-time work.
+- Zig is still what the scripts, CI and the sibling pen.json files run.
+  GOOSE_PORT.md lists the switch under "What is left before Zig can go".
 
 ## Contracts
 

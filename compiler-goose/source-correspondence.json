@@ -714,23 +714,23 @@
   },
   {
    "zig": "compiler/src/compile.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/compile.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/direct/direct.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/direct/direct.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/direct/emit.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/direct/emit.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/direct/function.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/direct/function.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/direct/runtime.zig",
@@ -739,8 +739,8 @@
   },
   {
    "zig": "compiler/src/direct/types.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/direct/types.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/direct/writer.zig",
@@ -769,8 +769,8 @@
   },
   {
    "zig": "compiler/src/migrate_stores.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/driver/cli_migrate_stores.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/native_test_policy.zig",
@@ -900,12 +900,14 @@
   {
    "zig": "compiler/src/reuse/declaration_demand.zig",
    "goose": "compiler-goose/pending/reuse/declaration_demand.goose",
-   "state": "pending"
+   "state": "pending",
+   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
   },
   {
    "zig": "compiler/src/reuse/dependency_bundle.zig",
    "goose": "compiler-goose/pending/reuse/dependency_bundle.goose",
-   "state": "pending"
+   "state": "pending",
+   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
   },
   {
    "zig": "compiler/src/reuse/dependency_cli.zig",
@@ -1110,7 +1112,8 @@
   {
    "zig": "compiler/src/reuse/resolution_cache.zig",
    "goose": "compiler-goose/pending/reuse/resolution_cache.goose",
-   "state": "pending"
+   "state": "pending",
+   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
   },
   {
    "zig": "compiler/src/reuse/resolution_cache_tests.zig",

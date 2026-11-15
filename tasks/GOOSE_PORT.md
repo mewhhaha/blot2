@@ -13,65 +13,99 @@ times.
 ## Where the port stands (15 November 2026)
 
 compiler-goose/ was the scoped compiler as the Zig source stood at 44ee94f4
-(12 November). It matched Zig then on Ink's suite and on Gdev Main's Wasm
-([executable](../benchmarks/evidence/qualification/2026-11-12-goose-first-executable.json),
-[Ink](../benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json),
-[speed](../benchmarks/evidence/measurements/2026-11-13-goose-compile-speed.json)).
-The Zig compiler then replaced the scoped backend with the direct one and
-deleted about 170,000 lines.
+(12 November). The Zig compiler then replaced the scoped backend with the
+direct one and deleted about 170,000 lines. The port followed that cut and
+was then brought up to today's Zig.
 
-The port now follows that cut:
+`compiler-goose/build/blotc-goose` now has every command of `blotc`:
+`lex`, `parse`, `check`, `build`, `parse-project`, `check-project`,
+`build-project`, `dependencies`, `serve-project` and `migrate-stores`.
 
-- **Deleted:** the 214 Goose modules whose Zig originals are gone (scoped
-  backend, evaluator, scoped runtime, retained revisions, the checker's
-  cross-revision reuse), 41 Goose-only modules that served them (helpers,
-  worker packets, the old driver) and 36 laws that tested them.
-- **Builds:** compiler-goose/src is a frontend of 166 modules. Goose
-  checks it in 33 s and `build.py` links `blotc-goose` in 49 s. Before
-  the cut these took 271 s and about 12 minutes, at 10.4 GiB.
-- **Frontend parity** (15 November, against the Zig release compiler):
-  - `check-project` gives the same JSON records, every counter included,
-    on the 33 programs of compiler/fixtures/direct and on 99 of Ink's 112
-    test programs. The other 13 differ only in three counters (see "Known
-    differences").
-  - Lowering diagnostics agree on the 73 programs of
-    compiler-goose/tests/uniqueness and on four programs with stores and
-    `values.copy` under the prelude.
-  - A debug build (`-O0`) checks an Ink test in 250 to 380 ms where the Zig
-    release build takes 40 to 65 ms.
-- **Parked** in compiler-goose/pending/ (31 modules and 13 laws): the project server,
-  dependency bundles, editor completion and native assets. They are ported
-  to the 12 November source and wait for step 3.
-- **Backend:** writer and runtime are ported and give the same bytes as
-  Zig (`python3 compiler-goose/tools/test_direct.py`).
+Against the Zig release compiler:
+
+| What | Result |
+| --- | --- |
+| Guest and host suite (`deno test -A --parallel tests/guest tests/host -- blotc-goose`) | 1,053 pass, 1 fails, 101 ignored. Zig: 1,054, 0, 101 |
+| compiler/fixtures/direct, 33 programs | Wasm and records byte-identical |
+| Ink's 112 test programs, `build-project` | Wasm byte-identical |
+| Ink's suite through Pen (`pen test-blot`) | Same log line for line, timings aside: 268 passed, 1 failed, 3 did not compile, in 73 modules |
+| Gdev Main | Wasm byte-identical through `serve-project` (2,720,970 bytes, sha256 af9f24dd…); its first Pen frame matches the recorded hashes (frame.png c1ff619f… on the software driver, frames.trace 86d50101…) |
+| `migrate-stores` on compiler-goose/tests/uniqueness (73 programs, 78 sites) and a dry run on Gdev | Same output and same rewritten files |
+| Dependency bundles | Same size as Zig's; only the 63 header bytes that hold the compiler identity differ. Each compiler declines the other's bundle (SchemaMismatch) |
+
+The one failing test is tests/guest/worker_determinism.test.ts. It
+requires that `--frontend-workers` checks modules in parallel
+(`parallel_jobs >= modules`). The Goose compiler accepts the option and
+checks serially. See "What is left".
 
 compiler-goose/source-correspondence.json lists every Zig file with where
 its Goose module is.
 
 ## Steps
 
-Each step ends with a comparison against the Zig compiler.
-
-1. **Frontend up to today's Zig.** Done for what compiles a program: the
-   store `place = value` (parser, checker, Core lowering), the storage
-   rule for a generalized `let`, rebinding without generalization,
-   associated members imported on first lookup, the uniqueness pass, and
-   the project commands `parse-project` and `check-project`.
-   Left: the lexer's keyword precheck and ASCII fast path (speed only),
-   and the leftovers under "Known differences".
-2. **Direct backend.** Port types (584 lines of Zig), emit (674), function
-   (3,875), direct (121) and the compile interface. Compare the Wasm for
-   compiler/fixtures/direct byte for byte.
-3. **Projects.** Bring compiler-goose/pending/ back into src against
-   today's Zig: the project pipeline of main.zig, `serve-project` (it now
-   builds each revision fresh), dependency bundles, `migrate-stores`,
-   native assets. Checking is serial; the worker processes of the old port
-   are gone.
-4. **Parity.** The guest suite (it takes the compiler as an argument),
-   Ink's suite through Pen, and the Gdev frame.
-5. **Deprecate Zig.** Point the scripts, CI and docs at `blotc-goose`.
+1. **Frontend up to today's Zig.** Done.
+2. **Direct backend.** Done: types, emit, function, direct and the compile
+   interface, with Zig's hash-map order reproduced where output depends on
+   it.
+3. **Projects.** Done: the project pipeline of main.zig, `serve-project`
+   (each revision built fresh), dependency bundles, `migrate-stores`,
+   native assets and editor completion. Checking is serial.
+4. **Parity.** The table above.
+5. **Deprecate Zig.** Not started. See "What is left".
 
 Then compile times, as the owner ordered.
+
+## What is left before Zig can go
+
+- **Parallel module checks.** Zig checks modules on worker threads when
+  `--frontend-workers` is above 1, and one guest test requires it. Goose
+  threads cannot share the checker's pools (each thread gets its own copy
+  of every global, and a pool is not a flat value), so this needs worker
+  processes that exchange packets, as the 12 November port had. The packet
+  codecs (src/support/project_packet_codecs.goose) and the native worker
+  host (native/platform.c) are still there; the driver for them was
+  deleted in the cut. Until then `build_gdev.ts` and Pen run the Goose
+  compiler with one checker.
+- **Switch the tooling.** scripts/build_compiler.ts, test_compiler.ts and
+  pack_native.ts, the default compiler path in the tests, deno.json's
+  tasks, CI, editor/helix and the `blotc` path in the sibling pen.json
+  files all name the Zig compiler.
+- **Zig's own tests.** `zig build test` (the native suite) tests the Zig
+  source. The port has laws for the direct backend and the uniqueness pass
+  only; compiler-goose/pending/tests holds 13 laws written for the 12
+  November interfaces, and they are not run.
+- **Speed.** A release build of the Goose compiler is slower than Zig
+  (see "Speed" below).
+
+## Speed
+
+Release builds of both compilers, 15 November 2026, on the 4-core
+development container. Each row is the same work; the Wasm is the same.
+
+| What | Zig | Goose |
+| --- | ---: | ---: |
+| Gdev Main through `serve-project` (264 modules, 2.5 MB of source) | 0.9 s with 4 checkers, 1.37 s with 1 | 1.7 s |
+| Ink tests/six-more-physics, `build-project` (best of 7) | 127 ms | 200 ms |
+| Ink tests/app-words, `build-project` (best of 7) | 62 ms | 89 ms |
+| Ink's suite through Pen | 3.3 s | 4.3 s |
+| Guest and host suite | 21 s | 26 s |
+
+A server that builds the same Ink test 30 times stays at 37 MB: the
+compiler returns its memory after each build.
+
+## The memory record
+
+The compilation records carry `memory` (live, peak and allocated bytes,
+allocations). In Zig these count every allocation of the command. In the
+Goose compiler they count its pooled owners: the buffers it takes and
+releases by hand, which is where the port keeps what Zig allocated.
+An array that belongs to a scope is released with the scope and is not
+counted. `memory_scope` in each record says so. `--profile` charges the
+same requests to the phase where they happen.
+
+The guest suite asserts `live_bytes == 0` after most builds. That found a
+leak the port had from the start: the checker kept the environment rows of
+every certified lambda.
 
 ## Known differences from Zig that remain in src
 
@@ -84,12 +118,19 @@ Then compile times, as the owner ordered.
   (`src/eval/type_evidence.goose` is `check/type_evidence.zig` today).
 - `check/check_scheme_import.goose` still has the helpers the reuse cache
   used (Zig removed 98 lines); nothing calls them.
+- `reuse/revision_inputs.goose` still has code for retained revisions;
+  nothing reaches it.
+- native/ still has the request supervisor of the 12 November server
+  (request_supervisor.c, request_transport.c, request_cache.c), which
+  forked a process for each request. The server no longer uses it: like
+  Zig's, it answers every request in the one server process, and an error
+  ends that process.
 - **Hash-map order** is reproduced where it was found to matter: the
   checker walks its imported names and its globals in the slot order of
-  Zig's hash map (support/zigmap.goose keeps the same layout), so schemes
-  are imported in Zig's order.
-- **Three counters still differ slightly.** Diagnostics and the imported
-  schemes are the same; the cause is not found.
+  Zig's hash map, and the backend its binding map (support/zigmap.goose
+  keeps the same layout).
+- **Three counters still differ slightly.** Diagnostics, the imported
+  schemes and the Wasm are the same; the cause is not found.
   - A module that declares a function with a `where` clause beside
     another declaration ends with one more type node than in Zig (a
     one-element product, appended after every node the two share):
@@ -97,10 +138,16 @@ Then compile times, as the owner ordered.
   - Ink's lib/codec takes 6 more `associated_steps` and
     `inference_steps` and has 4 more type nodes; 13 of Ink's 112 tests
     import it.
+- The server's request parser checks the whole document's syntax before it
+  types any field. Zig's streams, so a request with both a type error and
+  a later syntax error is refused as `SyntaxError` here and
+  `UnexpectedToken` there. Both end the session.
 
 ## Making Goose faster
 
-The lean program removed the cost that mattered: one build is 49 s.
+The lean program removed the cost that mattered: Goose checks the port in
+about 55 s, a debug build takes about 85 s and a release build about 7
+minutes (Goose's emit 60 s, clang -O2 the rest).
 
 For the record, where the time went on the whole port (133 stack samples
 of the emit, 15 November):

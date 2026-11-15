@@ -6,25 +6,26 @@ state, the steps and the measurements are in
 
 ## Layout
 
-- `src/` is what builds today: the parser, the checker, Core lowering and a
-  command line with `lex`, `parse`, `check` and `build` for one file. The
-  module map follows the Zig source; a module keeps the name of its Zig
-  original.
-- `src/direct/` is the direct backend. `writer` and `runtime` are ported
-  and produce the same bytes as Zig.
-- `pending/` holds modules that are ported but not yet brought up to
-  today's Zig source: the project server, dependency bundles, editor
-  completion and native assets, with their laws in `pending/tests/`. They
-  are outside `src/` so the build does not load them.
-- `native/` is the C host: the entry point, file and process calls.
+- `src/` is the compiler: the parser, the checker, Core lowering, the
+  direct backend (`src/direct/`), the project pipeline, the project server
+  and the command line (`src/driver/`). It has every command of `blotc`.
+  The module map follows the Zig source; a module keeps the name of its
+  Zig original.
+- `pending/` holds three modules that Zig uses only from its tests, and 13
+  laws written for the 12 November interfaces. Nothing builds or runs
+  them.
+- `native/` is the C host: the entry point, file and process calls, and
+  the observer that counts pool requests for the `memory` record.
 - `tools/` has the generators for the generated modules in `src/support/`
   and `src/reuse/`, the build of the patched Goose, and the test runners.
 
 ## Build
 
 `sh compiler-goose/build.sh` writes `compiler-goose/build/blotc-goose`
-(debug, about a minute); `--release` optimizes it (about four minutes). It
-needs clang, cmake, ninja and Python 3.
+(debug, about a minute and a half); `--release` optimizes it (about seven
+minutes). It needs clang, cmake, ninja and Python 3. A rebuilt compiler
+has a new identity, so dependency bundles made by the previous build are
+declined as stale.
 
 - The first run builds the Goose compiler: upstream Goose
   ([github.com/aardappel/goose](https://github.com/aardappel/goose)) with
@@ -41,10 +42,16 @@ python3 compiler-goose/tools/write_structural_adapters.py
 python3 compiler-goose/tools/write_json_adapters.py
 python3 compiler-goose/tools/write_project_packet.py
 python3 compiler-goose/tools/write_project_packet_contexts.py
+python3 compiler-goose/tools/write_dependency_codecs.py
+python3 compiler-goose/tools/write_dependency_owned_headers.py
 ```
 
 ## Tests
 
+- The guest and host suite takes the compiler as its argument:
+  `deno test -A --parallel tests/guest tests/host -- compiler-goose/build/blotc-goose`.
+  One test fails: tests/guest/worker_determinism.test.ts requires parallel
+  module checks, and this compiler checks serially.
 - `python3 compiler-goose/tools/test_direct.py` runs each law in
   `tests/direct/` against the Zig source of the direct backend and requires
   the same bytes.
@@ -54,3 +61,14 @@ python3 compiler-goose/tools/write_project_packet_contexts.py
 - `tests/checker_tools`, `tests/copied_argument_contents`,
   `tests/global_empty_facts` and `tests/qualification` test the patches to
   the Goose compiler, not this port.
+
+## Finding a pooled owner that is not released
+
+The `memory` field of a compilation record counts the compiler's pooled
+owners; `live_bytes` must be 0. When it is not, build with debug
+information (`sh compiler-goose/build.sh --cflag=-g`) and trace the pool
+events under gdb: break on `event` in native/allocation_observer.c, sum
+allocated minus freed bytes for each `owner` after
+`blot_allocation_observer_mark`, and match the owner that keeps bytes
+against the `base` of each `gs_rhdr` field of `gs_globals_main`. The field
+name is the pool; the callers of its allocations name the site.
