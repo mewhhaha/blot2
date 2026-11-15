@@ -22,15 +22,16 @@ state, the steps and the measurements are in
 
 ## Build
 
-1. The Goose compiler:
-   `sh compiler-goose/tools/upstream-32a4f44/build.sh` builds upstream
-   Goose ([github.com/aardappel/goose](https://github.com/aardappel/goose))
-   with the patch series beside it into
-   `build/goose-port/upstream-d5ae5bb/build-precision/`.
-2. The Blot compiler:
-   `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 1500 --total-timeout 2400`
-   writes `compiler-goose/build/blotc-goose`. `--release` selects `-O2`.
-   The build regenerates `src/source_identity.goose`.
+`sh compiler-goose/build.sh` writes `compiler-goose/build/blotc-goose`
+(debug, about a minute); `--release` optimizes it (about four minutes). It
+needs clang, cmake, ninja and Python 3.
+
+- The first run builds the Goose compiler: upstream Goose
+  ([github.com/aardappel/goose](https://github.com/aardappel/goose)) with
+  the patch series in `tools/upstream-32a4f44/`, into
+  `build/goose-port/upstream-d5ae5bb/build-precision/` (about two minutes).
+- Then `build.py` has Goose emit C and compiles it with clang. It
+  regenerates `src/source_identity.goose`.
 
 After a module, a struct or a field is added or removed, regenerate the
 adapters before building:
