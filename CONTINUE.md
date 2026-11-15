@@ -160,6 +160,11 @@ compiles".
   `systemd-run` wrappers above are for the owner's machine.
 - `deno task lint:zig` is at zero findings with zig-analyzer 0.17.0-1. Main
   had 16 until 15 November, so CI failed there before it ran a test.
+- CI now passes lint, the native laws, the release build and the pack, and
+  fails in the guest phase: tests/guest/owned_render_copy_execution.test.ts
+  imports ../ink/lib, and the runner has only blot2. A copy of the
+  repository without its siblings fails exactly those two cases. The owner
+  decides whether CI fetches Ink or the test declares that it needs it.
 - Two host tests depend on process start-up time and can fail when the
   whole suite runs in parallel on a slow machine:
   tests/host/lsp.test.ts ("Completion was never sent", its wait is now
