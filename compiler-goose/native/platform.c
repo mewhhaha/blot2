@@ -412,6 +412,19 @@ void blot_sleep_ms(uint64_t milliseconds) {
     while (nanosleep(&pause, &pause) < 0 && errno == EINTR) {}
 }
 int64_t blot_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errno; return pid; }
+/* One check job in a copy of this process. The copy has the whole compiler
+ * state as it stood here, and answers on a pipe. The parent gets the copy's
+ * pid and the read end; the copy gets 0 and the write end. */
+int64_t blot_job_fork(int32_t *descriptor) {
+    int ends[2];
+    if (pipe(ends) < 0) return -(int64_t)errno;
+    pid_t pid = fork();
+    if (pid < 0) { int saved = errno; close(ends[0]); close(ends[1]); return -(int64_t)saved; }
+    if (pid == 0) { close(ends[0]); *descriptor = ends[1]; return 0; }
+    close(ends[1]); *descriptor = ends[0]; return pid;
+}
+/* Ends a job's copy at once: it releases nothing and flushes nothing. */
+_Noreturn void blot_job_exit(int32_t status) { _exit(status); }
 int32_t blot_detach_session(void) { if (setsid() < 0) return -errno; return 0; }
 _Bool blot_wait_success(uint32_t pid) {
     int status;

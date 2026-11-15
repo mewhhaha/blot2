@@ -13,7 +13,6 @@ import json;
 import main;
 import reuse.project;
 import reuse.project_check;
-import reuse.project_check_serial;
 import reuse.revision_inputs;
 import reuse.source_overlays;
 import backend.native_assets;
@@ -66,7 +65,7 @@ fn migrateLoaded(writer:blot_io::Writer,request:MigrationRequest,entry:const u8[
   for item in loaded.diagnostics.items {let path=if item.unit!=0 {loaded.filename(item.unit)}else {entry};let error=diagnostic(writer,path,"parse-project",item.codeName(),item.span.start,item.span.end,item.message());if error!=blot_error::Error.none {return MigrationOutcome{..},error;}}
   return MigrationOutcome{failed:true,..},blot_error::Error.none;
  }
- loaded.checking=blot_reuse_project::Lowering{io:true,workers:1};var executor=blot_reuse_project_check::SerialChecks{..};var checked,error=blot_reuse_project_check::checkProject(executor,loaded);if error!=blot_error::Error.none {return MigrationOutcome{..},error;}
+ loaded.checking=blot_reuse_project::Lowering{io:true,workers:1};var executor=blot_reuse_project_check::Workers{..};var checked,error=blot_reuse_project_check::checkProject(executor,loaded);if error!=blot_error::Error.none {return MigrationOutcome{..},error;}
  let outcome,error=migrateChecked(writer,request,entry,loaded,checked);checked.deinit();return outcome,error;
 }
 fn migrateChecked(writer:blot_io::Writer,request:MigrationRequest,entry:const u8[:],loaded:Project&,checked:CheckedProject&)->MigrationOutcome,Error {

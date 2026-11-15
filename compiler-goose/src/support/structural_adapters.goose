@@ -143,7 +143,7 @@ import reuse.project_check_engine;
 import reuse.project_check_origins;
 import reuse.project_check_owners;
 import reuse.project_check_parallel;
-import reuse.project_check_serial;
+import reuse.project_check_workers;
 import reuse.projection_cache;
 import reuse.purity_diagnostics;
 import reuse.revision_inputs;
@@ -1481,8 +1481,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::MigrationSummary)->
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::MigrationSummary,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ProjectStats)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ProjectStats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SerialExecutor)->bool {return equalFields(left,right);}
-fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SerialExecutor,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SimpleRecord)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SimpleRecord,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::Stats)->bool {return equalFields(left,right);}
@@ -2325,12 +2323,14 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::Res
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::ResultOwner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::ResultState)->bool {return equalFields(left,right);}
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::ResultState,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::SerialChecks)->bool {return equalFields(left,right);}
-fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::SerialChecks,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::RunningJob)->bool {return equalFields(left,right);}
+fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::RunningJob,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::SourceModule)->bool {return equalFields(left,right);}
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::SourceModule,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::WorkOrder)->bool {return equalFields(left,right);}
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::WorkOrder,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::Workers)->bool {return equalFields(left,right);}
+fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::Workers,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_projection_cache::Answer)->bool {return equalFields(left,right);}
 fn blot_reuse_projection_cache::blotStructuralHash<StructuralSink>(value:blot_reuse_projection_cache::Answer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_projection_cache::Answers)->bool {return equalFields(left,right);}

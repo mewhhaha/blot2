@@ -104,7 +104,7 @@ fn prepareProject(source:Project&,entry_path:const u8[:],output_identity:blot_su
  }
  if output_identity.present {for unit in source.units.items {if output_identity.value==source.symbols.get(unit.filename) {return Preparation.inactive,blot_error::Error.output_is_source;}}}
  // Checking stops at the first module that reports a diagnostic.
- var checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticSerial(source);if error!=blot_error::Error.none {return Preparation.inactive,error;}
+ var checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticWithWorkers(source);if error!=blot_error::Error.none {return Preparation.inactive,error;}
  let value,failure=prepareChecked(source,entry_path,checked);checked.deinit();return value,failure;
 }
 fn prepareChecked(source:Project&,entry_path:const u8[:],checked:CheckedProject&)->Preparation,Error {

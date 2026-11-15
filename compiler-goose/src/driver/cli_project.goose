@@ -22,11 +22,6 @@ type Core=blot_check_core::Module;
 type InputOwner=blot_reuse_dependency_payload::Owner;
 type Project=blot_reuse_project::Project;
 type CheckedProject=blot_reuse_project_check::CheckedProject;
-// Checking is serial. The project check asks an executor for workers only
-// when the project requests more than one, and this driver requests one.
-struct SerialExecutor {requested:u8=1}
-fn runProjectChecks(self_:SerialExecutor&,parent:blot_reuse_project_check::Engine&,order:const u32[:],width:i64,jobs:blot_reuse_project_check::ParallelJob[:])->blot_work_counters::Frontend,Error {return blot_work_counters::Frontend{..},blot_error::Error.invalid_request;}
-fn cancelProjectChecks(self_:SerialExecutor&) {}
 struct ProjectStats {
  kind:const u8[:]="compilation",
  filename:const u8[:]=default<const u8[:]>(),
@@ -67,14 +62,14 @@ fn processProject(writer:blot_io::Writer,command:Command,filename:const u8[:],op
  if installation.present {installation.value.restore();}if profile.present {profile.value.deinit();}return accepted&&written==blot_error::Error.none,written;
 }
 fn projectLoad(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,output:Text,policy:Policy,started:u64,stats:ProjectStats&)->bool,Error {
- var loaded,error=blot_reuse_project::load(filename,options);if error!=blot_error::Error.none {return false,error;}loaded.checking=blot_reuse_project::Lowering{io:true,workers:1};
+ var loaded,error=blot_reuse_project::load(filename,options);if error!=blot_error::Error.none {return false,error;}loaded.checking=blot_reuse_project::Lowering{io:true,workers:policy.frontend_workers};
  let accepted,error=projectLoaded(writer,command,filename,output,policy,started,stats,loaded);let release_start=now();loaded.deinit();stats.teardown_us+=elapsed(release_start);return accepted,error;
 }
 fn projectLoaded(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,policy:Policy,started:u64,stats:ProjectStats&,loaded:Project&)->bool,Error {
  stats.source_bytes=loaded.source_bytes;stats.files=loaded.units.len;stats.symbol_bytes=loaded.symbols.bytes.len;for unit in loaded.units.items {if unit.tree.nodes.len!=0 {stats.syntax_nodes+=unit.tree.nodes.len-1;}}
  for item in loaded.diagnostics.items {let path=if item.unit!=0 {loaded.filename(item.unit)}else {filename};var error=blot_error::Error.none;if item.publication.present {let unit .= loaded.unit(item.unit);if item.parse_code.present {error=frontendDiagnostic(writer,path,"parse-project",unit.source,item.publication.value,unit.tree.diagnostics.items);}else {error=frontendDiagnostic(writer,path,"parse-project",unit.source,item.publication.value,item.lexical_details);}}else {error=diagnostic(writer,path,"parse-project",item.codeName(),item.span.start,item.span.end,item.message());}if error!=blot_error::Error.none {return false,error;}}
  stats.load_us=elapsed(started);if loaded.diagnostics.len!=0 {return false,blot_error::Error.none;}if command==Command.parse_project {return true,blot_error::Error.none;}
- let check_start=now();var executor=SerialExecutor{..};var checked,error=blot_reuse_project_check::checkProject(executor,loaded);if error!=blot_error::Error.none {return false,error;}var checked_live=true;
+ let check_start=now();var executor=blot_reuse_project_check::Workers{..};var checked,error=blot_reuse_project_check::checkProject(executor,loaded);if error!=blot_error::Error.none {return false,error;}var checked_live=true;
  let accepted,error=projectChecked(writer,command,filename,output,policy,check_start,stats,loaded,checked,checked_live);if checked_live {let release_start=now();checked.deinit();stats.teardown_us+=elapsed(release_start);}return accepted,error;
 }
 fn projectChecked(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,policy:Policy,check_start:u64,stats:ProjectStats&,loaded:Project&,checked:CheckedProject&,checked_live:bool&)->bool,Error {

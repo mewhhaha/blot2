@@ -8,7 +8,6 @@ import json;
 import reuse.zig_project_frames;
 import reuse.project;
 import reuse.project_check;
-import reuse.project_check_serial;
 import reuse.revision_inputs;
 import reuse.source_overlays;
 import reuse.partial_dependency;
@@ -108,7 +107,8 @@ fn initOpen(request:Request,compiler:Digest,policy:Policy)->OpenProject,Error {
     }
     return result,blot_error::Error.none;
 }
-fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {source.lowering=blot_reuse_project::Lowering{io:true,workers:1};source.checking=blot_reuse_project::Lowering{io:true,workers:1};}
+// Lowering is serial here whatever the policy asks.
+fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {source.lowering=blot_reuse_project::Lowering{io:true,workers:1};source.checking=blot_reuse_project::Lowering{io:true,workers:self_.policy.frontend_workers};}
 // Loads, checks and lowers this revision's sources. With a dependency bundle,
 // the bundle's unchanged modules are taken as checked; a rejection there is
 // reported by the fresh check of every module.
