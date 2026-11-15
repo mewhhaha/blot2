@@ -310,6 +310,13 @@ async function main() {
         }
       }
       if (result.code !== 0) {
+        // The logs are files; show their ends where the run is read (CI).
+        for (const log of [result.stdout, result.stderr]) {
+          const lines = (await Deno.readTextFile(log)).trimEnd().split("\n");
+          if (lines.length === 1 && !lines[0]) continue;
+          console.error(`--- last lines of ${log}`);
+          console.error(lines.slice(-60).join("\n"));
+        }
         throw new Error(`${step.name} failed; logs: ${runDirectory}`);
       }
     }
