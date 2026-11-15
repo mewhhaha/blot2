@@ -95,8 +95,13 @@ compile. Where the time goes (133 stack samples of the emit, 15 November):
 - This is what the 12 November record found after patches 20–29: each call
   replays every store event of its callee. Changing that is a redesign of
   the analysis, not a patch.
-- `GOOSE_PGO=1` on build.sh trains the checker on the port and was worth
-  1.29× on 12 November.
+- `GOOSE_PGO=1` on build.sh trains the checker on the port. On 15 November
+  it checks the port in 233 s against 271 s, at the same 10.4 GiB, and
+  emits the same C once the absolute source path is removed. It needs
+  `libclang-rt-18-dev` and takes 13 minutes to build.
+- No new patch was added on 15 November. The profile points at the event
+  replay, and the two cheaper levers are the trained build above and a
+  smaller program below.
 - Deleting the scoped compiler (step 4) removes about 40% of the program
   the checker has to analyse.
 
