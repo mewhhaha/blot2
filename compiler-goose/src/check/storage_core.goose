@@ -31,8 +31,8 @@ fn contract(m: const blot_check_core::Module&, id: blot_check_core::Id) -> Contr
             else { if !element.present || (op == blot_check_storage_ops::Op.link && kind.present && kind.value.kind != blot_check_storage_types::grow) { return Contract {..}, blot_error::Error.invalid_artifact; }
                 same(result, element.value, out.value.element); for arg in args[1..] { same(result, blot_check_types::u32_type, m.typeOf(arg)); } }
         },
-        load, write => { if !kind.present || (kind.value.kind != blot_check_storage_types::ref && kind.value.kind != blot_check_storage_types::link) { return Contract {..}, blot_error::Error.invalid_artifact; }
-            if op == blot_check_storage_ops::Op.load { same(result, kind.value.element, n.ty); } else { same(result, kind.value.element, m.typeOf(args[1])); same(result, blot_check_types::unit, n.ty); } },
+        load => { if !kind.present || (kind.value.kind != blot_check_storage_types::ref && kind.value.kind != blot_check_storage_types::link) { return Contract {..}, blot_error::Error.invalid_artifact; }
+            same(result, kind.value.element, n.ty); },
         length => { if !element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, blot_check_types::u32_type, n.ty); },
         read => { if !element.present { return Contract {..}, blot_error::Error.invalid_artifact; } same(result, element.value, n.ty); same(result, blot_check_types::u32_type, m.typeOf(args[1])); },
         push, reserve => { if !kind.present || (kind.value.kind != blot_check_storage_types::grow && kind.value.kind != blot_check_storage_types::resize) { return Contract {..}, blot_error::Error.invalid_artifact; }

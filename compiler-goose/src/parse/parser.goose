@@ -307,6 +307,7 @@ let a_field_access=blot_parse_ast::tag_field_access;
 let a_index_access=blot_parse_ast::tag_index_access;
 let a_let_stmt=blot_parse_ast::tag_let_stmt;
 let a_rebind_stmt=blot_parse_ast::tag_rebind_stmt;
+let a_store_stmt=blot_parse_ast::tag_store_stmt;
 let a_use_stmt=blot_parse_ast::tag_use_stmt;
 let a_iterator_bind=blot_parse_ast::tag_iterator_bind;
 let a_function_return_stmt=blot_parse_ast::tag_function_return_stmt;
@@ -850,15 +851,12 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   if at(p,source,tokens,t_identifier)&&has_use_binding(p,tokens) { let name=lower_identifier(p,source,tokens); var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); } expect(p,source,tokens,t_left_arrow); let value=expression(p,source,tokens); return add(p,source,tokens,a_use_stmt,name,value,annotation,start); }
   let value=expression(p,source,tokens); return add(p,source,tokens,a_use_stmt,0,value,0,start);
  }
- if (at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false))&&has_rebinding(p,tokens) { return identifier_syntax(p,source,tokens); }
- if at(p,source,tokens,t_identifier)&&has_rebinding(p,tokens) {
-  let name=lower_identifier(p,source,tokens); var target=add(p,source,tokens,a_name,name,0,0,start);
-  while p.failure==blot_error::Error.none&&(at(p,source,tokens,t_dot)||at(p,source,tokens,t_l_bracket)) {
-   if at(p,source,tokens,t_dot) { let dot=advance(p,source,tokens); let member=identifier(p,source,tokens); target=add(p,source,tokens,a_field_access,target,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
-   else { advance(p,source,tokens); let index=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); target=add(p,source,tokens,a_index_access,target,index,0,start); }
-  }
-  expect(p,source,tokens,t_colon_equal); let value=expression(p,source,tokens); return add(p,source,tokens,a_rebind_stmt,target,value,0,start);
+ let assignment=assignment_operator(p,tokens);
+ if assignment==t_colon_equal {
+  if at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false) { return identifier_syntax(p,source,tokens); }
+  if at(p,source,tokens,t_identifier) { let target=place(p,source,tokens,start); if p.failure!=blot_error::Error.none { return 0; } expect(p,source,tokens,t_colon_equal); let value=expression(p,source,tokens); return add(p,source,tokens,a_rebind_stmt,target,value,0,start); }
  }
+ if assignment==t_equal { let target=place(p,source,tokens,start); if p.failure!=blot_error::Error.none { return 0; } expect(p,source,tokens,t_equal); let value=expression(p,source,tokens); return add(p,source,tokens,a_store_stmt,target,value,0,start); }
  return expression(p,source,tokens);
 }
 recursive fn local_function_declaration(p:Parser&,source:const u8[:],tokens:const Token[:])->Id {
@@ -877,13 +875,27 @@ fn has_use_binding(p: Parser&,tokens: const Token[:]) -> bool {
  }
  return false;
 }
-fn has_rebinding(p: Parser&,tokens: const Token[:]) -> bool {
+// The target of `:=` or `=`: a name (or, for a store, any atom) followed by
+// `.field` and `[index]` steps.
+recursive fn place(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
+ var target: Id=0; if at(p,source,tokens,t_identifier) { let name=lower_identifier(p,source,tokens); target=add(p,source,tokens,a_name,name,0,0,start); } else { target=atom(p,source,tokens); }
+ while p.failure==blot_error::Error.none&&(at(p,source,tokens,t_dot)||at(p,source,tokens,t_l_bracket)) {
+  if at(p,source,tokens,t_dot) { let dot=advance(p,source,tokens); let member=identifier(p,source,tokens); target=add(p,source,tokens,a_field_access,target,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:target,span:Span {dot.start,dot.end},member:member}); }
+  else { advance(p,source,tokens); let index=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); target=add(p,source,tokens,a_index_access,target,index,0,start); }
+ }
+ return target;
+}
+// Classify before allocating a target. An ordinary call such as f [a, b]
+// must not speculatively parse the argument as an index. A top-level `:=`
+// on the statement's line rebinds; a top-level `=` stores. The end-of-file
+// tag stands for neither.
+fn assignment_operator(p: Parser&,tokens: const Token[:]) -> blot_parse_token::Tag {
  var nesting=0; var i=p.index;
  while i<tokens.len {
-  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal { return true; } if tag==t_newline||tag==t_dedent||tag==t_eof { return false; } }
+  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal||tag==t_equal { return tag; } if tag==t_newline||tag==t_dedent||tag==t_eof { return t_eof; } }
   if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nesting++; } else if (tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace)&&nesting!=0 { nesting--; } i++;
  }
- return false;
+ return t_eof;
 }
 recursive fn trailing_else(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let saved=p.index; newlines(p,source,tokens); if !eat(p,source,tokens,t_kw_else) { p.index=saved; return 0; } expect(p,source,tokens,t_colon); return suite(p,source,tokens); }
 recursive fn if_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
