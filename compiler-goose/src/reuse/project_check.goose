@@ -29,6 +29,7 @@ import .project_check_services;
 import .project_check_module;
 import .project_check_parallel;
 import .project_check_factory;
+import .project_check_serial;
 type Error=blot_error::Error;
 type Project=blot_reuse_project::Project;
 type ExportKind=blot_reuse_frozen_dependency::ExportKind;

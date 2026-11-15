@@ -1,4 +1,5 @@
-// Actual packed C.2 retained payload storage; wire bytes are separate.
+// The storage of a frozen payload as the Zig compiler counts it: each slice is its length times the
+// element size Zig gives it (@sizeOf, padding included). Wire bytes are separate.
 namespace blot_reuse_payload_bytes;
 import backend.collection_ops;
 import backend.opaque_storage;
@@ -28,10 +29,10 @@ fn bytes(value:u64)->i64 {return 0;}
 fn bytes(value:u8)->i64 {return 0;}
 fn bytes(values:const u32[:])->i64 {var total=values.len*4;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_numeric_proof_terms::Kind[:])->i64 {var total=values.len*1;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_numeric_proof_terms::Term[:])->i64 {var total=values.len*10;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_numeric_proof_contracts::Requirement[:])->i64 {var total=values.len*13;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_numeric_proof_headers::Named[:])->i64 {var total=values.len*98;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_capability_contracts::Term[:])->i64 {var total=values.len*13;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_numeric_proof_terms::Term[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_numeric_proof_contracts::Requirement[:])->i64 {var total=values.len*16;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_numeric_proof_headers::Named[:])->i64 {var total=values.len*112;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_capability_contracts::Term[:])->i64 {var total=values.len*16;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_capability_contracts::Binding[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::FieldName[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::RuntimeName[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
@@ -42,61 +43,61 @@ fn bytes(values:const blot_check_core::ErasedDeclarationReference[:])->i64 {var 
 fn bytes(values:const blot_check_core::RequestLoopInfo[:])->i64 {var total=values.len*56;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::RequestArm[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_types::Node[:])->i64 {var total=values.len*16;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_effects::Row[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_effects::Row[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_types::Operation[:])->i64 {var total=values.len*24;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_types::QuantifierGoals[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_types::Obligation[:])->i64 {var total=values.len*48;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Node[:])->i64 {var total=values.len*18;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_types::Obligation[:])->i64 {var total=values.len*52;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Node[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_parse_ast::Span[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Binding[:])->i64 {var total=values.len*105;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Body[:])->i64 {var total=values.len*95;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Parameter[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Binding[:])->i64 {var total=values.len*112;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Body[:])->i64 {var total=values.len*96;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Parameter[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::CallInfo[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::Merge[:])->i64 {var total=values.len*16;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::List[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const u8[:])->i64 {var total=values.len*1;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Obligation[:])->i64 {var total=values.len*60;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Nominal[:])->i64 {var total=values.len*62;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Obligation[:])->i64 {var total=values.len*64;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Nominal[:])->i64 {var total=values.len*68;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::OperationName[:])->i64 {var total=values.len*48;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::Constructor[:])->i64 {var total=values.len*64;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::Projection[:])->i64 {var total=values.len*32;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::ProjectionVariant[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Pattern[:])->i64 {var total=values.len*25;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Pattern[:])->i64 {var total=values.len*28;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::PatternRow[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::MatchArm[:])->i64 {var total=values.len*24;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::MatchInfo[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::UpdateInfo[:])->i64 {var total=values.len*28;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::UpdateStep[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::ClosureInfo[:])->i64 {var total=values.len*45;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Associated[:])->i64 {var total=values.len*21;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Contract[:])->i64 {var total=values.len*70;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::ContractMember[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Implementation[:])->i64 {var total=values.len*98;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::ImplementationMember[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::MatchInfo[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::UpdateInfo[:])->i64 {var total=values.len*32;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::UpdateStep[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::ClosureInfo[:])->i64 {var total=values.len*48;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Associated[:])->i64 {var total=values.len*24;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Contract[:])->i64 {var total=values.len*72;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::ContractMember[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Implementation[:])->i64 {var total=values.len*104;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::ImplementationMember[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_reuse_principal_interface::MemberTemplate[:])->i64 {var total=values.len*24;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::SelectedProof[:])->i64 {var total=values.len*101;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::SelectedProof[:])->i64 {var total=values.len*108;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::SelectedUse[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::DictionarySelection[:])->i64 {var total=values.len*53;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::DictionarySelection[:])->i64 {var total=values.len*56;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::DictionaryUse[:])->i64 {var total=values.len*28;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Primitive[:])->i64 {var total=values.len*4;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::LoopInfo[:])->i64 {var total=values.len*26;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Primitive[:])->i64 {var total=values.len*8;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::LoopInfo[:])->i64 {var total=values.len*28;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::LoopCarry[:])->i64 {var total=values.len*16;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::ResolverInfo[:])->i64 {var total=values.len*29;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::ResolverInfo[:])->i64 {var total=values.len*32;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::OperationValue[:])->i64 {var total=values.len*40;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_check_core::HandleEffects[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_core::Diagnostic[:])->i64 {var total=values.len*9;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_check_parameter_patterns::Node[:])->i64 {var total=values.len*9;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Binding[:])->i64 {var total=values.len*78;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Nominal[:])->i64 {var total=values.len*82;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Constructor[:])->i64 {var total=values.len*70;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::EffectFamily[:])->i64 {var total=values.len*54;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_core::Diagnostic[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_check_parameter_patterns::Node[:])->i64 {var total=values.len*12;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Binding[:])->i64 {var total=values.len*88;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Nominal[:])->i64 {var total=values.len*88;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Constructor[:])->i64 {var total=values.len*72;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::EffectFamily[:])->i64 {var total=values.len*56;for value in values {total+=bytes(value);}return total;}
 fn bytes(values:const blot_reuse_principal_interface::EffectTemplate[:])->i64 {var total=values.len*24;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Associated[:])->i64 {var total=values.len*17;for value in values {total+=bytes(value);}return total;}
-fn bytes(values:const blot_reuse_principal_interface::Contract[:])->i64 {var total=values.len*90;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Associated[:])->i64 {var total=values.len*20;for value in values {total+=bytes(value);}return total;}
+fn bytes(values:const blot_reuse_principal_interface::Contract[:])->i64 {var total=values.len*92;for value in values {total+=bytes(value);}return total;}
 fn bytes(value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>)->i64 {if !value.present {return 0;}return bytes(value.value);}
 fn bytes(value:blot_support::Option<blot_parse_ast::Span>)->i64 {if !value.present {return 0;}return bytes(value.value);}
 fn bytes(value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>)->i64 {if !value.present {return 0;}return bytes(value.value);}
-fn bytes(value:const blot_check_core::Module&)->i64 {return bytes(value.has_rank_contracts)+bytes(value.has_usage_contracts)+bytes(value.has_numeric_proofs)+bytes(value.proof_contracts)+bytes(value.capability_contracts)+bytes(value.field_names)+bytes(value.runtime_names)+bytes(value.source_names)+bytes(value.declaration_dependencies)+bytes(value.dependency_references)+bytes(value.dependency_members)+bytes(value.erased_declaration_references)+bytes(value.request_loops)+bytes(value.request_arms)+bytes(value.tag_calls)+bytes(value.unit)+bytes(value.types)+bytes(value.nodes)+bytes(value.spans)+bytes(value.extra)+bytes(value.bindings)+bytes(value.bodies)+bytes(value.parameters)+bytes(value.references)+bytes(value.calls)+bytes(value.merges)+bytes(value.merge_ranges)+bytes(value.names)+bytes(value.obligations)+bytes(value.nominals)+bytes(value.operation_names)+bytes(value.constructors)+bytes(value.projections)+bytes(value.projection_variants)+bytes(value.patterns)+bytes(value.pattern_rows)+bytes(value.match_arms)+bytes(value.matches)+bytes(value.updates)+bytes(value.update_steps)+bytes(value.closures)+bytes(value.associated)+bytes(value.contracts)+bytes(value.contract_members)+bytes(value.implementations)+bytes(value.implementation_members)+bytes(value.member_templates)+bytes(value.selected_proofs)+bytes(value.selected_members)+bytes(value.selected_edges)+bytes(value.selected_uses)+bytes(value.dictionary_selections)+bytes(value.dictionary_uses)+bytes(value.primitives)+bytes(value.loops)+bytes(value.loop_carries)+bytes(value.resolver_ops)+bytes(value.operation_values)+bytes(value.handle_effects)+bytes(value.dispatch_signatures)+bytes(value.diagnostics)+bytes(value.body_lowerings)+value.package_payloads.len*4;}
+fn bytes(value:const blot_check_core::Module&)->i64 {return bytes(value.has_rank_contracts)+bytes(value.has_usage_contracts)+bytes(value.has_numeric_proofs)+bytes(value.proof_contracts)+bytes(value.capability_contracts)+bytes(value.field_names)+bytes(value.runtime_names)+bytes(value.source_names)+bytes(value.request_loops)+bytes(value.request_arms)+bytes(value.tag_calls)+bytes(value.unit)+bytes(value.types)+bytes(value.nodes)+bytes(value.spans)+bytes(value.extra)+bytes(value.bindings)+bytes(value.bodies)+bytes(value.parameters)+bytes(value.references)+bytes(value.calls)+bytes(value.merges)+bytes(value.merge_ranges)+bytes(value.names)+bytes(value.obligations)+bytes(value.nominals)+bytes(value.operation_names)+bytes(value.constructors)+bytes(value.projections)+bytes(value.projection_variants)+bytes(value.patterns)+bytes(value.pattern_rows)+bytes(value.match_arms)+bytes(value.matches)+bytes(value.updates)+bytes(value.update_steps)+bytes(value.closures)+bytes(value.associated)+bytes(value.contracts)+bytes(value.contract_members)+bytes(value.implementations)+bytes(value.implementation_members)+bytes(value.member_templates)+bytes(value.selected_proofs)+bytes(value.selected_members)+bytes(value.selected_edges)+bytes(value.selected_uses)+bytes(value.dictionary_selections)+bytes(value.dictionary_uses)+bytes(value.primitives)+bytes(value.loops)+bytes(value.loop_carries)+bytes(value.resolver_ops)+bytes(value.operation_values)+bytes(value.handle_effects)+bytes(value.dispatch_signatures)+bytes(value.diagnostics)+bytes(value.body_lowerings)+value.package_payloads.len*4;}
 fn bytes(value:const blot_check_numeric_proof_headers::Named&)->i64 {return bytes(value.binding)+bytes(value.header);}
 fn bytes(value:const blot_check_numeric_proof_headers::Owned&)->i64 {return bytes(value.arity)+bytes(value.value_slots)+bytes(value.proof_slots)+bytes(value.values)+bytes(value.operands)+bytes(value.requirements)+bytes(value.result);}
 fn bytes(value:blot_check_numeric_proof_terms::Kind)->i64 {match value {unsigned32=>{return 0;},array=>{return 0;},list=>{return 0;}}}
@@ -160,7 +161,7 @@ fn bytes(value:blot_check_core::PatternTag)->i64 {match value {invalid=>{return 
 fn bytes(value:const blot_check_core::PatternRow&)->i64 {return bytes(value.patterns);}
 fn bytes(value:const blot_check_core::MatchArm&)->i64 {return bytes(value.rows)+bytes(value.guard_)+bytes(value.body)+bytes(value.span);}
 fn bytes(value:const blot_check_core::MatchInfo&)->i64 {return bytes(value.inputs)+bytes(value.arms)+bytes(value.statement);}
-fn bytes(value:const blot_check_core::UpdateInfo&)->i64 {return bytes(value.root)+bytes(value.path)+bytes(value.value)+bytes(value.self_binding)+bytes(value.selectors);}
+fn bytes(value:const blot_check_core::UpdateInfo&)->i64 {return bytes(value.root)+bytes(value.path)+bytes(value.value)+bytes(value.self_binding)+bytes(value.selectors)+bytes(value.store);}
 fn bytes(value:const blot_check_core::UpdateStep&)->i64 {return bytes(value.kind)+bytes(value.projection)+bytes(value.index)+bytes(value.source_type)+bytes(value.result_type);}
 fn bytes(value:blot_check_core::UpdateKind)->i64 {match value {field=>{return 0;},index=>{return 0;}}}
 fn bytes(value:const blot_check_core::ClosureInfo&)->i64 {return bytes(value.qualifier)+bytes(value.body)+bytes(value.parameter)+bytes(value.captures)+bytes(value.function_type)+bytes(value.closed_rows);}
@@ -191,7 +192,7 @@ fn bytes(value:blot_check_core::ResolverOperation)->i64 {match value {monad=>{re
 fn bytes(value:const blot_check_core::OperationValue&)->i64 {return bytes(value.identity)+bytes(value.arguments)+bytes(value.signature)+bytes(value.witness)+bytes(value.witness_result)+bytes(value.instance)+bytes(value.capability);}
 fn bytes(value:const blot_check_core::HandleEffects&)->i64 {return bytes(value.node)+bytes(value.first)+bytes(value.second)+bytes(value.extended)+bytes(value.residual);}
 fn bytes(value:const blot_check_core::Diagnostic&)->i64 {return bytes(value.code)+bytes(value.span);}
-fn bytes(value:blot_check_core::Code)->i64 {match value {unchecked=>{return 0;},unsupported=>{return 0;},unresolved_binding=>{return 0;},invalid_call=>{return 0;},complexity=>{return 0;}}}
+fn bytes(value:blot_check_core::Code)->i64 {match value {unchecked=>{return 0;},unsupported=>{return 0;},unresolved_binding=>{return 0;},invalid_call=>{return 0;},complexity=>{return 0;},aliased_update=>{return 0;}}}
 fn bytes(value:const blot_reuse_principal_interface::Interface&)->i64 {return bytes(value.has_rank_contracts)+bytes(value.has_usage_contracts)+bytes(value.has_numeric_proofs)+bytes(value.proof_contracts)+bytes(value.capability_contracts)+bytes(value.unit)+bytes(value.graph)+bytes(value.patterns)+bytes(value.bindings)+bytes(value.obligations)+bytes(value.obligation_spans)+bytes(value.nominals)+bytes(value.constructors)+bytes(value.effect_families)+bytes(value.effect_templates)+bytes(value.associated)+bytes(value.contracts)+bytes(value.contract_predicates)+bytes(value.contract_members)+bytes(value.implementations)+bytes(value.implementation_predicates)+bytes(value.implementation_members)+bytes(value.member_templates)+bytes(value.selected_proofs)+bytes(value.selected_members)+bytes(value.selected_edges);}
 fn bytes(value:const blot_check_frozen_types::Graph&)->i64 {return bytes(value.nodes)+bytes(value.extra)+bytes(value.rows)+bytes(value.labels)+bytes(value.operations)+bytes(value.row_variable_count)+bytes(value.quantifier_goals)+bytes(value.quantifier_obligations);}
 fn bytes(value:const blot_check_frozen_types::PatternGraph&)->i64 {return bytes(value.nodes)+bytes(value.extra);}

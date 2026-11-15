@@ -24,6 +24,7 @@ if sys.argv[1:]==['--repair-owner-dispatch']:
  print(f'Updated {count} decoder allocation sites')
  raise SystemExit(0)
 from source_model import clean,balanced,split
+from normalize_syntax import normalize,finish_syntax
 def fields(body):
  out=[]
  for part in split(body):
@@ -77,6 +78,15 @@ def native_fields(body):
   m=re.match(r'^\s*(\w+)\s*:\s*(.*)',part,re.S)
   if m:out.append((m[1],split(m[2],'=')[0].strip()))
  return out
+def native_variants(body):
+ # A union variant is `name: Type` or, for a void payload, a bare `name`.
+ body=re.sub(r'(?m)^\s*(?:pub\s+)?const\s+\w+\s*=\s*[^;]*;', '', body)
+ out=[]
+ for part in split(body):
+  part=part.strip();m=re.match(r'^(\w+)\s*:\s*(.*)',part,re.S)
+  if m:out.append((m[1],split(m[2],'=')[0].strip()))
+  elif re.fullmatch(r'\w+',part):out.append((part,'void'))
+ return out
 PRIMITIVES={'bool','void','usize','isize','f16','f32','f64'}|{p+str(n) for p in ('u','i') for n in range(1,65)}
 RENAMES={'u32':'unsigned32','f32':'floating32','block':'block_','match':'match_','loop':'loop_','opaque':'opaque_'}
 def goose_type(raw,namespace):
@@ -103,7 +113,6 @@ SPELLINGS={
 DESCS={};ORDER=[];ROOTS=[]
 def native_resolve(raw,module,parent='',field='',hint=None,seen=()):
  raw=raw.strip()
- if raw=='@TypeOf(@as(Value, undefined).scalar)' and module=='eval.eval_values':raw='backend.runtime_ir.Scalar'
  if raw.startswith('?'):
   child=native_resolve(raw[1:],module,parent,field,hint=option_child(hint));return install('?'+child['name'],'optional',hint,[child])
  if raw.startswith('[]'):
@@ -216,7 +225,7 @@ def build_named(name,kind,body,module,hint):
    d['variants'].append((field,current,target))
  elif kind=='union':
   gv=dict(gbody);tagname=SPELLINGS.get(name+'.tag','@typeInfo('+name+').@"union".tag_type.?');tag=install(tagname,'union_tag','u32',[]);tag['variants']=[]
-  for ordinal,(field,raw) in enumerate(native_fields(body)):
+  for ordinal,(field,raw) in enumerate(native_variants(body)):
    target=RENAMES.get(field,field)
    if target not in gv:raise ValueError(('missing Goose union variant',name,field,hint))
    fs=gv[target];payload_hint=None
@@ -230,21 +239,8 @@ ROOT_PAIRS=[
  ('blot_reuse_frozen_dependency::Module','reuse.frozen_dependency.Module'),
  ('blot_reuse_principal_interface::Interface','reuse.principal_interface.Interface'),
  ('blot_check_core::Module','check.core.Module'),
- ('blot_reuse_revision_inputs::Wire','reuse.revision_inputs.Persisted.Wire'),
- ('blot_reuse_principal_archive::Snapshot','reuse.principal_archive.Snapshot'),
- ('blot_reuse_semantic_archive::Snapshot','reuse.semantic_archive.Snapshot'),
- ('blot_reuse_optimized_archive::Snapshot','reuse.optimized_archive.Snapshot'),
- ('blot_backend_backend_checkpoint::Wire','backend.backend_checkpoint.Wire'),
- ('blot_reuse_retained_revision::RestoredWire','reuse.retained_revision.Restored.Wire'),
 ]
-# Section is a concrete Goose record per archive; source uses a generic factory.
-for module,claim in [('principal_archive','principal_complete_proof'),('semantic_archive','selected_complete_proof'),('optimized_archive','optimizer_output')]:
- name='reuse.'+module+'.Section';N[name]=('struct','header: @import("portable_query.zig").Header, records: []Record,','reuse.'+module,'')
- SPELLINGS[name]='reuse.portable_query.Section(.'+claim+',reuse.'+module+'.Record)'
 for g,n in ROOT_PAIRS:
- # Wire DTO identity uses readonly data; the native spelling remains Metadata.
- if g=='blot_reuse_semantic_archive::Snapshot':
-  G.setdefault('blot_backend_runtime_identity::Metadata',G['blot_reuse_code_artifacts::IdentityMetadata'])
  d=native_resolve(n,n.rpartition('.')[0],hint=g);ROOTS.append(d)
 # Primitive and fixed digest are public format roots too.
 for p in ('u8','u16','u32','u64','i8','i16','i32','i64','bool','f32','f64'):
@@ -275,6 +271,12 @@ imports={'support.error','support.option','support.native','support.blake3','reu
 for d in ORDER:
  for namespace in re.findall(r'\b(blot_\w+)::',actual(d)):
   if namespace in GF:imports.add(GF[namespace])
+# Two files share the numeric proof term namespace; the terms live in the second.
+if 'check.numeric_proof_names' in imports:imports.add('check.numeric_proof_terms')
+# The port's spelling: qualified errors, varint_, unqualified match patterns.
+SYNTAX_TYPES={'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
+for path in GOOSE.rglob('*.goose'):SYNTAX_TYPES.update(re.findall(r'\b(?:struct|enum|type)\s+(\w+)',path.read_text()))
+def port_syntax(text):return finish_syntax(normalize(text,SYNTAX_TYPES))
 lines=['// Concrete native-schema wire codecs, authored from frozen declarations.\n// Package/anonymous/generic native type-name spellings remain unqualified.\nnamespace blot_reuse_dependency_format;\n']+['import '+p+';\n' for p in sorted(imports)]+['struct Void {}\n',OWNER_DISPATCH]
 for d in ORDER:
  t=actual(d);name=proc(d);kind=d['kind']
@@ -403,7 +405,7 @@ for d in ROOTS:
  lines.append(f'fn writeValue(writer:Encoder&,value:{t},level:i64)->Error {{return write_{name}(writer,value,level);}}\n')
  lines.append(f'fn readValue<O>(reader:Decoder<O>&,witness:{t},level:i64)->{t},Error {{return read_{name}(reader,level);}}\n')
  lines.append(f'fn describe(hasher:blot_support_blake3::State&,value:{t}) {{describe_{name}(hasher,value);}}\n')
-Path('compiler-goose/src/reuse/dependency_format_codecs.goose').write_text(''.join(lines))
+(GOOSE/'reuse/dependency_format_codecs.goose').write_text(''.join(lines))
 # Decode allocation journal: one finite ADT and reusable typed pool per actual
 # Goose element type. Rollback/deinit never traverse partially built records.
 elements={}
@@ -431,7 +433,15 @@ for t in elements:
  tag=ident(t);owner.append(f'''fn allocate(self:Owner&,witness:{t},length:i64)->{t}[:],Error {{assert(self.valid());if length<0 {{return [],Error.artifact_limit;}}if length==0 {{return [],Error.none;}}let values=pool_{tag}.alloc_slice(length);let error=self.remember(Run.run_{tag}{{values}});if error!=Error.none {{pool_{tag}.free_slice(values);return [],error;}}return values,Error.none;}}
 fn mutable(self:const Owner&,values:const {t}[:])->{t}[:] {{assert(self.valid());if values.len==0 {{return [];}}var link=owners[self.lease-1].head;while link!=0 {{let entry=links[link-1];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{return pool_{tag}.realloc_slice(run.values,run.values.len);}}}},_=>{{}}}}link=entry.next;}}abort("archive slice is outside its owner");}}
 ''')
-Path('compiler-goose/src/reuse/dependency_format_owners.goose').write_text(''.join(owner))
+def owner_syntax(text):
+ # Receivers are `self_` in the port, and an empty typed slice is spelled out.
+ text=re.sub(r'\breceiver\b','self_',port_syntax(text));out=[]
+ for line in text.split('\n'):
+  m=re.match(r'fn allocate\(self_:Owner&,witness:(.+?),length:i64\)->',line) or re.match(r'fn mutable\(self_:const Owner&,values:const (.+?)\[:\]\)->',line)
+  if m:line=line.replace('return [],','return default<'+m[1]+'[:]>(),').replace('return [];','return default<'+m[1]+'[:]>();')
+  out.append(line)
+ return '\n'.join(out)
+(GOOSE/'reuse/dependency_format_owners.goose').write_text(''.join(owner))
 # Explicit partial-field cleanup remains available for record constructors.
 # It unlinks exact completed typed runs; unfinished decoder records are instead
 # rolled back to their caller's mark by decodeWithOwner.
@@ -461,9 +471,11 @@ for d in ORDER:
  partial.add(actual(d));release_lines.append(f'fn deinitFields(owner:Owner&,value:{actual(d)}&,initialized:i64) {{')
  for index,(field,child,target) in enumerate(d['fields']):release_lines.append(f'if initialized>{index} {{release_{proc(child)}(owner,value.{target});}}')
  release_lines.append('}\n')
-with Path('compiler-goose/src/reuse/dependency_format_codecs.goose').open('a') as file:file.write(''.join(release_lines))
+with (GOOSE/'reuse/dependency_format_codecs.goose').open('a') as file:file.write(''.join(release_lines))
+(GOOSE/'reuse/dependency_format_codecs.goose').write_text(port_syntax((GOOSE/'reuse/dependency_format_codecs.goose').read_text()))
 release_owner=[]
 for t in elements:
  tag=ident(t);release_owner.append(f'''fn releaseSlice(self:Owner&,values:const {t}[:]) {{assert(self.valid());if values.len==0 {{return;}}var previous:u32=0;var link=owners[self.lease-1].head;while link!=0 {{let at=link-1;let entry=links[at];match entry.run {{Run.run_{tag} run=>{{if blot_support::same_slice_identity(run.values,values) {{if previous==0 {{owners[self.lease-1].head=entry.next;}}else {{links[previous-1].next=entry.next;}}freeRun(entry.run);links[at]=Link{{}};links.free(at);return;}}}},_=>{{}}}}previous=link;link=entry.next;}}abort("partial field cleanup requires its exact archive owner");}}
 ''')
-with Path('compiler-goose/src/reuse/dependency_format_owners.goose').open('a') as file:file.write(''.join(release_owner))
+with (GOOSE/'reuse/dependency_format_owners.goose').open('a') as file:file.write(''.join(release_owner))
+(GOOSE/'reuse/dependency_format_owners.goose').write_text(owner_syntax((GOOSE/'reuse/dependency_format_owners.goose').read_text()))

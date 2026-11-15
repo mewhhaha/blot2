@@ -909,8 +909,8 @@
   },
   {
    "zig": "compiler/src/reuse/dependency_cli.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_cli.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_cli.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_cli_tests.zig",
@@ -919,8 +919,8 @@
   },
   {
    "zig": "compiler/src/reuse/dependency_closure.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_closure.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_closure.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_closure_tests.zig",
@@ -934,8 +934,8 @@
   },
   {
    "zig": "compiler/src/reuse/dependency_format.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_format.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_format.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_format_tests.zig",
@@ -954,13 +954,13 @@
   },
   {
    "zig": "compiler/src/reuse/dependency_interface_validation.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_interface_validation.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_interface_validation.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_project_loader.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_project_loader.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_project_loader.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_publication_tests.zig",
@@ -974,8 +974,8 @@
   },
   {
    "zig": "compiler/src/reuse/dependency_snapshot.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_snapshot.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/dependency_snapshot.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/dependency_symbol_slots.zig",
@@ -1034,8 +1034,8 @@
   },
   {
    "zig": "compiler/src/reuse/module_abstraction_validation.zig",
-   "goose": "compiler-goose/pending/reuse/module_abstraction_validation.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/module_abstraction_validation.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/module_relink_tests.zig",
@@ -1059,8 +1059,8 @@
   },
   {
    "zig": "compiler/src/reuse/partial_dependency.zig",
-   "goose": "compiler-goose/pending/reuse/partial_dependency.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/partial_dependency.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/principal_interface.zig",

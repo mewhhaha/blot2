@@ -108,16 +108,26 @@ import reuse.completion_names;
 import reuse.completion_probe;
 import reuse.composite_resolution_cache;
 import reuse.declaration_dependencies;
+import reuse.dependency_cli;
+import reuse.dependency_closure;
 import reuse.dependency_consumer;
+import reuse.dependency_format;
+import reuse.dependency_format_codecs;
+import reuse.dependency_format_owners;
+import reuse.dependency_interface_validation;
 import reuse.dependency_payload;
+import reuse.dependency_project_loader;
 import reuse.dependency_relink;
+import reuse.dependency_snapshot;
 import reuse.dependency_symbol_slots;
 import reuse.dispatch_explanation;
 import reuse.epoch_resolution_cache;
 import reuse.frozen_dependency;
 import reuse.global_references;
 import reuse.hole_diagnostics;
+import reuse.module_abstraction_validation;
 import reuse.module_visibility;
+import reuse.partial_dependency;
 import reuse.principal_interface;
 import reuse.principal_type_graph;
 import reuse.project;
@@ -126,6 +136,7 @@ import reuse.project_check_engine;
 import reuse.project_check_origins;
 import reuse.project_check_owners;
 import reuse.project_check_parallel;
+import reuse.project_check_serial;
 import reuse.projection_cache;
 import reuse.purity_diagnostics;
 import runtime.memory;
@@ -1898,6 +1909,26 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_declaration_depend
 fn blot_reuse_declaration_dependencies::blotStructuralHash<StructuralSink>(value:blot_reuse_declaration_dependencies::SchemeFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_declaration_dependencies::Selection)->bool {return equalFields(left,right);}
 fn blot_reuse_declaration_dependencies::blotStructuralHash<StructuralSink>(value:blot_reuse_declaration_dependencies::Selection,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_cli::CanonicalOptions)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_cli::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_cli::CanonicalOptions,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_cli::DiagnosticWire)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_cli::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_cli::DiagnosticWire,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_cli::FailureWire)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_cli::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_cli::FailureWire,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_cli::Metrics)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_cli::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_cli::Metrics,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_cli::MetricsWire)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_cli::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_cli::MetricsWire,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_closure::ExportName)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_closure::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_closure::ExportName,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_closure::ImportFrame)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_closure::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_closure::ImportFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_closure::Ordinals)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_closure::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_closure::Ordinals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_closure::ValidationRun)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_closure::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_closure::ValidationRun,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Compiled)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::Compiled,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Details)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::Details,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Diagnostic)->bool {return equalFields(left,right);}
@@ -1908,8 +1939,32 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consume
 fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::HoleDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Publication)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::Publication,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Result)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::Result,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_consumer::Stats)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_consumer::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_consumer::Stats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft,O>(left:StructuralLeft,right:blot_reuse_dependency_format::Decoder<O>)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink,O>(value:blot_reuse_dependency_format::Decoder<O>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Encoder)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Encoder,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Key)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Key,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Lease)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Lease,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Limits)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Limits,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Link)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Link,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft,T>(left:StructuralLeft,right:blot_reuse_dependency_format::Owned<T>)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink,T>(value:blot_reuse_dependency_format::Owned<T>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Owner)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Owner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_format::Void)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_format::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_format::Void,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_interface_validation::Frame)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_interface_validation::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_interface_validation::Frame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_interface_validation::GraphEdges)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_interface_validation::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_interface_validation::GraphEdges,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_payload::Lease)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_payload::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_payload::Lease,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_payload::Link)->bool {return equalFields(left,right);}
@@ -1920,12 +1975,34 @@ fn equal<StructuralLeft,T>(left:StructuralLeft,right:blot_reuse_dependency_paylo
 fn blot_reuse_dependency_payload::blotStructuralHash<StructuralSink,T>(value:blot_reuse_dependency_payload::Owned<T>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_payload::Owner)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_payload::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_payload::Owner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_project_loader::Stats)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_project_loader::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_project_loader::Stats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_relink::Dictionary)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_relink::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_relink::Dictionary,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_relink::FieldOrder)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_relink::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_relink::FieldOrder,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_relink::Retained)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_relink::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_relink::Retained,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Goals)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Goals,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::NoPrivate)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::NoPrivate,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Nodes)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Nodes,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Obligations)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Obligations,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Operations)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Operations,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Patterns)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Patterns,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft,C>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Projector<C>)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink,C>(value:blot_reuse_dependency_snapshot::Projector<C>,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Rows)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Rows,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Spans)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Spans,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_snapshot::Words)->bool {return equalFields(left,right);}
+fn blot_reuse_dependency_snapshot::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_snapshot::Words,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dependency_symbol_slots::Slots)->bool {return equalFields(left,right);}
 fn blot_reuse_dependency_symbol_slots::blotStructuralHash<StructuralSink>(value:blot_reuse_dependency_symbol_slots::Slots,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_dispatch_explanation::Builder)->bool {return equalFields(left,right);}
@@ -1980,10 +2057,22 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_hole_diagnostics::
 fn blot_reuse_hole_diagnostics::blotStructuralHash<StructuralSink>(value:blot_reuse_hole_diagnostics::Snapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_hole_diagnostics::Span)->bool {return equalFields(left,right);}
 fn blot_reuse_hole_diagnostics::blotStructuralHash<StructuralSink>(value:blot_reuse_hole_diagnostics::Span,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_module_abstraction_validation::PublicContext)->bool {return equalFields(left,right);}
+fn blot_reuse_module_abstraction_validation::blotStructuralHash<StructuralSink>(value:blot_reuse_module_abstraction_validation::PublicContext,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_module_visibility::Scan)->bool {return equalFields(left,right);}
 fn blot_reuse_module_visibility::blotStructuralHash<StructuralSink>(value:blot_reuse_module_visibility::Scan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_module_visibility::Work)->bool {return equalFields(left,right);}
 fn blot_reuse_module_visibility::blotStructuralHash<StructuralSink>(value:blot_reuse_module_visibility::Work,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::ContextDetails)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::ContextDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::ExplanationDetails)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::ExplanationDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::HoleDetails)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::HoleDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::Prepared)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::Prepared,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::Result)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::Result,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::Associated)->bool {return equalFields(left,right);}
 fn blot_reuse_principal_interface::blotStructuralHash<StructuralSink>(value:blot_reuse_principal_interface::Associated,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_principal_interface::Binding)->bool {return equalFields(left,right);}
@@ -2098,6 +2187,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::Res
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::ResultOwner,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::ResultState)->bool {return equalFields(left,right);}
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::ResultState,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::SerialChecks)->bool {return equalFields(left,right);}
+fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::SerialChecks,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::SourceModule)->bool {return equalFields(left,right);}
 fn blot_reuse_project_check::blotStructuralHash<StructuralSink>(value:blot_reuse_project_check::SourceModule,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project_check::WorkOrder)->bool {return equalFields(left,right);}

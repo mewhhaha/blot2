@@ -16,6 +16,7 @@ import check.core;
 import check.core_builder;
 import compile;
 import reuse.project;
+import reuse.dependency_cli;
 import runtime.memory;
 import support.error;
 import support.option;
@@ -128,8 +129,7 @@ fn run(args:const Argument[:])->bool,Error {
    else {return false,blot_error::Error.none;}
   }
   options.aliases=aliases[..];
-  // Dependency bundles are not ported yet (compiler-goose/pending).
-  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers {return false,blot_error::Error.none;}return false,blot_error::Error.invalid_request;}
+  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers {return false,blot_error::Error.none;}var out=stdout;return blot_reuse_dependency_cli::process(out,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity);}
   var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}
   var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
   for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}
