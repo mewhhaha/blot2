@@ -620,6 +620,7 @@ fn migrateStores(init: std.process.Init, backing: std.mem.Allocator, args: []con
     const a = arena.allocator();
     var entries: std.ArrayList([]const u8) = .empty;
     var aliases: std.ArrayList(project.Alias) = .empty;
+    defer aliases.deinit(a);
     var settings: migrate_stores.Settings = .{};
     var write_root: ?[]const u8 = null;
     var include_std = false;

@@ -158,10 +158,13 @@ compiles".
   then `cargo build --release -p pen` and, in ../pen/plugins,
   `cargo build --release --target wasm32-wasip2`. The `flock` and
   `systemd-run` wrappers above are for the owner's machine.
-- `deno task lint:zig` reports 16 findings on main with zig-analyzer
-  0.17.0-1 (check.zig, package_core.zig, scheme_equations.zig, direct/,
-  main.zig, principal_type_graph.zig, bench_declaration_demand.zig). They
-  were there before 15 November's changes, which add none.
+- `deno task lint:zig` is at zero findings with zig-analyzer 0.17.0-1. Main
+  had 16 until 15 November, so CI failed there before it ran a test.
+- Two host tests depend on process start-up time and can fail when the
+  whole suite runs in parallel on a slow machine:
+  tests/host/lsp.test.ts ("Completion was never sent", its wait is now
+  10 s) and tests/guest/zig_project_transport.test.ts ("startup timed
+  out" after 2 s, seen once). Neither runs the checker.
 
 ## The Goose port (phase 3 of the order)
 

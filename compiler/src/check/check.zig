@@ -865,7 +865,7 @@ const Engine = struct {
     let_pattern_source: ast.Id = 0,
     tag_origins: []TagOrigin = &.{},
     effect_scopes: std.ArrayList(EffectScope) = .empty,
-    effect_scope_ids: []u32 = &.{},
+    effect_scope_ids: std.AutoHashMapUnmanaged(ast.Id, u32) = .empty,
     scoped_parameter: ast.Id = 0,
     scoped_parameter_type: T.Id = 0,
     active_effect_scopes: usize = 0,
@@ -6391,7 +6391,7 @@ const Engine = struct {
                     if (index.tag != .integer) return store.elements(self.allocator, receiver) catch |err| return contractError(err);
                     return store.project(self.allocator, receiver, index.a, .index) catch |err| return contractError(err);
                 }
-                if (self.effect_scope_ids[source] != 0) return self.valueShape(store, self.tree.node(self.effect_scopes.items[self.effect_scope_ids[source] - 1].callback).b, boundary, inherited, remaining, depth + 1);
+                if (self.effect_scope_ids.get(source)) |scope| return self.valueShape(store, self.tree.node(self.effect_scopes.items[scope - 1].callback).b, boundary, inherited, remaining, depth + 1);
                 var arguments: [16]ast.Id = undefined;
                 var count: usize = 0;
                 var callee = source;
@@ -6583,8 +6583,8 @@ const Engine = struct {
             return false;
         }
         if (@import("capability_flow.zig").projectionSource(self.tree, self.pool, source) != null) return try self.projectedFootprint(source, boundary, inherited, remaining, depth + 1);
-        if (self.effect_scope_ids[source] != 0) {
-            const scope = self.effect_scopes.items[self.effect_scope_ids[source] - 1];
+        if (self.effect_scope_ids.get(source)) |ordinal| {
+            const scope = self.effect_scopes.items[ordinal - 1];
             return self.valueFootprint(self.tree.node(scope.callback).b, boundary, inherited, remaining, depth + 1);
         }
         // A checked resource scope executes cleanup before its result leaves.
@@ -7030,6 +7030,28 @@ const Engine = struct {
             .budget => .task_budget,
         };
     }
+    /// The product of the result types of one to sixteen task handles, or
+    /// null after diagnosing an operand that is not a handle.
+    fn taskOutputs(self: *Engine, handles: T.Node, operand: ast.Id, id: ast.Id) T.Error!?T.Id {
+        const tasks = @import("task_types.zig");
+        var outputs: std.ArrayList(T.Id) = .empty;
+        defer outputs.deinit(self.allocator);
+        try outputs.ensureTotalCapacity(self.allocator, handles.b);
+        for (0..handles.b) |index| {
+            const item = self.types.list(.{ .start = handles.a, .len = handles.b })[index];
+            if (!tasks.isHandle(&self.types, try self.types.resolve(item, 0))) {
+                try self.diagnostic(.task_host_contract, operand);
+                return null;
+            }
+            const wrapper = self.types.node(try self.types.resolve(item, 0));
+            const handle = self.types.node(try self.types.resolve(wrapper.a, 0));
+            const arguments = self.types.nominalArguments(handle);
+            const arrow = self.types.node(try self.types.resolve(arguments[1], 0));
+            outputs.appendAssumeCapacity(arrow.b);
+            try self.constrainEffects(arrow.c, self.ambient, id);
+        }
+        return try self.types.product(outputs.items);
+    }
     fn taskApplication(self: *Engine, id: ast.Id) T.Error!?T.Id {
         if (!self.has_tasks) return null;
         const tasks = @import("task_types.zig");
@@ -7128,22 +7150,9 @@ const Engine = struct {
                 try self.diagnostic(.task_host_contract, first);
                 return try self.types.fresh();
             }
-            var results: [16]T.Id = undefined;
-            for (self.types.list(.{ .start = input_shape.a, .len = input_shape.b }), 0..) |item, index| {
-                if (!tasks.isHandle(&self.types, try self.types.resolve(item, 0))) {
-                    try self.diagnostic(.task_host_contract, first);
-                    return try self.types.fresh();
-                }
-                const wrapper = self.types.node(try self.types.resolve(item, 0));
-                const handle = self.types.node(try self.types.resolve(wrapper.a, 0));
-                const arguments = self.types.nominalArguments(handle);
-                const arrow = self.types.node(try self.types.resolve(arguments[1], 0));
-                results[index] = arrow.b;
-                try self.constrainEffects(arrow.c, self.ambient, id);
-            }
-            const result = try self.types.product(results[0..input_shape.b]);
-            self.expr_types[head] = try self.types.functionWithEffects(input, result, self.ambient);
-            return result;
+            const collected = (try self.taskOutputs(input_shape, first, id)) orelse return try self.types.fresh();
+            self.expr_types[head] = try self.types.functionWithEffects(input, collected, self.ambient);
+            return collected;
         }
         if (operation == .spawn) {
             const group = try self.types.resolve(input, 0);
@@ -7385,7 +7394,7 @@ const Engine = struct {
         }
         if (footprint or residual_owner) try self.diagnostic(.capability_escape, id);
         try self.effect_scopes.append(self.allocator, .{ .node = id, .callback = callback, .parameter = lambda.a, .capability = capability, .result = signature.b, .body_effects = signature.c });
-        self.effect_scope_ids[id] = @intCast(self.effect_scopes.items.len);
+        try self.effect_scope_ids.put(self.allocator, id, @intCast(self.effect_scopes.items.len));
         return signature.b;
     }
     fn scopedOperation(self: *Engine, source: ast.Id, receiver: T.Id, member: u32, capability_source: ast.Id) T.Error!?T.Id {
@@ -15334,7 +15343,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
         allocator.free(engine.provider_block_ids);
     }
     engine.effect_scopes.deinit(allocator);
-    allocator.free(engine.effect_scope_ids);
+    engine.effect_scope_ids.deinit(allocator);
     engine.generative_bindings.deinit(allocator);
     engine.capability_roots.deinit(allocator);
     engine.capability_store.deinit(allocator);
@@ -15427,8 +15436,6 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
         };
     }
 
-    engine.effect_scope_ids = try allocator.alloc(u32, tree.nodes.items.len);
-    @memset(engine.effect_scope_ids, 0);
     engine.provider_block_ids = try allocator.alloc(u32, tree.nodes.items.len);
     @memset(engine.provider_block_ids, 0);
     engine.effect_runner_ids = try allocator.alloc(u32, tree.nodes.items.len);

@@ -41,6 +41,7 @@ pub fn main(init: std.process.Init) !void {
     if (asset_candidate.issue != null) return error.NativeAssetIssue;
 
     var source_overlays: std.ArrayList(inputs.overlays.Source) = .empty;
+    defer source_overlays.deinit(a);
     try source_overlays.appendSlice(a, asset_candidate.sources.items);
     if (ablated) try source_overlays.append(a, .{ .path = entry, .contents = try tinyEntrySource(a, original_entry) });
     var snapshot = try inputs.Snapshot.initWithSources(a, io, loader_options, source_overlays.items);

@@ -109,7 +109,7 @@ const SharedAuthority = struct {
             .executable = views.executable,
             .large_plain_graph = views.large_plain_graph,
         };
-        @memcpy(result.schemes[0..views.scheme_count], views.schemes[0..views.scheme_count]);
+        for (views.schemes[0..views.scheme_count], 0..) |scheme, index| result.schemes[index] = scheme;
         return result;
     }
     fn matches(self: *const SharedAuthority, views: anytype) bool {

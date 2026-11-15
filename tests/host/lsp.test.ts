@@ -194,7 +194,9 @@ async function peer(mode: string) {
   return { directory, compiler, log };
 }
 async function waiting(path: string) {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  // The peer is a fresh process; half a second can pass before its first
+  // write when the whole suite runs in parallel.
+  for (let attempt = 0; attempt < 2000; attempt++) {
     try {
       if ((await Deno.readTextFile(path)).includes('"kind":"complete"')) return;
     } catch (error) {

@@ -480,8 +480,11 @@ pub const Generator = struct {
         return self.addInstanceWith(key, env, parameters, result, false, &.{}, site, site_id);
     }
     pub fn addInstanceWith(self: *Generator, key: InstanceKey, env: types.Env, parameters: []const Ty, result: Ty, closure: bool, captures: []const Ty, site: *const core.Module, site_id: core.Id) Error!u32 {
-        if (closure and parameters.len != 1) return self.fail(site, site_id, "closures take one parameter", .{});
-        const signature = (if (closure and parameters.len == 1) self.closureSignature(parameters[0], result) else self.signatureOf(parameters, result)) catch |err| switch (err) {
+        const computed = if (closure) one: {
+            if (parameters.len != 1) return self.fail(site, site_id, "closures take one parameter", .{});
+            break :one self.closureSignature(parameters[0], result);
+        } else self.signatureOf(parameters, result);
+        const signature = computed catch |err| switch (err) {
             error.Unsupported => return self.typeFailure(site, site_id),
             else => return err,
         };

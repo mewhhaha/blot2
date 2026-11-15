@@ -823,7 +823,8 @@ pub const Fn = struct {
         try self.opIndex(.global_set, rt.effect_context);
         const address = cell orelse return inner;
         const final = try self.readFlat(address, 0, state, id);
-        const words = try self.arena.alloc(u32, final.words.len + inner.words.len);
+        const total = std.math.add(usize, final.words.len, inner.words.len) catch return error.OutOfMemory;
+        const words = try self.arena.alloc(u32, total);
         @memcpy(words[0..final.words.len], final.words);
         @memcpy(words[final.words.len..], inner.words);
         const ty = try self.g.types.tuple(&.{ state, inner.ty });

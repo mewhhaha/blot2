@@ -113,7 +113,7 @@ pub const Types = struct {
     fn storeList(self: *Types, payload: []const u32) Error!u32 {
         if (payload.len == 0) return 0;
         if (payload.len > chunk_words) return error.Unsupported;
-        if (self.chunk_used + payload.len > chunk_words) {
+        if (payload.len > chunk_words - self.chunk_used) {
             try self.chunks.append(self.allocator, try self.arena.allocator().alloc(u32, chunk_words));
             self.chunk_used = 0;
         }
@@ -172,13 +172,19 @@ pub const Types = struct {
         if (tag == .nominal and payload.len < 2) return error.Unsupported;
         const listed = tag == .tuple or tag == .record or tag == .nominal or tag == .state_provider;
         const start: u32 = if (listed) try self.storeList(payload) else 0;
+        // The arity check above gives a function two words and a container one.
+        var first: u32 = 0;
+        if (arity != null) {
+            if (payload.len == 0) return error.Unsupported;
+            first = payload[0];
+        }
         const value: Node = switch (tag) {
             .unit, .boolean, .u32, .f32, .never => .{ .tag = tag },
             .tuple, .state_provider => .{ .tag = tag, .a = start, .b = @intCast(payload.len) },
             .record => .{ .tag = tag, .a = start, .b = @intCast(payload.len / 2) },
             .nominal => .{ .tag = tag, .a = start, .b = @intCast(payload.len - 2) },
-            .function => if (payload.len == 2) .{ .tag = tag, .a = payload[0], .b = payload[1] } else unreachable,
-            .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => if (payload.len == 1) .{ .tag = tag, .a = payload[0] } else unreachable,
+            .function => .{ .tag = tag, .a = first, .b = payload[payload.len - 1] },
+            .array, .list, .cursor, .grow, .resize, .ref, .view, .link, .provider => .{ .tag = tag, .a = first },
         };
         try self.nodes.append(a, value);
         try self.keys.append(a, span);

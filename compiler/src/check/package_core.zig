@@ -1612,7 +1612,7 @@ const Walker = struct {
     fn sharedGoalKey(self: *Self, solver: *Equations.Solver, owner: *const core.Module, binding: core.BindingId, given: core.Obligation) Equations.Error!?Equations.SharedGoal {
         const declaration = owner.binding(binding);
         if (!self.admission.source_bodies or declaration.scheme.generative.len != 0 or self.scope_owner != null or self.handled_count != 0 or
-            declaration.public_variables.len + declaration.public_rows.len > 128) return null;
+            declaration.public_variables.len > 128 or declaration.public_rows.len > 128 - declaration.public_variables.len) return null;
         const product = solver.store.node(given.ty);
         var key: Equations.SharedGoal = .{
             .producer = owner,
@@ -4277,7 +4277,8 @@ fn sharedGoalFailureScenario(allocator: std.mem.Allocator, producer: *const core
     try std.testing.expectEqual(@as(u32, 1), declaration.public_variables.len);
     var actuals: [128]T.Id = @splat(0);
     actuals[0] = nominal_type;
-    const count = declaration.public_variables.len + declaration.public_rows.len;
+    const count = try std.math.add(u32, declaration.public_variables.len, declaration.public_rows.len);
+    try std.testing.expect(count >= 1 and count <= actuals.len);
     for (actuals[1..count]) |*actual| actual.* = try solver.store.function(T.unit, T.unit);
     const pack = try solver.store.product(actuals[0..count]);
     actuals[0] = T.f32_type;
