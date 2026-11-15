@@ -78,6 +78,9 @@ let dedent: Tag = 71;
 struct Token { tag: Tag, start: u32, end: u32 }
 fn text(value: Token, source: const u8[:]) -> const u8[:] { return source[value.start..value.end]; }
 fn keyword(value: const u8[:]) -> Tag {
+    // Every keyword is two to eight lowercase letters. The first letter
+    // rules out most identifiers before any spelling is compared.
+    if value.len < 2 || value.len > 8 || value[0] < 'a' || value[0] > 'z' { return identifier; }
     if value == "import" { return kw_import; }
     if value == "as" { return kw_as; }
     if value == "const" { return kw_const; }

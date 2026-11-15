@@ -162,6 +162,8 @@ fn decode_point(bytes: const u8[:]) -> u32,Error {
 fn validate_source(source: const u8[:],result: Result&) {
  var at=0;
  while at<source.len {
+  // An ASCII byte is one valid scalar outside the reserved range.
+  if source[at]<128 { at++; continue; }
   let width=utf8_width(source[at]); if width==0 { diagnose(result,invalid_utf8,at,at+1); return; }
   if width>source.len-at { diagnose(result,invalid_utf8,at,source.len); return; }
   let point,err=decode_point(source[at..at+width]); if err!=blot_error::Error.none { diagnose(result,invalid_utf8,at,at+width); return; }
@@ -187,7 +189,7 @@ fn scan(source: const u8[:],result: Result&) {
    if !terminated { diagnose(result,string_literal,start,at); } emit(result.tokens,blot_parse_token::string,start,at); continue;
   }
   if digit(c) { let n=scan_number(source,at); at=n.end; emit(result.tokens,n.tag,start,at); continue; }
-  if starts(source,at,"froM")||starts(source,at,"wherE") {
+  if (c=='f'||c=='w')&&(starts(source,at,"froM")||starts(source,at,"wherE")) {
    var tag=blot_parse_token::private_where; var size=5; if c=='f' { tag=blot_parse_token::private_from; size=4; } at+=size; emit(result.tokens,tag,start,at); continue;
   }
   if lower(c)||upper(c)||c=='_' {
