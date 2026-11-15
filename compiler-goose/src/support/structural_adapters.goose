@@ -412,6 +412,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::Implementat
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ImplementationOrderContext,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImportArena)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ImportArena,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImportedAssociated)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ImportedAssociated,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImportedBinding)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ImportedBinding,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ImportedCatalog)->bool {return equalFields(left,right);}
