@@ -29,9 +29,16 @@ The port now follows that cut:
 - **Builds:** compiler-goose/src is a frontend of 166 modules. Goose
   checks it in 33 s and `build.py` links `blotc-goose` in 49 s. Before
   the cut these took 271 s and about 12 minutes, at 10.4 GiB.
-- **Runs:** `blotc-goose lex|parse|check FILE` gives the same diagnostics
-  and counts as the Zig compiler on the two programs tried. That is a
-  smoke test, not qualification.
+- **Frontend parity** (15 November, against the Zig release compiler):
+  - `check-project` gives the same JSON records, every counter included,
+    on the 33 programs of compiler/fixtures/direct and on 99 of Ink's 112
+    test programs. The other 13 differ only in three counters (see "Known
+    differences").
+  - Lowering diagnostics agree on the 73 programs of
+    compiler-goose/tests/uniqueness and on four programs with stores and
+    `values.copy` under the prelude.
+  - A debug build (`-O0`) checks an Ink test in 250 to 380 ms where the Zig
+    release build takes 40 to 65 ms.
 - **Parked** in compiler-goose/pending/ (31 modules and 13 laws): the project server,
   dependency bundles, editor completion and native assets. They are ported
   to the 12 November source and wait for step 3.
@@ -45,15 +52,13 @@ its Goose module is.
 
 Each step ends with a comparison against the Zig compiler.
 
-1. **Frontend up to today's Zig.** Not started. The single-file commands
-   need:
-   - the store `place = value` in the parser, the checker and Core
-     lowering;
-   - `@storage.copy`;
-   - the checker changes of 15 November (associated members on first
-     lookup, rebinding without generalization);
-   - the uniqueness pass (check/uniqueness.zig, 871 lines).
-   Compare `check` output on std, Ink, Gdev and the rejected fixtures.
+1. **Frontend up to today's Zig.** Done for what compiles a program: the
+   store `place = value` (parser, checker, Core lowering), the storage
+   rule for a generalized `let`, rebinding without generalization,
+   associated members imported on first lookup, the uniqueness pass, and
+   the project commands `parse-project` and `check-project`.
+   Left: the lexer's keyword precheck and ASCII fast path (speed only),
+   and the leftovers under "Known differences".
 2. **Direct backend.** Port types (584 lines of Zig), emit (674), function
    (3,875), direct (121) and the compile interface. Compare the Wasm for
    compiler/fixtures/direct byte for byte.
@@ -77,6 +82,15 @@ Then compile times, as the owner ordered.
   them.
 - Modules keep the directory their Zig file had on 12 November
   (`src/eval/type_evidence.goose` is `check/type_evidence.zig` today).
+- `check/check_scheme_import.goose` still has the helpers the reuse cache
+  used (Zig removed 98 lines); nothing calls them.
+- **Hash-map order.** `memberTemplates` walks the contract names in the
+  order of a hash map, and Goose's `dictionary` orders them differently
+  from Zig's. The same schemes are imported in another order, so
+  `type_nodes`, `checker.associated_steps` and `checker.inference_steps`
+  differ by a few units in a module that declares a contract beside other
+  declarations (std/codec, std/equality, std/text; 13 Ink tests through
+  lib/codec). Diagnostics and the set of imported schemes are the same.
 
 ## Making Goose faster
 

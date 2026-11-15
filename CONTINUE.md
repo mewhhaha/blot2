@@ -190,14 +190,17 @@ compiler-goose/README.md has the layout and the build.
   Goose (136 s). Then
   `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 1500 --total-timeout 2400`
   links compiler-goose/build/blotc-goose in 49 s.
-- `blotc-goose lex|parse|check FILE` works and matches Zig on a smoke
-  test. It has no store statement, no backend call and no project
-  commands yet.
+- The frontend is at today's Zig: store statement, uniqueness pass,
+  lazy associated import, `parse-project` and `check-project`. Its records
+  match Zig's on the direct fixtures and on Ink's tests (GOOSE_PORT.md has
+  the counts and the one known difference).
 - The direct backend's writer and runtime are ported and byte-identical
-  (`python3 compiler-goose/tools/test_direct.py`).
-- Next, in this order: the frontend changes since 12 November (store
-  statement first), the rest of the direct backend, the project pipeline
-  and server from compiler-goose/pending/, parity, deprecation.
+  (`python3 compiler-goose/tools/test_direct.py`). The rest of the backend
+  and the project server are in progress on branches `wip/goose-direct`
+  and `wip/goose-server` (local worktrees under ../blot2-wt/, not pushed).
+- Next: merge those two, compare Wasm on compiler/fixtures/direct, run the
+  guest suite, Ink through Pen and the Gdev frame against `blotc-goose`,
+  then switch the tooling and deprecate Zig.
 
 ## Contracts
 
