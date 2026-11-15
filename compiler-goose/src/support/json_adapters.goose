@@ -141,6 +141,7 @@ import support.project_packet;
 import support.project_packet_owners;
 import support.u64_id_map;
 import support.wyhash;
+import support.zigmap;
 import work_counters;
 fn blot_backend_collection_ops::blotJsonWrite<JsonWriter>(value:blot_backend_collection_ops::Primitive,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_backend_loop_targets::blotJsonWrite<JsonWriter>(value:blot_backend_loop_targets::Collector,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -1095,6 +1096,7 @@ fn blot_support_pooled_buffer::blotJsonWrite<JsonWriter,T>(value:blot_support_po
 fn blot_support_pooled_map::blotJsonWrite<JsonWriter,K,V>(value:blot_support_pooled_map::Map<K,V>,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_support_u64_id_map::blotJsonWrite<JsonWriter>(value:blot_support_u64_id_map::Buckets,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_support_wyhash::blotJsonWrite<JsonWriter>(value:blot_support_wyhash::Wyhash,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_support_zigmap::blotJsonWrite<JsonWriter>(value:blot_support_zigmap::Map,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_work_counters::blotJsonWrite<JsonWriter>(value:blot_work_counters::Counters,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_work_counters::blotJsonWrite<JsonWriter>(value:blot_work_counters::Frontend,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_work_counters::blotJsonWrite<JsonWriter>(value:blot_work_counters::Normalization,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -1540,5 +1542,7 @@ fn blot_support_pooled_map::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)
 fn blot_support_u64_id_map::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_support_wyhash::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
+
+fn blot_support_zigmap::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_work_counters::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}

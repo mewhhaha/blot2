@@ -84,13 +84,19 @@ Then compile times, as the owner ordered.
   (`src/eval/type_evidence.goose` is `check/type_evidence.zig` today).
 - `check/check_scheme_import.goose` still has the helpers the reuse cache
   used (Zig removed 98 lines); nothing calls them.
-- **Hash-map order.** `memberTemplates` walks the contract names in the
-  order of a hash map, and Goose's `dictionary` orders them differently
-  from Zig's. The same schemes are imported in another order, so
-  `type_nodes`, `checker.associated_steps` and `checker.inference_steps`
-  differ by a few units in a module that declares a contract beside other
-  declarations (std/codec, std/equality, std/text; 13 Ink tests through
-  lib/codec). Diagnostics and the set of imported schemes are the same.
+- **Hash-map order** is reproduced where it was found to matter: the
+  checker walks its imported names and its globals in the slot order of
+  Zig's hash map (support/zigmap.goose keeps the same layout), so schemes
+  are imported in Zig's order.
+- **Three counters still differ slightly.** Diagnostics and the imported
+  schemes are the same; the cause is not found.
+  - A module that declares a function with a `where` clause beside
+    another declaration ends with one more type node than in Zig (a
+    one-element product, appended after every node the two share):
+    std/codec, std/equality and std/text have 2 more.
+  - Ink's lib/codec takes 6 more `associated_steps` and
+    `inference_steps` and has 4 more type nodes; 13 of Ink's 112 tests
+    import it.
 
 ## Making Goose faster
 

@@ -134,6 +134,7 @@ import support.project_packet;
 import support.project_packet_owners;
 import support.u64_id_map;
 import support.wyhash;
+import support.zigmap;
 import work_counters;
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_collection_ops::Primitive)->bool {return equalFields(left,right);}
 fn blot_backend_collection_ops::blotStructuralHash<StructuralSink>(value:blot_backend_collection_ops::Primitive,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
@@ -2067,6 +2068,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_u64_id_map::Buck
 fn blot_support_u64_id_map::blotStructuralHash<StructuralSink>(value:blot_support_u64_id_map::Buckets,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_wyhash::Wyhash)->bool {return equalFields(left,right);}
 fn blot_support_wyhash::blotStructuralHash<StructuralSink>(value:blot_support_wyhash::Wyhash,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_support_zigmap::Map)->bool {return equalFields(left,right);}
+fn blot_support_zigmap::blotStructuralHash<StructuralSink>(value:blot_support_zigmap::Map,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_work_counters::Counters)->bool {return equalFields(left,right);}
 fn blot_work_counters::blotStructuralHash<StructuralSink>(value:blot_work_counters::Counters,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_work_counters::Frontend)->bool {return equalFields(left,right);}
