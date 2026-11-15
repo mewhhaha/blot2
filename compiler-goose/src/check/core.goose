@@ -237,12 +237,15 @@ struct UpdateStep {
     source_type: blot_check_types::Id,
     result_type: blot_check_types::Id
 }
+// A store (`place = value`) is an update whose root is the container
+// expression before the first index. It is a statement and rebinds nothing.
 struct UpdateInfo {
     root: Id,
     path: List,
     value: Id,
     self_binding: BindingId,
-    selectors: List = List {..}
+    selectors: List = List {..},
+    store: bool = false
 }
 struct ClosureInfo {
     qualifier: BindingId = 0,
@@ -312,7 +315,7 @@ struct LoopInfo {
     carries: List = List {..},
     can_exit: bool = false
 }
-enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity }
+enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update }
 struct Diagnostic {
     code: Code,
     span: Span
@@ -434,6 +437,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         unresolved_binding => { return "Typed expression has no resolved binding identity"; },
         invalid_call => { return "Typed core requires a resolved named call or compiler primitive"; },
         complexity => { return "Typed core exceeds its nesting or table limit"; },
+        aliased_update => { return "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"; },
     }
 }
 fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {
@@ -951,6 +955,7 @@ fn codeCode(value: Code) -> u32 {
         unresolved_binding => { return 2; },
         invalid_call => { return 3; },
         complexity => { return 4; },
+        aliased_update => { return 5; },
     }
 }
 fn codeFromCode(code: u32) -> Code, blot_error::Error {
@@ -960,6 +965,7 @@ fn codeFromCode(code: u32) -> Code, blot_error::Error {
         2 => { return Code.unresolved_binding, blot_error::Error.none; },
         3 => { return Code.invalid_call, blot_error::Error.none; },
         4 => { return Code.complexity, blot_error::Error.none; },
+        5 => { return Code.aliased_update, blot_error::Error.none; },
         _ => { return Code.unchecked, blot_error::Error.core_limit; },
     }
 }

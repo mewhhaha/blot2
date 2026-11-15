@@ -3887,6 +3887,9 @@ return blot_check_core::Code.invalid_call,blot_error::Error.none;},
 complexity=>{
 return blot_check_core::Code.complexity,blot_error::Error.none;},
 
+aliased_update=>{
+return blot_check_core::Code.aliased_update,blot_error::Error.none;},
+
 }
 
 }
@@ -7481,6 +7484,9 @@ invalid_call=>{
 },
 
 complexity=>{
+},
+
+aliased_update=>{
 },
 
 }
