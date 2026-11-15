@@ -778,7 +778,7 @@ test "module abstraction public contracts cannot name private predicates" {
     try std.testing.expect(hasDiagnostic(&checked, "private_identity_escape", 1));
 }
 
-test "unused imported values stay absent while forwarded associated catalogs retain exact schemes" {
+test "unused imported values stay absent while a forwarded associated member is copied only where it is used" {
     var fixture = try Fixture.init(&.{
         .{ .name = "main.blot", .text =
         \\import { identity, Point } from "./facade"
@@ -802,18 +802,26 @@ test "unused imported values stay absent while forwarded associated catalogs ret
     try requireValid(&checked);
     const facade_id = fixture.source.unitImports(1)[0].target;
     const facade = &checked.module(facade_id).checked;
-    // The method escapes with LocalPoint's declaration catalog. The unrelated
-    // imported identity has no binding or copied certificate in the facade.
-    try std.testing.expectEqual(@as(usize, 1), facade.imported_schemes);
+    // The method escapes with LocalPoint's declaration catalog. The facade
+    // never looks it up, so its binding only names the producer and carries
+    // no copied scheme. The unrelated imported identity has no binding there.
+    try std.testing.expectEqual(@as(usize, 0), facade.imported_schemes);
     try std.testing.expectEqual(@as(usize, 1), facade.associated.len);
-    try std.testing.expect(facade.bindings[facade.associated[0].binding].scheme.root != 0);
+    const forwarded = facade.bindings[facade.associated[0].binding];
+    try std.testing.expectEqual(check.Kind.external, forwarded.kind);
+    try std.testing.expectEqual(@as(types.Id, 0), forwarded.scheme.root);
     for (facade.bindings) |binding| if (binding.kind == .external) try std.testing.expect(binding.name != fixture.source.symbols.lookup("unused").?);
+    // Main dispatches to the method, so it copies the producer's scheme.
     const main = &checked.module(1).checked;
     try std.testing.expectEqual(@as(usize, 2), main.imported_schemes);
     const integer = try exported(&checked, &fixture.source, 1, "integer");
     try std.testing.expectEqual(types.u32_type, main.bindings[integer.binding].ty);
     try std.testing.expectEqual(@as(usize, 1), main.associated.len);
-    try std.testing.expectEqual(facade.bindings[facade.associated[0].binding].external.?, main.bindings[main.associated[0].binding].external.?);
+    const used = main.bindings[main.associated[0].binding];
+    try std.testing.expect(used.scheme.root != 0);
+    try std.testing.expectEqual(forwarded.external.?, used.external.?);
+    const library = &checked.module(forwarded.external.?.unit).checked;
+    try std.testing.expectEqual(check.Kind.global, library.bindings[forwarded.external.?.binding].kind);
 }
 
 test "imported result and callback schemes keep owned quantified relations and numeric target identity" {
@@ -840,7 +848,8 @@ test "imported result and callback schemes keep owned quantified relations and n
     defer checked.deinit(a);
     try requireValid(&checked);
     const consumer = &checked.module(1).checked;
-    try std.testing.expectEqual(@as(usize, 3), consumer.imported_schemes);
+    // `convert` and `delay`. The consumer never looks up `Box.from` itself.
+    try std.testing.expectEqual(@as(usize, 2), consumer.imported_schemes);
     const integer = try exported(&checked, &fixture.source, 1, "integer");
     const floating = try exported(&checked, &fixture.source, 1, "floating");
     try std.testing.expectEqual(types.u32_type, consumer.types.node(consumer.bindings[integer.binding].ty).b);

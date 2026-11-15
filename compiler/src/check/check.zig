@@ -153,8 +153,11 @@ pub const Reflection = struct { node: ast.Id, kind: ReflectionKind, left: ast.Id
 pub const OperationUse = struct { node: ast.Id, template: u32, arguments: T.List, signature: T.Id, instance: Identity = .{ .unit = 0, .decl = 0 }, capability: ast.Id = 0, capability_binding: BindingId = 0, call: enum { value, state_read, state_write } = .value, operand: ast.Id = 0 };
 const AssociatedKey = struct { identity: Identity, operator: T.Operator };
 const AssociatedMember = struct { identity: Identity, member: symbols.Symbol };
-/// An associated entry copied from an imported catalog, keyed by its binding.
-const ImportedAssociated = struct { identity: Identity, member: symbols.Symbol, binding: BindingId };
+/// An associated entry copied from an imported catalog, keyed by its producer.
+const ImportedAssociated = struct { identity: Identity, member: symbols.Symbol, target: ExternalTarget };
+/// An imported associated member keeps this in `Associated.binding` until its
+/// first lookup copies the scheme: the bit, then its `associated_pending` slot.
+const pending_associated: BindingId = 1 << 31;
 const EffectMember = struct { family: u32, member: symbols.Symbol };
 pub const Rebinding = struct { root: BindingId = 0, self_binding: BindingId = 0, path: T.List = .{} };
 pub const Projection = struct { nominal: Identity, field: symbols.Symbol, variants: T.List };
@@ -298,6 +301,10 @@ pub const CapabilitySource = struct { callees: Callees, binding: BindingId };
 pub const ProducerCapabilities = struct {
     context: *const anyopaque,
     lookup: *const fn (context: *const anyopaque, target: ExternalTarget) ?ProducerCapability,
+    /// The scheme the producer itself published for `target`. With it, a
+    /// module imports a member another module's catalog forwards without
+    /// reading that module's copy, so the copy need not exist.
+    interface: ?*const fn (context: *const anyopaque, target: ExternalTarget) ?SchemeInterface = null,
 };
 /// Opaque recipes come from the current original producer. A semantically
 /// reusable forwarding catalog may still carry its previous physical recipe.
@@ -1037,6 +1044,8 @@ const Engine = struct {
     loop_stack: std.ArrayList(LoopFrame) = .empty,
     cases: std.ArrayList(ast.Id) = .empty,
     associated: std.ArrayList(Associated) = .empty,
+    /// Producers of the imported associated members no lookup has needed yet.
+    associated_pending: std.ArrayList(ExternalTarget) = .empty,
 
     fn collectModuleHeaders(self: *Engine, imports: []const ImportedBinding, headers: []const SourceHeader, catalogs: []const ImportedCatalog, source_catalogs: []const SourceCatalog, allow_imports: bool, inherited_fixities: []const ImportedFixity) T.Error!void {
         const allocator = self.allocator;
@@ -1077,6 +1086,20 @@ const Engine = struct {
         // Catalogs repeat the members they import; each copy is recorded once.
         var imported_associated: std.AutoHashMapUnmanaged(ImportedAssociated, void) = .empty;
         defer imported_associated.deinit(allocator);
+        // The largest catalog already repeats most of what the others carry.
+        var largest: usize = 0;
+        for (catalogs) |imported| if (imported.kind == .catalog) {
+            largest = @max(largest, imported.catalog().associated.len);
+        };
+        for (source_catalogs) |imported| if (imported.kind == .catalog) {
+            largest = @max(largest, imported.producer.associated.len);
+        };
+        if (largest > std.math.maxInt(u32) / 2) return error.TypeLimit;
+        const expected: u32 = @intCast(largest);
+        try imported_associated.ensureUnusedCapacity(allocator, expected);
+        try self.catalogs.associated_members.ensureUnusedCapacity(allocator, expected);
+        try self.associated.ensureUnusedCapacity(allocator, expected);
+        try self.imported_values.ensureUnusedCapacity(allocator, expected + @as(u32, @intCast(@min(imports.len, std.math.maxInt(u32) / 4))));
         for (catalogs) |imported| try self.importCatalog(imported, &imported_associated);
         for (source_catalogs) |imported| try self.importCatalog(imported, &imported_associated);
         for (imports) |imported| {
@@ -1558,6 +1581,40 @@ const Engine = struct {
     fn producerCapability(self: *const Engine, target: ExternalTarget) ?ProducerCapability {
         const resolver = self.producer_capabilities orelse return null;
         return resolver.lookup(resolver.context, target);
+    }
+    fn producerInterface(self: *const Engine, target: ExternalTarget) ?SchemeInterface {
+        const resolver = self.producer_capabilities orelse return null;
+        const published = resolver.interface orelse return null;
+        return published(resolver.context, target);
+    }
+    /// Imported associated members are copied on first lookup only when every
+    /// module that imports this one's catalog can reach their producers.
+    fn defersAssociated(self: *const Engine) bool {
+        const resolver = self.producer_capabilities orelse return false;
+        return resolver.interface != null and !self.source_validation and self.editor_marker == null;
+    }
+    /// The binding of an associated member. The first lookup of an imported
+    /// member copies its scheme.
+    fn associatedBinding(self: *Engine, index: u32) T.Error!BindingId {
+        const binding = self.associated.items[index].binding;
+        if (binding & pending_associated == 0) return binding;
+        const imported = (try self.importedBinding(self.associated_pending.items[binding & ~pending_associated])) orelse return error.TypeLimit;
+        self.associated.items[index].binding = imported;
+        return imported;
+    }
+    /// Gives each imported associated member that no lookup needed a binding
+    /// naming its producer. The published catalog forwards the member through
+    /// it; an importing module reads the scheme from the producer.
+    fn publishPendingAssociated(self: *Engine) T.Error!void {
+        for (self.associated.items) |*entry| {
+            if (entry.binding & pending_associated == 0) continue;
+            const target = self.associated_pending.items[entry.binding & ~pending_associated];
+            entry.binding = self.catalogs.external_targets.get(target) orelse forwarded: {
+                const imported = self.imported_values.get(target) orelse return error.TypeLimit;
+                break :forwarded try self.addBinding(.{ .name = 0, .declaration = imported.origin, .owner = imported.origin, .kind = .external, .ty = T.unit, .capability_flow = imported.interface.capability_flow, .capability_parameters = imported.interface.capability_parameters, .named_function = imported.interface.named_function, .external = target });
+            };
+        }
+        self.associated_pending.clearRetainingCapacity();
     }
     fn importHeader(self: *Engine, imported: SourceHeader) T.Error!void {
         std.debug.assert(self.source_validation);
@@ -2078,7 +2135,7 @@ const Engine = struct {
     const AssociatedChoice = union(enum) { absent, waiting, selected: struct { ty: T.Id, binding: BindingId } };
     fn tryAssociated(self: *Engine, identity: Identity, member: symbols.Symbol, operator: T.Operator, left: T.Id, right: T.Id, source: ast.Id) T.Error!AssociatedChoice {
         const index = (if (member == 0) self.catalogs.associated_ops.get(.{ .identity = identity, .operator = operator }) else self.catalogs.associated_members.get(.{ .identity = identity, .member = member })) orelse return .absent;
-        const binding = self.associated.items[index].binding;
+        const binding = try self.associatedBinding(index);
         if (!try self.prepareSelectedGlobal(binding)) return .waiting;
         const point = self.types.mark();
         const pending = self.pending.items.len;
@@ -2206,7 +2263,7 @@ const Engine = struct {
         const destination = try self.types.resolve(expected, 0);
         const identity = self.identityOf(destination) orelse return null;
         const index = self.catalogs.associated_members.get(.{ .identity = identity, .member = member }) orelse return null;
-        const binding = self.associated.items[index].binding;
+        const binding = try self.associatedBinding(index);
         if (!try self.prepareSelectedGlobal(binding)) return null;
         const function = try self.instantiate(binding, source);
         // Destination lookup selects exactly one ordinary unary member. Unlike
@@ -2232,7 +2289,7 @@ const Engine = struct {
             return true;
         }
         const selected = self.catalogs.associated_members.get(.{ .identity = .{ .unit = token.a, .decl = token.b }, .member = constraint.name }) orelse return false;
-        const binding = self.associated.items[selected].binding;
+        const binding = try self.associatedBinding(selected);
         if (!try self.prepareSelectedGlobal(binding)) return false;
         // The protocol's selected ordinary method determines every input,
         // continuation and output type. No wrapper shape or fallback is implied.
@@ -2496,30 +2553,44 @@ const Engine = struct {
                 const definition = if (@TypeOf(imported) == SourceCatalog) imported.declarations[method.binding] else imported.declaration(method.binding);
                 if (definition.private) continue;
                 const target = definition.external orelse ExternalTarget{ .unit = producer.unit, .binding = method.binding };
+                // Catalogs repeat the members they import; each is recorded once.
+                const key: ImportedAssociated = .{ .identity = method.identity, .member = method.member, .target = target };
+                if ((try imported_associated.getOrPut(self.allocator, key)).found_existing) continue;
                 // A member the catalog's module itself imported keeps its
                 // producer's capability facts, never the alias's copy.
                 const owned: ?ProducerCapability = if (definition.external != null) self.producerCapability(target) else null;
+                var binding: BindingId = undefined;
                 if (@TypeOf(imported) == SourceCatalog or self.source_validation) {
                     const flow = if (owned) |facts| facts.flow else definition.capability_flow;
                     const parameters = if (owned) |facts| facts.parameters else definition.capability_parameters;
                     try self.importHeader(.{ .target = target, .capability_flow = flow, .capability_parameters = parameters, .named_function = definition.named_function, .origin = imported.origin, .expose = false });
+                    binding = (try self.importedBinding(target)).?;
                 } else {
-                    var interface = imported.interface(method.binding);
+                    // The forwarding module copied the scheme only if it used
+                    // the member, so the producer's own scheme is preferred.
+                    var interface = (if (definition.external != null) self.producerInterface(target) else null) orelse imported.interface(method.binding);
+                    if (definition.external != null and interface.scheme.root == 0) {
+                        // Forwarded without a copy and no producer to ask:
+                        // another catalog may still carry the member.
+                        _ = imported_associated.remove(key);
+                        continue;
+                    }
                     if (owned) |facts| {
                         interface.capability_flow = facts.flow;
                         interface.capability_parameters = facts.parameters;
                         interface.capability_source = facts.recipe orelse CapabilitySource{ .callees = .none, .binding = 0 };
                     }
                     try self.importBinding(.{ .target = target, .interface = interface, .origin = imported.origin, .expose = false });
+                    if (self.defersAssociated()) {
+                        if (self.associated_pending.items.len >= pending_associated) return error.TypeLimit;
+                        binding = pending_associated | @as(BindingId, @intCast(self.associated_pending.items.len));
+                        try self.associated_pending.append(self.allocator, target);
+                    } else binding = (try self.importedBinding(target)).?;
                 }
-                const binding = (try self.importedBinding(target)).?;
-                const present = try imported_associated.getOrPut(self.allocator, .{ .identity = method.identity, .member = method.member, .binding = binding });
-                if (!present.found_existing) {
-                    const index: u32 = @intCast(self.associated.items.len);
-                    try self.associated.append(self.allocator, .{ .identity = method.identity, .member = method.member, .operator = method.operator, .binding = binding });
-                    try self.catalogs.associated_members.put(self.allocator, .{ .identity = method.identity, .member = method.member }, index);
-                    if (method.operator != .none) try self.catalogs.associated_ops.put(self.allocator, .{ .identity = method.identity, .operator = method.operator }, index);
-                }
+                const index: u32 = @intCast(self.associated.items.len);
+                try self.associated.append(self.allocator, .{ .identity = method.identity, .member = method.member, .operator = method.operator, .binding = binding });
+                try self.catalogs.associated_members.put(self.allocator, .{ .identity = method.identity, .member = method.member }, index);
+                if (method.operator != .none) try self.catalogs.associated_ops.put(self.allocator, .{ .identity = method.identity, .operator = method.operator }, index);
             }
             return;
         }
@@ -3456,11 +3527,11 @@ const Engine = struct {
         }
         if (selected_identity) |identity| {
             const descriptor = if (predicate.name == 0) self.catalogs.associated_ops.get(.{ .identity = identity, .operator = predicate.operator }) else self.catalogs.associated_members.get(.{ .identity = identity, .member = predicate.name });
-            if (descriptor) |ordinal| candidates[0] = self.associated.items[ordinal].binding;
+            if (descriptor) |ordinal| candidates[0] = try self.associatedBinding(ordinal);
         }
         if (predicate.kind == .dispatch) if (self.identityOf(predicate.other)) |identity| {
             const descriptor = if (predicate.name == 0) self.catalogs.associated_ops.get(.{ .identity = identity, .operator = predicate.operator }) else self.catalogs.associated_members.get(.{ .identity = identity, .member = predicate.name });
-            if (descriptor) |ordinal| candidates[1] = self.associated.items[ordinal].binding;
+            if (descriptor) |ordinal| candidates[1] = try self.associatedBinding(ordinal);
         };
         for (candidates, 0..) |candidate, side| {
             if (side == 1 and predicate.kind == .dispatch and predicate.name == 0) {
@@ -7844,7 +7915,7 @@ const Engine = struct {
             if (result != 0) {
                 try self.diagnostic(.ambiguous_member, source);
             } else {
-                const binding = self.associated.items[index].binding;
+                const binding = try self.associatedBinding(index);
                 // An unfinished member has no independently completed body
                 // interface yet. Preserve its requirement for the demanded
                 // Core instance instead of constraining that unfinished body
@@ -9886,8 +9957,12 @@ const Engine = struct {
     fn prepareQualifications(self: *Engine, group: []const BindingId) T.Error!void {
         var index: usize = 0;
         while (index < self.pending.items.len) : (index += 1) {
+            // Most entries are skipped: test them in place before copying one.
+            {
+                const entry = &self.pending.items[index];
+                if (entry.declared or entry.covered or entry.solved or entry.local_scheme or entry.value.kind != .callee_use) continue;
+            }
             const pending = self.pending.items[index];
-            if (pending.declared or pending.covered or pending.solved or pending.local_scheme or pending.value.kind != .callee_use) continue;
             const qualified = for (self.qualifications.items) |boundary| {
                 if (boundary.scope == pending.scope and inList(group, boundary.owner)) break true;
             } else false;
@@ -9964,9 +10039,13 @@ const Engine = struct {
         defer parts.deinit(self.allocator);
         var index: usize = 0;
         while (index < pending_end) : (index += 1) {
+            // Most entries are skipped: test them in place before copying one.
+            {
+                const entry = &self.pending.items[index];
+                if (entry.solved or entry.covered or entry.local_scheme or !inList(group, entry.owner) or (entry.declared and entry.scope != qualification_scope)) continue;
+            }
             // Evidence selection may append obligations and move this table.
             const pending = self.pending.items[index];
-            if (pending.solved or pending.covered or pending.local_scheme or !inList(group, pending.owner) or (pending.declared and pending.scope != qualification_scope)) continue;
             if (pending.value.kind == .contract and try self.lexicalDictionaryGoal(pending.value)) {
                 self.pending.items[index].solved = true;
                 continue;
@@ -10752,7 +10831,7 @@ const Engine = struct {
     }
     fn pendingState(self: *const Engine) usize {
         var count: usize = 0;
-        for (self.pending.items) |pending| if (!pending.solved and !pending.declared and !pending.covered and !pending.local_scheme) {
+        for (self.pending.items) |*pending| if (!pending.solved and !pending.declared and !pending.covered and !pending.local_scheme) {
             count += 1;
         };
         return count;
@@ -14379,8 +14458,11 @@ const Engine = struct {
             changed = false;
             var i: usize = 0;
             while (i < self.pending.items.len) : (i += 1) {
+                {
+                    const entry = &self.pending.items[i];
+                    if (entry.solved or entry.suspended or entry.value.kind != .callee_use or !inList(group, entry.owner)) continue;
+                }
                 const item = self.pending.items[i];
-                if (item.solved or item.suspended or item.value.kind != .callee_use or !inList(group, item.owner)) continue;
                 const product = self.types.node(try self.types.resolve(item.value.ty, 0));
                 const summary = self.bindings.items[item.value.identity.decl].summary;
                 const type_count = summary.public_variables.len;
@@ -15187,6 +15269,7 @@ noinline fn deinitEngine(engine: *Engine, published: bool) void {
     engine.contracts.deinit(allocator);
     engine.nominals.deinit(allocator);
     engine.associated.deinit(allocator);
+    engine.associated_pending.deinit(allocator);
     engine.cases.deinit(allocator);
     engine.computation_annotations.deinit(allocator);
     engine.row_env.deinit(allocator);
@@ -15464,6 +15547,7 @@ fn checkEngine(allocator: Allocator, tree: *const ast.Tree, pool: *symbols.Pool,
     checked.request_arms = try engine.request_arms.toOwnedSlice(allocator);
     checked.request_controls = try engine.request_controls.toOwnedSlice(allocator);
     checked.reflections = try engine.reflections.toOwnedSlice(allocator);
+    try engine.publishPendingAssociated();
     checked.bindings = try engine.bindings.toOwnedSlice(allocator);
     checked.diagnostics = try engine.diagnostics.toOwnedSlice(allocator);
     checked.obligations = try engine.obligations.toOwnedSlice(allocator);

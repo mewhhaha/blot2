@@ -110,8 +110,12 @@ pub fn keyword(text: []const u8) Tag {
         .{ "false", Tag.kw_false },       .{ "and", Tag.kw_and },
         .{ "or", Tag.kw_or },
     };
+    // Every keyword is two to eight lowercase letters. The first letter
+    // rules out most of the table before any spelling is compared.
+    if (text.len < 2 or text.len > 8 or text[0] < 'a' or text[0] > 'z') return .identifier;
     inline for (words) |entry| {
-        if (std.mem.eql(u8, text, entry[0])) return entry[1];
+        comptime std.debug.assert(entry[0].len >= 2 and entry[0].len <= 8 and entry[0][0] >= 'a' and entry[0][0] <= 'z');
+        if (text.len == entry[0].len and text[0] == entry[0][0] and std.mem.eql(u8, text, entry[0])) return entry[1];
     }
     return .identifier;
 }

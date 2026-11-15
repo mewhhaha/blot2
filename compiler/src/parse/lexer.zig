@@ -182,6 +182,11 @@ pub fn decodePoint(bytes: []const u8) error{InvalidUtf8}!u21 {
 fn validateSource(allocator: Allocator, source: []const u8, result: *Result) Allocator.Error!void {
     var at: usize = 0;
     while (at < source.len) {
+        // An ASCII byte is one valid scalar outside the reserved range.
+        if (source[at] < 0x80) {
+            at += 1;
+            continue;
+        }
         const width = std.unicode.utf8ByteSequenceLength(source[at]) catch {
             try diagnose(result, allocator, .invalid_utf8, at, at + 1);
             return;
@@ -245,7 +250,7 @@ fn scan(allocator: Allocator, source: []const u8, result: *Result) Allocator.Err
             try emit(&result.tokens, allocator, number.tag, start, at);
             continue;
         }
-        if (std.mem.startsWith(u8, source[at..], "froM") or std.mem.startsWith(u8, source[at..], "wherE")) {
+        if ((c == 'f' or c == 'w') and (std.mem.startsWith(u8, source[at..], "froM") or std.mem.startsWith(u8, source[at..], "wherE"))) {
             const from = source[at] == 'f';
             at += if (from) @as(usize, 4) else 5;
             try emit(&result.tokens, allocator, if (from) .private_from else .private_where, start, at);

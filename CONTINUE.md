@@ -36,9 +36,22 @@ compiles".
   turned 1,880 `:=` in Ink (44ec97e) and 3,011 in Gdev (6aa6350) into `=`.
   These are the writes into arrays a function was handed. Phase 3 moves them
   to the `own` style and deletes `=`.
-- **Checker speed.** Importing a catalog no longer scans every earlier
-  associated member for each new one; it uses a hash set. This was quadratic
-  per module and 12% of a Gdev build. Gdev's Wasm is unchanged.
+- **Checker speed.** Gdev's Wasm is unchanged by each of these
+  (2,720,970 bytes, sha256 af9f24dd…).
+  - Importing a catalog no longer scans every earlier associated member for
+    each new one; it uses a hash set. This was quadratic per module and 12%
+    of a Gdev build.
+  - A module copies the scheme of an imported associated member (`Vec3.add`,
+    `Array.at`) at its first lookup, not at import. Gdev's 264 modules
+    imported 48,324 schemes and now import 17,560. A member a module only
+    forwards gets a binding that names its producer, and the importing
+    module reads the scheme from the producer
+    (`ProducerCapabilities.interface`).
+  - The lexer compares a keyword's first letter before its spelling and
+    skips ASCII when it validates UTF-8.
+  - Together: 7.19 to 6.41 billion instructions for a Gdev build, and 1.36
+    to 1.30 s on the cloud container
+    ([record](benchmarks/evidence/measurements/2026-11-15-lazy-associated-import.json)).
 
 ## In progress
 
@@ -56,21 +69,29 @@ compiles".
     needs, and the order of work. Spec Annex B item 13 points to it.
   - **The owner decides:** the two rule changes, and whether `own` in
     function types waits for the B3 and C8 removals.
-- **Checker speed.** A release (LLVM) compiler builds Gdev Main in 1.59 s
-  with one frontend worker, of which checking is 1.09 s (lower 0.15, backend
-  0.11, lex 0.06, parse 0.04).
+- **Checker speed.** A release (LLVM) compiler builds Gdev Main in 1.30 s
+  on the cloud container with one frontend worker, of which checking is
+  0.87 s (lower 0.16, backend 0.14, lex 0.03, parse 0.03).
 
-  | Next costs (share of a sampled Gdev build) | |
+  | Next costs (share of a Gdev build's instructions, inclusive) | |
   | --- | ---: |
-  | `validateModuleBodies` | 48% |
-  | `inferGlobal` / declaration bodies | 39% |
-  | `resolve` / `resolveNode` | 21% |
-  | `collectModuleHeaders` (catalog import copies) | 17% |
-  | `unify` | 10% |
-  | hash-map and list growth copies (self) | ~9% |
+  | `validateModuleBodies` | 60% |
+  | `inferGlobal` / declaration bodies | 49% |
+  | `types.Store.resolve` | 26% |
+  | Core lowering (`lowerWithOrigins`) | 11% |
+  | `finishGlobal` (generalization, `schemeInto` 7%) | 11% |
+  | `collectModuleHeaders` (`copyNominal` 5%) | 9% |
+  | `finish` (resolves every expression's type once more) | 9% |
+  | load (lex and parse) | 7% |
 
-  - The catalog import still copies every prelude member into every module;
-    sharing or lazy import is the next step there.
+  - No function is hot on its own: `resolveNode` has the largest self cost
+    at 6%, and hash maps total 15%.
+  - `copyNominal` still copies every public type of every imported catalog
+    into each module (29,593 copies, 5%). Making it lazy touches the 65
+    places that read `self.nominals`.
+  - The costs above the import are inference itself. Required signatures
+    (tasks/FAST_COMPILE.md, decision 2) remove generalization and let bodies
+    be checked alone; that is the step that changes the order of magnitude.
 
 ## Language
 
@@ -106,11 +127,30 @@ compiles".
   build/goose-perf and compare with build/goose-perf/compare_ink.py against
   ink-zig.log.
 - Profiling:
-  - Build with `-Doptimize=ReleaseFast -Dllvm=true -Dprofiling=true`.
-  - Run the compiler (not Deno) with
-    `LD_PRELOAD=build/goose-perf/prof/cpusample.so CPUSAMPLE_DIR=… CPUSAMPLE_US=500`.
-  - Summarize with `ABSADDR=1 python3 build/goose-perf/prof/analyze.py DIR BINARY`
+  - Build with `-Doptimize=fast -Dllvm=true -Dprofiling=true`.
+  - Sampling, on a machine that has build/goose-perf (untracked): run the
+    compiler (not Deno) with
+    `LD_PRELOAD=build/goose-perf/prof/cpusample.so CPUSAMPLE_DIR=… CPUSAMPLE_US=500`
+    and summarize with `ABSADDR=1 python3 build/goose-perf/prof/analyze.py DIR BINARY`
     (or `callers.py DIR BINARY FUNCTION`).
+  - Instruction counts, anywhere valgrind is installed: give `build_gdev.ts`
+    a `--compiler` shell script that runs
+    `valgrind --tool=callgrind --callgrind-out-file=DIR/callgrind.out.%p blotc "$@"`
+    without `exec`. The client kills the script, valgrind sees the end of its
+    input and writes the file. Read it with
+    `callgrind_annotate --inclusive=yes` and `--tree=caller`.
+- A fresh cloud container has none of the toolchain. Install what
+  .github/workflows/ci.yml pins: Zig 0.17.0, Deno 2, and zig-analyzer
+  0.17.0-1 (set `ZIG_ANALYZER`, or put it at
+  ../zig-analyzer/zig-out/bin/zig-analyzer). Pen needs
+  `apt-get install pkg-config cmake libasound2-dev libdbus-1-dev libudev-dev`,
+  then `cargo build --release -p pen` and, in ../pen/plugins,
+  `cargo build --release --target wasm32-wasip2`. The `flock` and
+  `systemd-run` wrappers above are for the owner's machine.
+- `deno task lint:zig` reports 16 findings on main with zig-analyzer
+  0.17.0-1 (check.zig, package_core.zig, scheme_equations.zig, direct/,
+  main.zig, principal_type_graph.zig, bench_declaration_demand.zig). They
+  were there before 15 November's changes, which add none.
 
 ## The Goose port (phase 3 of the order)
 

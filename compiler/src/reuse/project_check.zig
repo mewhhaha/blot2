@@ -524,6 +524,24 @@ const Engine = struct {
             },
         }
     }
+    /// The scheme `target`'s own module published, for a member that reaches
+    /// an importing module through another module's catalog.
+    fn producerInterface(context: *const anyopaque, target: check.ExternalTarget) ?check.SchemeInterface {
+        const self: *const Engine = @ptrCast(@alignCast(context));
+        if (self.source_validation) return null;
+        const module = self.catalogModule(target.unit) orelse return null;
+        switch (module.owner) {
+            .typed => |owner| {
+                if (target.binding >= owner.bindings.len or owner.bindings[target.binding].external != null) return null;
+                return self.result.interface(target);
+            },
+            .frozen => |owner| {
+                if (target.binding >= owner.bindings.len or owner.bindings[target.binding].external != null) return null;
+                return (check.ImportedCatalog{ .frozen = owner, .kind = .catalog, .index = 0, .origin = 0 }).interface(target.binding);
+            },
+            .source => return null,
+        }
+    }
     fn producerStorage(context: *const anyopaque, identity_: check.Identity) ?@import("../check/opaque_storage.zig").Storage {
         const self: *const Engine = @ptrCast(@alignCast(context));
         if (identity_.unit == 0 or identity_.unit > self.source.units.items.len) return null;
@@ -686,7 +704,7 @@ const Engine = struct {
             return;
         }
         var options: check.ModuleOptions = .{ .associated_remaining = &self.associated_remaining, .purity_origins = .{ .context = self.source, .lookup = moduleOrigin, .source_available = moduleSourceAvailable }, .builtin_catalog = unit == self.source.prelude_unit, .prelude_unit = self.source.prelude_unit, .inherited_fixities = inherited_fixities.items };
-        options.producer_capabilities = .{ .context = self, .lookup = producerCapability };
+        options.producer_capabilities = .{ .context = self, .lookup = producerCapability, .interface = producerInterface };
         options.producer_storage = .{ .context = self, .lookup = producerStorage };
         if (self.editor) |query| {
             options.max_inference_transitions = query.budget.remaining;

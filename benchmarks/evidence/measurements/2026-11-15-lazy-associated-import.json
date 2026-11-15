@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-15",
+  "subject": "Gdev Main build: associated members imported on first lookup, a cheaper lexer and pending-table scans",
+  "machine": "cloud container, 4 cores, 15 GB; times vary by about 10% between runs",
+  "command": "deno run -A scripts/integration/build_gdev.ts --compiler <blotc> --timeout-ms 600000 --profile --frontend-workers 1 <out>",
+  "compilers": {
+    "before": "blot2 26a6a55, zig build install -Doptimize=fast -Dllvm=true -Dprofiling=true",
+    "after": "the commit that adds this record, same build"
+  },
+  "sources": { "gdev": "../gdev 6aa6350", "ink": "../ink 44ec97e" },
+  "wasm": {
+    "bytes": 2720970,
+    "sha256_before": "af9f24dd1dcef384e3f20be758912e79dee8ab7d3af2994470903546d7ab8697",
+    "sha256_after": "af9f24dd1dcef384e3f20be758912e79dee8ab7d3af2994470903546d7ab8697"
+  },
+  "instructions": {
+    "tool": "valgrind 3.22 callgrind, the whole serve-project process",
+    "before": 7190152884,
+    "after": 6413276744,
+    "by_function_inclusive": {
+      "check (checkEngine)": { "before": 5007348928, "after": 4476942635 },
+      "collectModuleHeaders": { "before": 998659638, "after": 597757909 },
+      "importScheme": { "before": 394364099, "after": 180446746 },
+      "lexer.lex": { "before": 408797340, "after": 201074888 },
+      "schemeInto": { "before": 538426956, "after": 459149031 }
+    }
+  },
+  "milliseconds_median_of_7": {
+    "before": { "build": 1361, "lex": 49, "parse": 33, "check": 925, "lower": 154, "backend": 131 },
+    "after": { "build": 1295, "lex": 34, "parse": 32, "check": 874, "lower": 158, "backend": 136 }
+  },
+  "counters": {
+    "imported_schemes": { "before": 48324, "after": 17560 },
+    "import_requests": { "before": 523440, "after": 193584 },
+    "type_nodes": { "before": 1431685, "after": 1331480 },
+    "peak_rss_kib": { "before": 246228, "after": 238596 }
+  },
+  "after_profile_shares_inclusive": {
+    "validateModuleBodies": "59.9%",
+    "inferGlobal": "48.7%",
+    "types.Store.resolve": "26.4%",
+    "lowerWithOrigins (Core)": "10.9%",
+    "finishGlobal": "10.5%",
+    "collectModuleHeaders": "9.3%",
+    "direct backend": "9.1%",
+    "finish (final resolve of every expression type)": "8.6%",
+    "schemeInto": "7.2%",
+    "load (lex and parse)": "6.6%",
+    "copyNominal": "4.7%"
+  },
+  "checks": {
+    "guest_suite": "1054 passed, 0 failed, 101 ignored",
+    "full_gate": "deno task test:compiler passed (native laws with exhaustive allocation failures, release build, pack, guests)",
+    "ink": "pen test-blot: 268 passed, 1 failed, 3 modules do not compile, in 73 modules, before and after; every test has the same outcome",
+    "gdev_frame": "not run: the Wasm is byte-identical to the one the compiler before this change builds"
+  }
+}
