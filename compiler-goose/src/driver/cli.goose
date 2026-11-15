@@ -2,6 +2,7 @@
 namespace blot_cli;
 import .cli_diagnostics;
 import .cli_project;
+import .cli_migrate_stores;
 import main;
 import inference_limits;
 import execution_policy;
@@ -118,6 +119,7 @@ fn run(args:const Argument[:])->bool,Error {
   }
   let error=blot_reuse_zig_project_server::run(blot_io::Reader{0},stdout,blot_main::configured_identity,policy);return error==blot_error::Error.none,error;
  }
+ if args[1]=="migrate-stores" {return migrateStores(args[2..]);}
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
  if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
  let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.dependencies;

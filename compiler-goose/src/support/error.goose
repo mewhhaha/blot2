@@ -338,6 +338,7 @@ enum Error {
     invalid_number,
     invalid_enum_tag,
     unexpected_end_of_input,
+    invalid_project_settings,
 }
 
 fn error_name(code: Error) -> const u8[:] {
@@ -678,6 +679,7 @@ fn error_name(code: Error) -> const u8[:] {
         invalid_number => "InvalidNumber",
         invalid_enum_tag => "InvalidEnumTag",
         unexpected_end_of_input => "UnexpectedEndOfInput",
+        invalid_project_settings => "InvalidProjectSettings",
     }
 }
 

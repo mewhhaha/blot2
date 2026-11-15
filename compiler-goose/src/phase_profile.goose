@@ -8,9 +8,9 @@ import support.option;
 import support.error;
 import work_counters;
 type Error=blot_error::Error;
-enum Phase {other,assets,inputs,load,lex,parse,check,lower,freeze,validation,backend}
-let phase_names=["other","assets","inputs","load","lex","parse","check","lower","freeze","validation","backend"];
-let phases=[Phase.other,Phase.assets,Phase.inputs,Phase.load,Phase.lex,Phase.parse,Phase.check,Phase.lower,Phase.freeze,Phase.validation,Phase.backend];
+enum Phase {other,assets,load,lex,parse,check,lower,freeze,validation,backend}
+let phase_names=["other","assets","load","lex","parse","check","lower","freeze","validation","backend"];
+let phases=[Phase.other,Phase.assets,Phase.load,Phase.lex,Phase.parse,Phase.check,Phase.lower,Phase.freeze,Phase.validation,Phase.backend];
 fn phaseIndex(phase:Phase)->i64 {for value,index in phases {if value==phase {return index;}}abort("invalid phase");}
 fn difference(now:u64,before:u64)->u64 {if now<before {return 0;}return now-before;}
 fn add(a:u64,b:u64)->u64 {return blot_work_counters::saturating_add(a,b);}
@@ -19,25 +19,27 @@ struct Profile {key:Key=Key{..}}
 struct ProfileState {
     live:bool=false,generation:u64=0,started:u64=0,previous:u64=0,active:Phase=Phase.other,
     checking:blot_work_counters::Frontend=blot_work_counters::Frontend{..},
-    nanos:u64[11]=[0;11],requested_bytes:u64[11]=[0;11],allocations:u64[11]=[0;11],rss_growth_kib:u64[11]=[0;11],
-    peak_rss_kib:u64=0,rss_sampled:u64=0,allocation_coverage:bool=false,
+    nanos:u64[10]=[0;10],requested_bytes:u64[10]=[0;10],allocations:u64[10]=[0;10],rss_growth_kib:u64[10]=[0;10],
+    // Pooled requests are charged to the phase active when they happen;
+    // these are the runtime's totals at the last charge.
+    peak_rss_kib:u64=0,rss_sampled:u64=0,allocation_coverage:bool=false,seen_bytes:u64=0,seen_allocations:u64=0,
 }
 reusable var profiles:ProfileState[>..]=[];
 var installed:Key=Key{..};
 fn validProfile(key:Key)->bool {return key.slot!=0 && key.slot-1<profiles.len && profiles[key.slot-1].live && profiles[key.slot-1].generation==key.generation;}
 fn state(self_:Profile)->ProfileState& {assert(validProfile(self_.key));return profiles[self_.key.slot-1];}
-fn initProfile()->Profile {let now=blot_native::clock_ns();let generation=blot_native::fresh_owner_id();let at=profiles.alloc_index(ProfileState{live:true,generation:generation,started:now,previous:now,peak_rss_kib:blot_native::peak_rss_kib(),rss_sampled:now,..});assert(at<0xffffffff);return Profile{Key{(at+1) as u32,generation}};}
+fn initProfile()->Profile {let now=blot_native::clock_ns();let generation=blot_native::fresh_owner_id();let coverage=(blot_native::runtime_observation(0)&1)!=0;var seen_bytes:u64=0;var seen_allocations:u64=0;if coverage {seen_bytes=blot_native::runtime_observation(8);seen_allocations=blot_native::runtime_observation(4);}let at=profiles.alloc_index(ProfileState{live:true,generation:generation,started:now,previous:now,peak_rss_kib:blot_native::peak_rss_kib(),rss_sampled:now,allocation_coverage:coverage,seen_bytes:seen_bytes,seen_allocations:seen_allocations,..});assert(at<0xffffffff);return Profile{Key{(at+1) as u32,generation}};}
 fn deinit(self_:Profile&) {if self_.key.slot==0 {return;}assert(validProfile(self_.key) && installed!=self_.key);profiles[self_.key.slot-1].live=false;profiles.free(self_.key.slot-1);self_=Profile{..};}
 fn sampleRss(self_:ProfileState&,phase:i64) {let peak=blot_native::peak_rss_kib();self_.rss_growth_kib[phase]=add(self_.rss_growth_kib[phase],difference(peak,self_.peak_rss_kib));self_.peak_rss_kib=max(self_.peak_rss_kib,peak);self_.rss_sampled=self_.previous;}
-fn account(self_:ProfileState&) {let now=blot_native::clock_ns();let phase=phaseIndex(self_.active);self_.nanos[phase]=add(self_.nanos[phase],difference(now,self_.previous));self_.previous=now;if difference(now,self_.rss_sampled)>=2000000 {self_.sampleRss(phase);}}
+fn account(self_:ProfileState&) {let now=blot_native::clock_ns();let phase=phaseIndex(self_.active);self_.nanos[phase]=add(self_.nanos[phase],difference(now,self_.previous));self_.previous=now;if self_.allocation_coverage {blot_native::runtime_observation(0);let bytes=blot_native::runtime_observation(8);let count=blot_native::runtime_observation(4);self_.requested_bytes[phase]=add(self_.requested_bytes[phase],difference(bytes,self_.seen_bytes));self_.allocations[phase]=add(self_.allocations[phase],difference(count,self_.seen_allocations));self_.seen_bytes=bytes;self_.seen_allocations=count;}if difference(now,self_.rss_sampled)>=2000000 {self_.sampleRss(phase);}}
+// Requested bytes and allocations are those of pooled owners; null when the
+// runtime does not observe its pools.
 struct PhaseRecord {us:u64=0,requested_bytes:blot_support::Option<u64> =blot_support::none<u64>(),allocations:blot_support::Option<u64> =blot_support::none<u64>(),rss_growth_kib:u64=0}
 fn jsonStringify(self_:PhaseRecord,writer:blot_json::Writer&)->Error {return blot_json::jsonStringify(self_,writer);}
-struct Record {profiled:bool=false,total_us:u64=0,peak_rss_kib:u64=0,phases:PhaseRecord[11]=[PhaseRecord{..};11],checking:blot_work_counters::Frontend=blot_work_counters::Frontend{..},allocation_coverage:bool=false}
+struct Record {profiled:bool=false,total_us:u64=0,peak_rss_kib:u64=0,phases:PhaseRecord[10]=[PhaseRecord{..};10],checking:blot_work_counters::Frontend=blot_work_counters::Frontend{..},allocation_coverage:bool=false}
 fn jsonStringify(self_:Record,writer:blot_json::Writer&)->Error {
     let error=writer.beginObject();if error!=blot_error::Error.none {return error;}if self_.profiled {
         writer.field("total_us",self_.total_us);writer.field("peak_rss_kib",self_.peak_rss_kib);writer.key("phases");writer.beginObject();for name,index in phase_names {writer.field(name,self_.phases[index]);}writer.endObject();writer.field("checking",self_.checking);
-        // Null counters distinguish unavailable allocator coverage from zero.
-        writer.field("allocation_coverage",self_.allocation_coverage);
     }writer.endObject();return writer.failure;
 }
 fn record(self_:Profile&)->Record {let data .= self_.state();data.account();data.sampleRss(phaseIndex(data.active));let trace .= currentTrace();if trace {trace.flushPasses();}var result=Record{profiled:true,total_us:difference(data.previous,data.started)/1000,peak_rss_kib:data.peak_rss_kib,checking:data.checking,allocation_coverage:data.allocation_coverage,..};for ns,index in data.nanos {result.phases[index].us=ns/1000;result.phases[index].rss_growth_kib=data.rss_growth_kib[index];if data.allocation_coverage {result.phases[index].requested_bytes=blot_support::some(blot_native::atomic_load(data.requested_bytes[index]));result.phases[index].allocations=blot_support::some(blot_native::atomic_load(data.allocations[index]));}}return result;}
@@ -93,7 +95,7 @@ fn flushPasses(self_:Trace) {
 }
 fn detail(stage:const u8[:],unit:u32,start:u32,end:u32,items:u64) {let owner .= currentTrace();if !owner {return;}var bytes:u8[>..]=[];bytes.append("BLOT_PROFILE ");var writer=blot_json::Writer{out:bytes,options:blot_json::Options{..},..};writeBegin(owner,trace_space,"detail",writer);writer.field("thread",blot_native::thread_id());writer.field("stage",stage);writer.field("unit",unit);writer.field("start",start);writer.field("end",end);writer.field("items",items);writer.field("at_us",owner.elapsed());writeEnd(writer);}
 fn traceModule(unit:u32,filename:const u8[:],bytes:i64) {let owner .= currentTrace();if !owner {return;}var output:u8[>..]=[];output.append("BLOT_PROFILE ");var writer=blot_json::Writer{out:output,options:blot_json::Options{..},..};writeBegin(owner,trace_space,"module",writer);writer.field("unit",unit);writer.field("filename",filename);writer.field("bytes",bytes);writeEnd(writer);}
-fn tracePhases(profile:const ProfileState&) {let owner .= currentTrace();if !owner {return;}var micros:u64[11]=[0;11];for ns,index in profile.nanos {micros[index]=ns/1000;}var output:u8[>..]=[];output.append("BLOT_PROFILE ");var writer=blot_json::Writer{out:output,options:blot_json::Options{..},..};writeBegin(owner,trace_space,"phases",writer);writer.field("active",phase_names[phaseIndex(profile.active)]);writer.field("phase_us",micros[..]);writer.field("at_us",owner.elapsed());writeEnd(writer);}
+fn tracePhases(profile:const ProfileState&) {let owner .= currentTrace();if !owner {return;}var micros:u64[10]=[0;10];for ns,index in profile.nanos {micros[index]=ns/1000;}var output:u8[>..]=[];output.append("BLOT_PROFILE ");var writer=blot_json::Writer{out:output,options:blot_json::Options{..},..};writeBegin(owner,trace_space,"phases",writer);writer.field("active",phase_names[phaseIndex(profile.active)]);writer.field("phase_us",micros[..]);writer.field("at_us",owner.elapsed());writeEnd(writer);}
 
 struct CheckingState {live:bool=false,generation:u64=0,work:blot_work_counters::Frontend=blot_work_counters::Frontend{..}}
 reusable var checking_states:CheckingState[>..]=[];
