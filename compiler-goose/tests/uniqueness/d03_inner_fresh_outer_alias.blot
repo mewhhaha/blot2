@@ -1,0 +1,13 @@
+type Opt is data = $Has (Array U32) | $Missing
+const keep = func (values: Array U32) => return values[0]
+const run = func (n: U32) => return do:
+  let rows = #[0, 0]
+  let held = #[0]
+  for i in 0..2:
+    for j in 0..2:
+      rows := #[j, j]
+      rows[0] := n
+    rows[1] := n
+    held := rows
+  rows[0] := n
+  break held[0]

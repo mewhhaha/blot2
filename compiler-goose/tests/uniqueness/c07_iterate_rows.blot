@@ -1,0 +1,18 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Three is data = $One | $Two | $Three
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const table = #[1, 2, 3]
+const run = func (n: U32) => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  let total = 0
+  for row in grid:
+    total := @u32.add total row[0]
+  grid[0][0] := n
+  let flat = #[1, 2, 3]
+  for value in flat:
+    total := @u32.add total value
+  flat[0] := n
+  break total

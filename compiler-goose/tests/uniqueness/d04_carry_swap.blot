@@ -1,0 +1,15 @@
+type Opt is data = $Has (Array U32) | $Missing
+const keep = func (values: Array U32) => return values[0]
+const run = func (n: U32) => return do:
+  let a = #[0]
+  let b = #[1]
+  let w = { left: #[0], right: #[1], mid: #[2] }
+  for i in 0..3:
+    a[0] := n
+    w.left[0] := n
+    w.mid[0] := n
+    for j in 0..2:
+      w.right[0] := n
+      w.left := w.right
+    b := a
+  break @u32.add a[0] b[0]

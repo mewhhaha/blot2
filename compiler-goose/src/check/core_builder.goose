@@ -17,6 +17,7 @@ import check.storage_ops;
 import check.task_types;
 import check.typed_staging;
 import check.types;
+import check.uniqueness;
 import eval.body_recipe;
 import eval.implementation_predicates;
 import parse.ast;
@@ -693,6 +694,7 @@ if error!=blot_error::Error.none {return default<Module>(),error;
 if error!=blot_error::Error.none {return default<Module>(),error;
 }result.capability_contracts=blot_check_capability_contracts::Collection{nodes:nodes,words:words,bindings:bindings, ..};
 result.unit=builder.source.checked.unit;
+if result.diagnostics.len==0 {var rejected:blot_check_core::Diagnostic[>..<]=[];blot_check_uniqueness::check(result,rejected);if rejected.len!=0 {let diagnostics,error=blot_reuse_dependency_payload::copy<blot_check_core::Diagnostic>(owner,rejected[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.diagnostics=diagnostics;}}
 let error=blot_reuse_declaration_dependencies::capture(result,declarations,references,members);
 if error!=blot_error::Error.none {return default<Module>(),error;
 }let declaration_dependencies,error=blot_reuse_dependency_payload::copy<blot_check_core::DeclarationDependencies>(owner,declarations[..]);

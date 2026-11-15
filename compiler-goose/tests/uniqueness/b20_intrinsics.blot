@@ -1,0 +1,11 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const run = func (n: U32) => return do:
+  let filled = @array.fill 3 0
+  let generated = @array.generate 3 (func index => return index)
+  filled[1] := n
+  generated[2] := @u32.add self n
+  break @u32.add filled[1] generated[2]

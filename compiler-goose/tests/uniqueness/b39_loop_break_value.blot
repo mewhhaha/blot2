@@ -1,0 +1,15 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const run = func (n: U32) => return do:
+  let rows = #[0, 0, 0]
+  let kept = #[9]
+  for i in 0..3:
+    if @u32.eq i n:
+      kept := rows
+      break
+    rows[i] := n
+  rows[0] := n
+  break kept[0]

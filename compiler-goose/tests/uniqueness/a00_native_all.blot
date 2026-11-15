@@ -1,0 +1,85 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const keep = func (values: Array U32) => return values[0]
+const fresh = func (n: U32) => return do:
+  let rows = #[1, 2, 3]
+  rows[0] := n
+  rows[1] := @u32.add self n
+  break rows[0]
+const named = func (n: U32) => return do:
+  let rows = #[1, 2, 3]
+  let before = rows
+  rows[0] := n // aliased
+  break before[0]
+const captured = func (n: U32) => return do:
+  let rows = #[1, 2]
+  let read = func (i: U32) => return rows[i]
+  rows[0] := n // aliased
+  break read 0
+const passed = func (n: U32) => return do:
+  let rows = #[1, 2]
+  let first = keep rows
+  rows[0] := n // aliased
+  break first
+const constructed = func (n: U32) => return do:
+  let rows = #[1, 2]
+  let box = $Box rows
+  rows[0] := n // aliased
+  break box
+const parameter = func (rows: Array U32) => return do:
+  rows[0] := 1 // aliased
+  break rows
+const returned_early = func (flag: Bool) => return do:
+  let rows = #[1, 2]
+  if flag:
+    return rows
+  rows[0] := 3
+  break rows
+const sibling = func (flag: Bool) => return do:
+  let rows = #[1, 2]
+  let first = 0
+  if flag:
+    first := keep rows
+  else:
+    rows[0] := 3
+  break rows[0]
+const looped = func (n: U32) => return do:
+  let rows = #[0, 0, 0]
+  for i in 0..3:
+    rows[i] := n
+  break rows
+const looped_alias = func (n: U32) => return do:
+  let rows = #[0, 0, 0]
+  let total = 0
+  for i in 0..3:
+    rows[i] := n // aliased
+    total := keep rows
+  break total
+const iterated = func (n: U32) => return do:
+  let rows = #[1, 2, 3]
+  let total = 0
+  for value in rows:
+    total := @u32.add total value
+    rows[0] := n // aliased
+  break rows
+const element = func (n: U32) => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  grid[1][0] := n
+  let row = grid[0]
+  grid[0][1] := n // aliased
+  break row
+const shared_rows = func (n: U32) => return do:
+  let grid = @array.fill 2 #[0, 0]
+  grid[0][0] := n // aliased
+  grid[1] := #[n, n]
+  break grid
+const record_root = func (n: U32) => return do:
+  let counts = #[0, 0]
+  let world = { counts: counts, other: #[1] }
+  world.other[0] := n
+  world.counts[0] := n // aliased
+  break counts
+const nominal_root = func (n: U32) => return do:
+  let world = $World { counts: #[0, 0], other: #[1] }
+  world.counts[1] := n
+  break world

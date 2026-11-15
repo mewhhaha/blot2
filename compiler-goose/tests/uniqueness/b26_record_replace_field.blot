@@ -1,0 +1,12 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const run = func (n: U32) => return do:
+  let shared = #[0, 0]
+  let world = { counts: shared, other: #[1, 1] }
+  world.other[1] := n
+  world.counts := #[5, 5]
+  world.counts[0] := n
+  break @u32.add world.other[1] (@u32.add world.counts[0] shared[0])
