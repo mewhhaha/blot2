@@ -333,6 +333,11 @@ enum Error {
     missing_field,
     invalid_character,
     overflow,
+    syntax_error,
+    unexpected_token,
+    invalid_number,
+    invalid_enum_tag,
+    unexpected_end_of_input,
 }
 
 fn error_name(code: Error) -> const u8[:] {
@@ -668,6 +673,11 @@ fn error_name(code: Error) -> const u8[:] {
         missing_field => "MissingField",
         invalid_character => "InvalidCharacter",
         overflow => "Overflow",
+        syntax_error => "SyntaxError",
+        unexpected_token => "UnexpectedToken",
+        invalid_number => "InvalidNumber",
+        invalid_enum_tag => "InvalidEnumTag",
+        unexpected_end_of_input => "UnexpectedEndOfInput",
     }
 }
 

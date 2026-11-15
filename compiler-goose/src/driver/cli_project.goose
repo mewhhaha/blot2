@@ -56,13 +56,13 @@ struct ProjectStats {
  teardown_us:i64=0,
  phase_profile:blot_phase_profile::Record=blot_phase_profile::Record{..},
  memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},
- memory_scope:const u8[:]="Requested bytes for project source, syntax, symbols, typed core and compiler scratch; excludes allocator overhead and process RSS. All owners released before this record.",
+ memory_scope:const u8[:]="Requested bytes of the compiler's pooled owners; excludes arrays owned by a scope, pool capacity and process RSS. All owners released before this record.",
 }
 fn processProject(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,profile_requested:bool,output:Text,policy:Policy)->bool,Error {
  // --profile clocks every phase of this compilation until its record.
  var profile=blot_support::none<blot_phase_profile::Profile>();var installation=blot_support::none<blot_phase_profile::Installation>();if profile_requested {profile=blot_support::some(blot_phase_profile::initProfile());installation=blot_support::some(blot_phase_profile::install(profile.value));}
- let started=now();var stats=ProjectStats{filename:filename,stage:stageName(command),..};let accepted,error=projectLoad(writer,command,filename,options,output,policy,started,stats);
- var written=error;if error==blot_error::Error.none {stats.success=accepted;stats.total_us=elapsed(started);if profile.present {stats.phase_profile=profile.value.record();}written=emit(writer,stats);}
+ let meter=blot_runtime_memory::start();let started=now();var stats=ProjectStats{filename:filename,stage:stageName(command),..};let accepted,error=projectLoad(writer,command,filename,options,output,policy,started,stats);
+ var written=error;if error==blot_error::Error.none {stats.success=accepted;stats.total_us=elapsed(started);if profile.present {stats.phase_profile=profile.value.record();}stats.memory=meter.counts();written=emit(writer,stats);}
  if installation.present {installation.value.restore();}if profile.present {profile.value.deinit();}return accepted&&written==blot_error::Error.none,written;
 }
 fn projectLoad(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,output:Text,policy:Policy,started:u64,stats:ProjectStats&)->bool,Error {

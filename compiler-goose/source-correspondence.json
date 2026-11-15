@@ -19,18 +19,18 @@
   },
   {
    "zig": "compiler/src/assets/native_asset_readers.zig",
-   "goose": "compiler-goose/pending/backend/native_asset_readers.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/backend/native_asset_readers.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/assets/native_asset_wgsl.zig",
-   "goose": "compiler-goose/pending/backend/native_asset_wgsl.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/backend/native_asset_wgsl.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/assets/native_assets.zig",
-   "goose": "compiler-goose/pending/backend/native_assets.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/backend/native_assets.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/bench_declaration_demand.zig",
@@ -994,8 +994,8 @@
   },
   {
    "zig": "compiler/src/reuse/editor_completion.zig",
-   "goose": "compiler-goose/pending/reuse/editor_completion.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/editor_completion.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/entry_diagnostic_tests.zig",
@@ -1124,8 +1124,8 @@
   },
   {
    "zig": "compiler/src/reuse/revision_inputs.zig",
-   "goose": "compiler-goose/pending/reuse/revision_inputs.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/revision_inputs.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/source_input_tests.zig",
@@ -1139,8 +1139,8 @@
   },
   {
    "zig": "compiler/src/reuse/source_overlays.zig",
-   "goose": "compiler-goose/pending/reuse/source_overlays.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/source_overlays.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/specialization_origin_tests.zig",
@@ -1154,8 +1154,8 @@
   },
   {
    "zig": "compiler/src/reuse/zig_project_frames.zig",
-   "goose": "compiler-goose/pending/reuse/zig_project_frames.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/zig_project_frames.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/reuse/zig_project_frames_tests.zig",
@@ -1164,8 +1164,8 @@
   },
   {
    "zig": "compiler/src/reuse/zig_project_server.zig",
-   "goose": "compiler-goose/pending/reuse/zig_project_server.goose",
-   "state": "pending"
+   "goose": "compiler-goose/src/reuse/zig_project_server.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/structural.zig",

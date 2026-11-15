@@ -7,6 +7,17 @@ import support.json;
 import support.option;
 type Error=blot_error::Error;
 struct Counts {live_bytes:u64=0,peak_bytes:u64=0,allocated_bytes:u64=0,allocations:u64=0,complete:bool=false}
+// A command's counts are those of its pooled owners: the buffers the compiler
+// takes and releases by hand, as every allocation of the Zig compiler was.
+// An array that belongs to a scope is released with it and is not counted.
+struct Meter {allocated:u64=0,freed:u64=0,allocations:u64=0,observed:bool=false}
+fn start()->Meter {let coverage=blot_native::runtime_observation(0);if (coverage&1)==0 {return Meter{..};}blot_native::runtime_memory_mark();return Meter{allocated:blot_native::runtime_observation(8),freed:blot_native::runtime_observation(9),allocations:blot_native::runtime_observation(4),observed:true};}
+fn below(value:u64,base:u64)->u64 {if value<base {return 0;}return value-base;}
+// Call after the command's owners are released.
+fn counts(self_:Meter)->Counts {
+    if !self_.observed {return Counts{..};}blot_native::runtime_observation(0);let allocated=blot_native::runtime_observation(8);let freed=blot_native::runtime_observation(9);let base=below(self_.allocated,self_.freed);
+    return Counts{live_bytes:below(below(allocated,freed),base),peak_bytes:below(blot_native::runtime_observation(20),base),allocated_bytes:below(allocated,self_.allocated),allocations:below(blot_native::runtime_observation(4),self_.allocations),complete:true};
+}
 fn jsonStringify(receiver:Counts,writer:blot_json::Writer&)->Error {
     let coverage=blot_native::runtime_observation(0);
     writer.beginObject();if receiver.complete {writer.field("live_bytes",receiver.live_bytes);writer.field("peak_bytes",receiver.peak_bytes);writer.field("allocated_bytes",receiver.allocated_bytes);writer.field("allocations",receiver.allocations);}

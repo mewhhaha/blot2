@@ -20,6 +20,8 @@ typedef struct {
     uint64_t request, attempts, matching_attempts, refusals;
     uint64_t pool_allocations, pool_reallocations, pool_frees, pool_reuses;
     uint64_t pool_payload_allocated_bytes, pool_payload_freed_bytes;
+    /* Highest allocated minus freed since the last mark. */
+    uint64_t pool_payload_peak_bytes;
     uint64_t pool_capacity_growth_bytes;
     uint64_t region_reservations, region_releases;
     uint64_t region_reserved_bytes, region_reserved_peak_bytes;

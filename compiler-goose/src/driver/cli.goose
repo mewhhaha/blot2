@@ -17,6 +17,7 @@ import check.core_builder;
 import compile;
 import reuse.project;
 import reuse.dependency_cli;
+import reuse.zig_project_server;
 import runtime.memory;
 import support.error;
 import support.option;
@@ -74,8 +75,8 @@ struct Stats {
 }
 fn now()->u64 {return blot_native::clock_ns();}
 fn elapsed(start:u64)->i64 {let ended=now();if ended<start {return 0;}return ((ended-start)/1000) as i64;}
-struct SimpleRecord {kind:const u8[:]="compilation",filename:const u8[:],stage:const u8[:],success:bool,total_us:i64,stats:Stats,memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},memory_scope:const u8[:]="Requested bytes for source and compiler-owned buffers; excludes allocator overhead and process RSS. All owners released before this record."}
-fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text)->bool,Error {var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,..});return accepted,written;}
+struct SimpleRecord {kind:const u8[:]="compilation",filename:const u8[:],stage:const u8[:],success:bool,total_us:i64,stats:Stats,memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},memory_scope:const u8[:]="Requested bytes of the compiler's pooled owners; excludes arrays owned by a scope, pool capacity and process RSS. All owners released before this record."}
+fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text)->bool,Error {let meter=blot_runtime_memory::start();var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,memory:meter.counts(),..});return accepted,written;}
 fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&)->bool,Error {
  var input=blot_reuse_project::FileInputs{..};var source:u8[>..<]=[];let read=input.read(filename,33554432,source);if read!=blot_error::Error.none {return false,read;}stats.source_bytes=source.len;
  var names,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return false,error;}
@@ -105,6 +106,18 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
 fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}
 fn run(args:const Argument[:])->bool,Error {
  let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}
+ if args[1]=="serve-project" {
+  var policy=Policy{..};var at:i64=2;
+  while at<args.len {
+   if at+1>=args.len {return false,blot_error::Error.invalid_serve_arguments;}let value=args[at+1];
+   if args[at]=="--semantic-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.semantic_workers=workers;}
+   else if args[at]=="--frontend-workers" {let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.invalid_serve_arguments;}policy.frontend_workers=workers;}
+   else if args[at]=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {return false,error;}}
+   else {return false,blot_error::Error.invalid_serve_arguments;}
+   at+=2;
+  }
+  let error=blot_reuse_zig_project_server::run(blot_io::Reader{0},stdout,blot_main::configured_identity,policy);return error==blot_error::Error.none,error;
+ }
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
  if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
  let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.dependencies;

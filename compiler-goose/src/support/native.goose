@@ -67,6 +67,7 @@ extern fn last_errno()->i32="blot_last_errno";
 // Field zero freezes the optional observer snapshot and returns its coverage.
 // Other fields read that snapshot; absent native observation returns zero.
 extern fn runtime_observation(field:u32)->u64="blot_runtime_observation";
+extern fn runtime_memory_mark()="blot_runtime_memory_mark";
 
 // Opaque request transaction transport; all parsing/compilation stays Goose.
 extern fn request_start(max_request:u64,max_reply:u64,timeout_ms:u32)->i32="blot_request_start";

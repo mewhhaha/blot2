@@ -14,16 +14,16 @@ struct CompletionFailureReply {
 }
 fn completionFailure(writer:blot_io::Writer,opened:OpenProject&,request:Request,code:const u8[:],message:const u8[:],position:u32)->Error {
  assert(request.snapshot.present&&request.filename.present&&request.position.present);var end=min(message.len,1024);while end!=0&&end<message.len&&(message[end]&0xc0)==0x80 {end--;}
- return reply(writer,CompletionFailureReply{id:request.id,revision:opened.session.state().revisions,snapshot:request.snapshot.value,filename:request.filename.value,position:request.position.value,diagnostics:[Diagnostic{filename:request.filename.value,stage:"complete",code:code,start:position,end:position,message:message[..end],..}],..},[]);
+ return reply(writer,CompletionFailureReply{id:request.id,revision:opened.revisions,snapshot:request.snapshot.value,filename:request.filename.value,position:request.position.value,diagnostics:[Diagnostic{filename:request.filename.value,stage:"complete",code:code,start:position,end:position,message:message[..end],..}],..},[]);
 }
 struct CompletionReply {
  kind:const u8[:]="complete",id:u32,epoch:const u8[:]=epoch,revision:u64,snapshot:u32,filename:const u8[:],position:u32,success:bool=true,
  replace:blot_parse_ast::Span,context:blot_support::Option<blot_reuse_hole_diagnostics::Snapshot>,items:const blot_reuse_editor_completion::Item[:],truncated:bool,diagnostics:const blot_reuse_editor_completion::Diagnostic[:],
 }
 fn completionReply(opened:const OpenProject&,request:Request,result:const blot_reuse_editor_completion::Result&,item_count:i64,diagnostic_count:i64)->CompletionReply {
- return CompletionReply{id:request.id,revision:opened.session.state().revisions,snapshot:request.snapshot.value,filename:request.filename.value,position:request.position.value,replace:result.replace,context:result.context,items:result.items[..item_count],truncated:result.truncated,diagnostics:result.diagnostics[..diagnostic_count],..};
+ return CompletionReply{id:request.id,revision:opened.revisions,snapshot:request.snapshot.value,filename:request.filename.value,position:request.position.value,replace:result.replace,context:result.context,items:result.items[..item_count],truncated:result.truncated,diagnostics:result.diagnostics[..diagnostic_count],..};
 }
-fn complete<E>(executor:E&,writer:blot_io::Writer,opened:OpenProject&,request:Request,sources:const Source[:])->Error {
+fn complete(writer:blot_io::Writer,opened:OpenProject&,request:Request,sources:const Source[:])->Error {
  assert(request.snapshot.present&&request.filename.present&&request.position.present);if request.snapshot.value==0 {return completionFailure(writer,opened,request,"invalid_completion","Snapshot must be nonzero",0);}
  var assets:blot_backend_native_assets::Candidate?=null;
  if opened.assets.present {
@@ -31,7 +31,7 @@ fn complete<E>(executor:E&,writer:blot_io::Writer,opened:OpenProject&,request:Re
   if assets.issue.present {let __cleanup_result_4_0: Error = completionFailure(writer,opened,request,"completion_failed",assets.issue.value.message,0); {if assets {assets.deinit();}} return __cleanup_result_4_0;}
  }
  var merged:Source[>..]=[];let complete_sources=composeSources(sources,assets,merged);var snapshot,error=blot_reuse_revision_inputs::initWithSources(opened.options_owner.options(),complete_sources);if error!=blot_error::Error.none {if error==blot_error::Error.out_of_memory {let __cleanup_result_5_0: Error = error; {if assets {assets.deinit();}} return __cleanup_result_5_0;}if error==blot_error::Error.duplicate_source_path {let __cleanup_result_6_0: Error = completionFailure(writer,opened,request,"duplicate_source","Sources identify the same canonical file",0); {if assets {assets.deinit();}} return __cleanup_result_6_0;}if error==blot_error::Error.source_limit {let __cleanup_result_7_0: Error = completionFailure(writer,opened,request,"source_limit","Completion source acquisition limit",0); {if assets {assets.deinit();}} return __cleanup_result_7_0;}let __cleanup_result_8_0: Error = completionFailure(writer,opened,request,"completion_failed",blot_error::error_name(error),0); {if assets {assets.deinit();}} return __cleanup_result_8_0;}
- var result,error=blot_reuse_editor_completion::query(executor,opened.entry,snapshot,request.filename.value,request.position.value);if error!=blot_error::Error.none {
+ var executor=blot_reuse_project_check::SerialChecks{..};var result,error=blot_reuse_editor_completion::query(executor,opened.entry,snapshot,request.filename.value,request.position.value);if error!=blot_error::Error.none {
   if error==blot_error::Error.out_of_memory {let __cleanup_result_9_0: Error = error; {snapshot.deinit();} {if assets {assets.deinit();}} return __cleanup_result_9_0;}var position:u32=0;
   if error==blot_error::Error.invalid_position {let path,canonical_error=snapshot.canonical(request.filename.value);if canonical_error==blot_error::Error.none {let source=snapshot.capturedSource(path);if source.present {position=min(source.value.len,request.position.value as i64) as u32;while position!=0&&position!=source.value.len&&(source.value[position]&0xc0)==0x80 {position--;}}}}
   var code:const u8[:]="completion_failed";if error==blot_error::Error.invalid_position {code="invalid_position";}else if error==blot_error::Error.invalid_completion {code="invalid_completion";}else if error==blot_error::Error.missing_source {code="missing_source";}else if error==blot_error::Error.source_limit {code="source_limit";}

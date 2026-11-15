@@ -488,6 +488,14 @@ int32_t blot_last_errno(void) { return errno; }
 #if defined(__GNUC__) || defined(__clang__)
 extern uint64_t blot_allocation_observer_value(uint32_t field) __attribute__((weak));
 #endif
+#if defined(__GNUC__) || defined(__clang__)
+extern void blot_allocation_observer_mark(void) __attribute__((weak));
+#endif
+void blot_runtime_memory_mark(void) {
+#if defined(__GNUC__) || defined(__clang__)
+    if (blot_allocation_observer_mark) blot_allocation_observer_mark();
+#endif
+}
 uint64_t blot_runtime_observation(uint32_t field) {
 #if defined(__GNUC__) || defined(__clang__)
     if (blot_allocation_observer_value) return blot_allocation_observer_value(field);

@@ -30,6 +30,12 @@ static void refusal(int kind, uint64_t bytes) {
     _Exit(125);
 }
 
+static void grown(void) {
+    uint64_t live = stats.pool_payload_allocated_bytes - stats.pool_payload_freed_bytes;
+    if (stats.pool_payload_allocated_bytes >= stats.pool_payload_freed_bytes &&
+        live > stats.pool_payload_peak_bytes) stats.pool_payload_peak_bytes = live;
+}
+
 static void event(int kind, uint64_t owner, uint64_t old_bytes,
                   uint64_t new_bytes, uint64_t capacity) {
     (void)owner;
@@ -37,12 +43,14 @@ static void event(int kind, uint64_t owner, uint64_t old_bytes,
         case BLOT_OBS_POOL_ALLOC:
             stats.pool_allocations++;
             stats.pool_payload_allocated_bytes += new_bytes;
+            grown();
             break;
         case BLOT_OBS_POOL_REALLOC:
             stats.pool_reallocations++;
-            if (new_bytes > old_bytes)
+            if (new_bytes > old_bytes) {
                 stats.pool_payload_allocated_bytes += new_bytes - old_bytes;
-            else
+                grown();
+            } else
                 stats.pool_payload_freed_bytes += old_bytes - new_bytes;
             break;
         case BLOT_OBS_POOL_FREE:
@@ -100,6 +108,12 @@ void blot_allocation_observer_begin(uint64_t request, uint64_t fail_at, int fail
     selected_kind = fail_kind;
 }
 
+/* The peak restarts at the payload live now. */
+void blot_allocation_observer_mark(void) {
+    stats.pool_payload_peak_bytes = 0;
+    grown();
+}
+
 const blot_allocation_stats *blot_allocation_observer_stats(void) {
     return &stats;
 }
@@ -130,6 +144,7 @@ uint64_t blot_allocation_observer_value(uint32_t field) {
         case 17: return snapshot.registry_allocated_bytes;
         case 18: return snapshot.matching_attempts;
         case 19: return snapshot.failure_kind;
+        case 20: return snapshot.pool_payload_peak_bytes;
         default: abort();
     }
 }
