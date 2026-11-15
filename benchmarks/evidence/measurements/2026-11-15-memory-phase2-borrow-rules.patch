@@ -1,0 +1,172 @@
+diff --git a/compiler/src/check/uniqueness.zig b/compiler/src/check/uniqueness.zig
+index 6e96e29..cbf43ef 100644
+--- a/compiler/src/check/uniqueness.zig
++++ b/compiler/src/check/uniqueness.zig
+@@ -21,6 +21,8 @@ const storage_types = @import("storage_types.zig");
+ const storage_ops = @import("storage_ops.zig");
+ const body_recipe = @import("body_recipe.zig");
+ const Allocator = std.mem.Allocator;
++/// Measurement only. 1: stores and pushes are not escapes, and function values and call results of variable type are not borrowed. 2: also, type variables hold no array. 3: also, a return is an escape only when its type owns an array.
++const experiment: u8 = 3;
+ 
+ /// `none`: something else in this function may observe it. `shell`: its own
+ /// storage is unique (through record fields too), but storage held by its
+@@ -93,6 +95,7 @@ const Analyzer = struct {
+     records: std.ArrayList(Record) = .empty,
+     entries: std.ArrayList(Entry) = .empty,
+     holds_cache: std.AutoHashMapUnmanaged(T.Id, bool) = .empty,
++    owns_cache: std.AutoHashMapUnmanaged(T.Id, bool) = .empty,
+     nominal_index: std.AutoHashMapUnmanaged(T.NominalIdentity, u32) = .empty,
+     expanding: std.ArrayList(Expansion) = .empty,
+     loops: std.ArrayList(LoopFrame) = .empty,
+@@ -111,6 +114,7 @@ const Analyzer = struct {
+         self.records.deinit(a);
+         self.entries.deinit(a);
+         self.holds_cache.deinit(a);
++        self.owns_cache.deinit(a);
+         self.nominal_index.deinit(a);
+         self.expanding.deinit(a);
+         self.loops.deinit(a);
+@@ -164,11 +168,14 @@ const Analyzer = struct {
+     /// A parameter or capture: its storage is lent by the caller.
+     fn lent(self: *Analyzer, binding: core.BindingId) Error!void {
+         if (!self.local(binding)) return;
+-        try self.set(binding, if (try self.holds(self.m.binding(binding).ty)) borrowed else none);
++        const ty = self.m.binding(binding).ty;
++        if (experiment >= 1 and ty != 0 and ty < self.m.types.nodes.len and self.m.types.node(ty).tag == .function) return self.set(binding, none);
++        try self.set(binding, if (try self.holds(ty)) borrowed else none);
+     }
+     /// A function's result is owned by its caller, so it may not hold
+     /// storage the function only borrowed.
+     fn returned(self: *Analyzer, id: core.Id, value: Value) Error!void {
++        if (experiment >= 3 and !try self.owns(self.m.typeOf(id))) return;
+         if (self.containsBorrowed(try self.carried(value))) try self.reject(id, .borrowed_escape);
+     }
+     /// The fact of a call's result, which the caller owns.
+@@ -306,6 +313,7 @@ const Analyzer = struct {
+         const n = self.m.types.node(ty);
+         switch (n.tag) {
+             .unit, .boolean, .u32, .f32, .never => return false,
++            .variable => return experiment < 2,
+             .array, .list, .cursor, .function => return true,
+             .product => {
+                 for (self.m.types.list(.{ .start = n.a, .len = n.b })) |item| if (try self.holdsIn(item, variables, arguments, depth + 1)) return true;
+@@ -342,6 +350,64 @@ const Analyzer = struct {
+             else => return true,
+         }
+     }
++    /// Whether a value of `ty` can hold an array it owns: views, references,
++    /// links and functions only borrow.
++    fn owns(self: *Analyzer, ty: T.Id) Error!bool {
++        if (self.owns_cache.get(ty)) |known| return known;
++        const result = try self.ownsIn(ty, &.{}, &.{}, 0);
++        try self.owns_cache.put(self.allocator, ty, result);
++        return result;
++    }
++    fn ownsIn(self: *Analyzer, ty: T.Id, variables: []const T.Id, arguments: []const bool, depth: usize) Error!bool {
++        switch (ty) {
++            T.unit, T.boolean, T.u32_type, T.f32_type, T.never => return false,
++            else => {},
++        }
++        if (depth > 64 or ty >= self.m.types.nodes.len) return true;
++        for (variables, arguments) |variable, argument| if (variable == ty) return argument;
++        if (variables.len == 0) if (self.owns_cache.get(ty)) |known| return known;
++        const n = self.m.types.node(ty);
++        switch (n.tag) {
++            .unit, .boolean, .u32, .f32, .never => return false,
++            .variable => return false,
++            .array, .list => return true,
++            .cursor, .function => return false,
++            .product => {
++                for (self.m.types.list(.{ .start = n.a, .len = n.b })) |item| if (try self.ownsIn(item, variables, arguments, depth + 1)) return true;
++                return false;
++            },
++            .record => {
++                for (0..n.b) |index| if (try self.ownsIn(self.m.types.recordField(n, index).ty, variables, arguments, depth + 1)) return true;
++                return false;
++            },
++            .nominal => {
++                if (storage_types.identity(n.a, n.b)) |kind| return kind == .grow or kind == .resize;
++                if (n.a == std.math.maxInt(u32)) return true;
++                const identity: T.NominalIdentity = .{ .unit = n.a, .decl = n.b };
++                const index = try self.nominalIndex(identity) orelse return true;
++                const nominal = self.m.nominal(index);
++                if (nominal.is_opaque) return true;
++                const own = self.m.types.list(nominal.variables);
++                const given = self.m.types.nominalArguments(n);
++                if (own.len != given.len or own.len > 16) return true;
++                var bits: [16]bool = undefined;
++                for (given, 0..) |argument, at| bits[at] = try self.ownsIn(argument, variables, arguments, depth + 1);
++                // A recursive occurrence at the same arguments adds no storage
++                // its first expansion lacks; one at other arguments might.
++                for (self.expanding.items) |outer| if (outer.identity.unit == identity.unit and outer.identity.decl == identity.decl) {
++                    return !std.mem.eql(bool, outer.arguments[0..outer.len], bits[0..own.len]);
++                };
++                try self.expanding.append(self.allocator, .{ .identity = identity, .arguments = bits, .len = own.len });
++                defer _ = self.expanding.pop();
++                for (self.m.nominalConstructors(index)) |constructor| {
++                    const payload = self.m.constructor(constructor).payload;
++                    if (payload != 0 and try self.ownsIn(payload, own, bits[0..own.len], depth + 1)) return true;
++                }
++                return false;
++            },
++            else => return true,
++        }
++    }
+     fn nominalIndex(self: *Analyzer, identity: T.NominalIdentity) Error!?u32 {
+         if (self.nominal_index.count() == 0) {
+             for (self.m.nominals, 0..) |nominal, index| try self.nominal_index.put(self.allocator, nominal.identity, @intCast(index));
+@@ -482,7 +548,7 @@ const Analyzer = struct {
+                 const fact = try self.carried(result);
+                 try self.escape(result);
+                 if (self.function_roots.items.len != 0 and n.b == self.function_roots.items[self.function_roots.items.len - 1]) {
+-                    if (self.containsBorrowed(fact)) try self.reject(id, .borrowed_escape);
++                    if (self.containsBorrowed(fact) and (experiment < 3 or try self.owns(self.m.typeOf(n.a)))) try self.reject(id, .borrowed_escape);
+                     return .{ .exits = true };
+                 }
+                 var at = self.blocks.items.len;
+@@ -529,7 +595,7 @@ const Analyzer = struct {
+                 try self.returned(info.body, result);
+                 _ = self.function_roots.pop();
+                 self.undo(mark);
+-                return .{ .fact = fact };
++                return .{ .fact = if (experiment >= 1) none else fact };
+             },
+             .project => {
+                 if (try self.memberCopy(id)) |fact| {
+@@ -614,7 +680,7 @@ const Analyzer = struct {
+             if (self.containsBorrowed(try self.carried(value))) fact = borrowed;
+             try self.escape(value);
+         }
+-        if (holder) return .{ .fact = fact, .exits = exits };
++        if (holder) return .{ .fact = if (experiment >= 1) none else fact, .exits = exits };
+         return .{ .fact = try self.owned(n.ty), .exits = exits };
+     }
+     fn apply(self: *Analyzer, id: core.Id) Error!Value {
+@@ -629,7 +695,7 @@ const Analyzer = struct {
+         const fact: Fact = if (self.containsBorrowed(try self.carried(callee)) or self.containsBorrowed(try self.carried(argument))) borrowed else none;
+         try self.escape(callee);
+         try self.escape(argument);
+-        return .{ .fact = if (operation) try self.owned(n.ty) else fact, .exits = exits };
++        return .{ .fact = if (operation) try self.owned(n.ty) else if (experiment >= 1) none else fact, .exits = exits };
+     }
+     fn functionType(self: *const Analyzer, ty: T.Id) bool {
+         if (ty == 0 or ty >= self.m.types.nodes.len) return false;
+@@ -700,7 +766,7 @@ const Analyzer = struct {
+         const lends = leaf_holds and self.containsBorrowed(replacement);
+         if (info.store) {
+             // Storage outlives the call, so it may not keep lent storage.
+-            if (lends) try self.reject(id, .borrowed_escape);
++            if (lends and experiment == 0) try self.reject(id, .borrowed_escape);
+             if (shared) try self.sharedInto(info.root, selectors);
+             return .{};
+         }
+@@ -825,7 +891,7 @@ const Analyzer = struct {
+                 const fact = try self.carried(value);
+                 try self.escape(value);
+                 if (try self.elementHolds(self.m.typeOf(children[0]))) {
+-                    if (self.containsBorrowed(fact)) try self.reject(id, .borrowed_escape);
++                    if (self.containsBorrowed(fact) and experiment == 0) try self.reject(id, .borrowed_escape);
+                     if (fact != deep) try self.sharedInto(children[0], &.{});
+                 }
+                 return .{ .exits = container.exits or value.exits };

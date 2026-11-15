@@ -42,16 +42,20 @@ compiles".
 
 ## In progress
 
-- **Memory model phase 2** (`own` and borrowed parameters) is unfinished on
-  branch `wip/memory-phase2-own` (0afccb55).
-  - It adds a `borrowed` fact and `borrowed_escape` to the uniqueness pass.
-  - The guest suite has 585 failures with it: the borrowed rules reject
-    code that std, the prelude or the tests rely on, or have a bug. Find out
-    which before going on.
-  - The brief is the phase 2 list in tasks/MEMORY_MODEL.md and spec section
-    10.3. Measure the new errors in std, Ink and Gdev before migrating
-    anything. If the rewrite is large, report the counts and examples to the
-    owner first.
+- **Memory model phase 2** (`own` and borrowed parameters) is measured and
+  waits for the owner. Nothing is migrated, and main has none of it. The
+  unfinished pass is on branch `wip/memory-phase2-own` (0afccb55).
+  - Its 585 guest failures come from the breadth of its rules: it rejects
+    the prelude (`identity`, `Maybe.map`, `Array.at`), which every case
+    compiles. It also has one bug, in shallow copies.
+  - As written (spec section 10.3) the rules reject 352 places in the Gdev
+    build and 350 in Ink's tests. With two rules narrowed they reject 44
+    and 27.
+  - tasks/MEMORY_MODEL.md, "Phase 2: what the borrowed rules reject", has
+    the counts, the two recommended rule changes, what the pass still
+    needs, and the order of work. Spec Annex B item 13 points to it.
+  - **The owner decides:** the two rule changes, and whether `own` in
+    function types waits for the B3 and C8 removals.
 - **Checker speed.** A release (LLVM) compiler builds Gdev Main in 1.59 s
   with one frontend worker, of which checking is 1.09 s (lower 0.15, backend
   0.11, lex 0.06, parse 0.04).

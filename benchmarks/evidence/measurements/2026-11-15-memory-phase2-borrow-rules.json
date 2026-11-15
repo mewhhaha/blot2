@@ -1,0 +1,72 @@
+{
+  "date": "2026-11-15",
+  "subject": "Memory model phase 2: what each borrowed-parameter rule rejects in std, Ink and Gdev",
+  "compilers": {
+    "main": "blot2 6ad5fbb, zig build install -Doptimize=safe -Dllvm=false",
+    "wip": "wip/memory-phase2-own 0afccb55 on top of 6ad5fbb, same build",
+    "variants": "wip plus 2026-11-15-memory-phase2-borrow-rules.patch with `experiment` set to 1, 2 or 3"
+  },
+  "sources": {
+    "std": "blot2 6ad5fbb",
+    "ink": "../ink 44ec97e",
+    "gdev": "../gdev 6aa6350"
+  },
+  "commands": {
+    "gdev": "(in ../gdev) blotc migrate-stores src/main.blot --project pen.json --dry-run --include-std",
+    "ink_tests": "(in ../ink) blotc migrate-stores <the 62 files of pen.json's tests.files outside tests/rejected> --project pen.json --dry-run --include-std",
+    "guest_suite": "deno test -A --parallel tests/guest tests/host -- <blotc>"
+  },
+  "counting": "Distinct (file, span, code) diagnostics from the lowering stage. Every one is borrowed_escape, except one aliased_update in ink/tests/next-improvements.blot:177 that the wip and all variants add.",
+  "variants": {
+    "wip": "The branch as written: every parameter, capture and constant that can hold storage is borrowed; a type variable can hold storage; a call whose result type is a function or a type variable is borrowed when an argument is.",
+    "1": "A store (`=`) or push of a borrowed value is not an escape. A function value is never borrowed, a closure is not borrowed for what it captures, and a call result of function or variable type is not borrowed.",
+    "2": "Variant 1, and a type variable holds no array inside a generic body.",
+    "3": "Variant 2, and a return is an escape only when the returned type owns an array: Array, GrowArray, ResizeArray, a list, an opaque type, or data that holds one. Views, references, links and functions only borrow."
+  },
+  "gdev_main_closure": {
+    "main": { "total": 0 },
+    "wip": { "total": 352, "std": 55, "ink_lib": 170, "gdev_src": 127, "files": 69 },
+    "1": { "total": 187, "std": 37, "ink_lib": 93, "gdev_src": 57, "files": 46 },
+    "2": { "total": 130, "std": 4, "ink_lib": 81, "gdev_src": 45, "files": 41 },
+    "3": { "total": 44, "std": 1, "ink_lib": 26, "gdev_src": 17, "files": 20 }
+  },
+  "ink_tests_closure": {
+    "main": { "total": 0 },
+    "wip": { "total": 350, "std": 55, "ink_lib": 232, "ink_tests": 63, "files": 76 },
+    "1": { "total": 152, "std": 37, "ink_lib": 108, "ink_tests": 7, "files": 43 },
+    "2": { "total": 88, "std": 4, "ink_lib": 79, "ink_tests": 5, "files": 30 },
+    "3": { "total": 27, "std": 1, "ink_lib": 24, "ink_tests": 2, "files": 12 }
+  },
+  "guest_suite": {
+    "main": { "passed": 1054, "failed": 0, "ignored": 101 },
+    "wip": {
+      "passed": 469,
+      "failed": 585,
+      "ignored": 101,
+      "diagnostics_printed": 14687,
+      "in_std_prelude": 14028,
+      "in_test_programs": 338
+    },
+    "3": {
+      "passed": 979,
+      "failed": 75,
+      "ignored": 101,
+      "diagnostics_printed": 108,
+      "in_std_iter": 70,
+      "in_std_list": 8,
+      "in_std_simd": 6,
+      "in_test_programs": 24,
+      "failing_test_files": 39
+    }
+  },
+  "variant_3_sites_in_gdev_main_closure": {
+    "records_of_array_handles_built_from_or_read_out_of_parameters": 19,
+    "a_parameter_that_owns_an_array_returned_changed_or_unchanged": 18,
+    "a_constant_array_returned": 6,
+    "std_simd_store_returns_the_storage_it_wrote": 1
+  },
+  "notes": [
+    "Variants 1 to 3 only measure. They add no `own` syntax, no check at call sites and no check that a returned value is unique in itself, so they are not a sound rule set as built.",
+    "The measured numbers are the first layer: marking a parameter `own` moves the obligation to its callers."
+  ]
+}

@@ -71,7 +71,9 @@ full gate green, and moves std, ../ink and ../gdev itself.
    below. It also landed the `=` store and `blotc migrate-stores`, which
    turned 1,880 `:=` in Ink and 3,011 in Gdev into `=`. `=` stays until
    phase 3.
-2. **`own` and borrowed parameters.**
+2. **`own` and borrowed parameters.** Measured, not built: "Phase 2: what
+   the borrowed rules reject" below has the counts, the recommended rules
+   and what is still open.
    - In the checker: `own` in function types, spent names, owned call
      results, borrowed parameters not updatable or returnable, ownership
      returning at a holder's last use, and the generic-read rule.
@@ -119,6 +121,131 @@ full gate green, and moves std, ../ink and ../gdev itself.
   store until phase 3.
 - **Transitional:** the `=` statement (`store_stmt`, `UpdateInfo.store`) and
   `blotc migrate-stores`.
+
+## Phase 2: what the borrowed rules reject (15 November 2026)
+
+`wip/memory-phase2-own` (0afccb55) fails 585 guest cases. The cause is the
+breadth of its rules, with one bug beside it. Nothing is migrated yet.
+[The record](../benchmarks/evidence/measurements/2026-11-15-memory-phase2-borrow-rules.json)
+has the commands and every count, and the patch next to it rebuilds the
+variants.
+
+**Cause.** Every failing case fails with `borrowed_escape`, and 14,028 of
+the 14,687 diagnostics the suite prints are in std/prelude.blot, which each
+case compiles. The branch rejects the prelude for three reasons:
+
+- It treats a type variable as an array. That rejects `identity`, `min`,
+  `max`, `Maybe.unwrap_or` and every other generic function that returns a
+  parameter. This is the generic-read rule of spec section 10.3 as written.
+- It treats a call result of function or variable type as borrowed when an
+  argument is, because the call may be a partial application. That rejects
+  `apply`, `compose`, `Maybe.map`, `array.map` and each `with_…` function
+  that ends in `return consume (…)`.
+- It rejects a `=` store or a push of a borrowed value, which is what the
+  transitional `=` exists to do.
+
+**The bug.** A shallow copy of a borrowed array whose elements hold storage
+gets the one fact `borrowed`, so the copy's own storage is not unique. The
+branch therefore rejects `moved[0].position := …` after
+`let moved = @storage.copy sources` (ink/tests/next-improvements.blot:177),
+which phase 1 accepts. The copy needs "unique storage, borrowed elements".
+
+**Counts.** Distinct rejected sites when the rules are narrowed one step at
+a time:
+
+| Rules | Gdev Main build | Ink's tests build | Guest cases failing |
+| --- | ---: | ---: | ---: |
+| The branch | 352 | 350 | 585 |
+| 1. Stores, function values and variable-typed call results are not escapes | 187 | 152 | |
+| 2. Also, a type variable holds no array inside a generic body | 130 | 88 | |
+| 3. Also, a return is an escape only when its type owns an array | 44 | 27 | 75 |
+
+Both builds include std and the Ink modules they import. Under rule set 3
+the Gdev build has 1 site in std, 26 in ink/lib and 17 in gdev/src:
+
+- 19 build a record of array handles from parameters, or read one out
+  (`func access state -> text -> asked => return $Access {state, text, asked}`,
+  Ink's `$Scene`, `$Index` and `$Geometry`).
+- 18 return a parameter that owns an array, changed or not
+  (`ground.cells := …` then `return ground` in gdev/src/world/trails.blot).
+- 6 return a constant array (`kind_name` in ink/lib/pen/semantic.blot).
+- 1 is std's `simd.store`, which returns the storage it wrote.
+
+The 75 failing guest cases are in 39 files. 84 of their 108 diagnostics are
+in std/iter, std/list and std/simd; the first two are on the removal list
+(round 2, item 11 and E6).
+
+### Recommended rules (the owner has not seen these)
+
+Rule set 3 is the implementer's recommendation. It keeps what section 10.3
+is for: a call result that owns an array is unique, so `:=` on it is in
+place. It changes two of that section's rules and adds one for the
+transition.
+
+1. **A result may borrow through a view, a reference or a function.** The
+   spec says a function may not return "anything that holds" a borrowed
+   parameter. Recommended instead:
+   - A type *owns* an array when it is `Array`, `GrowArray` or
+     `ResizeArray`, or data that holds one. A view (`&[a]`), a reference
+     (`&a`), a link and a function only *borrow*.
+   - A function may return borrowed storage in a part of the result whose
+     type borrows. It may not return it in a part whose type owns.
+   - At a call, a result whose type has a borrowing part holds the call's
+     arguments, like a closure that captured them. Every other result is
+     unique.
+
+   Each side reads only the signature. It keeps `line_of (text: &[U32])`
+   returning `$Line { text, caret }`, a closure that captures a parameter,
+   and a partial application, which is why the branch's second rule is not
+   needed.
+2. **The generic-read rule is checked where the type variable gets its
+   type.** The spec rejects the generic function. Recommended instead: when
+   a type variable occurs in the result and, as data, in a borrowed
+   parameter, each call must give it a type that owns no array. Inside the
+   body such a variable is plain data. `identity`, `min` and `Array.at` stay
+   as they are, `identity rows` on an `Array U32` is the error, and
+   `func identity (value: own a): a` lifts it. A variable under a function
+   type in the parameter does not count, so `array.map` may still build an
+   array of arrays.
+3. **Until phase 3, a `=` store and a push are not escapes.** They write
+   where aliases see it, which is their meaning, and both go in phase 3.
+
+### What the finished pass still needs
+
+The branch and the variants leave these open:
+
+- **A returned value must be unique in itself.** The branch only rejects
+  borrowed storage. It accepts `return {left: rows, right: rows}`, and the
+  caller then updates `left` in place and sees it in `right`. A result that
+  owns an array must be unique at the `return`. That needs the next item,
+  or `let before = rows` rejects `return rows`.
+- **Ownership returns at a holder's last use** (rule 3). Not started. Facts
+  need to know which names hold a value, not only that some other name
+  does.
+- **`own`.** Not started: the syntax, `own` in function types, the
+  argument that must be owned, and the spent name.
+- **`own` and depth.** An `own` parameter is unique all the way down only
+  when the argument was. Either the call requires that, or the callee may
+  update only the outer array in place.
+- **The call-site check of recommendation 2** needs the callee's scheme at
+  each call, including calls into other modules. Core keeps the callee's
+  type at the call (`CallInfo.callee_type`) and names a binding of another
+  module by unit and number, so the pass must be handed that binding's
+  scheme. The checker has it (`check.Binding.scheme`).
+- **In-place append** on a non-owned array (above).
+
+### Order of work
+
+`own` in function types touches about 200 places that build a function type
+and 200 that inspect one, in check.zig, the package, staging, usage and
+proof modules, and the dependency format. Sections B3 and C8 of
+tasks/LANGUAGE_COHERENCE.md remove most of those modules. Doing those
+removals first means `own` is written once, in a smaller checker.
+
+A smaller first step is possible without it: `own` on the parameters of
+named functions only, recorded per binding and called directly. That covers
+all 44 sites. A lambda with an `own` parameter, which `State.modify` needs,
+waits for `own` in types.
 
 ## Measured scope before phase 1
 

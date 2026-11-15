@@ -1062,6 +1062,16 @@ unnecessary.
     in a `use`. That makes `return call ()` and `=> call ()` errors for a
     call with effects; allowing those two would save a line each. `use call`
     discards a result of any type, as it does today.
+13. **What a result may borrow.** Section 10.3 forbids returning anything
+    that holds a borrowed parameter, and rejects a generic function that
+    reads a type variable out of one. Measured on 15 November 2026, those
+    two rules reject 352 places in the Gdev build, the prelude's `identity`
+    and `Maybe.map` among them. The implementer recommends two changes,
+    which leave 44: a view, a reference or a function in a result may borrow
+    from the arguments, and the generic rule is checked at each call, on
+    the type the variable gets.
+    [The memory model](../../tasks/MEMORY_MODEL.md) has the rules and the
+    counts under "Phase 2". The owner has not seen them.
 
 ## Annex C. Considered and declined
 
