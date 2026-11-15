@@ -516,6 +516,11 @@ fn finish(self_:Tables&,owner:blot_reuse_dependency_payload::Owner&,body_lowerin
  let request_arms,error=blot_reuse_dependency_payload::copy<blot_check_core::RequestArm>(owner,self_.request_arms[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.request_arms=request_arms;
  let tag_calls,error=blot_reuse_dependency_payload::copy<blot_check_core::Id>(owner,self_.tag_calls[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.tag_calls=tag_calls;
  let nodes,error=blot_reuse_dependency_payload::copy<blot_check_core::Node>(owner,self_.nodes[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.nodes=nodes;
+ // A pack node without a selected dictionary has its payload as its only
+ // child. `children` returns a slice of this table, where Zig points at the
+ // node's own field.
+ var packages=false;for node in nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}
+ if packages {let run,error=blot_reuse_dependency_payload::alloc<u32>(owner,nodes.len);if error!=blot_error::Error.none {return default<Module>(),error;}for node,index in nodes {run[index]=node.a;}result.package_payloads=run;}
  let spans,error=blot_reuse_dependency_payload::copy<blot_check_core::Span>(owner,self_.spans[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.spans=spans;
  let extra,error=blot_reuse_dependency_payload::copy<blot_check_core::Id>(owner,self_.extra[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.extra=extra;
  let type_nodes,error=blot_reuse_dependency_payload::copy<blot_check_types::Node>(owner,self_.type_nodes[..]);if error!=blot_error::Error.none {return default<Module>(),error;}result.types.nodes=type_nodes;

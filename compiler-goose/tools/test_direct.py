@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Check the Goose port of the direct backend against the Zig source.
+"""Check the direct backend's laws against the recorded bytes.
 
-Each law is a pair in compiler-goose/tests/direct: NAME.goose prints bytes as
-hex, and NAME_reference.zig prints what compiler/src/direct produces for the
-same input. The outputs must be equal, and Goose must not warn.
+Each law in compiler-goose/tests/direct is NAME.goose, which prints bytes as
+hex, beside NAME.expected, the bytes the Zig source of the direct backend
+produced for the same input on 15 November 2026, the day it was removed. The
+output must equal the record, and Goose must not warn.
 
-Usage: python3 compiler-goose/tools/test_direct.py [NAME ...]
+Usage: python3 compiler-goose/tools/test_direct.py [--goose EXE] [--stdlib DIR] [NAME ...]
 """
 import argparse
 from pathlib import Path
@@ -17,6 +18,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY = ROOT.parent
 LAWS = ROOT / "tests/direct"
+GOOSE = REPOSITORY / "build/goose-port/upstream-d5ae5bb"
 
 
 def run(command, cwd):
@@ -27,24 +29,18 @@ def run(command, cwd):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*")
-    parser.add_argument("--goose", type=Path, default=REPOSITORY / "build/goose-upstream/build/goose")
-    parser.add_argument("--stdlib", type=Path, default=REPOSITORY / "build/goose-upstream/stdlib")
+    parser.add_argument("--goose", type=Path, default=GOOSE / "build-precision/goose")
+    parser.add_argument("--stdlib", type=Path, default=GOOSE / "source-precision/stdlib")
     args = parser.parse_args()
     names = args.names or sorted(path.stem for path in LAWS.glob("*.goose"))
     failed = False
     for name in names:
+        expected = (LAWS / f"{name}.expected").read_text().strip()
         with tempfile.TemporaryDirectory(prefix="blot-direct-") as scratch:
-            scratch = Path(scratch)
-            # The Zig side: the reference beside a copy of the direct backend.
-            zig = scratch / "zig"
-            shutil.copytree(REPOSITORY / "compiler/src/direct", zig)
-            shutil.copy(LAWS / f"{name}_reference.zig", zig / "reference.zig")
-            expected, _ = run(["zig", "run", "reference.zig"], zig)
-            # The Goose side: the law as main.goose beside the port's sources.
-            goose = scratch / "goose"
-            goose.mkdir()
+            # The law as main.goose beside the compiler's sources.
+            goose = Path(scratch)
             for part in ("direct", "support"):
                 (goose / part).symlink_to(ROOT / "src" / part)
             shutil.copy(LAWS / f"{name}.goose", goose / "main.goose")
