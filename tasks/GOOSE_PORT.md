@@ -52,6 +52,12 @@ In this order, so an executable keeps working throughout:
 1. **Port the direct backend** (compiler/src/direct/ and compile.zig,
    6,487 lines) into compiler-goose/src/direct/, beside the scoped
    backend: writer, types, runtime, emit, function, direct.
+   - Done: writer (382 lines of Zig). `python3 compiler-goose/tools/test_direct.py`
+     runs each law in compiler-goose/tests/direct against the Zig source
+     and requires equal bytes; the writer's module of 352 bytes, which
+     uses every section, is identical.
+   - Not started: types (584), runtime (817), emit (674), function
+     (3,875), direct (121), compile (34).
 2. **Bring the frontend up to date.** Outside the backends the Zig source
    changed little since 44ee94f4:
    - the parser's `store_stmt` and `place`;
