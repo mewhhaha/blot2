@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const compiler = resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc");
+const compiler = resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose");
 const std = resolve(Deno.args[1] ?? "std");
 const output = resolve(Deno.args[2] ?? "build/tmp/runtime-costs");
 const source = fileURLToPath(

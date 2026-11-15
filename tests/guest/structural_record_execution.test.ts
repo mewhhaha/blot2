@@ -168,7 +168,7 @@ Deno.test("structural record contracts survive imports, dependency relocation an
   const library = `${directory}/record.blot`;
   const bundle = `${directory}/records.blotdep`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
   const declaration = `
 type Point = { z: U32, a: F32 }
 type Merge [a, b, c] is contract = { merge a b c }

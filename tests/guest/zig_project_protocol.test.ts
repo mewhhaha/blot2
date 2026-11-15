@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const executable = resolve(
   Deno.args[0] ??
-    fileURLToPath(new URL("../../compiler/zig-out/bin/blotc", import.meta.url)),
+    fileURLToPath(new URL("../../compiler-goose/build/blotc-goose", import.meta.url)),
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });

@@ -34,7 +34,7 @@ entry const last = array.fold_left add 0 (array.push 6 (array.slice 1 2 numbers)
 `,
     );
     const compiler = Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
     const output = `${dir}/main.wasm`;
     const result = await new Deno.Command(compiler, {
       args: [

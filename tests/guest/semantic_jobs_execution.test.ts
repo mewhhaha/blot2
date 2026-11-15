@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const source = (seed: number) => `
 const a = func value => return @u32.add value ${seed}
 const b = func value => return @u32.add value 2

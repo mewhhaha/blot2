@@ -9,9 +9,8 @@ rewrite scope.
 
 - [compiler-goose/](../compiler-goose/README.md) is the compiler, written in
   Goose: it parses, checks, lowers to Core, serves projects and emits
-  WebAssembly. [tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md) has its state.
-- [compiler/](../compiler/README.md) is the Zig compiler it was ported from.
-  It is deprecated and still the one the scripts and CI run.
+  WebAssembly. It was ported from a Zig compiler that was removed on 15
+  November 2026; [tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md) has the record.
 - [host/](../host/README.md) contains Deno clients and tools, including the
   formatter, CLI, package manager, editor integration and guest ABI runtime.
 - [tests/guest](../tests/guest) exercises compiled guest behavior;
@@ -31,7 +30,9 @@ rewrite scope.
   once the approved language changes land.
 - [Compiler](compiler/ARCHITECTURE.md): architecture, ownership and
   implementation contracts. [Compiler status](compiler/STATUS.md) tracks current
-  design state.
+  design state. These were written for the Zig compiler and name its files
+  and commands; the Goose compiler keeps its module names
+  (`check/check.zig` is `compiler-goose/src/check/check.goose`).
 - [Deferred work](compiler/DEFERRED_WORK.md): ordinary callbacks after memoized
   demands were removed. [Packed sequences](compiler/PACKED_SEQUENCES.md): the
   immutable List representation pilot, separate from production support.

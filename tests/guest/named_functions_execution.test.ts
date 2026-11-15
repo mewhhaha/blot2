@@ -8,7 +8,7 @@ import {
 } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 
 Deno.test("named functions execute curried calls and partial applications alongside ordinary function values", async () => {
   await compileAndRun(

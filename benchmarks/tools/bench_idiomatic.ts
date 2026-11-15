@@ -20,7 +20,7 @@ for (let i = 0; i < Deno.args.length; i++) {
 }
 const root = resolve(new URL("../..", import.meta.url).pathname);
 const compiler = resolve(
-  options.get("--compiler") ?? "compiler/zig-out/bin/blotc",
+  options.get("--compiler") ?? "compiler-goose/build/blotc-goose",
 );
 const output = resolve(
   options.get("--out") ?? `build/bench/idiomatic-${Date.now()}`,
@@ -124,7 +124,6 @@ const report = {
   versions: {
     deno: Deno.version,
     rust: await command(rustc, ["-vV"]),
-    zig: await command("zig", ["version"]),
   },
   rust_sysroot: rustSysroot,
   rust_target_libdir: rustTargetLibdir,

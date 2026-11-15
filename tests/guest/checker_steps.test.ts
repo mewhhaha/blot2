@@ -1,7 +1,7 @@
 import { strict as assert } from "node:assert";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const repo = new URL("../../", import.meta.url).pathname;
 const prelude = `${repo}std/prelude.blot`;
 

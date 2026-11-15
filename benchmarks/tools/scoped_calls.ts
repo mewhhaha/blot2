@@ -64,7 +64,7 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 30_000) {
 
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const blotc = resolve(
-  option("--blotc", `${repo}/compiler/zig-out-dev/bin/blotc`),
+  option("--blotc", `${repo}/compiler-goose/build/blotc-goose-dev`),
 );
 const stdRoot = resolve(`${repo}/std`);
 const entryPath = `${Deno.cwd()}/scoped-call-profile.blot`;

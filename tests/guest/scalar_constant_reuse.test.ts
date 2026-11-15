@@ -7,7 +7,7 @@ Deno.test("retained callers validate scalar constants through edits traps and re
   const entry = `${directory}/main.blot`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
     entry,
     prelude: null,
   };
@@ -64,7 +64,7 @@ Deno.test("runtime body cutoff rebuilds executable and staged results through tr
   const dependency = `${directory}/values.blot`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
     entry,
     prelude: null,
   };

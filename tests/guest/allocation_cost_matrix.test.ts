@@ -62,7 +62,7 @@ Deno.test("allocation cost matrix programs keep equivalent results in both tiers
   const directory = await Deno.makeTempDir({ prefix: "blot-cost-matrix-" });
   const entry = `${directory}/main.blot`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
   const run = (bytes: Uint8Array<ArrayBuffer>, name: string, input: number) => {
     const exports =
       new WebAssembly.Instance(new WebAssembly.Module(bytes)).exports;

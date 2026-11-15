@@ -21,51 +21,41 @@
   invocation-local borrows and explicit copies replace the old guest memory
   model. Preserve ABI 8 and session protocol 2. Language tasks are retired;
   copied-packet host workers remain.
-- Use Zig 0.17.0. Check `zig version` before each build batch.
-- The compiler lives in `compiler/`; Deno hosts its client, formatter and Wasm
-  guest API.
+- The compiler is written in Goose and lives in `compiler-goose/`; its README
+  has the layout, the build, the generators and the tests. Deno hosts its
+  client, formatter and Wasm guest API. The Zig compiler it was ported from
+  was removed on 15 November 2026.
 - Read `docs/language/guide.md` for language behavior and
-  `docs/compiler/CONTRACT.md` for ownership rules.
-- Always use Zig's native backend without LLVM (`-Dllvm=false`) for development
-  builds and all native unit-test compilation, including the full gate. Use
-  `deno task check:dev` (its default `direct` area) for a five-minute
-  development cycle. It compiles the complete native inventory once, runs an explicit
-  regression family with sampled allocation faults, guests and local checks. It
-  reports full qualification as pending. An incomplete run is not a pass.
-- Use `deno task check:dev --list-areas` to choose `direct`, `project`,
-  `syntax`, `type-effects` or `body-checking`. These are explicit regression
-  families, not whole-subsystem qualification. Add the affected laws when
-  expanding scope.
-- Reserve LLVM (`-Dllvm=true`) for the actual final release compiler and release
-  performance measurements. Use `deno task build:compiler` for releases; qualify
-  the final candidate with `deno task test:compiler`.
-- Keep semantic regression laws in Zig and executed-Wasm tests. Run
-  `deno task test:compiler` before committing compiler changes.
+  `docs/compiler/CONTRACT.md` for ownership rules. `docs/compiler/` describes
+  the Zig compiler; the Goose modules keep the names of their Zig originals.
+- The compiler's build needs clang, cmake, ninja and Python 3. Its first run
+  also builds the patched Goose compiler (about two minutes).
+  - `deno task build:compiler:dev` builds the debug compiler,
+    `compiler-goose/build/blotc-goose-dev`, in about a minute and a half. Use
+    it while developing.
+  - `deno task build:compiler` builds the optimized compiler,
+    `compiler-goose/build/blotc-goose`, in about seven minutes. Pen, the
+    sibling checkouts and the tests' default path run this one.
+- `deno task test:compiler:dev [FILES...]` builds the debug compiler and runs
+  the named guest test files against it (three smoke files when none is named).
+  `deno task test:guest` runs the guest and host suite against the optimized
+  compiler as it is. `deno task test:compiler` is the full gate: the tooling's
+  tests, the optimized build, the recorded references, the package and every
+  guest and host test. Run it before committing compiler changes.
+- The recorded references hold what the Zig compiler produced:
+  `python3 compiler-goose/tools/test_fixtures.py` (187 programs: Wasm and
+  records), `test_uniqueness.py` (lowering diagnostics) and `test_direct.py`
+  (backend bytes). A deliberate change of behavior re-records them with
+  `--record`; say so in the commit.
+- After a module, a struct or a field is added or removed, regenerate the
+  adapters as `compiler-goose/README.md` lists, then build.
+- Keep semantic regression laws in the recorded references and in
+  executed-Wasm tests.
 - For the current integration frontier, use the tracked
   `scripts/integration/build_gdev.ts`, `report.py` and `run_pen.py` runners as
   described in `CONTINUE.md`. Run a coherent affected batch after a fix; reserve
   full qualification for the final candidate. Inspect the real PNG before
   claiming the frame milestone.
-- For a focused native test, run
-  `zig build test -Doptimize=safe -Dllvm=false
-  --prefix zig-out-native-dev -Dtest-filter="test name"`
-  in `compiler/`. The full compiler gate is still required before committing
-  compiler changes.
-- `check:dev` and the full gate both compile the complete native suite with
-  `-Dllvm=false --prefix zig-out-native-dev`, catching generic mock/interface
-  errors outside focused tests. Full native execution defaults to exhaustive
-  allocation-failure sweeps; sampled development checks never replace it.
-- The full gate directly schedules the installed native binary in one to four
-  isolated shards (`--native-shards`, default two). It verifies the exact
-  inventory, shard completion and fault mode, and pins raw shard evidence in the
-  resume journal. Native failures or cancellation terminate sibling groups.
-- The installed test binary supports `--test=EXACT_INVENTORY_NAME` and emits
-  `BLOT_NATIVE_TEST` timing records. Prefer runtime selection over creating a
-  separate large executable for each filter. Keep correctness boundary cases
-  when reducing a slow fixture; measure per-test time before changing scale.
-- Run `deno task lint:zig` (zig-analyzer from `$ZIG_ANALYZER` or
-  `../zig-analyzer/zig-out/bin/zig-analyzer`). `compiler/src` must stay at zero
-  findings; CI enforces it.
 - Preserve uncommitted work.
 - Keep `CONTINUE.md` focused on the current frontier, contracts and evidence.
   Use pinned Git history for superseded checkpoint narratives. Preserve task

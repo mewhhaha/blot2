@@ -1,0 +1,86 @@
+{
+ "check/check": {
+  "AssociatedChoice": {
+   "selected": "struct { ty: T.Id, binding: BindingId }"
+  },
+  "Callees": {
+   "frozen": "*const PI.Interface",
+   "live": "*const Checked"
+  },
+  "DictionaryProof": {
+   "given": "DictionaryGiven",
+   "selected": "u32"
+  }
+ },
+ "check/core": {
+  "DictionaryProof": {
+   "given": "DictionaryGiven",
+   "selected": "u32"
+  }
+ },
+ "check/effects": {
+  "Tail": {
+   "formal": "u32",
+   "parameter": "u32",
+   "variable": "u32"
+  }
+ },
+ "check/frozen_types": {
+  "Patterns": {
+   "frozen": "*const PatternGraph",
+   "store": "*const P.Store"
+  },
+  "Source": {
+   "frozen": "*const Graph",
+   "store": "*const T.Store"
+  }
+ },
+ "check/numeric_proof_core": {
+  "Fact": {
+   "order": "terms.Proposition",
+   "unequal": "contracts.Unequal"
+  },
+  "SummaryInputs": {
+   "captures": "[]const Entry",
+   "locals": "struct { entries: []const Entry, parent: *const SummaryInputs }",
+   "parameters": "struct { bindings: []const core.Parameter, values: []const Value }"
+  }
+ },
+ "check/scalar_ops": {
+  "Folded": {
+   "value": "u32"
+  }
+ },
+ "check/task_core": {
+  "SpawnApplication": {
+   "full": "struct { group: C.Id, action: C.Id, carrier: C.Id = 0 }",
+   "partial": "C.Id"
+  }
+ },
+ "reuse/dependency_closure": {
+  "Cores": {
+   "lowered": "*parallel_lowering.Batch"
+  }
+ },
+ "reuse/global_references": {
+  "Event": {
+   "bind": "symbols.Symbol",
+   "pattern_bind": "ast.Id",
+   "pattern_read": "ast.Id",
+   "restore": "usize",
+   "visit": "ast.Id"
+  }
+ },
+ "reuse/partial_dependency": {
+  "Preparation": {
+   "ready": "Prepared",
+   "rejected": "Result"
+  }
+ },
+ "reuse/revision_inputs": {
+  "Outcome": {
+   "bytes": "[]u8",
+   "failure": "anyerror"
+  }
+ }
+}

@@ -22,7 +22,7 @@ entry const answer = func () => return text.concat (words.words true) (text.form
   try {
     {
       const options = {
-        executable: Deno.args[0] ?? new URL("compiler/zig-out/bin/blotc", root),
+        executable: Deno.args[0] ?? new URL("compiler-goose/build/blotc-goose", root),
         entry, prelude: new URL("std/prelude.blot", root), stdRoot: new URL("std/", root),
       };
       const compiler = await createZigProjectCompiler(options);

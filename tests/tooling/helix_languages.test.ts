@@ -28,7 +28,7 @@ Deno.test("registers the public blot language and completion server with absolut
   ok(installed.includes('language-servers = ["blot"]'));
   ok(installed.includes("[language-server.blot]"));
   ok(installed.includes('"/projects/blot2/host/lsp.ts"'));
-  ok(installed.includes('"/projects/blot2/compiler/zig-out/bin/blotc"'));
+  ok(installed.includes('"/projects/blot2/compiler-goose/build/blotc-goose"'));
   ok(installed.includes("auto-format = false"));
   ok(installed.includes('path = "/projects/blot2/editor/tree-sitter-blot2"'));
 });

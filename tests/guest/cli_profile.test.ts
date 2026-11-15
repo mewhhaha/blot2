@@ -4,7 +4,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 const source = `const twice = func x => return x + x
 const quad = func x => return twice (twice x)

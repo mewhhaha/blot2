@@ -1,8 +1,11 @@
-// Package the Zig executable. Publish only a complete compressed archive.
+// Package the compiler executable. Publish only a complete compressed archive.
 import { fileURLToPath } from "node:url";
 
 const directory = new URL("../generated/compiler/", import.meta.url);
-const source = new URL("../compiler/zig-out/bin/blotc", import.meta.url);
+const source = new URL(
+  "../compiler-goose/build/blotc-goose",
+  import.meta.url,
+);
 const destination = new URL("blotc.gz", directory);
 await Deno.mkdir(directory, { recursive: true });
 const temporary = await Deno.makeTempFile({

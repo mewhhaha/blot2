@@ -2,7 +2,7 @@
 // absent catalogs or fixities explicitly request prelude: "none". The CLI
 // continues to default to none.
 import { instantiateGuest } from "../../host/guest.ts";
-const compiler = Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+const compiler = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 
 export async function compileAndRun(
   source: string,

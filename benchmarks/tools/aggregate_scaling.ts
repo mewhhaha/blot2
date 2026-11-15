@@ -20,7 +20,7 @@ const kinds = [
 type Kind = typeof kinds[number];
 const { values } = parseArgs({
   options: {
-    compiler: { type: "string", default: "compiler/zig-out/bin/blotc" },
+    compiler: { type: "string", default: "compiler-goose/build/blotc-goose" },
     widths: { type: "string", default: "8,32,128" },
     operations: { type: "string", default: "1,8,32" },
     kinds: { type: "string", default: "scalar,branch,loop,shared,distinct" },

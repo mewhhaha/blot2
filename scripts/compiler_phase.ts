@@ -9,22 +9,8 @@ export type Phase = {
   code: number;
   stdout: string;
   stderr: string;
-  cache: string;
   stopped?: "budget" | "cancelled";
 };
-
-export function cacheStatus(name: string, stderr: string): string {
-  let step = "";
-  if (name === "native-compile") step = "compile test";
-  if (name === "native-run") step = "run test";
-  if (!step) return "not-applicable";
-  const lines = stderr.split("\n").filter((line) => line.includes(step));
-  if (lines.some((line) => /\bsuccess\b|\bpass\b/.test(line))) return "miss";
-  if (lines.length && lines.every((line) => /\bcached\b/.test(line))) {
-    return "hit";
-  }
-  return "unknown";
-}
 
 type Controls = {
   seconds?: number;
@@ -55,10 +41,9 @@ export async function runPhase(
     code: 127,
     stdout,
     stderr,
-    cache: "not-applicable",
   };
   console.log(`${name}: starting`);
-  // A separate process group lets cancellation reach Zig workers and test guests.
+  // A separate process group lets cancellation reach build tools and test guests.
   // Direct file descriptors also preserve partial logs if a descendant stalls.
   const child = spawn(command[0], command.slice(1), {
     cwd,
@@ -138,11 +123,8 @@ export async function runPhase(
     controls.signal?.removeEventListener("abort", abort);
   }
   result.wall_seconds = (performance.now() - started) / 1000;
-  result.cache = cacheStatus(name, await Deno.readTextFile(stderr));
   console.log(
-    `${name}: ${
-      result.wall_seconds.toFixed(2)
-    }s, exit ${result.code}, cache ${result.cache}`,
+    `${name}: ${result.wall_seconds.toFixed(2)}s, exit ${result.code}`,
   );
   return result;
 }

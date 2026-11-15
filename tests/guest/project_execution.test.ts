@@ -1,7 +1,7 @@
 import { instantiateGuest } from "../../host/guest.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const buildDir = new URL("../../build", import.meta.url).pathname;
 function equal(actual: unknown, expected: unknown): void {
   if (!Object.is(actual, expected)) {

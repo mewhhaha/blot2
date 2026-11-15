@@ -15,7 +15,7 @@ const get = func ($Box mapper) => return mapper
     const entry = `${directory}/main.blot`;
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0] ??
-        new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+        new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
       entry,
       prelude: null,
     });
@@ -230,7 +230,7 @@ Deno.test.ignore("closed local wrapper body edits retain fresh failure recovery"
   const dependency = `${directory}/wrapper.blot`;
   const options = {
     executable: Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
     entry,
     prelude: null,
   };

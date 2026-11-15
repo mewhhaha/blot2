@@ -26,7 +26,7 @@ entry const answer = func (extra: U32) : U32 => return callback extra
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -88,7 +88,7 @@ const unrelated = func (value: U32) => return @u32.add value ${unused}
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -153,7 +153,7 @@ ${layers}
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -215,7 +215,7 @@ entry const third: U32 = local (odd ${seed})
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -294,7 +294,7 @@ entry const answer: U32 = local 41
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };
@@ -365,7 +365,7 @@ entry const answer: U32 = case local 41.25 of
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };

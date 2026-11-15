@@ -106,7 +106,7 @@ Deno.test("retained generic records invalidate constant values and inlined bodie
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`, library = `${directory}/lib.blot`;
   const executable = Deno.args[0] ??
-    new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
   const options = { entry, executable };
   const compiler = await createCompiler(options);
   const main = `import * as lib from "./lib"

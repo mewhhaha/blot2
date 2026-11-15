@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { readDispatchExplanation } from "../../host/type_diagnostics.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
 async function cli(args: string[]): Promise<Record<string, unknown>[]> {

@@ -6,7 +6,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const root = new URL("../../", import.meta.url).pathname;
 const executable = resolve(
-  Deno.args[0] ?? `${root}compiler/zig-out/bin/blotc`,
+  Deno.args[0] ?? `${root}compiler-goose/build/blotc-goose`,
 );
 const output = resolve(Deno.args[1] ?? `${root}build/bench/guest-heap`);
 await Deno.mkdir(output, { recursive: true });

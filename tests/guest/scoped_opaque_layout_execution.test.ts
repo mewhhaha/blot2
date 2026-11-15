@@ -3,8 +3,8 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest, readGuestAbi } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
-const fixture = new URL("../../compiler/fixtures/scoped-opaque/", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
+const fixture = new URL("../../compiler-goose/tests/fixtures/scoped-opaque/", import.meta.url);
 
 async function execute(bytes: Uint8Array<ArrayBuffer>, asynchronous: boolean) {
   assert.equal(readGuestAbi(new WebAssembly.Module(bytes)).version, 8);

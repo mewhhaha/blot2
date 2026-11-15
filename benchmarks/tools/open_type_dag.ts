@@ -25,7 +25,7 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 5000) {
 }
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const executable = resolve(
-  options.get("--blotc") ?? `${repo}/compiler/zig-out-native-dev/bin/blotc`,
+  options.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
 );
 const entry = `${repo}/build/bench/open-type-dag.blot`;
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>

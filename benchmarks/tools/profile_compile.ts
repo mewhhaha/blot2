@@ -1,6 +1,6 @@
 // Sampling profile of blotc builds, for attributing compile time to code:
 //
-//   deno task profile:compile [--blotc compiler/zig-out/bin/blotc]
+//   deno task profile:compile [--blotc compiler-goose/build/blotc-goose]
 //     [--workload game|devtools] [--test tests/NAME.blot] [--edit SCENARIO]
 //     [--runs 3] [--reps 10] [--min-ms 3] [--max-ms 10] [--top 40]
 //     [--snapshot DIR] [--out DIR]
@@ -433,7 +433,7 @@ async function main(): Promise<number> {
   if (args["successive-literals"] && args.edit !== "literal_constant") {
     throw new Error("--successive-literals requires --edit literal_constant");
   }
-  const blotc = resolve(args.blotc ?? `${repo}/compiler/zig-out/bin/blotc`);
+  const blotc = resolve(args.blotc ?? `${repo}/compiler-goose/build/blotc-goose`);
   const snapshotRoot = resolve(
     args.snapshot ?? `${repo}/build/bench/gdev-snapshot`,
   );

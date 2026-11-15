@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 export const program = await Deno.readTextFile(
   new URL(
-    "../../compiler/fixtures/request-fixtures/effectful-dictionary-closure.blot",
+    "../../compiler-goose/tests/fixtures/request-fixtures/effectful-dictionary-closure.blot",
     import.meta.url,
   ),
 );

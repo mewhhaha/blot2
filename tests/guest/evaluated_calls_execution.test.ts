@@ -91,7 +91,7 @@ Deno.test("optimized evaluated folds compute ranges maps filters and takes", asy
   try {
     const compiler = await createZigProjectCompiler({
       executable: Deno.args[0] ??
-        new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+        new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
       entry,
       stdRoot,
       prelude: `${stdRoot}/prelude.blot`,
@@ -172,7 +172,7 @@ entry const stable = func (value: U32) => return scalar value
     {
       const options = {
         executable: Deno.args[0] ??
-          new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname,
+          new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname,
         entry,
         prelude: null,
       };

@@ -18,7 +18,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler/zig-out-native-dev/bin/blotc",
+      default: "compiler-goose/build/blotc-goose-dev",
     },
     tier: { type: "string", default: "optimized" },
     workers: { type: "string", default: "1" },

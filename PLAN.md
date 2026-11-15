@@ -1,6 +1,7 @@
 # Compiler direction
 
-Zig is Blot's only compiler. Deno provides its project client, CLI, formatter,
+Blot has one compiler, written in Goose (compiler-goose/). Deno provides its
+project client, CLI, formatter,
 source generators, editor integration and WebAssembly host. See the
 [repository map](docs/README.md) and [current frontier](CONTINUE.md).
 

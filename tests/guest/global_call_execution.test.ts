@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const fixture = (name: string) =>
-  Deno.readTextFile(new URL(`../../compiler/fixtures/${name}`, import.meta.url));
+  Deno.readTextFile(new URL(`../../compiler-goose/tests/fixtures/${name}`, import.meta.url));
 
 function createCompiler(entry: string) {
   return createZigProjectCompiler({

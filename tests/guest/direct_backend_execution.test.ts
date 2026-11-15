@@ -1,4 +1,4 @@
-// Each fixture in compiler/fixtures/direct/ runs its entries to the expected
+// Each fixture in compiler-goose/tests/fixtures/direct/ runs its entries to the expected
 // results (tasks/FAST_COMPILE.md).
 import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
@@ -101,7 +101,7 @@ const cases: Record<string, Call[]> = {
 };
 
 async function build(fixture: string) {
-  const entry = new URL(`../../compiler/fixtures/direct/${fixture}`, import.meta.url).pathname;
+  const entry = new URL(`../../compiler-goose/tests/fixtures/direct/${fixture}`, import.meta.url).pathname;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0],
     entry,

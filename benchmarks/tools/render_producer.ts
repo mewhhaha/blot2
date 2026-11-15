@@ -9,7 +9,7 @@ const root = resolve(repo, "../gdev");
 const penBytes = await Deno.readFile(`${root}/pen.json`);
 const settings =
   JSON.parse(new TextDecoder().decode(penBytes)).compiler.settings;
-let executable = resolve(repo, "compiler/zig-out-native-dev/bin/blotc");
+let executable = resolve(repo, "compiler-goose/build/blotc-goose-dev");
 if (Deno.args.length !== 0) {
   if (Deno.args.length !== 2 || Deno.args[0] !== "--compiler") {
     throw new Error("Expected --compiler PATH");

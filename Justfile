@@ -1,8 +1,8 @@
-# Build the Zig compiler and its package payload.
+# Build the optimized compiler and its package payload.
 build:
   deno task package:build
 
-# Incrementally rebuild Zig during compiler development.
+# Build the debug compiler during compiler development.
 dev:
   deno task build:compiler:dev
 

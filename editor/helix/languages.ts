@@ -56,7 +56,7 @@ export function installBlotLanguage(
         "--allow-run",
         join(options.repository, "host", "lsp.ts"),
         "--compiler",
-        join(options.repository, "compiler", "zig-out", "bin", "blotc"),
+        join(options.repository, "compiler-goose", "build", "blotc-goose"),
         "--prelude",
         join(options.repository, "std", "prelude.blot"),
         "--std-root",

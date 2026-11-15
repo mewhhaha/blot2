@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).

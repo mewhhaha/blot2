@@ -236,7 +236,7 @@ def main():
         help="Freeze reference scripts/catalog/ports from this Git revision; the binary is pinned separately.",
     )
     parser.add_argument(
-        "--blotc", type=Path, default=ROOT / "compiler/zig-out/bin/blotc"
+        "--blotc", type=Path, default=ROOT / "compiler-goose/build/blotc-goose"
     )
     parser.add_argument("--node", type=Path, default=Path("node"))
     parser.add_argument("--deno", default="deno")

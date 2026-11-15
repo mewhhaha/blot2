@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const library = `const identity = func (index: U32) => return do:
   let multiplied = @u32.mul 1 index
   let masked = @u32.bit_and multiplied 0xffffffff

@@ -12,7 +12,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler/zig-out-native-dev/bin/blotc",
+      default: "compiler-goose/build/blotc-goose-dev",
     },
     baseline: { type: "string" },
     repetitions: { type: "string", default: "3" },

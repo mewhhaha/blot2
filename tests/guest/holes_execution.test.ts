@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import type { DiagnosticType } from "../../host/type_diagnostics.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 Deno.test("typed holes reach project diagnostics and preserve the last successful revision", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;

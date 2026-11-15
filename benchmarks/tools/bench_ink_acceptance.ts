@@ -8,7 +8,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 
 const root = fileURLToPath(new URL("../..", import.meta.url));
 const executable = resolve(
-  Deno.args[0] ?? `${root}/compiler/zig-out/bin/blotc`,
+  Deno.args[0] ?? `${root}/compiler-goose/build/blotc-goose`,
 );
 const ink = resolve(Deno.args[1] ?? `${root}/../ink`);
 const output = resolve(Deno.args[2] ?? `${root}/build/bench/ink-acceptance`);

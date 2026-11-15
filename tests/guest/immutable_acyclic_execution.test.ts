@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const std = new URL("../../std", import.meta.url).pathname;
 
 const tree = `

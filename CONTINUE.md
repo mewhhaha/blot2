@@ -1,28 +1,36 @@
 # Continue: fast compilation and the language rewrite
 
 The owner's order (14 November 2026):
-1. Make the direct backend (compiler/src/direct/, [plan](tasks/FAST_COMPILE.md))
+1. Make the direct backend (compiler-goose/src/direct/, [plan](tasks/FAST_COMPILE.md))
    the only backend. Done ([deletion record](tasks/DELETE_SCOPED.md)).
 2. Carry out the approved [language changes](tasks/LANGUAGE_COHERENCE.md),
    memory model first ([rules and phases](tasks/MEMORY_MODEL.md)), together
    with the frontend speed work.
-3. Port the result to Goose.
+3. Port the result to Goose. Done; see below.
 
 The goal behind all of it is compiling Blot at 1M lines/s; "prioritize fast
 compiles".
 
 Added on 15 November 2026: "add some more patches to goose to make it
 faster until goose to wasm is ready. And try to finish the goose compiler
-so we can retire zig." The plan and the measured state are in
-[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md).
+so we can retire zig." Then, the same day: "make the switch and delete the
+zig compiler". Both are done: the compiler is the Goose one in
+compiler-goose/, and compiler/ (Zig) is gone. The record is in
+[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md). Next is compile times.
 
 ## State on main (15 November 2026)
 
-- **Direct backend only.** `compiler/src/compile.zig` is its interface.
-  `backend/`, `eval/`, `runtime/`, the scoped reuse and the checker's
-  cross-revision reuse are deleted, about 170,000 lines in all.
-  `serve-project` builds each revision fresh; dependency bundles (`.blotdep`)
-  still provide checked modules.
+- **One compiler, written in Goose** (compiler-goose/). The Zig compiler it
+  was ported from was removed on 15 November 2026; its last tree is commit
+  359b14f6, directory compiler/. Before the removal the two gave the same
+  Wasm on every program compared, and the Goose compiler's tests now
+  compare it with what Zig produced (compiler-goose/tests/fixtures,
+  tests/uniqueness and tests/direct).
+- **Direct backend only.** `compiler-goose/src/compile.goose` is its
+  interface. The scoped backend, the evaluator, the scoped reuse and the
+  checker's cross-revision reuse are deleted. `serve-project` builds each
+  revision fresh; dependency bundles (`.blotdep`) still provide checked
+  modules.
 - **Gdev Main** builds; its first Pen frame is byte-identical (frame.png
   19a03f0a…, frames.trace 86d50101…), at 0.075 ms of guest time per frame
   against the old backend's 2.45 ms.
@@ -30,9 +38,10 @@ so we can retire zig." The plan and the measured state are in
   the old backend's reference log.
 - **Guest suite:** 1,054 cases pass, 101 are ignored, each with its reason
   (tasks/DELETE_SCOPED.md lists them by kind), and none fail. The full gate
-  (`deno task test:compiler`) passes.
+  (`deno task test:compiler`) passes. It no longer has Zig's native laws;
+  see "What went with Zig" in tasks/GOOSE_PORT.md.
 - **Memory model phase 1** is done (bf582a9c):
-  - the uniqueness pass (compiler/src/check/uniqueness.zig);
+  - the uniqueness pass (compiler-goose/src/check/uniqueness.goose);
   - `aliased_update`;
   - `values.copy`;
   - the storage part of the value restriction.
@@ -41,7 +50,8 @@ so we can retire zig." The plan and the measured state are in
   turned 1,880 `:=` in Ink (44ec97e) and 3,011 in Gdev (6aa6350) into `=`.
   These are the writes into arrays a function was handed. Phase 3 moves them
   to the `own` style and deletes `=`.
-- **Checker speed.** Gdev's Wasm is unchanged by each of these
+- **Checker speed.** These were measured on the Zig compiler; the Goose
+  compiler has the same changes. Gdev's Wasm is unchanged by each of them
   (2,720,970 bytes, sha256 af9f24dd…).
   - Importing a catalog no longer scans every earlier associated member for
     each new one; it uses a hash set. This was quadratic per module and 12%
@@ -65,7 +75,8 @@ so we can retire zig." The plan and the measured state are in
 
 - **Memory model phase 2** (`own` and borrowed parameters) is measured and
   waits for the owner. Nothing is migrated, and main has none of it. The
-  unfinished pass is on branch `wip/memory-phase2-own` (0afccb55).
+  unfinished pass is on branch `wip/memory-phase2-own` (0afccb55), written
+  in Zig; resuming it means porting that pass to Goose.
   - Its 585 guest failures come from the breadth of its rules: it rejects
     the prelude (`identity`, `Maybe.map`, `Array.at`), which every case
     compiles. It also has one bug, in shallow copies.
@@ -79,12 +90,15 @@ so we can retire zig." The plan and the measured state are in
     function types waits for the B3 and C8 removals.
 - **Memory model phase 4** (the value restriction for `let`) is measured
   and not built. std, Ink and Gdev need no change and Gdev's frame is
-  identical, but 13 guest cases and 11 native laws pin the old rule and it
-  saves about 1% of a build. tasks/MEMORY_MODEL.md has the list and the
+  identical, but 13 guest cases pin the old rule (and 11 of Zig's native
+  laws did) and it saves about 1% of a build. tasks/MEMORY_MODEL.md has the list and the
   patch.
-- **Checker speed.** A release (LLVM) compiler builds Gdev Main in 1.30 s
-  on the cloud container with one frontend worker, of which checking is
-  0.87 s (lower 0.16, backend 0.14, lex 0.03, parse 0.03).
+- **Compile times** are next. The Goose compiler builds Gdev Main in 1.9 s
+  (the Zig compiler took 0.9 s with four checkers and 1.37 s with one);
+  tasks/GOOSE_PORT.md has the table. The profile below is of the Zig
+  compiler, one checker, where checking was 0.87 s of 1.30 s (lower 0.16,
+  backend 0.14, lex 0.03, parse 0.03). The algorithms are the same, so the
+  shares should carry over; the Goose compiler has not been profiled.
 
   | Next costs (share of a Gdev build's instructions, inclusive) | |
   | --- | ---: |
@@ -126,50 +140,52 @@ so we can retire zig." The plan and the measured state are in
 
 ## Commands
 
-- Development compiler: `zig build install -Doptimize=safe -Dllvm=false --prefix zig-out-dev`;
-  fast: `-Doptimize=fast --prefix zig-out-direct`. Run both in compiler/,
-  under `flock /var/tmp/blot2-heavy.lock systemd-run --user --scope -q -p MemoryMax=14G -p MemorySwapMax=2G`.
-- Guest suite: `deno test -A --parallel tests/guest tests/host -- compiler/zig-out-dev/bin/blotc`.
-- Gdev: `deno run -A scripts/integration/build_gdev.ts --compiler X --timeout-ms 600000 OUT`
-  (`--profile` adds phase timings), then
+- Compiler: `deno task build:compiler` writes the optimized compiler,
+  compiler-goose/build/blotc-goose (about seven minutes; Pen, the siblings
+  and the tests' default path run it). `deno task build:compiler:dev`
+  writes a debug compiler, compiler-goose/build/blotc-goose-dev, in about a
+  minute and a half. The first build also builds the patched Goose. The
+  build needs clang, cmake, ninja and Python 3.
+- Gate: `deno task test:compiler` (tooling tests, the optimized build, the
+  recorded references, the package, every guest and host test).
+  `deno task test:guest` runs the guest and host suite against the
+  optimized compiler as it is; `deno task test:compiler:dev FILES` builds
+  the debug compiler and runs those files.
+- References: `python3 compiler-goose/tools/test_fixtures.py`,
+  `test_uniqueness.py` and `test_direct.py` compare the compiler with what
+  the Zig compiler produced. `--record EXE` rewrites a record after a
+  deliberate change of behavior.
+- Gdev: `deno run -A scripts/integration/build_gdev.ts --timeout-ms 600000 OUT`
+  (`--profile` adds phase timings; `--compiler X` picks another compiler),
+  then
   `python3 scripts/integration/run_pen.py --launch --hardware --compiled-main OUT/main-*/main.wasm --expected-wasm-sha256 SHA --output DIR`.
   Without `--hardware` it runs headless on a software Vulkan driver
   (`apt-get install mesa-vulkan-drivers`). There frame.png is c1ff619f…;
   frames.trace is 86d50101… on either.
-- Ink: build/goose-perf/ink-direct is a copy of ../ink whose pen.json runs
-  build/goose-perf/blotc-direct (compiler/zig-out-direct). Refresh its .blot
-  files from ../ink after changing Ink, then run
-  `../../../pen/target/release/pen test-blot --project ink-direct` from
-  build/goose-perf and compare with build/goose-perf/compare_ink.py against
-  ink-zig.log.
-- Profiling:
-  - Build with `-Doptimize=fast -Dllvm=true -Dprofiling=true`.
-  - Sampling, on a machine that has build/goose-perf (untracked): run the
-    compiler (not Deno) with
-    `LD_PRELOAD=build/goose-perf/prof/cpusample.so CPUSAMPLE_DIR=… CPUSAMPLE_US=500`
-    and summarize with `ABSADDR=1 python3 build/goose-perf/prof/analyze.py DIR BINARY`
-    (or `callers.py DIR BINARY FUNCTION`).
-  - Instruction counts, anywhere valgrind is installed: give `build_gdev.ts`
-    a `--compiler` shell script that runs
-    `valgrind --tool=callgrind --callgrind-out-file=DIR/callgrind.out.%p blotc "$@"`
-    without `exec`. The client kills the script, valgrind sees the end of its
-    input and writes the file. Read it with
-    `callgrind_annotate --inclusive=yes` and `--tree=caller`.
-- A fresh cloud container has none of the toolchain. Install what
-  .github/workflows/ci.yml pins: Zig 0.17.0, Deno 2, and zig-analyzer
-  0.17.0-1 (set `ZIG_ANALYZER`, or put it at
-  ../zig-analyzer/zig-out/bin/zig-analyzer). Pen needs
+- Ink: `../pen/target/release/pen test-blot` in ../ink. Today it gives
+  268 passed, 1 failed, 3 did not compile, in 73 modules; the Zig compiler
+  gave the same log.
+- Profiling: the tools in benchmarks/tools (`profile_compile.ts`,
+  `summarize_compile_profile.py`, `summarize_stacks.py`) name stack frames
+  by Zig source file and need redoing for the Goose compiler. Instruction
+  counts work as before, anywhere valgrind is installed: give
+  `build_gdev.ts` a `--compiler` shell script that runs
+  `valgrind --tool=callgrind --callgrind-out-file=DIR/callgrind.out.%p blotc-goose "$@"`
+  without `exec`. The client kills the script, valgrind sees the end of its
+  input and writes the file. Read it with
+  `callgrind_annotate --inclusive=yes` and `--tree=caller`.
+- A fresh cloud container has none of the toolchain. Install Deno 2, and
+  `apt-get install clang cmake ninja-build` for the compiler. Pen needs
   `apt-get install pkg-config cmake libasound2-dev libdbus-1-dev libudev-dev`,
   then `cargo build --release -p pen` and, in ../pen/plugins,
-  `cargo build --release --target wasm32-wasip2`. The `flock` and
-  `systemd-run` wrappers above are for the owner's machine.
-- `deno task lint:zig` is at zero findings with zig-analyzer 0.17.0-1. Main
-  had 16 until 15 November, so CI failed there before it ran a test.
-- CI now passes lint, the native laws, the release build and the pack, and
-  fails in the guest phase: tests/guest/owned_render_copy_execution.test.ts
-  imports ../ink/lib, and the runner has only blot2. A copy of the
-  repository without its siblings fails exactly those two cases. The owner
-  decides whether CI fetches Ink or the test declares that it needs it.
+  `cargo build --release --target wasm32-wasip2`.
+- CI (.github/workflows/compiler.yml) builds the compiler and runs
+  `deno task check`. It fails in the guest phase, as it did before the
+  switch: tests/guest/owned_render_copy_execution.test.ts imports
+  ../ink/lib, and the runner has only blot2. A copy of the repository
+  without its siblings fails exactly those two cases. The owner has said a
+  failing CI is fine for now; fetching Ink in CI, or having the test declare
+  that it needs Ink, would fix it.
 - Two host tests depend on process start-up time and can fail when the
   whole suite runs in parallel on a slow machine:
   tests/host/lsp.test.ts ("Completion was never sent", its wait is now
@@ -180,30 +196,17 @@ so we can retire zig." The plan and the measured state are in
   (15 November, under `--parallel`). The compiler under test is not
   involved.
 
-## The Goose port
+## The compiler in Goose
 
-[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state, the comparison
-with Zig and what is left; compiler-goose/README.md has the layout, the
-build and the tests.
+[compiler-goose/README.md](compiler-goose/README.md) has the layout, the
+build, the generators and the tests. [tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md)
+has the port's record: the comparison with Zig before it was removed, what
+went with Zig, the known differences and the speed.
 
-- The owner's order: a working Goose compiler, then Zig deprecated, then
-  compile times.
-- `sh compiler-goose/build.sh` builds compiler-goose/build/blotc-goose
-  (and, the first time, the patched Goose it needs). `--release` optimizes.
-- The Goose compiler has every command of `blotc`, `serve-project`
-  included. Against it the guest and host suite gives 1,054 passed, 0
-  failed, 101 ignored, as it does for Zig (`deno task test:goose`). Wasm
-  is byte-identical to Zig's on the direct fixtures, Ink's tests and Gdev
-  Main; Ink's suite through Pen gives the same log.
-- `--frontend-workers` checks modules in forked copies of the process.
-  That is correct and slower than one checker, so the Goose compiler
-  defaults to one.
-- Zig is deprecated: it gets no new work, and it stays until the tooling
-  is switched. The scripts, CI and the sibling pen.json files still run
-  it. GOOSE_PORT.md lists the switch under "What is left before Zig can
-  go"; the sibling pen.json change waits for the owner.
-- Next, by the owner's order: compile times. The Goose compiler builds
-  Gdev Main in 1.9 s where Zig takes 0.9 s.
+- `--frontend-workers` checks modules in forked copies of the process. That
+  is correct and slower than one checker, so one is the default.
+- The `memory` field of a compilation record counts the compiler's pooled
+  owners, not every allocation as Zig's did; `live_bytes` must be 0.
 
 ## Contracts
 

@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const library = `type Probe is data = $Probe U32
 const copy = func (value: U32) => return value
 const advance = func (value: U32) => return func (delta: U32) => return @u32.add (copy value) (copy delta)

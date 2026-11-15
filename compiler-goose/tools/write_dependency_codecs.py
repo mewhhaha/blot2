@@ -1,9 +1,9 @@
-# Source authoring only: native wire declarations -> concrete Goose codecs.
+# Source authoring only: the wire model -> concrete Goose codecs.
 # Never executes either compiler, a checker, tests, formatting or qualification.
 from pathlib import Path
 import re,json,sys
 REPO=Path(__file__).resolve().parents[2]
-ROOT=REPO/'compiler/src';GOOSE=REPO/'compiler-goose/src'
+GOOSE=REPO/'compiler-goose/src'
 OWNER_DISPATCH='''// Decode storage belongs to the concrete caller's allocation journal.
 fn allocateDecoded<T>(owner:Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_format::alloc<T>(owner,length);}
 fn allocateDecoded<T>(owner:blot_reuse_dependency_payload::Owner&,length:i64)->T[:],Error {return blot_reuse_dependency_payload::alloc<T>(owner,length);}
@@ -50,203 +50,46 @@ for path in sorted(GOOSE.rglob('*.goose')):
      if m:variants.append((m[1],fields(m[2] or '')))
     G[key]=('enum',variants,namespace)
 (GOOSE.parent/'build').mkdir(parents=True,exist_ok=True)
-# Native declarations retain qualified source names and field scalar domains.
-N={};NI={};NA={};NFILE={}
-for path in sorted(ROOT.rglob('*.zig')):
- module=path.relative_to(ROOT).with_suffix('').as_posix().replace('/','.')
- text=clean(path.read_text());NFILE[module]=path
- NI[module]={}
- for m in re.finditer(r'\bconst\s+(\w+)\s*=\s*@import\("([^"\n]+)"\)\s*;',text):
-  target=(path.parent/m[2]).resolve()
-  try:NI[module][m[1]]=target.relative_to(ROOT.resolve()).with_suffix('').as_posix().replace('/','.')
-  except ValueError:pass
- containers=[]
- for m in re.finditer(r'\b(?:pub\s+)?const\s+(\w+)\s*=\s*(?:(packed|extern)\s+)?(struct|enum|union)(?:\(([^)]*)\))?\s*\{',text):
-  name,layout,kind,backing=m.groups();start=m.end()-1;end=balanced(text,start);parent=[c for c in containers if c[1]<m.start()<c[2]]
-  full=(max(parent,key=lambda x:x[1])[0]+'.'+name) if parent else module+'.'+name
-  containers.append((full,start,end));N[full]=(kind,text[start+1:end],module,backing or '')
- for m in re.finditer(r'\b(?:pub\s+)?const\s+(\w+)\s*=\s*([^;\n]+);',text):
-  name,expr=m.groups();parent=[c for c in containers if c[1]<m.start()<c[2]];full=(max(parent,key=lambda x:x[1])[0]+'.'+name) if parent else module+'.'+name
-  if full not in N:NA[full]=(expr.strip(),module)
-# Native declaration parsing does not infer a schema from Goose owner fields.
-def native_fields(body):
- # Methods follow fields in all transported native records. Nested public
- # type declarations end with semicolons, so remove those before splitting.
- body=re.sub(r'(?m)^\s*(?:pub\s+)?const\s+\w+\s*=\s*[^;]*;', '', body)
- out=[]
- for part in split(body):
-  m=re.match(r'^\s*(\w+)\s*:\s*(.*)',part,re.S)
-  if m:out.append((m[1],split(m[2],'=')[0].strip()))
- return out
-def native_variants(body):
- # A union variant is `name: Type` or, for a void payload, a bare `name`.
- body=re.sub(r'(?m)^\s*(?:pub\s+)?const\s+\w+\s*=\s*[^;]*;', '', body)
- out=[]
- for part in split(body):
-  part=part.strip();m=re.match(r'^(\w+)\s*:\s*(.*)',part,re.S)
-  if m:out.append((m[1],split(m[2],'=')[0].strip()))
-  elif re.fullmatch(r'\w+',part):out.append((part,'void'))
- return out
-PRIMITIVES={'bool','void','usize','isize','f16','f32','f64'}|{p+str(n) for p in ('u','i') for n in range(1,65)}
-RENAMES={'u32':'unsigned32','f32':'floating32','block':'block_','match':'match_','loop':'loop_','opaque':'opaque_'}
-def goose_type(raw,namespace):
- raw=raw.strip()
- if raw.startswith('const '):raw=raw[6:].strip()
- if raw in ('u8','u16','u32','u64','i8','i16','i32','i64','bool','f32','f64'):return raw
- m=re.fullmatch(r'(.+)\[(:|\d+)\]',raw)
- if m:return goose_type(m[1],namespace)+'['+m[2]+']'
- if raw.startswith(('blot_support::Option<','Option<')):
-  child=raw[raw.index('<')+1:-1]
-  resolved=goose_type(child,namespace)
-  if child.startswith('const ') and child.endswith('[:]'):resolved='const '+resolved
-  return 'blot_support::Option<'+resolved+'>'
- key=raw if '::' in raw else namespace+'::'+raw
- if key not in G:raise ValueError(('undeclared Goose wire type',key))
- kind,body,owner=G[key]
- if kind=='alias':return goose_type(body,owner)
- return key
-# Explicit spelling frontiers for anonymous native field types are recorded
-# separately. The source compiler's generated names need oracle qualification.
-SPELLINGS={
- # Assigned native definitions resolve aliases before their type names hash.
-}
+# The wire model: every type on the wire and its Goose type, in the order
+# the codecs are emitted. It was derived from the Zig compiler's declarations
+# until 15 November 2026, when Zig was removed; dependency-wire-model.json is
+# now the declaration, edited by hand.
+MODEL=json.loads(Path(__file__).with_name('dependency-wire-model.json').read_text())
 DESCS={};ORDER=[];ROOTS=[]
-def native_resolve(raw,module,parent='',field='',hint=None,seen=()):
- raw=raw.strip()
- if raw.startswith('?'):
-  child=native_resolve(raw[1:],module,parent,field,hint=option_child(hint));return install('?'+child['name'],'optional',hint,[child])
- if raw.startswith('[]'):
-  tail=raw[2:].strip();const=tail.startswith('const ')
-  if const:tail=tail[6:].strip()
-  child=native_resolve(tail,module,parent,field,hint=slice_child(hint));return install('[]'+('const ' if const else '')+child['name'],'slice',hint,[child])
- m=re.match(r'^\[(\d+)\](.*)',raw,re.S)
- if m:
-  child=native_resolve(m[2],module,parent,field,hint=slice_child(hint));return install('['+m[1]+']'+child['name'],'array',hint,[child],count=int(m[1]))
- if raw in PRIMITIVES:return install(raw,'primitive',hint,[],primitive=raw)
- if raw.startswith(('enum','struct','union')):
-  kind=re.match(r'(enum|struct|union)',raw)[1];a=raw.index('{');body=raw[a+1:balanced(raw,a)];name=SPELLINGS.get(parent+'.'+field,parent+'.'+field)
-  return build_named(name,kind,body,module,hint)
- imp=re.fullmatch(r'@import\("([^"\n]+)"\)\.([\w.]+)',raw)
- if imp:
-  p=(NFILE[module].parent/imp[1]).resolve();mod=p.relative_to(ROOT.resolve()).with_suffix('').as_posix().replace('/','.');return native_resolve(mod+'.'+imp[2],mod,parent,field,hint,seen)
- if raw.startswith('@FieldType('):
-  m=re.fullmatch(r'@FieldType\(([^,]+),\s*"([^"]+)"\)',raw);base=native_resolve(m[1],module,hint=None);return next(x[1] for x in base['fields'] if x[0]==m[2])
- if raw in NI.get(module,{}):raise ValueError(('module requested as data',raw,module))
- candidates=[raw]
- if '.' in raw:
-  first,rest=raw.split('.',1)
-  if first in NI.get(module,{}):candidates=[NI[module][first]+'.'+rest]
-  else:candidates=[module+'.'+raw,raw]
- else:
-  scope=parent
-  while scope and scope!=module:
-   candidates.append(scope+'.'+raw);scope=scope.rpartition('.')[0]
-  candidates.append(module+'.'+raw)
- for key in candidates:
-  if key in DESCS:return DESCS[key]
-  if key in N:
-   kind,body,owner,backing=N[key]
-   if kind=='struct' or kind in ('enum','union'):return build_named(key,kind,body,owner,hint)
-  if key in NA and key not in seen:
-   expr,owner=NA[key]
-   if expr.startswith('@import(') and re.fullmatch(r'@import\("[^"]+"\)',expr):continue
-   # Public aliases can traverse an imported alias namespace (T.Effects.Row).
-   return native_resolve(expr,owner,parent,field,hint,seen+(key,))
-  # T.Effects names a module-valued const in the imported type namespace.
-  parts=key.split('.')
-  for cut in range(len(parts)-1,0,-1):
-   alias='.'.join(parts[:cut]);tail='.'.join(parts[cut:])
-   if alias in NA:
-    expr,owner=NA[alias];m=re.fullmatch(r'@import\("([^"]+)"\)',expr)
-    if m:
-     target=(NFILE[owner].parent/m[1]).resolve().relative_to(ROOT.resolve()).with_suffix('').as_posix().replace('/','.')
-     return native_resolve(target+'.'+tail,target,parent,field,hint,seen+(alias,))
- raise ValueError(('unresolved native wire type',raw,module,parent,field,hint))
-def option_child(hint):
- if hint and hint.startswith('blot_support::Option<'):return hint[21:-1]
- return None
-def slice_child(hint):
- if hint:
-  if hint.startswith('const '):hint=hint[6:]
-  m=re.fullmatch(r'(.+)\[(:|\d+)\]',hint)
-  if m:return m[1]
- return None
-def install(name,kind,hint,children,**extra):
- if name in DESCS:
-  existing=DESCS[name]
-  # Optional slice headers are invariant in Goose; use readonly ownership at
-  # every reference to this one native domain, including describe samples.
-  if hint and hint.startswith('blot_support::Option<const ') and existing['goose']==hint.replace('<const ','<',1):existing['goose']=hint
-  return existing
- if not hint:
-  if kind=='primitive':
-   if name=='void':hint='Void'
-   elif name=='usize' or name=='isize':hint='i64'
-   elif name=='bool':hint='bool'
-   elif name.startswith('u'):
-    bits=int(name[1:]);hint=next('u'+str(n) for n in (8,16,32,64) if n>=bits)
-   elif name.startswith('i'):
-    bits=int(name[1:]);hint=next('i'+str(n) for n in (8,16,32,64) if n>=bits)
-   else:hint=name
-  elif kind=='slice':hint=children[0]['goose']+'[:]'
-  elif kind=='array':hint=children[0]['goose']+'['+str(extra['count'])+']'
-  elif kind=='optional':hint='blot_support::Option<'+children[0]['goose']+'>'
- d={'name':name,'kind':kind,'goose':hint,'children':children,**extra};DESCS[name]=d;ORDER.append(d);return d
-def build_named(name,kind,body,module,hint):
- if name in DESCS:return DESCS[name]
- if hint is None:
-  suffix=name.split('.')[-1];goose_ns='blot_'+module.replace('.','_');hint=goose_ns+'::'+suffix
- if hint not in G:
-  if kind=='enum' and hint in ('u8','u16','u32','u64','i8','i16','i32','i64'):gkind,gbody,gns='primitive',[],''
-  else:raise ValueError(('missing Goose counterpart',name,hint))
- else:gkind,gbody,gns=G[hint]
- d=install(SPELLINGS.get(name,name),kind,hint,[]);DESCS[name]=d;d['fields']=[];d['variants']=[]
- if kind=='struct':
-  gf=dict(gbody);nf=native_fields(body)
-  if name=='check.types.Node':nf=[(n,t) for n,t in nf if n in ('tag','a','b','c')]
-  for field,raw in nf:
-   target=field
-   if field not in gf:
-    target={'type':'ty'}.get(field,field)
-    if target not in gf and field+'_' in gf:target=field+'_'
-   if target not in gf:raise ValueError(('missing Goose wire field',name,field,hint,list(gf)))
-   gh=goose_type(gf[target],gns);child=native_resolve(raw,module,name,field,gh);d['fields'].append((field,child,target))
- elif kind=='enum':
-  current=-1;gv={n:fs for n,fs in gbody}
-  for part in split(body):
-   part=part.strip()
-   if not re.match(r'^(?:@"[^"]+"|\w+)(?:\s*=|\s*$)',part):continue
-   m=re.fullmatch(r'(@"[^"]+"|\w+)(?:\s*=\s*(\d+|0x[0-9a-fA-F]+))?',part)
-   if not m:continue
-   field=m[1].removeprefix('@"').removesuffix('"')
-   if field=='_':continue
-   current=int(m[2],0) if m[2] else current+1;target=RENAMES.get(field,field)
-   if gkind=='enum' and target not in gv:raise ValueError(('missing Goose enum field',name,field,hint))
-   d['variants'].append((field,current,target))
- elif kind=='union':
-  gv=dict(gbody);tagname=SPELLINGS.get(name+'.tag','@typeInfo('+name+').@"union".tag_type.?');tag=install(tagname,'union_tag','u32',[]);tag['variants']=[]
-  for ordinal,(field,raw) in enumerate(native_variants(body)):
-   target=RENAMES.get(field,field)
-   if target not in gv:raise ValueError(('missing Goose union variant',name,field,hint))
-   fs=gv[target];payload_hint=None
-   if len(fs)==1:payload_hint=goose_type(fs[0][1],gns)
-   payload=native_resolve(raw,module,name,field,payload_hint);d['variants'].append((field,ordinal,target,payload,fs));tag['variants'].append((field,ordinal,target))
-  d['tag']=tag
- return d
-ROOT_PAIRS=[
- ('blot_reuse_dependency_format::Key','reuse.dependency_format.Key'),
- ('blot_reuse_frozen_dependency::FrozenDependency','reuse.frozen_dependency.FrozenDependency'),
- ('blot_reuse_frozen_dependency::Module','reuse.frozen_dependency.Module'),
- ('blot_reuse_principal_interface::Interface','reuse.principal_interface.Interface'),
- ('blot_check_core::Module','check.core.Module'),
-]
-for g,n in ROOT_PAIRS:
- d=native_resolve(n,n.rpartition('.')[0],hint=g);ROOTS.append(d)
-# Primitive and fixed digest are public format roots too.
-for p in ('u8','u16','u32','u64','i8','i16','i32','i64','bool','f32','f64'):
- ROOTS.append(native_resolve(p,'reuse.dependency_format'))
-ROOTS.append(native_resolve('[32]u8','reuse.dependency_format',hint='u8[32]'))
-(GOOSE.parent/'build/dependency-wire-model.json').write_text(json.dumps({'roots':[d['name'] for d in ROOTS],'descriptors':[{'name':d['name'],'kind':d['kind'],'goose':d['goose'],'children':[x['name'] for x in d['children']],'fields':[(n,c['name'],g) for n,c,g in d.get('fields',[])],'variants':[(v[0],v[1],v[2]) for v in d.get('variants',[])]} for d in ORDER]},indent=2))
+for entry in MODEL['descriptors']:
+ d={'name':entry['name'],'kind':entry['kind'],'goose':entry['goose'],'children':[]}
+ for key in ('count','primitive'):
+  if key in entry:d[key]=entry[key]
+ DESCS[d['name']]=d;ORDER.append(d)
+for entry in MODEL['descriptors']:
+ d=DESCS[entry['name']];d['children']=[DESCS[name] for name in entry.get('children',[])]
+ if entry['kind']=='struct':d['fields']=[(field,DESCS[child],target) for field,child,target in entry['fields']];d['variants']=[]
+ elif entry['kind'] in ('enum','union_tag'):d['variants']=[tuple(v) for v in entry['variants']]
+ elif entry['kind']=='union':
+  d['fields']=[];d['variants']=[(field,ordinal,target,DESCS[child],[tuple(x) for x in fs]) for field,ordinal,target,child,fs in entry['variants']];d['tag']=DESCS[entry['tag']]
+ROOTS=[DESCS[name] for name in MODEL['roots']]
+# A Goose type that changed without the model is an error here, not a field
+# that silently stays off the wire.
+def stale(message):raise SystemExit('dependency-wire-model.json: '+message)
+for entry in MODEL['descriptors']:
+ goose=entry['goose']
+ if goose not in G:continue
+ gkind,gbody,gns=G[goose]
+ if entry['kind']=='struct' and gkind=='struct':
+  have=[name for name,_ in gbody];wired=[target for _,_,target in entry['fields']];unwired=entry.get('unwired',[])
+  for name in wired+unwired:
+   if name not in have:stale(f'{entry["name"]} names `{name}`, which {goose} no longer has')
+  for name in have:
+   if name not in wired and name not in unwired:stale(f'{goose} has a new field `{name}`: add it to `fields` of {entry["name"]} to put it on the wire, or to `unwired` to keep it off')
+ elif entry['kind'] in ('enum','union') and gkind=='enum':
+  have=[name for name,_ in gbody];listed=[v[2] for v in entry['variants']]
+  for name in listed:
+   if name not in have:stale(f'{entry["name"]} names variant `{name}`, which {goose} no longer has')
+  for name in have:
+   if name not in listed:stale(f'{goose} has a new variant `{name}`: add it to `variants` of {entry["name"]}')
+  if entry['kind']=='union':
+   for field,ordinal,target,child,fs in entry['variants']:
+    if [list(x) for x in dict(gbody)[target]]!=fs:stale(f'{goose}.{target} changed its payload: update `variants` of {entry["name"]}')
 # Concrete procedure names retain each native wire domain even when Goose
 # aliases share the same storage type (e.g Op/Role/Scalar are all u8).
 def ident(text):return re.sub(r'[^A-Za-z0-9_]','_',text)

@@ -204,7 +204,7 @@ export async function auditProject(options: Options) {
   );
   const compiler = await createZigProjectCompiler({
     executable: options.compiler ??
-      resolve(compilerRoot, "compiler/zig-out-dev/bin/blotc"),
+      resolve(compilerRoot, "compiler-goose/build/blotc-goose-dev"),
     entry,
     prelude: resolve(stdRoot, "prelude.blot"),
     stdRoot,

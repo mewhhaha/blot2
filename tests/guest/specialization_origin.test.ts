@@ -2,7 +2,7 @@ import { deepStrictEqual as equal, ok } from "node:assert/strict";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 const definition = '@type.call "add" left right';
 const preludeSource = await Deno.readTextFile(prelude);

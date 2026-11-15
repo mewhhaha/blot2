@@ -10,7 +10,7 @@ const output = resolve(Deno.args[2] ?? "build/tmp/stdlib-bench");
 const variants = [
   {
     name: "current",
-    compiler: resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc"),
+    compiler: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
     std: resolve(Deno.args[1] ?? "std"),
   },
 ];

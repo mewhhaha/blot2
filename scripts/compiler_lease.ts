@@ -3,7 +3,7 @@ import process from "node:process";
 
 /** Fail promptly instead of queuing a development cycle behind a long gate. */
 export async function compilerLease(root: string) {
-  const parent = resolve(root, ".zig-cache");
+  const parent = resolve(root, "build");
   const directory = resolve(parent, "compiler-check.lock");
   await Deno.mkdir(parent, { recursive: true });
   const ownerPath = resolve(directory, "owner.json");

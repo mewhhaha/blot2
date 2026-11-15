@@ -33,7 +33,7 @@ entry const nominal = func (value: U32) : U32 => return case $Some value of
 }
 
 async function command(args: string[]): Promise<{ result: Deno.CommandOutput; records: any[]; text: string }> {
-  const executable = Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
   const result = await new Deno.Command(executable, { args, stdout: "piped", stderr: "piped" }).output();
   const text = new TextDecoder().decode(result.stdout);
   const records = text.trim().split("\n").filter(Boolean).map(line => JSON.parse(line));

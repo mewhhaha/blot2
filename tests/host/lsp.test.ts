@@ -16,7 +16,9 @@ import {
 
 const encoder = new TextEncoder();
 const executable = Deno.args[0] ??
-  fileURLToPath(new URL("../../compiler/zig-out/bin/blotc", import.meta.url));
+  fileURLToPath(
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
+  );
 class Bytes {
   data: Uint8Array[] = [];
   async write(bytes: Uint8Array) {

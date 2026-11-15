@@ -1,11 +1,12 @@
 # Blot design direction
 
-The [language guide](docs/language/guide.md), Zig regression laws and `std/`
-describe the executable language. This document records the intent behind the
+The [language guide](docs/language/guide.md), the compiler's recorded
+references and guest tests, and `std/` describe the executable language. This document records the intent behind the
 current work; [CONTINUE.md](CONTINUE.md) records what has actually been
 qualified.
 
-Blot compiles to WebAssembly through one handwritten Zig compiler. Semantic
+Blot compiles to WebAssembly through one handwritten compiler, written in
+Goose. Semantic
 checking, compile-time evaluation and Wasm emission belong there. The Deno and
 Tree-sitter parsers serve source tools and editor highlighting.
 

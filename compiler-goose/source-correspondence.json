@@ -1,6 +1,5 @@
 {
- "note": "One entry per Zig source file of compiler/src today. state: in_src (the Goose module builds in compiler-goose/src; its Goose path may keep the directory the Zig file had on 12 November), pending (ported, parked in compiler-goose/pending until it is brought up to the Zig source), not_ported, zig_only (tests, benchmarks and test support that stay in Zig). The record says where a module is, not that it matches Zig.",
- "synced_to_zig_commit": "44ee94f4 for modules in src and pending, except where tasks/GOOSE_PORT.md lists a later change as applied",
+ "note": "The Zig source file each Goose module was ported from. The Zig compiler was removed on 15 November 2026; its last tree is commit 359b14f6, directory compiler/src. state: in_src (the module is in compiler-goose/src; its path may keep the directory the Zig file had on 12 November), zig_only (Zig tests, benchmarks and test support that were not ported), removed (ported once, used only by Zig's tests, deleted with them).",
  "modules": [
   {
    "zig": "compiler/src/allocation_failure_profile.zig",
@@ -899,15 +898,11 @@
   },
   {
    "zig": "compiler/src/reuse/declaration_demand.zig",
-   "goose": "compiler-goose/pending/reuse/declaration_demand.goose",
-   "state": "pending",
-   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
+   "state": "removed"
   },
   {
    "zig": "compiler/src/reuse/dependency_bundle.zig",
-   "goose": "compiler-goose/pending/reuse/dependency_bundle.goose",
-   "state": "pending",
-   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
+   "state": "removed"
   },
   {
    "zig": "compiler/src/reuse/dependency_cli.zig",
@@ -1111,9 +1106,7 @@
   },
   {
    "zig": "compiler/src/reuse/resolution_cache.zig",
-   "goose": "compiler-goose/pending/reuse/resolution_cache.goose",
-   "state": "pending",
-   "note": "Zig uses it only from tests and benchmarks; not part of the compiler binary"
+   "state": "removed"
   },
   {
    "zig": "compiler/src/reuse/resolution_cache_tests.zig",
@@ -1200,5 +1193,6 @@
    "goose": "compiler-goose/src/work_counters.goose",
    "state": "in_src"
   }
- ]
+ ],
+ "zig_tree": "359b14f6:compiler/src"
 }

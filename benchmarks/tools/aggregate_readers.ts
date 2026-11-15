@@ -6,7 +6,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 const repo = resolve(new URL("../../", import.meta.url).pathname);
 const out = resolve(repo, "build/bench/aggregate-producer");
 await Deno.mkdir(out, { recursive: true });
-let executable = resolve(repo, "compiler/zig-out-native-dev/bin/blotc");
+let executable = resolve(repo, "compiler-goose/build/blotc-goose-dev");
 let codegenTier: "development" | "optimized" = "optimized";
 let codegenWorkers = 1;
 for (let at = 0; at < Deno.args.length; at += 2) {

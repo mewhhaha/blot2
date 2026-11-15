@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { runCli } from "../../host/cli.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 
 for (const packaged of [false, true]) {
   // The packaged iteration uses the untracked generated/compiler/blotc.gz,

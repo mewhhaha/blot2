@@ -3,7 +3,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 const fields = Array.from({ length: 40 }, (_, word) => {
   if (word === 33) return `f033: #[value + 33]`;
   if (word === 34) return `f034: -0.0`;

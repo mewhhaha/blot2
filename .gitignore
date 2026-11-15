@@ -8,6 +8,4 @@ __pycache__/
 /editor/tree-sitter-blot2/*.dylib
 /editor/tree-sitter-blot2/*.dll
 
-/.zig-cache/
-/compiler/build/
 *.orig

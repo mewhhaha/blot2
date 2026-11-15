@@ -6,7 +6,7 @@ import {
 import { instantiateGuest } from "../../host/guest.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 // Exercise unknown callback rows, rejection and recovery with the ordinary
 // compiler configured to a process-local 256-step inference limit.
 function chain(length: number): string {

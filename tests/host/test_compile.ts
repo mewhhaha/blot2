@@ -8,7 +8,7 @@ export async function compile(
   const entry = `${directory}/main.blot`;
   const compiler = await createZigProjectCompiler({
     executable: Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
     entry,
     prelude: null,
   });

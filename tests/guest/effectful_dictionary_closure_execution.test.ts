@@ -46,7 +46,7 @@ entry const answer: Unit -> U32 = func unit => return consume Read
 `;
   const corrected = invalid.replace("consume Read", "consume (func () => return 42)");
   const executable = Deno.args[0] ??
-    new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
   const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
   try {
     {

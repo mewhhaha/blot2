@@ -1,345 +1,133 @@
 import { strict as assert } from "node:assert";
-import { compilerLease } from "../../scripts/compiler_lease.ts";
 import {
-  cacheStatus,
-  nativeBuildOptions,
-  runPhase,
-  sweepTimings,
+  developmentCompiler,
+  releaseCompiler,
+} from "../../scripts/build_compiler.ts";
+import {
+  harnessFiles,
+  plan,
+  referenceChecks,
+  type Selection,
+  smokeFiles,
+  testCommand,
 } from "../../scripts/test_compiler.ts";
 
-async function simulatedGate(
-  args: string[],
-  options: {
-    version?: string;
-    failBuild?: boolean;
-    guest?: boolean;
-    preflight?: number;
-  } = {},
-) {
-  const directory = await Deno.makeTempDir({ prefix: "blot-gate-scope-" });
-  const quote = (value: string) => "'" + value.replaceAll("'", "'\\''") + "'";
-  try {
-    const calls = `${directory}/zig-calls`;
-    await Deno.writeTextFile(calls, "");
-    const shim = `${directory}/zig`;
-    let script = "#!/bin/sh\n" +
-      `printf '%s\\n' CALL "$@" >> ${quote(calls)}\n` +
-      'if [ "$1" = version ]; then\n' +
-      `  printf '%s\\n' ${quote(options.version ?? "0.17.0-dev.123")}\n` +
-      "  exit 0\nfi\n";
-    if (options.failBuild) script += "exit 19\n";
-    await Deno.writeTextFile(shim, script);
-    await Deno.chmod(shim, 0o755);
-    if (options.guest) {
-      const guest = `${directory}/selected.test.ts`;
-      let source =
-        'Deno.test("selected guest", () => { if (Deno.args[0] !== "compiler/zig-out-dev/bin/blotc") throw new Error("wrong compiler"); });\n';
-      if (args.includes("--filter")) {
-        source +=
-          'Deno.test("excluded guest", () => { throw new Error("guest filter was ignored"); });\n';
-      }
-      await Deno.writeTextFile(
-        guest,
-        source,
-      );
-      args = [...args, guest];
-    }
-    if (options.preflight) {
-      for (let index = 1; index < options.preflight; index++) {
-        const file = `${directory}/passing-${index}.test.ts`;
-        await Deno.writeTextFile(
-          file,
-          `Deno.test("passing ${index}", () => {});\n`,
-        );
-        args = [...args, "--preflight", file];
-      }
-      const file = `${directory}/recent-failure.test.ts`;
-      await Deno.writeTextFile(
-        file,
-        'Deno.test("recent regression", () => { throw new Error("reproduce before LLVM"); });\n',
-      );
-      args = [...args, "--preflight", file];
-    }
-    const result = await new Deno.Command(Deno.execPath(), {
-      args: [
-        "run",
-        "--allow-read",
-        "--allow-write",
-        "--allow-run",
-        "--allow-env",
-        "scripts/test_compiler.ts",
-        "--timings-dir",
-        `${directory}/timings`,
-        ...args,
-      ],
-      env: { PATH: directory },
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    const report = JSON.parse(
-      await Deno.readTextFile(`${directory}/timings/timings.json`),
-    );
-    const commands = (await Deno.readTextFile(calls)).split("CALL\n")
-      .slice(1).map((call) => call.trimEnd().split("\n"));
-    return {
-      code: result.code,
-      stdout: new TextDecoder().decode(result.stdout),
-      stderr: new TextDecoder().decode(result.stderr),
-      report,
-      commands,
-    };
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
+const junit = (name: string) => `/logs/${name}.junit.xml`;
+const selection = (overrides: Partial<Selection>): Selection => ({
+  mode: "full",
+  files: [],
+  jobs: 4,
+  preflight: [],
+  ...overrides,
+});
+const script = new URL("../../scripts/test_compiler.ts", import.meta.url)
+  .pathname;
+async function rejected(...args: string[]) {
+  const result = await new Deno.Command(Deno.execPath(), {
+    args: ["run", "-A", script, ...args],
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  assert.notEqual(result.code, 0);
+  return new TextDecoder().decode(result.stderr);
 }
 
-Deno.test("full gate rejects busy artifacts before starting its smoke build", async () => {
-  await using lease = await compilerLease(Deno.cwd());
-  const result = await simulatedGate([]);
-  assert.notEqual(result.code, 0);
-  assert.match(result.stderr, /busy.*no build was queued/);
-  assert.deepEqual(result.commands, []);
-});
-
-Deno.test("selected development native laws skip compiler builds and guests", async () => {
-  const result = await simulatedGate([
-    "--dev",
-    "--native-suite",
-    "types",
-    "--native-filter",
-    "staging law",
-    "--native-filter",
-    "usage law",
-  ], { version: "0.17.0" });
-  assert.equal(result.code, 0, result.stderr);
-  assert.equal(result.report.success, true);
-  assert.equal(result.report.native_backend, "noLLVM");
-  assert.deepEqual(
-    result.report.phases.map((phase: { name: string }) => phase.name),
-    ["zig-version", "native-run"],
-  );
-  const options = [
-    "-Doptimize=safe",
-    "--summary",
-    "all",
-    "-j2",
-    "-Dtest-shards=2",
-    "-Dllvm=false",
-    "--prefix",
-    "zig-out-native-dev",
-    "-Dtest-suite=types",
-    "-Dtest-filter=staging law",
-    "-Dtest-filter=usage law",
-  ];
-  assert.deepEqual(result.commands, [
-    ["version"],
-    ["build", "test", ...options],
+Deno.test("the full gate tests its tooling, builds, checks the references, packs and runs every guest", () => {
+  const steps = plan(selection({}), junit);
+  assert.deepEqual(steps.map((step) => step.name), [
+    "harness",
+    "release-build",
+    ...referenceChecks.map(([name]) => name),
+    "pack",
+    "guests",
   ]);
-  assert(
-    result.report.phases.every((phase: { command: string[] }) =>
-      phase.command[0] === "zig"
-    ),
-  );
+  const harness = steps[0].command;
+  for (const file of harnessFiles) assert(harness.includes(file), file);
+  assert.deepEqual(steps[1].command.slice(-1), ["--release"]);
+  const guests = steps[steps.length - 1];
+  assert.deepEqual(guests.guests, ["tests/guest", "tests/host"]);
+  assert.deepEqual(guests.command.slice(-2), ["--", releaseCompiler]);
+  assert(guests.command.includes("--parallel"));
+  assert(guests.command.includes(junit("guests")));
 });
 
-Deno.test("native development selections force actual execution with Zig's backend", async () => {
-  const result = await simulatedGate([
-    "--dev",
-    "--native-filter",
-    "ownership",
-    "--force-native",
+Deno.test("every harness file and reference check of the gate exists", async () => {
+  const root = new URL("../../", import.meta.url);
+  for (const file of harnessFiles) await Deno.stat(new URL(file, root));
+  for (const [, tool] of referenceChecks) await Deno.stat(new URL(tool, root));
+  for (const file of smokeFiles) await Deno.stat(new URL(file, root));
+});
+
+Deno.test("recent failures run before the whole guest suite", () => {
+  const steps = plan(
+    selection({ preflight: ["tests/guest/a.test.ts"] }),
+    junit,
+  );
+  const names = steps.map((step) => step.name);
+  assert.equal(
+    names.indexOf("preflight-regressions"),
+    names.indexOf("guests") - 1,
+  );
+  assert.deepEqual(steps[names.indexOf("preflight-regressions")].guests, [
+    "tests/guest/a.test.ts",
   ]);
-  assert.equal(result.code, 0, result.stderr);
-  assert.equal(result.report.native_backend, "noLLVM");
-  for (const command of result.commands.slice(1)) {
-    assert(command.includes("-Dtest-filter=ownership"));
-    assert(command.includes("-Dtest-force-run=true"));
-    assert(command.includes("-Dllvm=false"));
-    assert(!command.includes("-fincremental"));
-  }
 });
 
-Deno.test("full and focused native compilation share the Zig backend and installed artifact", () => {
-  const options = nativeBuildOptions(2, 2);
-  assert(options.includes("-Dllvm=false"));
-  assert(!options.includes("-Dllvm=true"));
-  assert.equal(options[options.indexOf("--prefix") + 1], "zig-out-native-dev");
+Deno.test("guest mode runs only the guests, against the optimized compiler as it is", () => {
+  const steps = plan(
+    selection({
+      mode: "guest",
+      files: ["tests/guest/a.test.ts"],
+      filter: "name",
+      jobs: 1,
+    }),
+    junit,
+  );
+  assert.equal(steps.length, 1);
+  assert.deepEqual(steps[0].guests, ["tests/guest/a.test.ts"]);
+  assert(!steps[0].command.includes("--parallel"));
+  assert.deepEqual(steps[0].command.slice(-5), [
+    "--filter",
+    "name",
+    "tests/guest/a.test.ts",
+    "--",
+    releaseCompiler,
+  ]);
 });
 
-Deno.test("native-only development rejects incompatible Zig before building", async () => {
-  for (const version of ["0.16.0", "0.17.01", "0.17.0garbage"]) {
-    const result = await simulatedGate([
-      "--dev",
-      "--native-suite",
-      "checker",
-    ], { version });
-    assert.notEqual(result.code, 0);
-    assert.equal(result.report.success, false);
-    assert.match(result.stderr, /requires Zig 0\.17\.0/);
-    assert.deepEqual(result.commands, [["version"]]);
-    assert.deepEqual(
-      result.report.phases.map((phase: { name: string }) => phase.name),
-      ["zig-version"],
-    );
-  }
+Deno.test("development mode builds the debug compiler and runs the named files or the smoke files", () => {
+  const smoke = plan(selection({ mode: "development" }), junit);
+  assert.deepEqual(smoke.map((step) => step.name), [
+    "development-build",
+    "focused-guests",
+  ]);
+  assert.deepEqual(smoke[0].command.slice(-2), [
+    "--output",
+    developmentCompiler,
+  ]);
+  assert.deepEqual(smoke[1].guests, smokeFiles);
+  assert.deepEqual(smoke[1].command.slice(-2), ["--", developmentCompiler]);
+  const named = plan(
+    selection({ mode: "development", files: ["tests/host/lsp.test.ts"] }),
+    junit,
+  );
+  assert.deepEqual(named[1].guests, ["tests/host/lsp.test.ts"]);
 });
 
-Deno.test("selected guests and combined development checks omit smoke", async () => {
-  for (
-    const [native, filtered] of [[false, false], [false, true], [true, true]]
-  ) {
-    const args = ["--dev", "--jobs", "1"];
-    if (filtered) args.push("--filter", "selected guest");
-    const phases = ["development-build"];
-    if (native) {
-      args.push("--native-suite", "syntax");
-      phases.push("native-run");
-    }
-    phases.push("focused-guests");
-    const result = await simulatedGate(args, { guest: true });
-    assert.equal(result.code, 0, result.stderr);
-    assert.equal(result.report.success, true);
-    assert.deepEqual(
-      result.report.phases.map((phase: { name: string }) => phase.name),
-      phases,
-    );
-    assert.deepEqual(result.commands[0], ["version"]);
-    assert(result.commands[1].includes("install"));
-    let commandCount = 2;
-    if (native) commandCount = 3;
-    assert.equal(result.commands.length, commandCount);
-  }
-});
-
-Deno.test("guest filters build directly while default development and full gates retain smoke", async () => {
-  for (
-    const [args, name] of [
-      [["--dev", "--filter", "selected"], "development-build"],
-      [["--dev"], "smoke-build"],
-      [[], "smoke-build"],
-    ] as [string[], string][]
-  ) {
-    const result = await simulatedGate(args, { failBuild: true });
-    assert.notEqual(result.code, 0);
-    assert.equal(result.report.success, false);
-    assert.deepEqual(
-      result.report.phases.map((phase: { name: string }) => phase.name),
-      [name],
-      JSON.stringify({ args, stdout: result.stdout, stderr: result.stderr }),
-    );
-    assert.equal(result.report.phases[0].code, 19);
-    assert.deepEqual(result.commands[0], ["version"]);
-    assert(result.commands[1].includes("install"));
-    assert.equal(result.commands.length, 2);
-  }
-});
-
-Deno.test("full compiler gates reject all partial selections before building", async () => {
-  for (
-    const args of [
-      ["--native-suite", "syntax"],
-      ["--native-filter", "canonical"],
-      ["--filter", "selected guest"],
-      ["host/native.test.ts"],
-    ]
-  ) {
-    const result = await new Deno.Command(Deno.execPath(), {
-      args: [
-        "run",
-        "--allow-read",
-        "scripts/test_compiler.ts",
-        ...args,
-      ],
-      stdout: "piped",
-      stderr: "piped",
-    }).output();
-    assert.notEqual(result.code, 0);
-    assert.match(
-      new TextDecoder().decode(result.stderr),
-      /full compiler gate cannot be filtered/,
-    );
-    assert.equal(result.stdout.length, 0);
-  }
-});
-
-Deno.test("explicit preflight regressions are never truncated before release/native compilation", async () => {
-  const result = await simulatedGate([], { preflight: 9 });
-  assert.notEqual(result.code, 0);
-  assert.equal(result.report.success, false);
+Deno.test("the test command passes the compiler after the files", () => {
   assert.deepEqual(
-    result.report.phases.map((phase: { name: string }) => phase.name),
-    ["smoke-build", "preflight-regressions"],
-  );
-  assert.match(result.stderr, /reproduce before LLVM/);
-  assert.equal(result.commands.length, 2);
-  assert(
-    !result.commands.some((args: string[]) =>
-      args.includes("-Doptimize=fast") || args.includes("test-compile")
-    ),
+    testCommand(["a.test.ts"], "blotc", 2, undefined, undefined).slice(-4),
+    ["--parallel", "a.test.ts", "--", "blotc"],
   );
 });
 
-Deno.test("gate timings drain both pipes and preserve the command exit code", async () => {
-  const directory = await Deno.makeTempDir({ prefix: "blot-gate-timing-" });
-  try {
-    const result = await runPhase("failure", [
-      Deno.execPath(),
-      "eval",
-      "const bytes = new Uint8Array(131072).fill(65); await Promise.all([Deno.stdout.write(bytes), Deno.stderr.write(bytes)]); Deno.exit(7);",
-    ], directory);
-    assert.equal(result.code, 7);
-    assert.equal((await Deno.stat(result.stdout)).size, 131072);
-    assert.equal((await Deno.stat(result.stderr)).size, 131072);
-    assert(result.wall_seconds > 0);
-    const success = await runPhase("warning", [
-      Deno.execPath(),
-      "eval",
-      'console.error("failed command: warning from a successful test");',
-    ], directory);
-    assert.equal(success.code, 0);
-  } finally {
-    await Deno.remove(directory, { recursive: true });
-  }
-});
-
-Deno.test("OOM timing records preserve failed sweeps and rank by elapsed time", () => {
-  const rows = [
-    {
-      kind: "deterministic",
-      duration_ns: 20,
-      allocations: 4,
-      runs: 5,
-      completed: true,
-      scenario: "small",
-    },
-    {
-      kind: "concurrent",
-      duration_ns: 80,
-      allocations: 8,
-      runs: 12,
-      completed: false,
-      scenario: "failed",
-    },
-  ];
-  const log = "normal test output\n" +
-    rows.map((row) => "BLOT_OOM_PROFILE\t" + JSON.stringify(row)).join("\n");
-  const result = sweepTimings(log);
-  assert.deepEqual(result.map((row) => row.scenario), ["failed", "small"]);
-  assert.equal(result[0].completed, false);
-  assert.throws(() => sweepTimings('BLOT_OOM_PROFILE\t{"duration_ns":-1}'));
-});
-
-Deno.test("native timing distinguishes cached compilation from executed tests", () => {
-  const summary =
-    "test success\n+- run test 1507 pass (1507 total) success 6m\n   +- compile test safe native-native cached 20ms MaxRSS:38M\n";
-  assert.equal(cacheStatus("native-compile", summary), "hit");
-  assert.equal(cacheStatus("native-run", summary), "miss");
-  assert.equal(
-    cacheStatus("native-run", "+- run test 3 pass (3 total) 1ms"),
-    "miss",
+Deno.test("the full gate cannot be filtered, and modes do not combine", async () => {
+  assert.match(await rejected("--filter", "name"), /cannot be filtered/);
+  assert.match(
+    await rejected("tests/guest/a.test.ts"),
+    /cannot be filtered/,
   );
-  assert.equal(
-    cacheStatus("native-run", "test cached\n+- run test cached"),
-    "hit",
-  );
+  assert.match(await rejected("--dev", "--guest"), /Choose --dev or --guest/);
+  assert.match(await rejected("--guest", "notes.md"), /Expected a test file/);
+  assert.match(await rejected("--jobs", "9"), /--jobs must be 1 through 4/);
 });

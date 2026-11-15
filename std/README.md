@@ -347,7 +347,7 @@ JavaScript numbers. There is no compiler-specific ECS storage ABI. See
 
 ## Lists and arrays
 
-In the Zig compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
+In the compiler, `[1, 2]` has type `List U32`; `#[1, 2]` has type
 `Array U32` by default. A type annotation selects fixed-length `Array a`,
 append-only `GrowArray a`, or `ResizeArray a` with push and truncate
 capabilities; all three use `#[...]` literals. Lists and arrays are separate
@@ -491,7 +491,7 @@ Source folds and predicates preserve iteration order and callback effects.
 Explicit copies and caller destinations express independent versions rather than
 depending on last-reference/COW optimization.
 
-The Zig const evaluator retains immutable collection values. Appending or
+The const evaluator retains immutable collection values. Appending or
 prepending to the latest version uses unused buffer slots and grows the buffer
 geometrically, making repeated construction linear in work and storage. Earlier
 versions retain their original contents. Branching from an older version copies

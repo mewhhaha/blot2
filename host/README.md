@@ -1,10 +1,10 @@
 # Deno host
 
-This directory contains the Deno client and host tools for the Zig compiler:
-CLI, package manager, formatter and derive generator, editor integration,
-project client, diagnostics, and WebAssembly guest and ABI runtime. It does not
-parse and compile programs independently; semantic queries and emission are
-handled by [the Zig compiler](../compiler/README.md).
+This directory contains the Deno client and host tools for the compiler: CLI,
+package manager, formatter and derive generator, editor integration, project
+client, diagnostics, and WebAssembly guest and ABI runtime. It does not parse
+and compile programs independently; semantic queries and emission are handled by
+[the compiler](../compiler-goose/README.md).
 
 The Baba grammar and parser inputs are in `host/parser/`; generated parser
 outputs are in [generated/parser](../generated/parser). The compiler parses

@@ -228,7 +228,7 @@ Deno.test("retained collection wrapper bodies invalidate after append becomes pr
   const options = {
     entry,
     executable: Deno.args[0] ??
-      new URL("../../compiler/zig-out/bin/blotc", import.meta.url),
+      new URL("../../compiler-goose/build/blotc-goose", import.meta.url),
   };
   const compiler = await createCompiler(options);
   const declarations =

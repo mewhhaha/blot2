@@ -26,7 +26,7 @@ entry const closures = func (steps: U32) => return do:
 `;
 
 const options = (entry: string) => ({
-  executable: resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc"),
+  executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
   entry,
   prelude: new URL("../../std/prelude.blot", import.meta.url),
   stdRoot: new URL("../../std", import.meta.url),

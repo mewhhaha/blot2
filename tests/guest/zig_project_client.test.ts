@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 
 const executable = resolve(
   Deno.args[0] ??
-    fileURLToPath(new URL("../../compiler/zig-out/bin/blotc", import.meta.url)),
+    fileURLToPath(new URL("../../compiler-goose/build/blotc-goose", import.meta.url)),
 );
 async function sha(bytes: Uint8Array<ArrayBuffer>): Promise<string> {
   return Array.from(

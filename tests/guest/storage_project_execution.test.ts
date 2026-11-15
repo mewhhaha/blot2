@@ -26,7 +26,7 @@ entry const answer = func (value: U32) => return do:
 `,
     );
     const compiler = await createZigProjectCompiler({
-      executable: resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc"),
+      executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
       entry,
       prelude: null,
     });
@@ -58,7 +58,7 @@ entry const answer = func () => return values[0]
   try {
     await Deno.writeTextFile(entry, source(41));
     const compiler = await createZigProjectCompiler({
-      executable: resolve(Deno.args[0] ?? "compiler/zig-out/bin/blotc"),
+      executable: resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose"),
       entry,
       prelude: null,
     });

@@ -148,7 +148,7 @@ async function main() {
   ) throw new Error("--workloads must contain reader or writer");
   const repo = resolve(new URL("../..", import.meta.url).pathname);
   const blotc = resolve(
-    args.get("--blotc") ?? `${repo}/compiler/zig-out-native-dev/bin/blotc`,
+    args.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
   );
   const hash = async (bytes: Uint8Array<ArrayBuffer>) =>
     [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((

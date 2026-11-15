@@ -9,7 +9,7 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { jsonAssetParser } from "../../host/assets.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 const encoder = new TextEncoder();
 const echo = { revision: 0, snapshot: 7, filename: "/query.blot", position: 3 };
 function reply() {

@@ -12,7 +12,7 @@ Project options: --prelude PATH|none, --std-root DIR, --alias PREFIX=DIR,
 
 export async function runCli(
   executable: string | URL = new URL(
-    "../compiler/zig-out/bin/blotc",
+    "../compiler-goose/build/blotc-goose",
     import.meta.url,
   ),
   args: string[] = Deno.args,

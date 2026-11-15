@@ -1,21 +1,23 @@
-# Finish the Goose compiler and retire Zig
+# The Goose compiler replaced the Zig compiler
 
 The owner's direction (15 November 2026):
 
 - "add some more patches to goose to make it faster until goose to wasm is
   ready. And try to finish the goose compiler so we can retire zig."
-- Later the same day: "make a path to get goose compiler working and the
-  zig one deprecated and we can work on compiler times after that."
+- "make a path to get goose compiler working and the zig one deprecated and
+  we can work on compiler times after that."
+- "Yes make the switch and delete the zig compiler."
 
-So the order is: a working Goose compiler, Zig deprecated, then compile
-times.
+All three are done. The compiler is compiler-goose/. The Zig compiler,
+compiler/, was removed on 15 November 2026; commit 359b14f6 is the last
+with it. Compile times are next.
 
-## Where the port stands (15 November 2026)
+## The comparison before Zig was removed
 
 compiler-goose/ was the scoped compiler as the Zig source stood at 44ee94f4
 (12 November). The Zig compiler then replaced the scoped backend with the
 direct one and deleted about 170,000 lines. The port followed that cut and
-was then brought up to today's Zig.
+was then brought up to the Zig source of 15 November.
 
 `compiler-goose/build/blotc-goose` now has every command of `blotc`:
 `lex`, `parse`, `check`, `build`, `parse-project`, `check-project`,
@@ -25,8 +27,8 @@ Against the Zig release compiler:
 
 | What | Result |
 | --- | --- |
-| Guest and host suite (`deno task test:goose`) | 1,054 pass, 0 fail, 101 ignored, as for Zig |
-| compiler/fixtures/direct, 33 programs | Wasm and records byte-identical |
+| Guest and host suite | 1,054 pass, 0 fail, 101 ignored, as for Zig |
+| The 187 fixture programs (now compiler-goose/tests/fixtures) | Wasm and records identical on 183; the other four differ in one counter (see "Known differences") |
 | Ink's 112 test programs, `build-project` | Wasm byte-identical |
 | Ink's suite through Pen (`pen test-blot`) | Same log line for line, timings aside: 268 passed, 1 failed, 3 did not compile, in 73 modules |
 | Gdev Main | Wasm byte-identical through `serve-project` (2,720,970 bytes, sha256 af9f24dd…); its first Pen frame matches the recorded hashes (frame.png c1ff619f… on the software driver, frames.trace 86d50101…) |
@@ -49,33 +51,66 @@ its Goose module is.
    (each revision built fresh), dependency bundles, `migrate-stores`,
    native assets, editor completion and parallel module checks.
 4. **Parity.** The table above.
-5. **Deprecate Zig.** Not started. See "What is left".
+5. **Switch and delete Zig.** Done; see the next two sections.
 
 Then compile times, as the owner ordered.
 
-## What is left before Zig can go
+## What the switch changed
 
-Nothing in the compiler. What remains is around it:
+- **References.** The Goose compiler's tests compared it with the Zig
+  compiler. They now compare it with records of what Zig produced on 15
+  November: tests/fixtures/expected.json (187 programs: exit code, Wasm
+  hash and size, records), tests/uniqueness/expected.json (lowering
+  diagnostics of 73 programs) and tests/direct/NAME.expected (backend
+  bytes). `--record` rewrites a record after a deliberate change.
+- **Scripts.** `deno task build:compiler` and `build:compiler:dev` build
+  the Goose compiler (optimized to build/blotc-goose, debug to
+  build/blotc-goose-dev). `deno task test:compiler` is the gate: tooling
+  tests, the optimized build, the three references, the package and every
+  guest and host test. The tests' default compiler path, `pack_native.ts`,
+  editor/helix and the benchmark tools name the Goose compiler.
+- **CI** builds the Goose compiler (clang, cmake, ninja; the patched Goose
+  is cached) and runs `deno task check`.
+- **Siblings.** ../ink and ../gdev run
+  ../blot2/compiler-goose/build/blotc-goose from their pen.json; Pen's
+  tests, example check and CI, and Ink's CI, build and run it too. A
+  machine that builds them needs the compiler built first
+  (`deno task build:compiler`).
+- **Generators.** Two generators read Zig declarations: the dependency
+  bundle codecs and the JSON adapters. What they read is now recorded in
+  tools/dependency-wire-model.json (the bundle format: 203 types) and
+  tools/json-union-model.json (15 unions), and both are edited by hand
+  from here on. The codec generator refuses to run when a Goose type on
+  the wire gains or loses a field or variant the model does not list.
+- **A test fixture.** The fake completion peer of the LSP tests was a Zig
+  program built with `zig build-exe`; it is now C, built with `cc`
+  (tests/host/fixtures/completion_peer.c). The tests no longer need Zig.
+- **A crash found while recording.** A `pack` without a selected dictionary
+  failed an assertion in the backend, because only frozen modules had the
+  table its child is read from. No test had reached it. The core builder
+  now fills the table.
 
-- **Switch the tooling.** scripts/build_compiler.ts, test_compiler.ts and
-  pack_native.ts, the default compiler path in the tests, CI,
-  editor/helix and the `blotc` path in the sibling pen.json files
-  (../ink, ../gdev) all name the Zig compiler. `deno task build:goose`
-  and `deno task test:goose` build and test the Goose compiler meanwhile.
-  Switching a sibling's pen.json makes its builds need
-  compiler-goose/build/blotc-goose on that machine (clang, cmake, ninja
-  and a 7-minute release build), so that step waits for the owner.
-- **CI.** The workflow fails on main for a reason that predates the port:
-  a guest test needs ../ink, and the owner has not yet chosen between
-  fetching Ink in CI and marking the test. A Goose job would fail the same
-  way, so none is added yet.
-- **Zig's own tests.** `zig build test` (the native suite) tests the Zig
-  source. The port has laws for the direct backend and the uniqueness pass
-  only; compiler-goose/pending/tests holds 13 laws written for the 12
-  November interfaces, and they are not run. Deleting Zig deletes that
-  suite.
-- **Speed.** A release build of the Goose compiler is slower than Zig
-  (see "Speed" below).
+## What went with Zig
+
+- **Zig's native test suite** (`zig build test`): the unit tests of the
+  lexer, parser, checker, Core lowering and backend, with their
+  allocation-failure sweeps. The Goose compiler has no unit tests of its
+  own beyond the two direct-backend laws. What tests it is the guest and
+  host suite and the three recorded references.
+- **The Zig lint** (`deno task lint:zig`, zig-analyzer) and the scripts
+  around the native suite: `check:dev`, `test:native`, the native test
+  inventory, shards and costs, and their tooling tests.
+- **Benchmark tools for Zig's own build**: compiler_iteration.py,
+  development_cycles.py and zig_time_report.ts. The profilers that remain
+  in benchmarks/tools name frames by Zig source file and need redoing.
+- **The Zig-oracle runner** compiler-goose/tools/qualify_compiler.ts with
+  its fixtures, and compiler-goose/pending/: three modules that only Zig's
+  tests used and 13 laws written for the 12 November interfaces.
+- **The unfinished memory-model phase 2 pass** exists only in Zig, on
+  branch `wip/memory-phase2-own` (0afccb55). It has to be ported to Goose
+  when that work resumes.
+- `compiler-goose/source-correspondence.json` still says which Zig file
+  each Goose module came from.
 
 ## Parallel checks
 
@@ -129,7 +164,7 @@ The guest suite asserts `live_bytes == 0` after most builds. That found a
 leak the port had from the start: the checker kept the environment rows of
 every certified lambda.
 
-## Known differences from Zig that remain in src
+## Known differences from the Zig compiler
 
 - Core still has the four declaration-dependency tables Zig dropped in
   f429ffd8, and `reuse/declaration_dependencies.goose` still fills them.
@@ -151,8 +186,11 @@ every certified lambda.
   checker walks its imported names and its globals in the slot order of
   Zig's hash map, and the backend its binding map (support/zigmap.goose
   keeps the same layout).
-- **Three counters still differ slightly.** Diagnostics, the imported
-  schemes and the Wasm are the same; the cause is not found.
+- **Three counters differ slightly from Zig's.** Diagnostics, the imported
+  schemes and the Wasm are the same; the cause was not found before Zig
+  was removed. tests/fixtures/expected.json keeps Zig's value beside the
+  Goose compiler's for the four fixtures it affects (`type_nodes`, 2 or 3
+  more).
   - A module that declares a function with a `where` clause beside
     another declaration ends with one more type node than in Zig (a
     one-element product, appended after every node the two share):

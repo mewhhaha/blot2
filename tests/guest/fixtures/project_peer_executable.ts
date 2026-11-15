@@ -10,15 +10,16 @@ export function completionPeerExecutable(): Promise<string> {
 
 async function compileCompletionPeer(): Promise<string> {
   const source = new URL(
-    "../../host/fixtures/completion_peer.zig",
+    "../../host/fixtures/completion_peer.c",
     import.meta.url,
   );
-  const version = await new Deno.Command("zig", {
-    args: ["version"],
+  const version = await new Deno.Command("cc", {
+    args: ["--version"],
     stdout: "piped",
+    stderr: "piped",
   }).output();
   if (!version.success) {
-    throw new Error("Cannot identify Zig for the completion peer");
+    throw new Error("Cannot identify the C compiler for the completion peer");
   }
   const digest = await crypto.subtle.digest(
     "SHA-256",
@@ -37,7 +38,7 @@ async function compileCompletionPeer(): Promise<string> {
     new URL("../../../build/tests/completion-peer/", import.meta.url),
   );
   await Deno.mkdir(cache, { recursive: true });
-  const output = `${cache}${key}${Deno.build.os === "windows" ? ".exe" : ""}`;
+  const output = `${cache}${key}`;
   try {
     if ((await Deno.stat(output)).isFile) return output;
   } catch (error) {
@@ -45,19 +46,9 @@ async function compileCompletionPeer(): Promise<string> {
   }
   const directory = await Deno.makeTempDir({ dir: cache });
   try {
-    const temporary = `${directory}/peer${
-      Deno.build.os === "windows" ? ".exe" : ""
-    }`;
-    const compiled = await new Deno.Command("zig", {
-      args: [
-        "build-exe",
-        fileURLToPath(source),
-        "-O",
-        "fast",
-        "-lc",
-        ...(Deno.build.os === "linux" ? ["-fno-llvm"] : []),
-        `-femit-bin=${temporary}`,
-      ],
+    const temporary = `${directory}/peer`;
+    const compiled = await new Deno.Command("cc", {
+      args: ["-O2", "-o", temporary, fileURLToPath(source)],
       stdout: "piped",
       stderr: "piped",
     }).output();

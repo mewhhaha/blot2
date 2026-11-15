@@ -1,61 +1,37 @@
+// Build the Blot compiler, which is written in Goose (compiler-goose/).
+//   build_compiler.ts        the optimized compiler, about seven minutes
+//   build_compiler.ts --dev  the debug compiler, about a minute and a half
+// The first build also builds the patched Goose compiler it needs. Both need
+// clang, cmake, ninja and Python 3.
 import { fileURLToPath } from "node:url";
 
-const directory = new URL("../compiler/", import.meta.url);
-let development = false;
-let incremental = false;
-let timeReport = false;
-let jobs: number | undefined;
-for (let index = 0; index < Deno.args.length; index++) {
-  const argument = Deno.args[index];
-  if (argument === "--dev") {
-    development = true;
-  } else if (argument === "--incremental") {
-    incremental = true;
-  } else if (argument === "--time-report") {
-    timeReport = true;
-  } else if (argument.startsWith("--jobs=")) {
-    jobs = Number(argument.slice("--jobs=".length));
-    if (!Number.isInteger(jobs) || jobs < 1) {
-      throw new Error("--jobs requires a positive integer");
-    }
-  } else throw new Error(`Unknown argument: ${argument}`);
+export const releaseCompiler = "compiler-goose/build/blotc-goose";
+export const developmentCompiler = "compiler-goose/build/blotc-goose-dev";
+
+/** The command that builds one of the two compilers, run from the repository root. */
+export function buildCommand(development: boolean): string[] {
+  const command = ["sh", "compiler-goose/build.sh"];
+  if (development) command.push("--output", developmentCompiler);
+  else command.push("--release");
+  return command;
 }
-if (incremental && !development) {
-  throw new Error("--incremental requires --dev");
+
+if (import.meta.main) {
+  let development = false;
+  for (const argument of Deno.args) {
+    if (argument === "--dev") development = true;
+    else throw new Error(`Unknown argument: ${argument}`);
+  }
+  const root = fileURLToPath(new URL("../", import.meta.url));
+  const command = buildCommand(development);
+  const result = await new Deno.Command(command[0], {
+    cwd: root,
+    args: command.slice(1),
+    stdout: "inherit",
+    stderr: "inherit",
+  }).output();
+  if (!result.success) Deno.exit(result.code);
+  let executable = releaseCompiler;
+  if (development) executable = developmentCompiler;
+  console.log(`Compiler executable: ${root}${executable}`);
 }
-const version = await new Deno.Command("zig", {
-  args: ["version"],
-  stdout: "piped",
-}).output();
-const installed = new TextDecoder().decode(version.stdout).trim();
-if (!version.success || !/^0\.17\.0(?:-|$)/.test(installed)) {
-  throw new Error(`Blot requires Zig 0.17.0 (installed: ${installed})`);
-}
-console.log(`Building Blot with Zig ${installed}`);
-const args = ["build", "install", "compiler-identity"];
-if (development) {
-  args.push(
-    "-Doptimize=safe",
-    "-Dllvm=false",
-    "--prefix",
-    "zig-out-dev",
-  );
-} else {
-  args.push("-Doptimize=fast", "-Dllvm=true");
-}
-if (incremental) args.push("-fincremental");
-// Zig deliberately forces a rebuild for this report; keep it opt-in.
-if (timeReport) args.push("--time-report");
-if (jobs !== undefined) args.push(`-j${jobs}`);
-args.push("--summary", "all");
-const result = await new Deno.Command("zig", {
-  cwd: fileURLToPath(directory),
-  args,
-  stdout: "inherit",
-  stderr: "inherit",
-}).output();
-if (!result.success) Deno.exit(result.code);
-await Deno.mkdir(new URL("../build/", import.meta.url), { recursive: true });
-let executable = new URL("zig-out/bin/blotc", directory);
-if (development) executable = new URL("zig-out-dev/bin/blotc", directory);
-console.log(`Compiler executable: ${fileURLToPath(executable)}`);

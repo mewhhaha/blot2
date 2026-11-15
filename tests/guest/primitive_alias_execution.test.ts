@@ -2,7 +2,7 @@ import { strict as assert } from "node:assert";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { instantiateGuest } from "../../host/guest.ts";
 
-const fixture = new URL("../../compiler/fixtures/primitive-aliases.blot", import.meta.url);
+const fixture = new URL("../../compiler-goose/tests/fixtures/primitive-aliases.blot", import.meta.url);
 const importedSource = `import * as primitives from "./primitives"
 const apply = func operation -> left -> right => return operation left right
 entry const imported = func (value: U32): Array U32 => return do:

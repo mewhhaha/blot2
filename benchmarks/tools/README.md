@@ -136,39 +136,7 @@ The collector uses individual counter reads because Linux does not support
 inherited `PERF_FORMAT_GROUP` reads; see the
 [perf event interface](https://man7.org/linux/man-pages/man2/perf_event_open.2.html).
 
-## Zig compilation timing
-
-Check `zig version` first: these scripts target Zig 0.17.0. Add `--time-report`
-to the next necessary `deno task build:compiler` release build, or to a `--dev`
-build when studying native development compilation. Zig forces a rebuild for
-this option and starts a persistent local timing web server. The command remains
-running after compilation completes.
-
-Capture the server's WebSocket URL into a new directory:
-
-```sh
-deno run -A benchmarks/tools/zig_time_report.ts \
-  'ws://[::1]:PORT/' build/bench/new-zig-report
-```
-
-The collector saves every raw message, per-step timing, declaration timing and
-LLVM text. It sends no rebuild requests. It succeeds only when every step has
-succeeded and has a report. Stop the original build's idle web server after
-capturing that evidence; an intentional server stop is not a compiler failure.
-Keep CPU categories separate from elapsed stages: they need not add to wall
-time. The decoder follows the installed Zig 0.17.0 build-web format and must be
-rechecked when Zig changes.
-
-`compiler_iteration.py` measures isolated Safe/noLLVM construction, including
-production/test edits, reverts and full native inventory compilation. It does
-not execute the full gate and its percentile is not a complete edit/check cycle
-percentile. Keep those measurements separate.
-
-`development_cycles.py --out NEW_DIRECTORY` runs 20 complete static-sharing
-edit/check cycles in a disposable checkout with frozen sibling corpus fixtures.
-It groups leaf, checker and test-only edits, restores every input, and reports
-the initial check and group restoration checks separately. Set `ZIG_ANALYZER`
-first. Its p95 is the observed sample percentile, not a universal latency bound.
+## Other measurements
 
 ### Asset reply copying
 

@@ -276,7 +276,7 @@ entry const collected = func count => return do:
 Deno.test("retained cursor, structural-list and SIMD bodies match fresh compilation through edits and recovery", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-iterator-revision-" });
   const entry = `${directory}/main.blot`, dependency = `${directory}/values.blot`;
-  const executable = Deno.args[0] ?? new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  const executable = Deno.args[0] ?? new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
   const options = { executable, entry, stdRoot, prelude: `${stdRoot}/prelude.blot` };
   const before = `import * as list from "std/list"
 const cursor = (list.slice 1 3 [10, 20, 30, 40, 50]).iter

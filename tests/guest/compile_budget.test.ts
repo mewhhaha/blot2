@@ -25,7 +25,7 @@ import {
 } from "../../host/zig_project_client.ts";
 
 const compiler = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 const stdRoot = new URL("../../std", import.meta.url).pathname;
 const scratchRoot = new URL("../../build/tmp/", import.meta.url).pathname;

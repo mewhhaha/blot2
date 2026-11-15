@@ -38,7 +38,7 @@ entry const stored_bits_${shape} = func (seed: F32) => return do:
 `).join("");
   const sources = { [entry]: main, [library]: fixture.shapes };
   const executable = Deno.args[0] ??
-    new URL("../../compiler/zig-out/bin/blotc", import.meta.url);
+    new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
   try {
     await Deno.writeTextFile(entry, main);
     await Deno.writeTextFile(library, fixture.shapes);

@@ -1,7 +1,9 @@
 from dispatch_hooks import write_generated
 from pathlib import Path
+import json
 import re
 ROOT=Path(__file__).resolve().parents[1] / 'src'
+UNION_MODEL=json.loads(Path(__file__).with_name('json-union-model.json').read_text())
 # Source authoring only. Emit finite JSON overloads from the current model;
 # never compile, execute or claim to verify a Goose module.
 def clean(s):
@@ -80,18 +82,10 @@ for path in sorted(ROOT.rglob('*.goose')):
         continue
     ns = match[1]
     module = path.relative_to(ROOT).with_suffix('').as_posix().replace('/','.')
-    native_path = ROOT.parents[1] / 'compiler/src' / path.relative_to(ROOT).with_suffix('.zig')
-    native_unions = {}
-    if native_path.is_file():
-        native = clean(native_path.read_text())
-        for union in re.finditer(r'\bconst\s+(\w+)\s*=\s*union\s*\([^;{}]+\)\s*\{', native):
-            union_end = balanced(native, union.end()-1)
-            variants = {}
-            for item in split(native[union.end():union_end]):
-                variant = re.fullmatch(r'(?:@"([^"\n]+)"|(\w+))\s*:\s*(.+)', item, re.S)
-                if variant:
-                    variants[variant[1] or variant[2]] = variant[3].strip()
-            native_unions[union[1]] = variants
+    # The payload type each union variant had in the Zig compiler, recorded
+    # in json-union-model.json when it was removed. An enum that is not in
+    # the record keeps its payloads as field objects.
+    native_unions = UNION_MODEL.get(path.relative_to(ROOT).with_suffix('').as_posix(), {})
     for declaration in re.finditer(r'(?<!root )\bstruct\s+(\w+)(?:<([^>{}]+)>)?\s*\{', text):
         name, generic = declaration.groups()
         qualified = ns+'::'+name

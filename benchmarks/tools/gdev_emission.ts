@@ -8,7 +8,7 @@ const { values } = parseArgs({
   options: {
     compiler: {
       type: "string",
-      default: "compiler/zig-out-native-dev/bin/blotc",
+      default: "compiler-goose/build/blotc-goose-dev",
     },
     output: { type: "string", default: "build/bench/gdev-emission" },
     "timeout-ms": { type: "string", default: "30000" },

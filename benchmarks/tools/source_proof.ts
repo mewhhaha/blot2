@@ -18,7 +18,7 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 5000) {
 }
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const compiler = resolve(
-  options.get("--blotc") ?? `${repo}/compiler/zig-out-native-dev/bin/blotc`,
+  options.get("--blotc") ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
 );
 const runner = `${repo}/benchmarks/tools/scoped_calls.ts`;
 const decoder = new TextDecoder();

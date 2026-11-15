@@ -1,31 +1,39 @@
-# The Blot compiler in Goose
+# The Blot compiler
 
-This is the port of `../compiler/` (Zig) that is meant to replace it. The
-state, the steps and the measurements are in
-[tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md).
+This is Blot's compiler. It is written in Goose and was ported from a
+compiler written in Zig, which was removed on 15 November 2026 once the two
+matched. [tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md) has the record of the
+port: the comparison, what went with Zig, the known differences and the
+speed.
 
 ## Layout
 
 - `src/` is the compiler: the parser, the checker, Core lowering, the
   direct backend (`src/direct/`), the project pipeline, the project server
-  and the command line (`src/driver/`). It has every command of `blotc`.
-  The module map follows the Zig source; a module keeps the name of its
-  Zig original.
-- `pending/` holds three modules that Zig uses only from its tests, and 13
-  laws written for the 12 November interfaces. Nothing builds or runs
-  them.
+  and the command line (`src/driver/`). The module map follows the Zig
+  source it came from; `source-correspondence.json` names the Zig file of
+  each module.
 - `native/` is the C host: the entry point, file and process calls, and
   the observer that counts pool requests for the `memory` record.
 - `tools/` has the generators for the generated modules in `src/support/`
-  and `src/reuse/`, the build of the patched Goose, and the test runners.
+  and `src/reuse/`, the two models they read, the build of the patched
+  Goose, and the test runners.
+- `tests/` has the recorded references and the laws.
 
 ## Build
 
-`sh compiler-goose/build.sh` (`deno task build:goose:dev`) writes
-`compiler-goose/build/blotc-goose` (debug, about a minute and a half);
-`--release` (`deno task build:goose`) optimizes it (about seven minutes). It needs clang, cmake, ninja and Python 3. A rebuilt compiler
-has a new identity, so dependency bundles made by the previous build are
-declined as stale.
+From the repository root:
+
+- `deno task build:compiler` writes the optimized compiler,
+  `compiler-goose/build/blotc-goose`, in about seven minutes. Pen, the
+  sibling checkouts and the tests' default path run this file.
+- `deno task build:compiler:dev` writes a debug compiler,
+  `compiler-goose/build/blotc-goose-dev`, in about a minute and a half.
+
+Both run `compiler-goose/build.sh`, which takes `--release`, `--output FILE`
+and `--cflag=FLAG`. It needs clang, cmake, ninja and Python 3. A rebuilt
+compiler has a new identity, so dependency bundles made by the previous
+build are declined as stale.
 
 - The first run builds the Goose compiler: upstream Goose
   ([github.com/aardappel/goose](https://github.com/aardappel/goose)) with
@@ -46,20 +54,39 @@ python3 compiler-goose/tools/write_dependency_codecs.py
 python3 compiler-goose/tools/write_dependency_owned_headers.py
 ```
 
+Two of them read a model that is edited by hand:
+
+- `tools/dependency-wire-model.json` declares the format of dependency
+  bundles: each type on the wire, its fields in wire order, and the fields
+  of the Goose type that stay off the wire (`unwired`). When a Goose type
+  on the wire gains or loses a field or a variant, `write_dependency_codecs.py`
+  stops and names it; add it to the model.
+- `tools/json-union-model.json` gives, for 15 enums, the payload type each
+  variant had in Zig. It decides whether a variant's payload is written
+  bare or as an object in JSON. An enum that is not listed writes objects.
+
 ## Tests
 
-- The guest and host suite takes the compiler as its argument:
-  `deno task test:goose` runs it against `compiler-goose/build/blotc-goose`
-  (1,054 pass, 101 ignored, as for Zig).
-- `python3 compiler-goose/tools/test_direct.py` runs each law in
-  `tests/direct/` against the Zig source of the direct backend and requires
-  the same bytes.
-- `python3 compiler-goose/tools/test_uniqueness.py --zig compiler/zig-out/bin/blotc`
-  builds each program in `tests/uniqueness/` with both compilers and
-  requires the same lowering diagnostics.
-- `tests/checker_tools`, `tests/copied_argument_contents`,
-  `tests/global_empty_facts` and `tests/qualification` test the patches to
-  the Goose compiler, not this port.
+- `deno task test:compiler` is the gate: the tooling's tests, the optimized
+  build, the three references below, the package, and the guest and host
+  suite (1,054 cases pass, 101 are ignored). `deno task test:guest` runs
+  only the suite, against the optimized compiler as it is, and
+  `deno task test:compiler:dev FILES` builds the debug compiler and runs
+  those files.
+- The references hold what the Zig compiler produced on 15 November 2026:
+  - `python3 compiler-goose/tools/test_fixtures.py` builds the 187
+    programs of `tests/fixtures/` and requires the recorded exit code, Wasm
+    and records.
+  - `python3 compiler-goose/tools/test_uniqueness.py` requires the recorded
+    lowering diagnostics for the 73 programs of `tests/uniqueness/`.
+  - `python3 compiler-goose/tools/test_direct.py` runs each law of
+    `tests/direct/` and requires the recorded bytes.
+
+  After a deliberate change of behavior, `--record EXE` rewrites the first
+  two from that compiler.
+- `tests/checker_tools`, `tests/copied_argument_contents` and
+  `tests/global_empty_facts` test the patches to the Goose compiler, not
+  this compiler.
 
 ## Finding a pooled owner that is not released
 

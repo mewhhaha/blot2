@@ -10,7 +10,7 @@ if (Deno.args.length > 2) throw new Error("Expected [COMPILER [OUTPUT]]");
 const out = resolve(Deno.args[1] ?? `${root}/build/bench/staging-current-cost`);
 await Deno.mkdir(out, { recursive: true });
 const executable = resolve(
-  Deno.args[0] ?? `${root}/compiler/zig-out/bin/blotc`,
+  Deno.args[0] ?? `${root}/compiler-goose/build/blotc-goose`,
 );
 const samples: Record<string, unknown>[] = [];
 const hash = async (bytes: Uint8Array<ArrayBuffer>) =>

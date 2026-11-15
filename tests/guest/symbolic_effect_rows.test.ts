@@ -4,7 +4,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
 
 const executable = Deno.args[0] ??
-  new URL("../../compiler/zig-out/bin/blotc", import.meta.url).pathname;
+  new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 
 const library = `type State a is effect = { get: Unit -> a, set: a -> Unit }
 const read: Unit -> a ! {State.get a} = func () => return State.get ()

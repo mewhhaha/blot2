@@ -33,7 +33,7 @@ if (!Number.isInteger(workers) || workers < 1 || workers > 16) {
 const repo = resolve(new URL("../..", import.meta.url).pathname);
 const root = resolve(repo, "../gdev");
 const executable = resolve(
-  values.compiler ?? `${repo}/compiler/zig-out-native-dev/bin/blotc`,
+  values.compiler ?? `${repo}/compiler-goose/build/blotc-goose-dev`,
 );
 const directory = resolve(values.output);
 await Deno.mkdir(directory, { recursive: true });

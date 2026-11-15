@@ -35,7 +35,7 @@ entry const ordered = func () => return do:
   break @f32.add (@u32.to_f32 (@u32.add (@u32.mul count 10) x)) y
 entry const folded = ordered ()
 `;
-const compiler=Deno.args[0]??new URL("../../compiler/zig-out/bin/blotc",import.meta.url).pathname;
+const compiler=Deno.args[0]??new URL("../../compiler-goose/build/blotc-goose",import.meta.url).pathname;
 for(const asynchronous of [false,true])Deno.test(`imported callable record constructors retain source arrows, captures and State argument order (${asynchronous?"JSPI":"sync"})`,async()=>{
  const dir=await Deno.makeTempDir({dir:new URL("../../build",import.meta.url).pathname,prefix:"zig-native-constructor-import-"});
  try{
