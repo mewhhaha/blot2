@@ -674,8 +674,8 @@
   },
   {
    "zig": "compiler/src/check/uniqueness.zig",
-   "goose": null,
-   "state": "not_ported"
+   "goose": "compiler-goose/src/check/uniqueness.goose",
+   "state": "in_src"
   },
   {
    "zig": "compiler/src/check/uniqueness_tests.zig",

@@ -47,6 +47,9 @@ python3 compiler-goose/tools/write_project_packet_contexts.py
 - `python3 compiler-goose/tools/test_direct.py` runs each law in
   `tests/direct/` against the Zig source of the direct backend and requires
   the same bytes.
+- `python3 compiler-goose/tools/test_uniqueness.py --zig compiler/zig-out/bin/blotc`
+  builds each program in `tests/uniqueness/` with both compilers and
+  requires the same lowering diagnostics.
 - `tests/checker_tools`, `tests/copied_argument_contents`,
   `tests/global_empty_facts` and `tests/qualification` test the patches to
   the Goose compiler, not this port.
