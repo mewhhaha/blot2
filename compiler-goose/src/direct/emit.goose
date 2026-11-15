@@ -19,7 +19,7 @@ import direct.writer;
 import direct.types;
 import direct.runtime;
 import direct.map;
-import direct.zigmap;
+import support.zigmap;
 import direct.function;
 
 type Ty = u32;
@@ -736,7 +736,7 @@ fn within(g: Generator&, m: const Module&, ty: TId, reach: i64) -> bool {
 // --- Instances ----------------------------------------------------------
 
 // The instance of a named function at concrete function type `ty`.
-fn named(g: Generator&, target: BindingRef, ty: Ty, site: const Module&, site_id: u32) -> u32, Error { return namedWith(g, target, ty, false, site, site_id); }
+recursive fn named(g: Generator&, target: BindingRef, ty: Ty, site: const Module&, site_id: u32) -> u32, Error { return namedWith(g, target, ty, false, site, site_id); }
 // `named`, where `unused_holes` says every hole of `ty` is unused.
 recursive fn namedWith(g: Generator&, target: BindingRef, ty: Ty, unused_holes: bool, site: const Module&, site_id: u32) -> u32, Error {
     let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, 0 };

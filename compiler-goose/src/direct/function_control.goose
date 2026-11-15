@@ -161,10 +161,10 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         } else {
             // Alternatives bind the same names; later rows copy into the first row's locals.
             let matched = open(g, f, OP_block);
-            var first = blot_direct_zigmap::Map {};
+            var first = blot_support_zigmap::Map {};
             for row, row_index in rows {
                 let row_fail = open(g, f, OP_block);
-                let before = blot_direct_zigmap::clone(g.s.map_pool, f.bindings);
+                let before = blot_support_zigmap::clone(g.s.map_pool, f.bindings);
                 let patterns = m.rowPatterns(row);
                 for pattern, at in patterns {
                     let tested = test_(g, f, pattern, g.s.vals[values.start + at], true, row_fail, id);
@@ -174,25 +174,25 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     // Zig walks its hash map here; the table keeps its order.
                     let table = f.bindings;
                     for slot in 0..(table.capacity as i64) {
-                        if !blot_direct_zigmap::used(g.s.map_pool, table, slot as u32) { continue; }
-                        let key = blot_direct_zigmap::keyAt(g.s.map_pool, table, slot as u32);
-                        let entry = g.s.vals[blot_direct_zigmap::valueAt(g.s.map_pool, table, slot as u32)];
-                        let prior_at, has_prior = blot_direct_zigmap::get(g.s.map_pool, before, key);
+                        if !blot_support_zigmap::used(g.s.map_pool, table, slot as u32) { continue; }
+                        let key = blot_support_zigmap::keyAt(g.s.map_pool, table, slot as u32);
+                        let entry = g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, table, slot as u32)];
+                        let prior_at, has_prior = blot_support_zigmap::get(g.s.map_pool, before, key);
                         if has_prior && sameWords(g, g.s.vals[prior_at], entry) { continue; }
                         let owned, error = fresh(g, f, entry.ty, id);
                         if error != blot_direct_types::Error.none { return neverVal(), error; }
                         let copied = copy(g, f, entry, owned, id);
                         if copied != blot_direct_types::Error.none { return neverVal(), copied; }
                         g.s.vals.push(owned);
-                        blot_direct_zigmap::put(g.s.map_pool, first, key, (g.s.vals.len - 1) as u32);
+                        blot_support_zigmap::put(g.s.map_pool, first, key, (g.s.vals.len - 1) as u32);
                     }
                 } else {
                     // Every name the first row binds: a later row's payload
                     // may sit in the same locals as the first row's.
                     for slot in 0..(first.capacity as i64) {
-                        if !blot_direct_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
-                        let key = blot_direct_zigmap::keyAt(g.s.map_pool, first, slot as u32);
-                        let target = g.s.vals[blot_direct_zigmap::valueAt(g.s.map_pool, first, slot as u32)];
+                        if !blot_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
+                        let key = blot_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
+                        let target = g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)];
                         let value, present = bindGet(g, f, key);
                         if present {
                             let copied = copy(g, f, value, target, id);
@@ -206,9 +206,9 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             br(g, f, OP_br, next);
             close(g, f);
             for slot in 0..(first.capacity as i64) {
-                if !blot_direct_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
-                let key = blot_direct_zigmap::keyAt(g.s.map_pool, first, slot as u32);
-                bindPut(g, f, key, g.s.vals[blot_direct_zigmap::valueAt(g.s.map_pool, first, slot as u32)]);
+                if !blot_support_zigmap::used(g.s.map_pool, first, slot as u32) { continue; }
+                let key = blot_support_zigmap::keyAt(g.s.map_pool, first, slot as u32);
+                bindPut(g, f, key, g.s.vals[blot_support_zigmap::valueAt(g.s.map_pool, first, slot as u32)]);
             }
         }
         if arm.guard_ != 0 {

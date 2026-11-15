@@ -20,7 +20,7 @@ import direct.types;
 import direct.emit;
 import direct.runtime;
 import direct.map;
-import direct.zigmap;
+import support.zigmap;
 import .function_ops;
 import .function_values;
 import .function_calls;
@@ -74,7 +74,7 @@ struct Fn {
     locals_base: i64 = 0,
     labels_base: i64 = 0,
     parameter_words: u32 = 0,
-    bindings: blot_direct_zigmap::Map = blot_direct_zigmap::Map {},
+    bindings: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     depth: u32 = 0,
     // Set when this body allocates environment memory or receives a value
     // that may refer to it; such a body restores the stack on exit unless
@@ -150,10 +150,10 @@ fn w(g: const Generator&, value: Val, at: i64) -> u32 { return g.s.words[value.s
 
 fn bindPut(g: Generator&, f: Fn&, binding: u32, value: Val) {
     g.s.vals.push(value);
-    blot_direct_zigmap::put(g.s.map_pool, f.bindings, binding, (g.s.vals.len - 1) as u32);
+    blot_support_zigmap::put(g.s.map_pool, f.bindings, binding, (g.s.vals.len - 1) as u32);
 }
 fn bindGet(g: const Generator&, f: const Fn&, binding: u32) -> Val, bool {
-    let at, present = blot_direct_zigmap::get(g.s.map_pool, f.bindings, binding);
+    let at, present = blot_support_zigmap::get(g.s.map_pool, f.bindings, binding);
     if !present { return Val {}, false; }
     return g.s.vals[at], true;
 }

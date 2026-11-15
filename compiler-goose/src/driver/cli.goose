@@ -98,7 +98,7 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  checked.deinit();tree.deinit();names.deinit();source.clear();tokens.clear();comments.clear();diagnostics.clear();
  let emit_start=now();var wasm:u8[>..<]=[];var detail:u8[>..<]=[];let units:blot_check_core::Module[1]=[lowered.value];
  let compiled=blot_compile::compile(units[..],1,wasm,detail);stats.emit_us=elapsed(emit_start);stats.emitted_functions=compiled.emitted_functions;
- if compiled.has_diagnostic {let error=diagnostic(writer,filename,"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,blot_compile::message(compiled.diagnostic,detail[..]));lowered.deinit();return false,error;}
+ if compiled.has_diagnostic {var message:u8[>..]=[];message.append(blot_compile::message(compiled.diagnostic,detail[..]));let error=diagnostic(writer,filename,"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,message[..]);lowered.deinit();return false,error;}
  stats.wasm_bytes=wasm.len;let written=blot_io::write_file(output.value,wasm[..]);lowered.deinit();if written!=blot_error::Error.none {return false,written;}return true,blot_error::Error.none;
 }
 fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}

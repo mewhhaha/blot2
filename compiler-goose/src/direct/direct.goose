@@ -112,7 +112,8 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     }
     for init_function in inits { starts.push(init_function); }
     if starts.len != 0 {
-        g.module.start = blot_direct_function::startFunction(g, m, starts[..]);
+        let start_function = blot_direct_function::startFunction(g, m, starts[..]);
+        g.module.start = start_function;
         g.module.has_start = true;
     }
     let failure, has_summary = g.summary();

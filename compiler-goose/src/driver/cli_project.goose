@@ -8,6 +8,7 @@ import work_counters;
 import check.check;
 import check.core;
 import check.core_builder;
+import compile;
 import reuse.project;
 import reuse.project_check;
 import reuse.dependency_payload;
@@ -90,6 +91,7 @@ fn projectLowered(writer:blot_io::Writer,filename:const u8[:],output:Text,lower_
  // Paths and the tiny import catalog remain for diagnostics; source, syntax
  // and mutable inference state cannot be consulted by emission.
  let release_start=now();checked.deinit();checked_live=false;for &unit in loaded.units.items {unit.tree.deinit();blot_reuse_project::releaseSource(unit.source);unit.source=default<const u8[:]>();}stats.teardown_us+=elapsed(release_start);
- // The direct backend is not hooked up yet.
- return false,blot_error::Error.invalid_request;
+ let emit_start=now();var wasm:u8[>..<]=[];var detail:u8[>..<]=[];let backend=blot_phase_profile::enter(blot_phase_profile::Phase.backend);let compiled=blot_compile::compile(units,loaded.entry,wasm,detail);backend.exit();stats.emitted_functions=compiled.emitted_functions;
+ if compiled.has_diagnostic {var message:u8[>..]=[];message.append(blot_compile::message(compiled.diagnostic,detail[..]));let error=diagnostic(writer,loaded.filename(compiled.diagnostic.unit),"emit",enumName(compiled.diagnostic.code),compiled.diagnostic.span.start,compiled.diagnostic.span.end,message[..]);stats.emit_us=elapsed(emit_start);return false,error;}
+ stats.wasm_bytes=wasm.len;stats.emit_us=elapsed(emit_start);let write_start=now();assert(output.present);let error=blot_io::write_file(output.value,wasm[..]);if error!=blot_error::Error.none {return false,error;}stats.write_us=elapsed(write_start);return true,blot_error::Error.none;
 }
