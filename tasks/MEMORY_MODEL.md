@@ -90,6 +90,11 @@ full gate green, and moves std, ../ink and ../gdev itself.
      grammar.
 4. **Value restriction** in full: a `let` generalizes only when its value
    is a syntactic `func` (phase 1 did the part for array-holding lets).
+   - Done for rebinding (15 November 2026): the new version a `:=` gives a
+     name is never generalized. No program in the suites, Ink or Gdev
+     changed.
+   - Measured for `let`, not built: "Phase 4: the value restriction for
+     `let`" below.
 5. **Read-only references** (A4) and the end of references as a write
    path, after phase 3.
 
@@ -246,6 +251,36 @@ A smaller first step is possible without it: `own` on the parameters of
 named functions only, recorded per binding and called directly. That covers
 all 44 sites. A lambda with an `own` parameter, which `State.modify` needs,
 waits for `own` in types.
+
+## Phase 4: the value restriction for `let` (measured 15 November 2026)
+
+[The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)
+generalizes a `let` only when its value is a written `func`. It is 11
+lines in check.zig and is not applied.
+
+- **std, Ink and Gdev need no change.** The Gdev build and Ink's 62 test
+  programs check without a diagnostic.
+- **It must keep solving fields at each `let`.** A generalized `let` solves
+  the pending field requirements on its way to a scheme. Without that,
+  gdev/src/buildings/cannon.blot:329 fails with `ambiguous_operator`, so
+  the patch calls `solveFields` for a plain `let` too.
+- **Gdev's Wasm changes and its frame does not.** The Wasm is 2,720,283
+  bytes against 2,720,970. The first Pen frame is byte-identical on the
+  software Vulkan driver: frame.png c1ff619f…, frames.trace 86d50101… (the
+  recorded trace).
+- **24 tests pin the old rule** and must be restated or go with it:
+  - 13 guest cases: 7 in generalized_local_instance_execution (one local
+    used at two layouts), 2 in unused_aggregate_execution (an unused tuple
+    of generic constants now has an open type), and one each in
+    associated_execution, where_execution, qualified_evidence_execution and
+    result_execution (a local alias of a generic function).
+  - 11 native laws, in check_result_tests, check_effect_tests (2),
+    check_where_tests (3), check_shared_scheme_tests (4) and
+    scoped_effect_backend_tests. Most bind a local with a `where` clause or
+    an alias of a generic global.
+- **It saves little time:** 6.33 billion instructions for a Gdev build
+  against 6.41, with 8,313 schemes computed against 11,766. The cost of a
+  `let` is solving its fields, which stays.
 
 ## Measured scope before phase 1
 

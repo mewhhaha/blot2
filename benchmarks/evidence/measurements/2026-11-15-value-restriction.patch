@@ -1,0 +1,30 @@
+diff --git a/compiler/src/check/check.zig b/compiler/src/check/check.zig
+index 7a62554..f092a9c 100644
+--- a/compiler/src/check/check.zig
++++ b/compiler/src/check/check.zig
+@@ -12595,6 +12595,12 @@ const Engine = struct {
+         try self.env.append(self.allocator, .{ .name = name, .binding = binding });
+         return binding;
+     }
++    /// The value restriction: only a written function is generalized.
++    fn functionValue(self: *const Engine, id: ast.Id) bool {
++        var source = id;
++        while (self.tree.node(source).tag == .group) source = self.tree.node(source).a;
++        return self.tree.node(source).tag == .lambda;
++    }
+     fn templateValue(self: *const Engine, id: ast.Id) bool {
+         const node = self.tree.node(id);
+         return switch (node.tag) {
+@@ -12794,8 +12800,11 @@ const Engine = struct {
+         // Storage has one identity, so a local holding it keeps one type: its
+         // stores and reads must agree (tasks/MEMORY_MODEL.md rule 8). A closed
+         // type has nothing to generalize.
+-        const generalize = value_.fallback == 0 and self.tree.node(value_.pattern).tag == .pattern_name and
++        const generalize = value_.fallback == 0 and self.tree.node(value_.pattern).tag == .pattern_name and self.functionValue(value_.value) and
+             !(try self.holdsStorage(value, 0) and !self.types.knownClosed(try self.types.resolve(value, 0)));
++        // A plain binding settles its pending field requirements here, as a
++        // generalized one does on its way to a scheme.
++        if (!generalize and value_.fallback == 0 and self.tree.node(value_.pattern).tag == .pattern_name) try self.solveFields();
+         const saved_pattern_source = self.let_pattern_source;
+         self.let_pattern_source = id;
+         const total = self.pattern(value_.pattern, value, scope, &.{}, generalize) catch |err| {

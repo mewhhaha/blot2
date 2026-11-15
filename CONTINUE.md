@@ -52,6 +52,9 @@ compiles".
   - Together: 7.19 to 6.41 billion instructions for a Gdev build, and 1.36
     to 1.30 s on the cloud container
     ([record](benchmarks/evidence/measurements/2026-11-15-lazy-associated-import.json)).
+  - The new version a `:=` gives a name is no longer generalized (6.37
+    billion). This is the rebinding part of the value restriction, memory
+    model phase 4.
 
 ## In progress
 
@@ -69,6 +72,11 @@ compiles".
     needs, and the order of work. Spec Annex B item 13 points to it.
   - **The owner decides:** the two rule changes, and whether `own` in
     function types waits for the B3 and C8 removals.
+- **Memory model phase 4** (the value restriction for `let`) is measured
+  and not built. std, Ink and Gdev need no change and Gdev's frame is
+  identical, but 13 guest cases and 11 native laws pin the old rule and it
+  saves about 1% of a build. tasks/MEMORY_MODEL.md has the list and the
+  patch.
 - **Checker speed.** A release (LLVM) compiler builds Gdev Main in 1.30 s
   on the cloud container with one frontend worker, of which checking is
   0.87 s (lower 0.16, backend 0.14, lex 0.03, parse 0.03).
@@ -120,6 +128,9 @@ compiles".
 - Gdev: `deno run -A scripts/integration/build_gdev.ts --compiler X --timeout-ms 600000 OUT`
   (`--profile` adds phase timings), then
   `python3 scripts/integration/run_pen.py --launch --hardware --compiled-main OUT/main-*/main.wasm --expected-wasm-sha256 SHA --output DIR`.
+  Without `--hardware` it runs headless on a software Vulkan driver
+  (`apt-get install mesa-vulkan-drivers`). There frame.png is c1ff619f…;
+  frames.trace is 86d50101… on either.
 - Ink: build/goose-perf/ink-direct is a copy of ../ink whose pen.json runs
   build/goose-perf/blotc-direct (compiler/zig-out-direct). Refresh its .blot
   files from ../ink after changing Ink, then run

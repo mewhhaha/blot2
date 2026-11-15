@@ -12595,6 +12595,14 @@ const Engine = struct {
         try self.env.append(self.allocator, .{ .name = name, .binding = binding });
         return binding;
     }
+    /// The new version of a rebound name. A rebinding keeps one type, so
+    /// its value is never generalized.
+    fn rebound(self: *Engine, name: symbols.Symbol, value: T.Id, declaration: ast.Id) T.Error!BindingId {
+        try self.solveFields();
+        const binding = try self.addBinding(.{ .name = name, .declaration = declaration, .owner = self.owner, .kind = .local, .ty = value, .scheme = .{ .root = value } });
+        try self.env.append(self.allocator, .{ .name = name, .binding = binding });
+        return binding;
+    }
     fn templateValue(self: *const Engine, id: ast.Id) bool {
         const node = self.tree.node(id);
         return switch (node.tag) {
@@ -12917,7 +12925,7 @@ const Engine = struct {
         try self.env.append(self.allocator, .{ .name = self.self_name, .binding = previous });
         const value = try self.pureExpression(node.b, 0);
         self.env.shrinkRetainingCapacity(scope);
-        const binding = try self.local(name, value, id);
+        const binding = try self.rebound(name, value, id);
         self.bindings.items[binding].predecessor = previous;
         self.resolved[id] = binding;
         self.resolved[node.a] = previous;
@@ -13722,7 +13730,7 @@ const Engine = struct {
                 updated = result;
             }
         }
-        const successor = try self.local(root_node.a, updated, id);
+        const successor = try self.rebound(root_node.a, updated, id);
         self.bindings.items[successor].predecessor = previous;
         self.resolved[id] = successor;
         self.expr_types[id] = T.unit;
