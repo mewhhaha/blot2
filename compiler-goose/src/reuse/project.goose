@@ -205,7 +205,7 @@ fn decodePath(path:const u8[:],decoded:u8[>..<]&)->Error {
         } else {at++;}
         if byte==0 {decoded.resize(before);return blot_error::Error.invalid_path;}decoded.push(byte);
     }
-    if !blot_backend_runtime_identity::validUtf8(decoded[before..]) {decoded.resize(before);return blot_error::Error.invalid_path;}
+    if !blot_support_path::validUtf8(decoded[before..]) {decoded.resize(before);return blot_error::Error.invalid_path;}
     return blot_error::Error.none;
 }
 fn resolveImportPath(source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {

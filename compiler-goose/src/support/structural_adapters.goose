@@ -70,6 +70,7 @@ import direct.runtime;
 import direct.writer;
 import driver.cli;
 import driver.cli_diagnostics;
+import driver.cli_project;
 import eval.body_recipe;
 import eval.closed_evidence_import;
 import eval.evidence_projection;
@@ -1311,6 +1312,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ExplanationDetail)-
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ExplanationDetail,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::HoleDetail)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::HoleDetail,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ProjectStats)->bool {return equalFields(left,right);}
+fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ProjectStats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SerialExecutor)->bool {return equalFields(left,right);}
+fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SerialExecutor,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SimpleRecord)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SimpleRecord,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::Stats)->bool {return equalFields(left,right);}

@@ -45,3 +45,20 @@ fn relative(base: const u8[:],target: const u8[:],out: u8[>..<]&) -> Error {
     for index in common..right.len { if written { out.push('/'); } let component = right[index]; out.append(to[component.start..component.start + component.len]); written = true; }
     if !written { out.push('.'); } return blot_error::Error.none;
 }
+// std.unicode.utf8ValidateSlice: shortest forms only, no surrogates, at most U+10FFFF.
+fn validUtf8(bytes: const u8[:]) -> bool {
+    var at = 0;
+    while at < bytes.len {
+        let lead = bytes[at]; at++;
+        if lead < 128 { continue; }
+        var count = 0; var code: u32 = 0; var minimum: u32 = 0;
+        if lead >= 194 && lead <= 223 { count = 1; code = lead & 31; minimum = 128; }
+        else if lead >= 224 && lead <= 239 { count = 2; code = lead & 15; minimum = 2048; }
+        else if lead >= 240 && lead <= 244 { count = 3; code = lead & 7; minimum = 65536; }
+        else { return false; }
+        if count > bytes.len - at { return false; }
+        for index in 0..count { let byte = bytes[at]; at++; if byte < 128 || byte > 191 { return false; } code = (code << 6) | (byte & 63); }
+        if code < minimum || code > 1114111 || (code >= 55296 && code <= 57343) { return false; }
+    }
+    return true;
+}

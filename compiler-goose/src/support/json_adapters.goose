@@ -75,6 +75,7 @@ import direct.runtime;
 import direct.writer;
 import driver.cli;
 import driver.cli_diagnostics;
+import driver.cli_project;
 import eval.body_recipe;
 import eval.closed_evidence_import;
 import eval.evidence_projection;
@@ -729,6 +730,8 @@ fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::ContextDetails,writer:Jso
 fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::ExplanationContexts,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::ExplanationDetail,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::HoleDetail,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::ProjectStats,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::SerialExecutor,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::SimpleRecord,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_cli::blotJsonWrite<JsonWriter>(value:blot_cli::Stats,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_runtime::blotJsonWrite<JsonWriter>(value:blot_direct_runtime::Budgets,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}

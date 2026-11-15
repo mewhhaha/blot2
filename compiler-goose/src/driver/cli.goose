@@ -1,6 +1,7 @@
 // Command dispatch; mirrors compiler/src/main.zig.
 namespace blot_cli;
 import .cli_diagnostics;
+import .cli_project;
 import main;
 import inference_limits;
 import execution_policy;
@@ -25,7 +26,7 @@ type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
 enum Command {lex,parse,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc migrate-stores ENTRY [--project PEN.json] [--write-root DIR] [--include-std] [--dry-run] [project options]\n";
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc migrate-stores ENTRY... [--project PEN_JSON] [--write-root DIR] [--include-std] [--dry-run] [project options]\n       migrate-stores rewrites each := that gets aliased_update into the store =.\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -41,7 +42,7 @@ fn unsigned(text:const u8[:],maximum:u64)->u64,Error {
  if text.len==0 {return 0,blot_error::Error.invalid_character;}var start:i64=0;var negative=false;if text[0]=='+'||text[0]=='-' {negative=text[0]=='-';start=1;}if start==text.len||text[start]=='_'||text[text.len-1]=='_' {return 0,blot_error::Error.invalid_character;}
  var result:u64=0;for byte in text[start..] {if byte=='_' {continue;}if byte<'0'||byte>'9' {return 0,blot_error::Error.invalid_character;}let value=(byte-'0') as u64;if negative&&value!=0 {return 0,blot_error::Error.overflow;}if result>maximum/10||(result==maximum/10&&value>maximum%10) {return 0,blot_error::Error.overflow;}result=result*10+value;}return result,blot_error::Error.none;
 }
-fn semanticPolicy(value:const u8[:])->Policy,bool {let workers,error=unsigned(value,255);if error!=blot_error::Error.none||workers==0||workers>16 {return Policy{..},false;}return Policy{semantic_workers:workers as u8,semantic_components:true,..},true;}
+fn workerCount(value:const u8[:])->u8,bool {let workers,error=unsigned(value,255);if error!=blot_error::Error.none||workers==0||workers>16 {return 0,false;}return workers as u8,true;}
 fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=blot_error::Error.none {return error;}return blot_main::configureInferenceBudget(limit);}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len&&text[..prefix.len]==prefix;}
 fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",lex=>"lex",parse=>"parse",check=>"check",build=>"build",dependencies=>"dependencies"}}
@@ -97,11 +98,44 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  // The direct backend is not ported yet.
  lowered.deinit();return false,blot_error::Error.invalid_request;
 }
+fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}
 fn run(args:const Argument[:])->bool,Error {
  let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}
  let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
- if args.len<3||(isBuild(command)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
+ if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
+ let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.dependencies;
+ var first_option:i64=3;if isBuild(command)||command==Command.dependencies {first_option=4;}
+ if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
+ if project_command||first_option<args.len {
+  if command==Command.lex {return false,blot_error::Error.none;}
+  var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var semantic_workers=false;var policy=Policy{..};var at=first_option;
+  while at<args.len {
+   let arg=args[at];
+   // The profiling flag takes no value.
+   if arg=="--profile" {if !isBuild(command) {return false,blot_error::Error.none;}profile=true;at+=1;continue;}
+   if at+1>=args.len {return false,blot_error::Error.none;}let value=args[at+1];at+=2;
+   if arg=="--semantic-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.semantic_workers=workers;semantic_workers=true;}
+   else if arg=="--frontend-workers" {if !isBuild(command) {return false,blot_error::Error.none;}let workers,valid=workerCount(value);if !valid {return false,blot_error::Error.none;}policy.frontend_workers=workers;}
+   else if arg=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {return false,error;}}
+   else if arg=="--std-root" {options.std_root=blot_support::some<const u8[:]>(value);}
+   else if arg=="--alias" {var split:i64=-1;for byte,index in value {if byte=='=' {split=index;break;}}if split<0 {return false,blot_error::Error.none;}aliases.push(blot_reuse_project::Alias{value[..split],value[split+1..]});}
+   else if arg=="--input-mode" {if value=="project" {options.input_mode=blot_reuse_project::InputMode.project;}else if value=="source" {options.input_mode=blot_reuse_project::InputMode.source;}else {return false,blot_error::Error.none;}}
+   else if arg=="--prelude" {if value=="none" {options.prelude_path=blot_support::none<const u8[:]>();}else {options.prelude_path=blot_support::some<const u8[:]>(value);}}
+   else if arg=="--dependencies" {if !isBuild(command)||dependency_path.present {return false,blot_error::Error.none;}dependency_path=blot_support::some<const u8[:]>(value);}
+   else {return false,blot_error::Error.none;}
+  }
+  options.aliases=aliases[..];
+  // Dependency bundles are not ported yet (compiler-goose/pending).
+  if command==Command.dependencies||dependency_path.present {if profile||semantic_workers {return false,blot_error::Error.none;}return false,blot_error::Error.invalid_request;}
+  var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}
+  var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;
+  for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}
+   let accepted,error=processProject(stdout,selected,filename,options,profile,output,policy);
+   if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,stageName(selected),blot_error::error_name(error),0,0,"Compiler operation failed");return false,written;}
+   success=success&&accepted;}
+  return success,blot_error::Error.none;
+ }
  var success=true;var end=args.len;if command==Command.build {end=3;}
- for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=process(stdout,command,filename,output);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,blot_error::error_name(error));if written!=blot_error::Error.none {return false,written;}success=false;}else if !accepted {success=false;}}
+ for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=process(stdout,command,filename,output);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,"Compiler operation failed");if written!=blot_error::Error.none {return false,written;}success=false;}else if !accepted {success=false;}}
  return success,blot_error::Error.none;
 }
