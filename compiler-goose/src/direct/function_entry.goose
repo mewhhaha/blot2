@@ -1,0 +1,573 @@
+// Instance bodies, exported entries and the host boundary of the direct
+// backend's function emitter (compiler/src/direct/function.zig).
+namespace blot_direct_function;
+import .function;
+
+// A body that begins at the top of the generator's stacks.
+fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
+    g.s.serial += 1;
+    return Fn { unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
+}
+
+// ----- host boundary -----------------------------------------------------
+
+// A fresh fixed array copied from the host packet at `packet` (a local).
+fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32) -> Val, Error {
+    let packet_length = g.runtime_().packet_length;
+    let length = local32(g, f);
+    lget(g, packet);
+    callf(g, packet_length);
+    lset(g, length);
+    let array_ty, error = g.types.intern(blot_direct_types::Tag.array, [g.types.node(ty).a]);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    let handle, error = create(g, f, array_ty, length, 0);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    let base = baseOf(g, f, handle);
+    lget(g, base);
+    lget(g, packet);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lget(g, length);
+    i32Const(g, 4);
+    op(g, OP_i32_mul);
+    op(g, OP_prefix_fc);
+    uleb(g, 10);
+    op(g, 0);
+    op(g, 0);
+    return Val { ty, handle.start, handle.len }, blot_direct_types::Error.none;
+}
+// Copies an array into a fresh host packet; returns its address local.
+fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
+    let reset = g.runtime_().reset;
+    let allocate_function = g.runtime_().allocate;
+    let length, error = lengthOf(g, f, value, id);
+    if error != blot_direct_types::Error.none { return 0, error; }
+    i32Const(g, 0);
+    callf(g, reset);
+    op(g, OP_drop);
+    let packet = local32(g, f);
+    lget(g, length);
+    i32Const(g, 4);
+    op(g, OP_i32_mul);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    callf(g, allocate_function);
+    ltee(g, packet);
+    lget(g, length);
+    op(g, OP_i32_store);
+    uleb(g, 2);
+    uleb(g, 0);
+    let opened = open(g, f, OP_block);
+    lget(g, length);
+    op(g, OP_i32_eqz);
+    opIndex(g, OP_br_if, 0);
+    let base = baseOf(g, f, value);
+    lget(g, packet);
+    i32Const(g, 4);
+    op(g, OP_i32_add);
+    lget(g, base);
+    lget(g, length);
+    i32Const(g, 4);
+    op(g, OP_i32_mul);
+    op(g, OP_prefix_fc);
+    uleb(g, 10);
+    op(g, 0);
+    op(g, 0);
+    close(g, f);
+    return packet, blot_direct_types::Error.none;
+}
+// A closure calling host callback `slot` of table 1.
+fn hostClosure(g: Generator&, f: Fn&, ty: Ty, first: Abi, second: Abi, slot: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let import_id = hostImport(g, first, second);
+    let key = InstanceKey { kind: blot_direct_emit::InstanceKind.host, unit: f.unit, id: import_id, ty: ty };
+    let arrow = g.types.node(ty);
+    var instance, found = g.find(key);
+    if !found {
+        let parameters = g.saveTys([arrow.a]);
+        let captures = g.saveTys([blot_direct_types::u32_]);
+        let made, error = g.addInstanceWith(key, Env {}, parameters, arrow.b, true, captures, m, 0);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        instance = made;
+    }
+    let captured = constLocal(g, f, slot);
+    let capture = valOf1(g, blot_direct_types::u32_, captured);
+    return makeClosure(g, f, instance, ty, g.saveVals([capture]), 0);
+}
+// The host adapter body: converts the argument, calls the import with the
+// callback's externref and converts the result.
+fn hostBody(g: Generator&, f: Fn&, instance_id: u32, captures: Vals, argument: Val) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let key = g.s.instances[instance_id].key;
+    let arrow = g.types.node(key.ty);
+    let first, second, known = callbackAbi(g, key.ty);
+    if !known { return neverVal(), g.fail(m, 0, "host callback shape"); }
+    var has_packet = false;
+    var packet: u32 = 0;
+    if isArray(first) {
+        let address, error = toPacket(g, f, argument, 0);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        has_packet = true;
+        packet = address;
+    }
+    lget(g, w(g, g.s.vals[captures.start], 0));
+    opIndex(g, OP_table_get, 1);
+    if has_packet { lget(g, packet); } else if first == Abi.unit { i32Const(g, 0); } else { push(g, argument); }
+    callf(g, key.id);
+    if isArray(second) {
+        let address = local32(g, f);
+        lset(g, address);
+        noteAllocation(f);
+        return fromPacket(g, f, arrow.b, address);
+    }
+    if second == Abi.unit {
+        op(g, OP_drop);
+        return unitVal(), blot_direct_types::Error.none;
+    }
+    return pop(g, f, arrow.b, 0);
+}
+
+// ----- instances ---------------------------------------------------------
+
+// Emits the body of instance `id`. Bodies nest (an instance emitted to learn
+// its result type), so this one owns the generator's stacks from here up and
+// gives them back when it ends, whether or not it succeeds.
+recursive fn emitInstance(g: Generator&, id: u32) -> Error {
+    let s .= g.s;
+    let code_mark = s.code.len;
+    let locals_mark = s.locals.len;
+    let labels_mark = s.labels.len;
+    let handles_mark = s.handles.len;
+    let error = emitInstanceBody(g, id);
+    s.code.resize(code_mark);
+    s.locals.resize(locals_mark);
+    s.labels.resize(labels_mark);
+    s.handles.resize(handles_mark);
+    return error;
+}
+recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
+    let key = g.s.instances[id].key;
+    var unit = key.unit;
+    if !g.hasUnit(unit) { unit = g.s.instances[id].site; }
+    var f = newFn(g, unit, id);
+    f.env = g.s.instances[id].env;
+    let m .= g.units[unit - 1];
+    let closure = g.s.instances[id].closure;
+    let parameters = g.s.instances[id].parameters;
+    var root: u32 = 0;
+    if closure { let environment = local(g, f, VT_i32); }
+    let inputs = g.reserveVals(parameters.len);
+    for at in 0..(parameters.len as i64) {
+        let value, error = fresh(g, f, g.s.tys[parameters.start + at], 0);
+        if error != blot_direct_types::Error.none { return error; }
+        g.s.vals[inputs.start + at] = value;
+    }
+    f.parameter_words = localCount(g, f);
+    let owner_mark = local(g, f, VT_i32);
+    let stack_mark = local(g, f, VT_i32);
+    var captures = Vals {};
+    if closure {
+        let loaded, error = loadCaptures(g, f, g.s.instances[id].captures, 0);
+        if error != blot_direct_types::Error.none { return error; }
+        captures = loaded;
+    }
+    if key.kind == blot_direct_emit::InstanceKind.named {
+        let body .= m.body(key.id);
+        if !body { return g.fail(m, 0, "instance without a body"); }
+        let body_parameters = m.bodyParameters(body);
+        for parameter, at in body_parameters { bindPut(g, f, parameter.binding, g.s.vals[inputs.start + at]); }
+        root = body.root;
+    } else if key.kind == blot_direct_emit::InstanceKind.lambda {
+        let info = m.closure(key.id);
+        let captured = m.closureCaptures(key.id);
+        for binding, at in captured { bindPut(g, f, binding, g.s.vals[captures.start + at]); }
+        bindPut(g, f, info.parameter.binding, g.s.vals[inputs.start]);
+        root = info.body;
+    }
+    let slot = g.newSlot();
+    if !g.s.instances[id].inferring {
+        let made, error = fresh(g, f, g.s.instances[id].result, root);
+        if error != blot_direct_types::Error.none { return error; }
+        g.s.slots[slot] = blot_direct_emit::Slot { true, made };
+    }
+    let exit = open(g, f, OP_block);
+    g.s.labels.push(blot_direct_emit::Label { target: 0xffffffff, depth: exit, result: slot, kind: blot_direct_emit::LabelKind.function });
+    var value = neverVal();
+    match key.kind {
+        named, lambda => {
+            let made, error = stmt(g, f, root);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        partial, primitive, constructor => {
+            let made, error = adapterBody(g, f, id, captures, g.s.vals[inputs.start]);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        host => {
+            let made, error = hostBody(g, f, id, captures, g.s.vals[inputs.start]);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        pool => {
+            let made, error = poolBody(g, f, id);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        operation => {
+            let made, error = operationBody(g, f, id, g.s.vals[inputs.start]);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        state_get => {
+            let made, error = readFlat(g, f, 0, 0, g.s.instances[id].result, root);
+            if error != blot_direct_types::Error.none { return error; }
+            value = made;
+        },
+        state_set => {
+            let written = writeFlat(g, f, 0, 0, g.s.vals[inputs.start], root);
+            if written != blot_direct_types::Error.none { return written; }
+            value = unitVal();
+        },
+        trap => { op(g, OP_unreachable_); },
+    }
+    let delivered = deliver(g, f, value, slot, root);
+    if delivered == blot_direct_types::Error.unsupported { g.recordFailure(m, root); }
+    else if delivered != blot_direct_types::Error.none { return delivered; }
+    close(g, f);
+    // An inferred result is the type of the first value the body delivers.
+    var result = neverVal();
+    if g.s.slots[slot].present { result = g.s.slots[slot].value; }
+    if g.s.instances[id].inferring { g.s.instances[id].result = result.ty; }
+    // Stored memory-holding values may now be reachable from older storage.
+    var release = false;
+    if f.allocates {
+        let holds, error = g.holdsMemory(g.s.instances[id].result);
+        if error != blot_direct_types::Error.none { return error; }
+        release = !holds && f.memory_stores == 0;
+    }
+    if release { releaseTo(g, owner_mark, stack_mark); }
+    if result.ty == blot_direct_types::never { op(g, OP_unreachable_); } else { push(g, result); }
+    op(g, OP_end);
+    finishWith(g, g.s.instances[id].function, f, release, owner_mark, stack_mark);
+    return blot_direct_types::Error.none;
+}
+
+// Encodes the body and gives the generator's stacks back. Only for bodies
+// that are not nested in another one (exports and start functions).
+fn finish(g: Generator&, function: u32, f: const Fn&) {
+    finishWith(g, function, f, false, 0, 0);
+    g.s.code.resize(f.code_base);
+    g.s.locals.resize(f.locals_base);
+    g.s.labels.resize(f.labels_base);
+    g.s.handles.resize(f.handles_base);
+}
+
+// Encodes the body: local declarations (in runs of one type), the marks a
+// releasing body records on entry, then code.
+fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_mark: u32, stack_mark: u32) {
+    var out: u8[>..<] = [];
+    let first = f.locals_base + f.parameter_words;
+    let count = g.s.locals.len - first;
+    var runs: u64 = 0;
+    var at: i64 = 0;
+    while at < count {
+        var end = at + 1;
+        while end < count && g.s.locals[first + end] == g.s.locals[first + at] { end += 1; }
+        at = end;
+        runs += 1;
+    }
+    blot_direct_writer::uleb(out, runs);
+    at = 0;
+    while at < count {
+        var end = at + 1;
+        while end < count && g.s.locals[first + end] == g.s.locals[first + at] { end += 1; }
+        blot_direct_writer::uleb(out, (end - at) as! u64);
+        out.push(g.s.locals[first + at]);
+        at = end;
+    }
+    if release { markInto(g, out, owner_mark, stack_mark); }
+    blot_direct_writer::raw(out, g.s.code[f.code_base..g.s.code.len]);
+    blot_direct_writer::setBody(g.module, function, out[..]);
+}
+
+// ----- ABI ---------------------------------------------------------------
+
+// ABI 8 value kinds (runtime_ir.Scalar), and callback import names.
+enum Abi { unit, u32_, bool_, f32_, array_u32, array_f32 }
+fn abiCode(kind: Abi) -> u8 {
+    match kind {
+        unit => { return 0; },
+        u32_ => { return 1; },
+        bool_ => { return 2; },
+        f32_ => { return 3; },
+        array_u32 => { return 5; },
+        array_f32 => { return 6; },
+    }
+}
+fn abiName(kind: Abi) -> Chars {
+    match kind {
+        unit => { return "unit"; },
+        u32_ => { return "u32"; },
+        bool_ => { return "bool"; },
+        f32_ => { return "f32"; },
+        array_u32 => { return "array_u32"; },
+        array_f32 => { return "array_f32"; },
+    }
+}
+fn abiKind(g: const Generator&, ty: Ty) -> Abi, bool {
+    let n = g.types.node(ty);
+    match n.tag {
+        unit => { return Abi.unit, true; },
+        u32_ => { return Abi.u32_, true; },
+        boolean => { return Abi.bool_, true; },
+        f32_ => { return Abi.f32_, true; },
+        array, grow, resize => {
+            let element = g.types.node(n.a).tag;
+            if element == blot_direct_types::Tag.u32_ { return Abi.array_u32, true; }
+            if element == blot_direct_types::Tag.f32_ { return Abi.array_f32, true; }
+            return Abi.unit, false;
+        },
+        _ => { return Abi.unit, false; },
+    }
+}
+fn abiMachine(kind: Abi) -> ValType {
+    if kind == Abi.f32_ { return VT_f32; }
+    return VT_i32;
+}
+fn isArray(kind: Abi) -> bool { return kind == Abi.array_u32 || kind == Abi.array_f32; }
+// A Foreign host callback parameter: its argument and result kinds.
+fn callbackAbi(g: const Generator&, ty: Ty) -> Abi, Abi, bool {
+    let n = g.types.node(ty);
+    if n.tag != blot_direct_types::Tag.function { return Abi.unit, Abi.unit, false; }
+    let first, has_first = abiKind(g, n.a);
+    if !has_first { return Abi.unit, Abi.unit, false; }
+    let second, has_second = abiKind(g, n.b);
+    if !has_second { return Abi.unit, Abi.unit, false; }
+    return first, second, true;
+}
+// Declares the host import for a callback shape; imports precede functions.
+fn hostImport(g: Generator&, first: Abi, second: Abi) -> u32 {
+    let key = blot_direct_emit::key64(abiCode(first), abiCode(second));
+    let found, present = g.s.host_imports.get(key);
+    if present { return found; }
+    var name: u8[>..<] = [];
+    name.append("call_");
+    name.append(abiName(first));
+    name.append("_");
+    name.append(abiName(second));
+    let signature = g.module.signature([VT_externref, abiMachine(first)], [abiMachine(second)]);
+    let import_id = g.module.importFunction("blot:host/1", name[..], signature);
+    let stored = g.s.host_imports.put(key, import_id);
+    return import_id;
+}
+
+// ----- exports -----------------------------------------------------------
+
+// Recovers temporaries and providers a trapped earlier call left behind.
+fn resetEntry(g: Generator&) {
+    let release = g.runtime_().release;
+    let stack_base = g.runtime_().layout.stack_base;
+    let stack_pointer = g.runtime_().stack_pointer;
+    let effect_context = g.runtime_().effect_context;
+    i32Const(g, 1);
+    callf(g, release);
+    i32Const(g, stack_base);
+    gset(g, stack_pointer);
+    i32Const(g, 0);
+    gset(g, effect_context);
+}
+fn releaseEntry(g: Generator&) {
+    let release = g.runtime_().release;
+    i32Const(g, 1);
+    callf(g, release);
+}
+
+// An exported scalar constant: a global its init function sets from the
+// constant's instance. Returns the init function; the caller writes the ABI.
+fn emitConstantExport(g: Generator&, m: const Module&, body: const blot_check_core::Body&, abi: u8[>..<]&) -> u32, Error {
+    let ty, error = g.types.lower(m, m.binding(body.binding).ty, Env {});
+    if error != blot_direct_types::Error.none { return 0, g.failCode(m, body.root, blot_check_diagnostic_code::Code.entry_type, "an exported binding needs a concrete type"); }
+    let kind, supported = abiKind(g, ty);
+    if !supported {
+        g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
+        g.put("exported constants of type ");
+        g.put(blot_direct_types::tagName(g.types.node(ty).tag));
+        g.put(" are not supported");
+        return 0, g.failClose();
+    }
+    if isArray(kind) { return 0, g.failCode(m, body.root, blot_check_diagnostic_code::Code.entry_type, "exported constants must be scalars"); }
+    let instance_id, error = g.named(BindingRef { unit: m.unit, binding: body.binding }, ty, m, body.root);
+    if error != blot_direct_types::Error.none { return 0, error; }
+    let machine = abiMachine(kind);
+    let global = g.module.addGlobal(machine, true, 0);
+    let function = g.module.addFunction(g.module.signature([], []));
+    var f = newFn(g, m.unit, 0);
+    resetEntry(g);
+    callf(g, g.s.instances[instance_id].function);
+    let value, error = pop(g, f, ty, body.root);
+    if error != blot_direct_types::Error.none { return 0, error; }
+    if ty == blot_direct_types::unit { i32Const(g, 0); } else { push(g, value); }
+    gset(g, global);
+    releaseEntry(g);
+    op(g, OP_end);
+    finish(g, function, f);
+    let name = m.name(body.export_name);
+    g.module.exportItem(name, blot_direct_writer::EXPORT_global, global);
+    blot_direct_writer::name(abi, name);
+    abi.push(abiCode(kind));
+    return function, blot_direct_types::Error.none;
+}
+
+// Initializes every array constant the program reads, in declaration order,
+// so their initializers run at instantiation rather than at a first read.
+fn poolInits(g: Generator&, m: const Module&, pools: const u32[:]) -> u32, Error {
+    let function = g.module.addFunction(g.module.signature([], []));
+    var f = newFn(g, m.unit, 0);
+    resetEntry(g);
+    for pool_id in pools {
+        callf(g, g.s.instances[pool_id].function);
+        let words, error = g.types.layout(g.s.instances[pool_id].result);
+        if error != blot_direct_types::Error.none { return 0, error; }
+        for word in words { op(g, OP_drop); }
+    }
+    releaseEntry(g);
+    op(g, OP_end);
+    finish(g, function, f);
+    return function, blot_direct_types::Error.none;
+}
+
+// The start function: computes every exported constant in order.
+fn startFunction(g: Generator&, m: const Module&, inits: const u32[:]) -> u32 {
+    let function = g.module.addFunction(g.module.signature([], []));
+    var f = newFn(g, m.unit, 0);
+    for init_function in inits { callf(g, init_function); }
+    op(g, OP_end);
+    finish(g, function, f);
+    return function;
+}
+
+// An exported entry: resets temporaries, converts its one ABI argument, calls
+// the instance, converts the result and releases temporaries.
+fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body&, abi: u8[>..<]&) -> Error {
+    let ty, error = g.types.lower(m, m.binding(body.binding).ty, Env {});
+    if error != blot_direct_types::Error.none { return g.failCode(m, body.root, blot_check_diagnostic_code::Code.entry_type, "an exported binding needs a concrete type"); }
+    let instance_id, error = g.named(BindingRef { unit: m.unit, binding: body.binding }, ty, m, body.root);
+    if error != blot_direct_types::Error.none { return error; }
+    // An exported constant whose value is a function: its instance builds
+    // the closure, which the export then applies.
+    let via_closure = !body.is_function;
+    let arrow = g.types.node(ty);
+    if via_closure && arrow.tag != blot_direct_types::Tag.function { return g.fail(m, body.root, "exported constant of a non-function type"); }
+    let instance_function = g.s.instances[instance_id].function;
+    let instance_result = g.s.instances[instance_id].result;
+    var parameter = arrow.a;
+    if !via_closure { parameter = g.s.tys[g.s.instances[instance_id].parameters.start]; }
+    // The declared result: a body that always diverges has result never.
+    var result_ty = instance_result;
+    if via_closure || instance_result == blot_direct_types::never { result_ty = arrow.b; }
+    let first, second, has_callback = callbackAbi(g, parameter);
+    var parameter_abi = Abi.unit;
+    if !has_callback {
+        let kind, supported = abiKind(g, parameter);
+        if !supported {
+            g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
+            g.put("entry parameters of type ");
+            g.put(blot_direct_types::tagName(g.types.node(parameter).tag));
+            g.put(" are not supported");
+            return g.failClose();
+        }
+        parameter_abi = kind;
+    }
+    let result_abi, supported = abiKind(g, result_ty);
+    if !supported {
+        g.failOpenCode(m, body.root, blot_check_diagnostic_code::Code.entry_type);
+        g.put("entry results of type ");
+        g.put(blot_direct_types::tagName(g.types.node(result_ty).tag));
+        g.put(" are not supported");
+        return g.failClose();
+    }
+    var machine = abiMachine(parameter_abi);
+    if has_callback { machine = VT_externref; }
+    let signature = g.module.signature([machine], [abiMachine(result_abi)]);
+    let function = g.module.addFunction(signature);
+    var f = newFn(g, m.unit, 0);
+    let entry_parameter = local(g, f, machine);
+    f.parameter_words = 1;
+    // The host requires the storage exports exactly when packets cross.
+    let packets = isArray(parameter_abi) || isArray(result_abi) || (has_callback && (isArray(first) || isArray(second)));
+    resetEntry(g);
+    var argument = unitVal();
+    if has_callback {
+        let slot = g.module.host_slots;
+        g.module.host_slots += 1;
+        i32Const(g, slot);
+        lget(g, 0);
+        opIndex(g, OP_table_set, 1);
+        let made, error = hostClosure(g, f, parameter, first, second, slot);
+        if error != blot_direct_types::Error.none { return error; }
+        argument = made;
+    } else if isArray(parameter_abi) {
+        let made, error = fromPacket(g, f, parameter, 0);
+        if error != blot_direct_types::Error.none { return error; }
+        argument = made;
+    } else if parameter != blot_direct_types::unit {
+        argument = valOf1(g, parameter, 0);
+    }
+    var result = neverVal();
+    if via_closure {
+        callf(g, instance_function);
+        let closure, error = pop(g, f, ty, body.root);
+        if error != blot_direct_types::Error.none { return error; }
+        let applied, error = applyClosure(g, f, closure, argument, body.root);
+        if error != blot_direct_types::Error.none { return error; }
+        result = applied;
+    } else {
+        push(g, argument);
+        callf(g, instance_function);
+        let returned, error = pop(g, f, instance_result, body.root);
+        if error != blot_direct_types::Error.none { return error; }
+        result = returned;
+    }
+    if result.ty == blot_direct_types::never || (result.ty != result_ty && g.types.node(result.ty).tag == blot_direct_types::Tag.never) {
+        // The body always diverges: the export traps with it.
+        op(g, OP_unreachable_);
+        op(g, OP_end);
+        finish(g, function, f);
+        exportEntry(g, m, body, abi, function, has_callback, first, second, parameter_abi, result_abi, packets);
+        return blot_direct_types::Error.none;
+    }
+    if isArray(result_abi) {
+        let packet, error = toPacket(g, f, result, body.root);
+        if error != blot_direct_types::Error.none { return error; }
+        releaseEntry(g);
+        lget(g, packet);
+    } else {
+        releaseEntry(g);
+        if result_ty == blot_direct_types::unit { i32Const(g, 0); } else { push(g, result); }
+    }
+    op(g, OP_end);
+    finish(g, function, f);
+    exportEntry(g, m, body, abi, function, has_callback, first, second, parameter_abi, result_abi, packets);
+    return blot_direct_types::Error.none;
+}
+// Exports `function` under the body's name and writes its ABI entry.
+fn exportEntry(g: Generator&, m: const Module&, body: const blot_check_core::Body&, abi: u8[>..<]&, function: u32, has_callback: bool, first: Abi, second: Abi, parameter_abi: Abi, result_abi: Abi, packets: bool) {
+    let name = m.name(body.export_name);
+    g.module.exportItem(name, blot_direct_writer::EXPORT_function, function);
+    blot_direct_writer::name(abi, name);
+    if has_callback {
+        abi.push(4);
+        abi.push(abiCode(first));
+        abi.push(abiCode(second));
+    } else { abi.push(abiCode(parameter_abi)); }
+    abi.push(abiCode(result_abi));
+    if packets && !g.s.exported_storage {
+        let allocate_function = g.runtime_().allocate;
+        let reset = g.runtime_().reset;
+        g.s.exported_storage = true;
+        g.module.exportItem("blot:memory", blot_direct_writer::EXPORT_memory, 0);
+        g.module.exportItem("blot:allocate", blot_direct_writer::EXPORT_function, allocate_function);
+        g.module.exportItem("blot:reset", blot_direct_writer::EXPORT_function, reset);
+    }
+}
