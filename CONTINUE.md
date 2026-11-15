@@ -178,23 +178,26 @@ so we can retire zig." The plan and the measured state are in
 
 ## The Goose port
 
-[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state, the steps and
-the profile.
+[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state and the steps;
+compiler-goose/README.md has the layout and the build.
 
-- compiler-goose/ is the scoped compiler as of 12 November. It built with
-  the patched Goose then and matched Zig on Ink's suite and on Gdev Main's
-  Wasm, at 3 to 30 times Zig's compile time.
-- It builds again on the cloud container:
-  `sh compiler-goose/tools/upstream-32a4f44/build.sh` (upstream Goose
-  d5ae5bb with patches 01–29; `GOOSE_PGO=1` trains it on the port and
-  needs `libclang-rt-18-dev`), then
-  `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --inference-budget 1000000 --stage-timeout 1500 --total-timeout 2400`.
-  The check takes 271 s at 10.4 GiB, so run one Goose at a time.
-- The executable, compiler-goose/build/blotc-goose, cannot read today's
-  std: it has no store statement and no direct backend.
-- Next: port compiler/src/direct/ into the port, then the frontend changes
-  since 44ee94f4.
-- ../goose-to-wasm does not finish its lifetime pass on the port.
+- The owner's order: a working Goose compiler, then Zig deprecated, then
+  compile times.
+- compiler-goose/src is now a lean frontend (166 modules). The scoped
+  backend, the evaluator, retained revisions and the checker's
+  cross-revision reuse are deleted from the port, as they are from Zig.
+- `sh compiler-goose/tools/upstream-32a4f44/build.sh` builds the patched
+  Goose (136 s). Then
+  `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 1500 --total-timeout 2400`
+  links compiler-goose/build/blotc-goose in 49 s.
+- `blotc-goose lex|parse|check FILE` works and matches Zig on a smoke
+  test. It has no store statement, no backend call and no project
+  commands yet.
+- The direct backend's writer and runtime are ported and byte-identical
+  (`python3 compiler-goose/tools/test_direct.py`).
+- Next, in this order: the frontend changes since 12 November (store
+  statement first), the rest of the direct backend, the project pipeline
+  and server from compiler-goose/pending/, parity, deprecation.
 
 ## Contracts
 

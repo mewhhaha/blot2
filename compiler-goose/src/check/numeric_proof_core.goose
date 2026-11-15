@@ -4,8 +4,7 @@ import reuse.principal_interface;
 
 import backend.collection_ops;
 import backend.opaque_storage;
-import backend.runtime_ir;
-import backend.scalar_ops;
+import .scalar_ops;
 import check.check_packet_owner;
 import check.core;
 import check.frozen_core_scopes;
@@ -135,7 +134,7 @@ fn arithmeticIdentity(self_: Checker&, op: Op, left: u32, right: u32) -> u32, Er
 }
 fn arithmetic(self_: Checker&, id: u32, op: Op, left: Value, right: Value) -> Value, Error {
     let lhs, err = self_.values.view().get(left.operand); if err != blot_error::Error.none { return Value {..}, err; } let rhs, err = self_.values.view().get(right.operand); if err != blot_error::Error.none { return Value {..}, err; }
-    if lhs.tag == blot_check_numeric_proof_terms::Tag.literal && rhs.tag == blot_check_numeric_proof_terms::Tag.literal { let value, err = blot_backend_scalar_ops::evaluate(op, blot_backend_scalar_ops::Value { blot_backend_runtime_ir::SC_u32, lhs.a , ..}, blot_backend_scalar_ops::Value { blot_backend_runtime_ir::SC_u32, rhs.a , ..}); if err != blot_error::Error.none { return self_.version(self_.module.typeOf(id), 0); } if value.scalar == blot_backend_runtime_ir::SC_u32 { let operand, err = self_.values.intern(Term { tag: blot_check_numeric_proof_terms::Tag.literal, a: value.bits , ..}); return Value { operand: operand , ..}, err; } }
+    if lhs.tag == blot_check_numeric_proof_terms::Tag.literal && rhs.tag == blot_check_numeric_proof_terms::Tag.literal { let fold, bits = blot_check_scalar_ops::foldU32(op, lhs.a, rhs.a); if fold == blot_check_scalar_ops::Fold.none { return self_.version(self_.module.typeOf(id), 0); } if fold == blot_check_scalar_ops::Fold.value { let operand, err = self_.values.intern(Term { tag: blot_check_numeric_proof_terms::Tag.literal, a: bits , ..}); return Value { operand: operand , ..}, err; } }
     let identity, err = self_.arithmeticIdentity(op, left.operand, right.operand); if err != blot_error::Error.none { return Value {..}, err; } if identity != 0 { return Value { operand: identity , ..}, blot_error::Error.none; } let result, err = self_.version(self_.module.typeOf(id), 0); if err != blot_error::Error.none || (op != blot_check_core::Op.add && op != blot_check_core::Op.sub) { return result, err; }
     let zero, err = self_.values.intern(Term { tag: blot_check_numeric_proof_terms::Tag.literal, a: 0 , ..}); if err != blot_error::Error.none { return result, err; } var fits = blot_check_numeric_proof_terms::Relation.add_fits; if op == blot_check_core::Op.sub { fits = blot_check_numeric_proof_terms::Relation.sub_fits; } let fits, err = self_.query(Proposition { fits, left.operand, right.operand , ..}); if err != blot_error::Error.none || !fits { return result, err; }
     if op == blot_check_core::Op.add { let err = self_.order(blot_check_numeric_proof_terms::Relation.le, left.operand, result.operand); if err != blot_error::Error.none { return result, err; } let err = self_.order(blot_check_numeric_proof_terms::Relation.le, right.operand, result.operand); if err != blot_error::Error.none { return result, err; } let positive, err = self_.query(Proposition { blot_check_numeric_proof_terms::Relation.lt, zero, right.operand , ..}); if err != blot_error::Error.none { return result, err; } if positive { let err = self_.order(blot_check_numeric_proof_terms::Relation.lt, left.operand, result.operand); if err != blot_error::Error.none { return result, err; } } let positive, err = self_.query(Proposition { blot_check_numeric_proof_terms::Relation.lt, zero, left.operand , ..}); if err != blot_error::Error.none { return result, err; } if positive { let err = self_.order(blot_check_numeric_proof_terms::Relation.lt, right.operand, result.operand); if err != blot_error::Error.none { return result, err; } } }

@@ -10,13 +10,8 @@ TARGET = ROOT / 'support/structural_adapters.goose'
 # Concrete equality covers only explicitly selected private domains. Tagged
 # enums compare their active payload fields, never owner addresses or padding.
 ENUM_EQUALITY = {
-    'blot_backend_layout::Tag': ('backend/layout.goose', 'Tag'),
-    'blot_eval_eval_values::ValueKind': ('eval/eval_values.goose', 'ValueKind'),
-    'blot_eval_eval_values::ClosureOrigin': ('eval/eval_values.goose', 'ClosureOrigin'),
     'blot_eval_type_evidence::Tag': ('eval/type_evidence_schema.goose', 'Tag'),
     'blot_eval_implementation_evidence::ProofKind': ('eval/implementation_evidence.goose', 'ProofKind'),
-    'blot_reuse_code_artifacts::Request': ('reuse/code_artifacts.goose', 'Request'),
-    'blot_reuse_code_artifacts::OperationLocation': ('reuse/code_artifacts.goose', 'OperationLocation'),
 }
 def enum_equalities():
     result={}

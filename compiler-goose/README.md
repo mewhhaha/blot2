@@ -1,69 +1,52 @@
-# Goose compiler experiment
+# The Blot compiler in Goose
 
-This is a source port of the compiler in `../compiler/`. The Zig source and
-installed compiler remain the oracle; the ordinary Blot toolchain still uses
-them. `oracle.json` pins the source and executable used for later comparisons.
-The remote tag `goose-port-oracle-156f84b` preserves that Zig source baseline.
-Language changes now follow [RFC #46's Zig-first migration](../docs/language/NEXT_MIGRATION.md).
-Named module functions are mirrored in the parser and checker sources; only
-the parser has executed qualification. The original oracle pin is unchanged.
+This is the port of `../compiler/` (Zig) that is meant to replace it. The
+state, the steps and the measurements are in
+[tasks/GOOSE_PORT.md](../tasks/GOOSE_PORT.md).
 
-The whole port type checks, passes Goose's lifetime checks and links an
-executable with the patched Goose below. On 12 November 2026 that
-executable matched the Zig compiler on Ink's suite and on Gdev Main's Wasm.
-It is the scoped compiler of that date; [the plan](../tasks/GOOSE_PORT.md)
-lists what it lacks against today's Zig compiler.
-Native request rollback, staged cache publication and scoped runtime observation
-now have component tests. Their complete compiler integration and retained
-workload qualification remain pending.
+## Layout
 
-The module map follows the Zig implementation. Goose contexts borrow typed
-tables owned by their callers; numeric identities survive growth. Errors travel
-as explicit trailing results. Native adapters cover scalar representation and
-OS operations, without delegating compilation to Zig.
+- `src/` is what builds today: the parser, the checker, Core lowering and a
+  command line with `lex`, `parse`, `check` and `build` for one file. The
+  module map follows the Zig source; a module keeps the name of its Zig
+  original.
+- `src/direct/` is the direct backend. `writer` and `runtime` are ported
+  and produce the same bytes as Zig.
+- `pending/` holds modules that are ported but not yet brought up to
+  today's Zig source: the project server, dependency bundles, editor
+  completion and native assets, with their laws in `pending/tests/`. They
+  are outside `src/` so the build does not load them.
+- `native/` is the C host: the entry point, file and process calls.
+- `tools/` has the generators for the generated modules in `src/support/`
+  and `src/reuse/`, the build of the patched Goose, and the test runners.
 
-The target is the same supported syntax and diagnostics, checker/evaluator
-behavior, both Wasm backends and reuse behavior. The public `blot-zig-project` server uses
-protocol 1; guest session protocol is 2 and the private worker protocol is 2.
-Guest ABI 8 and existing storage budgets remain the owned backend contract.
+## Build
 
-`source-correspondence.json` inventories the pinned native source and records
-writing status. `port-notes/` contains the owners' exact remaining scope and
-shared constructor contracts. See [the compilation frontier](port-notes/compilation.md)
-for current checks and remaining build work.
+1. The Goose compiler:
+   `sh compiler-goose/tools/upstream-32a4f44/build.sh` builds upstream
+   Goose ([github.com/aardappel/goose](https://github.com/aardappel/goose))
+   with the patch series beside it into
+   `build/goose-port/upstream-d5ae5bb/build-precision/`.
+2. The Blot compiler:
+   `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --stage-timeout 1500 --total-timeout 2400`
+   writes `compiler-goose/build/blotc-goose`. `--release` selects `-O2`.
+   The build regenerates `src/source_identity.goose`.
 
-The native entry is now source-written in `src/main.goose`, with concrete CLI
-pipelines and process worker dispatch under `src/driver/`. `build.py` regenerates
-`src/source_identity.goose` from the actual Goose sources, native host support,
-build options, selected Goose/C compiler binaries and emitted Goose runtime.
-Actual builds require `--stdlib` and fingerprint that selected tree. Additional
-package trees can be pinned with `--resource-root`. It emits C
-with a C-host header and links the ordinary Goose runtime plus the scalar/OS
-adapter; it never invokes the Zig oracle. Reusable runtime and platform objects
-are keyed by their actual source text, C compiler and flags.
+After a module, a struct or a field is added or removed, regenerate the
+adapters before building:
 
-The first build exposed source syntax failures. Those parser failures are
-repaired; full compilation remains in progress. The build entry is `python3 build.py --goose /path/to/goose --cc clang --stdlib /path/to/stdlib`.
-Development defaults to Goose `-O0` and C `-O0`; `--release` selects `-O2` for
-both. Each stage saves a log and timing receipt and has a 30-second default limit,
-adjustable with `--stage-timeout SECONDS`. `--total-timeout` caps the whole
-attempt at 300 seconds by default. Failed emission stops three seconds after
-its first diagnostic. Cancellation terminates the process group; failed stages
-preserve existing cached objects and the previous executable.
-`--identity-only` writes a source-only fingerprint without starting a compiler;
-that is not a qualified build identity. Active payload, retained pool capacity and scratch metrics stay null with
-explicit unavailable coverage.
+```bash
+python3 compiler-goose/tools/write_structural_adapters.py
+python3 compiler-goose/tools/write_json_adapters.py
+python3 compiler-goose/tools/write_project_packet.py
+python3 compiler-goose/tools/write_project_packet_contexts.py
+```
 
-The port builds with upstream Goose
-([github.com/aardappel/goose](https://github.com/aardappel/goose)) plus the
-patch series in `tools/upstream-32a4f44/`: `sh tools/upstream-32a4f44/build.sh`
-builds it into `build/goose-port/upstream-d5ae5bb/build-precision/`, and
-`GOOSE_PGO=1` trains it on this port. Plain upstream, which
-`python3 compiler-goose/tools/build_upstream_goose.py` builds, does not finish
-checking the port.
+## Tests
 
-Run the checked engine laws with
-`python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning, scalar owner-frame and parser sources
-to C and execute them using cached runtime/platform objects.
-Commands, source hashes and timings are saved under
-`build/goose-port/engine-tests/`; these laws do not qualify the whole compiler.
+- `python3 compiler-goose/tools/test_direct.py` runs each law in
+  `tests/direct/` against the Zig source of the direct backend and requires
+  the same bytes.
+- `tests/checker_tools`, `tests/copied_argument_contents`,
+  `tests/global_empty_facts` and `tests/qualification` test the patches to
+  the Goose compiler, not this port.

@@ -28,8 +28,6 @@ import std;
 import .storage_types;
 import .simd_contracts;
 import .frozen_core_validation;
-import backend.scalar_ops;
-import backend.runtime_ir;
 type Error=blot_error::Error;
 type Module=blot_check_core::Module;
 type ModuleRef=blot_check_frozen_core_validation::ModuleRef;

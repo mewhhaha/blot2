@@ -19,7 +19,6 @@ import support.io;
 import support.path;
 import support.pooled_buffer;
 import support.pooled_map;
-import backend.runtime_identity;
 import reuse.project_check;
 type Error = blot_error::Error;
 type UnitId = u32;

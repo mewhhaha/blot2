@@ -1,88 +1,89 @@
 # Finish the Goose compiler and retire Zig
 
-The owner's direction (15 November 2026): "add some more patches to goose
-to make it faster until goose to wasm is ready. And try to finish the goose
-compiler so we can retire zig."
+The owner's direction (15 November 2026):
 
-This replaces the 14 November choice to build the port with plain upstream
-Goose only. The patch series is back in
-compiler-goose/tools/upstream-32a4f44/.
+- "add some more patches to goose to make it faster until goose to wasm is
+  ready. And try to finish the goose compiler so we can retire zig."
+- Later the same day: "make a path to get goose compiler working and the
+  zig one deprecated and we can work on compiler times after that."
 
-## Where the port stands
+So the order is: a working Goose compiler, Zig deprecated, then compile
+times.
 
-- **What it is.** compiler-goose/ ports the scoped compiler as the Zig
-  source stood at 44ee94f4 (12 November): 551 files, 125,000 lines.
-- **It built and matched Zig** on 12 and 13 November, with the patched
-  Goose:
-  - a whole executable
-    ([record](../benchmarks/evidence/qualification/2026-11-12-goose-first-executable.json));
-  - Ink's suite with the same outcome on all 73 modules
-    ([record](../benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json));
-  - Gdev Main to the same bytes as Zig, with an identical first frame.
-- **It was slower than Zig**
-  ([record](../benchmarks/evidence/measurements/2026-11-13-goose-compile-speed.json)).
-  Seconds to compile, all with byte-identical Wasm:
+## Where the port stands (15 November 2026)
 
-  | Program | Zig, LLVM release | Goose, release |
-  | --- | ---: | ---: |
-  | Ink app-words | 0.1 | 1.4 |
-  | Ink next-improvements | 0.5 | 4.1 |
-  | Ink six-more-physics | 5.4 | 16.2 |
-  | Gdev Main | 6.9 | 204.0 |
+compiler-goose/ was the scoped compiler as the Zig source stood at 44ee94f4
+(12 November). It matched Zig then on Ink's suite and on Gdev Main's Wasm
+([executable](../benchmarks/evidence/qualification/2026-11-12-goose-first-executable.json),
+[Ink](../benchmarks/evidence/qualification/2026-11-12-goose-ink-parity.json),
+[speed](../benchmarks/evidence/measurements/2026-11-13-goose-compile-speed.json)).
+The Zig compiler then replaced the scoped backend with the direct one and
+deleted about 170,000 lines.
 
-- **It builds again** (15 November, cloud container, 4 cores, 15 GiB):
-  - `sh compiler-goose/tools/upstream-32a4f44/build.sh` builds upstream
-    Goose d5ae5bb with patches 01–29 in 136 s.
-  - That Goose checks the port without an error in 271 s at 10.4 GiB.
-  - `compiler-goose/build.py` emits 229 MB of C (387 s of CPU) and links
-    `compiler-goose/build/blotc-goose` (clang -O0, 86 s). It compiles a
-    one-line program.
-- **It cannot read today's sources.** The Zig compiler moved on after the
-  port's last sync: the direct backend replaced the scoped one, and memory
-  model phase 1 added the store `place = value`. The port stops at the
-  first `=` in std/prelude.blot with a syntax error.
-- **Stale notes.** compiler-goose/README.md, compiler-goose/CONTINUE.md and
-  source-correspondence.json still say no executable exists. They predate
-  12 November.
+The port now follows that cut:
 
-## What retiring Zig takes
+- **Deleted:** the 214 Goose modules whose Zig originals are gone (scoped
+  backend, evaluator, scoped runtime, retained revisions, the checker's
+  cross-revision reuse), 41 Goose-only modules that served them (helpers,
+  worker packets, the old driver) and 36 laws that tested them.
+- **Builds:** compiler-goose/src is a frontend of 166 modules. Goose
+  checks it in 33 s and `build.py` links `blotc-goose` in 49 s. Before
+  the cut these took 271 s and about 12 minutes, at 10.4 GiB.
+- **Runs:** `blotc-goose lex|parse|check FILE` gives the same diagnostics
+  and counts as the Zig compiler on the two programs tried. That is a
+  smoke test, not qualification.
+- **Parked** in compiler-goose/pending/ (31 modules and 13 laws): the project server,
+  dependency bundles, editor completion and native assets. They are ported
+  to the 12 November source and wait for step 3.
+- **Backend:** writer and runtime are ported and give the same bytes as
+  Zig (`python3 compiler-goose/tools/test_direct.py`).
 
-In this order, so an executable keeps working throughout:
+compiler-goose/source-correspondence.json lists every Zig file with where
+its Goose module is.
 
-1. **Port the direct backend** (compiler/src/direct/ and compile.zig,
-   6,487 lines) into compiler-goose/src/direct/, beside the scoped
-   backend: writer, types, runtime, emit, function, direct.
-   - Done: writer (382 lines of Zig). `python3 compiler-goose/tools/test_direct.py`
-     runs each law in compiler-goose/tests/direct against the Zig source
-     and requires equal bytes; the writer's module of 352 bytes, which
-     uses every section, is identical.
-   - Not started: types (584), runtime (817), emit (674), function
-     (3,875), direct (121), compile (34).
-2. **Bring the frontend up to date.** Outside the backends the Zig source
-   changed little since 44ee94f4:
-   - the parser's `store_stmt` and `place`;
-   - check.zig (+305, −770 lines), core_builder.zig (+71, −32), the store
-     flag on Core updates;
-   - the new uniqueness pass (871 lines);
-   - the checker modules that moved from backend/ to check/, which the port
-     still has under src/backend/;
-   - 15 November's checker changes (associated members imported on first
-     lookup, rebinding without generalization).
-3. **Match Zig** on compiler/fixtures/direct, the guest suite (it takes
-   the compiler as an argument), Ink's suite through Pen and the Gdev
-   frame.
-4. **Delete the scoped compiler from the port**: src/backend, src/eval,
-   src/runtime and the scoped part of src/reuse, about 52,000 lines whose
-   Zig originals are gone. The project server builds each revision fresh,
-   as in Zig.
-5. **Decide on speed.** At the last measurement the Goose compiler was 3 to
-   30 times slower than the Zig release build. The owner's goal is faster
-   compiles, so retiring Zig waits on this number for the new backend.
+## Steps
+
+Each step ends with a comparison against the Zig compiler.
+
+1. **Frontend up to today's Zig.** Not started. The single-file commands
+   need:
+   - the store `place = value` in the parser, the checker and Core
+     lowering;
+   - `@storage.copy`;
+   - the checker changes of 15 November (associated members on first
+     lookup, rebinding without generalization);
+   - the uniqueness pass (check/uniqueness.zig, 871 lines).
+   Compare `check` output on std, Ink, Gdev and the rejected fixtures.
+2. **Direct backend.** Port types (584 lines of Zig), emit (674), function
+   (3,875), direct (121) and the compile interface. Compare the Wasm for
+   compiler/fixtures/direct byte for byte.
+3. **Projects.** Bring compiler-goose/pending/ back into src against
+   today's Zig: the project pipeline of main.zig, `serve-project` (it now
+   builds each revision fresh), dependency bundles, `migrate-stores`,
+   native assets. Checking is serial; the worker processes of the old port
+   are gone.
+4. **Parity.** The guest suite (it takes the compiler as an argument),
+   Ink's suite through Pen, and the Gdev frame.
+5. **Deprecate Zig.** Point the scripts, CI and docs at `blotc-goose`.
+
+Then compile times, as the owner ordered.
+
+## Known differences from Zig that remain in src
+
+- Core still has the four declaration-dependency tables Zig dropped in
+  f429ffd8, and `reuse/declaration_dependencies.goose` still fills them.
+  Nothing reads them.
+- `numeric_proof_bodies` still has `debits` and `frontier`; nothing fills
+  them.
+- Modules keep the directory their Zig file had on 12 November
+  (`src/eval/type_evidence.goose` is `check/type_evidence.zig` today).
 
 ## Making Goose faster
 
-Building the port is one Goose run of about 6.5 minutes of CPU, plus the C
-compile. Where the time goes (133 stack samples of the emit, 15 November):
+The lean program removed the cost that mattered: one build is 49 s.
+
+For the record, where the time went on the whole port (133 stack samples
+of the emit, 15 November):
 
 | Where | Share |
 | --- | ---: |
@@ -92,23 +93,16 @@ compile. Where the time goes (133 stack samples of the emit, 15 November):
 | `FlatMap::Probe` | 12% |
 | `ReplaceStoreEventLog` | 7% |
 
-- This is what the 12 November record found after patches 20–29: each call
-  replays every store event of its callee. Changing that is a redesign of
-  the analysis, not a patch.
-- `GOOSE_PGO=1` on build.sh trains the checker on the port. On 15 November
-  it checks the port in 233 s against 271 s, at the same 10.4 GiB, and
-  emits the same C once the absolute source path is removed. It needs
-  `libclang-rt-18-dev` and takes 13 minutes to build.
-- No new patch was added on 15 November. The profile points at the event
-  replay, and the two cheaper levers are the trained build above and a
-  smaller program below.
-- Deleting the scoped compiler (step 4) removes about 40% of the program
-  the checker has to analyse.
+- Each call replays every store event of its callee. Changing that is a
+  redesign of the analysis, not a patch.
+- `GOOSE_PGO=1` on build.sh trains the checker on the port: 233 s against
+  271 s on the whole port, same C once the absolute source path is
+  removed. It needs `libclang-rt-18-dev` and takes 13 minutes to build.
+- No new patch was added on 15 November.
 
 ## goose-to-wasm
 
-../goose-to-wasm does not finish its lifetime pass on the port: it stops
-after 884 s with its 2 GiB region full
+../goose-to-wasm did not finish its lifetime pass on the whole port: it
+stopped after 884 s with its 2 GiB region full
 ([its notes](https://github.com/mewhhaha/goose-to-wasm/blob/main/CONTINUE.md)).
-Until it does, the patched upstream Goose is the only compiler that builds
-the port.
+It has not been tried on the lean program.

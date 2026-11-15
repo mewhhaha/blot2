@@ -8,7 +8,6 @@ import eval.implementation_predicates;
 import eval.semantic_evidence_import;
 import eval.type_evidence;
 import support.error;
-import backend.runtime_identity;
 
 import dictionary;
 import check.check;
@@ -24,7 +23,6 @@ fn convert(error: Error) -> Error { if error==blot_error::Error.none||error==blo
 struct Host { units: const C[:],evidence: blot_eval_type_evidence::Store&,associated_remaining: i64 }
 fn evidenceStore(self_: Host&) -> blot_eval_type_evidence::Store& { return self_.evidence; }
 fn associatedBudget(self_: Host&) -> i64& { return self_.associated_remaining; }
-fn diagnosticIdentity(self_: Host&) -> blot_support::Option<blot_backend_runtime_identity::View> { return blot_support::none<blot_backend_runtime_identity::View>(); }
 fn implementationRead(self_: Host&,context: u32,identity: blot_check_types::NominalIdentity) -> Error { return blot_error::Error.none; }
 recursive fn implementationLegacyPredicate<R>(self_: Host&,context: u32,value: blot_check_core::Obligation,operands: E[4],resolver_context:R,resolver_remaining:i64&,resolver_enabled:bool) -> blot_eval_implementation_evidence::LegacyChoice,bool,Error {
  var owner: i64=-1; for module,index in self_.units { if module.unit==context { owner=index; break; } } if owner<0 { return default<blot_eval_implementation_evidence::LegacyChoice>(),false,blot_error::Error.none; } let module=self_.units[owner];

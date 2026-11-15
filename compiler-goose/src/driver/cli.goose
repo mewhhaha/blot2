@@ -1,19 +1,20 @@
-// Native command dispatch and option admission preserve the public CLI shape.
+// Command dispatch; mirrors compiler/src/main.zig.
 namespace blot_cli;
-import .cli_workers;
 import .cli_diagnostics;
-import .cli_pipeline;
-import .compile_workspace;
-import .project_executor;
 import main;
-import source_identity;
 import inference_limits;
 import execution_policy;
+import parse.lexer;
+import parse.token;
+import parse.parser;
+import parse.ast;
+import parse.symbols;
+import parse.syntax_diagnostics;
+import check.check;
+import check.core;
+import check.core_builder;
 import reuse.project;
-import backend.core_backend;
-import reuse.restart_cache;
-import reuse.dependency_cli;
-import reuse.zig_project_server;
+import runtime.memory;
 import support.error;
 import support.option;
 import support.native;
@@ -24,7 +25,7 @@ type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
 enum Command {lex,parse,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds detailed backend clocks to the stats record.\n       --profile-memory instruments executed allocation, copy, RC and cycle costs.\n       --require-collector-free rejects modules without a whole-arena certificate.\n       --explain-allocations reports bounded emitted allocation sites and array-edit ownership decisions.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) opts into private semantic jobs.\n\nGoose source compiler. JSON-lines diagnostics and stage metrics are written\nto stdout. Parse coverage and executable coverage are distinct.\n\n";
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc migrate-stores ENTRY [--project PEN.json] [--write-root DIR] [--include-std] [--dry-run] [project options]\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -46,31 +47,61 @@ fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.le
 fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",lex=>"lex",parse=>"parse",check=>"check",build=>"build",dependencies=>"dependencies"}}
 fn parseCommand(text:const u8[:])->Command,bool {for command in [Command.lex,Command.parse,Command.check,Command.build,Command.dependencies,Command.parse_project,Command.check_project,Command.build_project] {if text==commandName(command) {return command,true;}}return Command.lex,false;}
 fn isBuild(command:Command)->bool {return command==Command.build||command==Command.build_project;}
+struct Stats {
+ source_bytes:i64=0,
+ tokens:i64=0,
+ syntax_nodes:i64=0,
+ syntax_extra_words:i64=0,
+ symbols:i64=0,
+ symbol_bytes:i64=0,
+ type_nodes:i64=0,
+ type_versions:i64=0,
+ bindings:i64=0,
+ body_elaborations:i64=0,
+ wasm_bytes:i64=0,
+ emitted_functions:i64=0,
+ core_nodes:i64=0,
+ body_lowerings:i64=0,
+ lex_us:i64=0,
+ parse_us:i64=0,
+ check_us:i64=0,
+ lower_us:i64=0,
+ emit_us:i64=0,
+ checker:blot_check_check::Counters=blot_check_check::Counters{..},
+}
+fn now()->u64 {return blot_native::clock_ns();}
+fn elapsed(start:u64)->i64 {let ended=now();if ended<start {return 0;}return ((ended-start)/1000) as i64;}
+struct SimpleRecord {kind:const u8[:]="compilation",filename:const u8[:],stage:const u8[:],success:bool,total_us:i64,stats:Stats,memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},memory_scope:const u8[:]="Requested bytes for source and compiler-owned buffers; excludes allocator overhead and process RSS. All owners released before this record."}
+fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text)->bool,Error {var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,..});return accepted,written;}
+fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&)->bool,Error {
+ var input=blot_reuse_project::FileInputs{..};var source:u8[>..<]=[];let read=input.read(filename,33554432,source);if read!=blot_error::Error.none {return false,read;}stats.source_bytes=source.len;
+ var names,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return false,error;}
+ var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);let lex_start=now();let error=blot_parse_lexer::lex(source[..],lexed);if error!=blot_error::Error.none {names.deinit();return false,error;}stats.lex_us=elapsed(lex_start);stats.tokens=tokens.len;
+ if diagnostics.len!=0 {let error=frontendDiagnostic(writer,filename,"lex",source[..],blot_parse_syntax_diagnostics::lexical(tokens[..],diagnostics[0]),diagnostics[..]);names.deinit();return false,error;}
+ if command==Command.lex {names.deinit();return true,blot_error::Error.none;}
+ var tree,error=blot_parse_ast::initPooled();if error!=blot_error::Error.none {names.deinit();return false,error;}
+ let parse_start=now();let error=blot_parse_parser::parse(source[..],tokens[..],names,tree);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}
+ if tree.diagnostics.len!=0 {let publication,error=blot_parse_syntax_diagnostics::parse(tokens[..],tree.diagnostics.items[0]);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}let error=frontendDiagnostic(writer,filename,"parse",source[..],publication,tree.diagnostics.items);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}}
+ stats.parse_us=elapsed(parse_start);stats.syntax_nodes=tree.nodes.len-1;stats.syntax_extra_words=tree.extra.len;stats.symbols=names.entries.len;stats.symbol_bytes=names.bytes.len;
+ if tree.diagnostics.len!=0 {tree.deinit();names.deinit();return false,blot_error::Error.none;}
+ if command==Command.parse {tree.deinit();names.deinit();return true,blot_error::Error.none;}
+ let check_start=now();var checked,error=blot_check_check::check(tree,names);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}
+ stats.check_us=elapsed(check_start);stats.type_nodes=checked.types.nodes.len;stats.type_versions=checked.types.versions.len;stats.bindings=checked.bindings.len-1;stats.body_elaborations=checked.body_elaborations;stats.checker=checked.counters;
+ if checked.diagnostics.len!=0 {let error=checkDiagnostics(writer,filename,source[..],names,checked.diagnostics);checked.deinit();tree.deinit();names.deinit();return false,error;}
+ if command==Command.check {checked.deinit();tree.deinit();names.deinit();return true,blot_error::Error.none;}
+ let lower_start=now();var lowered,error=blot_check_core_builder::lower(tree,names,checked);if error!=blot_error::Error.none {checked.deinit();tree.deinit();names.deinit();return false,error;}
+ lowered.value.unit=1;stats.lower_us=elapsed(lower_start);stats.core_nodes=lowered.value.nodes.len-1;stats.body_lowerings=lowered.value.body_lowerings;
+ for item in lowered.value.diagnostics {let error=diagnostic(writer,filename,"lower",enumName(item.code),item.span.start,item.span.end,item.message());if error!=blot_error::Error.none {lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,error;}}
+ if lowered.value.diagnostics.len!=0 {lowered.deinit();checked.deinit();tree.deinit();names.deinit();return false,blot_error::Error.none;}
+ checked.deinit();tree.deinit();names.deinit();source.clear();tokens.clear();comments.clear();diagnostics.clear();
+ // The direct backend is not ported yet.
+ lowered.deinit();return false,blot_error::Error.invalid_request;
+}
 fn run(args:const Argument[:])->bool,Error {
- let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}if args[1]=="--worker" {if args.len!=2 {return false,blot_error::Error.invalid_request;}let error=worker();return error==blot_error::Error.none,error;}
- var cache=blot_support::none<u8[:]>();let root,error=blot_reuse_restart_cache::root();if error==blot_error::Error.none {cache=root;}
- var cache_root=blot_support::none<const u8[:]>();if cache.present {cache_root=blot_support::some<const u8[:]>(cache.value[..]);}
- var executor=blot_project_executor::init();
- if args[1]=="serve-project" {var policy=Policy{..};var at:i64=2;while at<args.len {if at+1>=args.len {let __cleanup_result_1_0: bool = false; let __cleanup_result_1_1: Error = blot_error::Error.invalid_serve_arguments; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_1_0, __cleanup_result_1_1;}if args[at]=="--semantic-workers" {let selected,valid=semanticPolicy(args[at+1]);if !valid {let __cleanup_result_2_0: bool = false; let __cleanup_result_2_1: Error = blot_error::Error.invalid_serve_arguments; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_2_0, __cleanup_result_2_1;}policy.semantic_workers=selected.semantic_workers;policy.semantic_components=true;}else if args[at]=="--frontend-workers" {let selected,valid=semanticPolicy(args[at+1]);if !valid {let __cleanup_result_3_0: bool = false; let __cleanup_result_3_1: Error = blot_error::Error.invalid_serve_arguments; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_3_0, __cleanup_result_3_1;}policy.frontend_workers=selected.semantic_workers;}else if args[at]=="--inference-budget" {let error=configure(args[at+1]);if error!=blot_error::Error.none {let __cleanup_result_4_0: bool = false; let __cleanup_result_4_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_4_0, __cleanup_result_4_1;}}else {let __cleanup_result_5_0: bool = false; let __cleanup_result_5_1: Error = blot_error::Error.invalid_serve_arguments; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_5_0, __cleanup_result_5_1;}at+=2;}let error=blot_reuse_zig_project_server::runWithPolicy(executor,blot_io::Reader{0},stdout,blot_main::configured_identity,cache_root,policy);let __cleanup_result_6_0: bool = error==blot_error::Error.none; let __cleanup_result_6_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_6_0, __cleanup_result_6_1;}
- let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);let __cleanup_result_7_0: bool = false; let __cleanup_result_7_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_7_0, __cleanup_result_7_1;}if args.len<3||((isBuild(command)||command==Command.dependencies)&&args.len<4) {let error=blot_io::write_all(stderr,usage);let __cleanup_result_8_0: bool = false; let __cleanup_result_8_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_8_0, __cleanup_result_8_1;}
- let project_command=command==Command.parse_project||command==Command.check_project||command==Command.build_project||command==Command.dependencies;var first_option:i64=3;if isBuild(command)||command==Command.dependencies {first_option=4;}
- if !project_command&&command!=Command.build {first_option=args.len;for arg,index in args[3..] {if starts(arg,"--") {first_option=index+3;break;}}}
- if project_command||first_option<args.len {if command==Command.lex {let __cleanup_result_9_0: bool = false; let __cleanup_result_9_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_9_0, __cleanup_result_9_1;}var aliases:blot_reuse_project::Alias[>..]=[];var options=Options{..};var dependency_path=blot_support::none<const u8[:]>();var profile=false;var explain=false;var policy=Policy{..};var at=first_option;
-  while at<args.len {
-   let arg=args[at];if arg=="--require-collector-free"||arg=="--profile-memory"||arg=="--profile"||arg=="--explain-allocations" {if !isBuild(command) {let __cleanup_result_10_0: bool = false; let __cleanup_result_10_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_10_0, __cleanup_result_10_1;}if arg=="--require-collector-free" {policy.require_collector_free=true;}else if arg=="--profile-memory" {policy.memory_profile=true;}else if arg=="--profile" {profile=true;}else {explain=true;}at++;continue;}
-   if at+1>=args.len {let __cleanup_result_11_0: bool = false; let __cleanup_result_11_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_11_0, __cleanup_result_11_1;}let value=args[at+1];at+=2;
-   if arg=="--semantic-workers" {if !isBuild(command) {let __cleanup_result_12_0: bool = false; let __cleanup_result_12_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_12_0, __cleanup_result_12_1;}let selected,valid=semanticPolicy(value);if !valid {let __cleanup_result_13_0: bool = false; let __cleanup_result_13_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_13_0, __cleanup_result_13_1;}policy.semantic_workers=selected.semantic_workers;policy.semantic_components=true;}
-   else if arg=="--frontend-workers" {if !isBuild(command) {let __cleanup_result_14_0: bool = false; let __cleanup_result_14_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_14_0, __cleanup_result_14_1;}let selected,valid=semanticPolicy(value);if !valid {let __cleanup_result_15_0: bool = false; let __cleanup_result_15_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_15_0, __cleanup_result_15_1;}policy.frontend_workers=selected.semantic_workers;}
-   else if arg=="--inference-budget" {let error=configure(value);if error!=blot_error::Error.none {let __cleanup_result_16_0: bool = false; let __cleanup_result_16_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_16_0, __cleanup_result_16_1;}}
-   else if arg=="--std-root" {options.std_root=blot_support::some<const u8[:]>(value);}
-   else if arg=="--alias" {var split:i64=-1;for byte,index in value {if byte=='=' {split=index;break;}}if split<0 {let __cleanup_result_17_0: bool = false; let __cleanup_result_17_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_17_0, __cleanup_result_17_1;}aliases.push(blot_reuse_project::Alias{value[..split],value[split+1..]});}
-   else if arg=="--input-mode" {if value=="project" {options.input_mode=blot_reuse_project::InputMode.project;}else if value=="source" {options.input_mode=blot_reuse_project::InputMode.source;}else {let __cleanup_result_18_0: bool = false; let __cleanup_result_18_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_18_0, __cleanup_result_18_1;}}
-   else if arg=="--prelude" {if value=="none" {options.prelude_path=blot_support::none<const u8[:]>();}else {options.prelude_path=blot_support::some<const u8[:]>(value);}}
-   else if arg=="--dependencies" {if !isBuild(command)||dependency_path.present {let __cleanup_result_19_0: bool = false; let __cleanup_result_19_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_19_0, __cleanup_result_19_1;}dependency_path=blot_support::some<const u8[:]>(value);}
-   else {let __cleanup_result_20_0: bool = false; let __cleanup_result_20_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_20_0, __cleanup_result_20_1;}
-  }
-  options.aliases=aliases[..];if command==Command.dependencies||dependency_path.present {if profile||policy.semantic_components||explain {let __cleanup_result_21_0: bool = false; let __cleanup_result_21_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_21_0, __cleanup_result_21_1;}var frame,error=blot_compile_workspace::create(allocationOwner());if error!=blot_error::Error.none {let __cleanup_result_22_0: bool = false; let __cleanup_result_22_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_22_0, __cleanup_result_22_1;}let workspace=frame.borrow();assert(workspace);let success,error=blot_reuse_dependency_cli::processWithOptions(executor,workspace,stdout,command==Command.dependencies,args[2],args[3],dependency_path,options,blot_main::configured_identity,blot_backend_core_backend::CompileOptions{ policy:policy, compiler_identity:blot_support::some<u8[32]>(blot_main::configured_identity), .. });let released=frame.release();if error!=blot_error::Error.none {let __cleanup_result_23_0: bool = false; let __cleanup_result_23_1: Error = error; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_23_0, __cleanup_result_23_1;}if released!=blot_error::Error.none {let __cleanup_result_24_0: bool = false; let __cleanup_result_24_1: Error = released; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_24_0, __cleanup_result_24_1;}let __cleanup_result_25_0: bool = success; let __cleanup_result_25_1: Error = blot_io::flush(stdout); {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_25_0, __cleanup_result_25_1;}
-  var selected=Command.build_project;if command==Command.parse||command==Command.parse_project {selected=Command.parse_project;}else if command==Command.check||command==Command.check_project {selected=Command.check_project;}var end=first_option;if selected==Command.build_project||project_command {end=3;}var success=true;for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if selected==Command.build_project {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=processProject(executor,stdout,selected,filename,options,profile,explain,output,cache_root,policy);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(selected),blot_error::error_name(error),0,0,"Compiler operation failed");if written!=blot_error::Error.none {let __cleanup_result_26_0: bool = false; let __cleanup_result_26_1: Error = written; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_26_0, __cleanup_result_26_1;}blot_io::flush(stdout);let __cleanup_result_27_0: bool = false; let __cleanup_result_27_1: Error = blot_error::Error.none; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_27_0, __cleanup_result_27_1;}success=success&&accepted;}let __cleanup_result_28_0: bool = success; let __cleanup_result_28_1: Error = blot_io::flush(stdout); {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_28_0, __cleanup_result_28_1;
- }
- var success=true;var end=args.len;if command==Command.build {end=3;}for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=process(stdout,command,filename,output,cache_root);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,"Compiler operation failed");if written!=blot_error::Error.none {let __cleanup_result_29_0: bool = false; let __cleanup_result_29_1: Error = written; {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_29_0, __cleanup_result_29_1;}success=false;continue;}success=success&&accepted;}let __cleanup_result_30_0: bool = success; let __cleanup_result_30_1: Error = blot_io::flush(stdout); {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} return __cleanup_result_30_0, __cleanup_result_30_1;
- {executor.deinit();} {if cache.present {blot_reuse_restart_cache::releaseRoot(cache.value);}} }
+ let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}
+ let command,valid=parseCommand(args[1]);if !valid {let error=blot_io::write_all(stderr,usage);return false,error;}
+ if args.len<3||(isBuild(command)&&args.len<4) {let error=blot_io::write_all(stderr,usage);return false,error;}
+ var success=true;var end=args.len;if command==Command.build {end=3;}
+ for filename in args[2..end] {var output=blot_support::none<const u8[:]>();if command==Command.build {output=blot_support::some<const u8[:]>(args[3]);}let accepted,error=process(stdout,command,filename,output);if error!=blot_error::Error.none {let written=diagnostic(stdout,filename,commandName(command),blot_error::error_name(error),0,0,blot_error::error_name(error));if written!=blot_error::Error.none {return false,written;}success=false;}else if !accepted {success=false;}}
+ return success,blot_error::Error.none;
+}

@@ -3,7 +3,7 @@ namespace blot_reuse_project_check;
 import .project_check;
 import reuse.dependency_owned_headers;
 struct ResultOwner {slot:u32=0,generation:u64=0}
-struct ResultState {relocated:blot_reuse_dependency_payload::Owner[:]=default<blot_reuse_dependency_payload::Owner[:]>(),generation:u64=0,live:bool=false}
+struct ResultState {generation:u64=0,live:bool=false}
 reusable var result_states:ResultState[>..]=[];
 reusable[] var owned_u8:u8[>..]=[];
 fn copyOwned(values:const u8[:])->u8[:] {if values.len==0 {return default<u8[:]>();}let run=owned_u8.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
@@ -32,9 +32,6 @@ fn copyDiagnostics(buffer:DiagnosticBuffer)->Diagnostic[:] {
  let run=owned_Diagnostic.alloc_slice(buffer.items.len);for index in 0..buffer.items.len {run[index]=canonicalOwnedDiagnostic(source[index]);}return run;
 }
 fn releaseOwned(values:const Diagnostic[:]) {if values.len==0 {return;}owned_Diagnostic.free_slice(values);}
-reusable[] var owned_blot_reuse_body_check_cache__Cache:blot_reuse_body_check_cache::Cache[>..]=[];
-fn copyOwned(values:const blot_reuse_body_check_cache::Cache[:])->blot_reuse_body_check_cache::Cache[:] {if values.len==0 {return default<blot_reuse_body_check_cache::Cache[:]>();}let run=owned_blot_reuse_body_check_cache__Cache.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
-fn releaseOwned(values:const blot_reuse_body_check_cache::Cache[:]) {if values.len==0 {return;}owned_blot_reuse_body_check_cache__Cache.free_slice(values);}
 reusable[] var owned_blot_support__Option_Module_:blot_support::Option<Module>[>..]=[];
 fn copyOwned(values:const blot_support::Option<Module>[:])->blot_support::Option<Module>[:] {if values.len==0 {return default<blot_support::Option<Module>[:]>();}let run=owned_blot_support__Option_Module_.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
 fn moduleSlots(self_:CheckedProject)->blot_support::Option<Module>[:] {
@@ -45,54 +42,21 @@ fn moduleSlots(self_:CheckedProject)->blot_support::Option<Module>[:] {
 fn canonicalModule(value:Module)->Module {let checked=blot_check_check::canonicalOwnedChecked(value.checked);let length=value.exports.len;if length==0 {return Module{checked:checked,exports:default<Export[:]>(),valid:value.valid};}let owned=owned_Export.realloc_slice(value.exports,length);assert(blot_support::same_slice_identity(owned,value.exports));let start=owned_Export.index_of(owned[0]);return Module{checked:checked,exports:owned_Export[start..start+length],valid:value.valid};}
 fn publishModule(self_:CheckedProject,unit:u32,value:Module) {let modules=moduleSlots(self_);modules[unit-1]=blot_support::Option<Module>{true,canonicalModule(value)};}
 fn releaseOwned(values:const blot_support::Option<Module>[:]) {if values.len==0 {return;}owned_blot_support__Option_Module_.free_slice(values);}
-reusable[] var owned_blot_reuse_entry_frontend_cutoff__Color:blot_reuse_entry_frontend_cutoff::Color[>..]=[];
-fn copyOwned(values:const blot_reuse_entry_frontend_cutoff::Color[:])->blot_reuse_entry_frontend_cutoff::Color[:] {if values.len==0 {return default<blot_reuse_entry_frontend_cutoff::Color[:]>();}let run=owned_blot_reuse_entry_frontend_cutoff__Color.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
-fn releaseOwned(values:const blot_reuse_entry_frontend_cutoff::Color[:]) {if values.len==0 {return;}owned_blot_reuse_entry_frontend_cutoff__Color.free_slice(values);}
-reusable[] var owned_blot_support__Option_BindingMap_:blot_support::Option<BindingMap>[>..]=[];
-fn copyOwned(values:const blot_support::Option<BindingMap>[:])->blot_support::Option<BindingMap>[:] {if values.len==0 {return default<blot_support::Option<BindingMap>[:]>();}let run=owned_blot_support__Option_BindingMap_.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
-fn releaseOwned(values:const blot_support::Option<BindingMap>[:]) {if values.len==0 {return;}owned_blot_support__Option_BindingMap_.free_slice(values);}
-reusable[] var owned_blot_support__Option_FrozenModule_:blot_support::Option<FrozenModule>[>..]=[];
-fn copyOwned(values:const blot_support::Option<FrozenModule>[:])->blot_support::Option<FrozenModule>[:] {if values.len==0 {return default<blot_support::Option<FrozenModule>[:]>();}let run=owned_blot_support__Option_FrozenModule_.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
-fn publishRelocatedModule(self_:CheckedProject,unit:u32,value:blot_reuse_dependency_payload::Owned<FrozenModule>&) {
- assert(self_.owner.valid() && unit!=0 && unit<=self_.relocated_modules.len);assert(value.owner.unique());
- let length=self_.relocated_modules.len;let owned=owned_blot_support__Option_FrozenModule_.realloc_slice(self_.relocated_modules,length);assert(blot_support::same_slice_identity(owned,self_.relocated_modules));let start=owned_blot_support__Option_FrozenModule_.index_of(owned[0]);assert(start>=0 && length<=owned_blot_support__Option_FrozenModule_.len-start);
- let slots=owned_blot_support__Option_FrozenModule_[start..start+length];slots[unit-1]=blot_support::Option<FrozenModule>{true,blot_reuse_dependency_owned_headers::canonical(value.owner,value.value)};
- let owners=result_states[self_.owner.slot-1].relocated;assert(unit<=owners.len && owners[unit-1].lease==0);owners[unit-1]=value.owner;value.owner=blot_reuse_dependency_payload::Owner{};
-}
-fn releaseOwned(values:const blot_support::Option<FrozenModule>[:]) {if values.len==0 {return;}owned_blot_support__Option_FrozenModule_.free_slice(values);}
-reusable[] var owned_blot_reuse_dependency_payload__Owner:blot_reuse_dependency_payload::Owner[>..]=[];
-fn copyOwned(values:const blot_reuse_dependency_payload::Owner[:])->blot_reuse_dependency_payload::Owner[:] {if values.len==0 {return default<blot_reuse_dependency_payload::Owner[:]>();}let run=owned_blot_reuse_dependency_payload__Owner.alloc_slice(values.len);for value,index in values {run[index]=value;}return run;}
-fn releaseOwned(values:const blot_reuse_dependency_payload::Owner[:]) {if values.len==0 {return;}owned_blot_reuse_dependency_payload__Owner.free_slice(values);}
 fn valid(self_:ResultOwner)->bool {return self_.slot!=0 && self_.slot-1<result_states.len && result_states[self_.slot-1].live && result_states[self_.slot-1].generation==self_.generation;}
 fn initResult()->CheckedProject,Error {if result_states.len>=0xffffffff {return CheckedProject{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=result_states.alloc_index(ResultState{generation:generation,live:true, ..});return CheckedProject{owner:ResultOwner{(at+1) as u32,generation, ..}, ..},blot_error::Error.none;}
 // Publish the exact owned runs without retaining the temporary Engine header.
 fn canonicalOwnedResult(value:CheckedProject)->CheckedProject {
  assert(value.owner.valid());
- let body_caches=owned_blot_reuse_body_check_cache__Cache.realloc_slice(value.body_caches,value.body_caches.len);assert(blot_support::same_slice_identity(body_caches,value.body_caches));
  let modules=owned_blot_support__Option_Module_.realloc_slice(value.modules,value.modules.len);assert(blot_support::same_slice_identity(modules,value.modules));
  let diagnostics=owned_Diagnostic.realloc_slice(value.diagnostics,value.diagnostics.len);assert(blot_support::same_slice_identity(diagnostics,value.diagnostics));
- let reused_modules=owned_bool.realloc_slice(value.reused_modules,value.reused_modules.len);assert(blot_support::same_slice_identity(reused_modules,value.reused_modules));
- let interface_colors=owned_blot_reuse_entry_frontend_cutoff__Color.realloc_slice(value.interface_colors,value.interface_colors.len);assert(blot_support::same_slice_identity(interface_colors,value.interface_colors));
- let binding_maps=owned_blot_support__Option_BindingMap_.realloc_slice(value.binding_maps,value.binding_maps.len);assert(blot_support::same_slice_identity(binding_maps,value.binding_maps));
- let relocated_modules=owned_blot_support__Option_FrozenModule_.realloc_slice(value.relocated_modules,value.relocated_modules.len);assert(blot_support::same_slice_identity(relocated_modules,value.relocated_modules));
- return CheckedProject{owner:value.owner,body_caches:body_caches,modules:modules,diagnostics:diagnostics,body_elaborations:value.body_elaborations,imported_schemes:value.imported_schemes,normalization:value.normalization,entry_cutoff:value.entry_cutoff,module_cutoff:value.module_cutoff,reused_modules:reused_modules,interface_colors:interface_colors,binding_maps:binding_maps,relocated_modules:relocated_modules,deferred_entry:value.deferred_entry};
+ return CheckedProject{owner:value.owner,modules:modules,diagnostics:diagnostics,body_elaborations:value.body_elaborations,imported_schemes:value.imported_schemes,normalization:value.normalization};
 }
-fn allocateModules(self_:CheckedProject&,count:i64,retain_bodies:bool)->Error {assert(self_.owner.valid());self_.modules=owned_blot_support__Option_Module_.alloc_slice(count);for &value in self_.modules {value=blot_support::none<Module>();}if retain_bodies {self_.body_caches=owned_blot_reuse_body_check_cache__Cache.alloc_slice(count);for &cache in self_.body_caches {cache=blot_reuse_body_check_cache::Cache{..};}}return blot_error::Error.none;}
-fn allocateReuse(self_:CheckedProject&,count:i64)->Error {
- assert(self_.owner.valid());self_.reused_modules=owned_bool.alloc_slice(count);for &value in self_.reused_modules {value=false;}
- self_.interface_colors=owned_blot_reuse_entry_frontend_cutoff__Color.alloc_slice(count);for &value in self_.interface_colors {value=blot_reuse_entry_frontend_cutoff::Color.unknown;}
- self_.binding_maps=owned_blot_support__Option_BindingMap_.alloc_slice(count);for &value in self_.binding_maps {value=blot_support::none<BindingMap>();}
- self_.relocated_modules=owned_blot_support__Option_FrozenModule_.alloc_slice(count);for &value in self_.relocated_modules {value=blot_support::none<FrozenModule>();}
- let owners=owned_blot_reuse_dependency_payload__Owner.alloc_slice(count);for &value in owners {value=blot_reuse_dependency_payload::Owner{..};}result_states[self_.owner.slot-1].relocated=owners;return blot_error::Error.none;
-}
+fn allocateModules(self_:CheckedProject&,count:i64)->Error {assert(self_.owner.valid());self_.modules=owned_blot_support__Option_Module_.alloc_slice(count);for &value in self_.modules {value=blot_support::none<Module>();}return blot_error::Error.none;}
 fn deinit(self_:Module&) {self_.checked.deinit();releaseOwned(self_.exports);self_.exports=default<blot_reuse_project_check::Export[:]>();self_.valid=false;}
-fn takeBodyCaches(self_:CheckedProject&)->blot_reuse_body_check_cache::Cache[:],Error {assert(self_.owner.valid());let value=owned_blot_reuse_body_check_cache__Cache.realloc_slice(self_.body_caches,self_.body_caches.len);assert(blot_support::same_slice_identity(value,self_.body_caches));self_.body_caches=default<blot_reuse_body_check_cache::Cache[:]>();return value,blot_error::Error.none;}
-fn releaseBodyCaches(values:blot_reuse_body_check_cache::Cache[:]) {for &cache in values {cache.deinit();}releaseOwned(values);}
 fn deinit(self_:Diagnostic&) {if self_.purity.present && self_.purity.value.operation_name.present {releaseOwned(self_.purity.value.operation_name.value);}if self_.detail.present {releaseOwned(self_.detail.value);}if self_.hole.present {self_.hole.value.deinit();}if self_.explanation.present {self_.explanation.value.deinit();}self_.purity=blot_support::none<blot_check_check::PurityWitness>();self_.detail=blot_support::none<const u8[:]>();self_.hole=blot_support::none<blot_reuse_hole_diagnostics::Snapshot>();self_.explanation=blot_support::none<blot_reuse_dispatch_explanation::Explanation>();}
 fn deinit(self_:CheckedProject&) {
  if self_.owner.slot==0 {return;}assert(self_.owner.valid());
- for &cache in self_.body_caches {cache.deinit();}releaseOwned(self_.body_caches);for &item in self_.modules {if item.present {item.value.deinit();}}releaseOwned(self_.modules);
- releaseOwned(self_.reused_modules);releaseOwned(self_.interface_colors);for &item in self_.binding_maps {if item.present {item.value.deinit();}}releaseOwned(self_.binding_maps);
- let state:ResultState& =result_states[self_.owner.slot-1];for &owner in state.relocated {owner.deinit();}releaseOwned(state.relocated);releaseOwned(self_.relocated_modules);
+ for &item in self_.modules {if item.present {item.value.deinit();}}releaseOwned(self_.modules);
+ let state:ResultState& =result_states[self_.owner.slot-1];
  for &diagnostic in self_.diagnostics {diagnostic.deinit();}releaseOwned(self_.diagnostics);let at=self_.owner.slot-1;state=ResultState{..};result_states.free(at);self_=CheckedProject{..};
 }

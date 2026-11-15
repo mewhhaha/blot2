@@ -1,35 +1,32 @@
-// Public constructors publish only complete ownership; failed resume empties it.
+// Public constructors publish only complete ownership.
 namespace blot_reuse_project_check;
 import .project_check;
 fn checkProject<E>(executor:E&,source:Project)->CheckedProject,Error {return checkProjectWithPrivateExecution(executor,source,blot_check_check::PrivateExecution{..});}
-fn checkProjectWithPrivateExecution<E>(executor:E&,source:Project,execution:blot_check_check::PrivateExecution)->CheckedProject,Error {return checkProjectMode(executor,source,execution,blot_support::none<blot_reuse_entry_frontend_cutoff::Previous>(),Editor.none,false);}
-fn checkProjectForEditor<E>(executor:E&,source:Project,query:EditorQuery)->CheckedProject,Error {return checkProjectModeDeferring(executor,source,blot_check_check::PrivateExecution{..},blot_support::none<blot_reuse_entry_frontend_cutoff::Previous>(),Editor.query{query},false,false,false);}
-fn checkProjectWithEntryCutoff<E>(executor:E&,source:Project,previous:blot_reuse_entry_frontend_cutoff::Previous)->CheckedProject,Error {return checkProjectMode(executor,source,blot_check_check::PrivateExecution{..},blot_support::some(previous),Editor.none,true);}
-fn checkProjectRetainingBodies<E>(executor:E&,source:Project,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->CheckedProject,Error {return checkProjectMode(executor,source,blot_check_check::PrivateExecution{..},previous,Editor.none,true);}
-fn checkProjectToFirstDiagnostic<E>(executor:E&,source:Project,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>,retain_bodies:bool)->CheckedProject,Error {return checkProjectModeDeferring(executor,source,blot_check_check::PrivateExecution{..},previous,Editor.none,retain_bodies,false,true);}
-fn checkProjectDeferringEntry<E>(executor:E&,source:Project,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->CheckedProject,Error {return checkProjectModeDeferring(executor,source,blot_check_check::PrivateExecution{..},previous,Editor.none,true,true,false);}
-fn checkProjectDeferringEntryToFirstDiagnostic<E>(executor:E&,source:Project,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->CheckedProject,Error {return checkProjectModeDeferring(executor,source,blot_check_check::PrivateExecution{..},previous,Editor.none,true,true,true);}
-fn checkProjectMode<E>(executor:E&,source:Project,execution:blot_check_check::PrivateExecution,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>,editor:Editor,retain_bodies:bool)->CheckedProject,Error {return checkProjectModeDeferring(executor,source,execution,previous,editor,retain_bodies,false,false);}
+// PRIVATE execution-only project proof. Public callers remain default off;
+// the loader, semantic options and artifact identities receive no new flags.
+fn checkProjectWithPrivateExecution<E>(executor:E&,source:Project,execution:blot_check_check::PrivateExecution)->CheckedProject,Error {return checkProjectMode(executor,source,execution,Editor.none,false);}
+// One request-local checker graph, with a shared work budget across modules.
+fn checkProjectForEditor<E>(executor:E&,source:Project,query:EditorQuery)->CheckedProject,Error {return checkProjectMode(executor,source,blot_check_check::PrivateExecution{..},Editor.query{query},false);}
+// checkProject for callers that publish only the first diagnostic. Checking
+// stops after the first module that reports one, so `diagnostics` is a
+// non-empty prefix of the complete check's list exactly when that list is
+// non-empty, and later modules stay unchecked.
+fn checkProjectToFirstDiagnostic<E>(executor:E&,source:Project)->CheckedProject,Error {return checkProjectMode(executor,source,blot_check_check::PrivateExecution{..},Editor.none,true);}
 fn finishProject(engine:Engine&)->CheckedProject {engine.result.diagnostics=copyDiagnostics(engine.diagnostics);engine.diagnostics.items=engine.diagnostics.storage[..0];let result=canonicalOwnedResult(engine.result);engine.result=CheckedProject{..};return result;}
-fn checkProjectModeDeferring<E>(executor:E&,source:Project,execution:blot_check_check::PrivateExecution,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>,editor:Editor,retain_bodies:bool,defer_entry:bool,first_diagnostic:bool)->CheckedProject,Error {
- let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);var engine,error=initEngine(source,execution,editor,retain_bodies);if error!=blot_error::Error.none {timing.exit();return CheckedProject{..},error;}
- let error=checkProjectInto(engine,executor,previous,defer_entry,first_diagnostic);if error!=blot_error::Error.none {engine.deinit();timing.exit();return CheckedProject{..},error;}let result=finishProject(engine);engine.deinit();timing.exit();return result,blot_error::Error.none;
+fn checkProjectMode<E>(executor:E&,source:Project,execution:blot_check_check::PrivateExecution,editor:Editor,first_diagnostic:bool)->CheckedProject,Error {
+ let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);var engine,error=initEngine(source,execution,editor);if error!=blot_error::Error.none {timing.exit();return CheckedProject{..},error;}
+ let error=checkProjectInto(engine,executor,first_diagnostic);if error!=blot_error::Error.none {engine.deinit();timing.exit();return CheckedProject{..},error;}let result=finishProject(engine);engine.deinit();timing.exit();return result,blot_error::Error.none;
 }
-fn checkProjectInto<E>(self_:Engine&,executor:E&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>,defer_entry:bool,first_diagnostic:bool)->Error {
- { let propagated_error = self_.offerBodies(previous); if propagated_error != blot_error::Error.none { return propagated_error; } }let source=self_.source;if source.diagnostics.len!=0 {return self_.appendSourceDiagnostics();}
- { let propagated_error = self_.result.allocateModules(source.units.len,self_.retain_bodies); if propagated_error != blot_error::Error.none { return propagated_error; } }self_.source_validation=source.input_mode==blot_reuse_project::InputMode.source && blot_check_check::sourceImportDiagnostic(source.unit(source.entry).tree).present;
+fn checkProjectInto<E>(self_:Engine&,executor:E&,first_diagnostic:bool)->Error {
+ let source=self_.source;if source.diagnostics.len!=0 {return self_.appendSourceDiagnostics();}
+ { let propagated_error = self_.result.allocateModules(source.units.len); if propagated_error != blot_error::Error.none { return propagated_error; } }self_.source_validation=source.input_mode==blot_reuse_project::InputMode.source && blot_check_check::sourceImportDiagnostic(source.unit(source.entry).tree).present;
  for unit in source.units.items {if blot_check_check::hasNumericFailure(unit.tree) {self_.source_validation=true;break;}}
  if self_.source_validation {self_.source_modules=source_module_runs.alloc_slice(source.units.len);for &value in self_.source_modules {value=blot_support::none<SourceModule>();}}
- if previous.present && previous.value.reuse_modules && !self_.source_validation {{ let propagated_error = self_.result.allocateReuse(source.compiled_modules.len); if propagated_error != blot_error::Error.none { return propagated_error; } }}
- { let propagated_error = self_.initCompiledCatalogs(); if propagated_error != blot_error::Error.none { return propagated_error; } }let deferrable=defer_entry && source.input_mode==blot_reuse_project::InputMode.project && !self_.source_validation && source.order.len!=0 && source.order.items[source.order.len-1]==source.entry;
- var parallel=false;if !previous.present {let checked,error=self_.checkParallel(executor,deferrable);{ let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } }parallel=checked;}
- if !parallel {for unit in source.order.items {if deferrable && unit==source.entry {self_.result.deferred_entry=blot_support::some(Deferred{self_.resolution_remaining,self_.associated_remaining, ..});break;}let continued,error=self_.checkOrdered(unit,previous);{ let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } }if !continued {break;}if first_diagnostic && !self_.source_validation && self_.diagnostics.items.len!=0 {break;}}}
+ { let propagated_error = self_.initCompiledCatalogs(); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ let parallel,error=self_.checkParallel(executor);{ let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } }
+ // Diagnostics are appended in dependency order and never reordered, so the
+ // first is final once it exists. Source validation still collects every
+ // module's numeric diagnostics.
+ if !parallel {for unit in source.order.items {let continued,error=self_.checkOrdered(unit);{ let propagated_error = error; if propagated_error != blot_error::Error.none { return propagated_error; } }if !continued {break;}if first_diagnostic && !self_.source_validation && self_.diagnostics.items.len!=0 {break;}}}
  return blot_error::Error.none;
 }
-fn checkDeferredEntry<E>(executor:E&,source:Project,checked:CheckedProject&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->Error {
- if !checked.deferred_entry.present {return blot_error::Error.none;}let deferred=checked.deferred_entry.value;let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);
- var engine,error=initEngine(source,blot_check_check::PrivateExecution{..},Editor.none,checked.body_caches.len!=0);if error!=blot_error::Error.none {checked.deinit();timing.exit();return error;}engine.result.deinit();engine.result=copy(checked);checked=CheckedProject{..};engine.resolution_remaining=deferred.resolution_remaining;engine.associated_remaining=deferred.associated_remaining;engine.result.deferred_entry=blot_support::none<Deferred>();
- engine.diagnostics=DiagnosticBuffer{engine.result.diagnostics,engine.result.diagnostics, ..};engine.result.diagnostics=default<Diagnostic[:]>();
- let error=resumeEntry(engine,previous);if error!=blot_error::Error.none {engine.deinit();timing.exit();return error;}checked=finishProject(engine);engine.deinit();timing.exit();return blot_error::Error.none;
-}
-fn resumeEntry(self_:Engine&,previous:blot_support::Option<blot_reuse_entry_frontend_cutoff::Previous>)->Error {{ let propagated_error = self_.offerBodies(previous); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.initCompiledCatalogs(); if propagated_error != blot_error::Error.none { return propagated_error; } }let ignored,error=self_.checkOrdered(self_.source.entry,previous);return error;}

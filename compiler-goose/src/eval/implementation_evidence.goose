@@ -20,7 +20,6 @@ import support.pooled_map;
 import std;
 import dictionary;
 import check.check;
-import backend.runtime_identity;
 type Error=blot_error::Error;
 type Identity=blot_check_types::NominalIdentity;
 type List=blot_check_types::List;
@@ -214,11 +213,9 @@ fn step<H>(w:Work&,host:H&,store:Handle) -> bool {
 }
 fn owner<H>(host: H&,unit: u32) -> i64 { for module,index in host.units { var identity=module.unit; if identity==0 { identity=(index+1) as u32; } if identity==unit { return index; } } return -1; }
 fn canonicalLess<H>(host: H&,left: blot_check_core::Implementation,right: blot_check_core::Implementation) -> bool {
- let identity=host.diagnosticIdentity();
- if identity.present { let before=identity.value.owner(left.identity.unit); let after=identity.value.owner(right.identity.unit); if before.present&&after.present&&before.value!=after.value { return ::compare(before.value,after.value)<0; } }
  if left.identity.unit!=right.identity.unit { return left.identity.unit<right.identity.unit; }
  if left.origin_span.present&&right.origin_span.present&&left.origin_span.value.start!=right.origin_span.value.start { return left.origin_span.value.start<right.origin_span.value.start; }
- if identity.present { let before=identity.value.symbol(left.name); let after=identity.value.symbol(right.name); if before.present&&after.present { return ::compare(before.value,after.value)<0; } } return left.identity.decl<right.identity.decl;
+ return left.identity.decl<right.identity.decl;
 }
 fn key(context: u32,contract: Identity,arguments: const u32[:]) -> u64 { var bytes: u8[>..<]=[]; blot_eval_type_evidence::put32(bytes,context); blot_eval_type_evidence::put32(bytes,contract.unit); blot_eval_type_evidence::put32(bytes,contract.decl); for arg in arguments { blot_eval_type_evidence::put32(bytes,arg); } return blot_parse_symbols::wyhash(bytes); }
 fn sameArguments(self_: Store,span: List,arguments: const u32[:]) -> bool { return span.len==arguments.len&&self_.arguments.items[span.start..span.start+span.len]==arguments; }

@@ -50,11 +50,6 @@ SPECIAL={
  'blot_check_parameter_patterns::Store':None,
  'blot_parse_ast::Tree':None,
  'blot_parse_symbols::Pool':None,
- 'blot_reuse_body_check_cache::Cache':None,
- 'blot_reuse_body_check_cache::Body':{'owner'},
- 'blot_reuse_body_check_cache::Loops':{'slot'},
- 'blot_reuse_body_auxiliary::Owner':{'slot'},
- 'blot_reuse_body_check_cache::Chunk':{'references','graph_owner','live','slot'},
  'blot_check_type_store_snapshot::Snapshot':{'lease_index','generation'},
  'blot_check_type_store_snapshot::State':{'store_owner_id'},
 }
@@ -62,9 +57,8 @@ ROOTS=[
  'blot_check_check::Checked','blot_parse_ast::Tree','blot_parse_symbols::Pool',
  'blot_check_check::ModuleOrigins','blot_reuse_project_check::Diagnostic','blot_reuse_project_check::Export',
  'blot_reuse_project::Range','blot_reuse_project::Import','blot_reuse_project::Diagnostic','blot_reuse_project::Lowering','blot_reuse_project::InputMode',
- 'blot_reuse_frozen_dependency::Module','blot_reuse_body_check_cache::Cache',
+ 'blot_reuse_frozen_dependency::Module',
  'blot_check_type_store_snapshot::Snapshot','blot_check_parameter_patterns::Node',
- 'blot_reuse_body_check_cache::Chunk','blot_reuse_body_check_cache::Body',
  'blot_work_counters::Frontend','blot_phase_profile::WorkerContext','blot_phase_profile::WorkerSnapshot',
 ]
 CUSTOM_CHILDREN={
@@ -72,7 +66,6 @@ CUSTOM_CHILDREN={
  'blot_parse_symbols::Pool':['u8[:]','blot_parse_symbols::Entry[:]','u32[:]'],
  'blot_check_types::Store':['blot_check_type_store_snapshot::Snapshot'],
  'blot_check_parameter_patterns::Store':['blot_check_parameter_patterns::Node[:]','u32[:]'],
- 'blot_reuse_body_check_cache::Cache':['blot_reuse_body_check_cache::Chunk','u32[:]','dictionary_slot<const u8[:],i64>[:]'],
 }
 # Every AST owner table is explicit, preserving actual tag/ID ordinals.
 for field,t in D['blot_parse_ast::Tree'][2]:
@@ -122,7 +115,7 @@ def visit(t,ns='blot_project_packet'):
  else:raise ValueError((kind,t))
 for root in ROOTS:visit(root)
 # Header vectors and mutable body data also allocate exact typed slices.
-for t in ['u8','u32','blot_reuse_project_check::Export','blot_reuse_project_check::Diagnostic','blot_reuse_frozen_dependency::Module','blot_reuse_body_check_cache::Body','blot_check_parameter_patterns::Node','blot_reuse_project::Import','blot_reuse_project::Diagnostic','blot_reuse_body_check_cache::Cache','bool']:
+for t in ['u8','u32','blot_reuse_project_check::Export','blot_reuse_project_check::Diagnostic','blot_reuse_frozen_dependency::Module','blot_check_parameter_patterns::Node','blot_reuse_project::Import','blot_reuse_project::Diagnostic','bool']:
  t=resolve(t);visit(t);SLICES[t]=True
 for t in list(SLICES):visit(t)
 # Concrete code below is emitted after the contexts file has defined all roots.
@@ -170,7 +163,7 @@ for t,skip in [('blot_check_core::Module',{'owner_id','package_payloads'}),('blo
 # optional helpers. Reader/writer inference keeps unused codecs uninstantiated.
 private={'blot_check_core::Module','blot_check_core::Types','blot_check_frozen_types::Graph'}
 for t in sorted(STRUCTS):
- if t in private or (t in SPECIAL and t not in {'blot_reuse_body_check_cache::Loops','blot_reuse_body_auxiliary::Owner'}):continue
+ if t in private or t in SPECIAL:continue
  owner=D[t.split('<')[0]][3]
  fields=[(f,resolve(q(ty,owner),owner)) for f,ty in STRUCTS[t] if f not in SPECIAL.get(t,set())]
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in fields)+'self.depth--;}')

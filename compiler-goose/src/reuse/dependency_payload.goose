@@ -17,8 +17,6 @@ import parse.ast;
 import reuse.frozen_dependency;
 import reuse.principal_interface;
 import support.error;
-import backend.runtime_identity;
-import reuse.entry_frontend_cutoff;
 import support.native;
 import support.option;
 
@@ -32,8 +30,6 @@ enum Run {
 run_header_module {values:blot_check_core::Module[:]},
 run_header_path {values:HeaderPath[:]},
 run_header_digest {values:HeaderDigest[:]},
-run_header_name {values:blot_backend_runtime_identity::Name[:]},
-run_header_import {values:blot_reuse_entry_frontend_cutoff::Import[:]},
 run_header_owner {values:Owner[:]},
 run_bool {values:bool[:]},
 run_u32 {values:u32[:]},
@@ -269,8 +265,6 @@ fn deinit(self_:Owner&) {if self_.lease==0 {return;}assert(valid(self_));let own
 run_header_module run=>{pool_header_module.free_slice(run.values);},
 run_header_path run=>{pool_header_path.free_slice(run.values);},
 run_header_digest run=>{pool_header_digest.free_slice(run.values);},
-run_header_name run=>{pool_header_name.free_slice(run.values);},
-run_header_import run=>{pool_header_import.free_slice(run.values);},
 run_header_owner run=>{pool_header_owner.free_slice(run.values);},
 run_bool run=>{pool_bool.free_slice(run.values);},
 
@@ -4379,8 +4373,6 @@ fn rollback(self_:Owner&,mark:Mark) {
 run_header_module run=>{pool_header_module.free_slice(run.values);},
 run_header_path run=>{pool_header_path.free_slice(run.values);},
 run_header_digest run=>{pool_header_digest.free_slice(run.values);},
-run_header_name run=>{pool_header_name.free_slice(run.values);},
-run_header_import run=>{pool_header_import.free_slice(run.values);},
 run_header_owner run=>{pool_header_owner.free_slice(run.values);},
 run_bool run=>{pool_bool.free_slice(run.values);},
 
@@ -7896,14 +7888,8 @@ fn allocate(self_:Owner&,sample:HeaderDigest,length:i64)->HeaderDigest[:],Error 
 fn mutable(self_:const Owner&,values:const HeaderDigest[:])->HeaderDigest[:] {assert(unique(self_));if values.len==0 {return default<HeaderDigest[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_digest run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_digest.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
-reusable[] var pool_header_name:blot_backend_runtime_identity::Name[>..]=[];
-fn allocate(self_:Owner&,sample:blot_backend_runtime_identity::Name,length:i64)->blot_backend_runtime_identity::Name[:],Error {assert(unique(self_));if length<0 {return default<blot_backend_runtime_identity::Name[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_backend_runtime_identity::Name[:]>(),blot_error::Error.none;}let run=pool_header_name.alloc_slice(length);let error=remember(self_,Run.run_header_name{run, ..});if error!=blot_error::Error.none {pool_header_name.free_slice(run);return default<blot_backend_runtime_identity::Name[:]>(),error;}return run,blot_error::Error.none;}
-fn mutable(self_:const Owner&,values:const blot_backend_runtime_identity::Name[:])->blot_backend_runtime_identity::Name[:] {assert(unique(self_));if values.len==0 {return default<blot_backend_runtime_identity::Name[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_name run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_name.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
-reusable[] var pool_header_import:blot_reuse_entry_frontend_cutoff::Import[>..]=[];
-fn allocate(self_:Owner&,sample:blot_reuse_entry_frontend_cutoff::Import,length:i64)->blot_reuse_entry_frontend_cutoff::Import[:],Error {assert(unique(self_));if length<0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),blot_error::Error.none;}let run=pool_header_import.alloc_slice(length);let error=remember(self_,Run.run_header_import{run, ..});if error!=blot_error::Error.none {pool_header_import.free_slice(run);return default<blot_reuse_entry_frontend_cutoff::Import[:]>(),error;}return run,blot_error::Error.none;}
-fn mutable(self_:const Owner&,values:const blot_reuse_entry_frontend_cutoff::Import[:])->blot_reuse_entry_frontend_cutoff::Import[:] {assert(unique(self_));if values.len==0 {return default<blot_reuse_entry_frontend_cutoff::Import[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_header_import run=>{if blot_support::same_slice_identity(run.values,values) {return pool_header_import.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Header runs retain their own slots; child payloads use explicit reader pins.
 reusable[] var pool_header_owner:Owner[>..]=[];

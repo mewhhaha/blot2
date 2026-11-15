@@ -1,4 +1,4 @@
-// A fresh no-import consumer checked against an admitted dependency interface.
+// Owned frontend diagnostics, published after every frontend owner is released.
 // Published frontend evidence is snapped to owned JSON before teardown.
 namespace blot_reuse_dependency_consumer;
 import dictionary;
@@ -21,9 +21,6 @@ import reuse.dependency_payload;
 import reuse.hole_diagnostics;
 import reuse.dispatch_explanation;
 import reuse.purity_diagnostics;
-import reuse.partial_dependency;
-import reuse.dependency_project_consumer;
-import backend.core_backend;
 import work_counters;
 import support.error;
 import support.option;
@@ -183,63 +180,10 @@ fn write(self_:const Diagnostic&,out:u8[>..]&,filename:const u8[:])->Error {
  writer.endObject();if writer.failure!=blot_error::Error.none {return writer.failure;}out.push('\n');return blot_error::Error.none;
 }
 fn write<S>(self_:const Diagnostic&,stream:S&,filename:const u8[:])->Error {var bytes:u8[>..]=[];let error=self_.write(bytes,filename);if error!=blot_error::Error.none {return error;}return stream.writeAll(bytes[..]);}
-struct Result {compiled:blot_backend_core_backend::Result=default<blot_backend_core_backend::Result>(),stats:Stats=Stats{},diagnostic:blot_support::Option<Diagnostic> =blot_support::none<Diagnostic>()}
-fn deinit(self_:Result&) {self_.compiled.deinit();if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
-fn rejected(stage:const u8[:],code:const u8[:],span:Span,message:const u8[:])->Result,Error {let diagnostic,error=init(1,stage,code,span,message);if error!=blot_error::Error.none {return Result{},error;}return Result{diagnostic:blot_support::some(diagnostic)},blot_error::Error.none;}
 struct HoleDetails {hole:blot_reuse_hole_diagnostics::Snapshot}
 struct ExplanationDetails {explanation:blot_reuse_dispatch_explanation::Explanation}
-fn exportKind(kind:blot_reuse_frozen_dependency::ExportKind)->blot_check_check::ImportedCatalog_kind {match kind {
- nominal=>{return blot_check_check::ImportedCatalog_kind.nominal;},constructor=>{return blot_check_check::ImportedCatalog_kind.constructor;},effect_family=>{return blot_check_check::ImportedCatalog_kind.effect_family;},contract=>{return blot_check_check::ImportedCatalog_kind.contract;},implementation=>{return blot_check_check::ImportedCatalog_kind.implementation;},value=>{abort("value export is not a catalog");},
-}}
-fn scheme(dependency:const blot_reuse_frozen_dependency::Module&,binding:u32)->blot_check_check::SchemeInterface {
- let definition=dependency.interface.bindings[binding];                  let __field_order_551_producer_binding: blot_check_check::BindingId = binding; let __field_order_552_proof_contract: blot_support::Option<blot_check_numeric_proof_headers::Owned> = blot_check_numeric_proof_headers::findValue(dependency.interface.proof_contracts,binding); let __field_order_553_types: blot_check_frozen_types::Source = blot_check_frozen_types::Source.frozen{dependency.interface.graph}; let __field_order_554_scheme: blot_check_types::Scheme = definition.scheme; let __field_order_555_obligations: const blot_check_types::Obligation[:] = dependency.interface.obligations; let __field_order_556_capability_flow: blot_check_check::CapabilityFlow = definition.capability_flow; let __field_order_557_capability_parameters: blot_check_capability_flow::Parameters = definition.capability_parameters; let __field_order_558_named_function: bool = definition.named_function; let __field_order_559_callees: blot_check_check::Callees = blot_check_check::Callees.frozen{blot_check_check::frozenCallees(dependency.interface)}; return blot_check_check::SchemeInterface{ producer_binding: __field_order_551_producer_binding, proof_contract: __field_order_552_proof_contract, capability_flow: __field_order_556_capability_flow, capability_parameters: __field_order_557_capability_parameters, named_function: __field_order_558_named_function, types: __field_order_553_types, scheme: __field_order_554_scheme, obligations: __field_order_555_obligations, callees: __field_order_559_callees };
-}
 fn codeName(code:blot_check_check::Code)->const u8[:] {match code {const for <N,V> in variants<blot_check_check::Code> {V=>{return N;},}}}
 fn coreCodeName(code:blot_check_core::Code)->const u8[:] {match code {const for <N,V> in variants<blot_check_core::Code> {V=>{return N;},}}}
-fn compile(workspace:blot_backend_core_backend::CompileWorkspace&,source:const u8[:],pool:Pool&,dependency:const blot_reuse_frozen_dependency::Module&)->Result,Error {
- if dependency.core.unit!=2 || dependency.interface.unit!=2 {return Result{},blot_error::Error.invalid_artifact;}
- var inherited:blot_parse_parser::InheritedFixity[>..<]=[];for fixity in dependency.fixities {inherited.push(blot_parse_parser::InheritedFixity{fixity.operator,fixity.precedence,fixity.association,fixity.named});}
- var token_items:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var lexical_issues:blot_parse_lexer::Diagnostic[>..<]=[];var tokens=blot_parse_lexer::init(token_items,comments,lexical_issues);
- let error=blot_parse_lexer::lex(source,tokens);if error!=blot_error::Error.none {return Result{},error;}
- if lexical_issues.len!=0 {let diagnostic,error=publishedDiagnostic(1,"parse-project",source,blot_parse_syntax_diagnostics::lexical(token_items[..],lexical_issues[0]),lexical_issues[..]);if error!=blot_error::Error.none {return Result{},error;}return Result{diagnostic:blot_support::some(diagnostic)},blot_error::Error.none;}
- let created,error=blot_parse_ast::initPooled();if error!=blot_error::Error.none {return Result{},error;}var tree=created;
- let error=blot_parse_parser::parse_with_fixities(source,token_items[..],pool,tree,inherited[..]);if error!=blot_error::Error.none {let __cleanup_result_4_0: Result = Result{}; let __cleanup_result_4_1: Error = error; {tree.deinit();} return __cleanup_result_4_0, __cleanup_result_4_1;}
- if tree.diagnostics.len!=0 {let publication,error=blot_parse_syntax_diagnostics::parse(token_items[..],tree.diagnostics.items[0]);if error!=blot_error::Error.none {let __cleanup_result_5_0: Result = Result{}; let __cleanup_result_5_1: Error = error; {tree.deinit();} return __cleanup_result_5_0, __cleanup_result_5_1;}let diagnostic,error=publishedDiagnostic(1,"parse-project",source,publication,tree.diagnostics.items);if error!=blot_error::Error.none {let __cleanup_result_6_0: Result = Result{}; let __cleanup_result_6_1: Error = error; {tree.deinit();} return __cleanup_result_6_0, __cleanup_result_6_1;}let __cleanup_result_7_0: Result = Result{diagnostic:blot_support::some(diagnostic)}; let __cleanup_result_7_1: Error = blot_error::Error.none; {tree.deinit();} return __cleanup_result_7_0, __cleanup_result_7_1;}
- var occupied:dictionary<u32,bool> =dictionary<u32,bool>{};
- for id in tree.roots.items {let node=tree.node(id);if node.tag==blot_parse_ast::tag_import_decl {let __cleanup_result_8_0: Result = Result{}; let __cleanup_result_8_1: Error = blot_error::Error.imported_consumer_unsupported; {tree.deinit();} return __cleanup_result_8_0, __cleanup_result_8_1;}
-  if node.tag==blot_parse_ast::tag_value_decl || node.tag==blot_parse_ast::tag_data_decl || node.tag==blot_parse_ast::tag_effect_type_decl || node.tag==blot_parse_ast::tag_effect_decl {occupied.insert(node.a,true);}else if node.tag==blot_parse_ast::tag_implementation_decl {occupied.insert(tree.implementation(id).name,true);}
-  if node.tag==blot_parse_ast::tag_data_decl {let count=tree.children(node.b).len;for index in count {let name=tree.node(tree.children(node.b)[index]).a;occupied.insert(name,true);}}
- }
- var imports:blot_check_check::ImportedBinding[>..]=[];var catalogs:blot_check_check::ImportedCatalog[>..]=[];var fixities:blot_check_check::ImportedFixity[>..]=[];
- catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(dependency.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0});
- for exported in dependency.exports {
-  if occupied.contains(exported.name) {continue;}
-  if exported.kind==blot_reuse_frozen_dependency::ExportKind.value {    let __field_order_560_name: blot_parse_symbols::Symbol = exported.name; let __field_order_561_target: blot_check_check::ExternalTarget = exported.target; let __field_order_562_origin: blot_parse_ast::Id = 0; let __field_order_563_interface: blot_check_check::SchemeInterface = scheme(dependency,exported.target.binding); imports.push(blot_check_check::ImportedBinding{ name: __field_order_560_name, target: __field_order_561_target, interface: __field_order_563_interface, origin: __field_order_562_origin });}
-  else {catalogs.push(blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(dependency.interface)},name:exported.name,kind:exportKind(exported.kind),index:exported.catalog,origin:0});}
- }
- for fixity in dependency.fixities {
-  if !fixity.named {    let __field_order_564_expose: bool = false; let __field_order_565_target: blot_check_check::ExternalTarget = fixity.producer; let __field_order_566_origin: blot_parse_ast::Id = 0; let __field_order_567_interface: blot_check_check::SchemeInterface = scheme(dependency,fixity.producer.binding); imports.push(blot_check_check::ImportedBinding{ target: __field_order_565_target, interface: __field_order_567_interface, origin: __field_order_566_origin, expose: __field_order_564_expose });}
-  var target=blot_support::none<blot_check_check::ExternalTarget>();if !fixity.named {target=blot_support::some(fixity.producer);}fixities.push(blot_check_check::ImportedFixity{operator:fixity.operator,target:fixity.target,named:fixity.named,external:target});
- }
- let value,error=blot_check_check::checkModuleWithOptions(tree,pool,imports[..],catalogs[..],1,blot_check_check::ModuleOptions{prelude_unit:2,inherited_fixities:fixities[..],..});if error!=blot_error::Error.none {let __cleanup_result_9_0: Result = Result{}; let __cleanup_result_9_1: Error = error; {tree.deinit();} return __cleanup_result_9_0, __cleanup_result_9_1;}var checked=value;
- if checked.diagnostics.len!=0 {
-  let item=checked.diagnostics[0];let stats=Stats{syntax_nodes:tree.nodes.len-1,body_elaborations:checked.body_elaborations,imported_schemes:checked.imported_schemes};let publication=blot_parse_syntax_diagnostics::Publication{cause:blot_parse_syntax_diagnostics::native_detail,code:codeName(item.code),span:item.span,message:item.message()};
-  if item.hole.present {let diagnostic,error=publishedDiagnostic(1,"check",source,publication,HoleDetails{item.hole.value});if error!=blot_error::Error.none {let __cleanup_result_10_0: Result = Result{}; let __cleanup_result_10_1: Error = error; {checked.deinit();} {tree.deinit();} return __cleanup_result_10_0, __cleanup_result_10_1;}let __cleanup_result_11_0: Result = Result{stats:stats,diagnostic:blot_support::some(diagnostic)}; let __cleanup_result_11_1: Error = blot_error::Error.none; {checked.deinit();} {tree.deinit();} return __cleanup_result_11_0, __cleanup_result_11_1;}
-  if item.explanation.present {let diagnostic,error=publishedDiagnostic(1,"check",source,publication,ExplanationDetails{item.explanation.value});if error!=blot_error::Error.none {let __cleanup_result_12_0: Result = Result{}; let __cleanup_result_12_1: Error = error; {checked.deinit();} {tree.deinit();} return __cleanup_result_12_0, __cleanup_result_12_1;}let __cleanup_result_13_0: Result = Result{stats:stats,diagnostic:blot_support::some(diagnostic)}; let __cleanup_result_13_1: Error = blot_error::Error.none; {checked.deinit();} {tree.deinit();} return __cleanup_result_13_0, __cleanup_result_13_1;}
-  if item.symbol==0 {let __cleanup_result_14_0, __cleanup_result_14_1 = rejected("check",codeName(item.code),item.span,item.message()); {checked.deinit();} {tree.deinit();} return __cleanup_result_14_0, __cleanup_result_14_1;}
-  var message:u8[>..];message.append(item.message());if codeName(item.code)=="unknown_intrinsic" || codeName(item.code)=="unknown_record_field" {message.append(" ");}else {message.append(": ");}message.append(pool.get(item.symbol));let __cleanup_result_15_0, __cleanup_result_15_1 = rejected("check",codeName(item.code),item.span,message[..]); {checked.deinit();} {tree.deinit();} return __cleanup_result_15_0, __cleanup_result_15_1;
- }
- let lowered,error=blot_check_core_builder::lower(tree,pool,checked);if error!=blot_error::Error.none {let __cleanup_result_16_0: Result = Result{}; let __cleanup_result_16_1: Error = error; {checked.deinit();} {tree.deinit();} return __cleanup_result_16_0, __cleanup_result_16_1;}var ir=lowered;
- if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let __cleanup_result_17_0, __cleanup_result_17_1 = rejected("lower",coreCodeName(issue.code),issue.span,issue.message()); {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_17_0, __cleanup_result_17_1;}
- let stats=Stats{syntax_nodes:tree.nodes.len-1,body_elaborations:checked.body_elaborations,body_lowerings:ir.value.body_lowerings,imported_schemes:checked.imported_schemes,normalization:checked.types.normalization};
- let copied,error=blot_reuse_dependency_payload::clone(dependency.core);if error!=blot_error::Error.none {let __cleanup_result_18_0: Result = Result{}; let __cleanup_result_18_1: Error = error; {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_18_0, __cleanup_result_18_1;}var dependency_core=copied;
- let opened,error=blot_reuse_dependency_payload::init();if error!=blot_error::Error.none {let __cleanup_result_19_0: Result = Result{}; let __cleanup_result_19_1: Error = error; {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_19_0, __cleanup_result_19_1;}var catalog=opened;
- let units,error=catalog.alloc<Core>(2);if error!=blot_error::Error.none {let __cleanup_result_20_0: Result = Result{}; let __cleanup_result_20_1: Error = error; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_20_0, __cleanup_result_20_1;}units[0]=ir.value;units[1]=dependency_core.value;
- let input_owners=[ir.owner,dependency_core.owner];let staged=blot_backend_core_backend::pinWorkspaceInputs(workspace,units,catalog,input_owners[..],[]);if staged!=blot_error::Error.none {return Result{},staged;}
- let emitted,error=blot_backend_core_backend::compileWithOptions(workspace,units,1,blot_backend_core_backend::CompileOptions{..});if error!=blot_error::Error.none {let __cleanup_result_21_0: Result = Result{}; let __cleanup_result_21_1: Error = error; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_21_0, __cleanup_result_21_1;}var result=Result{compiled:emitted,stats:stats};
- let unit_owners=[ir.owner,dependency_core.owner];let error=blot_backend_core_backend::pinResult(result.compiled,catalog,unit_owners[..],[]);if error!=blot_error::Error.none {result.deinit();let __cleanup_result_22_0: Result = Result{}; let __cleanup_result_22_1: Error = error; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_22_0, __cleanup_result_22_1;}let __cleanup_result_23_0: Result = result; let __cleanup_result_23_1: Error = blot_error::Error.none; {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} return __cleanup_result_23_0, __cleanup_result_23_1;
- {catalog.deinit();} {dependency_core.deinit();} {ir.deinit();} {checked.deinit();} {tree.deinit();} }
-
 fn detailWrite(writer:Writer&,value:HoleDetails)->Error {return detailRecord(writer,value);}
 
 fn detailWrite(writer:Writer&,value:ExplanationDetails)->Error {return detailRecord(writer,value);}
@@ -249,17 +193,11 @@ fn detailWrite(writer:Writer&,value:blot_parse_ast::Span)->Error {return detailR
 
 fn detailWrite(writer:Writer&,value:blot_check_check::DiagnosticContext)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::HoleDetails)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ExplanationDetails)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_partial_dependency::ContextDetails)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::HoleDetails)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ExplanationDetails)->Error {return detailRecord(writer,value);}
 
-fn detailWrite(writer:Writer&,value:blot_reuse_dependency_project_consumer::ContextDetails)->Error {return detailRecord(writer,value);}
 
 fn blot_reuse_dependency_consumer::forwardedDetails(details:blot_reuse_dependency_consumer::HoleDetails)->bool {return true;}
 

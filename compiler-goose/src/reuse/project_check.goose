@@ -5,10 +5,6 @@ import reuse.project;
 import reuse.principal_interface;
 import reuse.frozen_dependency;
 import reuse.dependency_payload;
-import reuse.entry_frontend_cutoff;
-import reuse.frontend_binding_relocation;
-import reuse.frontend_reference_relocation;
-import reuse.body_check_cache;
 import reuse.completion_fit;
 import reuse.hole_diagnostics;
 import reuse.dispatch_explanation;
@@ -39,7 +35,6 @@ type ExportKind=blot_reuse_frozen_dependency::ExportKind;
 type ExternalTarget=blot_check_check::ExternalTarget;
 type Span=blot_parse_ast::Span;
 type Checked=blot_check_check::Checked;
-type BindingMap=blot_reuse_frontend_binding_relocation::Map;
 type FrozenModule=blot_reuse_frozen_dependency::Module;
 struct EditorQuery {unit:u32,marker:blot_check_check::EditorMarker,budget:blot_reuse_completion_fit::Budget&}
 struct Export {name:u32,target:ExternalTarget=ExternalTarget{0,0, ..},kind:ExportKind=blot_reuse_frozen_dependency::ExportKind.value,catalog:u32=0}
@@ -67,17 +62,9 @@ fn message(self_:Diagnostic)->const u8[:] {
  entry_module=>{return "Only the entry module may declare host entries";},declaration_modifier=>{return "Unknown top-level declaration modifier";},dependency_failed=>{return "Imported module has no successful semantic interface";},
  }
 }
-struct Deferred {resolution_remaining:i64,associated_remaining:i64}
 struct CheckedProject {
- owner:ResultOwner=ResultOwner{..},body_caches:blot_reuse_body_check_cache::Cache[:]=default<blot_reuse_body_check_cache::Cache[:]>(),modules:blot_support::Option<Module>[:]=default<blot_support::Option<Module>[:]>(),diagnostics:Diagnostic[:]=default<Diagnostic[:]>(),
+ owner:ResultOwner=ResultOwner{..},modules:blot_support::Option<Module>[:]=default<blot_support::Option<Module>[:]>(),diagnostics:Diagnostic[:]=default<Diagnostic[:]>(),
  body_elaborations:i64=0,imported_schemes:i64=0,normalization:blot_work_counters::Normalization=blot_work_counters::Normalization{..},
- entry_cutoff:blot_reuse_entry_frontend_cutoff::Stats=blot_reuse_entry_frontend_cutoff::Stats{..},module_cutoff:blot_reuse_entry_frontend_cutoff::Stats=blot_reuse_entry_frontend_cutoff::Stats{..},
- reused_modules:bool[:]=default<bool[:]>(),interface_colors:blot_reuse_entry_frontend_cutoff::Color[:]=default<blot_reuse_entry_frontend_cutoff::Color[:]>(),binding_maps:blot_support::Option<BindingMap>[:]=default<blot_support::Option<BindingMap>[:]>(),relocated_modules:blot_support::Option<FrozenModule>[:]=default<blot_support::Option<FrozenModule>[:]>(),
- deferred_entry:blot_support::Option<Deferred> =blot_support::none<Deferred>(),
-}
-fn compiledModule(self_:const CheckedProject&,source:const Project&,id:i64)->const FrozenModule? {
- let compiled .= source.compiledModule(id);if compiled {return compiled;}if id==0 || id>self_.reused_modules.len || !self_.reused_modules[id-1] {return null;}
- if id<=self_.relocated_modules.len && self_.relocated_modules[id-1].present {return self_.relocated_modules[id-1].value;}return source.compiled_modules[id-1];
 }
 fn module(self_:const CheckedProject&,unit:u32)->const Module& {assert(unit!=0 && unit<=self_.modules.len && self_.modules[unit-1].present);return self_.modules[unit-1].value;}
 fn interface(self_:const CheckedProject&,target:ExternalTarget)->blot_check_check::SchemeInterface {
@@ -87,8 +74,3 @@ fn interface(self_:const CheckedProject&,target:ExternalTarget)->blot_check_chec
 // These callbacks borrow the invocation-local checker only during synchronous checking/capture.
 struct BodyNameContext {engine:const Engine?=null}
 fn borrow(self_:BodyNameContext)->const Engine? {return self_.engine;}
-fn lookup(self_:BodyNameContext,target:ExternalTarget)->blot_support::Option<const u8[:]> {let value .= self_.borrow();if !value {return blot_support::none<const u8[:]>();}return value.originalBindingName(target);}
-fn unitOrigin(self_:BodyNameContext,unit:u32)->blot_support::Option<blot_reuse_body_check_cache::Digest> {let value .= self_.borrow();if !value {return blot_support::none<blot_reuse_body_check_cache::Digest>();}return value.originalUnitOrigin(unit);}
-fn closedRows(self_:BodyNameContext,target:ExternalTarget)->blot_support::Option<blot_reuse_body_check_cache::Digest> {let value .= self_.borrow();if !value {return blot_support::none<blot_reuse_body_check_cache::Digest>();}return value.originalBindingClosedRows(target);}
-fn qualification(self_:BodyNameContext,unit:u32,span:Span)->blot_support::Option<blot_reuse_body_check_cache::Digest> {let value .= self_.borrow();if !value {return blot_support::none<blot_reuse_body_check_cache::Digest>();}return value.originalQualification(unit,span);}
-fn capabilities(self_:BodyNameContext,target:ExternalTarget)->blot_support::Option<blot_reuse_body_check_cache::Digest> {let value .= self_.borrow();if !value {return blot_support::none<blot_reuse_body_check_cache::Digest>();}return value.originalBindingCapabilities(target);}
