@@ -153,6 +153,8 @@ pub const Reflection = struct { node: ast.Id, kind: ReflectionKind, left: ast.Id
 pub const OperationUse = struct { node: ast.Id, template: u32, arguments: T.List, signature: T.Id, instance: Identity = .{ .unit = 0, .decl = 0 }, capability: ast.Id = 0, capability_binding: BindingId = 0, call: enum { value, state_read, state_write } = .value, operand: ast.Id = 0 };
 const AssociatedKey = struct { identity: Identity, operator: T.Operator };
 const AssociatedMember = struct { identity: Identity, member: symbols.Symbol };
+/// An associated entry copied from an imported catalog, keyed by its binding.
+const ImportedAssociated = struct { identity: Identity, member: symbols.Symbol, binding: BindingId };
 const EffectMember = struct { family: u32, member: symbols.Symbol };
 pub const Rebinding = struct { root: BindingId = 0, self_binding: BindingId = 0, path: T.List = .{} };
 pub const Projection = struct { nominal: Identity, field: symbols.Symbol, variants: T.List };
@@ -1072,8 +1074,11 @@ const Engine = struct {
             try self.global_states.put(allocator, binding, .{});
             self.resolved[id] = binding;
         }
-        for (catalogs) |imported| try self.importCatalog(imported);
-        for (source_catalogs) |imported| try self.importCatalog(imported);
+        // Catalogs repeat the members they import; each copy is recorded once.
+        var imported_associated: std.AutoHashMapUnmanaged(ImportedAssociated, void) = .empty;
+        defer imported_associated.deinit(allocator);
+        for (catalogs) |imported| try self.importCatalog(imported, &imported_associated);
+        for (source_catalogs) |imported| try self.importCatalog(imported, &imported_associated);
         for (imports) |imported| {
             if (self.source_validation) try self.importHeader(.{ .name = imported.name, .namespace = imported.namespace, .member = imported.member, .target = imported.target, .capability_flow = imported.interface.capability_flow, .capability_parameters = imported.interface.capability_parameters, .named_function = imported.interface.named_function, .origin = imported.origin, .expose = imported.expose }) else try self.importBinding(imported);
         }
@@ -2468,7 +2473,7 @@ const Engine = struct {
         self.effect_families.items[family].operations = try self.types.saveList(operations.items);
         return family;
     }
-    fn importCatalog(self: *Engine, imported: anytype) T.Error!void {
+    fn importCatalog(self: *Engine, imported: anytype, imported_associated: *std.AutoHashMapUnmanaged(ImportedAssociated, void)) T.Error!void {
         const producer = if (@TypeOf(imported) == SourceCatalog) imported.producer else imported.catalog();
         if (imported.kind == .catalog) {
             for (1..producer.nominals.len) |index| {
@@ -2508,12 +2513,8 @@ const Engine = struct {
                     try self.importBinding(.{ .target = target, .interface = interface, .origin = imported.origin, .expose = false });
                 }
                 const binding = (try self.importedBinding(target)).?;
-                var present = false;
-                for (self.associated.items) |prior| if (prior.identity.unit == method.identity.unit and prior.identity.decl == method.identity.decl and prior.member == method.member and prior.binding == binding) {
-                    present = true;
-                    break;
-                };
-                if (!present) {
+                const present = try imported_associated.getOrPut(self.allocator, .{ .identity = method.identity, .member = method.member, .binding = binding });
+                if (!present.found_existing) {
                     const index: u32 = @intCast(self.associated.items.len);
                     try self.associated.append(self.allocator, .{ .identity = method.identity, .member = method.member, .operator = method.operator, .binding = binding });
                     try self.catalogs.associated_members.put(self.allocator, .{ .identity = method.identity, .member = method.member }, index);
