@@ -1,0 +1,25 @@
+Speed: ReadBackRoot adds RootCandidates' alternatives, whose roots are
+distinct, directly into an empty set instead of through Roots::Add's linear
+search each (debug builds assert distinctness).
+
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index d2d288c..1225079 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1617,6 +1617,16 @@ inline Roots TypeCheck::ReadBackRoot(TypeExpr *rt, const Roots &container, bool
+             out.Add({ croot, false, from });
+             continue;
+         }
++        // The candidates' roots are distinct (RootCandidates), so none
++        // joins another: into an empty set each is added as it is.
++        if (out.alts.empty()) {
++            for (auto &a : cands.alts) out.alts.push_back({ a.root, a.exact, from });
++#ifndef NDEBUG
++            for (size_t i = 0; i < out.alts.size(); i++)
++                for (size_t j = 0; j < i; j++) assert(out.alts[i].root != out.alts[j].root);
++#endif
++            continue;
++        }
+         for (auto &a : cands.alts) out.Add({ a.root, a.exact, from });
+     }
+     return out;

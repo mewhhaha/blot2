@@ -1,0 +1,315 @@
+diff --git a/src/ast.h b/src/ast.h
+index 5ec0fa3..d92cf30 100644
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -512,6 +512,9 @@ struct RootAlt {
+     // This excludes sibling fields without claiming one exact owner instance.
+     // Reading an ordinary reference out of the component loses this proof.
+     bool projected = false;
++    // An unchanged contribution from a by-value argument's incoming contents.
++    // This is not an exact storage identity. Copies retain it, bounds drop it.
++    bool argcopy = false;
+     bool operator==(const RootAlt &) const = default;
+ };
+ 
+@@ -594,6 +597,7 @@ struct Roots {
+             b.slotread = b.slotread && a.slotread;
+             b.classread = b.classread && a.classread;
+             b.projected = b.projected && a.projected;
++            b.argcopy = b.argcopy && a.argcopy;
+             if (b.from != a.from) b.from = nullptr;
+             return b != before;
+         }
+@@ -613,6 +617,7 @@ struct Roots {
+             a.exact = false;
+             a.classread = false;
+             a.projected = false;
++            a.argcopy = false;
+         }
+     }
+     // Where a value was read out of (slotread, classread): nothing a
+@@ -622,6 +627,7 @@ struct Roots {
+         for (auto &a : alts) {
+             a.slotread = false;
+             a.classread = false;
++            a.argcopy = false;
+         }
+     }
+     // One alternative, and it holds the pointee: the value names one array.
+@@ -2150,6 +2156,9 @@ struct StoreEvent {
+     // one array exactly (RootArg::heldexact): its class only bounds them, and
+     // no store in the body put them there.
+     bool incoming = false;
++    // An unchanged contribution from a by-value argument's incoming contents.
++    // This is not an exact storage identity. Copies retain it, bounds drop it.
++    bool argcopy = false;
+ };
+ 
+ // A shrink, and a reference, slice or holder still used after it that only
+@@ -2312,7 +2321,7 @@ struct FnRecord {
+     // mapped for its own arguments (TypeCheck::ApplyCalleeStores).
+     struct BodyEvent {
+         VarDef *container, *root, *src;
+-        bool exact, classread;
++        bool exact, classread, argcopy;
+     };
+     vector<BodyEvent> bodyevents;
+ };
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 07ad3cb..9064d07 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -1958,7 +1958,7 @@ struct TypeCheck {
+     // feeds back as it does a new root (Roots::Add).
+     void AddContents(VarDef *x, const RootAlt &a, bool classread, const VarDef *src) {
+         auto held = a.classread || (classread && src == a.root);
+-        if (x->contents.Add({ a.root, a.exact, a.from, a.slotread, held }))
++        if (x->contents.Add({ a.root, a.exact, a.from, a.slotread, held, false, a.argcopy }))
+             NoteFact(x, ActivationFloor(a.root));
+     }
+     // A reference or slice variable's binding grown by the places `rv` may
+@@ -2813,14 +2813,14 @@ struct TypeCheck {
+         TypeExpr *arrtype;
+         const map<VarDef *, vector<size_t>> &bycontainer;
+         set<VarDef *> held;
+-        set<pair<VarDef *, bool>> rooted;
++        set<tuple<VarDef *, bool, bool>> rooted;
+         bool trace = false;
+         void Trace(string_view kind, VarDef *holder = nullptr, VarDef *root = nullptr,
+                    bool exact = false, VarDef *src = nullptr, TypeExpr *pointee = nullptr,
+                    bool byteview = false, Line at = {});
+         bool Fits(TypeExpr *pointee, bool byteview);
+-        bool Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee, bool byteview);
+-        bool Class(VarDef *cr, bool exact, TypeExpr *pointee, bool byteview);
++        bool Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee, bool byteview, bool argcopy = false);
++        bool Class(VarDef *cr, bool exact, TypeExpr *pointee, bool byteview, bool argcopy = false);
+         bool Holds(VarDef *x, Line *where = nullptr);
+         bool Event(const StoreEvent &e);
+         bool Covered(VarDef *src, VarDef *root, bool exact);
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index d297d54..97403d8 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1646,6 +1646,7 @@ inline void TypeCheck::AddStoreEvent(const StoreEvent &e) {
+             (!o.pointee || TypeEq(o.pointee, e.pointee)) &&
+             !o.reached == !e.reached && (!o.reached || TypeEq(o.reached, e.reached))) {
+             o.classread = o.classread && e.classread;
++            o.argcopy = o.argcopy && e.argcopy;
+             origin(m);
+             return;
+         }
+@@ -1760,6 +1761,7 @@ inline void TypeCheck::RecordStore(VarDef *container, const Roots &roots, bool b
+         // held.
+         e.classread = IsClassRoot(e.src) && (copied || a.classread);
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+         e.reached = reached;
+@@ -1835,6 +1837,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+         e.src = src;
+         e.classread = classread;
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+         e.at = at->line;
+@@ -1849,13 +1852,17 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+     };
+     // A class root of the callee, as seen from here (classat), each root
+     // only a bound where the callee's was (Bounds).
+-    auto mapped = [&](VarDef *cr, bool exact) -> Roots {
++    auto mapped = [&](VarDef *cr, bool exact, bool argcopy = false) -> Roots {
+         Roots r;
+-        if (classat(cr, r) < 0) {
++        auto parameter = classat(cr, r);
++        if (parameter < 0) {
+             r.Set(cr, exact);
++            r.alts[0].argcopy = argcopy;
+             return r;
+         }
+-        return exact ? r : Bounds(r);
++        auto copied = argcopy && !spec->inprogress && !spec->incycle && !spec->sf->isrec &&
++                      !IsRefOrSlice(spec->argtypes[(size_t)parameter]);
++        return exact || copied ? r : Bounds(r);
+     };
+     // A container the caller can name: its own variables and its lexical
+     // parents', a class root, a global. Anything else is the callee's own.
+@@ -1933,13 +1940,14 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+             e.src = b.src;
+             e.exact = b.exact;
+             e.classread = b.classread;
++            e.argcopy = b.argcopy;
+         }
+         // A call back into a body still being checked leaves the events of
+         // that body's own variables as they are: a cycle's rounds keep the
+         // variables, so they are those of the activation being checked, which
+         // this call's arguments do not describe.
+         if (spec->inprogress && e.container && e.container->ownerspec == spec) continue;
+-        auto r = mapped(e.root, e.exact);
++        auto r = mapped(e.root, e.exact, e.argcopy);
+         auto src = source(e.src);
+         e.classread = e.classread && IsClassRoot(src);
+         Roots own;
+@@ -1954,6 +1962,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+             auto &a = r.alts[k];
+             e.root = a.root;
+             e.exact = a.exact;
++        e.argcopy = a.argcopy;
+             e.src = src;
+             if (k == 0) ReplaceStoreEventLog(i, e);
+             else AppendStoreEventLog(e);
+@@ -1977,7 +1986,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+             v.byteview = v.byteview || held.byteview;
+             v.freshview = held.freshview;
+         } else {
+-            v.TakeAlts(mapped(e.root, e.exact));
++            v.TakeAlts(mapped(e.root, e.exact, e.argcopy));
+         }
+         return v;
+     };
+@@ -2164,7 +2173,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+                     continue;
+                 }
+                 auto src = source(b.src);
+-                for (auto &m : mapped(b.root, b.exact).alts) {
++                for (auto &m : mapped(b.root, b.exact, b.argcopy).alts) {
+                     ok = ok && callerside(m.root);
+                     add({ m, src, b.classread && IsClassRoot(src) });
+                 }
+@@ -2211,7 +2220,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+         }
+         auto from = storeevents.size();
+         replay.origin = (int)(&e - rec->classevents.data());
+-        applystore(e, mapped(e.root, e.exact), true);
++        applystore(e, mapped(e.root, e.exact, e.argcopy), true);
+         replay.origin = -1;
+         tag(from, (int)(&e - rec->classevents.data()));
+     }
+@@ -2287,6 +2296,7 @@ inline void TypeCheck::NoteGlobalBinding(VarDef *gd, const Roots &roots, bool by
+         e.container = gd;
+         e.root = a.root;
+         e.exact = a.exact;
++        e.argcopy = a.argcopy;
+         if (!a.exact && a.from != gd) e.src = StoreSource(a.from);
+         e.pointee = byteview ? nullptr : pointee;
+         e.byteview = byteview;
+@@ -2422,9 +2432,9 @@ inline bool TypeCheck::GlobalReach::Fits(TypeExpr *pointee, bool byteview) {
+ // only bounds the storage, which then may be the array wherever the pointee
+ // fits it: nothing outlives a global.
+ inline bool TypeCheck::GlobalReach::Root(VarDef *r, bool exact, VarDef *from, TypeExpr *pointee,
+-                                         bool byteview) {
++                                         bool byteview, bool argcopy) {
+     if (tc.IsClassRoot(r)) {
+-        auto hit = Class(r, exact, pointee, byteview);
++        auto hit = Class(r, exact, pointee, byteview, argcopy);
+         if (hit) Trace("root-class", nullptr, r, exact, from, pointee, byteview);
+         return hit;
+     }
+@@ -2448,8 +2458,8 @@ inline bool TypeCheck::GlobalReach::Root(VarDef *r, bool exact, VarDef *from, Ty
+ // one. A holder argument copied out of a container holds what that one
+ // does. A class no call reached stands for nothing.
+ inline bool TypeCheck::GlobalReach::Class(VarDef *cr, bool exact, TypeExpr *pointee,
+-                                          bool byteview) {
+-    if (!rooted.insert({ cr, exact }).second) return false;
++                                          bool byteview, bool argcopy) {
++    if (!rooted.insert({ cr, exact, argcopy }).second) return false;
+     auto it = tc.classuses.find(cr);
+     if (it == tc.classuses.end()) return false;
+     for (auto &u : it->second) {
+@@ -2459,7 +2469,7 @@ inline bool TypeCheck::GlobalReach::Class(VarDef *cr, bool exact, TypeExpr *poin
+         }
+         for (auto &a : u.roots.alts) {
+             if (u.src && Covered(u.src, a.root, a.exact)) continue;
+-            if (Root(a.root, a.exact && exact, a.from, pointee, byteview || u.byteview)) {
++            if (Root(a.root, a.exact && (exact || argcopy), a.from, pointee, byteview || u.byteview, (exact || argcopy) && a.argcopy)) {
+                 Trace("class-root", cr, a.root, a.exact && exact, u.src ? u.src : a.from,
+                       pointee, byteview || u.byteview);
+                 return true;
+@@ -2521,7 +2531,7 @@ inline bool TypeCheck::GlobalReach::Event(const StoreEvent &e) {
+         }
+         if (Covered(e.src, e.root, e.exact)) return false;
+     }
+-    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview);
++    auto hit = Root(e.root, e.exact, nullptr, e.pointee, e.byteview, e.argcopy);
+     if (hit) Trace("event-root", e.container, e.root, e.exact, e.src, e.pointee, e.byteview, e.at);
+     return hit;
+ }
+@@ -3367,6 +3377,7 @@ template<typename F> void TypeCheck::EachHolderRoot(VarDef *holder, size_t from,
+             if (e.src) {
+                 e.root = e.src;
+                 e.exact = false;
++                e.argcopy = false;
+                 if (e.src->isglobal) e.pointee = nullptr;
+             }
+             if (e.root) f(e);
+@@ -3844,6 +3855,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+             for (auto a : held.alts) {
+                 a.from = nullptr;
+                 a.classread = false;
++                a.argcopy = false;
+                 if (!a.exact && ownclass(a.root)) {
+                     roots.Add(a);
+                     continue;
+diff --git a/src/typecheck_calls.h b/src/typecheck_calls.h
+index b6162f8..3938743 100644
+--- a/src/typecheck_calls.h
++++ b/src/typecheck_calls.h
+@@ -2989,7 +2989,7 @@ inline bool TypeCheck::SameRecord(const FnRecord &a, const FnRecord &b, const Fn
+     auto sameevents = [&](const StoreEvent &p, const StoreEvent &q) {
+         return p.container == q.container && p.root == q.root && p.src == q.src &&
+                p.exact == q.exact && p.byteview == q.byteview && p.bound == q.bound &&
+-               p.slot == q.slot && p.sliceref == q.sliceref && p.classread == q.classread &&
++               p.slot == q.slot && p.sliceref == q.sliceref && p.classread == q.classread && p.argcopy == q.argcopy &&
+                sametype(p.pointee, q.pointee) && sametype(p.reached, q.reached);
+     };
+     if (a.classevents.size() != b.classevents.size()) return why("class stores");
+@@ -3182,6 +3182,7 @@ inline void TypeCheck::CheckSpecBodyOnce(FnSpec *spec, vector<Val> *argvals, Lin
+             // bounded by the class root, as an event of its own.
+             Roots held;
+             held.Set(cr, ra.heldexact, nullptr, ra.slotread);
++            held.alts[0].argcopy = cr && !sf->isrec && !spec->incycle;
+             auto stored = vd->storedinto;
+             auto first = storeevents.size();
+             RecordStore(vd, held, ra.byteview, nullptr);
+@@ -3433,7 +3434,8 @@ inline void TypeCheck::CheckSpecBodyOnce(FnSpec *spec, vector<Val> *argvals, Lin
+     spec->record.bodyevents.clear();
+     for (auto i = spec->record.eventstart; i < storeevents.size(); i++) {
+         auto &e = storeevents[i];
+-        spec->record.bodyevents.push_back({ e.container, e.root, e.src, e.exact, e.classread });
++        spec->record.bodyevents.push_back({ e.container, e.root, e.src, e.exact, e.classread,
++                                            e.argcopy });
+     }
+     spec->rounds++;
+ }
+@@ -3507,7 +3509,10 @@ inline void TypeCheck::RecordReturn(FnSpec *tspec, vector<Val> &vals, Node *at)
+         // What a caller gets is the value, not the container of this
+         // activation it was read out of, which a cycle's next round would
+         // take for its own (RecordStore).
+-        for (auto &a : roots.alts) a.from = nullptr;
++        for (auto &a : roots.alts) {
++            a.from = nullptr;
++            if (!holder || tspec->incycle || tspec->sf->isrec) a.argcopy = false;
++        }
+         auto &rr = tspec->record.retroots[i];
+         for (auto &a : roots.alts) {
+             auto root = a.root;
+@@ -3553,6 +3558,7 @@ inline Val TypeCheck::RetAltVal(FnSpec *spec, const RootAlt &alt, vector<Val> &a
+     m.Set(alt.root, alt.exact && (alt.root || !spec->inprogress), alt.from, alt.slotread);
+     m.alts[0].classread = alt.classread;
+     m.alts[0].projected = alt.projected;
++    m.alts[0].argcopy = alt.argcopy;
+     m.writable = true;
+     if (!alt.root || alt.root->isglobal || alt.root->ownerspec) return m;
+     auto v = m;
+@@ -3565,7 +3571,9 @@ inline Val TypeCheck::RetAltVal(FnSpec *spec, const RootAlt &alt, vector<Val> &a
+         auto base = view ? ViewClassOf(spec, p) : spec->params[p]->ref.Root();
+         auto ar = ProjectClass(alt.root, base,
+                                view ? a.held.AsRoots() : ClassArgRoots(spec->argtypes[p], a));
+-        x.TakeAlts(alt.exact || alt.projected ? ar : Bounds(ar));
++        auto copied = alt.argcopy && !view && !spec->inprogress && !spec->incycle &&
++                      !spec->sf->isrec && !IsRefOrSlice(spec->argtypes[p]);
++        x.TakeAlts(alt.exact || alt.projected || copied ? ar : Bounds(ar));
+         for (auto &xa : x.alts) xa.slotread = alt.slotread && xa.slotread;
+         if (alt.classread)
+             for (size_t k = 0; k < x.alts.size(); k++)

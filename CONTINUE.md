@@ -11,6 +11,11 @@ The owner's order (14 November 2026):
 The goal behind all of it is compiling Blot at 1M lines/s; "prioritize fast
 compiles".
 
+Added on 15 November 2026: "add some more patches to goose to make it
+faster until goose to wasm is ready. And try to finish the goose compiler
+so we can retire zig." The plan and the measured state are in
+[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md).
+
 ## State on main (15 November 2026)
 
 - **Direct backend only.** `compiler/src/compile.zig` is its interface.
@@ -171,16 +176,25 @@ compiles".
   10 s) and tests/guest/zig_project_transport.test.ts ("startup timed
   out" after 2 s, seen once). Neither runs the checker.
 
-## The Goose port (phase 3 of the order)
+## The Goose port
 
-- compiler-goose/ ports the deleted scoped compiler and is parked. Its
-  history and evidence are pinned at b9875a88.
-- It builds with plain upstream Goose: compiler-goose/tools/build_upstream_goose.py
-  builds github.com/aardappel/goose at d92c4315, unpatched (owner, 14
-  November 2026). Plain upstream did not finish checking the old port in 25
-  minutes.
-- The new port targets the rewritten, much smaller compiler, against plain
-  upstream from the start.
+[tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md) has the state, the steps and
+the profile.
+
+- compiler-goose/ is the scoped compiler as of 12 November. It built with
+  the patched Goose then and matched Zig on Ink's suite and on Gdev Main's
+  Wasm, at 3 to 30 times Zig's compile time.
+- It builds again on the cloud container:
+  `sh compiler-goose/tools/upstream-32a4f44/build.sh` (upstream Goose
+  d5ae5bb with patches 01–29; `GOOSE_PGO=1` trains it on the port and
+  needs `libclang-rt-18-dev`), then
+  `python3 compiler-goose/build.py --goose build/goose-port/upstream-d5ae5bb/build-precision/goose --cc clang --stdlib build/goose-port/upstream-d5ae5bb/source-precision/stdlib --inference-budget 1000000 --stage-timeout 1500 --total-timeout 2400`.
+  The check takes 271 s at 10.4 GiB, so run one Goose at a time.
+- The executable, compiler-goose/build/blotc-goose, cannot read today's
+  std: it has no store statement and no direct backend.
+- Next: port compiler/src/direct/ into the port, then the frontend changes
+  since 44ee94f4.
+- ../goose-to-wasm does not finish its lifetime pass on the port.
 
 ## Contracts
 

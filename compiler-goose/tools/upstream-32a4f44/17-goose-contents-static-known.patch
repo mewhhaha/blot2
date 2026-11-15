@@ -1,0 +1,13 @@
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index a334bdb..6c74482 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1642,7 +1642,7 @@ inline bool TypeCheck::ContentsReadBack(VarDef *h, TypeExpr *of, Roots &out) {
+         }
+         else if (IsClassRoot(a.root)) r.Add({ a.root, false, h });
+         else return false;
+-        known = known || a.classread || a.exact || IsClassRoot(a.root);
++        known = known || !a.root || a.classread || a.exact || IsClassRoot(a.root);
+     }
+     if (!known) return false;
+     out.Add(r);

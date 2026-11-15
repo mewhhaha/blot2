@@ -1,0 +1,95 @@
+Speed: while ApplyCalleeStores replays the callee's body events, ClassParam
+reads a table of each parameter's root and view class (the replay rebinds
+no parameter; debug builds compare every answer with ClassParam), and
+classat hands the found parameter to MapClassAt instead of MapClass
+searching for it again.
+
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 40b213f..ffd65e3 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -1527,6 +1527,7 @@ struct TypeCheck {
+     int ClassParam(FnSpec *spec, VarDef *root, bool &view);
+     Roots ProjectClass(VarDef *root, VarDef *base, const Roots &args);
+     Roots MapClass(FnSpec *spec, VarDef *root, const vector<Val> &args);
++    Roots MapClassAt(FnSpec *spec, VarDef *root, int p, bool view, const vector<Val> &args);
+     VarDef *NewVar(string_view name, TypeExpr *type, Line l, bool isvar,
+                    VarDef *previous = nullptr);
+     VarDef *LookupVar(string_view name, string_view ns, Node *use = nullptr);
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index ea887ae..4042253 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1807,12 +1807,35 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+         for (auto i = std::max(from, base); i < storeevents.size(); i++)
+             (*origins)[i - base] = origin;
+     };
++    // ClassParam over a table of each parameter's root and view class while
++    // the body's events are replayed below, which rebinds no parameter and
++    // changes no class: every event asks it of its root and source.
++    vector<pair<VarDef *, VarDef *>> paramclasses;
++    auto tabled = false;
++    auto classparam = [&](VarDef *cr, bool &view) -> int {
++        if (!tabled) return ClassParam(spec, cr, view);
++#ifndef NDEBUG
++        auto checked = view;
++        auto expected = ClassParam(spec, cr, checked);
++#endif
++        auto p = -1;
++        for (auto r = cr; r && p < 0; r = r->componentowner)
++            for (size_t q = 0; q < paramclasses.size(); q++) {
++                view = paramclasses[q].second == r;
++                if (paramclasses[q].first == r || view) {
++                    p = (int)q;
++                    break;
++                }
++            }
++        assert(p == expected && view == checked);
++        return p;
++    };
+     // What class root cr of the callee stands for here: the argument's roots,
+     // or for a view the slice its slot held (Val::held).
+     auto classat = [&](VarDef *cr, Roots &out) -> int {
+         bool view = false;
+-        auto p = ClassParam(spec, cr, view);
+-        if (p >= 0 && p < (int)argvals.size()) out = MapClass(spec, cr, argvals);
++        auto p = classparam(cr, view);
++        if (p >= 0 && p < (int)argvals.size()) out = MapClassAt(spec, cr, p, view, argvals);
+         return p;
+     };
+     auto paramof = [&](VarDef *cr) -> int {
+@@ -1931,6 +1954,9 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+             AddBinding(x, bound);
+         });
+     }
++    for (size_t p = 0; p < spec->params.size(); p++)
++        paramclasses.push_back({ spec->params[p]->ref.Root(), ViewClassOf(spec, p) });
++    tabled = true;
+     auto end = min(rec->eventend, storeevents.size());
+     for (auto i = rec->eventstart; i < end; i++) {
+         // Mapped from the body's own record, which an earlier call to it
+@@ -1971,6 +1997,7 @@ inline void TypeCheck::ApplyCalleeStores(FnSpec *spec, vector<Val> &argvals, Nod
+             else AppendStoreEventLog(e);
+         }
+     }
++    tabled = false;
+     // What a store into a slot put there, as seen from here. A slice loaded
+     // through a reference to a slice whose elements hold no references is
+     // one of the slice the argument's slot holds (SlotView), which nothing
+diff --git a/src/typecheck_flow.h b/src/typecheck_flow.h
+index 0944f53..c55d54b 100644
+--- a/src/typecheck_flow.h
++++ b/src/typecheck_flow.h
+@@ -710,6 +710,12 @@ inline Roots TypeCheck::MapClass(FnSpec *spec, VarDef *root, const vector<Val> &
+     bool view = false;
+     auto p = ClassParam(spec, root, view);
+     if (p < 0 || p >= (int)args.size()) return RootsOf(root);
++    return MapClassAt(spec, root, p, view, args);
++}
++
++// MapClass where ClassParam just gave p and view (p in range of args).
++inline Roots TypeCheck::MapClassAt(FnSpec *spec, VarDef *root, int p, bool view,
++                                   const vector<Val> &args) {
+     auto base = view ? ViewClassOf(spec, p) : spec->params[p]->ref.Root();
+     return ProjectClass(root, base, view ? args[p].held.AsRoots()
+                                         : ClassArgRoots(spec->argtypes[p], args[p]));

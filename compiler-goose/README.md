@@ -8,9 +8,11 @@ Language changes now follow [RFC #46's Zig-first migration](../docs/language/NEX
 Named module functions are mirrored in the parser and checker sources; only
 the parser has executed qualification. The original oracle pin is unchanged.
 
-Every compiler-algorithm module has a first source pass. The complete import
-graph parses under upstream Goose; type and lifetime checking are being
-repaired. No successful full compiler executable or parity result exists yet.
+The whole port type checks, passes Goose's lifetime checks and links an
+executable with the patched Goose below. On 12 November 2026 that
+executable matched the Zig compiler on Ink's suite and on Gdev Main's Wasm.
+It is the scoped compiler of that date; [the plan](../tasks/GOOSE_PORT.md)
+lists what it lacks against today's Zig compiler.
 Native request rollback, staged cache publication and scoped runtime observation
 now have component tests. Their complete compiler integration and retained
 workload qualification remain pending.
@@ -52,12 +54,13 @@ preserve existing cached objects and the previous executable.
 that is not a qualified build identity. Active payload, retained pool capacity and scratch metrics stay null with
 explicit unavailable coverage.
 
-The port builds with plain upstream Goose
-([github.com/aardappel/goose](https://github.com/aardappel/goose)), without
-patches. `python3 compiler-goose/tools/build_upstream_goose.py` clones or
-reuses `build/goose-upstream`, checks out the pinned commit (`--commit` picks
-another), builds it with CMake and prints the compiler and standard library
-paths as JSON for `--goose` and `--stdlib`.
+The port builds with upstream Goose
+([github.com/aardappel/goose](https://github.com/aardappel/goose)) plus the
+patch series in `tools/upstream-32a4f44/`: `sh tools/upstream-32a4f44/build.sh`
+builds it into `build/goose-port/upstream-d5ae5bb/build-precision/`, and
+`GOOSE_PGO=1` trains it on this port. Plain upstream, which
+`python3 compiler-goose/tools/build_upstream_goose.py` builds, does not finish
+checking the port.
 
 Run the checked engine laws with
 `python3 compiler-goose/tools/test_engines.py`. They compile live coalescing, interning, scalar owner-frame and parser sources

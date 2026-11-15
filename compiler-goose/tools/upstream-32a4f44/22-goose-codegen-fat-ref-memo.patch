@@ -1,0 +1,32 @@
+Speed: CodeGen::HoldsFatRef is remembered per type node; it reads only the
+checker's final instantiations, and SyncReach asked it at every call site.
+
+diff --git a/src/codegen.h b/src/codegen.h
+index 6a1265f..2c90226 100644
+--- a/src/codegen.h
++++ b/src/codegen.h
+@@ -328,6 +328,9 @@ struct CodeGen {
+     bool IsFatRef(TypeExpr *t);
+     bool HoldsFatRef(TypeExpr *t);
+     bool HoldsFatRefIn(TypeExpr *t, set<const void *> &open);
++    // HoldsFatRef by type node: the instantiations it reads are final once
++    // the checker is done, and type nodes live as long as the AST.
++    unordered_map<TypeExpr *, bool> holdsfatref;
+     bool IsVoidT(TypeExpr *t) { return !t || t->kind == TY_VOID; }
+ 
+     IntStorage LenStore(TypeArray *a);
+diff --git a/src/codegen_types.h b/src/codegen_types.h
+index f11dbd5..fa7ab10 100644
+--- a/src/codegen_types.h
++++ b/src/codegen_types.h
+@@ -157,8 +157,9 @@ inline bool CodeGen::IsFatRef(TypeExpr *t) {
+ // through itself has no further fat reference to offer, so `open` cuts the
+ // recursion there.
+ inline bool CodeGen::HoldsFatRef(TypeExpr *t) {
++    if (auto it = holdsfatref.find(t); it != holdsfatref.end()) return it->second;
+     set<const void *> open;
+-    return HoldsFatRefIn(t, open);
++    return holdsfatref[t] = HoldsFatRefIn(t, open);
+ }
+ 
+ inline bool CodeGen::HoldsFatRefIn(TypeExpr *t, set<const void *> &open) {

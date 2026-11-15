@@ -1,0 +1,283 @@
+diff --git a/src/ast.h b/src/ast.h
+index 0b28988..8824c39 100644
+--- a/src/ast.h
++++ b/src/ast.h
+@@ -2093,10 +2093,13 @@ enum ShrinkBalance { SB_BALANCED, SB_UNBALANCED };
+ // A shrink a body records against what one of its parameters' or outside
+ // roots' storage only leads to, through the references it holds: an array
+ // of the given type (TypeCheck::ShrinkTargets).
++// Diagnostic witness only: excluded from SameRecord and every effect key.
++struct ShrinkOrigin { Node *at = nullptr; FnSpec *spec = nullptr; };
+ template<typename K> struct BoundShrink {
+     K key;
+     TypeExpr *type = nullptr;
+     ShrinkBalance balance = SB_UNBALANCED;
++    ShrinkOrigin origin;
+ };
+ 
+ // A reference, slice or holder value stored into a container (§9.2): what
+@@ -2178,6 +2181,7 @@ struct LiveShrink {
+     // it lies in may relay out, whatever kind the shrink is
+     // (TypeCheck::ShrinkMayMove).
+     bool inplace = false;
++    ShrinkOrigin origin;
+ };
+ 
+ // One return value's reference roots, or for a holder the roots of what it
+@@ -2260,6 +2264,9 @@ struct FnRecord {
+     // Effect keys below: [0, params.size()) names the argument's class;
+     // [params.size(), 2 * params.size()) names its view's contents class.
+     map<int, ShrinkBalance> shrinkparams;
++    // Parallel diagnostic metadata; never read by checks, equality or ordering.
++    map<int, ShrinkOrigin> shrinkparamorigins;
++    map<VarDef *, ShrinkOrigin> shrinkexternalorigins;
+     // Shrinks of an array of the given type that such a root's storage only
+     // leads to, through the references it holds: the call counts each as a
+     // shrink of any array of that type the root, or the argument's root,
+diff --git a/src/typecheck.h b/src/typecheck.h
+index f17c7a5..cf9e91f 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -103,6 +103,26 @@ inline bool IsBranchConstruct(const Node *n) {
+ 
+ struct TypeCheck {
+     Ast &ast;
++    const char *shrinkorigins = getenv("GOOSE_SHRINK_ORIGINS");
++    ShrinkOrigin shrinkorigin;
++    bool shrinkoriginreplay = false;
++    ShrinkOrigin ShrinkOriginAt(Node *at) {
++        if (!shrinkorigins || !*shrinkorigins) return {};
++        if (shrinkoriginreplay) return shrinkorigin;
++        return { at, CurRealFrame().spec };
++    }
++    void ErrorShrinkOrigin(Node *at, const string &message, ShrinkOrigin origin, FnSpec *callee) {
++        if (!shrinkorigins || !*shrinkorigins || !origin.at ||
++            (string_view(shrinkorigins) != "*" && callee->sf->name != shrinkorigins &&
++             callee->sf->qname != shrinkorigins)) {
++            Error(at, message); return;
++        }
++        auto chain = Chain(at->expansiontrace.empty() ? ActiveExpansionTrace() : at->expansiontrace);
++        string function = "unknown";
++        if (origin.spec) function = string(origin.spec->sf->qname);
++        chain.insert(chain.begin(), { LocOf(origin.at), cat("original shrink witness in ", function) });
++        ErrorIn(LocOf(at), message, std::move(chain));
++    }
+     CheckerTrace trace;
+     void TraceEngine(CheckerEngine engine, TypeExpr *a = nullptr, TypeExpr *b = nullptr) {
+         if (!trace.Tick(engine)) return;
+@@ -2828,7 +2848,7 @@ struct TypeCheck {
+     // (`param` gets it and the parameter's index).
+     template <typename P, typename X> void NoteRootEvent(VarDef *root, P param, X external);
+     void NoteShrink(VarDef *root, TypeExpr *bound = nullptr,
+-                    ShrinkBalance balance = SB_UNBALANCED);
++                    ShrinkBalance balance = SB_UNBALANCED, Node *at = nullptr);
+     void ShrinkGrowShrink(Node *at, const string &op, VarDef *root, const string &what,
+                           TypeExpr *bound = nullptr, ShrinkBalance balance = SB_UNBALANCED);
+     bool ResizesToMark(Node *recv, Node *len);
+diff --git a/src/typecheck_builtins.h b/src/typecheck_builtins.h
+index 48170b5..c4757c8 100644
+--- a/src/typecheck_builtins.h
++++ b/src/typecheck_builtins.h
+@@ -1576,7 +1576,7 @@ inline void TypeCheck::GrowOnlyShrinkAt(Node *c, const string &op, VarDef *vd,
+     // so far: they are judged once every one has been.
+     if (vd->isglobal) NoteGlobalShrink(c, cat("cannot ", op, " ", what), vd, bound);
+     NoteLiveViews(c, cat("cannot ", op, " ", what), vd, what, true, bound);
+-    NoteShrink(vd, bound, SB_UNBALANCED);
++    NoteShrink(vd, bound, SB_UNBALANCED, c);
+     NoteShrinkOrder(vd, bound);
+ }
+ 
+@@ -2825,27 +2825,30 @@ inline void TypeCheck::NoteRootEvent(VarDef *root, P param, X external) {
+ // Records a shrink for callers (§5.2), a bound's with the type of the array
+ // its storage leads to. An array stays balanced only while every shrink of
+ // it is.
+-inline void TypeCheck::NoteShrink(VarDef *root, TypeExpr *bound, ShrinkBalance balance) {
++inline void TypeCheck::NoteShrink(VarDef *root, TypeExpr *bound, ShrinkBalance balance, Node *at) {
++    auto origin = ShrinkOriginAt(at);
+     auto note = [&](auto &bounds, auto key) {
+         for (auto &b : bounds)
+             if (b.key == key && TypeEq(b.type, bound)) {
++                if (origin.at && (!b.origin.at || balance > b.balance)) b.origin = origin;
+                 b.balance = std::max(b.balance, balance);
+                 return;
+             }
+-        bounds.push_back({ key, bound, balance });
++        bounds.push_back({ key, bound, balance, origin });
+     };
+-    auto mark = [&](auto &entries, auto key) {
++    auto mark = [&](auto &entries, auto &origins, auto key) {
+         auto [it, fresh] = entries.try_emplace(key, balance);
++        if (origin.at && (fresh || balance > it->second || !origins.count(key))) origins[key] = origin;
+         if (!fresh) it->second = std::max(it->second, balance);
+     };
+     NoteRootEvent(root,
+                   [&](FnSpec *s, int i) {
+                       if (bound) note(s->record.shrinkparambounds, i);
+-                      else mark(s->record.shrinkparams, i);
++                      else mark(s->record.shrinkparams, s->record.shrinkparamorigins, i);
+                   },
+                   [&](FnSpec *s, VarDef *r) {
+                       if (bound) note(s->record.shrinkexternalbounds, r);
+-                      else mark(s->record.shrinkexternals, r);
++                      else mark(s->record.shrinkexternals, s->record.shrinkexternalorigins, r);
+                   });
+ }
+ 
+@@ -2902,7 +2905,7 @@ inline void TypeCheck::ShrinkGrowShrink(Node *at, const string &op, VarDef *root
+     if (!root) return;
+     CheckShrinkHolders(at, op, root, what, bound);
+     NoteLiveViews(at, cat("cannot ", op), root, what, false, bound);
+-    NoteShrink(root, bound, balance);
++    NoteShrink(root, bound, balance, at);
+ }
+ 
+ // Whether `recv.resize(len)` is a balanced shrink (§5.2): len names a `let`
+@@ -3127,7 +3130,7 @@ inline void TypeCheck::NoteLiveViews(Node *at, const string &prefix, VarDef *roo
+                             .live = a.root, .liveexact = a.exact, .liveprojected = a.projected,
+                             .pointee = w.pointee,
+                             .byteview = w.p.byteview, .growonly = growonly, .name = name,
+-                            .contents = w.contents, .inplace = w.inplace };
++                            .contents = w.contents, .inplace = w.inplace, .origin = ShrinkOriginAt(at) };
+             if (!NoteLiveShrink(ls, current))
+                 Error(at, cat(prefix, " while ", name, " is still used: it may refer into ", what,
+                               growonly ? " (§5.1)" : " (§5.2)"));
+@@ -3397,6 +3400,7 @@ inline bool TypeCheck::NoteLiveShrink(LiveShrink ls, FnSpec *current) {
+             continue;
+         if (e.bound && !TypeEq(e.bound, ls.bound)) continue;
+         if (e.contents && !TypeEq(e.pointee, ls.pointee)) continue;
++        if (!e.origin.at) e.origin = ls.origin;
+         e.shrunkexact = e.shrunkexact && ls.shrunkexact;
+         e.liveexact = e.liveexact && ls.liveexact;
+         e.liveprojected = e.liveprojected && ls.liveprojected;
+@@ -3566,11 +3570,11 @@ inline void TypeCheck::ApplyCalleeLiveShrinks(Node *at, FnSpec *spec, vector<Val
+                     }
+                     auto what = unnamed ? cat("an array ", x.shrunk->name, " leads to")
+                                         : string(arr->name);
+-                    Error(at, cat("cannot call ", name, ": it ",
++                    ErrorShrinkOrigin(at, cat("cannot call ", name, ": it ",
+                                   x.bound || !shrunk.Exact() ? "may shrink " : "shrinks ",
+                                   what, " while ", livename, " is still used, and ", livename,
+                                   " may refer into ", unnamed ? "it" : what,
+-                                  x.growonly ? " (§5.1)" : " (§5.2)"));
++                                  x.growonly ? " (§5.1)" : " (§5.2)"), x.origin, spec);
+                 }
+             }
+         }
+@@ -3605,6 +3609,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+         const char *how;
+         const FnRecord::ShrinkOrder *order;   // Null where the record does not say.
+         bool viaclass;
++        ShrinkOrigin origin;
+     };
+     vector<Hit> hits;
+     auto storesbase = storeevents.size();
+@@ -3634,6 +3639,11 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+         cur.kills.push_back({ x, base, bpath + path, storesbase });
+     };
+     auto apply = [&](const Hit &h, ShrinkBalance judged) {
++        struct RestoreOrigin {
++            TypeCheck &tc; ShrinkOrigin origin; bool replay;
++            ~RestoreOrigin() { tc.shrinkorigin = origin; tc.shrinkoriginreplay = replay; }
++        } restoreorigin { *this, shrinkorigin, shrinkoriginreplay };
++        shrinkorigin = h.origin; shrinkoriginreplay = true;
+         auto what = cat("call ", name, ", which ", h.how);
+         auto op = cat(what, " ", h.root->name);
+         if (h.growonly) {
+@@ -3659,7 +3669,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+         } else if (judged == SB_UNBALANCED) {
+             ShrinkGrowShrink(at, op, h.root, string(h.root->name), h.bound);
+         } else {
+-            NoteShrink(h.root, h.bound, judged);
++            NoteShrink(h.root, h.bound, judged, at);
+         }
+         NoteShrinkEvent(at, h.root, h.bound, op, h.arr);
+     };
+@@ -3669,13 +3679,13 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+     // its call site. A callee's are applied once all of them are known.
+     auto shrink = [&](const Roots &roots, TypeExpr *arr, const char *how,
+                       ShrinkBalance balance, const FnRecord::ShrinkOrder *order,
+-                      bool classbound = false) {
++                      bool classbound = false, ShrinkOrigin origin = {}) {
+         auto growonly = arr ? GrowOnlyTail(arr) : IsGrowOnlyRootVar(roots.Root());
+         for (auto &t : ShrinkTargets(roots, arr, false, classbound && growonly))
+             hits.push_back({ t.root, t.bound ? arr : nullptr, arr, growonly,
+                              growonly ? SB_UNBALANCED : balance,
+                              roots.Exact() && t.root == roots.Root() ? how : "may shrink",
+-                             order, t.viaclass });
++                             order, t.viaclass, origin });
+     };
+     {
+         struct Restore {
+@@ -3704,11 +3714,21 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+                 return &o;
+         return nullptr;
+     };
++    auto originof = [&](int param, VarDef *external) {
++        if (param >= 0) {
++            auto i = rec->shrinkparamorigins.find(param);
++            if (i != rec->shrinkparamorigins.end()) return i->second;
++        } else {
++            auto i = rec->shrinkexternalorigins.find(external);
++            if (i != rec->shrinkexternalorigins.end()) return i->second;
++        }
++        return ShrinkOrigin {};
++    };
+     for (size_t i = 0; i < argvals.size() && i < spec->argtypes.size(); i++) {
+         auto vi = (int)(spec->params.size() + i);
+         if (auto view = rec->shrinkparams.find(vi); view != rec->shrinkparams.end())
+             shrink(argvals[i].held, nullptr, "shrinks", view->second,
+-                   orderof(vi, nullptr, nullptr));
++                   orderof(vi, nullptr, nullptr), false, originof(vi, nullptr));
+         auto pt = spec->argtypes[i];
+         auto entry = rec->shrinkparams.find((int)i);
+         auto recorded = entry != rec->shrinkparams.end();
+@@ -3720,7 +3740,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+         // class shared with a reference); an inexact one's are bounds, below.
+         if (!IsRefOrSlice(pt)) {
+             shrink(ClassArgRoots(pt, argvals[i]), nullptr, "shrinks", entry->second,
+-                   orderof((int)i, nullptr, nullptr));
++                   orderof((int)i, nullptr, nullptr), false, originof((int)i, nullptr));
+             continue;
+         }
+         // What shrinks through a parameter is its pointee: a resizable one,
+@@ -3728,7 +3748,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+         if (!argvals[i].Root() || pt->kind != TY_REF || ClassOf(pt->ref->sub) != SC_RESIZABLE)
+             continue;
+         shrink(argvals[i], LoadType(pt->ref->sub), "shrinks", entry->second,
+-               orderof((int)i, nullptr, nullptr));
++               orderof((int)i, nullptr, nullptr), false, originof((int)i, nullptr));
+     }
+     // An array only reached through the references an argument holds or
+     // points at: any of its type that the argument's roots, or its contents'
+@@ -3740,7 +3760,7 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+                 Roots roots = argvals[p].held;
+                 roots.Weaken();
+                 shrink(roots, b.type, "may shrink", b.balance,
+-                       orderof(b.key, nullptr, b.type), true);
++                       orderof(b.key, nullptr, b.type), true, b.origin);
+             }
+             continue;
+         }
+@@ -3799,19 +3819,19 @@ inline void TypeCheck::ApplyCalleeShrinks(Node *at, FnSpec *spec, vector<Val> &a
+                 roots.Add(a);
+             }
+         }
+-        shrink(roots, b.type, "may shrink", b.balance, orderof(b.key, nullptr, b.type), true);
++        shrink(roots, b.type, "may shrink", b.balance, orderof(b.key, nullptr, b.type), true, b.origin);
+     }
+     for (auto &[vd, balance] : rec->shrinkexternals) {
+         auto storage = vd->componentbase
+                            ? LoadType(GetStructInst(vd->componentbase)->ftypes[vd->componentfield])
+                            : nullptr;
+         shrink(MapClass(spec, vd, argvals), storage, "shrinks", balance,
+-               orderof(-1, vd, nullptr));
++               orderof(-1, vd, nullptr), false, originof(-1, vd));
+     }
+     for (auto &b : rec->shrinkexternalbounds) {
+         auto one = MapClass(spec, b.key, argvals);
+         one.Weaken();
+-        shrink(one, b.type, "may shrink", b.balance, orderof(-1, b.key, b.type));
++        shrink(one, b.type, "may shrink", b.balance, orderof(-1, b.key, b.type), false, b.origin);
+     }
+     // A balanced shrink frees nothing a view of the array taken before
+     // the call points into, unless the call may also shrink that array

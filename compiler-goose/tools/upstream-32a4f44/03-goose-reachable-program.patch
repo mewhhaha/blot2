@@ -1,0 +1,173 @@
+diff --git a/src/main.cpp b/src/main.cpp
+index 0597b80..35a3d26 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -1611,7 +1611,10 @@ int Main(int argc, char **argv) {
+         auto &ast = *astp;
+         if (jsondiag) ast.sink = [&](const Diagnostic &d) { found.push_back(d); };
+         auto stdlibdirs = StdlibDirs(stdlibdir, exe);
++        auto compile_started = chrono::steady_clock::now();
+         ParseProgram(ast, filename, stdlibdirs, DirOf(exe));
++        auto parse_finished = chrono::steady_clock::now();
++        CheckerPhase("parse", compile_started, parse_finished);
+         // The parser reported what it recovered from as it went; nothing
+         // further is asked of a program with a syntax error.
+         if (!ast.errors.empty()) return 1;
+@@ -1640,6 +1643,8 @@ int Main(int argc, char **argv) {
+             fclose(f);
+         }
+         ResolveTypeNames(ast);
++        auto resolve_finished = chrono::steady_clock::now();
++        CheckerPhase("resolve", parse_finished, resolve_finished);
+         // As after the parse, which an unknown type name is part of.
+         if (!ast.errors.empty()) return 1;
+         // With --stats, printed by every run that gets this far, so that one
+@@ -1666,9 +1671,13 @@ int Main(int argc, char **argv) {
+             if (!ast.errors.empty()) return 1;
+             return 0;
+         }
++        auto check_finished = chrono::steady_clock::now();
++        CheckerPhase("typecheck", resolve_finished, check_finished);
+         // The checker reported the errors it went on past, root by root.
+         if (!ast.errors.empty()) return 1;
+         Optimizer opt(ast, optlevel);
++        auto optimize_finished = chrono::steady_clock::now();
++        CheckerPhase("optimize", check_finished, optimize_finished);
+         if (specs) {
+             string s;
+             opt.DumpSpecs(s);
+@@ -1695,6 +1704,8 @@ int Main(int argc, char **argv) {
+                     break;
+                 }
+         }
++        auto bce_finished = chrono::steady_clock::now();
++        CheckerPhase("bce", optimize_finished, bce_finished);
+         // Per-line outcomes, for comparing two builds of the pass.
+         if (bcelines)
+             for (auto &[where, counts] : bce.lineout)
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 6ee23f3..6adf8d9 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -3143,6 +3143,7 @@ struct TypeCheck {
+     // the code that root reached after it; the rest is checked as if the
+     // root had completed.
+     void CheckRoots() {
++        CheckerRootProfile profile;
+         for (auto g : ast.globals) {
+             if (CheckRoot([&] { CheckVarDecl(g, true); })) {
+                 for (auto d : g->defs) d->assigned = d->maybeassigned = true;
+@@ -3152,6 +3153,7 @@ struct TypeCheck {
+         }
+         ValidateNamedComponents();
+         globalinitializersdone = true;
++        profile.Mark("roots.globals");
+         // Concrete ones only; a pointee still spelled with a type parameter
+         // gets here again once a specialization substitutes it.
+         for (auto t : ast.alltypes) {
+@@ -3188,6 +3190,7 @@ struct TypeCheck {
+             return;
+         }
+         auto mainsf = ast.MainFunction();
++        profile.Mark("roots.declarations");
+         if (!mainsf && !library && !(nomain && !ast.DeclaresMain()))
+             throw CompileError { "program needs exactly one global fn main()" };
+         if (mainsf && !mainsf->brokensig) {
+@@ -3201,6 +3204,7 @@ struct TypeCheck {
+                 CheckSpecBody(mainspec, nullptr, mainsf->line);
+             });
+         }
++        profile.Mark("roots.main");
+         // Thread entry points compile as separate programs (§11.2); check any
+         // that no spawn reached.
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+@@ -3212,6 +3216,7 @@ struct TypeCheck {
+         for (auto sf : ast.functions)
+             if (sf->isthread && !sf->specs.empty() && !sf->specs[0]->failed)
+                 CheckRoot([&] { CheckThreadGlobals(sf->specs[0]); });
++        profile.Mark("roots.threads");
+         // NOTE: in this compilation model, code no call reaches would never be
+         // typechecked at all. That is right for generic functions (they need a
+         // caller's types), but silently skipping plain dead code makes for a
+@@ -3227,10 +3232,26 @@ struct TypeCheck {
+             auto sf = ast.functions[i];
+             if (sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
+         }
++        profile.Mark("roots.export_bodies");
+         for (size_t i = 0; i < ast.functions.size(); i++) {
+             auto sf = ast.functions[i];
+-            if (!sf->isexport) CheckRoot([&] { CheckUnreached(sf); });
++            if (sf->isexport) continue;
++#if GOOSE_REACHABLE_PROGRAM
++            // Omit only eager dead-body diagnostics. Concrete dead signatures
++            // still validate, while extern specs remain available to C adapters.
++            if (!sf->isextern) {
++                if (!sf->specs.empty() || sf->isthread || sf->isnested || sf->brokensig ||
++                    sf->IsGeneric()) continue;
++                CheckRoot([&] {
++                    for (auto &p : sf->params) ValidateType(Subst(p.type), sf->line, VT_PARAM);
++                    for (auto t : sf->rets) ValidateType(Subst(t), sf->line, VT_RET);
++                });
++                continue;
++            }
++#endif
++            CheckRoot([&] { CheckUnreached(sf); });
+         }
++        profile.Mark("roots.dead");
+         auto exportcount = 0;
+         for (auto sf : ast.functions) {
+             if (!sf->isexport) continue;
+@@ -3239,6 +3260,7 @@ struct TypeCheck {
+         }
+         if (library && !exportcount)
+             throw CompileError { "--header and --shared require at least one export fn" };
++        profile.Mark("roots.exports");
+         CheckRoot([&] { CheckGlobalShrinks(); });
+         CheckRoot([&] { SettleParamRootExactness(); });
+         CheckRoot([&] { ResolveGrowConflicts(); });
+@@ -3246,6 +3268,7 @@ struct TypeCheck {
+         CheckRoot([&] { ReportRedundantCasts(); });
+         CheckRoot([&] { CheckDefers(); });
+         if (ast.exemplars) CheckExemplars();
++        profile.Mark("roots.fixups");
+     }
+ 
+     // Two parameter classes of one activation are one array where some
+diff --git a/src/utils.h b/src/utils.h
+index 7f8395c..3ba31c3 100644
+--- a/src/utils.h
++++ b/src/utils.h
+@@ -3,6 +3,33 @@
+ 
+ namespace goose {
+ 
++// Explicit private observation: no clock reads, formatting or allocations when
++// the environment switch is absent. Driver boundaries reuse existing clocks.
++inline bool CheckerProfileEnabled() {
++    static const bool enabled = [] {
++        auto value = getenv("GOOSE_CHECKER_PROFILE");
++        return value && *value;
++    }();
++    return enabled;
++}
++inline void CheckerPhase(const char *name, chrono::steady_clock::time_point from,
++                         chrono::steady_clock::time_point to) {
++    if (!CheckerProfileEnabled()) return;
++    auto ns = chrono::duration_cast<chrono::nanoseconds>(to - from).count();
++    fprintf(stderr, "GOOSE_CHECKER_PROFILE phase=%s ns=%lld\n", name, (long long)ns);
++}
++struct CheckerRootProfile {
++    bool enabled = CheckerProfileEnabled();
++    chrono::steady_clock::time_point from;
++    CheckerRootProfile() { if (enabled) from = chrono::steady_clock::now(); }
++    void Mark(const char *name) {
++        if (!enabled) return;
++        auto to = chrono::steady_clock::now();
++        CheckerPhase(name, from, to);
++        from = to;
++    }
++};
++
+ // String building: small variadic append/cat helpers, no iostreams.
+ inline void CatOne(string &s, string_view v)   { s += v; }
+ inline void CatOne(string &s, const char *v)   { s += v; }

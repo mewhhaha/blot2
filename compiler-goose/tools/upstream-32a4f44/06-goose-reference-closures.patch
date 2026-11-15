@@ -1,0 +1,95 @@
+diff --git a/src/typecheck.h b/src/typecheck.h
+index 32990eb..3e2f359 100644
+--- a/src/typecheck.h
++++ b/src/typecheck.h
+@@ -114,6 +114,30 @@ struct TypeCheck {
+     // at each store and shrink it judges.
+     using TypePairCache = flat_map<pair<TypeExpr *, TypeExpr *>, bool>;
+     TypePairCache cancontain, reachesthrough;
++    // Only fresh-empty type closures for ReachesThroughRefs' Boolean query.
++    // Struct roots inspect the instance's fields, never the outer qualifier;
++    // RefPointees -> EachField -> FieldRuns -> RunsOf(GetStructInst(t)).
++    // References/slices keep exact identity: reaching S itself differs from S.
++    struct ReferenceClosures {
++        unordered_map<const void *, vector<TypeExpr *>> entries;
++        size_t pointers = 0, max_entries = 4096, max_pointers = size_t(1) << 20;
++        StableQueryProfile profile { "reach.closure" };
++        ReferenceClosures() {
++            auto value = getenv("GOOSE_CHECKER_TRACE");
++            if (value && *value) profile.enabled = true;
++        }
++        void Retained() const {
++            if (!profile.enabled) return;
++            fprintf(stderr, "GOOSE_CHECKER_PROFILE reference_closure entries=%zu pointers=%zu max_entries=%zu max_pointers=%zu\n",
++                    entries.size(), pointers, max_entries, max_pointers);
++        }
++        void Sample() const {
++            if (profile.enabled && ((profile.hits + profile.misses) & ((UINT64_C(1) << 14) - 1)) == 0) {
++                profile.Report(); Retained();
++            }
++        }
++        ~ReferenceClosures() { Retained(); }
++    } referenceclosures;
+     // Only stable type exclusions, never roots or live reference provenance.
+     // Globals and their definitions are fixed after parsing. Initializers must
+     // finish before an entry can omit a non-reference global permanently.
+diff --git a/src/typecheck_types.h b/src/typecheck_types.h
+index b59583c..a6a3e45 100644
+--- a/src/typecheck_types.h
++++ b/src/typecheck_types.h
+@@ -1321,13 +1321,16 @@ inline void TypeCheck::ReachedThroughRefs(TypeExpr *t, vector<TypeExpr *> &out)
+ 
+ // Whether storage that can hold an `of` is among those.
+ inline bool TypeCheck::ReachesThroughRefs(TypeExpr *t, TypeExpr *of) {
+-    auto walk = [&]() {
+-        vector<TypeExpr *> reached;
+-        ReachedThroughRefs(t, reached);
++    auto matches = [&](const vector<TypeExpr *> &reached) {
+         for (auto p : reached)
+             if (CanContain(p, of)) return true;
+         return false;
+     };
++    auto walk = [&]() {
++        vector<TypeExpr *> reached;
++        ReachedThroughRefs(t, reached);
++        return matches(reached);
++    };
+     pair key { t, of };
+     if (auto known = reachesthrough.find(key)) {
+         assert(*known == walk());
+@@ -1335,7 +1338,34 @@ inline bool TypeCheck::ReachesThroughRefs(TypeExpr *t, TypeExpr *of) {
+     }
+     if (typesbuilding || !stablereaches.Ready(t, stablecontainment) ||
+         !stablecontainment.Identity(of)) return walk();
+-    auto result = walk();
++    const void *closurekey = t;
++    if (t->kind == TY_STRUCT) closurekey = GetStructInst(t);
++    bool result;
++    auto it = referenceclosures.entries.find(closurekey);
++    if (it != referenceclosures.entries.end()) {
++        referenceclosures.profile.Hit();
++#ifndef NDEBUG
++        vector<TypeExpr *> check;
++        ReachedThroughRefs(t, check);
++        assert(TypeArgsEq(check, it->second));
++#endif
++        result = matches(it->second);
++    } else {
++        referenceclosures.profile.Miss();
++        vector<TypeExpr *> reached;
++        ReachedThroughRefs(t, reached);
++        result = matches(reached);
++        // Bound retained payload, using capacity rather than length. On a cap
++        // the complete local walk still supplies the unchanged Boolean result.
++        auto capacity = reached.capacity();
++        if (referenceclosures.entries.size() < referenceclosures.max_entries &&
++            referenceclosures.pointers <= referenceclosures.max_pointers &&
++            capacity <= referenceclosures.max_pointers - referenceclosures.pointers) {
++            referenceclosures.entries.emplace(closurekey, std::move(reached));
++            referenceclosures.pointers += capacity;
++        } else referenceclosures.profile.Reject();
++    }
++    referenceclosures.Sample();
+     reachesthrough[key] = result;
+     return result;
+ }
