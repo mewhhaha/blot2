@@ -399,6 +399,39 @@ within the approved rules; the one deviation is marked.
    default once std, the tests, Ink and Gdev are changed. The switch is
    then deleted.
 
+### The plan, measured (16 November 2026)
+
+Items 1 to 3 and 5 of the plan are in the pass behind the environment
+variable `BLOT_BORROWED_RULES` (any value turns them on; without it nothing
+changes). Item 4's generic-read check is **not** built, so the switch is
+for measuring only: with it, `identity rows` wrongly gives a unique result.
+
+With the switch on:
+
+- each function and closure whose result type can own an array must
+  return a value nothing else holds (`result_not_owned`);
+- a call (`call` or `apply`) whose result type has no borrowing part only
+  borrows its arguments, and its result is `deep`; an effect operation is
+  excepted;
+- a type variable holds no array;
+- a constructor keeps its payload's fact, a tuple is `deep` when its parts
+  are, and `@storage.freeze` of a local at its last read moves it;
+- a type the pass cannot read (opaque, an effect type) is exempt.
+
+| With the switch on | |
+| --- | ---: |
+| Guest and host cases failing (of 1,163) | 33, in 16 files |
+| Diagnostics in those runs | all `result_not_owned` |
+| Distinct sites in std | 4 |
+| The older pass's narrowed rules, for comparison | 75 cases in 39 files |
+
+The std sites: `list.splice` and `list.splice_many` return the list they
+were given when nothing changes (2), `iter`'s windows return the buffer
+they hold (1), and `simd.store` returns the storage it wrote (1). The
+other 48 diagnostics are in the test programs themselves. Gdev and Ink are
+not measured yet: the project server stops at the first module with a
+diagnostic, and the command line lacks Gdev's asset settings.
+
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 
 [The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)

@@ -81,12 +81,19 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   those functions, and a value moving at its local's last read
   (tasks/MEMORY_MODEL.md, "Phase 2 as built so far"; docs/language/guide.md,
   "`own` parameters"). Nothing is migrated.
-  - **Next:** the borrowed rules for every function (rule set 3 under "The
-    rules"): lending to an ordinary parameter keeps the local unique,
-    every call result is the caller's, a borrowed parameter cannot be
-    returned in a part that owns, and the generic check at the call. Then
-    ownership returning at a holder's last use, `own` in function types,
-    and phase 3 (move std, Ink and Gdev off `=`, delete `=`).
+  - **Next:** the same rules for every function. They are in the pass
+    behind the environment variable `BLOT_BORROWED_RULES`, for measuring
+    only: with it the guest suite has 33 failing cases in 16 files and std
+    has 4 sites to change (tasks/MEMORY_MODEL.md, "Plan for the rest of
+    phase 2" and "The plan, measured"). Still to do before it can be the
+    default: the generic-read check (`identity rows`), measuring Gdev and
+    Ink, changing the 4 std sites and the tests, then deleting the switch.
+    After that: a temporary holder giving ownership back, `own` in
+    function types, and phase 3 (move std, Ink and Gdev off `=`, delete
+    `=`).
+  - **For the owner:** the plan treats a generic-read call (`grid.at 0`
+    on an array of arrays) as sharing, not as the error the approved text
+    names. Say if it should be the error.
   - An older, unfinished pass with the broad rules is on branch
     `wip/memory-phase2-own` (0afccb55), written in Zig. Its measurements
     are what the rules were chosen from:
