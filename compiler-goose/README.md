@@ -69,16 +69,19 @@ Two of them read a model that is edited by hand:
 
 - `deno task test:compiler` is the gate: the tooling's tests, the optimized
   build, the three references below, the package, and the guest and host
-  suite (1,054 cases pass, 101 are ignored). `deno task test:guest` runs
+  suite (1,059 cases pass, 101 are ignored). `deno task test:guest` runs
   only the suite, against the optimized compiler as it is, and
   `deno task test:compiler:dev FILES` builds the debug compiler and runs
   those files.
-- The references hold what the Zig compiler produced on 15 November 2026:
+- The references hold what the Zig compiler produced on 15 November 2026,
+  and what this compiler produced for the programs added since:
   - `python3 compiler-goose/tools/test_fixtures.py` builds the 187
     programs of `tests/fixtures/` and requires the recorded exit code, Wasm
     and records.
   - `python3 compiler-goose/tools/test_uniqueness.py` requires the recorded
-    lowering diagnostics for the 73 programs of `tests/uniqueness/`.
+    lowering diagnostics for the 100 programs of `tests/uniqueness/`. The
+    27 named `e…` are about `own` parameters, which Zig never had; their
+    record is this compiler's, read through by hand.
   - `python3 compiler-goose/tools/test_direct.py` runs each law of
     `tests/direct/` and requires the recorded bytes.
 

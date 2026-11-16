@@ -4,9 +4,12 @@
 Each program in compiler-goose/tests/uniqueness is built as one file, with no
 prelude. It may not get a lex, parse or check diagnostic, and its lowering
 diagnostics must be those in tests/uniqueness/expected.json: code, span,
-message, count and order. The record holds what the Zig compiler reported on
-15 November 2026, the day it was removed. The pass runs after lowering, so
-`build` reaches it whether or not a backend follows.
+message, count and order. For the 73 programs named a, b, c and d the record
+holds what the Zig compiler reported on 15 November 2026, the day it was
+removed. The programs named e are about `own` parameters, which came later;
+their record is this compiler's, read through by hand. The pass runs after
+lowering, so `build` reaches it whether or not a backend follows. A run that
+ends without a compilation record (a crash) fails.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
@@ -26,6 +29,8 @@ def diagnostics(compiler, source, output):
     result = subprocess.run([str(compiler), "build", str(source), str(output)], capture_output=True, text=True,
                             stdin=subprocess.DEVNULL, timeout=120)
     frontend, lowering = [], []
+    if '"kind":"compilation"' not in result.stdout:
+        raise SystemExit(f"{compiler} ended without a compilation record for {source.name}: {result.stderr.strip()[:300]}")
     for line in result.stdout.splitlines():
         try:
             record = json.loads(line)

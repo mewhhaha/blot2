@@ -2832,6 +2832,8 @@ var result=default<blot_check_capability_flow::Parameters>();
 
 {let copied,error=cloneValue(self_,value.invocation_count);if error!=blot_error::Error.none {return result,error;}result.invocation_count=copied;}
 
+result.own=value.own;
+
 return result,blot_error::Error.none;
 
 }
@@ -2958,6 +2960,8 @@ var result=default<blot_check_core::CallInfo>();
 {let copied,error=cloneValue(self_,value.target);if error!=blot_error::Error.none {return result,error;}result.target=copied;}
 
 {let copied,error=cloneValue(self_,value.callee_type);if error!=blot_error::Error.none {return result,error;}result.callee_type=copied;}
+
+result.own=value.own;
 
 return result,blot_error::Error.none;
 
@@ -3889,6 +3893,18 @@ return blot_check_core::Code.complexity,blot_error::Error.none;},
 
 aliased_update=>{
 return blot_check_core::Code.aliased_update,blot_error::Error.none;},
+
+spent_value=>{
+return blot_check_core::Code.spent_value,blot_error::Error.none;},
+
+own_argument=>{
+return blot_check_core::Code.own_argument,blot_error::Error.none;},
+
+own_function_value=>{
+return blot_check_core::Code.own_function_value,blot_error::Error.none;},
+
+result_not_owned=>{
+return blot_check_core::Code.result_not_owned,blot_error::Error.none;},
 
 }
 
@@ -7487,6 +7503,18 @@ complexity=>{
 },
 
 aliased_update=>{
+},
+
+spent_value=>{
+},
+
+own_argument=>{
+},
+
+own_function_value=>{
+},
+
+result_not_owned=>{
 },
 
 }

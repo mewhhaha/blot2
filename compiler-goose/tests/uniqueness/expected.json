@@ -594,5 +594,130 @@
    385,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
+ ],
+ "e01_own_local": [],
+ "e02_own_fresh": [],
+ "e03_own_spent": [
+  [
+   "spent_value",
+   556,
+   560,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e04_own_aliased": [
+  [
+   "own_argument",
+   551,
+   555,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e05_own_borrowed": [
+  [
+   "own_argument",
+   513,
+   517,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e06_own_forwarded": [],
+ "e07_own_in_loop": [
+  [
+   "own_argument",
+   567,
+   571,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e08_own_loop_local": [],
+ "e09_own_one_arm": [
+  [
+   "spent_value",
+   621,
+   625,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e10_own_record": [],
+ "e11_own_record_shared": [
+  [
+   "own_argument",
+   586,
+   591,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e12_own_captured": [
+  [
+   "spent_value",
+   576,
+   580,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e13_own_twice": [
+  [
+   "spent_value",
+   558,
+   562,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e14_own_field": [
+  [
+   "own_argument",
+   565,
+   577,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e15_own_scalar": [],
+ "e16_own_carried": [],
+ "e17_own_both_arms": [],
+ "e18_own_argument_reads": [
+  [
+   "spent_value",
+   543,
+   547,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e19_own_returned": [],
+ "e20_own_rebound": [],
+ "e21_result_borrowed": [
+  [
+   "result_not_owned",
+   523,
+   528,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e22_result_aliased": [
+  [
+   "result_not_owned",
+   532,
+   560,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e23_result_early": [],
+ "e24_result_global": [
+  [
+   "result_not_owned",
+   527,
+   532,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e25_result_record": [],
+ "e26_result_scalar": [],
+ "e27_result_element": [
+  [
+   "result_not_owned",
+   510,
+   517,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
  ]
 }

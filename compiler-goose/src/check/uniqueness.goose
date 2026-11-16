@@ -2,7 +2,13 @@
 // and 5; compiler/src/check/uniqueness.zig). A path update that reaches
 // storage writes in place, which is only the successor semantics of `:=` when
 // nothing else can observe the old root. This pass proves that inside one
-// body and rejects the rest with `aliased_update`; no fact crosses a call.
+// body and rejects the rest with `aliased_update`. One fact crosses a call:
+// a named function may take over a parameter (`own`). That parameter is
+// unique all the way down inside the function, so the call requires an
+// argument nothing else holds, and the name it was passed by is spent: a
+// later read of it is `spent_value`. In return, such a function's result is
+// the caller's alone: each of its returns must give a value nothing else
+// holds (`result_not_owned`), and the call's result is unique.
 //
 // Facts belong to binding versions and follow evaluation order. A version is
 // unique after it is bound to a fresh allocation, stays unique across its own
@@ -47,6 +53,9 @@ let shell: Fact = 1;
 let deep: Fact = 2;
 let first_record: Fact = 3;
 let top: Fact = 0xffffffff;
+// The version was passed to an `own` parameter: its storage belongs to that
+// call, which may have written it in place. Below every other fact.
+let spent: Fact = 0xfffffffe;
 
 struct Entry { field: u32, fact: Fact }
 // A record's facts by field symbol, sorted; unlisted fields have `default_`.
@@ -59,7 +68,7 @@ struct Value { fact: Fact = 0, origin: u32 = 0, exits: bool = false }
 // at `start` in the shared `carried` stack.
 struct LoopFrame { id: u32, start: i64, len: i64 }
 struct BlockFrame { id: u32, fact: Fact = 0xffffffff, broken: bool = false }
-struct Rejection { node: u32, span: blot_check_core::Span }
+struct Rejection { node: u32, span: blot_check_core::Span, code: blot_check_core::Code = blot_check_core::Code.aliased_update }
 // A nominal being expanded, with whether each type argument holds storage.
 struct Expansion { unit: u32, decl: u32, arguments: bool[16], len: i64 }
 // The local version a projection chain starts from, and its fields.
@@ -84,6 +93,8 @@ struct Join {
 
 root struct Analyzer {
     facts: Fact[>..] = [],
+    // Per binding: the innermost loop around its definition, or 0.
+    born: u32[>..] = [],
     trail: Change[>..<] = [],
     records: Record[>..] = [],
     entries: Entry[>..] = [],
@@ -109,18 +120,36 @@ root struct Analyzer {
     // Per join: one fact per branch merge.
     merged: Fact[>..<] = [],
     // While positive, loop bodies are only probed: rejections are dropped.
-    probing: u32 = 0
+    probing: u32 = 0,
+    // The root of the function being checked when its result must be owned.
+    owned_result: u32 = 0,
+    // Blocks whose value is the function's result: `return do: ...`.
+    tails: u32[>..<] = []
 }
 
-// Appends one `aliased_update` diagnostic per rejected `:=` in `module`.
+// Appends one diagnostic per rejected `:=`, `own` argument and read of a
+// spent name in `module`.
 fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
-    if module.updates.len == 0 { return; }
+    var takes_over = false;
+    for call in module.calls { takes_over = takes_over || call.own != 0; }
+    if module.updates.len == 0 && !takes_over { return; }
     var analyzer = Analyzer { .. };
-    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.changed_slot.push(-1); }
+    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.born.push(0); analyzer.changed_slot.push(-1); }
     for body, index in module.bodies {
         if index == 0 || body.root == 0 { continue; }
+        // An `own` parameter arrives unique all the way down: every call
+        // names this function and gives up an argument that was.
+        let own = module.bindings[body.binding].capability_parameters.own;
+        if own != 0 && body.is_function {
+            for parameter, position in module.bodyParameters(body) {
+                if position < 32 && (own >> (position as! u32)) & 1 != 0 { set(analyzer, parameter.binding, deep); }
+            }
+        }
+        analyzer.owned_result = 0;
+        if own != 0 && body.is_function { analyzer.owned_result = body.root; }
         analyzer.function_roots.push(body.root);
         let value = visit(analyzer, module, body.root);
+        if analyzer.owned_result != 0 && !value.exits { ownedResult(analyzer, module, body.root, value); }
         escape(analyzer, value);
         analyzer.function_roots.resize(analyzer.function_roots.len - 1);
     }
@@ -129,7 +158,7 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     for rejection in analyzer.rejections {
         if rejection.node == previous { continue; }
         previous = rejection.node;
-        out.push(blot_check_core::Diagnostic { code: blot_check_core::Code.aliased_update, span: rejection.span });
+        out.push(blot_check_core::Diagnostic { code: rejection.code, span: rejection.span });
     }
 }
 
@@ -141,7 +170,20 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.trail.push(Change { binding: binding, old: self_.facts[binding] });
     self_.facts[binding] = fact;
 }
-fn kill(self_: Analyzer&, binding: u32) { set(self_, binding, none); }
+// A spent version stays spent: nothing gives its storage back.
+fn kill(self_: Analyzer&, binding: u32) { if local(self_, binding) && self_.facts[binding] == spent { return; } set(self_, binding, none); }
+// Sets the fact of a version at its definition.
+fn define(self_: Analyzer&, binding: u32, fact: Fact) {
+    if local(self_, binding) {
+        var loop_id: u32 = 0;
+        if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
+        self_.born[binding] = loop_id;
+    }
+    set(self_, binding, fact);
+}
+fn reject(self_: Analyzer&, m: const Module&, node: u32, code: blot_check_core::Code) {
+    if self_.probing == 0 { self_.rejections.push(Rejection { node: node, span: m.span(node), code: code }); }
+}
 fn escape(self_: Analyzer&, value: Value) { if value.origin != 0 { kill(self_, value.origin); } }
 fn undo(self_: Analyzer&, mark: i64) {
     while self_.trail.len > mark {
@@ -204,6 +246,7 @@ recursive fn meet(self_: Analyzer&, left: Fact, right: Fact) -> Fact {
     if left == top { return right; }
     if right == top { return left; }
     if left == right { return left; }
+    if left == spent || right == spent { return spent; }
     if left == none || right == none { return none; }
     if left < first_record && right < first_record { return min(left, right); }
     // A record meets `deep` as itself; a record never has a `shell`.
@@ -244,7 +287,7 @@ recursive fn meet(self_: Analyzer&, left: Fact, right: Fact) -> Fact {
 }
 recursive fn same(self_: const Analyzer&, left: Fact, right: Fact) -> bool {
     if left == right { return true; }
-    if left < first_record || right < first_record || left == top || right == top { return false; }
+    if left < first_record || right < first_record || left >= spent || right >= spent { return false; }
     let l = record(self_, left);
     let r = record(self_, right);
     if !same(self_, l.default_, r.default_) || l.len != r.len { return false; }
@@ -398,6 +441,7 @@ fn sharedInto(self_: Analyzer&, m: const Module&, id: u32, selectors: const Upda
         target.fields[target.len] = m.projection(step.projection).field;
         target.len += 1;
     }
+    if self_.facts[target.binding] == spent { return; }
     let weakened = weaken(self_, self_.facts[target.binding], target.fields[..target.len]);
     set(self_, target.binding, weakened);
 }
@@ -437,8 +481,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.reference {
         let target = m.reference(id);
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
-        if local(self_, target.binding) { return Value { origin: target.binding, .. }; }
-        return Value { .. };
+        if !local(self_, target.binding) { return Value { .. }; }
+        if self_.facts[target.binding] == spent { reject(self_, m, id, blot_check_core::Code.spent_value); return Value { .. }; }
+        return Value { origin: target.binding, .. };
     }
     if tag == blot_check_core::Tag.suite {
         var exits = false;
@@ -454,15 +499,27 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         escape(self_, result);
         var fact = result.fact;
         if result.origin != 0 { fact = none; }
-        set(self_, n.a, fact);
+        define(self_, n.a, fact);
         return Value { exits: result.exits, .. };
     }
     if tag == blot_check_core::Tag.update { return update(self_, m, id, 0); }
     if tag == blot_check_core::Tag.return_ {
-        let result = visitEscaping(self_, m, n.a);
+        let leaves = self_.function_roots.len != 0 && n.b == self_.function_roots[self_.function_roots.len - 1];
+        // A local that leaves with the function has no later use, so the
+        // value keeps the local's fact; so does one a tail block breaks with.
+        let tail = leaves && n.b == self_.owned_result && n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.block_;
+        if tail { self_.tails.push(n.a); }
+        let result = visit(self_, m, n.a);
+        if tail { self_.tails.resize(self_.tails.len - 1); }
         var fact = result.fact;
-        if result.origin != 0 { fact = none; }
-        if self_.function_roots.len != 0 && n.b == self_.function_roots[self_.function_roots.len - 1] { return Value { exits: true, .. }; }
+        if result.origin != 0 {
+            fact = none;
+            let moves = (leaves && n.b == self_.owned_result) || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b);
+            if moves && m.node(n.a).tag == blot_check_core::Tag.reference { fact = self_.facts[result.origin]; }
+        }
+        if leaves && n.b == self_.owned_result && n.a != 0 && !result.exits && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { reject(self_, m, n.a, blot_check_core::Code.result_not_owned); }
+        escape(self_, result);
+        if leaves { return Value { exits: true, .. }; }
         var at = self_.blocks.len;
         while at != 0 {
             at -= 1;
@@ -488,6 +545,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.loop_ { return loop_(self_, m, id); }
     if tag == blot_check_core::Tag.break_ { return breakNode(self_, m, id); }
     if tag == blot_check_core::Tag.closure {
+        // A spent capture is reported where the body reads it.
         for captured in m.closureCaptures(id) { kill(self_, captured); }
         let body = m.closure(id).body;
         self_.function_roots.push(body);
@@ -529,8 +587,79 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
+    if tag == blot_check_core::Tag.call && m.call(id).own != 0 { return ownCall(self_, m, id); }
     let exits = visitChildren(self_, m, id);
     return Value { exits: exits, .. };
+}
+
+// A direct call of a function that takes over some of its parameters. An
+// `own` argument must be a fresh value, or a local that holds its value
+// alone; the local is spent. Inside a loop the local must belong to the same
+// iteration, or the next one would give it away again.
+recursive fn ownCall(self_: Analyzer&, m: const Module&, id: u32) -> Value {
+    let info = m.call(id);
+    var exits = false;
+    for child, position in info.arguments {
+        var named: u32 = 0;
+        if m.node(child).tag == blot_check_core::Tag.reference {
+            let target = m.reference(child);
+            if (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding) { named = target.binding; }
+        }
+        let was_spent = named != 0 && self_.facts[named] == spent;
+        let value = visit(self_, m, child);
+        exits = exits || value.exits;
+        let ty = m.typeOf(child);
+        if position >= 32 || (info.own >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) { escape(self_, value); continue; }
+        if was_spent { continue; }
+        var accepted = false;
+        if value.origin == 0 {
+            accepted = ownedAs(self_, m, value.fact, ty, 0);
+        } else if named != 0 {
+            var loop_id: u32 = 0;
+            if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
+            accepted = self_.born[named] == loop_id && ownedAs(self_, m, self_.facts[named], ty, 0);
+        }
+        if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
+        if accepted && named != 0 { set(self_, named, spent); } else { escape(self_, value); }
+    }
+    // Every return of the callee gave a value nothing else holds.
+    return Value { fact: deep, exits: exits, .. };
+}
+// The value a function with an `own` parameter ends with, when it ends
+// without a `return`.
+fn ownedResult(self_: Analyzer&, m: const Module&, node: u32, value: Value) {
+    var fact = value.fact;
+    if value.origin != 0 {
+        fact = none;
+        if m.node(node).tag == blot_check_core::Tag.reference { fact = self_.facts[value.origin]; }
+    }
+    if !ownedAs(self_, m, fact, m.typeOf(node), 0) { reject(self_, m, node, blot_check_core::Code.result_not_owned); }
+}
+// Whether a value of `ty` with `fact` is unique all the way down. A record
+// fact is when every field that holds storage is; a nominal is read through
+// its one record constructor when it has no type parameters.
+recursive fn ownedAs(self_: Analyzer&, m: const Module&, fact: Fact, ty: u32, depth: i64) -> bool {
+    if fact == deep { return true; }
+    if !holds(self_, m, ty) { return true; }
+    if fact < first_record || fact >= spent || depth > 16 || ty >= m.types.nodes.len { return false; }
+    var shape = m.types.node(ty);
+    if shape.tag == blot_check_types::Tag.nominal {
+        if blot_check_storage_types::identity(shape.a, shape.b).present || shape.a == 0xffffffff { return false; }
+        let index, found = nominalIndex(self_, m, shape.a, shape.b);
+        if !found { return false; }
+        let nominal = m.nominal(index);
+        let constructors = m.nominalConstructors(index);
+        if nominal.is_opaque || nominal.variables.len != 0 || constructors.len != 1 { return false; }
+        let payload = m.constructor(constructors[0]).payload;
+        if payload == 0 || payload >= m.types.nodes.len { return false; }
+        shape = m.types.node(payload);
+    }
+    if shape.tag != blot_check_types::Tag.record { return false; }
+    for index in 0..shape.b {
+        let declared = m.types.recordField(shape, index);
+        if !ownedAs(self_, m, field(self_, fact, declared.name), declared.ty, depth + 1) { return false; }
+    }
+    return true;
 }
 
 // The fresh fact of `values.copy` on an array, which only the prelude can
@@ -613,10 +742,10 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
         }
         let replaced = replace(self_, old, self_.fields[mark..], replacement);
         self_.fields.resize(mark);
-        set(self_, successor, replaced);
+        define(self_, successor, replaced);
         return Value { exits: value.exits, .. };
     }
-    if !accepts(self_, m, old, selectors) && self_.probing == 0 { self_.rejections.push(Rejection { node: id, span: m.span(id) }); }
+    if !accepts(self_, m, old, selectors) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
     for step in selectors {
         if step.kind == blot_check_core::UpdateKind.index { break; }
         self_.fields.push(m.projection(step.projection).field);
@@ -624,7 +753,7 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     var next = old;
     if shared { next = weaken(self_, old, self_.fields[mark..]); }
     self_.fields.resize(mark);
-    set(self_, successor, next);
+    define(self_, successor, next);
     return Value { exits: value.exits, .. };
 }
 recursive fn replace(self_: Analyzer&, fact: Fact, fields: const u32[:], replacement: Fact) -> Fact {
@@ -832,7 +961,7 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 let next = meet(self_, fact, reached);
                 if !same(self_, next, fact) { stable = false; }
                 var stored = next;
-                if attempt >= 2 { stored = none; }
+                if attempt >= 2 && stored != spent { stored = none; }
                 self_.loop_facts[assumed + at] = stored;
             }
             if stable { break; }
@@ -844,7 +973,7 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     for carry, at in carries {
         let met = meet(self_, self_.loop_facts[assumed + at], self_.loop_facts[outgoing + at]);
-        set(self_, carry.outgoing, met);
+        define(self_, carry.outgoing, met);
     }
     self_.loop_facts.resize(incoming);
     return Value { exits: exits || (info.kind == blot_check_core::LoopKind.forever && !info.can_exit), .. };
@@ -855,10 +984,11 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
 recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: const LoopCarry[:], assumed: i64) {
     let info = m.loopInfo(id);
     let count = carries.len;
-    for carry, at in carries { set(self_, carry.iteration, self_.loop_facts[assumed + at]); }
     let start = self_.carried.len;
     for at in 0..count * 2 { self_.carried.push(top); }
     self_.loops.push(LoopFrame { id: id, start: start, len: count });
+    // Defined inside the frame: each iteration has its own version.
+    for carry, at in carries { define(self_, carry.iteration, self_.loop_facts[assumed + at]); }
     let body = visit(self_, m, info.body);
     self_.loops.resize(self_.loops.len - 1);
     for carry, at in carries {
@@ -955,7 +1085,7 @@ fn finish(self_: Analyzer&, join: Join&) -> Value {
     for merge, index in join.merges {
         var fact = self_.merged[join.merged_start + index];
         if fact == top { fact = none; }
-        set(self_, merge.result, fact);
+        define(self_, merge.result, fact);
     }
     var release = self_.changed.len;
     while release > join.changed_start {

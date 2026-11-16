@@ -36,12 +36,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   against the old backend's 2.45 ms.
 - **Ink:** `pen test-blot` gives `same 64 wrong 0 newfail 0 other 9` against
   the old backend's reference log.
-- **Guest suite:** 1,054 cases pass, 101 are ignored, each with its reason
+- **Guest suite:** 1,059 cases pass, 101 are ignored, each with its reason
   (tasks/DELETE_SCOPED.md lists them by kind), and none fail. The full gate
   (`deno task test:compiler`) passes. It no longer has Zig's native laws;
   see "What went with Zig" in tasks/GOOSE_PORT.md.
 - **Memory model phase 1** is done (bf582a9c):
-  - the uniqueness pass (compiler-goose/src/check/uniqueness.goose);
+  - the uniqueness pass (compiler-goose/src/check/uniqueness.goose), which
+    now also checks `own` parameters;
   - `aliased_update`;
   - `values.copy`;
   - the storage part of the value restriction.
@@ -73,21 +74,32 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
 
 ## In progress
 
-- **Memory model phase 2** (`own` and borrowed parameters) is measured and
-  waits for the owner. Nothing is migrated, and main has none of it. The
-  unfinished pass is on branch `wip/memory-phase2-own` (0afccb55), written
-  in Zig; resuming it means porting that pass to Goose.
-  - Its 585 guest failures come from the breadth of its rules: it rejects
-    the prelude (`identity`, `Maybe.map`, `Array.at`), which every case
-    compiles. It also has one bug, in shallow copies.
-  - As written (spec section 10.3) the rules reject 352 places in the Gdev
-    build and 350 in Ink's tests. With two rules narrowed they reject 44
-    and 27.
-  - tasks/MEMORY_MODEL.md, "Phase 2: what the borrowed rules reject", has
-    the counts, the two recommended rule changes, what the pass still
-    needs, and the order of work. Spec Annex B item 13 points to it.
-  - **The owner decides:** the two rule changes, and whether `own` in
-    function types waits for the B3 and C8 removals.
+- **Memory model phase 2** (`own` and borrowed parameters). The owner
+  approved the rules on 16 November 2026 ("Yes. Do all of that."), and the
+  first part is on main: `own` on the parameters of top-level named
+  functions, with spent names, checked arguments and owned results for
+  those functions (tasks/MEMORY_MODEL.md, "Phase 2 as built so far";
+  docs/language/guide.md, "`own` parameters"). Nothing is migrated.
+  - **Next:** the borrowed rules for every function (rule set 3 under "The
+    rules"): lending to an ordinary parameter keeps the local unique,
+    every call result is the caller's, a borrowed parameter cannot be
+    returned in a part that owns, and the generic check at the call. Then
+    ownership returning at a holder's last use, `own` in function types,
+    and phase 3 (move std, Ink and Gdev off `=`, delete `=`).
+  - An older, unfinished pass with the broad rules is on branch
+    `wip/memory-phase2-own` (0afccb55), written in Zig. Its measurements
+    are what the rules were chosen from:
+    - Its 585 guest failures come from the breadth of its rules: it
+      rejects the prelude (`identity`, `Maybe.map`, `Array.at`), which
+      every case compiles. It also has one bug, in shallow copies.
+    - As first written the rules rejected 352 places in the Gdev build and
+      350 in Ink's tests. The approved rules reject 44 and 27, and 75
+      guest cases; those are the places phase 2 has to change.
+    - tasks/MEMORY_MODEL.md, "Phase 2: what the borrowed rules reject",
+      has the counts, the rules, what the pass still needs, and the order
+      of work. Spec Annex B item 13 points to it.
+  - Still the owner's: whether `own` in function types waits for the B3
+    and C8 removals.
 - **Memory model phase 4** (the value restriction for `let`) is measured
   and not built. std, Ink and Gdev need no change and Gdev's frame is
   identical, but 13 guest cases pin the old rule (and 11 of Zig's native

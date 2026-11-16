@@ -1,0 +1,12 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const fill = func (rows: own Array U32) -> (n: U32) => return do:
+  rows[0] := n
+  break rows
+const count = func (world: own World) -> (n: U32) => return do:
+  world.counts[0] := n
+  break world
+const run = func (rows: Array U32) -> (n: U32) => return fill rows n

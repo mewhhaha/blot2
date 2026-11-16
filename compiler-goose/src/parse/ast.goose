@@ -176,7 +176,8 @@ fn message(value: Diagnostic) -> const u8[:] {
 
 struct ValueDecl { name: blot_parse_symbols::Symbol, body: Id, annotation: Id, modifier: blot_parse_symbols::Symbol, runtime: bool, exported: bool, function_declaration: bool=false, where: List, where_node: Id, attributes: List }
 struct ImplementationDecl { name: blot_parse_symbols::Symbol, parameters: List, head: Id, members: List, where: List, where_node: Id }
-struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id }
+// `own`: the function takes the argument over (spec section 10.3).
+struct Parameter { name: blot_parse_symbols::Symbol, annotation: Id, is_unit: bool, requires_return: bool, pattern_bound: bool, where: List, where_node: Id, own: bool = false }
 struct Binding { pattern: Id, value: Id, annotation: Id, where: List, where_node: Id, fallback: Id }
 struct ImportDecl { path: blot_parse_symbols::Symbol, namespace_: blot_parse_symbols::Symbol, bindings: List, path_span: Span, namespace_span: Span }
 struct ImportBinding { name: blot_parse_symbols::Symbol, alias: blot_parse_symbols::Symbol }
@@ -421,7 +422,7 @@ fn implementation(tree: const Tree&, id: Id) -> ImplementationDecl {
 }
 fn parameter(tree: const Tree&, id: Id) -> Parameter {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+4];
- return Parameter {n.a,n.b,(x[0]&1)!=0,(x[0]&2)!=0,(x[0]&4)!=0,List {x[1],x[2], ..},x[3], ..};
+ return Parameter {n.a,n.b,(x[0]&1)!=0,(x[0]&2)!=0,(x[0]&4)!=0,List {x[1],x[2], ..},x[3],(x[0]&8)!=0};
 }
 fn binding(tree: const Tree&, id: Id) -> Binding {
  let n=node(tree,id); let x=tree.extra.items[n.c..n.c+5];

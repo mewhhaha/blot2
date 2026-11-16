@@ -105,7 +105,9 @@ struct Body {
 }
 struct CallInfo {
     target: BindingRef,
-    callee_type: blot_check_types::Id
+    callee_type: blot_check_types::Id,
+    // Bit i: the callee takes over its parameter i (`own`).
+    own: u32 = 0
 }
 struct DictionaryUse {
     node: Id,
@@ -135,7 +137,8 @@ struct DictionarySelection {
 struct Call {
     target: BindingRef,
     callee_type: blot_check_types::Id,
-    arguments: const Id[:]
+    arguments: const Id[:],
+    own: u32 = 0
 }
 struct Merge {
     node: Id,
@@ -315,7 +318,7 @@ struct LoopInfo {
     carries: List = List {..},
     can_exit: bool = false
 }
-enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update }
+enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, spent_value, own_argument, own_function_value, result_not_owned }
 struct Diagnostic {
     code: Code,
     span: Span
@@ -438,6 +441,10 @@ fn message(self_: Diagnostic) -> const u8[:] {
         invalid_call => { return "Typed core requires a resolved named call or compiler primitive"; },
         complexity => { return "Typed core exceeds its nesting or table limit"; },
         aliased_update => { return "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"; },
+        spent_value => { return "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"; },
+        own_argument => { return "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"; },
+        result_not_owned => { return "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"; },
+        own_function_value => { return "A function with an `own` parameter must be called by name with all its arguments; it cannot be used as a value or partly applied yet"; },
     }
 }
 fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {
@@ -539,7 +546,7 @@ fn children(self_: const Module&, id: Id) -> const Id[:] {
 }
 fn call(self_: const Module&, id: Id) -> Call {
     let value = self_.node(id); assert(value.tag == Tag.call); let target = self_.calls[value.a];
-    return Call { target.target, target.callee_type, self_.children(id) , ..};
+    return Call { target.target, target.callee_type, self_.children(id), target.own, ..};
 }
 fn dictionaryOffset(self_: const Module&, quantifier: blot_check_types::Id, wanted_goal: u32, wanted_member: u32) -> i64, blot_error::Error {
     let goals = self_.types.quantifierGoals(quantifier);
@@ -956,6 +963,10 @@ fn codeCode(value: Code) -> u32 {
         invalid_call => { return 3; },
         complexity => { return 4; },
         aliased_update => { return 5; },
+        spent_value => { return 6; },
+        own_argument => { return 7; },
+        own_function_value => { return 8; },
+        result_not_owned => { return 9; },
     }
 }
 fn codeFromCode(code: u32) -> Code, blot_error::Error {
@@ -966,6 +977,10 @@ fn codeFromCode(code: u32) -> Code, blot_error::Error {
         3 => { return Code.invalid_call, blot_error::Error.none; },
         4 => { return Code.complexity, blot_error::Error.none; },
         5 => { return Code.aliased_update, blot_error::Error.none; },
+        6 => { return Code.spent_value, blot_error::Error.none; },
+        7 => { return Code.own_argument, blot_error::Error.none; },
+        8 => { return Code.own_function_value, blot_error::Error.none; },
+        9 => { return Code.result_not_owned, blot_error::Error.none; },
         _ => { return Code.unchecked, blot_error::Error.core_limit; },
     }
 }

@@ -787,7 +787,8 @@ version is bound to another name or a pattern, captured, passed to a call or
 constructor, placed in a literal or record, returned or broken out, or read out
 as an array-holding element or field (`let row = grid[r]`). Reading a plain
 element or the length does not alias it. Parameters, call results and
-constants are never unique, and no fact crosses a call. Branches keep
+constants are never unique, and no fact crosses a call, except through an
+`own` parameter (below). Branches keep
 uniqueness only when every arm that continues keeps it; an arm that returns
 contributes nothing. A loop carry is unique when its first value and every
 value it carries back are.
@@ -810,6 +811,58 @@ entry func successors () => return do:
 copy keeps the old element. Without `.copy`, `let before = rows` would make
 `rows[1] := 20` an `aliased_update`. A local whose value holds storage keeps one
 type and is not generalized, so its stores and reads agree.
+
+### `own` parameters
+
+A top-level named function can take a parameter over by writing `own`
+before its type. Inside the function the parameter is unique, so `:=`
+through it writes in place, and the function's result belongs to the
+caller, who can update it in place in turn.
+
+```blot
+type World is data = $World { counts: Array U32, size: U32 }
+
+func damage (world: own World) -> (index: U32): World => return do:
+  world.counts[index] := world.counts[index] + 1
+  break world
+
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0, 0], size: 3 }
+  for i in 0..n:
+    world := damage world 2
+  world.counts[0] := world.size
+  break world.counts[0] * 10 + world.counts[2]
+```
+
+No array is copied in `run`. The rules:
+
+- The argument must be a value nothing else holds: a fresh value, or a
+  whole local that is unique all the way down (every array in it, and
+  every array in those). Anything else is `own_argument`; pass
+  `values.copy` of it instead.
+- The local is spent by the call. Reading it again is `spent_value`;
+  rebind it to the result (`world := damage world 2`) or use the result
+  under a new name.
+- Inside a loop, only a local bound in the same iteration can be given
+  away, because the next iteration would give it away again. A local the
+  loop rebinds each time, as `world` above, is one.
+- Each `return` of the function must give a value nothing else holds: the
+  parameter itself, updated or not, another unique local, or a fresh
+  value. A borrowed parameter, a constant, or a record that shares an
+  array between two fields is `result_not_owned`.
+
+What is not built yet:
+
+- `own` is accepted only on a parameter of a top-level `func` or
+  `const name = func`. On a lambda, a contract member or an implementation
+  member it is `own_parameter`.
+- A function with an `own` parameter must be called by name with all its
+  arguments. Using it as a value or applying it partly is
+  `own_function_value`, because function types do not carry `own` yet.
+- Passing a local to an ordinary parameter still ends its uniqueness, so
+  `let n = count rows` before `fill rows 0` makes the second call an
+  `own_argument`. The results of ordinary functions are not unique yet
+  either.
 
 ### Named owners and explicit copies
 

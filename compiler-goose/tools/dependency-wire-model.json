@@ -2691,6 +2691,11 @@
      "invocation_count",
      "u8",
      "invocation_count"
+    ],
+    [
+     "own",
+     "u32",
+     "own"
     ]
    ],
    "unwired": []
@@ -2969,6 +2974,11 @@
      "callee_type",
      "u32",
      "callee_type"
+    ],
+    [
+     "own",
+     "u32",
+     "own"
     ]
    ],
    "unwired": []
@@ -4869,6 +4879,26 @@
      "aliased_update",
      5,
      "aliased_update"
+    ],
+    [
+     "spent_value",
+     6,
+     "spent_value"
+    ],
+    [
+     "own_argument",
+     7,
+     "own_argument"
+    ],
+    [
+     "own_function_value",
+     8,
+     "own_function_value"
+    ],
+    [
+     "result_not_owned",
+     9,
+     "result_not_owned"
     ]
    ]
   },

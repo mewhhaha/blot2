@@ -571,13 +571,19 @@ recursive fn lambda(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id
 recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],start:u32,declaration:bool,declaration_where:Where&)->Id {
  var parameters=ScratchLambdaParameterBuffer {};
  while p.failure==blot_error::Error.none {
-  let point=current(p,source,tokens).start; var unit=false; var name: Symbol=0; var annotation: Id=0; var constraints=Where {}; var pattern_parameter: Id=0;
+  let point=current(p,source,tokens).start; var unit=false; var own=false; var name: Symbol=0; var annotation: Id=0; var constraints=Where {}; var pattern_parameter: Id=0;
   if eat(p,source,tokens,t_l_paren) {
    if eat(p,source,tokens,t_r_paren) { unit=true; }
    else if at(p,source,tokens,t_hash) { pattern_parameter=pattern(p,source,tokens); expect(p,source,tokens,t_r_paren); name=collection_name(p,source,tokens,point); }
-   else { name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_colon); annotation=type_expression(p,source,tokens); constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_r_paren); }
+   else {
+    name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_colon);
+    // `own` before the type marks a parameter the function takes over. It is
+    // a word only here: alone, or before `->`, it is still a type variable.
+    if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&peek(p,tokens,1)!=t_r_paren&&peek(p,tokens,1)!=t_arrow&&peek(p,tokens,1)!=t_kw_where { advance(p,source,tokens); own=true; }
+    annotation=type_expression(p,source,tokens); constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_r_paren);
+   }
   } else { name=lower_identifier(p,source,tokens); }
-  var flags: u32=0; if unit { flags=1; }
+  var flags: u32=0; if unit { flags=1; } if own { flags|=8; }
   let parameter=add(p,source,tokens,a_parameter,name,annotation,extra(p,source,tokens,[flags,constraints.predicates.start,constraints.predicates.len,constraints.node]),point);
   if p.failure!=blot_error::Error.none { let __cleanup_result_38_0: Id = 0; parameters.deinit(); return __cleanup_result_38_0; } if pattern_parameter!=0 { p.tree.extra.items[p.tree.node(parameter).c]|=4; }
   parameters.push(LambdaParameter {parameter,pattern_parameter,name,point}); if !eat(p,source,tokens,t_arrow) { break; } if parameters.len>=256 { let __cleanup_result_39_0: Id = fail(p,source,tokens,c_nesting_limit); parameters.deinit(); return __cleanup_result_39_0; }

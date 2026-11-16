@@ -29,7 +29,8 @@ type Module = blot_check_core::Module;
 type Mask = blot_support::Option<u16>;
 enum Contract { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape, consume_task, scope_task, spawn_task }
 enum ParameterResult { product, invoke_unit, invalid, member_closure_unit, captured_unit, invoke_input, invoke_inputs }
-struct Parameters { kind: ParameterResult = ParameterResult.product, mask: u16 = 0, inputs: u8 = 0, invocation_arguments: u64 = 0, invocation_count: u8 = 0 }
+// `own`: bit i is set when parameter i of a named function is marked `own`.
+struct Parameters { kind: ParameterResult = ParameterResult.product, mask: u16 = 0, inputs: u8 = 0, invocation_arguments: u64 = 0, invocation_count: u8 = 0, own: u32 = 0 }
 fn init(inputs: u8, mask: u16) -> Parameters { return Parameters { mask: mask, inputs: inputs , ..}; }
 fn result(self_: Parameters) -> u16 { if self_.kind == ParameterResult.invoke_input { return (1 as u16) << self_.callback(); } return self_.mask; }
 fn invokes(self_: Parameters) -> bool { return self_.kind == ParameterResult.invoke_unit || self_.inputInvokes(); }

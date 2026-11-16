@@ -82,9 +82,9 @@ full gate green, and moves std, ../ink and ../gdev itself.
    below. It also landed the `=` store and `blotc migrate-stores`, which
    turned 1,880 `:=` in Ink and 3,011 in Gdev into `=`. `=` stays until
    phase 3.
-2. **`own` and borrowed parameters.** Measured, not built: "Phase 2: what
-   the borrowed rules reject" below has the counts, the recommended rules
-   and what is still open.
+2. **`own` and borrowed parameters.** Started: "Phase 2 as built so far"
+   below. "Phase 2: what the borrowed rules reject" has the counts, the
+   approved rules and what is still open.
    - In the checker: `own` in function types, spent names, owned call
      results, borrowed parameters not updatable or returnable, ownership
      returning at a holder's last use, and the generic-read rule.
@@ -239,11 +239,12 @@ The branch and the variants leave these open:
 - **Ownership returns at a holder's last use** (rule 3). Not started. Facts
   need to know which names hold a value, not only that some other name
   does.
-- **`own`.** Not started: the syntax, `own` in function types, the
-  argument that must be owned, and the spent name.
+- **`own`.** Built for top-level named functions ("Phase 2 as built so
+  far"): the syntax, the argument that must be owned and the spent name.
+  Open: `own` in function types.
 - **`own` and depth.** An `own` parameter is unique all the way down only
   when the argument was. Either the call requires that, or the callee may
-  update only the outer array in place.
+  update only the outer array in place. Built: the call requires it.
 - **The call-site check of recommendation 2** needs the callee's scheme at
   each call, including calls into other modules. Core keeps the callee's
   type at the call (`CallInfo.callee_type`) and names a binding of another
@@ -263,6 +264,70 @@ A smaller first step is possible without it: `own` on the parameters of
 named functions only, recorded per binding and called directly. That covers
 all 44 sites. A lambda with an `own` parameter, which `State.modify` needs,
 waits for `own` in types.
+
+## Phase 2 as built so far (16 November 2026)
+
+`own` on the parameters of top-level named functions, in the Goose
+compiler. tests/guest/own_parameter_execution.test.ts and the 27 programs
+`e…` of compiler-goose/tests/uniqueness cover it; docs/language/guide.md
+("`own` parameters") describes it for users.
+
+- **Syntax.** `(name: own Type)`. The parser reads `own` as the mark when
+  it stands before a type; `own` alone, or before `->`, `)` or `where`, is
+  still a type variable. The host parser (host/parser/grammar.baba) is
+  unchanged: it reads `own Type` as a type application, and the formatter
+  prints it back as written.
+- **Where the mark lives.** Each binding's `capability_parameters.own` is
+  a bit mask of its `own` parameters. It travels with the binding through
+  interfaces and dependency bundles, and Core's `CallInfo.own` carries the
+  callee's mask on each direct call. Function types do not carry it.
+- **Where it is allowed.** On a top-level `func` or `const name = func`.
+  Anywhere else it is `own_parameter` (checker). A reference to such a
+  function that is not a direct, full call is `own_function_value` (Core
+  builder), which covers a function value, a partial application, and a
+  call the builder cannot make direct (a function with a `where` clause).
+- **In the function.** The parameter starts unique all the way down
+  (`deep`).
+- **At the call** (`ownCall` in uniqueness.goose). An `own` argument must
+  be a fresh value that is unique all the way down, or a reference to a
+  whole local that is. This is the first choice under "`own` and depth"
+  below: the call requires depth. Otherwise `own_argument`.
+  - Inside a loop the local must have been defined in the same loop body
+    (`born`), because a later iteration would give it away again.
+  - A record local counts when every field that holds an array is unique
+    all the way down. A nominal is read through its one record
+    constructor, and only when it has no type parameters.
+- **Spent names.** The local gets the fact `spent`, which is below every
+  other fact, so branches and loop carries keep it. A read of a spent name
+  is `spent_value`. Nothing gives a spent version its storage back; the
+  name is usable again after `name := …`, which is a new version.
+- **Owned results, for these functions only.** Each `return` of a function
+  with an `own` parameter must give a value that is unique all the way
+  down, else `result_not_owned`. A `return name`, and a `break name` out of
+  the block that is the function's result (`return do: … break name`),
+  take the local's fact, because the function ends there. In return the
+  call's result is `deep` in the caller. This is rule 1 of "The rules"
+  applied to the functions that cannot break existing code.
+
+What this leaves, besides the list under "What the finished pass still
+needs":
+
+- An argument passed to an ordinary parameter still ends the local's
+  uniqueness (phase 1), so `let n = count rows` before `fill rows 0`
+  rejects the second call. The borrowed rules fix this, and they are what
+  makes `own` pleasant to use.
+- The results of ordinary functions are not unique.
+- A result of an `own` function may not hold a closure, a view or an
+  element read out of the parameter (`return rows[0]` when the element
+  holds an array). Tuples have no per-part facts, so `return (world, n)`
+  is rejected too.
+- `own` on lambdas, contract members and implementation members, which
+  `State.modify` needs, waits for `own` in function types.
+- The spec's `world.damage 3` needs namespace functions on values (spec
+  section 6.4), which is a separate piece of work; today the call is
+  `damage world 3`.
+- The Pen fixture `owned_storage.blot` still copies; it can take
+  `own owner` now.
 
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 
