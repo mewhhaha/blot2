@@ -12,11 +12,16 @@ later; their record is this compiler's, read through by hand. The pass runs afte
 lowering, so `build` reaches it whether or not a backend follows. A run that
 ends without a compilation record (a crash) fails.
 
+Each program is also built with BLOT_BORROWED_RULES set, against
+expected-rules.json: the rules of tasks/MEMORY_MODEL.md that are not the
+default yet. The programs named g are about those.
+
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """
 import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -24,11 +29,18 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 LAWS = ROOT / "tests/uniqueness"
 EXPECTED = LAWS / "expected.json"
+EXPECTED_RULES = LAWS / "expected-rules.json"
+# (label, environment switch, record)
+MODES = [("", False, EXPECTED), (" under the rules", True, EXPECTED_RULES)]
 
 
-def diagnostics(compiler, source, output):
+def diagnostics(compiler, source, output, rules=False):
+    environment = dict(os.environ)
+    environment.pop("BLOT_BORROWED_RULES", None)
+    if rules:
+        environment["BLOT_BORROWED_RULES"] = "1"
     result = subprocess.run([str(compiler), "build", str(source), str(output)], capture_output=True, text=True,
-                            stdin=subprocess.DEVNULL, timeout=120)
+                            stdin=subprocess.DEVNULL, timeout=120, env=environment)
     frontend, lowering = [], []
     if '"kind":"compilation"' not in result.stdout:
         raise SystemExit(f"{compiler} ended without a compilation record for {source.name}: {result.stderr.strip()[:300]}")
@@ -51,40 +63,43 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*")
     parser.add_argument("--compiler", type=Path, default=ROOT / "build/blotc-goose")
-    parser.add_argument("--record", type=Path, help="write expected.json from this compiler")
+    parser.add_argument("--record", type=Path, help="write expected.json and expected-rules.json from this compiler")
     args = parser.parse_args()
     every = sorted(path.stem for path in LAWS.glob("*.blot"))
+    failed = False
     with tempfile.TemporaryDirectory(prefix="blot-uniqueness-") as scratch:
-        if args.record:
-            record = {}
-            for name in every:
-                frontend, lowering = diagnostics(args.record, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm")
+        for label, rules, path in MODES:
+            if args.record:
+                record = {}
+                for name in every:
+                    frontend, lowering = diagnostics(args.record, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm", rules)
+                    if frontend:
+                        raise SystemExit(f"{name}{label}: frontend diagnostics {[item[0] for item in frontend]}")
+                    record[name] = lowering
+                path.write_text(json.dumps(record, indent=1, sort_keys=True) + "\n")
+                print(f"recorded {len(record)} programs{label}")
+                continue
+            expected = json.loads(path.read_text())
+            names = args.names or every
+            wrong = rejected = accepted = 0
+            for name in names:
+                frontend, lowering = diagnostics(args.compiler, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm", rules)
+                problems = []
+                if name not in expected:
+                    problems.append("no record")
                 if frontend:
-                    raise SystemExit(f"{name}: frontend diagnostics {[item[0] for item in frontend]}")
-                record[name] = lowering
-            EXPECTED.write_text(json.dumps(record, indent=1, sort_keys=True) + "\n")
-            print(f"recorded {len(record)} programs")
-            return
-        expected = json.loads(EXPECTED.read_text())
-        names = args.names or every
-        failed = rejected = accepted = 0
-        for name in names:
-            frontend, lowering = diagnostics(args.compiler, LAWS / f"{name}.blot", Path(scratch) / f"{name}.wasm")
-            problems = []
-            if name not in expected:
-                problems.append("no record")
-            if frontend:
-                problems.append(f"frontend diagnostics {[item[0] for item in frontend]}")
-            if lowering != expected.get(name):
-                problems.append(f"got {[item[:3] for item in lowering]}, recorded {[item[:3] for item in expected.get(name, [])]}")
-            if problems:
-                failed += 1
-                print(f"{name}: {'; '.join(problems)}")
-            elif lowering:
-                rejected += 1
-            else:
-                accepted += 1
-    print(f"uniqueness: {rejected + accepted} of {len(names)} programs match the record ({rejected} with rejections, {accepted} accepted)")
+                    problems.append(f"frontend diagnostics {[item[0] for item in frontend]}")
+                if lowering != expected.get(name):
+                    problems.append(f"got {[item[:3] for item in lowering]}, recorded {[item[:3] for item in expected.get(name, [])]}")
+                if problems:
+                    wrong += 1
+                    print(f"{name}{label}: {'; '.join(problems)}")
+                elif lowering:
+                    rejected += 1
+                else:
+                    accepted += 1
+            print(f"uniqueness{label}: {rejected + accepted} of {len(names)} programs match the record ({rejected} with rejections, {accepted} accepted)")
+            failed = failed or wrong != 0
     if failed:
         raise SystemExit(1)
 

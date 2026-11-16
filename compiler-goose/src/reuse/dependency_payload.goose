@@ -3907,6 +3907,9 @@ return blot_check_core::Code.own_function_value,blot_error::Error.none;},
 result_not_owned=>{
 return blot_check_core::Code.result_not_owned,blot_error::Error.none;},
 
+lent_result_value=>{
+return blot_check_core::Code.lent_result_value,blot_error::Error.none;},
+
 }
 
 }
@@ -7516,6 +7519,9 @@ own_function_value=>{
 },
 
 result_not_owned=>{
+},
+
+lent_result_value=>{
 },
 
 }

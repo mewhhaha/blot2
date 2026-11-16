@@ -83,19 +83,19 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   "`own` parameters"). Nothing is migrated.
   - **Next:** the same rules for every function. They are in the pass
     behind the environment variable `BLOT_BORROWED_RULES`, for measuring
-    only: with it the guest suite has 33 failing cases in 16 files, std
-    has 4 sites to change and the Gdev build has 97 (tasks/MEMORY_MODEL.md,
-    "Plan for the rest of phase 2" and "The plan, measured"). Still to do
-    before it can be the default: the generic-read check (`identity rows`),
-    reading the 97 Gdev sites for the ones that are the pass's imprecision,
-    measuring Ink's tests, changing std, the tests, Ink and Gdev, then
-    deleting the switch.
+    only: with it the guest suite has 36 failing cases in 18 files, std
+    has 4 sites to change and the Gdev build has 101
+    (tasks/MEMORY_MODEL.md, "Plan for the rest of phase 2" and "The plan,
+    measured"). Still to do before it can be the default: reading the 101
+    Gdev sites for the ones that are the pass's imprecision, measuring
+    Ink's tests, changing std, the tests, Ink and Gdev, then deleting the
+    switch and bringing spec section 10.3 in line.
     After that: a temporary holder giving ownership back, `own` in
     function types, and phase 3 (move std, Ink and Gdev off `=`, delete
     `=`).
-  - **For the owner:** the plan treats a generic-read call (`grid.at 0`
-    on an array of arrays) as sharing, not as the error the approved text
-    names. Say if it should be the error.
+  - Decided by the owner on 16 November 2026 ("Do your plan."): a generic
+    call that returns what it was lent (`grid.at 0` on an array of arrays)
+    shares, as `grid[0]` does; it is not an error.
   - An older, unfinished pass with the broad rules is on branch
     `wip/memory-phase2-own` (0afccb55), written in Zig. Its measurements
     are what the rules were chosen from:

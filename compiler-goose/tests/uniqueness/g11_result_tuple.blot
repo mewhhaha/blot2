@@ -1,0 +1,15 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Opt is data = $Has (Array U32) | $Missing
+type Point is data = $Point { x: U32, y: U32 }
+const keep = func (values: Array U32) => return values[0]
+const first_of = func (rows: Array a) => return rows[0]
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const apply_to = func (f: Array (Array U32) -> Array U32) -> (grid: Array (Array U32)) => return f grid
+const pair = func (n: U32) => return do:
+  let left = #[n]
+  let right = #[n, n]
+  break (left, right)
+const run = func (n: U32) => return do:
+  let (left, right) = pair n
+  break @u32.add left[0] right[1]

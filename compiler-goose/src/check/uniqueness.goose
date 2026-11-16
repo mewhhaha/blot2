@@ -151,6 +151,15 @@ root struct Analyzer {
     // arguments, and a type variable holds no array.
     rules: bool = false,
     owns_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
+    // Under the rules: each binding by unit and number; whether it is a
+    // generic function that returns what it was lent (0 unknown, 1 no,
+    // 2 yes) and how many arguments its type takes; and each member of a
+    // type by the type and the member's name.
+    binding_index: dictionary<u64, u32> = dictionary<u64, u32> {},
+    reader_state: u8[>..] = [],
+    reader_arity: u8[>..] = [],
+    identity_ids: dictionary<u64, u32> = dictionary<u64, u32> {},
+    members: dictionary<u64, u32> = dictionary<u64, u32> {},
     lends_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
     // The root of the function being checked when its result must be owned.
     owned_result: u32 = 0,
@@ -172,6 +181,24 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.rules = blot_native::environment_size(name[0]) >= 0;
     }
     if module.updates.len == 0 && analyzer.takers.count == 0 && !analyzer.rules { return; }
+    if analyzer.rules {
+        for binding, index in module.bindings {
+            analyzer.reader_state.push(0);
+            analyzer.reader_arity.push(0);
+            if index != 0 { analyzer.binding_index.insert(((binding.target.unit as u64) << 32) | binding.target.binding, index as! u32); }
+        }
+        for method in module.associated {
+            if method.member == 0 { continue; }
+            let found .= analyzer.binding_index.get(((method.target.unit as u64) << 32) | method.target.binding);
+            if !found { continue; }
+            let index: u32 = found;
+            let key = ((method.identity.unit as u64) << 32) | method.identity.decl;
+            var identity_id = analyzer.identity_ids.count as u32 + 1;
+            let known .= analyzer.identity_ids.get(key);
+            if known { let existing: u32 = known; identity_id = existing; } else { analyzer.identity_ids.insert(key, identity_id); }
+            analyzer.members.insert(((identity_id as u64) << 32) | method.member, index);
+        }
+    }
     if analyzer.takers.count != 0 {
         for method in module.associated {
             let found .= analyzer.takers.get(((method.target.unit as u64) << 32) | method.target.binding);
@@ -670,6 +697,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // A function that takes over a parameter is only ever called in
         // full, which `apply` and `call` see before this.
         if taker(self_, m, id) != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); return Value { .. }; }
+        lentValue(self_, m, id);
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
         if !local(self_, target.binding) { return Value { .. }; }
         read(self_, target.binding, id);
@@ -766,6 +794,20 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if elementHolds(self_, m, n.ty) { escape(self_, value); }
             return Value { fact: copied, exits: value.exits, .. };
         }
+        if self_.rules && m.dispatchSignature(id) != 0 {
+            let member = calleeBinding(self_, m, id);
+            let lent = member != 0 && lentHere(self_, m, member, calleeType(m, id));
+            if member != 0 && self_.reader_arity[member] <= 1 {
+                // `value.member` with no further argument is the whole call.
+                let value = visit(self_, m, n.a);
+                if lent && owns(self_, m, n.ty) { return Value { origin: value.origin, exits: value.exits, .. }; }
+                if lends(self_, m, n.ty) { escape(self_, value); }
+                var fact: Fact = none;
+                if owns(self_, m, n.ty) { fact = deep; }
+                return Value { fact: fact, exits: value.exits, .. };
+            }
+            lentValue(self_, m, id);
+        }
         let value = visit(self_, m, n.a);
         if !holds(self_, m, n.ty) { return Value { exits: value.exits, .. }; }
         return Value { origin: value.origin, exits: value.exits, .. };
@@ -847,11 +889,53 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // A call only borrows its arguments, and the arrays its result
         // owns are the caller's alone. A part of the result that borrows
         // (a view, a function) may hold the arguments, so then they are
-        // shared from here on. An effect operation's handler may keep its
-        // argument and resume with a value it still holds.
+        // shared from here on.
         var head = id;
-        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; }
-        if m.node(head).tag != blot_check_core::Tag.operation_value {
+        var count: i64 = 0;
+        while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; count += 1; }
+        var binding: u32 = 0;
+        var used_at: u32 = 0;
+        if tag == blot_check_core::Tag.call {
+            let target = m.call(id).target;
+            let found .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+            if found { let index: u32 = found; binding = index; }
+            count = m.call(id).arguments.len;
+            used_at = m.call(id).callee_type;
+        } else {
+            binding = calleeBinding(self_, m, head);
+            if binding != 0 && m.node(head).tag == blot_check_core::Tag.project { count += 1; }
+            used_at = calleeType(m, head);
+        }
+        // A generic function that returns what it was lent, called in
+        // full where that holds an array: the result shares the arguments,
+        // as `grid[0]` shares `grid`.
+        if binding != 0 && reader(self_, m, binding) && count >= self_.reader_arity[binding] as i64 && owns(self_, m, n.ty) && lentHere(self_, m, binding, used_at) {
+            var shared = Value { .. };
+            if tag == blot_check_core::Tag.call {
+                for child in m.call(id).arguments { let value = visit(self_, m, child); sharedWith(self_, shared, value); }
+            } else {
+                // The applications run outermost first here; which argument
+                // the result is taken to alias does not matter.
+                var cursor = id;
+                while m.node(cursor).tag == blot_check_core::Tag.apply {
+                    let value = visit(self_, m, m.node(cursor).b);
+                    sharedWith(self_, shared, value);
+                    cursor = m.node(cursor).a;
+                }
+                if m.node(head).tag == blot_check_core::Tag.project { let value = visit(self_, m, m.node(head).a); sharedWith(self_, shared, value); }
+            }
+            return shared;
+        }
+        // Whether the callee is a function value whose result is the
+        // caller's: a named function, a closure, a function a call or a
+        // field gave, a member this module can name. A constructor keeps
+        // its argument, an effect operation's handler may keep it and
+        // resume with a value it still holds, and a member reached through
+        // a contract may be generic.
+        let head_tag = m.node(head).tag;
+        var known = tag == blot_check_core::Tag.call || head_tag == blot_check_core::Tag.reference || head_tag == blot_check_core::Tag.closure || head_tag == blot_check_core::Tag.call || head_tag == blot_check_core::Tag.if_value || head_tag == blot_check_core::Tag.match_ || head_tag == blot_check_core::Tag.block_;
+        if head_tag == blot_check_core::Tag.project { known = binding != 0 || m.dispatchSignature(head) == 0; }
+        if known {
             let holder = lends(self_, m, n.ty);
             var exits = false;
             if tag == blot_check_core::Tag.call {
@@ -889,32 +973,196 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     return Value { exits: exits, .. };
 }
 
+// The identity the backend's dispatch gives a receiver of type `ty`.
+fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdentity, bool {
+    var identity = blot_check_types::NominalIdentity { unit: 0, decl: ty };
+    if ty == 0 || ty >= m.types.nodes.len { return identity, false; }
+    let shape = m.types.node(ty);
+    if shape.tag == blot_check_types::Tag.nominal {
+        identity = blot_check_types::NominalIdentity { unit: shape.a, decl: shape.b };
+    } else if shape.tag == blot_check_types::Tag.array {
+        identity.decl = 0xffffffff;
+    } else if shape.tag == blot_check_types::Tag.unsigned32 {
+        identity.decl = blot_check_types::u32_type;
+    } else if shape.tag == blot_check_types::Tag.floating32 {
+        identity.decl = blot_check_types::f32_type;
+    } else if shape.tag == blot_check_types::Tag.boolean {
+        identity.decl = blot_check_types::boolean;
+    } else if shape.tag == blot_check_types::Tag.unit {
+        identity.decl = blot_check_types::unit;
+    } else {
+        return identity, false;
+    }
+    return identity, true;
+}
+// The binding a reference names, or the member `value.member` selects; 0
+// when this module's tables do not say.
+fn calleeBinding(self_: const Analyzer&, m: const Module&, node: u32) -> u32 {
+    let n = m.node(node);
+    if n.tag == blot_check_core::Tag.reference {
+        let target = m.reference(node);
+        let found .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+        if !found { return 0; }
+        let index: u32 = found;
+        return index;
+    }
+    if n.tag != blot_check_core::Tag.project || m.dispatchSignature(node) == 0 { return 0; }
+    let identity, known = receiverIdentity(m, m.typeOf(n.a));
+    if !known { return 0; }
+    let id .= self_.identity_ids.get(((identity.unit as u64) << 32) | identity.decl);
+    if !id { return 0; }
+    let identity_id: u32 = id;
+    let found .= self_.members.get(((identity_id as u64) << 32) | m.projection(n.b).field);
+    if !found { return 0; }
+    let index: u32 = found;
+    return index;
+}
+// Whether `variable` occurs in `ty`; with `data`, not counting what is
+// under a function type. A shape this cannot read counts as holding it.
+recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth: i64) -> bool {
+    if ty == variable { return true; }
+    if ty == 0 || ty >= m.types.nodes.len { return false; }
+    if depth > 64 { return true; }
+    let n = m.types.node(ty);
+    if n.tag == blot_check_types::Tag.absent || n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
+    if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
+    if n.tag == blot_check_types::Tag.function {
+        if data { return false; }
+        return occurs(m, variable, n.a, data, depth + 1) || occurs(m, variable, n.b, data, depth + 1);
+    }
+    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occurs(m, variable, n.a, data, depth + 1); }
+    if n.tag == blot_check_types::Tag.product {
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occurs(m, variable, item, data, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.record {
+        for index in 0..n.b { if occurs(m, variable, m.types.recordField(n, index).ty, data, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.nominal {
+        for argument in m.types.nominalArguments(n) { if occurs(m, variable, argument, data, depth + 1) { return true; } }
+        return false;
+    }
+    return true;
+}
+// Whether `binding` is a generic function that may return what it was lent:
+// a type variable of its scheme occurs in its result and, as data, in a
+// parameter it does not take over. Also sets how many arguments its type
+// takes. Inside its body the variable is plain data, so nothing there
+// stops it returning the parameter; each call decides (rule 2).
+fn reader(self_: Analyzer&, m: const Module&, binding: u32) -> bool {
+    if binding == 0 || binding >= self_.reader_state.len { return false; }
+    if self_.reader_state[binding] != 0 { return self_.reader_state[binding] == 2; }
+    self_.reader_state[binding] = 1;
+    let scheme = m.bindings[binding].scheme;
+    if scheme.root == 0 || scheme.root >= m.types.nodes.len { return false; }
+    let own = m.bindings[binding].capability_parameters.own;
+    var result = scheme.root;
+    var arity: u32 = 0;
+    while arity < 255 && m.types.node(result).tag == blot_check_types::Tag.function { result = m.types.node(result).b; arity += 1; }
+    self_.reader_arity[binding] = arity as! u8;
+    let variables = m.types.list(scheme.variables);
+    var found = false;
+    for variable in variables {
+        if !occurs(m, variable, result, false, 0) { continue; }
+        var parameter = scheme.root;
+        for position in 0..(arity as i64) {
+            let taken_over = position < 32 && (own >> (position as! u32)) & 1 != 0;
+            if !taken_over && occurs(m, variable, m.types.node(parameter).a, true, 0) { found = true; }
+            parameter = m.types.node(parameter).b;
+        }
+    }
+    if found { self_.reader_state[binding] = 2; }
+    return found;
+}
+// Adds `argument` to what the result `shared` of a call may alias. A value
+// names one version, so the first argument that is one stands for the
+// result and every other one is shared outright.
+fn sharedWith(self_: Analyzer&, shared: Value&, argument: Value) {
+    shared.exits = shared.exits || argument.exits;
+    if shared.origin == 0 && argument.origin != 0 { shared.origin = argument.origin; return; }
+    escape(self_, argument);
+}
+// Whether `actual`, an instance of the scheme type `pattern`, gives
+// `variable` a type that owns an array. Where the two cannot be matched it
+// may.
+recursive fn instanceOwns(self_: Analyzer&, m: const Module&, pattern: u32, actual: u32, variable: u32, depth: i64) -> bool {
+    if pattern == variable { return owns(self_, m, actual); }
+    if !occurs(m, variable, pattern, false, 0) { return false; }
+    if depth > 64 || actual == 0 || actual >= m.types.nodes.len || pattern >= m.types.nodes.len { return true; }
+    let p = m.types.node(pattern);
+    let a = m.types.node(actual);
+    if p.tag != a.tag { return true; }
+    if p.tag == blot_check_types::Tag.function { return instanceOwns(self_, m, p.a, a.a, variable, depth + 1) || instanceOwns(self_, m, p.b, a.b, variable, depth + 1); }
+    if p.tag == blot_check_types::Tag.array || p.tag == blot_check_types::Tag.list || p.tag == blot_check_types::Tag.cursor { return instanceOwns(self_, m, p.a, a.a, variable, depth + 1); }
+    if p.tag == blot_check_types::Tag.product {
+        if p.b != a.b { return true; }
+        let left = m.types.list(blot_check_types::List { start: p.a, len: p.b });
+        let right = m.types.list(blot_check_types::List { start: a.a, len: a.b });
+        for item, at in left { if instanceOwns(self_, m, item, right[at], variable, depth + 1) { return true; } }
+        return false;
+    }
+    if p.tag == blot_check_types::Tag.record {
+        if p.b != a.b { return true; }
+        for index in 0..p.b { if instanceOwns(self_, m, m.types.recordField(p, index).ty, m.types.recordField(a, index).ty, variable, depth + 1) { return true; } }
+        return false;
+    }
+    if p.tag == blot_check_types::Tag.nominal {
+        let left = m.types.nominalArguments(p);
+        let right = m.types.nominalArguments(a);
+        if p.a != a.a || p.b != a.b || left.len != right.len { return true; }
+        for item, at in left { if instanceOwns(self_, m, item, right[at], variable, depth + 1) { return true; } }
+        return false;
+    }
+    return true;
+}
+// Whether this use of the generic function `binding`, at the function type
+// `actual`, may get back an array it lent: one of the type variables that
+// make it a reader stands for a type that owns an array here.
+fn lentHere(self_: Analyzer&, m: const Module&, binding: u32, actual: u32) -> bool {
+    if !reader(self_, m, binding) { return false; }
+    let scheme = m.bindings[binding].scheme;
+    let own = m.bindings[binding].capability_parameters.own;
+    let arity = self_.reader_arity[binding] as i64;
+    var result = scheme.root;
+    for position in 0..arity { result = m.types.node(result).b; }
+    for variable in m.types.list(scheme.variables) {
+        if !occurs(m, variable, result, false, 0) { continue; }
+        var lent = false;
+        var parameter = scheme.root;
+        for position in 0..arity {
+            let taken_over = position < 32 && (own >> (position as! u32)) & 1 != 0;
+            if !taken_over && occurs(m, variable, m.types.node(parameter).a, true, 0) { lent = true; }
+            parameter = m.types.node(parameter).b;
+        }
+        if lent && instanceOwns(self_, m, scheme.root, actual, variable, 0) { return true; }
+    }
+    return false;
+}
+// The function type a callee is used at: a reference's own type, or for
+// `value.member` the member's type with the value as its first parameter.
+fn calleeType(m: const Module&, node: u32) -> u32 {
+    if m.node(node).tag == blot_check_core::Tag.project { return m.dispatchSignature(node); }
+    return m.typeOf(node);
+}
+// A reference to, or a member projection of, a generic function that
+// returns what it was lent, where that holds an array and the function is
+// not being called in full: its value would be a function whose result is
+// not the caller's alone.
+fn lentValue(self_: Analyzer&, m: const Module&, node: u32) {
+    if !self_.rules { return; }
+    let binding = calleeBinding(self_, m, node);
+    if binding == 0 { return; }
+    if lentHere(self_, m, binding, calleeType(m, node)) { reject(self_, m, node, blot_check_core::Code.lent_result_value); }
+}
 // The own mask and argument count of the function `node` names, or 0.
 fn taker(self_: const Analyzer&, m: const Module&, node: u32) -> u64 {
     if self_.takers.count == 0 { return 0; }
     if m.node(node).tag == blot_check_core::Tag.project {
         // `value.member`: the member is a function of the value's type.
-        // The identities are the ones the backend's dispatch uses.
         let field = m.projection(m.node(node).b).field;
-        let receiver = m.typeOf(m.node(node).a);
-        if receiver == 0 || receiver >= m.types.nodes.len { return 0; }
-        let shape = m.types.node(receiver);
-        var identity = blot_check_types::NominalIdentity { unit: 0, decl: receiver };
-        if shape.tag == blot_check_types::Tag.nominal {
-            identity = blot_check_types::NominalIdentity { unit: shape.a, decl: shape.b };
-        } else if shape.tag == blot_check_types::Tag.array {
-            identity.decl = 0xffffffff;
-        } else if shape.tag == blot_check_types::Tag.unsigned32 {
-            identity.decl = blot_check_types::u32_type;
-        } else if shape.tag == blot_check_types::Tag.floating32 {
-            identity.decl = blot_check_types::f32_type;
-        } else if shape.tag == blot_check_types::Tag.boolean {
-            identity.decl = blot_check_types::boolean;
-        } else if shape.tag == blot_check_types::Tag.unit {
-            identity.decl = blot_check_types::unit;
-        } else {
-            return 0;
-        }
+        let identity, known = receiverIdentity(m, m.typeOf(m.node(node).a));
+        if !known { return 0; }
         for method in self_.member_takers {
             if method.member == field && method.identity.unit == identity.unit && method.identity.decl == identity.decl { return method.taking; }
         }

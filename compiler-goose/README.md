@@ -79,11 +79,13 @@ Two of them read a model that is edited by hand:
     programs of `tests/fixtures/` and requires the recorded exit code, Wasm
     and records.
   - `python3 compiler-goose/tools/test_uniqueness.py` requires the recorded
-    lowering diagnostics for the 113 programs of `tests/uniqueness/`. The
-    40 named `e…` and `f…` are about `own` parameters and moves at a
-    local's last read, which Zig never had; their record is this
-    compiler's, read through by hand. Three of Zig's 73 (`b41`, `c05`,
-    `c10`) are accepted now, because the value they alias moves.
+    lowering diagnostics for the 129 programs of `tests/uniqueness/`. The
+    56 named `e…`, `f…` and `g…` are about `own` parameters, moves at a
+    local's last read and the rules for every function, which Zig never
+    had; their record is this compiler's, read through by hand. Three of
+    Zig's 73 (`b41`, `c05`, `c10`) are accepted now, because the value
+    they alias moves. Each program is also built with
+    `BLOT_BORROWED_RULES` set, against `expected-rules.json`.
   - `python3 compiler-goose/tools/test_direct.py` runs each law of
     `tests/direct/` and requires the recorded bytes.
 

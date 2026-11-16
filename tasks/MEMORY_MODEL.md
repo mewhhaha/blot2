@@ -23,6 +23,11 @@ On 16 November 2026 the owner approved ("Yes. Do all of that."):
 - no ownership passed at run time to a borrowed parameter;
 - building starts with `own` on the parameters of named functions.
 
+Later on 16 November 2026, asked whether a generic call that returns what
+it was lent (`grid.at 0` on an array of arrays) should be the error of the
+approved text or should share like `grid[0]`, the owner chose sharing: "Do
+your plan."
+
 This replaces the earlier plan for a store statement, `Cell` and `is root`.
 App code spells intrinsics as round 2, item 2 approved (`values.copy`,
 `panic`); std may keep `@name` forms.
@@ -374,19 +379,25 @@ within the approved rules; the one deviation is marked.
    when a type variable occurs in the callee's result and, as data, in a
    borrowed parameter, and the call gives that variable a type that owns an
    array (`identity rows`, `grid.at 0`).
-   - **Deviation to confirm with the owner:** the approved text makes such
-     a call an error. The plan treats it as phase 1 treats `grid[0]`: the
-     result shares the arguments, so neither is unique afterwards, and
-     returning it needs `values.copy`. That is sound and rejects less.
+   - **Decided by the owner (16 November 2026, "Do your plan."):** such a
+     call is not the error of the approved text. It is treated as phase 1
+     treats `grid[0]`: the result shares the arguments, so neither is
+     unique afterwards, and returning it needs `values.copy`. That is
+     sound and rejects less. Spec section 10.3 still has the error; it
+     changes when the rules become the default.
    - It must stay an error where the callee is not known at the call: a
      reference to a generic-read function, used as a value at a type that
      owns an array (`rows.map identity` on an array of arrays). Otherwise
      a function value of type `Array U32 -> Array U32` could return its
      argument and rule 3 would be unsound for `apply`.
-   - Finding it: for a direct call the Core builder has the callee's
-     scheme and can set a bit in `CallInfo`. For a dispatched member
-     `Module.dispatchSignature` may give the member's generic type; this
-     is not yet read through.
+   - Built (`reader`, `lentHere` in uniqueness.goose): the pass reads the
+     callee's scheme from the module's Core bindings, which hold imported
+     functions too, and matches it against the function type at the call
+     to see what each type variable stands for there. A member reached as
+     `value.member` is found by the receiver's type and the member's name.
+     A call whose callee the pass cannot name (a contract member through a
+     dictionary, a constructor used as a function, an effect operation)
+     keeps phase 1's behaviour.
 5. **Effects.** The result of an effect operation is not owned: a state's
    `get` returns what the state still holds. It stays shared until
    `modify` exists (rule 5).
@@ -401,10 +412,10 @@ within the approved rules; the one deviation is marked.
 
 ### The plan, measured (16 November 2026)
 
-Items 1 to 3 and 5 of the plan are in the pass behind the environment
-variable `BLOT_BORROWED_RULES` (any value turns them on; without it nothing
-changes). Item 4's generic-read check is **not** built, so the switch is
-for measuring only: with it, `identity rows` wrongly gives a unique result.
+Items 1 to 5 of the plan are in the pass behind the environment variable
+`BLOT_BORROWED_RULES` (any value turns them on; without it nothing
+changes). compiler-goose/tests/uniqueness/expected-rules.json records what
+the 129 reference programs give with it; the programs `g…` are about it.
 
 With the switch on:
 
@@ -414,6 +425,11 @@ With the switch on:
   borrows its arguments, and its result is `deep`; an effect operation is
   excepted;
 - a type variable holds no array;
+- a full call of a generic function that may return what it was lent,
+  where the type variable stands for a type that owns an array, shares:
+  its result aliases its arguments. Using such a function as a value or
+  applying it partly at such a type is `lent_result_value`, because a
+  function value's result is taken to be the caller's alone;
 - a constructor keeps its payload's fact, a tuple is `deep` when its parts
   are, and `@storage.freeze` of a local at its last read moves it, as does
   a pushed value;
@@ -424,11 +440,11 @@ With the switch on:
 
 | With the switch on | |
 | --- | ---: |
-| Guest and host cases failing (of 1,163) | 33, in 16 files |
-| Diagnostics in those runs | all `result_not_owned` |
+| Guest and host cases failing (of 1,163) | 36, in 18 files |
+| Diagnostics in those runs | `result_not_owned`, and `lent_result_value` in 2 files |
 | Distinct sites in std | 4 |
 | The older pass's narrowed rules, for comparison | 75 cases in 39 files |
-| Gdev Main build: rejected returns | 97 (66 in gdev/src, 29 in ink/lib, 2 in std) |
+| Gdev Main build: rejected returns | 101 (69 in gdev/src, 30 in ink/lib, 2 in std) |
 | The older pass's narrowed rules, for comparison | 44 |
 
 The std sites: `list.splice` and `list.splice_many` return the list they
@@ -439,7 +455,8 @@ other 48 diagnostics are in the test programs themselves.
 Gdev is measured with
 `BLOT_BORROWED_RULES=1 blotc migrate-stores src/main.blot --project pen.json --dry-run --inference-budget 20000000`
 in ../gdev; the dry run now reports every diagnostic it cannot rewrite, in
-every module, instead of stopping at the first. Of the 97 returns:
+every module, instead of stopping at the first. The kinds below were
+counted at 97, before the generic check added 4:
 
 - 27 return a parameter or a field of one (`return index`,
   `return index.bounds`): `own`, or a copy;

@@ -1,0 +1,861 @@
+{
+ "a00_native_all": [
+  [
+   "aliased_update",
+   376,
+   388,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   531,
+   543,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   791,
+   803,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   823,
+   826,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ],
+  [
+   "aliased_update",
+   884,
+   896,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   916,
+   920,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ],
+  [
+   "aliased_update",
+   1641,
+   1653,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   1673,
+   1677,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ],
+  [
+   "aliased_update",
+   1795,
+   1810,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   1830,
+   1833,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ],
+  [
+   "aliased_update",
+   1919,
+   1934,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   1975,
+   1979,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ],
+  [
+   "aliased_update",
+   2121,
+   2141,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   2161,
+   2167,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b01_fresh": [],
+ "b02_named": [
+  [
+   "aliased_update",
+   342,
+   354,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b03_captured": [
+  [
+   "aliased_update",
+   364,
+   376,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b04_passed": [],
+ "b05_constructed": [
+  [
+   "aliased_update",
+   341,
+   353,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   362,
+   365,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b06_parameter": [
+  [
+   "aliased_update",
+   307,
+   319,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   328,
+   332,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b07_returned_early": [],
+ "b08_sibling": [],
+ "b09_looped": [],
+ "b10_looped_alias": [],
+ "b11_iterated": [
+  [
+   "aliased_update",
+   395,
+   407,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   416,
+   420,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b12_element": [
+  [
+   "aliased_update",
+   369,
+   384,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   393,
+   396,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b13_shared_rows": [
+  [
+   "aliased_update",
+   333,
+   348,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   378,
+   382,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b14_record_root": [
+  [
+   "aliased_update",
+   389,
+   409,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "result_not_owned",
+   418,
+   424,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "b15_nominal_root": [],
+ "b16_copied": [],
+ "b17_record_literal_alias": [
+  [
+   "aliased_update",
+   348,
+   366,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b18_pattern_bound": [
+  [
+   "aliased_update",
+   333,
+   345,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b19_lambda_parameter": [
+  [
+   "aliased_update",
+   366,
+   380,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b20_intrinsics": [],
+ "b23_case_value": [
+  [
+   "aliased_update",
+   381,
+   393,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b24_case_value_fresh": [],
+ "b25_if_value": [
+  [
+   "aliased_update",
+   444,
+   457,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b26_record_replace_field": [],
+ "b27_nested_record": [
+  [
+   "aliased_update",
+   435,
+   459,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b28_loop_carry_fresh": [],
+ "b29_nested_loops_accepted": [],
+ "b30_nested_loops_alias": [],
+ "b31_forever_break": [],
+ "b32_closure_local": [
+  [
+   "aliased_update",
+   461,
+   474,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b33_array_of_records": [
+  [
+   "aliased_update",
+   401,
+   417,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b34_grow_push_shared": [
+  [
+   "aliased_update",
+   412,
+   427,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b35_grow_push_fresh": [],
+ "b36_append": [
+  [
+   "aliased_update",
+   447,
+   459,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b37_concat_slice": [],
+ "b38_get_element_alias": [
+  [
+   "aliased_update",
+   361,
+   376,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b39_loop_break_value": [
+  [
+   "aliased_update",
+   410,
+   422,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   425,
+   437,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b40_statement_if_join": [
+  [
+   "aliased_update",
+   383,
+   395,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b41_block_value": [],
+ "b43_deep_path": [
+  [
+   "aliased_update",
+   398,
+   416,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b44_many_fields": [
+  [
+   "aliased_update",
+   369,
+   384,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   387,
+   402,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   405,
+   420,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "b45_loop_join_inside": [
+  [
+   "aliased_update",
+   390,
+   402,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c01_case_arms_accepted": [],
+ "c02_case_arms_then_update": [],
+ "c03_global_alias": [
+  [
+   "aliased_update",
+   384,
+   396,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c04_continue": [
+  [
+   "aliased_update",
+   549,
+   561,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c05_construct_record": [],
+ "c06_three_arms": [
+  [
+   "aliased_update",
+   676,
+   688,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c07_iterate_rows": [
+  [
+   "aliased_update",
+   468,
+   483,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c08_range_bound_alias": [],
+ "c09_index_alias": [],
+ "c10_store_row_value": [],
+ "c11_self_path": [],
+ "c12_closure_return": [],
+ "c13_return_in_loop": [],
+ "c14_rebind_fresh": [],
+ "c15_storage_ops": [
+  [
+   "aliased_update",
+   665,
+   680,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c16_freeze": [
+  [
+   "aliased_update",
+   462,
+   476,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c17_resize": [
+  [
+   "aliased_update",
+   518,
+   532,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c18_nested_case_loop": [
+  [
+   "aliased_update",
+   476,
+   488,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c19_generate_capture": [
+  [
+   "aliased_update",
+   458,
+   470,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c20_fill_shared_scalar": [
+  [
+   "aliased_update",
+   434,
+   445,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c21_if_let": [
+  [
+   "aliased_update",
+   425,
+   438,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c22_tuple_alias": [
+  [
+   "aliased_update",
+   409,
+   421,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   459,
+   471,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c23_nested_record_alias": [
+  [
+   "aliased_update",
+   501,
+   525,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c24_loop_carry_record": [
+  [
+   "aliased_update",
+   449,
+   469,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   474,
+   493,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "c25_break_block_alias": [
+  [
+   "aliased_update",
+   469,
+   483,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   486,
+   498,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "d01_inner_backedge_alias": [
+  [
+   "aliased_update",
+   205,
+   217,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   243,
+   255,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "d02_three_levels": [
+  [
+   "aliased_update",
+   208,
+   220,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   246,
+   258,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   288,
+   300,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "d03_inner_fresh_outer_alias": [
+  [
+   "aliased_update",
+   265,
+   277,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   297,
+   309,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "d04_carry_swap": [
+  [
+   "aliased_update",
+   245,
+   254,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   259,
+   273,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   278,
+   291,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   317,
+   332,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "d05_forever_nested": [
+  [
+   "aliased_update",
+   266,
+   278,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   373,
+   385,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "e01_own_local": [],
+ "e02_own_fresh": [],
+ "e03_own_spent": [
+  [
+   "spent_value",
+   556,
+   560,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e04_own_aliased": [
+  [
+   "own_argument",
+   551,
+   555,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e05_own_borrowed": [
+  [
+   "own_argument",
+   513,
+   517,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e06_own_forwarded": [],
+ "e07_own_in_loop": [
+  [
+   "own_argument",
+   567,
+   571,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e08_own_loop_local": [],
+ "e09_own_one_arm": [
+  [
+   "spent_value",
+   621,
+   625,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e10_own_record": [],
+ "e11_own_record_shared": [
+  [
+   "own_argument",
+   586,
+   591,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e12_own_captured": [
+  [
+   "spent_value",
+   576,
+   580,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e13_own_twice": [
+  [
+   "spent_value",
+   558,
+   562,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e14_own_field": [
+  [
+   "own_argument",
+   565,
+   577,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "e15_own_scalar": [],
+ "e16_own_carried": [],
+ "e17_own_both_arms": [],
+ "e18_own_argument_reads": [
+  [
+   "spent_value",
+   543,
+   547,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "e19_own_returned": [],
+ "e20_own_rebound": [],
+ "e21_result_borrowed": [
+  [
+   "result_not_owned",
+   523,
+   528,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e22_result_aliased": [
+  [
+   "result_not_owned",
+   532,
+   560,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e23_result_early": [],
+ "e24_result_global": [
+  [
+   "result_not_owned",
+   527,
+   532,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "e25_result_record": [],
+ "e26_result_scalar": [],
+ "e27_result_element": [
+  [
+   "result_not_owned",
+   510,
+   517,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "f01_block_value_read_after": [
+  [
+   "aliased_update",
+   402,
+   414,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f02_construct_then_read": [
+  [
+   "aliased_update",
+   392,
+   412,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f03_store_row_then_read": [
+  [
+   "aliased_update",
+   368,
+   383,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f04_move_rename": [],
+ "f05_move_outer_in_loop": [
+  [
+   "aliased_update",
+   377,
+   392,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f06_move_then_captured": [
+  [
+   "aliased_update",
+   385,
+   400,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f07_move_before_return": [],
+ "f08_move_one_arm": [
+  [
+   "aliased_update",
+   386,
+   401,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f09_move_loop_local": [],
+ "f10_move_into_record_twice": [
+  [
+   "aliased_update",
+   360,
+   377,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f11_move_closure_local": [],
+ "f12_move_captured_inside": [
+  [
+   "aliased_update",
+   386,
+   401,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f13_move_carry_out": [
+  [
+   "aliased_update",
+   374,
+   386,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g01_lent_read": [],
+ "g02_lent_updated": [
+  [
+   "aliased_update",
+   619,
+   630,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g03_lent_then_owner_updated": [
+  [
+   "aliased_update",
+   619,
+   634,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g04_lent_copied": [],
+ "g05_lent_scalar": [],
+ "g06_lend_keeps_unique": [],
+ "g07_result_parameter": [
+  [
+   "result_not_owned",
+   564,
+   568,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "g08_result_field_of_parameter": [
+  [
+   "result_not_owned",
+   566,
+   578,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "g09_result_built": [],
+ "g10_result_shared_twice": [
+  [
+   "result_not_owned",
+   589,
+   616,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "g11_result_tuple": [],
+ "g12_result_constant": [
+  [
+   "result_not_owned",
+   582,
+   587,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "g13_lent_function_value": [
+  [
+   "lent_result_value",
+   612,
+   620,
+   "This generic function returns what it was lent, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
+  ]
+ ],
+ "g14_copying_function_value": [],
+ "g15_lambda_returns_parameter": [
+  [
+   "result_not_owned",
+   651,
+   655,
+   "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "g16_result_of_call": []
+}

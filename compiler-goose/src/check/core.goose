@@ -318,7 +318,7 @@ struct LoopInfo {
     carries: List = List {..},
     can_exit: bool = false
 }
-enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, spent_value, own_argument, own_function_value, result_not_owned }
+enum Code { unchecked, unsupported, unresolved_binding, invalid_call, complexity, aliased_update, spent_value, own_argument, own_function_value, result_not_owned, lent_result_value }
 struct Diagnostic {
     code: Code,
     span: Span
@@ -444,6 +444,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         spent_value => { return "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"; },
         own_argument => { return "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"; },
         result_not_owned => { return "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"; },
+        lent_result_value => { return "This generic function returns what it was lent, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"; },
         own_function_value => { return "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet"; },
     }
 }
@@ -967,6 +968,7 @@ fn codeCode(value: Code) -> u32 {
         own_argument => { return 7; },
         own_function_value => { return 8; },
         result_not_owned => { return 9; },
+        lent_result_value => { return 10; },
     }
 }
 fn codeFromCode(code: u32) -> Code, blot_error::Error {
@@ -981,6 +983,7 @@ fn codeFromCode(code: u32) -> Code, blot_error::Error {
         7 => { return Code.own_argument, blot_error::Error.none; },
         8 => { return Code.own_function_value, blot_error::Error.none; },
         9 => { return Code.result_not_owned, blot_error::Error.none; },
+        10 => { return Code.lent_result_value, blot_error::Error.none; },
         _ => { return Code.unchecked, blot_error::Error.core_limit; },
     }
 }

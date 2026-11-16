@@ -774,5 +774,89 @@
    386,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
+ ],
+ "g01_lent_read": [],
+ "g02_lent_updated": [
+  [
+   "aliased_update",
+   619,
+   630,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g03_lent_then_owner_updated": [
+  [
+   "aliased_update",
+   619,
+   634,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g04_lent_copied": [
+  [
+   "aliased_update",
+   649,
+   664,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g05_lent_scalar": [
+  [
+   "aliased_update",
+   609,
+   636,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g06_lend_keeps_unique": [
+  [
+   "aliased_update",
+   608,
+   620,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   623,
+   635,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g07_result_parameter": [],
+ "g08_result_field_of_parameter": [],
+ "g09_result_built": [
+  [
+   "aliased_update",
+   714,
+   734,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g10_result_shared_twice": [],
+ "g11_result_tuple": [],
+ "g12_result_constant": [],
+ "g13_lent_function_value": [],
+ "g14_copying_function_value": [
+  [
+   "aliased_update",
+   678,
+   689,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "aliased_update",
+   692,
+   707,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "g15_lambda_returns_parameter": [],
+ "g16_result_of_call": [
+  [
+   "aliased_update",
+   646,
+   658,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
  ]
 }
