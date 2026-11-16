@@ -447,20 +447,28 @@ of the salt simulation), Gdev's own tests as before (362, 27, 118).
 `FrameAccess` and what is made from it, and nothing can take that with
 `own` until the top of the program owns it. From the top:
 
-1. `world_storage.with_owners` makes every buffer as a local, so it owns
-   them, until it builds `hooks`: a closure that captures the whole record
-   to despawn, reset and stash on demand (23 uses). The hooks have to
-   become functions that are given the access.
+1. Done (gdev 6ca8ca6, ink d2628e6): `world_storage.with_owners` makes
+   every buffer as a local, so it owns them, until it built `hooks`: a
+   closure that captured the whole record to despawn, reset and stash on
+   demand. The hooks are one function that is given the access now.
 2. `with_owners` hands the record to a continuation, and Ink's
    `host.run` hands it on to `program.run`'s loop. Each has to take it
    with `own` and give it back (`own` in function types is there for
-   this).
+   this). An owned value can be rebound across the loop's suspension to
+   the host: tried on a small program, it is accepted. But it cannot be
+   done before step 3, because the first `bind_frame` shares the record
+   for good.
 3. Each frame `host.with_frame` makes the frame's buffers and
    `bind_frame` builds one `FrameAccess` out of them and the persistent
    record, field by field (170 fields), and nothing takes it apart again.
    Either the pass learns to move fields out of a record at its last use,
    or the frame's buffers live in the persistent record and are emptied
-   each frame.
+   each frame. The second is the one that fits the model: the world is
+   one value the loop owns, `FrameAccess` is that value, and `bind_frame`
+   and `host.with_frame` go. It changes Ink's host, Gdev's
+   `world_storage` and the test fixtures that bind their own frames, and
+   the frame's buffers are then reused instead of made fresh, so the
+   first frame has to be compared again.
 4. Then the 20 or so functions that hand out a part of the access as a
    record of its own (`simulation_access`, `read_state`, `read_surface`,
    Ink's `scene.access`, `spatial.access`, …) are replaced by passing the
