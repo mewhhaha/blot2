@@ -183,6 +183,7 @@ root struct Analyzer {
     exempt_root: u32 = 0,
     // The function a `return` being read leaves, or 0.
     leaving_root: u32 = 0,
+    lent_constant: bool = false,
     // Blocks whose value is the function's result: `return do: ...`.
     tails: u32[>..<] = []
 }
@@ -242,6 +243,8 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         let named = module.bindings[body.binding];
         let lent = body.is_function && named.kind == blot_reuse_principal_interface::Kind.global && !named.capability_parameters.owned_results && kind == 0;
         let to_host = (body.runtime || body.exported || lent) && own == 0;
+        // `lent const again = same` names a `lent` function: not a use of it as a value.
+        analyzer.lent_constant = !body.is_function && named.kind == blot_reuse_principal_interface::Kind.global && !named.capability_parameters.owned_results;
         if kind == 1 || to_host { analyzer.exempt_root = body.root; }
         if kind != 1 && !to_host && body.is_function { analyzer.owned_result = body.root; }
         analyzer.function_roots.push(body.root);
@@ -590,10 +593,15 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
         return false;
     }
     if n.tag != blot_check_types::Tag.nominal { return want == 1; }
-    // Until phase 3 a GrowArray and a ResizeArray are written through `=`
-    // by everything that holds them, as a reference is: they count as
-    // borrowing, with the views, references and links.
+    // A GrowArray and a ResizeArray own their storage as an array does. A
+    // view, a reference and a link borrow.
     if blot_check_storage_types::identity(n.a, n.b).present {
+        let kind = blot_check_storage_types::identity(n.a, n.b).value;
+        if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize {
+            if want == 0 { return true; }
+            for argument in m.types.nominalArguments(n) { if partsIn(self_, m, argument, want, variables, arguments, depth + 1) { return true; } }
+            return false;
+        }
         if want != 2 { return want == 1; }
         for argument in m.types.nominalArguments(n) { if partsIn(self_, m, argument, want, variables, arguments, depth + 1) { return true; } }
         return false;
@@ -755,7 +763,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let target = m.reference(id);
         // A function that takes over a parameter is only ever called in
         // full, which `apply` and `call` see before this.
-        if !self_.lent_arguments.contains(id) {
+        if !self_.lent_arguments.contains(id) && !self_.lent_constant {
             lentValue(self_, m, id);
             {
                 // An entry function may return what it shares, so it cannot
@@ -1870,10 +1878,10 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let container = visit(self_, m, children[0]);
             let value = visit(self_, m, children[1]);
             let pushed = taken(self_, m, children[1], value);
-            // Growable storage is still shared and written by every holder
-            // (until `=` goes). A module without stores may put into
-            // storage it does not own only a value it owns, or the caller
-            // would go on updating in place what the storage now holds.
+            // A push into storage the function was lent is a store like
+            // `=` (until that goes). It may put there only a value it
+            // owns, or the caller would go on updating in place what the
+            // storage now holds.
             if !keeping(self_) && !storageOwned(self_, m, children[0]) && (!ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) || lentHolder(self_, m, children[1])) { reject(self_, m, id, blot_check_core::Code.kept_value); }
             if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) { sharedInto(self_, m, children[0], []); }
             return Value { exits: container.exits || value.exits, .. };

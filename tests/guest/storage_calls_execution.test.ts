@@ -574,7 +574,7 @@ Deno.test("returned reader aliases remap owners variants and captured view bound
 type Pick is data = $First | $Second
 type Buffer is data = $Buffer {rows: ResizeArray U32, label: U32}
 type Pair is data = $Pair {first: Buffer, second: Buffer}
-const choose = func (pair: Pair) -> (pick: Pick): Buffer => return case pick of
+lent const choose = func (pair: Pair) -> (pick: Pick): Buffer => return case pick of
   $First => pair.first
   $Second => pair.second
 const window = func (rows: &[U32]) -> (start: U32) -> (end: U32) => return &rows[start..end]

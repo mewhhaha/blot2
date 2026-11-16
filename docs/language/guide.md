@@ -854,7 +854,8 @@ taken to be unique either:
 
 A result whose type owns no array is not checked: a number, a view, a
 function, a type variable. Growable storage (`GrowArray`, `ResizeArray`)
-counts as not owned while `=` exists, because every holder still writes it.
+is owned like an array: a function that returns one returns its own, and
+an `own` parameter of that type takes a growable array nothing else holds.
 
 **Generic functions that return what they were lent.** `Array.at`,
 `identity` and `Maybe.unwrap_or` return a value of a variable type that came
@@ -887,7 +888,8 @@ rules above still hold around it:
 - An array is not appended to in place unless the function owns it.
 
 **`lent` functions.** A function that still returns or keeps what it was
-lent is marked `lent`, before `func` or `const`:
+lent is marked `lent`, before `func` or `const`; so is a constant that
+only names one (`lent const refit = refit_dense`):
 
 ```blot
 lent func ground_of (world: World) => return world.ground
@@ -924,9 +926,9 @@ the result rule, closures included, wherever they are written. A
 constructor, a primitive or an effect operation keeps its argument, so it
 cannot stand for a function value where that owns an array
 (`lent_result_value`); write `func value => return $Some value.copy`. Where
-the result type has a part that borrows (a view, growable storage, a
-function), a call through a function value shares its arguments and its
-result is not unique.
+the result type has a part that borrows (a view, a reference, a function),
+a call through a function value shares its arguments and its result is
+not unique.
 
 ### `own` parameters
 

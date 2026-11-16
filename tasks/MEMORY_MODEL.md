@@ -348,11 +348,8 @@ Known gap, for as long as `lent` exists: a function that passes what it
 was lent on to a `lent` function is not itself marked, though the `lent`
 function may keep it.
 
-Not changed yet: `GrowArray` and `ResizeArray` still count as borrowing in
-a type, so a record of them is not checked as a result, and an `own`
-parameter of such a type accepts storage that is shared. That has to
-change before `=` goes, or `:=` through an `own` handle would be the same
-shared write under another name.
+`GrowArray` and `ResizeArray` are owned values since 16 November 2026
+(below). Until then they counted as borrowing in a type.
 
 What it took: 54 `lent` marks in Ink and Gdev (25 and 29), 8 in the
 guest tests and one fixture; three callbacks in Gdev that returned what
@@ -409,6 +406,28 @@ systems reach the world through callbacks and a continuation.
 
 Checked: 155 uniqueness programs (8 new, named `i`), the guest suite
 (1,065 pass), Ink and Gdev unchanged.
+
+**Growable arrays are owned values (16 November 2026).** `GrowArray` and
+`ResizeArray` counted as borrowing in a type, as a reference does: a
+record of them was not checked as a result, and an `own` parameter of such
+a type accepted storage that was shared, so `:=` through it would have
+been the same shared write as `=` under another name. Now they own their
+storage as an array does. A push into a growable array the function was
+lent stays what `=` is: a write through it, for as long as `=` exists.
+
+It was cheap. Gdev's main program needed 8 more `lent` functions in Ink
+(the spatial index and shape geometry, which hand back the buffers they
+were given), 5 in Gdev's devtools (the diagnostics HUD's fluent row
+builders), one guest test and three fixtures. Three places changed for
+real: the salt simulation reads `access.salt` instead of calling a
+`pools` accessor from its policy record; `spatial.build_into` builds its
+index outside the continuation it passes; and a constant that names a
+`lent` function is written `lent const`.
+
+That makes 66 `lent` functions (33 in Ink, 33 in Gdev) and 4,524 stores.
+Checked: the gate (1,065 pass, 101 ignored), Ink's suite as before, Gdev's
+first frame byte-identical (Wasm now 24013ca4…, 2,721,854 bytes, because
+of the salt simulation), Gdev's own tests as before (362, 27, 118).
 
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark

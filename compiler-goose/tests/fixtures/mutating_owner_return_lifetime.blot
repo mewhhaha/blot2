@@ -1,5 +1,5 @@
 type Row is data = $Row {values: &[U32]}
-const put = func (rows: ResizeArray Row) -> (values: &[U32]) => return do:
+lent const put = func (rows: ResizeArray Row) -> (values: &[U32]) => return do:
   @storage.push rows ($Row {values})
   return rows
 entry const answer = func (): U32 => return do:
