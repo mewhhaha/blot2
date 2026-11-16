@@ -13,9 +13,10 @@ lowering, so `build` reaches it whether or not a backend follows. A run that
 ends without a compilation record (a crash) fails.
 
 The programs named g are about the rules every function has: its result is
-the caller's alone, and a call only borrows its arguments. A program with a
-store `place = value` is a module in the old style, where only `own`
-functions are held to that.
+the caller's alone, and a call only borrows its arguments. The programs
+named h are about what stays while `=` exists: `lent` functions, what a
+store may keep, function values, and a closure that gives back what it
+captured after the call it was written for.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

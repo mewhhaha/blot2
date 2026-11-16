@@ -2136,17 +2136,18 @@ fn ownParameters(tree:const blot_parse_ast::Tree&,body:u32)->u32 {
 fn ownParameterHeaders(self_:Engine&)->blot_error::Error {
  var roots:dictionary<u32,bool> =dictionary<u32,bool>{};
  for id in self_.tree.roots.items {if self_.tree.node(id).tag==blot_parse_ast::tag_value_decl {roots.insert(id,true);}}
- // A module that still has a store `place = value` is in the old style:
- // its functions may keep what they are lent, so their results are not
- // taken to be the caller's alone. This goes when `=` does.
- var stores=false;
- for node in self_.tree.nodes.items {if node.tag==blot_parse_ast::tag_store_stmt {stores=true;break;}}
  var named:dictionary<u32,bool> =dictionary<u32,bool>{};
  for &binding in self_.bindings {
-  if binding.kind!=blot_reuse_principal_interface::Kind.global || !binding.named_function || !roots.contains(binding.declaration) {continue;}
+  if binding.kind!=blot_reuse_principal_interface::Kind.global {continue;}
+  if !roots.contains(binding.declaration) {binding.capability_parameters.owned_results=true;continue;}
   // An entry's result goes to the host, which copies it, so an entry may
   // return what it shares; a caller inside the program cannot rely on it.
-  binding.capability_parameters.owned_results=!stores && !self_.tree.value_decl(binding.declaration).runtime && !self_.tree.value_decl(binding.declaration).exported;
+  // A `lent` function is still in the old style: it may return or keep
+  // what it was lent, so a caller cannot rely on it either. The word goes
+  // when `=` does.
+  let lent=self_.tree.value_decl(binding.declaration).modifier!=0 && self_.pool.get(self_.tree.value_decl(binding.declaration).modifier)=="lent";
+  binding.capability_parameters.owned_results=!lent && !self_.tree.value_decl(binding.declaration).runtime && !self_.tree.value_decl(binding.declaration).exported;
+  if !binding.named_function {continue;}
   let body=self_.tree.value_decl(binding.declaration).body;
   binding.capability_parameters.own=ownParameters(self_.tree,body);
   var index:u32=0;var at=body;

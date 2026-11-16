@@ -851,7 +851,7 @@
    "lent_result_value",
    557,
    565,
-   "This generic function returns what it was lent, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
+   "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
   ]
  ],
  "g14_copying_function_value": [],
@@ -863,5 +863,86 @@
    "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
   ]
  ],
- "g16_result_of_call": []
+ "g16_result_of_call": [],
+ "h01_lent_returns_parameter": [],
+ "h02_lent_result_not_unique": [
+  [
+   "aliased_update",
+   349,
+   362,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "h03_lent_argument_shared": [
+  [
+   "aliased_update",
+   349,
+   361,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "h04_store_keeps_parameter": [
+  [
+   "kept_value",
+   285,
+   298,
+   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
+  ]
+ ],
+ "h05_store_keeps_owned": [],
+ "h06_store_through_lent_keeps_unique": [],
+ "h07_push_keeps_parameter": [
+  [
+   "kept_value",
+   282,
+   303,
+   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
+  ]
+ ],
+ "h08_function_value_result_owned": [],
+ "h09_function_value_lends": [],
+ "h10_constructor_value": [
+  [
+   "lent_result_value",
+   377,
+   381,
+   "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
+  ]
+ ],
+ "h11_lent_function_value": [
+  [
+   "lent_result_value",
+   315,
+   319,
+   "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"
+  ]
+ ],
+ "h12_lent_function_argument": [
+  [
+   "aliased_update",
+   407,
+   419,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "h13_closure_gives_back": [],
+ "h14_closure_kept_by_result": [
+  [
+   "aliased_update",
+   404,
+   416,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "h15_function_parameter_kept": [
+  [
+   "kept_value",
+   292,
+   320,
+   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
+  ]
+ ],
+ "h16_member_call_lends": [],
+ "h17_lent_generic_argument": [],
+ "h18_return_in_loop_moves": []
 }

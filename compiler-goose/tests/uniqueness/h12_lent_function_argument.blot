@@ -1,0 +1,10 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+lent const same = func (rows: Array U32) => return rows
+const apply_to = func f -> rows => return f rows
+const run = func (n: U32) => return do:
+  let rows = #[n, 2]
+  let again = apply_to same rows
+  rows[0] := 1
+  break again[0]

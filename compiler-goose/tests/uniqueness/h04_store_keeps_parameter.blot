@@ -1,0 +1,11 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const put = func (grid: Array (Array U32)) -> (row: Array U32) => return do:
+  grid[0] = row
+  break 0
+const run = func (n: U32) => return do:
+  let grid = #[#[n], #[2]]
+  let row = #[3]
+  let done = put grid row
+  break @u32.add done grid[0][0]

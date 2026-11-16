@@ -77,23 +77,35 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
 
 - **Removing `=`** (memory model phases 2 and 3). The owner asked on 16
   November 2026 to finish the conversion "so we don't have the mutable =
-  anymore". Phase 2 is the default now; the rest is not done.
-  tasks/MEMORY_MODEL.md, "Phase 2 is the default", has the details.
-  - **Done:** every function's result is its caller's alone and a call
-    only borrows its arguments; `own` parameters; moves at a local's last
-    read; std has no store; 379 provably unique stores in Ink and Gdev
-    became `:=`. A module that still has a store is in the old style and
-    lives beside converted ones.
+  anymore", and then to continue until it is done. It is not done.
+  tasks/MEMORY_MODEL.md, "Phase 2 is the default" and "One rule set for
+  every module", has the details.
+  - **Done:** one rule set for every module. Every function's result is
+    its caller's alone and a call only borrows its arguments, through
+    function values too; `own` parameters; moves at a local's last read; a
+    closure written as an argument gives back what it captured; std has no
+    store; 379 provably unique stores in Ink and Gdev became `:=`.
+  - **What `=` is now:** a write through what a function was lent, which
+    may keep only values it owns (`kept_value`). A function that still
+    returns or keeps what it was lent is marked `lent` (54 in Ink and
+    Gdev) and nobody relies on it.
   - **Left:** about 4,400 stores in Ink and Gdev (table in
-    tasks/MEMORY_MODEL.md), none of them convertible as it stands. They
-    are output parameters (2,208 in two files that `pen codegen`
-    generates), world state reached through shared records, and
-    one-element arrays used as cells. Then delete `=`, `migrate-stores`,
-    the old-style distinction, and bring spec section 10.3 in line.
-  - **Order that makes sense:** the generator in ../pen first (it is one
-    place and half the sites), then Ink's library module by module, then
-    Gdev's systems from the frame loop down. `own` on lambdas and in
-    function types is needed on the way.
+    tasks/MEMORY_MODEL.md) and the 54 `lent` functions. The way is
+    top-down from the frame loop: once every caller owns what it passes, a
+    writer takes it with `own`, returns it, and its `=` become `:=`. A
+    caller keeps ownership across calls to functions that still use `=`,
+    so this can go one function at a time with Ink's suite and Gdev's
+    frame checked at each step.
+  - **Needed on the way:** `own` on lambdas and in function types (Gdev's
+    systems are callbacks); `GrowArray` and `ResizeArray` as owned values
+    (today they count as borrowing, so `:=` through an `own` handle would
+    still be a shared write); a way to take a record apart into owned
+    fields (`bind_frame`).
+  - **Then:** delete `=`, `lent`, `migrate-stores` and
+    `BLOT_REPORT_STORES`, and bring spec section 10.3 in line.
+  - Gdev's own tests: 13 modules that compile now for the first time have
+    27 failing checks. They were hidden behind a compile error and are not
+    looked at yet.
   - Tools: `python3 scripts/integration/count_stores.py DIR...` counts
     what is left; `python3 scripts/integration/stores_to_updates.py
     PROJECT ENTRY...` converts what the compiler can already prove.

@@ -1,4 +1,4 @@
-const make = func (input: U32): {a: Array U32, z: Array U32, again: Array U32} => return do:
+lent const make = func (input: U32): {a: Array U32, z: Array U32, again: Array U32} => return do:
   let earlier: Array U32 = #[input]
   let scratch: Array U32 = #[input, 7, 9]
   let later: Array U32 = #[@u32.add input 10]

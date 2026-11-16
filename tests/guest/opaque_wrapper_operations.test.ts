@@ -97,15 +97,15 @@ async function inspectBuild(
         const source = `type Token${record ? " a" : ""}${
           opaque ? " is opaque" : ""
         } = ${record ? "{value: a}" : "Array U32"}
-const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
+lent const make: ${record ? "a -> Token a" : "Array U32 -> Token"} = func value => return ${
           opaque ? "$Token " : ""
         }${record ? "{value}" : "value"}
-const read: ${record ? "Token a -> a" : "Token -> Array U32"} = func ${
+lent const read: ${record ? "Token a -> a" : "Token -> Array U32"} = func ${
           opaque ? "($Token value)" : "value"
         } => return ${record ? "value.value" : "value"}
 const capture = func value => return do:
   let saved = make value
-  break func () => return read saved
+  break func () => return (read saved)[0]
 entry const run = func (value: U32) => return do:
   let original = #[value, 7]
   let alias = read (make original)
@@ -115,7 +115,7 @@ entry const captured = func (value: U32) => return do:
   let original = #[value, 7]
   let saved = capture original
   original[0] = 0
-  break @u32.add (saved ())[0] 2
+  break @u32.add (saved ()) 2
 `;
         await inspectBuild(source, async (bytes) => {
           const guest = await instantiateGuest(bytes);

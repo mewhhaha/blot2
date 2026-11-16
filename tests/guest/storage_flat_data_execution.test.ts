@@ -153,7 +153,7 @@ entry const snapshots = func () => return do:
   let cursor = @list.cursor saved
   let advanced = @cursor.advance cursor
   source[0] = 7
-  let extended = @list.append saved 9
+  let extended = @list.concat saved [9]
   let joined = @list.concat extended [1]
   let copied: Array U32 = @array.from_list joined
   let total = 0

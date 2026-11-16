@@ -297,32 +297,93 @@ module; the `BLOT_BORROWED_RULES` switch is gone.
   c1ff619f…, frames.trace 86d50101…). Gdev's Wasm is now dd97fe15…,
   2,724,223 bytes.
 
-**How modules in the old style live beside converted ones.** A module that
-still contains a store is in the old style. The checker marks each
-top-level named function of a module without stores (`owned_results`, with
-the `own` marks in `capability_parameters`), and the pass decides by that
-mark:
+**One rule set for every module (16 November 2026, later the same day).**
+The split into old-style and converted modules is gone. It could not carry
+the rest of the conversion: a call into an old-style module shared its
+arguments, so a caller could never keep ownership across such a call, and
+a writer could only be converted together with every function between it
+and the frame loop.
 
-- a call to a marked function, to a member that is one, to a contract's
-  member, or to a closure a store-free module made itself, only borrows
-  its arguments and gives a unique result. Every other call (an unmarked
-  function, a function value from a parameter or a field, a constructor
-  used as a function, an effect operation) shares its arguments and gives
-  a result that is not unique, as in phase 1;
-- the result rule is checked in every function and closure of a store-free
-  module, in every `own` function and in every contract implementation.
-  An `entry` function is exempt and unmarked: its result goes to the host,
-  which copies it;
-- a store-free module may only push a value it owns into growable storage
-  it was given, may not append in place to an array it does not own, and
-  may not `@simd.store` into one;
-- a generic function that puts its argument into growable storage it was
-  given (`bag.push rows`) counts like one that returns it: called where the
-  type variable is an array, it shares.
+- Every function's result is its caller's alone and a call only borrows
+  its arguments, in every module. That now covers calls through function
+  values (a parameter, a field, a local), because everything that can be a
+  function value obeys the result rule.
+- `=` stays for now as a write through what the function was lent. What it
+  stores is kept by that storage, so it must be owned or plain data
+  (`kept_value`); the same for a push into growable storage the function
+  was given and for an argument of an effect operation. `@simd.store` on
+  storage the function does not own is the same kind of store.
+- A function that still returns or keeps what it was lent is marked
+  `lent` (`lent func`, `lent const`). It is not checked and not trusted:
+  a call to it shares its arguments and its result is not unique, as phase
+  1 treated every call. Entry functions are treated the same way.
+- A constructor, a primitive or an effect operation used as a function
+  value, or given only some of its arguments, is `lent_result_value` where
+  it would keep an array; so is a `lent` or entry function whose result
+  owns an array and has no part that borrows.
+- Where the result type has a part that borrows, a call through a function
+  value shares its arguments and gives a result that is not unique. That
+  is what lets a `lent` function stand as a callback (Gdev's `bind_frame`
+  in the application record).
 
-All of this goes when the last store does: then every module is checked,
-every call is trusted, and `GrowArray` and `ResizeArray` become owned
-values.
+- A call that is given a `lent` function as an argument is treated like a
+  call to one: it shares its arguments and its result is not unique. That
+  is what keeps `apply_to same rows` honest.
+- A call's arguments are read as one call even when it is a chain of
+  applications (`world.total a b`, a function value given two arguments):
+  none of them is shared unless the result borrows. Before, every argument
+  but the last was.
+- A closure written as an argument gives back what it captured when the
+  call returns, if the call's result has no part that borrows. For that
+  to hold, a function may not keep a function it was lent: storing or
+  pushing a parameter or a capture that can hold one is `kept_value`.
+  This is the "temporary holder" of the plan, for closures; it is what
+  lets the collect-into-a-captured-buffer fixtures of Gdev's tests
+  compile (36 more of its test modules do).
+
+- A read under a `return` that leaves the function moves its local even
+  inside a loop: no later iteration runs.
+
+Known gap, for as long as `lent` exists: a function that passes what it
+was lent on to a `lent` function is not itself marked, though the `lent`
+function may keep it.
+
+Not changed yet: `GrowArray` and `ResizeArray` still count as borrowing in
+a type, so a record of them is not checked as a result, and an `own`
+parameter of such a type accepts storage that is shared. That has to
+change before `=` goes, or `:=` through an `own` handle would be the same
+shared write under another name.
+
+What it took: 54 `lent` marks in Ink and Gdev (25 and 29), 8 in the
+guest tests and one fixture; three callbacks in Gdev that returned what
+they were lent now copy (`migrate` in celebrations and locale, the pack
+migrations in robots, which take their array with `own`), and three test
+fixtures of Gdev copy what a closure returned. `pen codegen`
+no longer wraps `project.draw_extra` in a closure, and it emits `=` where
+the committed encoders have it, so `pen codegen --check` agrees again.
+
+Checked on 16 November 2026: the gate (1,165 guest and host cases: 1,064
+pass, 101 ignored, none fail; 147 uniqueness programs, 18 of them new and
+named `h`; 187 fixtures); Ink's suite as before (268 passed, 1 failed, 3
+did not compile); Gdev's first frame byte-identical (frame.png c1ff619f…,
+frames.trace 86d50101…; Wasm 406f4d8b…, 2,724,075 bytes).
+
+Gdev's own tests (`pen test-blot` in ../gdev) were compared module by
+module with the state before: 362 pass, 27 fail and 118 do not compile,
+where 218 passed, none failed and 155 did not compile. No module that
+compiled stopped compiling and none passes fewer tests. 37 more compile,
+because a captured buffer is given back; the 27 failures are all in 13 of
+those, so they were hidden before, not caused by this. 96 of the 118 are
+`missing_file`.
+
+**The way from here is top-down.** With one rule set, a function can be
+converted on its own as soon as every caller owns what it passes: mark
+the parameter `own`, return it, rebind at the call, and turn its `=` into
+`:=`. A caller that owns its state keeps owning it across calls to
+functions that still write through what they are lent, so the frontier
+moves down from the frame loop one function at a time, with Ink's suite
+and Gdev's frame checked at each step. A `lent` callee is the exception:
+it has to be converted with the caller that needs ownership back.
 
 **What is left: about 4,400 stores.** Counted by line shape with
 `python3 scripts/integration/count_stores.py DIR...`.

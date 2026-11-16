@@ -44,7 +44,7 @@ Deno.test("array writes are visible through aliases captures state and iterators
 type Cell value is data = $Cell value
 const stored = #[1, 2]
 const read = func values => return values[1]
-const delay = func value => return func () => return value
+const delay = func (value: Array U32) => return func () => return value[1]
 entry const alias = func () => return do:
   let values = #[1, 2]
   let before = values
@@ -59,7 +59,7 @@ entry const suspended = func () => return do:
   let values = #[1, 2]
   let before = delay values
   values[1] = 9
-  break @u32.add (@array.get (before ()) 1) values[1]
+  break @u32.add (before ()) values[1]
 entry const iterator = func () => return do:
   let values = #[1, 2]
   let sum = 0
@@ -200,11 +200,11 @@ const pair = func values => return (values, 1)
 const first = func values => return values[0]
 const reader = func values => return func index => return values[index]
 const left = func a => return func b => return a[0] + b[0]
-const merged = func (flag: Bool) => return func (values: Array U32) => return do:
+lent const merged = func (flag: Bool) => return func (values: Array U32) => return do:
   if flag:
     values := #[7]
   break values
-const carried = func (count: U32) => return func (values: Array U32) => return do:
+lent const carried = func (count: U32) => return func (values: Array U32) => return do:
   for index in 0..count:
     values := #[index]
   break values

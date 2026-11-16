@@ -1,0 +1,8 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const boxed = func (make: Array U32 -> Box) -> (rows: Array U32) => return make rows
+const run = func (n: U32) => return do:
+  let rows = #[n]
+  let ($Box inside) = boxed $Box rows
+  break inside[0]

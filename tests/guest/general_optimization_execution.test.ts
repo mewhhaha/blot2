@@ -187,7 +187,7 @@ entry const untouched = func (host: U32 -> U32 ! {Foreign}) => return generate (
 Deno.test("staged indexed construction freezes once and writes through input aliases and repeated indices", async () => {
   await compileAndRun(
     `
-const build = func values => return do:
+lent const build = func values => return do:
   let saved = func () => return values[0]
   for i in 0..4096:
     values[i] = i + 1

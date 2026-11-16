@@ -9,7 +9,7 @@ Deno.test("stores write elements, element fields and nested rows in place throug
   await compileAndRun(`
 type Point is data = $Point { x: U32, y: U32 }
 const pool: GrowArray U32 = #[1, 2]
-const pick = func (flag: Bool) -> (left: Array U32) -> (right: Array U32) => return if flag then left else right
+lent const pick = func (flag: Bool) -> (left: Array U32) -> (right: Array U32) => return if flag then left else right
 entry func element (n: U32) : U32 => return do:
   let rows = #[1, 2, 3]
   let alias = rows
@@ -390,4 +390,58 @@ entry func from_call (n: U32) : U32 => return do:
     equal(guest.call("lent", 5), 35);
     equal(guest.call("from_call", 4), 40);
   }, { stdRoot });
+});
+
+Deno.test("a store writes through what was lent, a lent function shares, and a closure gives back what it captured", async () => {
+  await compileAndRun(`func fill (rows: Array U32) -> (n: U32) : U32 => return do:
+  rows[0] = n
+  break rows.length
+lent func same (rows: Array U32) => return rows
+func each (count: U32) -> (visit: U32 -> Unit) : U32 => return do:
+  for index in 0..count:
+    visit index
+  break count
+func through (make: U32 -> Array U32) -> (n: U32) : Array U32 => return do:
+  let rows = make n
+  rows[0] := self + 1
+  break rows
+entry func stored (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let size = fill rows n
+  rows[1] := size
+  break rows[0] * 10 + rows[1]
+entry func shared (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let again = same rows
+  rows[0] = n
+  break again[0] * 10 + rows[0]
+entry func collected (n: U32) : U32 => return do:
+  let seen: GrowArray U32 = #[]
+  let count = each n (func index => return @storage.push seen (index * 2))
+  let rows = @storage.freeze seen
+  rows[0] := count
+  break rows[0] * 100 + rows[n - 1]
+entry func made (n: U32) : U32 => return (through (func k => return #[k, k]) n)[0]
+`, (guest) => {
+    equal(guest.call("stored", 5), 52);
+    equal(guest.call("shared", 7), 77);
+    equal(guest.call("collected", 4), 406);
+    equal(guest.call("made", 8), 9);
+  }, { stdRoot });
+  const kept = `func put (grid: Array (Array U32)) -> (row: Array U32) : U32 => return do:
+  grid[0] = row
+  break 0
+entry func run (n: U32) : U32 => return do:
+  let grid = #[#[n], #[2]]
+  break put grid #[3] + grid[0][0]
+`;
+  const start = kept.indexOf("grid[0] = row");
+  await compileExpectedFailure(kept, "kept_value", undefined, { span: [start, kept.indexOf("\n", start)] });
+  const value = `lent func same (rows: Array U32) => return rows
+entry func run (n: U32) : U32 => return do:
+  let pick = same
+  break (pick #[n])[0]
+`;
+  const named = value.indexOf("= same") + 2;
+  await compileExpectedFailure(value, "lent_result_value", undefined, { span: [named, named + 4] });
 });

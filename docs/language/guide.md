@@ -873,22 +873,60 @@ let mine = (grid.at 0).copy  // an array of its own; grid stays unique
 Such a function cannot be used as a value, or applied partly, where the
 variable is an array (`lent_result_value`): pass a function that copies.
 
-**Old-style modules.** A module that still contains a store `place = value`
-is in the old style until its last store is gone. Its functions may keep
-what they are lent, so:
+**Stores, while `=` exists.** A store `place = value` writes through
+storage the function does not own, and every holder sees the write. The
+rules above still hold around it:
 
-- their returns are not checked, except in `own` functions and contract
-  implementations;
-- a call to one of them shares its arguments and its result is not unique,
-  as before.
+- The value stored is kept by that storage, so the arrays it owns must be
+  nobody else's: a fresh value or a local that alone holds its value.
+  Storing a parameter, or a part of one, is `kept_value`; store
+  `values.copy` of it. The same holds for a value pushed into growable
+  storage the function was given, and for a value given to an effect
+  operation, whose handler may keep it.
+- `@simd.store` on an array the function does not own is a store too.
+- An array is not appended to in place unless the function owns it.
 
-A module without stores may only push a value it owns into growable storage
-it was given, may not append in place to an array it does not own, and may
-not call `@simd.store` on one.
+**`lent` functions.** A function that still returns or keeps what it was
+lent is marked `lent`, before `func` or `const`:
 
-A call through a function value (a parameter, a field) is treated as a call
-into an old-style module for now, unless the function is a closure the
-module made itself.
+```blot
+lent func ground_of (world: World) => return world.ground
+```
+
+Its result and what it keeps are not checked. In exchange nobody can rely
+on it: a call to it shares its arguments, and its result is not unique.
+So does a call that is given a `lent` function as an argument. A `lent`
+function cannot otherwise be used as a value, or applied partly, where
+its result owns an array and has no part that borrows
+(`lent_result_value`). `lent` is the list of what is left to convert: it
+goes from the language when `=` does.
+
+**Closures passed to a call.** A closure holds what it captured, so a
+captured local is shared while the closure lives. A closure written as an
+argument lives only as long as the call, when the call's result has no
+part that borrows: nothing a function does can keep a function it was
+lent (storing or pushing one is `kept_value`). So afterwards the local is
+unique again:
+
+```blot
+let seen: GrowArray U32 = #[]
+each rows (func row => return @storage.push seen row.length)
+let lengths = @storage.freeze seen   // seen is this function's alone again
+```
+
+A closure bound to a name first, or passed to a call whose result is a
+function or a view, keeps what it captured shared.
+
+**Function values.** A call through a function value (a parameter, a
+field, a local) is like any other call: the arguments are lent and the
+result is the caller's. So everything that can be a function value obeys
+the result rule, closures included, wherever they are written. A
+constructor, a primitive or an effect operation keeps its argument, so it
+cannot stand for a function value where that owns an array
+(`lent_result_value`); write `func value => return $Some value.copy`. Where
+the result type has a part that borrows (a view, growable storage, a
+function), a call through a function value shares its arguments and its
+result is not unique.
 
 ### `own` parameters
 

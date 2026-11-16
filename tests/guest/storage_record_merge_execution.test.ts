@@ -5,20 +5,20 @@ Deno.test("record merge preserves owner roots and known callbacks with right win
   await compileAndRun(
     `
 const overlay = func base -> replacement => return @record.merge base replacement
+lent const left = func (order: Array U32) -> base => return do:
+  order[0] = self * 10 + 1
+  return base
+lent const right = func (order: Array U32) -> (scratch: Array U32) => return do:
+  order[0] = self * 10 + 2
+  return {owner: scratch, view: &scratch[0..1], added: 9,
+    operation: func (value: U32) => return value + 5}
 entry const answer = func () => return do:
   let original: Array U32 = #[11]
   let scratch: Array U32 = #[23]
   let order: Array U32 = #[0]
   let base = {owner: original, view: &original[0..1], retained: 7,
     operation: func (value: U32) => return value + 1}
-  let left = func () => return do:
-    order[0] = self * 10 + 1
-    return base
-  let right = func () => return do:
-    order[0] = self * 10 + 2
-    return {owner: scratch, view: &scratch[0..1], added: 9,
-      operation: func (value: U32) => return value + 5}
-  let merged = overlay (left ()) (right ())
+  let merged = overlay (left order base) (right order scratch)
   merged.owner[0] = 31
   return #[order[0], merged.retained, merged.added, merged.view[0],
     merged.operation 10, base.operation 10, base.owner[0], base.view[0], scratch[0]]
