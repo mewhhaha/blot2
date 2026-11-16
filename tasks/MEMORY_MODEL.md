@@ -681,6 +681,15 @@ what they call. A system changes in three places: its parameter becomes
 calls a system directly rebinds too, so each system goes with the tests
 that call it. A system that returns a value returns it beside the world.
 
+Its size, counted by `python3 scripts/integration/world_writers.py`: of
+the 628 functions in gdev/src that take the world, 340 write through it
+themselves and 371 do counting the ones they call, in 65 modules
+(`ui/station` 24, `world/salt` 23, `player/hand` 21, `world/trails` 19,
+`actors/robots` 16). Most stores go through a typed name for one of the
+world's parts (`let stacks: Array Stack = access.salt.stacks`, then
+`stacks[i] = …`); with the world owned the write is `access.salt.stacks[i]
+:= …`, which the backend does in place.
+
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark
 the parameter `own`, return it, rebind at the call, and turn its `=` into
