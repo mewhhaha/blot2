@@ -344,6 +344,60 @@ needs":
 - The Pen fixture `owned_storage.blot` still copies; it can take
   `own owner` now.
 
+### Plan for the rest of phase 2 (16 November 2026, not built)
+
+Worked out while building the part above. It is the implementer's plan
+within the approved rules; the one deviation is marked.
+
+1. **One result rule for every function.** The rule `own` functions have
+   now: each `return` gives a value that is unique all the way down
+   (`ownedAs`), and a call's result is `deep` in the caller. A value that
+   holds a borrowed parameter, a constant, a capture or an element read out
+   of something is never `deep`, so this one check also rejects every
+   borrowed escape; no separate `borrowed` fact is needed, only a better
+   message when the value is a parameter. It needs moves (built) so that
+   `let cells = …; return $Grid { cells: cells }` passes.
+2. **Results that are exempt.** A result type that owns no array (the
+   `owns` predicate of the measurement patch: views, references, links,
+   functions and type variables own nothing) is not checked. A call whose
+   result type has a borrowing part keeps today's behaviour: the arguments
+   are shared with the result and the result is not unique.
+3. **Callers.** For every other call the arguments are only lent (the
+   local stays unique) and the result is `deep`. This must cover direct
+   calls, calls through function values (`apply`) and members selected by
+   dispatch (`rows.map f`), or `return rows.map f` is rejected by rule 1.
+   So lambdas, contract members and implementation members obey rule 1
+   too.
+4. **Generic functions.** Inside a generic body a type variable is plain
+   data (`holds` and `owns` are false for it). A call is *generic-read*
+   when a type variable occurs in the callee's result and, as data, in a
+   borrowed parameter, and the call gives that variable a type that owns an
+   array (`identity rows`, `grid.at 0`).
+   - **Deviation to confirm with the owner:** the approved text makes such
+     a call an error. The plan treats it as phase 1 treats `grid[0]`: the
+     result shares the arguments, so neither is unique afterwards, and
+     returning it needs `values.copy`. That is sound and rejects less.
+   - It must stay an error where the callee is not known at the call: a
+     reference to a generic-read function, used as a value at a type that
+     owns an array (`rows.map identity` on an array of arrays). Otherwise
+     a function value of type `Array U32 -> Array U32` could return its
+     argument and rule 3 would be unsound for `apply`.
+   - Finding it: for a direct call the Core builder has the callee's
+     scheme and can set a bit in `CallInfo`. For a dispatched member
+     `Module.dispatchSignature` may give the member's generic type; this
+     is not yet read through.
+5. **Effects.** The result of an effect operation is not owned: a state's
+   `get` returns what the state still holds. It stays shared until
+   `modify` exists (rule 5).
+6. **In-place append** only when the input is unique (the open item of
+   phase 1).
+7. **How to land it.** Rule 1 rejects existing code (at least the 44 Gdev,
+   27 Ink and 75 guest sites measured for borrowed returns, more for
+   results that are shared in themselves), so it goes in behind an
+   environment switch that the tests set, is measured, and becomes the
+   default once std, the tests, Ink and Gdev are changed. The switch is
+   then deleted.
+
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 
 [The patch](../benchmarks/evidence/measurements/2026-11-15-value-restriction.patch)
