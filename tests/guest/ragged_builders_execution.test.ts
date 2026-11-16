@@ -139,7 +139,7 @@ Deno.test("ragged empty and rejected branches retain complete payload checking",
 Deno.test("ragged inert reference copies preserve shared callback captures", async () => {
   await compileAndRun(
     `
-const delay = func value => return func () => return value
+const delay = func (value: Array U32) => return func () => return value.copy
 entry const captured = func (seed: U32) : U32 => return do:
   let pending = delay (@array.fill 3 seed)
   let first = pending ()

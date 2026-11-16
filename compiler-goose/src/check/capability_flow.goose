@@ -30,7 +30,12 @@ type Mask = blot_support::Option<u16>;
 enum Contract { unknown, identity, invoke_unit, member_unit, invoke_with_capability, member_first_unit, member_second_unit, input_shape, consume_task, scope_task, spawn_task }
 enum ParameterResult { product, invoke_unit, invalid, member_closure_unit, captured_unit, invoke_input, invoke_inputs }
 // `own`: bit i is set when parameter i of a named function is marked `own`.
-struct Parameters { kind: ParameterResult = ParameterResult.product, mask: u16 = 0, inputs: u8 = 0, invocation_arguments: u64 = 0, invocation_count: u8 = 0, own: u32 = 0, own_count: u8 = 0 }
+struct Parameters { kind: ParameterResult = ParameterResult.product, mask: u16 = 0, inputs: u8 = 0, invocation_arguments: u64 = 0, invocation_count: u8 = 0, own: u32 = 0, own_count: u8 = 0, owned_results: bool = false }
+// `self_` with the ownership marks of `previous`: which parameters the
+// function takes over, how many arguments a full call gives, and whether its
+// result is the caller's alone. They are facts of the declaration, not of the
+// capability summary a later stage replaces.
+fn withOwnership(self_: Parameters, previous: Parameters) -> Parameters { var result = self_; result.own = previous.own; result.own_count = previous.own_count; result.owned_results = previous.owned_results; return result; }
 fn init(inputs: u8, mask: u16) -> Parameters { return Parameters { mask: mask, inputs: inputs , ..}; }
 fn result(self_: Parameters) -> u16 { if self_.kind == ParameterResult.invoke_input { return (1 as u16) << self_.callback(); } return self_.mask; }
 fn invokes(self_: Parameters) -> bool { return self_.kind == ParameterResult.invoke_unit || self_.inputInvokes(); }
@@ -307,7 +312,7 @@ fn parameterCoreWithOwners(module: const Module&, body: blot_check_core::Body, s
     if summary.kind == ParameterResult.member_closure_unit || summary.kind == ParameterResult.captured_unit { arity += 1; }
     if body.parameters.len != arity || body.parameters.start > module.parameters.len || body.parameters.len > module.parameters.len - body.parameters.start || body.root == 0 || body.root >= module.nodes.len { return false; }
     let root = module.nodes[body.root]; var remaining: i64 = 4096; let parameters = module.parameters[body.parameters.start..body.parameters.start + summary.arity()];
-    if summary.invokes() { let reconstructed = invocationCore(module, body, owners, remaining); return reconstructed.present && summary == reconstructed.value; }
+    if summary.invokes() { let reconstructed = invocationCore(module, body, owners, remaining); return reconstructed.present && summary == reconstructed.value.withOwnership(summary); }
     if summary.kind == ParameterResult.product {
         if body.binding < module.bindings.len && module.bindings[body.binding].capability_flow == Contract.input_shape { return blot_check_capability_contract_core::inputBodyWithOwners(module, body, summary, owners); }
         let result = coreParameters(module, body.root, parameters, [], remaining, 0); return result.present && result.value == summary.result();

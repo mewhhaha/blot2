@@ -145,24 +145,33 @@ root struct Analyzer {
     // parameter mask, and above it how many arguments a call gives.
     takers: dictionary<u64, u64> = dictionary<u64, u64> {},
     member_takers: MemberTaker[>..] = [],
-    // Phase 2 for every function, while it is being measured (set by the
-    // environment variable BLOT_BORROWED_RULES; tasks/MEMORY_MODEL.md): each
-    // function's result is its caller's alone, a call only borrows its
-    // arguments, and a type variable holds no array.
-    rules: bool = false,
+    // Whether this module is free of the store `place = value`. Its
+    // functions and closures then return values nothing else holds, and it
+    // may not write storage it does not own. A module that still has a
+    // store is in the old style: only its `own` functions are held to
+    // that. This distinction goes when `=` does.
+    converted: bool = false,
+    report_stores: bool = false,
     owns_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
-    // Under the rules: each binding by unit and number; whether it is a
+    // Each binding by unit and number; whether it is a
     // generic function that returns what it was lent (0 unknown, 1 no,
     // 2 yes) and how many arguments its type takes; and each member of a
     // type by the type and the member's name.
     binding_index: dictionary<u64, u32> = dictionary<u64, u32> {},
+    // Per binding: 1 for a contract's member, which only passes on what
+    // the chosen implementation returns; 2 for an implementation's
+    // member, which is held to the result rule in every module, so that a
+    // call through the contract can rely on it.
+    member_kind: u8[>..] = [],
     reader_state: u8[>..] = [],
     reader_arity: u8[>..] = [],
     identity_ids: dictionary<u64, u32> = dictionary<u64, u32> {},
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
     lends_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
-    // The root of the function being checked when its result must be owned.
+    // The root of the function being checked when its result must be owned,
+    // and of a contract's member, whose result is its implementation's.
     owned_result: u32 = 0,
+    exempt_root: u32 = 0,
     // Blocks whose value is the function's result: `return do: ...`.
     tails: u32[>..<] = []
 }
@@ -176,15 +185,20 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         if parameters.own == 0 { continue; }
         analyzer.takers.insert(((binding.target.unit as u64) << 32) | binding.target.binding, ((parameters.own_count as u64) << 32) | parameters.own);
     }
+    analyzer.converted = true;
+    for update in module.updates { if update.store { analyzer.converted = false; } }
     {
-        let name = "BLOT_BORROWED_RULES\0";
-        analyzer.rules = blot_native::environment_size(name[0]) >= 0;
+        // Migration aid (tasks/MEMORY_MODEL.md, phase 3): with BLOT_REPORT_STORES set,
+        // each store whose place is provably unique is reported as `unchecked`,
+        // so a script can turn it into `:=`. It goes with `=`.
+        let name = "BLOT_REPORT_STORES\0";
+        analyzer.report_stores = blot_native::environment_size(name[0]) >= 0;
     }
-    if module.updates.len == 0 && analyzer.takers.count == 0 && !analyzer.rules { return; }
-    if analyzer.rules {
+    {
         for binding, index in module.bindings {
             analyzer.reader_state.push(0);
             analyzer.reader_arity.push(0);
+            analyzer.member_kind.push(0);
             if index != 0 { analyzer.binding_index.insert(((binding.target.unit as u64) << 32) | binding.target.binding, index as! u32); }
         }
         for method in module.associated {
@@ -198,6 +212,11 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
             if known { let existing: u32 = known; identity_id = existing; } else { analyzer.identity_ids.insert(key, identity_id); }
             analyzer.members.insert(((identity_id as u64) << 32) | method.member, index);
         }
+    }
+    for template in module.member_templates { if template.binding < analyzer.member_kind.len { analyzer.member_kind[template.binding] = 1; } }
+    for member in module.implementation_members {
+        if member.target.unit != 0 && member.target.unit != module.unit { continue; }
+        if member.target.binding != 0 && member.target.binding < analyzer.member_kind.len { analyzer.member_kind[member.target.binding] = 2; }
     }
     if analyzer.takers.count != 0 {
         for method in module.associated {
@@ -220,7 +239,12 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
             if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 { set(analyzer, parameter.binding, deep); }
         }
         analyzer.owned_result = 0;
-        if (own != 0 || analyzer.rules) && body.is_function { analyzer.owned_result = body.root; }
+        let kind = analyzer.member_kind[body.binding];
+        analyzer.exempt_root = 0;
+        // An entry's result goes to the host, which copies it.
+        let to_host = (body.runtime || body.exported) && own == 0;
+        if kind == 1 || to_host { analyzer.exempt_root = body.root; }
+        if (own != 0 || analyzer.converted || kind == 2) && kind != 1 && !to_host && body.is_function { analyzer.owned_result = body.root; }
         analyzer.function_roots.push(body.root);
         // The dry run: log the reads, judge nothing, keep no fact.
         {
@@ -455,7 +479,7 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
     let n = m.types.node(ty);
     if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
     // Inside a generic body a type variable is plain data.
-    if self_.rules && (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
+    if (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.function { return true; }
     if n.tag == blot_check_types::Tag.product {
         for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
@@ -721,7 +745,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let leaves = self_.function_roots.len != 0 && n.b == self_.function_roots[self_.function_roots.len - 1];
         // A local that leaves with the function has no later use, so the
         // value keeps the local's fact; so does one a tail block breaks with.
-        let tail = leaves && (n.b == self_.owned_result || self_.rules) && n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.block_;
+        let tail = leaves && (n.b == self_.owned_result || self_.converted) && n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.block_;
         if tail { self_.tails.push(n.a); }
         let logged = self_.reads.len;
         let result = visit(self_, m, n.a);
@@ -777,7 +801,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             lastReads(self_, logged);
             for captured in m.closureCaptures(id) { read(self_, captured, id); }
         }
-        if self_.rules && !value.exits { ownedResult(self_, m, body, value); }
+        if self_.converted && !value.exits { ownedResult(self_, m, body, value); }
         escape(self_, value);
         self_.function_roots.resize(self_.function_roots.len - 1);
         return Value { .. };
@@ -791,13 +815,14 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if elementHolds(self_, m, n.ty) { escape(self_, value); }
             return Value { fact: copied, exits: value.exits, .. };
         }
-        if self_.rules && m.dispatchSignature(id) != 0 {
+        if m.dispatchSignature(id) != 0 {
             let member = calleeBinding(self_, m, id);
             let lent = member != 0 && lentHere(self_, m, member, calleeType(m, id));
-            if member != 0 && self_.reader_arity[member] <= 1 {
+            if member != 0 { reader(self_, m, member); }
+            if trusted(self_, m, member) && self_.reader_arity[member] <= 1 {
                 // `value.member` with no further argument is the whole call.
                 let value = visit(self_, m, n.a);
-                if lent && owns(self_, m, n.ty) { return Value { origin: value.origin, exits: value.exits, .. }; }
+                if lent { return Value { origin: value.origin, exits: value.exits, .. }; }
                 if lends(self_, m, n.ty) { escape(self_, value); }
                 var fact: Fact = none;
                 if owns(self_, m, n.ty) { fact = deep; }
@@ -816,12 +841,12 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = visit(self_, m, child);
             let fact = taken(self_, m, child, value);
             exits = exits || value.exits;
-            elements_deep = elements_deep && (fact == deep || (self_.rules && ownedAs(self_, m, fact, m.typeOf(child), 0)));
+            elements_deep = elements_deep && (fact == deep || ownedAs(self_, m, fact, m.typeOf(child), 0));
         }
         let fact = freshContainer(self_, m, n.ty, elements_deep);
         return Value { fact: fact, exits: exits, .. };
     }
-    if tag == blot_check_core::Tag.product && self_.rules {
+    if tag == blot_check_core::Tag.product {
         // A tuple nothing else holds: every part that can hold an array
         // is fresh or moved in.
         var parts_deep = true;
@@ -845,7 +870,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if literal && payload.origin == 0 { fact = held; }
         // A constructor holds what its payload does: nothing without one,
         // and a payload nothing else holds stays that way inside it.
-        if self_.rules && (n.b == 0 || ownedAs(self_, m, held, m.typeOf(n.b), 0)) { fact = deep; }
+        if n.b == 0 || ownedAs(self_, m, held, m.typeOf(n.b), 0) { fact = deep; }
         return Value { fact: fact, exits: payload.exits, .. };
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false); }
@@ -882,7 +907,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { fact: deep, exits: exits, .. };
         }
     }
-    if self_.rules && (tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply) {
+    if tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply {
         // A call only borrows its arguments, and the arrays its result
         // owns are the caller's alone. A part of the result that borrows
         // (a view, a function) may hold the arguments, so then they are
@@ -906,7 +931,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // A generic function that returns what it was lent, called in
         // full where that holds an array: the result shares the arguments,
         // as `grid[0]` shares `grid`.
-        if binding != 0 && reader(self_, m, binding) && count >= self_.reader_arity[binding] as i64 && owns(self_, m, n.ty) && lentHere(self_, m, binding, used_at) {
+        if trusted(self_, m, binding) && reader(self_, m, binding) && count >= self_.reader_arity[binding] as i64 && lentHere(self_, m, binding, used_at) {
             var shared = Value { .. };
             if tag == blot_check_core::Tag.call {
                 for child in m.call(id).arguments { let value = visit(self_, m, child); sharedWith(self_, shared, value); }
@@ -923,15 +948,22 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             return shared;
         }
-        // Whether the callee is a function value whose result is the
-        // caller's: a named function, a closure, a function a call or a
-        // field gave, a member this module can name. A constructor keeps
-        // its argument, an effect operation's handler may keep it and
-        // resume with a value it still holds, and a member reached through
-        // a contract may be generic.
+        // Whether the callee's result is the caller's alone: a named
+        // function of a module without stores, a member of a type that is
+        // one, or a closure this module made, when it has none itself.
+        // Any other function value may come from a module in the old
+        // style; a constructor keeps its argument, and an effect
+        // operation's handler may keep it and resume with a value it
+        // still holds.
         let head_tag = m.node(head).tag;
-        var known = tag == blot_check_core::Tag.call || head_tag == blot_check_core::Tag.reference || head_tag == blot_check_core::Tag.closure || head_tag == blot_check_core::Tag.call || head_tag == blot_check_core::Tag.if_value || head_tag == blot_check_core::Tag.match_ || head_tag == blot_check_core::Tag.block_;
-        if head_tag == blot_check_core::Tag.project { known = binding != 0 || m.dispatchSignature(head) == 0; }
+        var known = trusted(self_, m, binding);
+        if !known && self_.converted && tag == blot_check_core::Tag.apply {
+            if head_tag == blot_check_core::Tag.closure { known = true; }
+            if head_tag == blot_check_core::Tag.reference && binding != 0 && m.bindings[binding].kind == blot_reuse_principal_interface::Kind.local {
+                let made = m.bindings[binding].initializer;
+                known = made != 0 && made < m.nodes.len && m.node(made).tag == blot_check_core::Tag.closure;
+            }
+        }
         if known {
             let holder = lends(self_, m, n.ty);
             var exits = false;
@@ -970,6 +1002,38 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     return Value { exits: exits, .. };
 }
 
+// Whether `binding` is a named function of a module without stores: its
+// result is the caller's alone, and it keeps nothing it is lent.
+fn trusted(self_: const Analyzer&, m: const Module&, binding: u32) -> bool {
+    var current = binding;
+    for step in 0..8 {
+        if current == 0 || current >= m.bindings.len { return false; }
+        if m.bindings[current].capability_parameters.owned_results || self_.member_kind[current] == 1 { return true; }
+        // `const replace = array.replace` names the same function.
+        if m.bindings[current].kind != blot_reuse_principal_interface::Kind.global { return false; }
+        var made = m.bindings[current].initializer;
+        let body = m.bindings[current].body_id;
+        if made == 0 && body != 0 && body < m.bodies.len && !m.bodies[body].is_function { made = m.bodies[body].root; }
+        if made != 0 && made < m.nodes.len && m.node(made).tag == blot_check_core::Tag.return_ { made = m.node(made).a; }
+        if made == 0 || made >= m.nodes.len || m.node(made).tag != blot_check_core::Tag.reference { return false; }
+        let target = m.reference(made);
+        let found .= self_.binding_index.get(((target.unit as u64) << 32) | target.binding);
+        if !found { return false; }
+        let index: u32 = found;
+        current = index;
+    }
+    return false;
+}
+// Whether the storage `node` names is a local's own: nothing else holds
+// it, so writing it in place is the local's business alone.
+fn storageOwned(self_: const Analyzer&, m: const Module&, node: u32) -> bool {
+    let target, found = place(self_, m, node);
+    if !found || !local(self_, target.binding) { return false; }
+    var fact = self_.facts[target.binding];
+    if fact == spent { return false; }
+    for at in 0..target.len { fact = field(self_, fact, target.fields[at]); }
+    return unique(fact);
+}
 // The identity the backend's dispatch gives a receiver of type `ty`.
 fn receiverIdentity(m: const Module&, ty: u32) -> blot_check_types::NominalIdentity, bool {
     var identity = blot_check_types::NominalIdentity { unit: 0, decl: ty };
@@ -1042,6 +1106,41 @@ recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth:
     }
     return true;
 }
+// Whether `variable` occurs in `ty` inside growable storage, a reference or
+// a link: storage a function can put a value into for later.
+recursive fn occursInSink(m: const Module&, variable: u32, ty: u32, inside: bool, depth: i64) -> bool {
+    if ty == variable { return inside; }
+    if ty == 0 || ty >= m.types.nodes.len || depth > 64 { return false; }
+    let n = m.types.node(ty);
+    if n.tag == blot_check_types::Tag.function { return occursInSink(m, variable, n.a, inside, depth + 1) || occursInSink(m, variable, n.b, inside, depth + 1); }
+    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursInSink(m, variable, n.a, inside, depth + 1); }
+    if n.tag == blot_check_types::Tag.product {
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursInSink(m, variable, item, inside, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.record {
+        for index in 0..n.b { if occursInSink(m, variable, m.types.recordField(n, index).ty, inside, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.nominal {
+        let storage = blot_check_storage_types::identity(n.a, n.b);
+        let sink = inside || (storage.present && storage.value != blot_check_storage_types::view);
+        for argument in m.types.nominalArguments(n) { if occursInSink(m, variable, argument, sink, depth + 1) { return true; } }
+        return false;
+    }
+    return false;
+}
+// Whether a function of type `root` with `arity` parameters can keep a value
+// of type `variable` past the call: in its result, or in storage one of its
+// parameters gives it.
+fn keeps(m: const Module&, root: u32, arity: i64, variable: u32) -> bool {
+    var parameter = root;
+    for position in 0..arity {
+        if occursInSink(m, variable, m.types.node(parameter).a, false, 0) { return true; }
+        parameter = m.types.node(parameter).b;
+    }
+    return occurs(m, variable, parameter, false, 0);
+}
 // Whether `binding` is a generic function that may return what it was lent:
 // a type variable of its scheme occurs in its result and, as data, in a
 // parameter it does not take over. Also sets how many arguments its type
@@ -1061,7 +1160,7 @@ fn reader(self_: Analyzer&, m: const Module&, binding: u32) -> bool {
     let variables = m.types.list(scheme.variables);
     var found = false;
     for variable in variables {
-        if !occurs(m, variable, result, false, 0) { continue; }
+        if !keeps(m, scheme.root, arity as i64, variable) { continue; }
         var parameter = scheme.root;
         for position in 0..(arity as i64) {
             let taken_over = position < 32 && (own >> (position as! u32)) & 1 != 0;
@@ -1124,7 +1223,7 @@ fn lentHere(self_: Analyzer&, m: const Module&, binding: u32, actual: u32) -> bo
     var result = scheme.root;
     for position in 0..arity { result = m.types.node(result).b; }
     for variable in m.types.list(scheme.variables) {
-        if !occurs(m, variable, result, false, 0) { continue; }
+        if !keeps(m, scheme.root, arity, variable) { continue; }
         var lent = false;
         var parameter = scheme.root;
         for position in 0..arity {
@@ -1147,7 +1246,7 @@ fn calleeType(m: const Module&, node: u32) -> u32 {
 // not being called in full: its value would be a function whose result is
 // not the caller's alone.
 fn lentValue(self_: Analyzer&, m: const Module&, node: u32) {
-    if !self_.rules { return; }
+    if !self_.converted { return; }
     let binding = calleeBinding(self_, m, node);
     if binding == 0 { return; }
     if lentHere(self_, m, binding, calleeType(m, node)) { reject(self_, m, node, blot_check_core::Code.lent_result_value); }
@@ -1211,15 +1310,16 @@ fn ownedResult(self_: Analyzer&, m: const Module&, node: u32, value: Value) {
         fact = none;
         if m.node(node).tag == blot_check_core::Tag.reference { fact = self_.facts[value.origin]; }
     }
-    if self_.rules && !owns(self_, m, m.typeOf(node)) { return; }
+    if !owns(self_, m, m.typeOf(node)) { return; }
     if !ownedAs(self_, m, fact, m.typeOf(node), 0) { reject(self_, m, node, blot_check_core::Code.result_not_owned); }
 }
 // Whether the function or closure with `root` must return a value nothing
 // else holds: one that takes over a parameter, and under the rules being
 // measured every one whose result can own an array.
 fn resultChecked(self_: Analyzer&, m: const Module&, root: u32, ty: u32) -> bool {
-    if self_.rules { return owns(self_, m, ty); }
-    return root == self_.owned_result;
+    if root == self_.owned_result { return owns(self_, m, ty); }
+    if root == self_.exempt_root { return false; }
+    return self_.converted && owns(self_, m, ty);
 }
 // Whether a value of `ty` with `fact` is unique all the way down. A record
 // fact is when every field that holds storage is; a nominal is read through
@@ -1229,8 +1329,8 @@ recursive fn ownedAs(self_: Analyzer&, m: const Module&, fact: Fact, ty: u32, de
     if !holds(self_, m, ty) { return true; }
     // A part that only borrows may hold what it likes, and so may the
     // elements of an array that is itself unique.
-    if self_.rules && !owns(self_, m, ty) { return true; }
-    if self_.rules && fact == shell {
+    if !owns(self_, m, ty) { return true; }
+    if fact == shell {
         let inner = element(self_, m, ty);
         if inner.present && !owns(self_, m, inner.value) { return true; }
     }
@@ -1242,10 +1342,21 @@ recursive fn ownedAs(self_: Analyzer&, m: const Module&, fact: Fact, ty: u32, de
         if !found { return false; }
         let nominal = m.nominal(index);
         let constructors = m.nominalConstructors(index);
-        if nominal.is_opaque || nominal.variables.len != 0 || constructors.len != 1 { return false; }
-        let payload = m.constructor(constructors[0]).payload;
-        if payload == 0 || payload >= m.types.nodes.len { return false; }
-        shape = m.types.node(payload);
+        if nominal.is_opaque || nominal.variables.len != 0 || constructors.len == 0 { return false; }
+        // Whichever constructor made the value, each field of its that
+        // can own an array has the fact its name has.
+        for constructor in constructors {
+            let payload = m.constructor(constructor).payload;
+            if payload == 0 { continue; }
+            if payload >= m.types.nodes.len { return false; }
+            let fields = m.types.node(payload);
+            if fields.tag != blot_check_types::Tag.record { if owns(self_, m, payload) { return false; } continue; }
+            for index in 0..fields.b {
+                let declared = m.types.recordField(fields, index);
+                if !ownedAs(self_, m, field(self_, fact, declared.name), declared.ty, depth + 1) { return false; }
+            }
+        }
+        return true;
     }
     if shape.tag != blot_check_types::Tag.record { return false; }
     for index in 0..shape.b {
@@ -1309,6 +1420,21 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     let selectors = m.updateSelectors(id);
     let root = visit(self_, m, info.root);
     for step in selectors { if step.kind == blot_check_core::UpdateKind.index { visitEscaping(self_, m, step.index); } }
+    // `self` in the value is the old leaf, which this update replaces: it
+    // is unique when every array the path goes through is, and a value
+    // read out of an array is only when the array is unique all the way
+    // down. So `world.items := grown self x` can give the old leaf away.
+    if !info.store && info.self_binding != 0 && local(self_, info.self_binding) {
+        var leaf: Fact = none;
+        if local(self_, root.origin) && self_.facts[root.origin] != spent {
+            leaf = self_.facts[root.origin];
+            for step in selectors {
+                if step.kind == blot_check_core::UpdateKind.field { leaf = field(self_, leaf, m.projection(step.projection).field); } else if leaf != deep { leaf = none; }
+            }
+            if selectors.len == 0 { for projection in m.updatePath(id) { leaf = field(self_, leaf, m.projection(projection).field); } }
+        }
+        define(self_, info.self_binding, leaf);
+    }
     let value = visit(self_, m, info.value);
     let replacement = taken(self_, m, info.value, value);
     var through_storage = false;
@@ -1317,6 +1443,7 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     if selectors.len != 0 { leaf = selectors[selectors.len - 1].result_type; }
     let shared = holds(self_, m, leaf) && replacement != deep;
     if info.store {
+        if self_.report_stores && through_storage && local(self_, root.origin) && accepts(self_, m, self_.facts[root.origin], selectors) { reject(self_, m, id, blot_check_core::Code.unchecked); }
         if shared { sharedInto(self_, m, info.root, selectors); }
         return Value { .. };
     }
@@ -1387,8 +1514,36 @@ recursive fn arrayOp(self_: Analyzer&, m: const Module&, id: u32, bound: bool) -
     if operation == blot_backend_collection_ops::Op.simd_store {
         // Writes four elements in place and returns the same storage.
         let container = visit(self_, m, children[0]);
+        let fresh = container.origin == 0 && unique(container.fact);
+        if self_.converted && !fresh && !storageOwned(self_, m, children[0]) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
         for child in children[1..] { visitEscaping(self_, m, child); }
+        if fresh { return Value { fact: container.fact, exits: container.exits, .. }; }
+        // A local written at its last read hands its storage on.
+        if container.origin != 0 && moves(self_, m, children[0], container.origin) {
+            let fact = self_.facts[container.origin];
+            kill(self_, container.origin);
+            return Value { fact: fact, exits: container.exits, .. };
+        }
         return Value { origin: container.origin, exits: container.exits, .. };
+    }
+    if bound && operation == blot_backend_collection_ops::Op.append && children.len == 2 && m.node(children[0]).tag == blot_check_core::Tag.reference {
+        // The backend grows an input named once in place, so the result is
+        // that input's storage with one more element. A module without
+        // stores may only do that to an array it owns.
+        let grown = visit(self_, m, children[0]);
+        let owned = local(self_, grown.origin) && unique(self_.facts[grown.origin]);
+        let item = visit(self_, m, children[1]);
+        let added = taken(self_, m, children[1], item);
+        let exits = grown.exits || item.exits;
+        if owned {
+            var fact = self_.facts[grown.origin];
+            if fact == deep && elementHolds(self_, m, n.ty) && !ownedAs(self_, m, added, m.typeOf(children[1]), 0) { fact = shell; }
+            kill(self_, grown.origin);
+            return Value { fact: fact, exits: exits, .. };
+        }
+        if self_.converted { reject(self_, m, id, blot_check_core::Code.aliased_update); }
+        escape(self_, grown);
+        return Value { exits: exits, .. };
     }
     if operation == blot_backend_collection_ops::Op.set || operation == blot_backend_collection_ops::Op.concat || operation == blot_backend_collection_ops::Op.slice || operation == blot_backend_collection_ops::Op.flatten || operation == blot_backend_collection_ops::Op.convert || operation == blot_backend_collection_ops::Op.prepend || operation == blot_backend_collection_ops::Op.append {
         // A new container whose elements are copies of the inputs'.
@@ -1428,6 +1583,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if unknown == blot_error::Error.none {
         if operation == blot_check_storage_ops::Op.length || operation == blot_check_storage_ops::Op.truncate || operation == blot_check_storage_ops::Op.reserve || operation == blot_check_storage_ops::Op.pop {
             let container = visit(self_, m, children[0]);
+
             var exits = container.exits;
             for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
             return Value { exits: exits, .. };
@@ -1442,9 +1598,13 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if operation == blot_check_storage_ops::Op.push {
             let container = visit(self_, m, children[0]);
             let value = visit(self_, m, children[1]);
-            var pushed = value.fact;
-            if self_.rules { pushed = taken(self_, m, children[1], value); } else { escape(self_, value); if value.origin != 0 { pushed = none; } }
-            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !(self_.rules && ownedAs(self_, m, pushed, m.typeOf(children[1]), 0)) { sharedInto(self_, m, children[0], []); }
+            let pushed = taken(self_, m, children[1], value);
+            // Growable storage is still shared and written by every holder
+            // (until `=` goes). A module without stores may put into
+            // storage it does not own only a value it owns, or the caller
+            // would go on updating in place what the storage now holds.
+            if self_.converted && !storageOwned(self_, m, children[0]) && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
+            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !ownedAs(self_, m, pushed, m.typeOf(children[1]), 0) { sharedInto(self_, m, children[0], []); }
             return Value { exits: container.exits || value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {
@@ -1456,11 +1616,13 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if operation == blot_check_storage_ops::Op.freeze {
             let container = visit(self_, m, children[0]);
             // Freezing a local at its last read gives its storage away.
-            if self_.rules && container.origin != 0 && moves(self_, m, children[0], container.origin) {
+            if container.origin != 0 && moves(self_, m, children[0], container.origin) {
                 let fact = self_.facts[container.origin];
                 kill(self_, container.origin);
                 return Value { fact: fact, exits: container.exits, .. };
             }
+            // A fresh value frozen is still that fresh value.
+            if container.origin == 0 { return Value { fact: container.fact, exits: container.exits, .. }; }
             return Value { origin: container.origin, exits: container.exits, .. };
         }
     }

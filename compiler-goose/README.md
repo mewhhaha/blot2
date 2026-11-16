@@ -69,7 +69,7 @@ Two of them read a model that is edited by hand:
 
 - `deno task test:compiler` is the gate: the tooling's tests, the optimized
   build, the three references below, the package, and the guest and host
-  suite (1,062 cases pass, 101 are ignored). `deno task test:guest` runs
+  suite (1,063 cases pass, 101 are ignored). `deno task test:guest` runs
   only the suite, against the optimized compiler as it is, and
   `deno task test:compiler:dev FILES` builds the debug compiler and runs
   those files.
@@ -84,8 +84,7 @@ Two of them read a model that is edited by hand:
     local's last read and the rules for every function, which Zig never
     had; their record is this compiler's, read through by hand. Three of
     Zig's 73 (`b41`, `c05`, `c10`) are accepted now, because the value
-    they alias moves. Each program is also built with
-    `BLOT_BORROWED_RULES` set, against `expected-rules.json`.
+    they alias moves.
   - `python3 compiler-goose/tools/test_direct.py` runs each law of
     `tests/direct/` and requires the recorded bytes.
 

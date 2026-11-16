@@ -796,9 +796,8 @@ holder is unique if the local was: `let cells = #[0, 0]` followed by
 `cells` is not read again. A read is the last one when nothing on any path
 after it reads the local: not a later statement, a closure made later, or a
 loop that carries it. Inside a loop only a local bound in the same iteration
-moves. Parameters, call results and
-constants are never unique, and no fact crosses a call, except through an
-`own` parameter (below). Branches keep
+moves. Parameters and constants are never unique; what crosses a call is
+described under "Ownership across calls" below. Branches keep
 uniqueness only when every arm that continues keeps it; an arm that returns
 contributes nothing. A loop carry is unique when its first value and every
 value it carries back are.
@@ -822,24 +821,92 @@ copy keeps the old element. Without `.copy`, `let before = rows` would make
 `rows[1] := 20` an `aliased_update`. A local whose value holds storage keeps one
 type and is not generalized, so its stores and reads agree.
 
+### Ownership across calls
+
+A function's result belongs to its caller alone, and a call only borrows
+its arguments. So a local stays unique after it is passed to a function,
+and what a function returns can be updated in place with `:=`:
+
+```blot
+func scaled (rows: Array U32) -> (k: U32): Array U32 => return #[x * k | x <- rows]
+
+entry func run (n: U32) : U32 => return do:
+  let rows = #[1, 2, 3]
+  let more = scaled rows n
+  more[0] := 9
+  rows[1] := 5
+  break more[0] + rows[1]
+```
+
+For that to hold, each `return` must give a value nothing else holds: a
+fresh value, or a local that alone holds its value. A parameter, a field of
+one, an element read out of an array of arrays, a module constant, or a
+record that puts one array in two fields is `result_not_owned`. Return
+`values.copy` of it, or take the parameter over with `own` (below). A
+literal is a fresh value each time; a module constant is one shared array.
+
+Two kinds of function are not held to this, and their results are not
+taken to be unique either:
+
+- an `entry` function, whose result goes to the host, which copies it;
+- a contract's member, which passes on what the chosen implementation
+  returns. Implementations are held to it.
+
+A result whose type owns no array is not checked: a number, a view, a
+function, a type variable. Growable storage (`GrowArray`, `ResizeArray`)
+counts as not owned while `=` exists, because every holder still writes it.
+
+**Generic functions that return what they were lent.** `Array.at`,
+`identity` and `Maybe.unwrap_or` return a value of a variable type that came
+in through a parameter. Called where that type is an array, the result
+shares with the argument, as `grid[0]` shares with `grid`: reading is fine,
+and an in-place `:=` on either side is `aliased_update` until one is
+copied. The same holds for a generic function that puts its argument into
+growable storage it was given (`bag.push rows`).
+
+```blot
+let grid = #[#[1, 2], #[3, 4]]
+let row = grid.at 0          // shares with grid
+let mine = (grid.at 0).copy  // an array of its own; grid stays unique
+```
+
+Such a function cannot be used as a value, or applied partly, where the
+variable is an array (`lent_result_value`): pass a function that copies.
+
+**Old-style modules.** A module that still contains a store `place = value`
+is in the old style until its last store is gone. Its functions may keep
+what they are lent, so:
+
+- their returns are not checked, except in `own` functions and contract
+  implementations;
+- a call to one of them shares its arguments and its result is not unique,
+  as before.
+
+A module without stores may only push a value it owns into growable storage
+it was given, may not append in place to an array it does not own, and may
+not call `@simd.store` on one.
+
+A call through a function value (a parameter, a field) is treated as a call
+into an old-style module for now, unless the function is a closure the
+module made itself.
+
 ### `own` parameters
 
 A top-level named function can take a parameter over by writing `own`
 before its type. Inside the function the parameter is unique, so `:=`
-through it writes in place, and the function's result belongs to the
-caller, who can update it in place in turn.
+through it writes in place, and it can be returned.
 
 ```blot
 type World is data = $World { counts: Array U32, size: U32 }
 
-func damage (world: own World) -> (index: U32): World => return do:
+func World.damage (world: own World) -> (index: U32): World => return do:
   world.counts[index] := world.counts[index] + 1
   break world
 
 entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0, 0], size: 3 }
   for i in 0..n:
-    world := damage world 2
+    world := world.damage 2
   world.counts[0] := world.size
   break world.counts[0] * 10 + world.counts[2]
 ```
@@ -851,15 +918,14 @@ No array is copied in `run`. The rules:
   every array in those). Anything else is `own_argument`; pass
   `values.copy` of it instead.
 - The local is spent by the call. Reading it again is `spent_value`;
-  rebind it to the result (`world := damage world 2`) or use the result
+  rebind it to the result (`world := world.damage 2`) or use the result
   under a new name.
+- In `place := f … self`, `self` is the old value of the place, which the
+  update replaces, so it can be given away: `world.counts := filled self 0`
+  hands the field to `filled` and puts the result back.
 - Inside a loop, only a local bound in the same iteration can be given
   away, because the next iteration would give it away again. A local the
   loop rebinds each time, as `world` above, is one.
-- Each `return` of the function must give a value nothing else holds: the
-  parameter itself, updated or not, another unique local, or a fresh
-  value. A borrowed parameter, a constant, or a record that shares an
-  array between two fields is `result_not_owned`.
 
 What is not built yet:
 
@@ -872,10 +938,6 @@ What is not built yet:
   type's namespace (`func World.damage …`), as `world.damage 2`. Using it
   as a value or applying it partly is `own_function_value`, because
   function types do not carry `own` yet.
-- Passing a local to an ordinary parameter still ends its uniqueness, so
-  `let n = count rows` before `fill rows 0` makes the second call an
-  `own_argument`. The results of ordinary functions are not unique yet
-  either.
 
 ### Named owners and explicit copies
 

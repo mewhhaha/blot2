@@ -58,7 +58,7 @@ const make = func value => return $Box { value: value }
 const read = func ($Box value) => return value.value
 const field = func value => return value.value
 const wrap = $Wrapped
-const unwrap = func ($Wrapped value) => return value
+const unwrap = func ($Wrapped value) => return @storage.copy value
 entry const answer = func (value: U32) => return @u32.add (read (make value)) (field (make 2))
 entry const shared = func (value: U32) => return do:
   let original = #[value, 2]

@@ -16,12 +16,13 @@ func equal (left: Text) -> (right: Text) : Bool => return do:
 
 func valid_scalar value => return
   value <= 0x10FFFF and (value < 0xD800 or value > 0xDFFF)
-func from_scalars (values: Array U32) : Maybe Text => return do:
+// Both take the array over: a Text is its scalars, so nothing is copied.
+func from_scalars (values: own Array U32) : Maybe Text => return do:
   for value in values:
     if Bool.not (valid_scalar value):
       return $Nothing
   break $Some values
-func scalars (value: Text) => return value
+func scalars (value: own Text) => return value
 
 // Append into a persistent List; one conversion produces the final Array.
 type Builder = List U32

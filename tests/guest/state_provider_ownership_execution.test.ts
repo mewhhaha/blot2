@@ -6,23 +6,25 @@ const executable = Deno.args[0] ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url).pathname;
 const source = `
 type State a is effect = {get: Unit -> a, set: a -> Unit}
-const selected = func () => return State.get (Array U32) ()
-const borrow = func () => return do:
+// A read shares what the state holds, so a function that hands it on copies it.
+const selected = func () => return (State.get (Array U32) ()).copy
+entry const run = func (count: U32) => return do:
   let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[7, 42]
   let (_, old) = do local:
-    use value <- selected ()
+    use value <- State.get (Array U32) ()
     use State.set (Array U32) #[90, 91]
     break value
-  break old
-entry const run = func (count: U32) => return do:
-  use old <- borrow ()
   for index in 0..count:
     let pressure = @array.fill 8192 index
     if pressure[8191] != index:
       @panic "lost pressure"
   break old
 entry const failed = func (host: Array U32 -> Unit ! {Foreign}) => return do:
-  use old <- borrow ()
+  let local = @effect.state (State.get (Array U32)) (State.set (Array U32)) #[7, 42]
+  let (_, old) = do local:
+    use value <- State.get (Array U32) ()
+    use State.set (Array U32) #[90, 91]
+    break value
   use host old
   break old[1]
 entry const floating = func () => return do:

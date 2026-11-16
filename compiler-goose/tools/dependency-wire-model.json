@@ -2701,6 +2701,11 @@
      "own_count",
      "u8",
      "own_count"
+    ],
+    [
+     "owned_results",
+     "bool",
+     "owned_results"
     ]
    ],
    "unwired": []

@@ -549,7 +549,7 @@ Deno.test("JSON root values always export their exact Data type, including empty
     try {
       for (const [json, expression, expected] of cases) {
         const source =
-          `import { value, Data } from "./config"\nconst identity = func (input: Data) : Data => return input\nentry const answer = func () => return ${expression}\n`;
+          `import { value, Data } from "./config"\nconst identity = func (input: own Data) : Data => return input\nentry const answer = func () => return ${expression}\n`;
         equal(
           await call(
             await compiler.build({

@@ -53,11 +53,6 @@ entry func looped (n: U32) : U32 => return do:
   for value in rows:
     total := self + value
   break total
-entry func method_write (n: U32) : U32 => return do:
-  let rows = #[1, 2]
-  let alias = rows
-  rows.write 0 n
-  break alias[0]
 `, (guest) => {
     equal(guest.call("element", 7), 77);
     equal(guest.call("field", 5), 12);
@@ -68,7 +63,6 @@ entry func method_write (n: U32) : U32 => return do:
     equal(guest.call("expression_root", false), 19);
     equal(guest.call("captured", 5), 5);
     equal(guest.call("looped", 4), 12);
-    equal(guest.call("method_write", 9), 9);
   }, { stdRoot });
 });
 
@@ -174,11 +168,6 @@ const aliased: [string, string][] = [
   let read = func (i: U32) => return rows[i]
   rows[0] := n
   break read 0`],
-  ["passed to a call", `
-  let rows = #[1, 2]
-  let total = array.fold_left U32.add 0 rows
-  rows[0] := n
-  break total`],
   ["placed in a constructor", `
   let rows = #[1, 2]
   let held = $Some rows
@@ -208,23 +197,21 @@ const aliased: [string, string][] = [
   break (func (values: Array U32) => return do:
     values[0] := 1
     break values[0]) rows`],
-  ["a call result", `
-  let rows = array.fill 2 0
-  rows[0] := n
-  break rows[0]`],
   ["aliased later in a loop", `
   let rows = #[0, 0]
   let total = 0
   for i in 0..2:
     rows[i] := n
-    total := self + array.fold_left U32.add 0 rows
+    let kept = rows
+    total := self + kept[0]
   break total`],
   ["aliased in a sibling branch of a loop", `
   let rows = #[0, 0]
   let total = 0
   for i in 0..2:
     if i == 0:
-      total := self + array.fold_left U32.add 0 rows
+      let kept = rows
+      total := self + kept[0]
     else:
       rows[i] := n
   break total`],
@@ -386,4 +373,21 @@ Deno.test("a local read again after another holder took its value is still alias
       throw new Error(`${name}: ${error}`);
     }
   }
+});
+
+Deno.test("a call only borrows its arguments, and its result is the caller's to update", async () => {
+  await compileAndRun(`import * as array from "std/array"
+entry func lent (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let total = array.fold_left U32.add 0 rows
+  rows[0] := n
+  break total * 10 + rows[0]
+entry func from_call (n: U32) : U32 => return do:
+  let rows = array.fill 2 0
+  rows[0] := n
+  break rows[0] * 10 + rows[1]
+`, (guest) => {
+    equal(guest.call("lent", 5), 35);
+    equal(guest.call("from_call", 4), 40);
+  }, { stdRoot });
 });

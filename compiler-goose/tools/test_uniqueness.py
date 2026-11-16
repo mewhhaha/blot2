@@ -12,9 +12,10 @@ later; their record is this compiler's, read through by hand. The pass runs afte
 lowering, so `build` reaches it whether or not a backend follows. A run that
 ends without a compilation record (a crash) fails.
 
-Each program is also built with BLOT_BORROWED_RULES set, against
-expected-rules.json: the rules of tasks/MEMORY_MODEL.md that are not the
-default yet. The programs named g are about those.
+The programs named g are about the rules every function has: its result is
+the caller's alone, and a call only borrows its arguments. A program with a
+store `place = value` is a module in the old style, where only `own`
+functions are held to that.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
@@ -29,16 +30,13 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 LAWS = ROOT / "tests/uniqueness"
 EXPECTED = LAWS / "expected.json"
-EXPECTED_RULES = LAWS / "expected-rules.json"
 # (label, environment switch, record)
-MODES = [("", False, EXPECTED), (" under the rules", True, EXPECTED_RULES)]
+MODES = [("", False, EXPECTED)]
 
 
 def diagnostics(compiler, source, output, rules=False):
     environment = dict(os.environ)
-    environment.pop("BLOT_BORROWED_RULES", None)
-    if rules:
-        environment["BLOT_BORROWED_RULES"] = "1"
+    environment.pop("BLOT_REPORT_STORES", None)
     result = subprocess.run([str(compiler), "build", str(source), str(output)], capture_output=True, text=True,
                             stdin=subprocess.DEVNULL, timeout=120, env=environment)
     frontend, lowering = [], []
@@ -63,7 +61,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*")
     parser.add_argument("--compiler", type=Path, default=ROOT / "build/blotc-goose")
-    parser.add_argument("--record", type=Path, help="write expected.json and expected-rules.json from this compiler")
+    parser.add_argument("--record", type=Path, help="write expected.json from this compiler")
     args = parser.parse_args()
     every = sorted(path.stem for path in LAWS.glob("*.blot"))
     failed = False

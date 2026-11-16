@@ -31,12 +31,12 @@ entry const answer = func () => return do:
   });
 });
 
-Deno.test("data stack SIMD stores validate the whole span before changing persistent lanes", async () => {
+Deno.test("data stack SIMD stores validate the whole span and write only the copy they were given", async () => {
   await compileAndRun(`
 const words = #[11,22,33,44,55,66]
 entry const write = func (index: U32) => return do:
   let owner: GrowArray U32 = #[]
-  let changed = @simd.store words index (9,8,7,6)
+  let changed = @simd.store (@storage.copy words) index (9,8,7,6)
   return changed[0]
 entry const read = func () => return do:
   let (a,b,c,d) = @simd.load words 1
@@ -46,7 +46,7 @@ entry const read = func () => return do:
     assert.deepEqual(Array.from(guest.call("read", null) as Uint32Array), [11,22,33,44,55,66]);
     assert.throws(() => guest.call("write", 0xFFFFFFFF), WebAssembly.RuntimeError);
     assert.equal(guest.call("write", 1), 11);
-    assert.deepEqual(Array.from(guest.call("read", null) as Uint32Array), [11,9,8,7,6,66]);
+    assert.deepEqual(Array.from(guest.call("read", null) as Uint32Array), [11,22,33,44,55,66]);
   });
 });
 

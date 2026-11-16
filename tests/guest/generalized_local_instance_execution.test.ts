@@ -179,9 +179,10 @@ entry const fraction = func (x: F32) => return do:
 
 Deno.test("allocating runtime producers release every instance", async () => {
   await compileAndRun(`
-${pair}
+// A closure hands out a copy of the array it holds: its result is the caller's alone.
+const holding = func (a: Array U32) => return func b => return (a.copy, b)
 entry const main = func (x: U32) => return do:
-  let k = pair (@array.fill 64 x)
+  let k = holding (@array.fill 64 x)
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[3] + second.length - 64
@@ -196,10 +197,10 @@ entry const memory = func () : Array U32 => return #[]
 // array would return 909 for 7.
 Deno.test("producers with a collection edit give every instance the same edited value", async () => {
   await compileAndRun(`
-${pair}
+const holding = func (a: Array U32) => return func b => return (a.copy, b)
 entry const main = func (x: U32) => return do:
   let values = @array.fill 4 x
-  let k = pair (@array.set values 0 (values[0] + 1))
+  let k = holding (@array.set values 0 (values[0] + 1))
   let (first, _) = k x
   let (second, _) = k 1.5
   break first[0] * 100 + second[0]

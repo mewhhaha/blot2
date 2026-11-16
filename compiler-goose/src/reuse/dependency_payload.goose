@@ -2834,6 +2834,7 @@ var result=default<blot_check_capability_flow::Parameters>();
 
 result.own=value.own;
 result.own_count=value.own_count;
+result.owned_results=value.owned_results;
 
 return result,blot_error::Error.none;
 

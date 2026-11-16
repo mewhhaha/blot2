@@ -18,7 +18,7 @@ zig compiler". Both are done: the compiler is the Goose one in
 compiler-goose/, and compiler/ (Zig) is gone. The record is in
 [tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md). Next is compile times.
 
-## State on main (15 November 2026)
+## State on main (16 November 2026)
 
 - **One compiler, written in Goose** (compiler-goose/). The Zig compiler it
   was ported from was removed on 15 November 2026; its last tree is commit
@@ -31,12 +31,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   checker's cross-revision reuse are deleted. `serve-project` builds each
   revision fresh; dependency bundles (`.blotdep`) still provide checked
   modules.
-- **Gdev Main** builds; its first Pen frame is byte-identical (frame.png
-  19a03f0a…, frames.trace 86d50101…), at 0.075 ms of guest time per frame
+- **Gdev Main** builds (Wasm dd97fe15…, 2,724,223 bytes); its first Pen
+  frame is byte-identical (frame.png 19a03f0a… on hardware, c1ff619f… on
+  the software driver; frames.trace 86d50101…), at 0.075 ms of guest time per frame
   against the old backend's 2.45 ms.
 - **Ink:** `pen test-blot` gives `same 64 wrong 0 newfail 0 other 9` against
   the old backend's reference log.
-- **Guest suite:** 1,062 cases pass, 101 are ignored, each with its reason
+- **Guest suite:** 1,063 cases pass, 101 are ignored, each with its reason
   (tasks/DELETE_SCOPED.md lists them by kind), and none fail. The full gate
   (`deno task test:compiler`) passes. It no longer has Zig's native laws;
   see "What went with Zig" in tasks/GOOSE_PORT.md.
@@ -74,43 +75,28 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
 
 ## In progress
 
-- **Memory model phase 2** (`own` and borrowed parameters). The owner
-  approved the rules on 16 November 2026 ("Yes. Do all of that."), and the
-  first part is on main: `own` on the parameters of top-level named
-  functions, with spent names, checked arguments and owned results for
-  those functions, and a value moving at its local's last read
-  (tasks/MEMORY_MODEL.md, "Phase 2 as built so far"; docs/language/guide.md,
-  "`own` parameters"). Nothing is migrated.
-  - **Next:** the same rules for every function. They are in the pass
-    behind the environment variable `BLOT_BORROWED_RULES`, for measuring
-    only: with it the guest suite has 24 failing cases in 14 files, std
-    has 1 site to change, Ink's tests 33 and the Gdev build 56
-    (tasks/MEMORY_MODEL.md, "Plan for the rest of phase 2" and "The plan,
-    measured"). Still to do before it can be the default: changing std,
-    the tests, Ink and Gdev in their working trees with the switch on
-    (most sites return a parameter or build a record from parameters'
-    arrays), then flipping the default in the three repositories
-    together, deleting the switch and bringing spec section 10.3 in line.
-    After that: a temporary holder giving ownership back, `own` in
-    function types, and phase 3 (move std, Ink and Gdev off `=`, delete
-    `=`).
-  - Decided by the owner on 16 November 2026 ("Do your plan."): a generic
-    call that returns what it was lent (`grid.at 0` on an array of arrays)
-    shares, as `grid[0]` does; it is not an error.
-  - An older, unfinished pass with the broad rules is on branch
-    `wip/memory-phase2-own` (0afccb55), written in Zig. Its measurements
-    are what the rules were chosen from:
-    - Its 585 guest failures come from the breadth of its rules: it
-      rejects the prelude (`identity`, `Maybe.map`, `Array.at`), which
-      every case compiles. It also has one bug, in shallow copies.
-    - As first written the rules rejected 352 places in the Gdev build and
-      350 in Ink's tests. The approved rules reject 44 and 27, and 75
-      guest cases; those are the places phase 2 has to change.
-    - tasks/MEMORY_MODEL.md, "Phase 2: what the borrowed rules reject",
-      has the counts, the rules, what the pass still needs, and the order
-      of work. Spec Annex B item 13 points to it.
-  - Still the owner's: whether `own` in function types waits for the B3
-    and C8 removals.
+- **Removing `=`** (memory model phases 2 and 3). The owner asked on 16
+  November 2026 to finish the conversion "so we don't have the mutable =
+  anymore". Phase 2 is the default now; the rest is not done.
+  tasks/MEMORY_MODEL.md, "Phase 2 is the default", has the details.
+  - **Done:** every function's result is its caller's alone and a call
+    only borrows its arguments; `own` parameters; moves at a local's last
+    read; std has no store; 380 provably unique stores in Ink and Gdev
+    became `:=`. A module that still has a store is in the old style and
+    lives beside converted ones.
+  - **Left:** about 4,400 stores in Ink and Gdev (table in
+    tasks/MEMORY_MODEL.md), none of them convertible as it stands. They
+    are output parameters (2,208 in two files that `pen codegen`
+    generates), world state reached through shared records, and
+    one-element arrays used as cells. Then delete `=`, `migrate-stores`,
+    the old-style distinction, and bring spec section 10.3 in line.
+  - **Order that makes sense:** the generator in ../pen first (it is one
+    place and half the sites), then Ink's library module by module, then
+    Gdev's systems from the frame loop down. `own` on lambdas and in
+    function types is needed on the way.
+  - Tools: `python3 scripts/integration/count_stores.py DIR...` counts
+    what is left; `python3 scripts/integration/stores_to_updates.py
+    PROJECT ENTRY...` converts what the compiler can already prove.
 - **Memory model phase 4** (the value restriction for `let`) is measured
   and not built. std, Ink and Gdev need no change and Gdev's frame is
   identical, but 13 guest cases pin the old rule (and 11 of Zig's native

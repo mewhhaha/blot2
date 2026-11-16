@@ -20,7 +20,7 @@ entry const variants = func (count: U32) => return do:
   break sum
 entry const pipeline = func (count: U32) => return do:
   let commands = array.generate count (func i => return $Command {lanes: array.generate 24 (func j => return lane i j)})
-  let chunks = array.map (func command => return command.lanes) commands
+  let chunks = array.map (func command => return command.lanes.copy) commands
   let values = flatten chunks
   break array.fold_left (func sum -> value => return sum + value) 0 values
 `;

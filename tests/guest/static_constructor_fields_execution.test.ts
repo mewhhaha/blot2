@@ -25,7 +25,7 @@ entry const forks = func count => return do:
 entry const references = func count => return do:
   let values = #[#[7, 8], #[9], #[10, 11, 12]]
   let total = 0
-  for value in iter.take count (iter.map identity values):
+  for value in iter.take count (iter.map (func (row: Array U32) => return row.copy) values):
     let garbage = @array.generate 8192 identity
     total := self + value.length + value[0]
   break total

@@ -87,9 +87,9 @@ full gate green, and moves std, ../ink and ../gdev itself.
    below. It also landed the `=` store and `blotc migrate-stores`, which
    turned 1,880 `:=` in Ink and 3,011 in Gdev into `=`. `=` stays until
    phase 3.
-2. **`own` and borrowed parameters.** Started: "Phase 2 as built so far"
-   below. "Phase 2: what the borrowed rules reject" has the counts, the
-   approved rules and what is still open.
+2. **`own` and borrowed parameters.** The default since 16 November 2026:
+   "Phase 2 is the default" below. Open: `own` in function types, and a
+   temporary holder giving ownership back.
    - In the checker: `own` in function types, spent names, owned call
      results, borrowed parameters not updatable or returnable, ownership
      returning at a holder's last use, and the generic-read rule.
@@ -272,6 +272,97 @@ named functions only, recorded per binding and called directly. That covers
 all 44 sites. A lambda with an `own` parameter, which `State.modify` needs,
 waits for `own` in types.
 
+## Phase 2 is the default (16 November 2026)
+
+The owner asked on 16 November 2026: "Can you finish the conversion so we
+don't have the mutable = anymore?" This is how far that got, and what is
+left.
+
+**Done.** The rules of "Plan for the rest of phase 2" apply to every
+module; the `BLOT_BORROWED_RULES` switch is gone.
+
+- std has no store. The prelude's `values.write` is gone (write
+  `values[i] = v` while `=` exists); `simd.store`, `text.from_scalars` and
+  `text.scalars` take their array over with `own`.
+- The guest and host suite passes (1,063 cases). 24 test programs changed:
+  a function that returned a parameter, a field of one or a module
+  constant now copies it or takes it `own`; tests that pinned "writes
+  through aliases" for `simd.store` now pin the take-over.
+- 380 stores in Ink and Gdev whose place was provably unique became `:=`
+  (318 from the Gdev build, 61 from Ink's tests, 1 more on a second pass).
+  Ink's suite gives the same result as before (268 passed, 1 failed, 3 did
+  not compile), and Gdev's first frame is byte-identical (frame.png
+  c1ff619f…, frames.trace 86d50101…). Gdev's Wasm is now dd97fe15…,
+  2,724,223 bytes.
+
+**How modules in the old style live beside converted ones.** A module that
+still contains a store is in the old style. The checker marks each
+top-level named function of a module without stores (`owned_results`, with
+the `own` marks in `capability_parameters`), and the pass decides by that
+mark:
+
+- a call to a marked function, to a member that is one, to a contract's
+  member, or to a closure a store-free module made itself, only borrows
+  its arguments and gives a unique result. Every other call (an unmarked
+  function, a function value from a parameter or a field, a constructor
+  used as a function, an effect operation) shares its arguments and gives
+  a result that is not unique, as in phase 1;
+- the result rule is checked in every function and closure of a store-free
+  module, in every `own` function and in every contract implementation.
+  An `entry` function is exempt and unmarked: its result goes to the host,
+  which copies it;
+- a store-free module may only push a value it owns into growable storage
+  it was given, may not append in place to an array it does not own, and
+  may not `@simd.store` into one;
+- a generic function that puts its argument into growable storage it was
+  given (`bag.push rows`) counts like one that returns it: called where the
+  type variable is an array, it shares.
+
+All of this goes when the last store does: then every module is checked,
+every call is trusted, and `GrowArray` and `ResizeArray` become owned
+values.
+
+**What is left: about 4,400 stores.** Counted by line shape with
+`python3 scripts/integration/count_stores.py DIR...`.
+`python3 scripts/integration/stores_to_updates.py PROJECT ENTRY...` turns
+into `:=` each store the compiler reports as provably unique (it runs
+`blotc migrate-stores --dry-run` with `BLOT_REPORT_STORES` set); none is
+left in the Gdev build or Ink's tests.
+
+| Tree | Stores | Files |
+| --- | ---: | ---: |
+| ink/lib | 373 | 51 |
+| ink/tests | 1,342 (1,104 in two generated protocol files) | 58 |
+| gdev/src | 703 | 63 |
+| gdev/tests | 707 | 131 |
+| gdev/pen | 1,104 (the same two generated files) | 2 |
+| gdev/devtools | 91 | 12 |
+| gdev/performance | 106 | 18 |
+
+None of these is a local the compiler can already see as unique. They are
+of three kinds, and each needs the code restructured, not a token changed:
+
+- **Output parameters.** A function fills an array or a growable buffer
+  its caller handed it (`encoded[at] = …` in the generated protocol
+  encoders, `out`, `output`, `destination`, `p` and `v` in Ink's motion
+  code). The immutable form takes the buffer `own` and returns it, and the
+  caller rebinds. The generated files come from `pen codegen`
+  (pen/crates/pen-codegen/src/blot.rs): changing the generator converts
+  2,208 of the sites, and then its callers in Ink and Gdev.
+- **World state reached through shared records.** `access.x[i] = v`,
+  `owners.…`, `frame.…`: records of array handles (`FrameAccess`) that
+  every system is handed and writes through. Each system has to take the
+  state it changes `own` and give it back, up to where the frame loop
+  holds it. This is the rewrite the phases list calls "a style rewrite of
+  how systems thread their world state".
+- **One-element arrays used as cells.** `state[0] = next`,
+  `meta[0] = next`, `settings[0] = settings`. They become plain fields of
+  the state that is threaded.
+
+Two things the compiler still lacks for that rewrite: `own` on lambdas and
+in function types (a system passed as a value, the state `modify`), and
+trust in calls through function values, which waits for the last store.
+
 ## Phase 2 as built so far (16 November 2026)
 
 `own` on the parameters of top-level named functions, in the Goose
@@ -410,12 +501,12 @@ within the approved rules; the one deviation is marked.
    default once std, the tests, Ink and Gdev are changed. The switch is
    then deleted.
 
-### The plan, measured (16 November 2026)
+### The plan, measured (16 November 2026, before it became the default)
 
-Items 1 to 5 of the plan are in the pass behind the environment variable
-`BLOT_BORROWED_RULES` (any value turns them on; without it nothing
-changes). compiler-goose/tests/uniqueness/expected-rules.json records what
-the 129 reference programs give with it; the programs `g…` are about it.
+These numbers are from when the rules sat behind the environment variable
+`BLOT_BORROWED_RULES`, applied to every module at once. They are what the
+per-module scheme of "Phase 2 is the default" was chosen from; the switch
+and its second reference record are gone.
 
 With the switch on:
 

@@ -3,7 +3,7 @@ import { instantiateGuest } from "../../host/guest.ts";
 import { compileAndRun } from "./compile_helpers.ts";
 
 const source = `
-const choose = func (values: Array U32) => return func (branch: U32) => return do:
+const choose = func (values: own Array U32) -> (branch: U32) => return do:
   if branch == 0:
     break values
   if branch == 1:

@@ -13,7 +13,7 @@ entry const staged = calculate 9
 entry const flags = func seed => return simd.u32_sum (simd.u32_xor (simd.u32_and (seed, seed, seed, seed) (1, 2, 4, 8)) (1, 2, 4, 8))
 entry const snapshot = func seed => return do:
   let before = #[seed, seed + 1, seed + 2, seed + 3, 99]
-  let after = simd.store 1 (simd.u32_add (simd.load 0 before) (10, 20, 30, 40)) before
+  let after = simd.store 1 (simd.u32_add (simd.load 0 before) (10, 20, 30, 40)) before.copy
   break #[before[1], after[0], after[1], after[2], after[3], after[4]]
 entry const invalid_load = func index => return simd.u32_sum (simd.load index #[1, 2, 3, 4])
 entry const invalid_store = func index => return simd.store index (1, 2, 3, 4) #[1, 2, 3, 4]
@@ -30,8 +30,8 @@ entry const floating = func (value: F32) => return do:
     equal(guest.read("staged"), 304);
     equal(guest.call("runtime", 0xffffffff), 44);
     equal(guest.call("flags", 5), 10);
-    // `simd.store` writes into `before`, which `after` aliases (tasks/LANGUAGE_COHERENCE.md A7).
-    deepStrictEqual(Array.from(guest.call("snapshot", 5) as Uint32Array), [15, 5, 15, 26, 37, 48]);
+    // `simd.store` takes its array over; given a copy, it leaves `before` as it was.
+    deepStrictEqual(Array.from(guest.call("snapshot", 5) as Uint32Array), [6, 5, 15, 26, 37, 48]);
     for (const index of [1, 4, 0xffffffff]) {
       throws(() => guest.call("invalid_load", index));
       throws(() => guest.call("invalid_store", index));
@@ -70,18 +70,18 @@ Deno.test("four-element Array loads and stores check one range and write through
 import * as simd from "std/simd"
 entry const edited = func (index: U32) : Array F32 => return do:
   let values = #[1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
-  let before = values
+  let before = values.copy
   values := simd.store index (simd.f32_mul (simd.load index values) (2.0, 2.0, 2.0, 2.0)) values
   break #[before[index], values[0], values[1], values[2], values[3], values[4], values[5]]
 entry const flags = func (index: U32) : U32 => return do:
   let values = #[true, false, true, true, false]
   let (a, b, c, d) = simd.load index values
-  let flipped = simd.store index (d, c, b, a) values
+  let flipped = simd.store index (d, c, b, a) values.copy
   break (if flipped[index] then 1 else 0) + (if flipped[index + 3] then 2 else 0) + (if values[index] then 4 else 0)
 `, guest => {
-    // `before` aliases `values`, so it sees the store (tasks/LANGUAGE_COHERENCE.md A7).
-    deepStrictEqual(Array.from(guest.call("edited", 0) as Float32Array), [2, 2, 4, 6, 8, 5, 6]);
-    deepStrictEqual(Array.from(guest.call("edited", 2) as Float32Array), [6, 1, 2, 6, 8, 10, 12]);
+    // `before` is a copy, so it keeps the element the store replaced.
+    deepStrictEqual(Array.from(guest.call("edited", 0) as Float32Array), [1, 2, 4, 6, 8, 5, 6]);
+    deepStrictEqual(Array.from(guest.call("edited", 2) as Float32Array), [3, 1, 2, 6, 8, 10, 12]);
     for (const index of [3, 4, 0xfffffffd, 0xffffffff]) throws(() => guest.call("edited", index));
     equal(guest.call("flags", 0), 1 + 2 + 4);
     equal(guest.call("flags", 1), 0);

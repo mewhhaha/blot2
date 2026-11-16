@@ -26,7 +26,7 @@ func prefix_sums (values: Array U32) : Array U32 => return do:
   let total = 0
   for index in 0..values.length:
     total := self + values[index]
-    result[index] = total
+    result[index] := total
   break result
 
 // One traversal; append into an owner whose growth capability is consumed.

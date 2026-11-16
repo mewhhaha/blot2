@@ -98,11 +98,11 @@ func f32_relaxed_madd a -> b -> c => return @simd.f32x4.relaxed_madd a (b, c)
 func f32_relaxed_nmadd a -> b -> c => return @simd.f32x4.relaxed_nmadd a (b, c)
 
 // One range check precedes the index arithmetic, so a wrapping index cannot
-// select unrelated lanes. Loads copy four elements; stores keep the ordinary
-// Array snapshot contract and replace in place when the Array is exclusive.
+// select unrelated lanes. Loads copy four elements; a store takes the Array
+// over, replaces four elements in place and gives it back.
 // U32, F32 and Bool elements are supported.
 func load index -> values => return @simd.load values index
-func store index -> lanes -> values => return @simd.store values index lanes
+func store index -> lanes -> (values: own Array a) => return @simd.store values index lanes
 
 // Reductions never reassociate implicitly. The pairwise variant is an explicit
 // choice of grouping and can round differently from the left-to-right version.
