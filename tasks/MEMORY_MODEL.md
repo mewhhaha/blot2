@@ -429,6 +429,45 @@ Checked: the gate (1,065 pass, 101 ignored), Ink's suite as before, Gdev's
 first frame byte-identical (Wasm now 24013ca4…, 2,721,854 bytes, because
 of the salt simulation), Gdev's own tests as before (362, 27, 118).
 
+**First conversions (16 November 2026).** With those three pieces in, the
+`own` style was tried on what was ready for it.
+
+- Nine `lent` functions took their parameter with `own` and lost the mark
+  with no caller changed: the devtools HUD's five row builders (already
+  called as `hud := row self …`), `construction_kit.structure`,
+  `impact.fringes`, `contact.reduce` and `field.mark`.
+  The trial was mechanical: add `own` to the parameter a `lent` function
+  returns, and keep it if every program still checks clean. Eight more
+  failed it because a caller does not own what it passes.
+- `stores_to_updates.py` found 58 more stores it can prove unique (32 in
+  Ink, 26 in Gdev), since locals stay unique across calls now.
+- Left: 4,466 stores and 57 `lent` functions.
+
+**What blocks the rest, in order.** The stores are writes through Gdev's
+`FrameAccess` and what is made from it, and nothing can take that with
+`own` until the top of the program owns it. From the top:
+
+1. `world_storage.with_owners` makes every buffer as a local, so it owns
+   them, until it builds `hooks`: a closure that captures the whole record
+   to despawn, reset and stash on demand (23 uses). The hooks have to
+   become functions that are given the access.
+2. `with_owners` hands the record to a continuation, and Ink's
+   `host.run` hands it on to `program.run`'s loop. Each has to take it
+   with `own` and give it back (`own` in function types is there for
+   this).
+3. Each frame `host.with_frame` makes the frame's buffers and
+   `bind_frame` builds one `FrameAccess` out of them and the persistent
+   record, field by field (170 fields), and nothing takes it apart again.
+   Either the pass learns to move fields out of a record at its last use,
+   or the frame's buffers live in the persistent record and are emptied
+   each frame.
+4. Then the 20 or so functions that hand out a part of the access as a
+   record of its own (`simulation_access`, `read_state`, `read_surface`,
+   Ink's `scene.access`, `spatial.access`, …) are replaced by passing the
+   part itself, and each system takes what it writes with `own`. From
+   there the writers convert one at a time, and the generated encoders
+   (half the stores) with their caller, `host.encode_frame`.
+
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark
 the parameter `own`, return it, rebind at the call, and turn its `=` into

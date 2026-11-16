@@ -87,10 +87,10 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     store; 379 provably unique stores in Ink and Gdev became `:=`.
   - **What `=` is now:** a write through what a function was lent, which
     may keep only values it owns (`kept_value`). A function that still
-    returns or keeps what it was lent is marked `lent` (66 in Ink and
+    returns or keeps what it was lent is marked `lent` (57 in Ink and
     Gdev) and nobody relies on it.
-  - **Left:** about 4,400 stores in Ink and Gdev (table in
-    tasks/MEMORY_MODEL.md) and the 66 `lent` functions. The way is
+  - **Left:** 4,466 stores in Ink and Gdev (table in
+    tasks/MEMORY_MODEL.md) and the 57 `lent` functions. The way is
     top-down from the frame loop: once every caller owns what it passes, a
     writer takes it with `own`, returns it, and its `=` become `:=`. A
     caller keeps ownership across calls to functions that still use `=`,
@@ -100,9 +100,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     systems are callbacks): `own World -> U32 -> World`.
     `GrowArray` and `ResizeArray` are owned values like arrays, so an
     `own` parameter of such a type needs storage nothing else holds.
-  - **Needed on the way:** a way to take a record apart into owned fields
-    (`bind_frame`); and the stores through one-element arrays and growable
-    buffers need their owner threaded from the frame loop.
+  - **Next, in this order** (tasks/MEMORY_MODEL.md, "What blocks the
+    rest"): Gdev's `hooks` closure must stop capturing the world;
+    `with_owners`, Ink's `host.run` and `program.run` take the access with
+    `own`; `bind_frame` needs a way to take a record apart into owned
+    fields, or the frame's buffers move into the persistent record; then
+    the functions that hand out parts of the access go, and the writers
+    convert one at a time.
   - **Then:** delete `=`, `lent`, `migrate-stores` and
     `BLOT_REPORT_STORES`, and bring spec section 10.3 in line.
   - Gdev's own tests: 13 modules that compile now for the first time have
