@@ -444,8 +444,10 @@ With the switch on:
 | Diagnostics in those runs | `result_not_owned`, and `lent_result_value` in 2 files |
 | Distinct sites in std | 4 |
 | The older pass's narrowed rules, for comparison | 75 cases in 39 files |
-| Gdev Main build: rejected returns | 101 (69 in gdev/src, 30 in ink/lib, 2 in std) |
+| Gdev Main build: rejected returns | 63 (34 in gdev/src, 27 in ink/lib, 2 in std) |
 | The older pass's narrowed rules, for comparison | 44 |
+| Ink's 65 test files: distinct rejected returns | 39 (28 in ink/lib, 9 in the tests, 2 in std) |
+| The older pass's narrowed rules, for comparison | 27 |
 
 The std sites: `list.splice` and `list.splice_many` return the list they
 were given when nothing changes (2), `iter`'s windows return the buffer
@@ -455,25 +457,39 @@ other 48 diagnostics are in the test programs themselves.
 Gdev is measured with
 `BLOT_BORROWED_RULES=1 blotc migrate-stores src/main.blot --project pen.json --dry-run --inference-budget 20000000`
 in ../gdev; the dry run now reports every diagnostic it cannot rewrite, in
-every module, instead of stopping at the first. The kinds below were
-counted at 97, before the generic check added 4:
+every module, instead of stopping at the first. Of the 63 returns:
 
 - 27 return a parameter or a field of one (`return index`,
   `return index.bounds`): `own`, or a copy;
-- 24 build a record or constructor from parameters' array handles
+- 20 build a record or constructor from parameters' array handles
   (`$Index { base: source.base, bounds: destination.bounds, … }`,
   `$FrameAccess`, `$Scene`). This is how Ink's storage and Gdev's world
   share `ResizeArray` handles today, and it is what phase 3 rewrites;
-- 35 are array literals, comprehensions and calls whose elements hold
-  arrays, and 6 freeze a local buffer. Some of these are the pass not yet
-  seeing that the elements are fresh, not real sharing; they need reading
-  one by one;
-- the rest are `if`/`case` values and tuples of the same kinds.
+- 9 are calls, 5 of them in generated or derived code whose span is the
+  top of the file (codecs, `actor_observation`);
+- 4 are `if`/`case` values (`if version == 1 then $Some (identity
+  saved_values) …` returns the parameter), 2 are tuples, and 1 is
+  `simd.store`.
+
+An array whose elements only borrow (Ink's `Draw` holds a view) is owned
+when the array itself is; counting those as shared had put the total at
+101.
 
 The count is higher than the older pass's 44 because that pass only
 rejected borrowed storage; this one also requires the result to be unique
-in itself, which the caller's in-place update relies on. Ink's own tests
-are not measured yet.
+in itself, which the caller's in-place update relies on.
+
+Ink's tests are measured one file at a time, in ../ink, with the same
+command and each file of `compiler.settings.tests.files` in pen.json as
+the entry; the sites are then counted once each. `lib/scene.blot` has 10
+and `lib/spatial.blot` 5.
+
+**Why the change cannot be made ahead of the switch.** Most of these
+sites want `own`. With the switch off a call's result is not unique and
+lending ends uniqueness, so an `own` argument is harder to give than it
+will be; code changed to `own` now would fail today. std, the tests, Ink
+and Gdev therefore change in their working trees with the switch on, and
+the default flips in the same step in all three repositories.
 
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 

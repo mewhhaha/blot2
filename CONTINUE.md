@@ -84,12 +84,12 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   - **Next:** the same rules for every function. They are in the pass
     behind the environment variable `BLOT_BORROWED_RULES`, for measuring
     only: with it the guest suite has 36 failing cases in 18 files, std
-    has 4 sites to change and the Gdev build has 101
+    has 4 sites to change and the Gdev build has 63
     (tasks/MEMORY_MODEL.md, "Plan for the rest of phase 2" and "The plan,
-    measured"). Still to do before it can be the default: reading the 101
-    Gdev sites for the ones that are the pass's imprecision, measuring
-    Ink's tests, changing std, the tests, Ink and Gdev, then deleting the
-    switch and bringing spec section 10.3 in line.
+    measured"). Still to do before it can be the default: measuring Ink's
+    tests, changing std, the tests, Ink and Gdev (most of the 63 return a
+    parameter or build a record of shared storage handles), then deleting
+    the switch and bringing spec section 10.3 in line.
     After that: a temporary holder giving ownership back, `own` in
     function types, and phase 3 (move std, Ink and Gdev off `=`, delete
     `=`).

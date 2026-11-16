@@ -819,7 +819,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = visit(self_, m, child);
             let fact = taken(self_, m, child, value);
             exits = exits || value.exits;
-            elements_deep = elements_deep && fact == deep;
+            elements_deep = elements_deep && (fact == deep || (self_.rules && ownedAs(self_, m, fact, m.typeOf(child), 0)));
         }
         let fact = freshContainer(self_, m, n.ty, elements_deep);
         return Value { fact: fact, exits: exits, .. };
@@ -833,7 +833,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = visit(self_, m, child);
             let fact = taken(self_, m, child, value);
             exits = exits || value.exits;
-            parts_deep = parts_deep && (fact == deep || !holds(self_, m, m.typeOf(child)));
+            parts_deep = parts_deep && ownedAs(self_, m, fact, m.typeOf(child), 0);
         }
         var fact: Fact = none;
         if parts_deep { fact = deep; }
@@ -848,7 +848,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if literal && payload.origin == 0 { fact = held; }
         // A constructor holds what its payload does: nothing without one,
         // and a payload nothing else holds stays that way inside it.
-        if self_.rules && (n.b == 0 || held == deep || !holds(self_, m, m.typeOf(n.b))) { fact = deep; }
+        if self_.rules && (n.b == 0 || ownedAs(self_, m, held, m.typeOf(n.b), 0)) { fact = deep; }
         return Value { fact: fact, exits: payload.exits, .. };
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false); }
@@ -1230,8 +1230,13 @@ fn resultChecked(self_: Analyzer&, m: const Module&, root: u32, ty: u32) -> bool
 recursive fn ownedAs(self_: Analyzer&, m: const Module&, fact: Fact, ty: u32, depth: i64) -> bool {
     if fact == deep { return true; }
     if !holds(self_, m, ty) { return true; }
-    // A part that only borrows may hold what it likes.
+    // A part that only borrows may hold what it likes, and so may the
+    // elements of an array that is itself unique.
     if self_.rules && !owns(self_, m, ty) { return true; }
+    if self_.rules && fact == shell {
+        let inner = element(self_, m, ty);
+        if inner.present && !owns(self_, m, inner.value) { return true; }
+    }
     if fact < first_record || fact >= spent || depth > 16 || ty >= m.types.nodes.len { return false; }
     var shape = m.types.node(ty);
     if shape.tag == blot_check_types::Tag.nominal {
@@ -1442,7 +1447,7 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let value = visit(self_, m, children[1]);
             var pushed = value.fact;
             if self_.rules { pushed = taken(self_, m, children[1], value); } else { escape(self_, value); if value.origin != 0 { pushed = none; } }
-            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep { sharedInto(self_, m, children[0], []); }
+            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep && !(self_.rules && ownedAs(self_, m, pushed, m.typeOf(children[1]), 0)) { sharedInto(self_, m, children[0], []); }
             return Value { exits: container.exits || value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {
