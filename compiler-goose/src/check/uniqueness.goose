@@ -843,19 +843,27 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { fact: deep, exits: exits, .. };
         }
     }
-    if self_.rules && (tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply) && !lends(self_, m, n.ty) {
-        // A call only borrows its arguments, and its result is the
-        // caller's alone. An effect operation's handler may keep its
+    if self_.rules && (tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply) {
+        // A call only borrows its arguments, and the arrays its result
+        // owns are the caller's alone. A part of the result that borrows
+        // (a view, a function) may hold the arguments, so then they are
+        // shared from here on. An effect operation's handler may keep its
         // argument and resume with a value it still holds.
         var head = id;
         while m.node(head).tag == blot_check_core::Tag.apply { head = m.node(head).a; }
         if m.node(head).tag != blot_check_core::Tag.operation_value {
+            let holder = lends(self_, m, n.ty);
             var exits = false;
             if tag == blot_check_core::Tag.call {
-                for child in m.call(id).arguments { let value = visit(self_, m, child); exits = exits || value.exits; }
+                for child in m.call(id).arguments {
+                    let value = visit(self_, m, child);
+                    if holder { escape(self_, value); }
+                    exits = exits || value.exits;
+                }
             } else {
                 let callee = visit(self_, m, n.a);
                 let argument = visit(self_, m, n.b);
+                if holder { escape(self_, callee); escape(self_, argument); }
                 exits = callee.exits || argument.exits;
             }
             var fact: Fact = none;
@@ -974,6 +982,8 @@ fn resultChecked(self_: Analyzer&, m: const Module&, root: u32, ty: u32) -> bool
 recursive fn ownedAs(self_: Analyzer&, m: const Module&, fact: Fact, ty: u32, depth: i64) -> bool {
     if fact == deep { return true; }
     if !holds(self_, m, ty) { return true; }
+    // A part that only borrows may hold what it likes.
+    if self_.rules && !owns(self_, m, ty) { return true; }
     if fact < first_record || fact >= spent || depth > 16 || ty >= m.types.nodes.len { return false; }
     var shape = m.types.node(ty);
     if shape.tag == blot_check_types::Tag.nominal {
@@ -1181,8 +1191,10 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         if operation == blot_check_storage_ops::Op.push {
             let container = visit(self_, m, children[0]);
-            let value = visitEscaping(self_, m, children[1]);
-            if elementHolds(self_, m, m.typeOf(children[0])) && (value.origin != 0 || value.fact != deep) { sharedInto(self_, m, children[0], []); }
+            let value = visit(self_, m, children[1]);
+            var pushed = value.fact;
+            if self_.rules { pushed = taken(self_, m, children[1], value); } else { escape(self_, value); if value.origin != 0 { pushed = none; } }
+            if elementHolds(self_, m, m.typeOf(children[0])) && pushed != deep { sharedInto(self_, m, children[0], []); }
             return Value { exits: container.exits || value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {

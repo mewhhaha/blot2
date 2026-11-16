@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "1c2e99b49c4b36580f195fccbfffbccf6a70ed559da13f96e79b290076c7410e",
+  "digest": "5b60e9624e33b6e9e854f9ff30e2360bda9dd64cd99eec682c12eb809d722f0b",
   "goose": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -592,9 +592,9 @@
       "sha256": "501b0302dce71519dde8fe95956c21ca70c081b70cc53ead408cf27b7652662e"
     },
     {
-      "bytes": 72060,
+      "bytes": 72693,
       "path": "src/check/uniqueness.goose",
-      "sha256": "de88618943f08f49f84a758d7f0af61747875b787ff8a7860e8a5d306dcdc7f8"
+      "sha256": "c915faa638937a9cc1049c92fb5aa59782de1fc3b469d6d89a34bebd19e8d8e2"
     },
     {
       "bytes": 69046,
@@ -697,9 +697,9 @@
       "sha256": "4d8b771ddc0a7bf0cffc91b09bf502235ff9fcc88f4f9a7dce3308f46317cdeb"
     },
     {
-      "bytes": 19620,
+      "bytes": 19815,
       "path": "src/driver/cli_migrate_stores.goose",
-      "sha256": "a8f05cfbd3c171469fd782b3809680c3f55b957f4c4e414ea5cac0ddb537f9be"
+      "sha256": "3f61cd3a0dfeca6ecb3322cb642fecbf21fabe9c85293eb123e4aab1abb908af"
     },
     {
       "bytes": 9156,

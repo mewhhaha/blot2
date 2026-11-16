@@ -415,7 +415,11 @@ With the switch on:
   excepted;
 - a type variable holds no array;
 - a constructor keeps its payload's fact, a tuple is `deep` when its parts
-  are, and `@storage.freeze` of a local at its last read moves it;
+  are, and `@storage.freeze` of a local at its last read moves it, as does
+  a pushed value;
+- in a result whose type both owns arrays and has a part that borrows (a
+  record with a closure field), the owned arrays are the caller's alone and
+  the arguments stay shared with the borrowing part;
 - a type the pass cannot read (opaque, an effect type) is exempt.
 
 | With the switch on | |
@@ -424,13 +428,35 @@ With the switch on:
 | Diagnostics in those runs | all `result_not_owned` |
 | Distinct sites in std | 4 |
 | The older pass's narrowed rules, for comparison | 75 cases in 39 files |
+| Gdev Main build: rejected returns | 97 (66 in gdev/src, 29 in ink/lib, 2 in std) |
+| The older pass's narrowed rules, for comparison | 44 |
 
 The std sites: `list.splice` and `list.splice_many` return the list they
 were given when nothing changes (2), `iter`'s windows return the buffer
 they hold (1), and `simd.store` returns the storage it wrote (1). The
-other 48 diagnostics are in the test programs themselves. Gdev and Ink are
-not measured yet: the project server stops at the first module with a
-diagnostic, and the command line lacks Gdev's asset settings.
+other 48 diagnostics are in the test programs themselves.
+
+Gdev is measured with
+`BLOT_BORROWED_RULES=1 blotc migrate-stores src/main.blot --project pen.json --dry-run --inference-budget 20000000`
+in ../gdev; the dry run now reports every diagnostic it cannot rewrite, in
+every module, instead of stopping at the first. Of the 97 returns:
+
+- 27 return a parameter or a field of one (`return index`,
+  `return index.bounds`): `own`, or a copy;
+- 24 build a record or constructor from parameters' array handles
+  (`$Index { base: source.base, bounds: destination.bounds, … }`,
+  `$FrameAccess`, `$Scene`). This is how Ink's storage and Gdev's world
+  share `ResizeArray` handles today, and it is what phase 3 rewrites;
+- 35 are array literals, comprehensions and calls whose elements hold
+  arrays, and 6 freeze a local buffer. Some of these are the pass not yet
+  seeing that the elements are fresh, not real sharing; they need reading
+  one by one;
+- the rest are `if`/`case` values and tuples of the same kinds.
+
+The count is higher than the older pass's 44 because that pass only
+rejected borrowed storage; this one also requires the result to be unique
+in itself, which the caller's in-place update relies on. Ink's own tests
+are not measured yet.
 
 ## Phase 4: the value restriction for `let` (measured 15 November 2026)
 

@@ -74,14 +74,18 @@ fn migrateChecked(writer:blot_io::Writer,request:MigrationRequest,entry:const u8
   return MigrationOutcome{failed:true,..},blot_error::Error.none;
  }
  var sites:MigrationSite[>..]=[];
+ // Every other lowering diagnostic is reported, in every module, before
+ // the run fails: none of them is a `:=` this tool can rewrite.
+ var blocked=false;
  for unit,index in loaded.units.items {
   let id=(index+1) as u32;let owned,error=blot_check_core_builder::lowerWithOrigins(unit.tree,loaded.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(loaded));if error!=blot_error::Error.none {return MigrationOutcome{..},error;}var lowered=owned;
   for item in lowered.value.diagnostics {
-   if item.code!=blot_check_core::Code.aliased_update {let error=diagnostic(writer,loaded.filename(id),"lower",enumName(item.code),item.span.start,item.span.end,item.message());lowered.deinit();if error!=blot_error::Error.none {return MigrationOutcome{..},error;}return MigrationOutcome{failed:true,..},blot_error::Error.none;}
+   if item.code!=blot_check_core::Code.aliased_update {let error=diagnostic(writer,loaded.filename(id),"lower",enumName(item.code),item.span.start,item.span.end,item.message());if error!=blot_error::Error.none {lowered.deinit();return MigrationOutcome{..},error;}blocked=true;continue;}
    sites.push(MigrationSite{id,item.span.start});
   }
   lowered.deinit();
  }
+ if blocked {return MigrationOutcome{failed:true,..},blot_error::Error.none;}
  var outcome=MigrationOutcome{..};var at:i64=0;
  while at<sites.len {
   let unit=sites[at].unit;var end=at;while end<sites.len && sites[end].unit==unit {end++;}let group=sites[at..end];at=end;let path=loaded.filename(unit);let source=loaded.unit(unit).source;

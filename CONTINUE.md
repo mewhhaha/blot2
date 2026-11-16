@@ -83,11 +83,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   "`own` parameters"). Nothing is migrated.
   - **Next:** the same rules for every function. They are in the pass
     behind the environment variable `BLOT_BORROWED_RULES`, for measuring
-    only: with it the guest suite has 33 failing cases in 16 files and std
-    has 4 sites to change (tasks/MEMORY_MODEL.md, "Plan for the rest of
-    phase 2" and "The plan, measured"). Still to do before it can be the
-    default: the generic-read check (`identity rows`), measuring Gdev and
-    Ink, changing the 4 std sites and the tests, then deleting the switch.
+    only: with it the guest suite has 33 failing cases in 16 files, std
+    has 4 sites to change and the Gdev build has 97 (tasks/MEMORY_MODEL.md,
+    "Plan for the rest of phase 2" and "The plan, measured"). Still to do
+    before it can be the default: the generic-read check (`identity rows`),
+    reading the 97 Gdev sites for the ones that are the pass's imprecision,
+    measuring Ink's tests, changing std, the tests, Ink and Gdev, then
+    deleting the switch.
     After that: a temporary holder giving ownership back, `own` in
     function types, and phase 3 (move std, Ink and Gdev off `=`, delete
     `=`).
