@@ -12,6 +12,17 @@ November 2026), the owner chose:
   immutable decision stays, unspecified, until Ink and Gdev are rewritten,
   and is then deleted.
 
+On 16 November 2026 the owner approved ("Yes. Do all of that."):
+- parameters stay borrowed by default, with `own` as the mark;
+- the two changes to the borrowed rules recommended under "Phase 2" below
+  (a result may borrow through a view, a reference or a function; the
+  generic-read rule is checked at the call), and the transitional third;
+- `values.copy x` is a move when `x` owns its array at its last use;
+- advice, not inference: the compiler suggests `own` for a function that
+  copies a borrowed parameter and updates the copy;
+- no ownership passed at run time to a borrowed parameter;
+- building starts with `own` on the parameters of named functions.
+
 This replaces the earlier plan for a store statement, `Cell` and `is root`.
 App code spells intrinsics as round 2, item 2 approved (`values.copy`,
 `panic`); std may keep `@name` forms.
@@ -180,9 +191,10 @@ The 75 failing guest cases are in 39 files. 84 of their 108 diagnostics are
 in std/iter, std/list and std/simd; the first two are on the removal list
 (round 2, item 11 and E6).
 
-### Recommended rules (the owner has not seen these)
+### The rules (approved 16 November 2026)
 
-Rule set 3 is the implementer's recommendation. It keeps what section 10.3
+Rule set 3 was the implementer's recommendation and is now in spec section
+10.3. It keeps what section 10.3
 is for: a call result that owns an array is unique, so `:=` on it is in
 place. It changes two of that section's rules and adds one for the
 transition.

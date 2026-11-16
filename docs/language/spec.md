@@ -824,14 +824,37 @@ signature states it.
   the call, and the caller's name is spent: using it again before rebinding
   it is an error. Inside the function the parameter is owned, so it can be
   updated in place and returned.
-- Every result is owned by the caller.
-- A result whose type may hold an array cannot be read out of a borrowed
-  parameter: it needs `values.copy`. A type variable may hold an array, so
-  this covers a generic element accessor. A result that holds no array is
-  unaffected.
+- A type **owns** an array when it is `Array`, `GrowArray` or
+  `ResizeArray`, or data that holds one. A view (`&[a]`), a reference
+  (`&a`), a link and a function only **borrow**.
+- A function may return borrowed storage in a part of the result whose type
+  borrows: a view of a parameter, or a closure that captured one. It may
+  not return it in a part whose type owns; that needs `values.copy` or an
+  `own` parameter.
+- At a call, a result whose type has a borrowing part holds the call's
+  arguments, like a closure that captured them. Every other result is owned
+  by the caller.
+- A generic function may return a parameter of variable type (`identity`,
+  `min`, `Array.at`). The rule is checked where the variable gets its type:
+  when a type variable occurs in the result and, as data, in a borrowed
+  parameter, each call must give it a type that owns no array. Marking the
+  parameter `own` lifts this. A variable under a function type in the
+  parameter does not count.
 - `own` is part of the function's type: `own (Array U32) -> U32 -> Array U32`.
 - A partial application cannot supply an `own` parameter.
 - On a type that holds no array, `own` changes nothing.
+
+**A copy that is not needed costs nothing.** `values.copy x` is a move when
+`x` owns its array and this is the last use of `x`. So a caller that is
+done with its array passes it to an `own` parameter as it is, and a caller
+that still needs it passes `values.copy xs` and pays for one copy, at the
+call, where it is written. No ownership is passed at run time and no
+function is compiled twice.
+
+**The compiler says when `own` would help.** A function that copies a
+borrowed parameter and then updates the copy gets the advice to mark the
+parameter `own`. The error for updating a borrowed parameter says the same.
+The signature stays what decides.
 
 ```blot
 func damage (world: own World) -> (index: U32): World =>
