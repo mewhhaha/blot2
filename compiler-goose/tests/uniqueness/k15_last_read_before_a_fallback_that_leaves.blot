@@ -1,0 +1,16 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+type Found is data = $Found U32 | $Missing
+const window = func (rows: Array U32) => return &rows[0..1]
+const first = func (cells: &[U32]) => return cells[0]
+const peek = func (world: World) => return &world.other[0..1]
+const found = func (cells: &[U32]) => return $Found cells[0]
+const step = func (world: own World) => return do:
+  world.other[0] := 1
+  break world
+const run = func (n: U32) => return do:
+  let world = $World { counts: #[n, 2], other: #[3] }
+  let seen = peek world
+  let $Found got = found seen else:
+    break first (window #[n])
+  world := step world
+  break @u32.add got world.counts[0]

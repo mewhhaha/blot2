@@ -207,6 +207,13 @@ recursive fn updateBoxed(g: Generator&, f: Fn&, id: u32, value: Val, name: u32, 
     if error != blot_direct_types::Error.none { return replacement, error; }
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
     if replacement.ty != field_ty { return neverVal(), g.fail(m, id, "an update that changes a boxed field's type"); }
+    // A write through an owner inside the field leaves the field's words
+    // as they were: the record is the same block.
+    if replacement.len == old.len {
+        var same = true;
+        for index in 0..(old.len as i64) { if g.s.words[replacement.start + index] != g.s.words[old.start + index] { same = false; } }
+        if same { return value, blot_direct_types::Error.none; }
+    }
     let memory_block, error = newBlock(g, f, value.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let bytes, error = blockBytes(g, f, value.ty, id);

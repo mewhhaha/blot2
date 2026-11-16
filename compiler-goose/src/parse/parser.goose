@@ -691,10 +691,22 @@ fn spark_call(p: Parser&,source: const u8[:],tokens: const Token[:],call: Id,sta
  let spawn=collection_intrinsic(p,source,tokens,"@task.spawn",[group,thunk],start); statements.push(add(p,source,tokens,a_return_stmt,spawn,0,0,start)); let __cleanup_result_52_0: Id = list_node(p,source,tokens,a_block,statements.items,start); statements.deinit(); operands.deinit(); return __cleanup_result_52_0;
  statements.deinit(); operands.deinit(); }
 recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],allow_witness: bool) -> Id {
- let start=current(p,source,tokens).start; var value=postfix(p,source,tokens);
+ let start=current(p,source,tokens).start; var value: Id=0;
+ if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&atom_tag(peek(p,tokens,1)) {
+  // `(own x)` on its own, as an argument in parentheses.
+  advance(p,source,tokens); let given=postfix(p,source,tokens); if p.failure!=blot_error::Error.none { return 0; }
+  value=add(p,source,tokens,a_group,given,1,0,start); p.tree.spans.items[value].end=p.tree.span(given).end;
+ } else { value=postfix(p,source,tokens); }
  while p.failure==blot_error::Error.none {
   if !atom_tag(current(p,source,tokens).tag)||(!allow_witness&&at(p,source,tokens,t_colon)) { break; }
   if at(p,source,tokens,t_colon)&&peek(p,tokens,1)==t_newline { break; }
+  // `f (own x)` or `f own x`: the argument is given away. A group node
+  // with b = 1 carries it; every other group has b = 0.
+  if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&atom_tag(peek(p,tokens,1)) {
+   let point=current(p,source,tokens).start; advance(p,source,tokens); let given=postfix(p,source,tokens); if p.failure!=blot_error::Error.none { break; }
+   let marked=add(p,source,tokens,a_group,given,1,0,point); p.tree.spans.items[marked].end=p.tree.span(given).end;
+   value=add(p,source,tokens,a_apply,value,marked,0,start); continue;
+  }
   let argument=postfix(p,source,tokens); value=add(p,source,tokens,a_apply,value,argument,0,start);
  }
  return value;

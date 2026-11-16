@@ -1,0 +1,21 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+const window = func (rows: Array U32) => return &rows[0..1]
+const narrowed = func (cells: &[U32]) => return &cells[0..1]
+const first = func (cells: &[U32]) => return cells[0]
+const peek = func (world: World) => return &world.other[0..1]
+const both = func (cells: &[U32]) -> (world: World) => return @u32.add cells[0] world.other[0]
+const step = func (world: own World) => return do:
+  world.other[0] := 1
+  break world
+const rows_of = func (grid: Array (Array U32)) => return &grid[0..2]
+const run = func (n: U32) => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  let total = 0
+  for row in rows_of grid:
+    total := @u32.add total row[0]
+  grid[0][0] := n
+  let sums = #[0]
+  for row in grid:
+    sums[0] := @u32.add sums[0] row[1]
+  grid[1][1] := sums[0]
+  break @u32.add total grid[1][1]

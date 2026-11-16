@@ -1,0 +1,32 @@
+{
+ "date": "2026-11-16",
+ "subject": "Gdev Main guest time per frame and session length: the world threaded with own",
+ "command": "pen bench --runs 3 --frames 300 --json; pen bench --runs 1 --frames N --json (in ../gdev)",
+ "pen": "../pen target/release/pen 0.1.0, wasmtime 49.0.3",
+ "states": {
+  "pushed": "gdev 6a08809, ink 7a2848b: the session loop carries the world; stages still lent. Compiler before the backend change.",
+  "stages_before_backend_change": "working tree: host.frame, app, clock and the stage lambdas take the world with own. Compiler before the backend change.",
+  "stages_after_backend_change": "same sources; updateBoxed keeps an unchanged block, loops release when a boxed carry is unchanged."
+ },
+ "pushed": {
+  "frames_300_median_ms": 0.071123,
+  "frames_300_p95_ms": 0.095558,
+  "runs_3000_frames": true,
+  "runs_12000_frames": false
+ },
+ "stages_before_backend_change": {
+  "frames_300_median_ms": 0.076449,
+  "frames_300_p95_ms": 0.091496,
+  "runs_300_frames": true,
+  "runs_600_frames": false
+ },
+ "stages_after_backend_change": {
+  "frames_600_median_ms": 0.0718,
+  "frames_600_p95_ms": 0.0852,
+  "frames_12000_median_ms": 0.0715,
+  "frames_200000_median_ms": 0.0691,
+  "frames_200000_p95_ms": 0.0938,
+  "runs_200000_frames": true
+ },
+ "reading": "Carrying the world in the session loop turned off the per-iteration release, so every frame's temporary memory stayed on the bump stack until it was full. With the release decided at run time by whether the carried block changed, and no block copy for a write through an array, the converted game runs 200,000 frames at the per-frame time of the game before the conversion."
+}

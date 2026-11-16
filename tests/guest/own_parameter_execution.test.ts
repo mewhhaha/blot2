@@ -92,7 +92,7 @@ const spent = "This name was passed to an `own` parameter, so its value now belo
 const argument = "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise";
 const result = "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`";
 const value = "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls";
-const position = "`own` marks a parameter of a function or a lambda, or the parameter of a function type; a contract member, an implementation member and a member an operator stands for cannot take one yet, and no other type can be `own`";
+const position = "`own` marks a parameter of a function or a lambda, the parameter of a function type, or an argument given away at a call; it is not a name, a contract member, an implementation member and a member an operator stands for cannot take one yet, and no other type can be `own`";
 
 // Each case: the code, its message, the source and the text the diagnostic
 // points at, marked with « and »; a case without marks is about a whole
@@ -135,6 +135,79 @@ entry func stored (n: U32) : U32 => return do:
     equal(guest.call("stored", 7), 811);
   });
 });
+
+Deno.test("generic code gives a value away with own at the call, and takes one by (own name)", async () => {
+  await compileAndRun(`${declarations}
+func twice step -> (own state) => return do:
+  state := step (own state) 1
+  state := step own state 2
+  break state
+func settle (own access) => return do:
+  access.counts[0] := access.size
+  break access
+entry func named (n: U32) : U32 => return do:
+  let rows = twice fill #[n, 9]
+  break rows[0] * 10 + rows[1]
+entry func lambda (n: U32) : U32 => return do:
+  let rows = twice (func rows -> k => return do:
+    rows[1] := rows[1] + k
+    break rows) #[n, 2]
+  break rows[0] * 10 + rows[1]
+entry func untyped (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: n }
+  world := settle world
+  break world.counts[0]
+`, (guest) => {
+    equal(guest.call("named", 4), 22);
+    equal(guest.call("lambda", 4), 45);
+    equal(guest.call("untyped", 7), 7);
+  });
+  const lent = `${declarations}
+func read (rows: Array U32) -> (k: U32): U32 => return rows[k]
+entry func run (n: U32) : U32 => return do:
+  let rows = #[n, 2]
+  break read (own rows) 1
+`;
+  await compileExpectedFailure(lent, "type_mismatch");
+});
+// A record too wide for registers is a block of memory. Handing it round a
+// loop, updating through it and returning it beside another value must not
+// use a new block each time: 300,000 rounds of 288 bytes would not fit the
+// stack.
+Deno.test("a wide record handed round a loop is not copied onto the stack each round", async () => {
+  await compileAndRun(`type Wide = {f0: Array U32, f1: Array U32, f2: Array U32, f3: Array U32, f4: Array U32, f5: Array U32, f6: Array U32, f7: Array U32, f8: Array U32, f9: Array U32, f10: Array U32, f11: Array U32, f12: Array U32, f13: Array U32, f14: Array U32, f15: Array U32, f16: Array U32, f17: Array U32, f18: Array U32, f19: Array U32, f20: Array U32, f21: Array U32, f22: Array U32, f23: Array U32}
+func wide (): Wide => return {f0: #[0], f1: #[0], f2: #[0], f3: #[0], f4: #[0], f5: #[0], f6: #[0], f7: #[0], f8: #[0], f9: #[0], f10: #[0], f11: #[0], f12: #[0], f13: #[0], f14: #[0], f15: #[0], f16: #[0], f17: #[0], f18: #[0], f19: #[0], f20: #[0], f21: #[0], f22: #[0], f23: #[0]}
+func step (world: own Wide): Wide => return do:
+  world.f0[0] := world.f0[0] + 1
+  break world
+func counted (world: own Wide) => return do:
+  world := step world
+  break (world.f0[0], world)
+entry func updated (n: U32) : U32 => return do:
+  let world = wide ()
+  for 0 .. n:
+    world.f1[0] := world.f1[0] + 2
+  break world.f1[0]
+entry func handed (n: U32) : U32 => return do:
+  let world = wide ()
+  for 0 .. n:
+    world := step world
+  break world.f0[0]
+entry func paired (n: U32) : U32 => return do:
+  let world = wide ()
+  let seen = 0
+  for 0 .. n:
+    let (count, next) = counted world
+    world := next
+    seen := count
+  break seen + world.f0[0]
+`, (guest) => {
+    equal(guest.call("updated", 300000), 600000);
+    equal(guest.call("handed", 300000), 300000);
+    equal(guest.call("paired", 300000), 600000);
+  });
+});
+
 const rejected: [string, string, string, string][] = [
   ["a name read after it was given away", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
@@ -239,6 +312,16 @@ entry func run (n: U32) : U32 => return do:
 entry func run (n: U32) : U32 => return do:
   let rows: Array («own U32») = #[n]
   break rows[0]`],
+  ["own as the name of a local", "own_parameter", position, `
+entry func run (n: U32) : U32 => return do:
+  let own = n
+  break own`],
+  ["own as the name of a parameter", "own_parameter", position, `
+func twice own => return own + own
+entry func run (n: U32) : U32 => return twice n`],
+  ["own as the name of a constant", "own_parameter", position, `
+const own = 3
+entry func run (n: U32) : U32 => return n`],
 ];
 
 Deno.test("own arguments, spent names, owned results and own positions are checked", async () => {

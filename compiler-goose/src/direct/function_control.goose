@@ -438,10 +438,16 @@ fn assign(g: Generator&, f: const Fn&, values: Vals, targets: Vals, id: u32) -> 
     return blot_direct_types::Error.none;
 }
 // assign, but a boxed carry's new value is copied into its slot.
-fn assignCarries(g: Generator&, f: const Fn&, values: Vals, targets: Vals, slots: Words, id: u32) -> Error {
+// `unchanged` is a local to leave 1 in when every boxed carry has the words
+// its slot already held, and 0 otherwise (0xffffffff: nobody asks).
+fn assignCarries(g: Generator&, f: Fn&, values: Vals, targets: Vals, slots: Words, unchanged: u32, id: u32) -> Error {
     let plain_values = g.reserveVals(values.len);
     let plain_targets = g.reserveVals(values.len);
     var plain: u32 = 0;
+    if unchanged != 0xffffffff {
+        i32Const(g, 1);
+        lset(g, unchanged);
+    }
     for at in 0..(values.len as i64) {
         let value = g.s.vals[values.start + at];
         let target = g.s.vals[targets.start + at];
@@ -454,7 +460,52 @@ fn assignCarries(g: Generator&, f: const Fn&, values: Vals, targets: Vals, slots
         if value.ty == blot_direct_types::never || w(g, value, 0) == w(g, target, 0) { continue; }
         let bytes, error = blockBytes(g, f, value.ty, id);
         if error != blot_direct_types::Error.none { return error; }
+        if unchanged == 0xffffffff {
+            memoryCopy(g, w(g, target, 0), 0, w(g, value, 0), bytes);
+            continue;
+        }
+        // The same block needs no copy; another one is compared word by
+        // word, then copied.
+        lget(g, w(g, value, 0));
+        lget(g, w(g, target, 0));
+        op(g, OP_i32_ne);
+        let differs = open(g, f, OP_if_);
+        let cursor = local32(g, f);
+        i32Const(g, 0);
+        lset(g, cursor);
+        let done = open(g, f, OP_block);
+        let again = open(g, f, OP_loop);
+        lget(g, cursor);
+        i32Const(g, bytes);
+        op(g, OP_i32_ge_u);
+        br(g, f, OP_br_if, done);
+        lget(g, w(g, target, 0));
+        lget(g, cursor);
+        op(g, OP_i32_add);
+        op(g, OP_i32_load);
+        uleb(g, 2);
+        uleb(g, 0);
+        lget(g, w(g, value, 0));
+        lget(g, cursor);
+        op(g, OP_i32_add);
+        op(g, OP_i32_load);
+        uleb(g, 2);
+        uleb(g, 0);
+        op(g, OP_i32_ne);
+        let found = open(g, f, OP_if_);
+        i32Const(g, 0);
+        lset(g, unchanged);
+        br(g, f, OP_br, done);
+        close(g, f);
+        lget(g, cursor);
+        i32Const(g, 4);
+        op(g, OP_i32_add);
+        lset(g, cursor);
+        br(g, f, OP_br, again);
+        close(g, f);
+        close(g, f);
         memoryCopy(g, w(g, target, 0), 0, w(g, value, 0), bytes);
+        close(g, f);
     }
     return assign(g, f, Vals { plain_values.start, plain }, Vals { plain_targets.start, plain }, id);
 }
@@ -492,7 +543,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         g.s.vals[outgoing.start + at] = after;
     }
-    let assigned = assignCarries(g, f, incoming, iteration, slots, id);
+    let assigned = assignCarries(g, f, incoming, iteration, slots, 0xffffffff, id);
     if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
     for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]); }
     var has_index = false;
@@ -565,12 +616,18 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var release = true;
     let s .= g.s;
     let scratch_mark = s.scratch.len;
+    // A boxed carry is judged at run time instead: an iteration that leaves
+    // its slot's words as they were carries out nothing it allocated there.
+    var boxed_carries = false;
     for at in 0..carries.len {
+        if g.s.words[slots.start + at] != 0 { boxed_carries = true; continue; }
         let value = g.s.vals[iteration.start + at];
         let safe, error = ownerSlots(g, value.ty, value.start);
         if error != blot_direct_types::Error.none { s.scratch.resize(scratch_mark); return neverVal(), error; }
         if !safe { release = false; }
     }
+    var unchanged: u32 = 0xffffffff;
+    if release && boxed_carries { unchanged = local32(g, f); }
     let guards = Words { g.s.words.len as u32, (s.scratch.len - scratch_mark) as u32 };
     for at in scratch_mark..s.scratch.len { let slot = s.scratch[at]; g.s.words.push(slot); }
     s.scratch.resize(scratch_mark);
@@ -582,7 +639,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let stores = f.memory_stores;
     let unused = g.newSlot();
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, has_release: release, release_owner: owner_mark, release_stack: stack_mark, slots: slots, allow: allow, guards: guards });
+    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, slots: slots, allow: allow, guards: guards });
     let body, error = stmt(g, f, info.body);
     let label = s.labels[labels_mark];
     s.labels.resize(labels_mark);
@@ -594,7 +651,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if !present { return neverVal(), g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
-        let assigned = assignCarries(g, f, backedge, iteration, slots, id);
+        let assigned = assignCarries(g, f, backedge, iteration, slots, unchanged, id);
         if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
         if label.has_release && f.allocations != allocations { releaseIteration(g, f, label); }
         br(g, f, OP_br, top);
@@ -635,6 +692,10 @@ fn noteStore(g: Generator&, f: Fn&, value: Val) -> Error {
 // carried owner predates the iteration.
 fn releaseIteration(g: Generator&, f: Fn&, label: blot_direct_emit::Label) {
     lget(g, label.allow);
+    if label.unchanged != 0xffffffff {
+        lget(g, label.unchanged);
+        op(g, OP_i32_and);
+    }
     for at in 0..(label.guards.len as i64) {
         lget(g, g.s.words[label.guards.start + at]);
         lget(g, label.release_owner);
@@ -719,7 +780,7 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if values.len != label.iteration.len { return neverVal(), g.fail(m, id, "break carries the wrong number of values"); }
         leaveHandles(g, f, label.depth);
         if n.op == blot_check_core::Op.continue_ {
-            let assigned = assignCarries(g, f, values, label.iteration, label.slots, id);
+            let assigned = assignCarries(g, f, values, label.iteration, label.slots, label.unchanged, id);
             if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
             if label.has_release {
                 releaseIteration(g, f, label);

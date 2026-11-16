@@ -542,22 +542,127 @@ Checked: gate 1,067 pass; Ink's suite as before; Gdev's first frame
 byte-identical (Wasm 7fab4303…, 2,677,122 bytes); Gdev's tests 376 pass,
 57 fail, 113 do not compile, as before this step.
 
-**Next: the layers under the session.** `host.frame`, then Ink's `app`
-(`begin_frame`, `advance`, `render`, which call the game's stages) and
-`clock.advance`, then Gdev's ten stage lambdas in `game.blot`, then each
-system they call. A stage or a system changes in three places: its
-parameter becomes `(own access)`, it returns the access, and every call
-of it becomes `access := f access …`. Its own callees stay as they are.
-Two things come with it:
+**The stages own the world (16 November 2026).** The layer under the
+session is converted: `host.frame`, Ink's `app` (`start`, `begin_frame`,
+`run_event`, `advance`, `render`), `clock.advance`, and the ten stage
+lambdas of Gdev's `game.blot`. Each takes the world with `own` and hands
+it back; the callers rebind (`access := app.begin_frame stages access`).
 
-- Callers pass parts of the access beside it (`app.advance stages access
-  … access.clock access.control access.wall …`); a part cannot be lent
-  while the whole is given away, so those functions read the parts
-  themselves.
-- Tests reach systems through fixtures that bind their own frames with
-  the `lent` `bind_frame`. A test cannot call a system that takes its
-  access with `own` until its fixture hands it a world it owns
-  (`world.owners`).
+- `app.advance` and `clock.advance` return the plan and the world as a
+  pair; `app.advanced` is `advance` for a caller with no use for the
+  plan. They read `access.clock`, `access.control` and `access.wall`
+  themselves: a part cannot be lent beside the whole that is given away.
+- `app.stages` has a signature now. Every stage is a stage of the same
+  world `a`: `own a -> a`, or `own a -> argument -> a` for the stages
+  that take an event, the seconds or the presentation; `route` reads the
+  world and makes what `interface` and `event` are given. Without it a
+  stage record used by two runners left one stage's world undetermined,
+  and the backend could not build that stage (`no member … for this
+  receiver`). It also makes an untyped lambda given to `app.stages` an
+  `own` function by the type it is expected to have.
+- `app.lent f` and `app.lent_with f` turn a function that still writes
+  through a lent world into a stage. Devtools, the performance programs
+  and the tests use them for their stage functions; they go when those
+  functions are converted. `app.no_keep` is the no-op for the session's
+  `keep` hook, which is lent the world (`app.no_action` is a stage).
+- Tests: 90 of Gdev's test, fixture, devtools and performance files and
+  12 of Ink's called the changed functions. A helper that runs a frame
+  takes the world `own` and returns it, or returns `(result, world)`;
+  the tests rebind. Six workers converted them in parallel from one
+  brief (the patterns are in the two examples `tests/cursor.blot` and
+  `tests/menu_feedback.blot`).
+- `own` is not a name any more. `f own x` gives `x` away, so a constant
+  called `own` (thirteen of Gdev's fixtures had one for their stage
+  record) made every call that passed it read as a marker. Binding a
+  local, a parameter or a constant called `own` is `own_parameter` now.
+
+What the compiler needed for it, found by the conversion (every worker
+met the first):
+
+- **A borrowed value without a name is given back.** `salt.stored
+  (salt.read_state access)` or `(buildings.read_state access).sites[0]`
+  used to share `access` for good, because the result that borrows had
+  no name whose last read could end it. Now the result of a call that
+  borrows its arguments is given back when what is around it has been
+  read, where that keeps nothing: it is the argument of a call whose
+  result borrows nothing, or a plain value is read out of it. Through a
+  call that hands its argument on in its result (`narrowed (window
+  rows)`) it goes to wherever that result goes: the `let` that names it,
+  or the expression that ends it. In a record or tuple literal, or as
+  the argument of a `lent` function or a function value, it is kept as
+  before.
+- **What a loop walks is given back after the loop**, with what a call
+  borrowed to make it (`for row in rows_of world`). Elements that hold
+  storage alias what is walked, and an element can leave the loop only
+  in a carry, so it is given back when every carry that can hold
+  storage is its own all the way down after the loop.
+- **A name nothing reads borrows nothing.** `let seen = view world`
+  with no read of `seen` used to keep `world` shared to the end of the
+  block.
+- **A name's loan ends with the call that read it last**, not only at
+  the end of the statement: `return (count frame, access)` works when
+  `frame` borrows from `access`. Not inside a loop, a closure or an arm
+  of a choice other than the statement's own: what an arm does to the
+  facts is taken back when the arms are joined.
+- **Two names may borrow from one local together**, the whole of it
+  and one field: the field's fact is kept in what the name that
+  borrows the whole gives back. Of several names that borrow the same
+  thing, the earliest holds the fact (the later ones used to overwrite
+  it, which was only ever too strict).
+
+tests/uniqueness has 15 programs for these (`k01` to `k15`), and `c07`
+is accepted now: rows a loop walked are the array's own again after it.
+
+**What the backend needed.** A record too wide for registers is a block
+of memory on the bump stack (Gdev's world is one). Two things made the
+owned style use up that stack:
+
+- `world.field[i] := value` copied the whole block for every update,
+  though the write goes through the array and the record's words stay as
+  they were. Such an update keeps its block now
+  (`direct/function_data.goose`, `updateBoxed`).
+- A loop that carries a boxed value never released an iteration's
+  memory, because the owners inside the block are not checked word by
+  word. So the session loop, which has carried the world since "the
+  session owns the world", kept every frame's temporary memory: the
+  pushed game stopped with a full stack after some thousands of frames
+  (it ran 3,000 and not 12,000), and with the stages converted after
+  about 450. Now the loop compares each boxed carry with the words its
+  slot held when the iteration began, and releases when they are the
+  same (`direct/function_control.goose`, `assignCarries`,
+  `releaseIteration`): an iteration that leaves the value as it was
+  carries out nothing it allocated.
+
+With both, Gdev runs 200,000 frames, at 0.072 ms of guest time a frame
+(median of 600 after 120; 0.071 before this layer, 0.076 with the copies)
+([record](../benchmarks/evidence/measurements/2026-11-16-owned-world-runtime.json)).
+tests/guest/own_parameter_execution.test.ts has the loop that failed.
+
+Open, and it will matter as the systems are converted: an iteration that
+puts a new array into the carried world (`world.rows := grown`) changes
+the block's words, so that iteration releases nothing. The memory is safe
+and never comes back. The same holds today for a function that stores a
+fresh array into older storage: nothing it allocated is released
+(`for …: put grid i` with `put` storing `#[n, n, n]` fills the stack after
+some ten thousand rounds, before and after this change). What is needed
+is a release that keeps the survivors: what the carried value still
+refers to is moved down, the rest is released.
+
+Not done in this layer:
+
+- `tests/codec_support/counter.blot` and the two tests on it
+  (`persistent`, `traps/persistent_rejects`) do not compile since the
+  session took the world: their `execute` is a closure that holds the
+  world across calls. It has to hand the world to its caller and back.
+- Devtools' and the performance programs' own stage functions are still
+  lent ones behind `app.lent`.
+
+**Next: the systems.** Each of Gdev's systems that the stages call, then
+what they call. A system changes in three places: its parameter becomes
+`(own access)`, it returns the access, and every call of it becomes
+`access := f access …`. Its own callees stay as they are. A test that
+calls a system directly rebinds too, so each system goes with the tests
+that call it. A system that returns a value returns it beside the world.
 
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark
@@ -568,7 +673,7 @@ moves down from the frame loop one function at a time, with Ink's suite
 and Gdev's frame checked at each step. A `lent` callee is the exception:
 it has to be converted with the caller that needs ownership back.
 
-**What is left: about 4,400 stores.** Counted by line shape with
+**What is left: 4,452 stores.** Counted by line shape with
 `python3 scripts/integration/count_stores.py DIR...`.
 `python3 scripts/integration/stores_to_updates.py PROJECT ENTRY...` turns
 into `:=` each store the compiler reports as provably unique (it runs
@@ -577,13 +682,14 @@ left in the Gdev build or Ink's tests.
 
 | Tree | Stores | Files |
 | --- | ---: | ---: |
-| ink/lib | 373 | 51 |
-| ink/tests | 1,342 (1,104 in two generated protocol files) | 58 |
-| gdev/src | 703 | 63 |
-| gdev/tests | 707 | 131 |
+| ink/lib | 352 | 47 |
+| ink/tests | 1,323 (1,104 in two generated protocol files) | 53 |
+| gdev/src | 691 | 62 |
+| gdev/tests | 701 | 131 |
 | gdev/pen | 1,104 (the same two generated files) | 2 |
-| gdev/devtools | 91 | 12 |
-| gdev/performance | 106 | 18 |
+| gdev/test_support | 92 | 16 |
+| gdev/devtools | 85 | 12 |
+| gdev/performance | 104 | 17 |
 
 None of these is a local the compiler can already see as unique. They are
 of three kinds, and each needs the code restructured, not a token changed:

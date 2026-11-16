@@ -8,6 +8,11 @@ and size of the Wasm, and the JSON records without clocks, memory counts and
 known to differ, `differences` holds its value beside Zig's; today that is the
 `type_nodes` counter of four programs.
 
+The record of `direct/boxed_records.blot` is this compiler's (16 November
+2026): an update that leaves a boxed record's words as they were keeps its
+block, and a loop that carries a boxed value releases an iteration's memory
+when the value came out as it went in. tests/guest runs the program.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

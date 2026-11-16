@@ -129,6 +129,9 @@ struct Label {
     // Owner and stack mark locals an iteration releases to, and whether a
     // `continue` already released to them.
     has_release: bool = false,
+    // A local that is 1 while every boxed carry came out of the iteration
+    // as it went in (0xffffffff: the loop carries none).
+    unchanged: u32 = 0xffffffff,
     release_owner: u32 = 0,
     release_stack: u32 = 0,
     used: bool = false,

@@ -1,0 +1,16 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+const window = func (rows: Array U32) => return &rows[0..1]
+const narrowed = func (cells: &[U32]) => return &cells[0..1]
+const first = func (cells: &[U32]) => return cells[0]
+const peek = func (world: World) => return &world.other[0..1]
+const both = func (cells: &[U32]) -> (world: World) => return @u32.add cells[0] world.other[0]
+const step = func (world: own World) => return do:
+  world.other[0] := 1
+  break world
+const run = func (n: U32) => return do:
+  let grid = #[#[1, 2], #[3, 4]]
+  let last = #[0]
+  for row in grid:
+    last := row
+  grid[0][0] := n
+  break last[0]

@@ -79,7 +79,7 @@ recursive fn pattern_result<C>(self_: Validator&,tree: const Tree&,pool: const P
  if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
  let n=tree.node(id);
  if n.tag==a_numeric_error { numeric_failure(self_,tree,pool,context,locals,id); }
- else if n.tag==a_pattern_name { bind(self_,tree,pool,context,locals,n.a); }
+ else if n.tag==a_pattern_name { if pool.get(n.a)=="own" { fail(self_,tree,pool,context,locals,c_own_name,id,tree.span(id).start,0); return; } bind(self_,tree,pool,context,locals,n.a); }
  else if n.tag==a_pattern_field { if n.b==0 { bind(self_,tree,pool,context,locals,n.a); } else { pattern_result(self_,tree,pool,context,locals,n.b,depth+1); } }
  else if n.tag==a_pattern_constructor {
   if n.b!=0&&tree.node(n.b).tag==a_pattern_record { if !record_target(self_,tree,pool,context,locals,id,n.a) { return; } } else { name(self_,tree,pool,context,locals,n.a,id,tree.span(id).start+1); }
@@ -213,6 +213,8 @@ let c_record_constructor: Code=31;
 let c_missing_record_field: Code=32;
 let c_unknown_modifier: Code=33;
 let c_nesting_limit: Code=34;
+// `own` marks ownership wherever it stands before a name, so it names nothing.
+let c_own_name: Code=35;
 let a_invalid=blot_parse_ast::tag_invalid;
 let a_value_decl=blot_parse_ast::tag_value_decl;
 let a_import_decl=blot_parse_ast::tag_import_decl;
@@ -375,6 +377,7 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
  else if n.tag==a_lambda {
   self_.failure=context.source_expression_annotations(id); if annotations_stopped(self_,tree,pool,context,locals) { return; }
   let saved_loops=self_.loops; let saved_replies=self_.replies; self_.loops=0; self_.replies=false;
+  if pool.get(tree.parameter(n.a).name)=="own" { fail(self_,tree,pool,context,locals,c_own_name,id,tree.span(id).start,0); return; }
   let saved=locals.len; bind(self_,tree,pool,context,locals,tree.parameter(n.a).name); walk(self_,tree,pool,context,locals,n.b,depth+1);
   locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
  } else if n.tag==a_block {
@@ -460,6 +463,7 @@ fn validate<C>(tree: const Tree&,pool: const Pool&,context: C&) -> Issue,bool,Er
    if annotations_stopped(validator,tree,pool,context,locals) { let __cleanup_result_90_0: Issue = Issue {}; let __cleanup_result_90_1: bool = false; let __cleanup_result_90_2: Error = validator.failure; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_90_0, __cleanup_result_90_1, __cleanup_result_90_2; } continue;
   }
   if tree.node(id).tag!=a_value_decl { continue; } let value=tree.value_decl(id);
+  if pool.get(value.name)=="own" { let __own_name_0: Issue = Issue {code:c_own_name,node:id,point:tree.span(id).start}; let __own_name_1: bool = true; let __own_name_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __own_name_0, __own_name_1, __own_name_2; }
   if value.modifier!=0&&pool.get(value.modifier)!="entry"&&pool.get(value.modifier)!="lent" { let __cleanup_result_91_0: Issue = Issue {code:c_unknown_modifier,node:id,point:tree.span(id).start}; let __cleanup_result_91_1: bool = true; let __cleanup_result_91_2: Error = blot_error::Error.none; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_91_0, __cleanup_result_91_1, __cleanup_result_91_2; }
   let scope,err=context.source_binding_start(id); if err!=blot_error::Error.none { let __cleanup_result_92_0: Issue = Issue {}; let __cleanup_result_92_1: bool = false; let __cleanup_result_92_2: Error = err; { locals.deinit(); validator_locals.free(locals_index); } return __cleanup_result_92_0, __cleanup_result_92_1, __cleanup_result_92_2; }
   validator.failure=context.source_binding_annotation(id);

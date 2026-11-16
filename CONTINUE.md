@@ -31,13 +31,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   checker's cross-revision reuse are deleted. `serve-project` builds each
   revision fresh; dependency bundles (`.blotdep`) still provide checked
   modules.
-- **Gdev Main** builds (Wasm dd97fe15…, 2,724,223 bytes); its first Pen
+- **Gdev Main** builds (Wasm 74998ccc…, 2,621,601 bytes); its first Pen
   frame is byte-identical (frame.png 19a03f0a… on hardware, c1ff619f… on
   the software driver; frames.trace 86d50101…), at 0.075 ms of guest time per frame
   against the old backend's 2.45 ms.
 - **Ink:** `pen test-blot` gives `same 64 wrong 0 newfail 0 other 9` against
   the old backend's reference log.
-- **Guest suite:** 1,063 cases pass, 101 are ignored, each with its reason
+- **Guest suite:** 1,069 cases pass, 101 are ignored, each with its reason
   (tasks/DELETE_SCOPED.md lists them by kind), and none fail. The full gate
   (`deno task test:compiler`) passes. It no longer has Zig's native laws;
   see "What went with Zig" in tasks/GOOSE_PORT.md.
@@ -87,19 +87,21 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     store; 379 provably unique stores in Ink and Gdev became `:=`.
   - **What `=` is now:** a write through what a function was lent, which
     may keep only values it owns (`kept_value`). A function that still
-    returns or keeps what it was lent is marked `lent` (57 in Ink and
+    returns or keeps what it was lent is marked `lent` (55 in Ink and
     Gdev) and nobody relies on it.
-  - **Left:** 4,466 stores in Ink and Gdev (table in
-    tasks/MEMORY_MODEL.md) and the 57 `lent` functions. The way is
+  - **Left:** 4,452 stores in Ink and Gdev (table in
+    tasks/MEMORY_MODEL.md) and 55 `lent` functions. The way is
     top-down from the frame loop: once every caller owns what it passes, a
     writer takes it with `own`, returns it, and its `=` become `:=`. A
     caller keeps ownership across calls to functions that still use `=`,
     so this can go one function at a time with Ink's suite and Gdev's
     frame checked at each step.
   - **Built for it:** `own` on lambdas and in function types (Gdev's
-    systems are callbacks): `own World -> U32 -> World`.
-    `GrowArray` and `ResizeArray` are owned values like arrays, so an
-    `own` parameter of such a type needs storage nothing else holds.
+    systems are callbacks): `own World -> U32 -> World`; `f (own x)` at a
+    call of an untyped function. `GrowArray` and `ResizeArray` are owned
+    values like arrays. Names that borrow give back at their last read,
+    and so does a borrowed value without a name (an argument, what a
+    plain value is read out of, what a loop walks).
   - **The world is one value now** (tasks/MEMORY_MODEL.md): the frame's
     buffers live in Gdev's `FrameAccess`, made once and emptied each
     frame; the hooks no longer capture it; `bind_frame` is out of the
@@ -107,19 +109,34 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   - **The session owns it:** `world_storage.owners` returns the world,
     `host.run` takes it with `own` and `program.run` rebinds it round the
     loop.
-  - **Next, in this order:** `host.frame`, Ink's `app` and `clock`, Gdev's
-    stage lambdas, then each system: `(own access)`, return it, rebind at
-    the call. Test fixtures must hand tests a world they own before a
-    system they call can change.
-  - Open: the backend's "never parameter" failure for generic functions
-    held in a record (worked around in Gdev's `application`), and the 30
-    failing checks in five of Gdev's test modules that compile for the
-    first time.
+  - **The stages own it** (tasks/MEMORY_MODEL.md, "The stages own the
+    world"): `host.frame`, Ink's `app` and `clock.advance`, and Gdev's
+    stage lambdas take the world and hand it back. `app.stages` has a
+    typed signature. The tests, devtools and performance programs that
+    call them are converted (`app.lent` wraps stage functions that still
+    write through a lent world).
+  - **The backend keeps up with it:** a write through an array inside a
+    wide record no longer copies the record, and a loop that carries one
+    releases each iteration's memory when the record came out as it went
+    in. Before that the pushed game filled its stack after some thousands
+    of frames (the session loop carried the world and released nothing).
+    Open: an iteration that puts a new array into the carried world
+    releases nothing; that needs a release that keeps survivors
+    (tasks/MEMORY_MODEL.md, "What the backend needed").
+  - **Next:** each system the stages call: `(own access)`, return it,
+    rebind at the call, with the tests that call it directly. The
+    conversion of test callers was done by parallel workers from one
+    brief; the same works for each system.
+  - Open:
+    - `tests/codec_support/counter.blot` in Gdev and the two tests on it
+      do not compile since the session took the world (a closure that
+      holds the world across calls).
+    - The backend's "never parameter" failure for generic functions held
+      in a record (worked around in Gdev's `application`).
+    - The failing checks in Gdev's test modules that compile for the
+      first time since the rules became one set; not looked at yet.
   - **Then:** delete `=`, `lent`, `migrate-stores` and
     `BLOT_REPORT_STORES`, and bring spec section 10.3 in line.
-  - Gdev's own tests: 13 modules that compile now for the first time have
-    27 failing checks. They were hidden behind a compile error and are not
-    looked at yet.
   - Tools: `python3 scripts/integration/count_stores.py DIR...` counts
     what is left; `python3 scripts/integration/stores_to_updates.py
     PROJECT ENTRY...` converts what the compiler can already prove.

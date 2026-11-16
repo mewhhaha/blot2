@@ -363,14 +363,7 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "c07_iterate_rows": [
-  [
-   "aliased_update",
-   468,
-   483,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "c07_iterate_rows": [],
  "c08_range_bound_alias": [],
  "c09_index_alias": [],
  "c10_store_row_value": [],
@@ -949,6 +942,16 @@
  ],
  "i07_own_function_in_record": [],
  "i09_lambda_two_parameters": [],
+ "i10_own_marker_at_a_call": [],
+ "i11_own_marker_needs_owned": [
+  [
+   "own_argument",
+   275,
+   280,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "i12_untyped_own_parameter": [],
  "j01_taking_apart_gives_owned_parts": [],
  "j02_taking_apart_a_shared_value": [
   [
@@ -991,5 +994,69 @@
    522,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
- ]
+ ],
+ "k01_borrowed_argument_gives_back": [],
+ "k02_plain_value_read_out_of_a_borrowing_result": [],
+ "k03_borrowed_argument_beside_the_value_given_away": [
+  [
+   "own_argument",
+   622,
+   627,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "k04_borrowing_name_never_read": [],
+ "k05_whole_and_one_field_borrowed_together": [],
+ "k06_one_of_two_borrowing_names_still_read": [
+  [
+   "aliased_update",
+   655,
+   677,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "k07_last_read_beside_the_value_in_one_result": [],
+ "k08_last_read_beside_the_value_given_away": [
+  [
+   "own_argument",
+   638,
+   643,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "k09_rows_walked_then_updated": [],
+ "k10_row_kept_past_the_loop": [
+  [
+   "aliased_update",
+   615,
+   630,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "k11_walked_value_given_away_in_the_loop": [
+  [
+   "own_argument",
+   635,
+   640,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "k12_borrowing_result_kept_in_a_record": [
+  [
+   "aliased_update",
+   636,
+   656,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "k13_two_names_borrow_the_same_and_end_out_of_order": [],
+ "k14_the_earlier_of_two_names_still_read": [
+  [
+   "own_argument",
+   613,
+   618,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "k15_last_read_before_a_fallback_that_leaves": []
 }

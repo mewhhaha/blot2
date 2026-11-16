@@ -1,0 +1,6 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const apply_to = func step -> (state: Array U32) => return step (own state) 1
+const bump = func (rows: own Array U32) -> (k: U32) => return rows
+const run = func (n: U32) => return (apply_to bump #[n, 2])[0]

@@ -868,7 +868,28 @@ access := step access              // access is its holder's own again
 
 That holds when the name's value went nowhere else (it was not bound to
 another name, captured, stored or returned) and nothing else came to hold
-the local meanwhile. A name rebound with `:=` does not give back.
+the local meanwhile. A name rebound with `:=` does not give back. The
+name gives back when the statement that read it last is done, or already
+when the call that read it last has returned, so `return (count frame,
+access)` hands back an `access` that `frame` borrowed from. A name that
+nothing reads borrows nothing. Several names may borrow from one local at
+once, the whole of it or a field each.
+
+A borrowed value needs no name. The result of a call that borrows its
+arguments is given back as soon as what is written around it is done with
+it, when that keeps nothing:
+
+```blot
+let stored = salt.stored (salt.read_state access)       // an argument of a call
+let site = (buildings.read_state access).sites[0].plot  // a plain value read out of it
+for stack in stacks_of access:                          // what a loop walks,
+  total := total + stack.count                          // given back after the loop
+access := step access
+```
+
+It is kept, as before, where it is put into a record, a tuple or an
+array, given to a `lent` function or a function value, or where a loop
+carries an element that holds storage out of the loop.
 
 **Taking a value apart.** `let {first, second} = parts ()`, `let (a, b) =
 pair ()` and `let ($Box inside) = box` give each name a value of its own
@@ -1001,6 +1022,23 @@ func run (hooks: Hooks) -> (world: own World): World => return do:
 
 A parameter can be taken over without naming its type: `func step (own
 world) -> (dt: F32) => …`.
+
+A call can say that it gives an argument away: `world := step (own world)
+dt`, or without the parentheses `step own world dt`. Where the function's
+type is known it changes nothing. Where it is not (a function that came
+in as an untyped parameter, or as a field of one) it is what tells the
+compiler that the function takes the argument over:
+
+```blot
+func twice step -> (own state) => return do:
+  state := step (own state) 1
+  state := step (own state) 2
+  break state
+```
+
+Because `own` before a name marks what follows it, `own` itself names
+nothing: a local, a parameter or a constant called `own` is
+`own_parameter`.
 
 A lambda takes a parameter over when it says so, `func (world: own World)
 => …`, or when it is written where such a function is expected:
