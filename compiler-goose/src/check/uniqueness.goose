@@ -21,6 +21,12 @@
 // backedges; nested loops are probed by a single pass, so a body is visited
 // once more per enclosing loop.
 //
+// A local's value moves at the local's last use: bound to another name,
+// placed in a record, an array or a constructor, returned or broken out, the
+// new holder takes the local's fact, because nothing reads the local again.
+// Each body is first walked once without judging it, only to log every read
+// of a local in evaluation order; the last read on each path is a last use.
+//
 // The walk is recursive, so every table lives in the Analyzer that `check`
 // owns. What the Zig source keeps in a local list during one visit (a
 // record's entries, a path's fields, a loop's carry facts, a branch's
@@ -82,6 +88,8 @@ struct Changed { binding: u32, fact: Fact, arms: i64, last: i64, previous: i64 }
 // bindings start at `changed_start` on the Analyzer's `changed` stack and
 // its merge facts at `merged_start` on `merged`.
 struct Join {
+    // Where this arm's reads start in the dry run's log.
+    log: i64 = 0,
     base: i64,
     merges: const Merge[:],
     falls: i64 = 0,
@@ -93,8 +101,17 @@ struct Join {
 
 root struct Analyzer {
     facts: Fact[>..] = [],
-    // Per binding: the innermost loop around its definition, or 0.
+    // Per binding: the innermost loop around its definition, or 0, and the
+    // root of the function or closure that defines it.
     born: u32[>..] = [],
+    home: u32[>..] = [],
+    // The dry run: every read of a local, as (binding, node) pairs in
+    // evaluation order, and the nodes that are a local's last read.
+    dry: bool = false,
+    reads: u32[>..<] = [],
+    last_read: bool[>..] = [],
+    stamp: u32[>..] = [],
+    generation: u32 = 0,
     trail: Change[>..<] = [],
     records: Record[>..] = [],
     entries: Entry[>..] = [],
@@ -134,20 +151,33 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     for call in module.calls { takes_over = takes_over || call.own != 0; }
     if module.updates.len == 0 && !takes_over { return; }
     var analyzer = Analyzer { .. };
-    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.born.push(0); analyzer.changed_slot.push(-1); }
+    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
+    for at in 0..module.nodes.len { analyzer.last_read.push(false); }
     for body, index in module.bodies {
         if index == 0 || body.root == 0 { continue; }
         // An `own` parameter arrives unique all the way down: every call
         // names this function and gives up an argument that was.
         let own = module.bindings[body.binding].capability_parameters.own;
-        if own != 0 && body.is_function {
-            for parameter, position in module.bodyParameters(body) {
-                if position < 32 && (own >> (position as! u32)) & 1 != 0 { set(analyzer, parameter.binding, deep); }
-            }
+        for parameter, position in module.bodyParameters(body) {
+            if !local(analyzer, parameter.binding) { continue; }
+            analyzer.home[parameter.binding] = body.root;
+            if own != 0 && body.is_function && position < 32 && (own >> (position as! u32)) & 1 != 0 { set(analyzer, parameter.binding, deep); }
         }
         analyzer.owned_result = 0;
         if own != 0 && body.is_function { analyzer.owned_result = body.root; }
         analyzer.function_roots.push(body.root);
+        // The dry run: log the reads, judge nothing, keep no fact.
+        {
+            let mark = analyzer.trail.len;
+            analyzer.dry = true;
+            analyzer.probing += 1;
+            analyzer.reads.resize(0);
+            visit(analyzer, module, body.root);
+            lastReads(analyzer, 0);
+            analyzer.probing -= 1;
+            analyzer.dry = false;
+            undo(analyzer, mark);
+        }
         let value = visit(analyzer, module, body.root);
         if analyzer.owned_result != 0 && !value.exits { ownedResult(analyzer, module, body.root, value); }
         escape(analyzer, value);
@@ -178,8 +208,49 @@ fn define(self_: Analyzer&, binding: u32, fact: Fact) {
         var loop_id: u32 = 0;
         if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
         self_.born[binding] = loop_id;
+        if self_.function_roots.len != 0 { self_.home[binding] = self_.function_roots[self_.function_roots.len - 1]; }
     }
     set(self_, binding, fact);
+}
+// A read of `binding` at `node`, for the dry run.
+fn read(self_: Analyzer&, binding: u32, node: u32) {
+    if self_.dry && local(self_, binding) { self_.reads.push(binding); self_.reads.push(node); }
+}
+// Marks the last read of each local among the reads logged since `start`.
+// Nothing reads the local after it: the function ends there, or the log
+// does.
+fn lastReads(self_: Analyzer&, start: i64) {
+    self_.generation += 1;
+    var at = self_.reads.len;
+    while at > start {
+        at -= 2;
+        let binding = self_.reads[at];
+        if self_.stamp[binding] == self_.generation { continue; }
+        self_.stamp[binding] = self_.generation;
+        self_.last_read[self_.reads[at + 1]] = true;
+    }
+}
+// Whether the value read at `node` moves out of `binding`: `node` names the
+// local, is its last read, and runs once for each definition of it.
+fn moves(self_: const Analyzer&, m: const Module&, node: u32, binding: u32) -> bool {
+    if self_.dry || !local(self_, binding) || m.node(node).tag != blot_check_core::Tag.reference || !self_.last_read[node] { return false; }
+    var loop_id: u32 = 0;
+    if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
+    if self_.born[binding] != loop_id || self_.function_roots.len == 0 { return false; }
+    return self_.home[binding] == self_.function_roots[self_.function_roots.len - 1];
+}
+// The fact the holder of `value` gets, where `node` computed it: a fresh
+// value's own fact, a moved local's fact, or none for an alias, which also
+// ends the uniqueness of the version it aliases.
+fn taken(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fact {
+    if value.origin == 0 { return value.fact; }
+    if moves(self_, m, node, value.origin) {
+        let fact = self_.facts[value.origin];
+        kill(self_, value.origin);
+        return fact;
+    }
+    escape(self_, value);
+    return none;
 }
 fn reject(self_: Analyzer&, m: const Module&, node: u32, code: blot_check_core::Code) {
     if self_.probing == 0 { self_.rejections.push(Rejection { node: node, span: m.span(node), code: code }); }
@@ -482,6 +553,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let target = m.reference(id);
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
         if !local(self_, target.binding) { return Value { .. }; }
+        read(self_, target.binding, id);
         if self_.facts[target.binding] == spent { reject(self_, m, id, blot_check_core::Code.spent_value); return Value { .. }; }
         return Value { origin: target.binding, .. };
     }
@@ -496,9 +568,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if value.tag == blot_check_core::Tag.update && !m.updateInfo(n.b).store { return update(self_, m, n.b, n.a); }
         var result = Value { .. };
         if value.tag == blot_check_core::Tag.array_op { result = arrayOp(self_, m, n.b, true); } else { result = visit(self_, m, n.b); }
-        escape(self_, result);
-        var fact = result.fact;
-        if result.origin != 0 { fact = none; }
+        let fact = taken(self_, m, n.b, result);
         define(self_, n.a, fact);
         return Value { exits: result.exits, .. };
     }
@@ -509,16 +579,20 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // value keeps the local's fact; so does one a tail block breaks with.
         let tail = leaves && n.b == self_.owned_result && n.a != 0 && m.node(n.a).tag == blot_check_core::Tag.block_;
         if tail { self_.tails.push(n.a); }
+        let logged = self_.reads.len;
         let result = visit(self_, m, n.a);
         if tail { self_.tails.resize(self_.tails.len - 1); }
-        var fact = result.fact;
-        if result.origin != 0 {
-            fact = none;
-            let moves = (leaves && n.b == self_.owned_result) || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b);
-            if moves && m.node(n.a).tag == blot_check_core::Tag.reference { fact = self_.facts[result.origin]; }
+        // Nothing runs after a return: its reads are the last on its path.
+        if leaves && self_.dry { lastReads(self_, logged); }
+        var fact: Fact = none;
+        let ends = leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b);
+        if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.reference && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
+            fact = self_.facts[result.origin];
+            kill(self_, result.origin);
+        } else {
+            fact = taken(self_, m, n.a, result);
         }
         if leaves && n.b == self_.owned_result && n.a != 0 && !result.exits && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { reject(self_, m, n.a, blot_check_core::Code.result_not_owned); }
-        escape(self_, result);
         if leaves { return Value { exits: true, .. }; }
         var at = self_.blocks.len;
         while at != 0 {
@@ -546,10 +620,19 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.break_ { return breakNode(self_, m, id); }
     if tag == blot_check_core::Tag.closure {
         // A spent capture is reported where the body reads it.
-        for captured in m.closureCaptures(id) { kill(self_, captured); }
+        for captured in m.closureCaptures(id) { read(self_, captured, id); kill(self_, captured); }
         let body = m.closure(id).body;
+        let parameter = m.closure(id).parameter.binding;
+        if local(self_, parameter) { self_.home[parameter] = body; }
         self_.function_roots.push(body);
+        let logged = self_.reads.len;
         let value = visit(self_, m, body);
+        // The closure's own locals end with its body. What it captured is
+        // read again whenever it runs, so those reads are never the last.
+        if self_.dry {
+            lastReads(self_, logged);
+            for captured in m.closureCaptures(id) { read(self_, captured, id); }
+        }
         escape(self_, value);
         self_.function_roots.resize(self_.function_roots.len - 1);
         return Value { .. };
@@ -570,24 +653,40 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         var elements_deep = true;
         var exits = false;
         for child in m.children(id) {
-            let value = visitEscaping(self_, m, child);
+            let value = visit(self_, m, child);
+            let fact = taken(self_, m, child, value);
             exits = exits || value.exits;
-            elements_deep = elements_deep && value.origin == 0 && value.fact == deep;
+            elements_deep = elements_deep && fact == deep;
         }
         let fact = freshContainer(self_, m, n.ty, elements_deep);
         return Value { fact: fact, exits: exits, .. };
     }
     if tag == blot_check_core::Tag.record { return recordLiteral(self_, m, id); }
     if tag == blot_check_core::Tag.construct {
-        let payload = visitEscaping(self_, m, n.b);
+        let payload = visit(self_, m, n.b);
         let literal = n.b != 0 && m.node(n.b).tag == blot_check_core::Tag.record;
+        let held = taken(self_, m, n.b, payload);
         var fact: Fact = none;
-        if literal && payload.origin == 0 { fact = payload.fact; }
+        if literal && payload.origin == 0 { fact = held; }
         return Value { fact: fact, exits: payload.exits, .. };
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
     if tag == blot_check_core::Tag.call && m.call(id).own != 0 { return ownCall(self_, m, id); }
+    if tag == blot_check_core::Tag.request_loop {
+        // A handler loop carries locals the way a loop does, but through
+        // its callbacks: each version it names is read by it and shared.
+        for carry in m.requestLoopCarries(id) { read(self_, carry.incoming, id); kill(self_, carry.incoming); }
+        let exits = visitChildren(self_, m, id);
+        for carry in m.requestLoopCarries(id) {
+            read(self_, carry.iteration, id);
+            read(self_, carry.backedge, id);
+            read(self_, carry.outgoing, id);
+            kill(self_, carry.backedge);
+        }
+        for binding in m.requestCompletionBindings(id) { read(self_, binding, id); }
+        return Value { exits: exits, .. };
+    }
     let exits = visitChildren(self_, m, id);
     return Value { exits: exits, .. };
 }
@@ -693,15 +792,14 @@ recursive fn recordLiteral(self_: Analyzer&, m: const Module&, id: u32) -> Value
     let mark = self_.scratch.len;
     var exits = false;
     for child, index in m.children(id) {
-        let value = visitEscaping(self_, m, child);
+        let value = visit(self_, m, child);
+        let fact = taken(self_, m, child, value);
         exits = exits || value.exits;
         if !is_record { continue; }
         let destination = m.recordDestinations(id)[index];
         if destination >= shape.b { continue; }
         let declared = m.types.recordField(shape, destination);
         if !holds(self_, m, declared.ty) { continue; }
-        var fact = value.fact;
-        if value.origin != 0 { fact = none; }
         pushSorted(self_, mark, Entry { field: declared.name, fact: fact });
     }
     if !is_record { return Value { exits: exits, .. }; }
@@ -717,9 +815,8 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     let selectors = m.updateSelectors(id);
     let root = visit(self_, m, info.root);
     for step in selectors { if step.kind == blot_check_core::UpdateKind.index { visitEscaping(self_, m, step.index); } }
-    let value = visitEscaping(self_, m, info.value);
-    var replacement = value.fact;
-    if value.origin != 0 { replacement = none; }
+    let value = visit(self_, m, info.value);
+    let replacement = taken(self_, m, info.value, value);
     var through_storage = false;
     for step in selectors { through_storage = through_storage || step.kind == blot_check_core::UpdateKind.index; }
     var leaf = m.typeOf(info.value);
@@ -931,6 +1028,7 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     let outgoing = result + count;
     for carry in carries {
         var fact: Fact = none;
+        read(self_, carry.incoming, id);
         if local(self_, carry.incoming) && carry.incoming != iterated { fact = self_.facts[carry.incoming]; }
         self_.loop_facts.push(fact);
     }
@@ -993,6 +1091,7 @@ recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: cons
     self_.loops.resize(self_.loops.len - 1);
     for carry, at in carries {
         var backedge: Fact = none;
+        read(self_, carry.backedge, id);
         if body.exits { backedge = top; } else if local(self_, carry.backedge) { backedge = self_.facts[carry.backedge]; }
         let next = meet(self_, backedge, self_.carried[start + at]);
         self_.loop_facts[assumed + count + at] = next;
@@ -1032,11 +1131,23 @@ recursive fn breakNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
 // ---- Joins -------------------------------------------------------------
 
 fn joinInit(self_: Analyzer&, merges: const Merge[:]) -> Join {
-    let join = Join { base: self_.trail.len, merges: merges, changed_start: self_.changed.len, merged_start: self_.merged.len, .. };
+    let join = Join { log: self_.reads.len, base: self_.trail.len, merges: merges, changed_start: self_.changed.len, merged_start: self_.merged.len, .. };
     for at in 0..merges.len { self_.merged.push(top); }
     return join;
 }
 fn arm(self_: Analyzer&, join: Join&, index: i64, result: Value) {
+    if self_.dry {
+        // An arm that only leaves the function reads nothing afterwards.
+        if result.exits { lastReads(self_, join.log); }
+        if index < 2 {
+            for merge in join.merges {
+                var binding = merge.else_binding;
+                if index == 0 { binding = merge.then_binding; }
+                read(self_, binding, merge.node);
+            }
+        }
+        join.log = self_.reads.len;
+    }
     if !result.exits {
         escape(self_, result);
         join.exits = false;

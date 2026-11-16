@@ -236,9 +236,11 @@ The branch and the variants leave these open:
   caller then updates `left` in place and sees it in `right`. A result that
   owns an array must be unique at the `return`. That needs the next item,
   or `let before = rows` rejects `return rows`.
-- **Ownership returns at a holder's last use** (rule 3). Not started. Facts
-  need to know which names hold a value, not only that some other name
-  does.
+- **Ownership returns at a holder's last use** (rule 3). Moves are built
+  ("Phase 2 as built so far"): the value goes to the new holder at the
+  local's last read. Open: a temporary holder giving ownership back, for
+  which facts need to know which names hold a value, not only that some
+  other name does.
 - **`own`.** Built for top-level named functions ("Phase 2 as built so
   far"): the syntax, the argument that must be owned and the spent name.
   Open: `own` in function types.
@@ -268,8 +270,9 @@ waits for `own` in types.
 ## Phase 2 as built so far (16 November 2026)
 
 `own` on the parameters of top-level named functions, in the Goose
-compiler. tests/guest/own_parameter_execution.test.ts and the 27 programs
-`e…` of compiler-goose/tests/uniqueness cover it; docs/language/guide.md
+compiler. tests/guest/own_parameter_execution.test.ts,
+tests/guest/store_uniqueness_execution.test.ts and the programs `e…` and
+`f…` of compiler-goose/tests/uniqueness cover it; docs/language/guide.md
 ("`own` parameters") describes it for users.
 
 - **Syntax.** `(name: own Type)`. The parser reads `own` as the mark when
@@ -308,6 +311,18 @@ compiler. tests/guest/own_parameter_execution.test.ts and the 27 programs
   take the local's fact, because the function ends there. In return the
   call's result is `deep` in the caller. This is rule 1 of "The rules"
   applied to the functions that cannot break existing code.
+
+- **Moves at a local's last read** (rule 3, in part). Each body is walked
+  once without judging it, to log every read of a local in evaluation order:
+  reference nodes, closure captures, loop carries, branch merges and the
+  carries of a handler loop. The last logged read of each local is a last
+  read; so is the last one inside an arm or a `return` that only leaves the
+  function. At such a read that binds, places, stores or returns the local,
+  the new holder takes the local's fact (`taken`). The local must be bound
+  in the same loop iteration and the same function or closure.
+  - Not built: a holder that is only temporary. After `let alias = rows`
+    with both names read later, `rows` does not own its array again when
+    `alias` is done.
 
 What this leaves, besides the list under "What the finished pass still
 needs":

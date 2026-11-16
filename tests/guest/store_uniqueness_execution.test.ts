@@ -292,3 +292,98 @@ entry func grown (n: U32) : U32 => return do:
     equal(guest.call("grown", 5), 115);
   });
 });
+
+Deno.test("a value moves at its local's last read and stays unique under the new holder", async () => {
+  await compileAndRun(`
+type Grid is data = $Grid { cells: Array U32, width: U32 }
+entry func renamed (n: U32) : U32 => return do:
+  let rows = #[1, 2]
+  let other = rows
+  other[0] := n
+  break other[0] * 10 + other[1]
+entry func built (n: U32) : U32 => return do:
+  let cells = #[n, n]
+  let grid = $Grid { cells: cells, width: 2 }
+  grid.cells[1] := 7
+  break grid.cells[0] * 10 + grid.cells[1]
+entry func nested (n: U32) : U32 => return do:
+  let row = #[5, 6]
+  let grid = #[#[1, 2], #[3, 4]]
+  grid[1] := row
+  grid[1][0] := n
+  break grid[0][0] * 100 + grid[1][0] * 10 + grid[1][1]
+entry func from_block (flag: Bool) : U32 => return do:
+  let rows = do:
+    let inner = #[1, 2]
+    if flag:
+      break inner
+    break #[3, 4]
+  rows[1] := 9
+  break rows[0] * 10 + rows[1]
+entry func before_return (flag: Bool) : U32 => return do:
+  let rows = #[1, 2]
+  if flag:
+    let taken = rows
+    taken[0] := 5
+    return taken[0] * 10 + taken[1]
+  rows[1] := 8
+  break rows[0] * 10 + rows[1]
+entry func each_iteration (n: U32) : U32 => return do:
+  let sum = 0
+  for i in 0..n:
+    let rows = #[i, 1]
+    let other = rows
+    other[1] := i
+    sum := sum + other[0] + other[1]
+  break sum
+`, (guest) => {
+    equal(guest.call("renamed", 7), 72);
+    equal(guest.call("built", 4), 47);
+    equal(guest.call("nested", 8), 186);
+    equal(guest.call("from_block", true), 19);
+    equal(guest.call("from_block", false), 39);
+    equal(guest.call("before_return", true), 52);
+    equal(guest.call("before_return", false), 18);
+    equal(guest.call("each_iteration", 4), 12);
+  });
+});
+
+Deno.test("a local read again after another holder took its value is still aliased", async () => {
+  const cases: [string, string][] = [
+    ["read after the rename", `
+  let rows = #[1, 2]
+  let other = rows
+  other[0] := n
+  break other[0] + rows[0]`],
+    ["given away inside a loop that runs again", `
+  let rows = #[1, 2]
+  let sum = 0
+  for i in 0..n:
+    let other = rows
+    other[0] := i
+    sum := sum + other[0]
+  break sum`],
+    ["captured by a closure afterwards", `
+  let rows = #[1, 2]
+  let other = rows
+  let read = func (i: U32) => return rows[i]
+  other[0] := n
+  break read 0 + other[0]`],
+    ["carried into a loop afterwards", `
+  let rows = #[1, 2]
+  let other = rows
+  for i in 0..n:
+    rows := #[i, i]
+  other[0] := n
+  break other[0] + rows[0]`],
+  ];
+  for (const [name, body] of cases) {
+    const source = `entry func run (n: U32) : U32 => return do:${body}\n`;
+    const start = source.indexOf("other[0] :=");
+    try {
+      await compileExpectedFailure(source, "aliased_update", undefined, { span: [start, source.indexOf("\n", start)] });
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
+});

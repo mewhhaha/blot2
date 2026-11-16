@@ -786,7 +786,17 @@ root stops being unique, for the rest of the path that follows, once the same
 version is bound to another name or a pattern, captured, passed to a call or
 constructor, placed in a literal or record, returned or broken out, or read out
 as an array-holding element or field (`let row = grid[r]`). Reading a plain
-element or the length does not alias it. Parameters, call results and
+element or the length does not alias it.
+
+A value moves at its local's last read. When the local is named for the last
+time and that read binds it to another name, puts it in a record, an array or
+a constructor, stores it with `:=`, or returns or breaks with it, the new
+holder is unique if the local was: `let cells = #[0, 0]` followed by
+`let grid = $Grid { cells: cells, width: 2 }` leaves `grid.cells` unique when
+`cells` is not read again. A read is the last one when nothing on any path
+after it reads the local: not a later statement, a closure made later, or a
+loop that carries it. Inside a loop only a local bound in the same iteration
+moves. Parameters, call results and
 constants are never unique, and no fact crosses a call, except through an
 `own` parameter (below). Branches keep
 uniqueness only when every arm that continues keeps it; an arm that returns

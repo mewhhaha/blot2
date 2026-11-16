@@ -36,7 +36,7 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   against the old backend's 2.45 ms.
 - **Ink:** `pen test-blot` gives `same 64 wrong 0 newfail 0 other 9` against
   the old backend's reference log.
-- **Guest suite:** 1,059 cases pass, 101 are ignored, each with its reason
+- **Guest suite:** 1,061 cases pass, 101 are ignored, each with its reason
   (tasks/DELETE_SCOPED.md lists them by kind), and none fail. The full gate
   (`deno task test:compiler`) passes. It no longer has Zig's native laws;
   see "What went with Zig" in tasks/GOOSE_PORT.md.
@@ -78,8 +78,9 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   approved the rules on 16 November 2026 ("Yes. Do all of that."), and the
   first part is on main: `own` on the parameters of top-level named
   functions, with spent names, checked arguments and owned results for
-  those functions (tasks/MEMORY_MODEL.md, "Phase 2 as built so far";
-  docs/language/guide.md, "`own` parameters"). Nothing is migrated.
+  those functions, and a value moving at its local's last read
+  (tasks/MEMORY_MODEL.md, "Phase 2 as built so far"; docs/language/guide.md,
+  "`own` parameters"). Nothing is migrated.
   - **Next:** the borrowed rules for every function (rule set 3 under "The
     rules"): lending to an ordinary parameter keeps the local unique,
     every call result is the caller's, a borrowed parameter cannot be

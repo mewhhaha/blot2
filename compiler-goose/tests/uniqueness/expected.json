@@ -273,14 +273,7 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "b41_block_value": [
-  [
-   "aliased_update",
-   404,
-   416,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "b41_block_value": [],
  "b43_deep_path": [
   [
    "aliased_update",
@@ -342,14 +335,7 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "c05_construct_record": [
-  [
-   "aliased_update",
-   459,
-   479,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "c05_construct_record": [],
  "c06_three_arms": [
   [
    "aliased_update",
@@ -382,14 +368,7 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "c10_store_row_value": [
-  [
-   "aliased_update",
-   474,
-   489,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "c10_store_row_value": [],
  "c11_self_path": [],
  "c12_closure_return": [
   [
@@ -718,6 +697,82 @@
    510,
    517,
    "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"
+  ]
+ ],
+ "f01_block_value_read_after": [
+  [
+   "aliased_update",
+   402,
+   414,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f02_construct_then_read": [
+  [
+   "aliased_update",
+   392,
+   412,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f03_store_row_then_read": [
+  [
+   "aliased_update",
+   368,
+   383,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f04_move_rename": [],
+ "f05_move_outer_in_loop": [
+  [
+   "aliased_update",
+   377,
+   392,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f06_move_then_captured": [
+  [
+   "aliased_update",
+   385,
+   400,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f07_move_before_return": [],
+ "f08_move_one_arm": [
+  [
+   "aliased_update",
+   386,
+   401,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f09_move_loop_local": [],
+ "f10_move_into_record_twice": [
+  [
+   "aliased_update",
+   360,
+   377,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f11_move_closure_local": [],
+ "f12_move_captured_inside": [
+  [
+   "aliased_update",
+   386,
+   401,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "f13_move_carry_out": [
+  [
+   "aliased_update",
+   374,
+   386,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ]
 }

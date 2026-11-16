@@ -6,8 +6,9 @@ prelude. It may not get a lex, parse or check diagnostic, and its lowering
 diagnostics must be those in tests/uniqueness/expected.json: code, span,
 message, count and order. For the 73 programs named a, b, c and d the record
 holds what the Zig compiler reported on 15 November 2026, the day it was
-removed. The programs named e are about `own` parameters, which came later;
-their record is this compiler's, read through by hand. The pass runs after
+removed, except b41, c05 and c10, which moves at a last read now accept. The
+programs named e and f are about `own` parameters and those moves, which came
+later; their record is this compiler's, read through by hand. The pass runs after
 lowering, so `build` reaches it whether or not a backend follows. A run that
 ends without a compilation record (a crash) fails.
 
