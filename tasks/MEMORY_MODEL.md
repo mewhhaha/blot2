@@ -288,8 +288,10 @@ module; the `BLOT_BORROWED_RULES` switch is gone.
   a function that returned a parameter, a field of one or a module
   constant now copies it or takes it `own`; tests that pinned "writes
   through aliases" for `simd.store` now pin the take-over.
-- 380 stores in Ink and Gdev whose place was provably unique became `:=`
-  (318 from the Gdev build, 61 from Ink's tests, 1 more on a second pass).
+- 379 stores in Ink and Gdev whose place was provably unique became `:=`
+  (171 in Ink, commit 2699436, whose subject says 380 by mistake; 208 in
+  Gdev, commit a09ba7a). One more was converted and put back: as a `:=`
+  inside a loop it made its array a loop carry, which was not unique.
   Ink's suite gives the same result as before (268 passed, 1 failed, 3 did
   not compile), and Gdev's first frame is byte-identical (frame.png
   c1ff619f…, frames.trace 86d50101…). Gdev's Wasm is now dd97fe15…,

@@ -81,7 +81,7 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   tasks/MEMORY_MODEL.md, "Phase 2 is the default", has the details.
   - **Done:** every function's result is its caller's alone and a call
     only borrows its arguments; `own` parameters; moves at a local's last
-    read; std has no store; 380 provably unique stores in Ink and Gdev
+    read; std has no store; 379 provably unique stores in Ink and Gdev
     became `:=`. A module that still has a store is in the old style and
     lives beside converted ones.
   - **Left:** about 4,400 stores in Ink and Gdev (table in
