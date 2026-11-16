@@ -458,7 +458,8 @@ of the salt simulation), Gdev's own tests as before (362, 27, 118).
    the host: tried on a small program, it is accepted. But it cannot be
    done before step 3, because the first `bind_frame` shares the record
    for good.
-3. Each frame `host.with_frame` makes the frame's buffers and
+3. Done, see "The world is one value" below. Each frame
+   `host.with_frame` made the frame's buffers and
    `bind_frame` builds one `FrameAccess` out of them and the persistent
    record, field by field (170 fields), and nothing takes it apart again.
    Either the pass learns to move fields out of a record at its last use,
@@ -475,6 +476,40 @@ of the salt simulation), Gdev's own tests as before (362, 27, 118).
    part itself, and each system takes what it writes with `own`. From
    there the writers convert one at a time, and the generated encoders
    (half the stores) with their caller, `host.encode_frame`.
+
+**The world is one value (17 November 2026, steps 1 and 3 of the list
+above).** Approved by the owner on 16 November ("Sounds good. Do all of
+that.").
+
+- Ink's `host.frame_owners ()` makes the frame's buffers once, and
+  `host.empty_frame access` empties them where a frame starts. Gdev's
+  `with_owners` takes that record apart and builds one `FrameAccess` out
+  of its own buffers, the hooks and the frame's buffers. The session's
+  `frame` and `execute` work on that value directly; `host.with_frame`
+  and `bind_frame` remain only for tests that bind their own frames.
+- For that the pass learned to take a value apart: `let {a, b} = v`,
+  `let (a, b) = v` and `let ($Box a) = v` give each name a value of its
+  own when `v` is fresh, or a unique local at its last read. Zig's `b18`
+  and one site of `c22` are accepted for that reason now.
+- Gdev's first frame is byte-identical with the buffers reused (Wasm
+  00582e5e…, 2,677,305 bytes).
+- Gdev's `application` record wraps each callback in a lambda with
+  written types (`func (access: FrameAccess) => return keep access`). With
+  the bare generic functions as fields the backend failed with "closure
+  argument of 1 words for a never parameter of 0 words" at the session's
+  calls: the field's type variable was left unresolved where the session
+  is given the world's nominal type. It was not tracked down. Five of
+  Gdev's test modules failed to compile on the same message at the old
+  `bind_frame` call and compile now.
+- Gdev's own tests: 376 pass, 57 fail, 113 do not compile (362, 27, 118
+  before). Compared module by module nothing that compiled got worse; the
+  30 new failures are in those five modules (`codec_saved_state`,
+  `ecs_sandbox`, `game`, `game_history`, `restore_game`), which call
+  `host.frame` with a frame they bound themselves. Whether their
+  expectations are stale or the reused buffers matter there is not known.
+- The devtools program does not build before or after
+  (`storage_unsupported`); its world takes the frame's buffers by a
+  record merge so that it still checks.
 
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark

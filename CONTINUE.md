@@ -100,13 +100,18 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     systems are callbacks): `own World -> U32 -> World`.
     `GrowArray` and `ResizeArray` are owned values like arrays, so an
     `own` parameter of such a type needs storage nothing else holds.
-  - **Next, in this order** (tasks/MEMORY_MODEL.md, "What blocks the
-    rest"): Gdev's `hooks` closure must stop capturing the world;
-    `with_owners`, Ink's `host.run` and `program.run` take the access with
-    `own`; `bind_frame` needs a way to take a record apart into owned
-    fields, or the frame's buffers move into the persistent record; then
-    the functions that hand out parts of the access go, and the writers
-    convert one at a time.
+  - **The world is one value now** (tasks/MEMORY_MODEL.md): the frame's
+    buffers live in Gdev's `FrameAccess`, made once and emptied each
+    frame; the hooks no longer capture it; `bind_frame` is out of the
+    session's path.
+  - **Next, in this order:** `with_owners`, Ink's `host.run` and
+    `program.run` take the world with `own`; then the functions that hand
+    out parts of the access go, and the writers convert one at a time
+    from the frame loop down.
+  - Open: the backend's "never parameter" failure for generic functions
+    held in a record (worked around in Gdev's `application`), and the 30
+    failing checks in five of Gdev's test modules that compile for the
+    first time.
   - **Then:** delete `=`, `lent`, `migrate-stores` and
     `BLOT_REPORT_STORES`, and bring spec section 10.3 in line.
   - Gdev's own tests: 13 modules that compile now for the first time have

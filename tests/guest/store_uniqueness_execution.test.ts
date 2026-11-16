@@ -226,10 +226,12 @@ const aliased: [string, string][] = [
   let grid = @array.fill 2 #[0, 0]
   grid[0][0] := n
   break grid[1][0]`],
-  ["bound by a pattern", `
-  let (rows, other) = (#[1, 2], 3)
+  ["bound by a pattern from a value that is read again", `
+  let whole = (#[1, 2], 3)
+  let (rows, other) = whole
   rows[0] := n
-  break rows[0] + other`],
+  let (again, same) = whole
+  break rows[0] + other + again[0] + same`],
 ];
 
 Deno.test(":= through an aliased root is rejected with both fixes named", async () => {
@@ -444,4 +446,32 @@ entry func run (n: U32) : U32 => return do:
 `;
   const named = value.indexOf("= same") + 2;
   await compileExpectedFailure(value, "lent_result_value", undefined, { span: [named, named + 4] });
+});
+
+Deno.test("taking a value nothing else holds apart gives each part to its name", async () => {
+  await compileAndRun(`func parts (n: U32) => return { first: #[n, 2], second: #[3] }
+func pair (n: U32) => return (#[n, 2], #[3])
+entry func record (n: U32) : U32 => return do:
+  let { first, second } = parts n
+  first[1] := self + second[0]
+  second[0] := n
+  break first[0] * 100 + first[1] * 10 + second[0]
+entry func tuple (n: U32) : U32 => return do:
+  let (left, right) = pair n
+  left[0] := self + 1
+  right[0] := self + left[1]
+  break left[0] * 10 + right[0]
+`, (guest) => {
+    equal(guest.call("record", 4), 454);
+    equal(guest.call("tuple", 4), 55);
+  }, { stdRoot });
+  const shared = `entry func run (n: U32) : U32 => return do:
+  let whole = (#[n, 2], #[3])
+  let (left, right) = whole
+  left[0] := 9
+  let (again, other) = whole
+  break left[0] + again[0]
+`;
+  const start = shared.indexOf("left[0] := 9");
+  await compileExpectedFailure(shared, "aliased_update", undefined, { span: [start, shared.indexOf("\n", start)] });
 });

@@ -834,7 +834,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.if_value || tag == blot_check_core::Tag.if_stmt { return conditional(self_, m, id); }
     if tag == blot_check_core::Tag.match_ { return match_(self_, m, id); }
     if tag == blot_check_core::Tag.pattern_bind {
-        visitEscaping(self_, m, n.b);
+        // Taking a value apart: the parts of a value nothing else holds
+        // are each their name's alone.
+        let whole = visit(self_, m, n.b);
+        if taken(self_, m, n.b, whole) == deep { ownPattern(self_, m, n.a, 0); }
         if n.c != 0 {
             let mark = self_.trail.len;
             let fallback = visit(self_, m, n.c);
@@ -1510,6 +1513,14 @@ fn lentFunction(self_: Analyzer&, m: const Module&, node: u32) -> bool {
     let kind = m.bindings[named].kind;
     if kind == blot_reuse_principal_interface::Kind.local || kind == blot_reuse_principal_interface::Kind.parameter { return false; }
     return !trusted(self_, m, named);
+}
+// Gives every name `pattern` binds a value of its own.
+recursive fn ownPattern(self_: Analyzer&, m: const Module&, pattern: u32, depth: i64) {
+    if pattern == 0 || pattern >= m.patterns.len || depth > 64 { return; }
+    let shape = m.pattern(pattern);
+    if shape.tag == blot_check_core::PatternTag.bind { define(self_, shape.a, deep); return; }
+    if shape.tag == blot_check_core::PatternTag.product { for child in m.patternChildren(pattern) { ownPattern(self_, m, child, depth + 1); } return; }
+    if shape.tag == blot_check_core::PatternTag.constructor || shape.tag == blot_check_core::PatternTag.record_payload { ownPattern(self_, m, shape.b, depth + 1); }
 }
 fn keeperValue(self_: Analyzer&, m: const Module&, node: u32, ty: u32) {
     var result = ty;

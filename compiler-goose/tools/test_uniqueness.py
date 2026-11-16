@@ -6,7 +6,8 @@ prelude. It may not get a lex, parse or check diagnostic, and its lowering
 diagnostics must be those in tests/uniqueness/expected.json: code, span,
 message, count and order. For the 73 programs named a, b, c and d the record
 holds what the Zig compiler reported on 15 November 2026, the day it was
-removed, except b41, c05 and c10, which moves at a last read now accept. The
+removed, except b41, c05 and c10, which moves at a last read now accept, and
+b18 and the second site of c22, which take a fresh tuple apart. The
 programs named e and f are about `own` parameters and those moves, which came
 later; their record is this compiler's, read through by hand. The pass runs after
 lowering, so `build` reaches it whether or not a backend follows. A run that
@@ -18,7 +19,8 @@ named h are about what stays while `=` exists: `lent` functions, what a
 store may keep, function values, and a closure that gives back what it
 captured after the call it was written for. The programs named i are
 about `own` in function types: lambdas and function values that take a
-parameter over.
+parameter over. The programs named j take a value apart into parts of
+its own.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

@@ -201,14 +201,7 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "b18_pattern_bound": [
-  [
-   "aliased_update",
-   333,
-   345,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "b18_pattern_bound": [],
  "b19_lambda_parameter": [
   [
    "aliased_update",
@@ -458,12 +451,6 @@
    "aliased_update",
    409,
    421,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ],
-  [
-   "aliased_update",
-   459,
-   471,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
@@ -973,5 +960,14 @@
   ]
  ],
  "i07_own_function_in_record": [],
- "i09_lambda_two_parameters": []
+ "i09_lambda_two_parameters": [],
+ "j01_taking_apart_gives_owned_parts": [],
+ "j02_taking_apart_a_shared_value": [
+  [
+   "aliased_update",
+   299,
+   308,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ]
 }

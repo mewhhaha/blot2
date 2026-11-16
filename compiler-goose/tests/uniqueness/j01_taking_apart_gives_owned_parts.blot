@@ -1,0 +1,14 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const parts = func (n: U32) => return { first: #[n, 2], second: #[3] }
+const pair = func (n: U32) => return (#[n, 2], #[3])
+const run = func (n: U32) => return do:
+  let { first, second } = parts n
+  first[0] := 7
+  second[0] := 8
+  let (a, b) = pair n
+  a[0] := 9
+  let ($Box inside) = $Box #[n]
+  inside[0] := 1
+  break @u32.add (@u32.add first[0] second[0]) (@u32.add a[0] (@u32.add b[0] inside[0]))
