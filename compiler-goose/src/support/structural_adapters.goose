@@ -1409,6 +1409,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_types::Version)->b
 fn blot_check_types::blotStructuralHash<StructuralSink>(value:blot_check_types::Version,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::BlockFrame)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::BlockFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Captured)->bool {return equalFields(left,right);}
+fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::Captured,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Change)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::Change,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Changed)->bool {return equalFields(left,right);}
@@ -1421,8 +1423,6 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Join)-
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::Join,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::LoopFrame)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::LoopFrame,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
-fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::MemberTaker)->bool {return equalFields(left,right);}
-fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::MemberTaker,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Place)->bool {return equalFields(left,right);}
 fn blot_check_uniqueness::blotStructuralHash<StructuralSink>(value:blot_check_uniqueness::Place,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_uniqueness::Record)->bool {return equalFields(left,right);}

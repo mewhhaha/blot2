@@ -54,7 +54,7 @@ fn shape<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node) ->
         product => { if value.a > values.len || value.b > values.len - value.a { return blot_error::Error.type_limit; } },
         record => { if value.a > values.len || value.b > (values.len - value.a) / 2 { return blot_error::Error.type_limit; } },
         nominal, projection => { if value.c >= values.len || values[value.c] > values.len - value.c - 1 { return blot_error::Error.type_limit; } },
-        usage => { if value.b > blot_parse_ast::usagekind_concurrent { return blot_error::Error.type_limit; } },
+        usage => { if value.b > blot_parse_ast::usagekind_own { return blot_error::Error.type_limit; } },
         _ => {},
     }
     if value.tag == blot_check_types::Tag.projection && values[value.c] >= values.len - value.c - 1 { return blot_error::Error.type_limit; }

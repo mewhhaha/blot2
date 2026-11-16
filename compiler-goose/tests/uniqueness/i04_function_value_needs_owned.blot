@@ -1,0 +1,2 @@
+const through = func (step: own Array U32 -> Array U32) -> (rows: Array U32) => return (step rows)[0]
+const run = func (n: U32) => return through (func (rows: own Array U32) => return rows) #[n]

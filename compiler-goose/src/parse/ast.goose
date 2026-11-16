@@ -119,6 +119,8 @@ let usagekind_once: UsageKind = 4;
 let usagekind_many: UsageKind = 5;
 let usagekind_cleanup: UsageKind = 6;
 let usagekind_concurrent: UsageKind = 7;
+// `own T` as a function type's parameter: the function takes the argument over.
+let usagekind_own: UsageKind = 8;
 type NumericCode = u32;
 let numericcode_integer_range: NumericCode = 0;
 let numericcode_float_range: NumericCode = 1;

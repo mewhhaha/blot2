@@ -2413,7 +2413,7 @@
     {
      "body_elaborations": 233,
      "body_lowerings": 233,
-     "check_occurs_steps": 2528,
+     "check_occurs_steps": 2529,
      "checker": {
       "associated_steps": 0,
       "inference_steps": 4251,
@@ -2438,8 +2438,8 @@
      "source_bytes": 22587,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2984,
-     "type_nodes": 8258,
+     "syntax_nodes": 2985,
+     "type_nodes": 8261,
      "type_versions": 1290,
      "wasm_bytes": 2312
     }
@@ -2453,7 +2453,7 @@
     {
      "body_elaborations": 235,
      "body_lowerings": 235,
-     "check_occurs_steps": 2631,
+     "check_occurs_steps": 2632,
      "checker": {
       "associated_steps": 0,
       "inference_steps": 4360,
@@ -2478,8 +2478,8 @@
      "source_bytes": 22882,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3059,
-     "type_nodes": 8551,
+     "syntax_nodes": 3060,
+     "type_nodes": 8554,
      "type_versions": 1365,
      "wasm_bytes": 3413
     }

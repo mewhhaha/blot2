@@ -1,0 +1,8 @@
+const through = func (step: own Array U32 -> Array U32) -> (n: U32) => return do:
+  let rows = #[n, 2]
+  rows := step rows
+  rows[0] := 7
+  break rows
+const run = func (n: U32) => return (through (func (rows: own Array U32) => return do:
+  rows[1] := 9
+  break rows) n)[1]

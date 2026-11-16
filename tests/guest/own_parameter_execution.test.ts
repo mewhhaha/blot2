@@ -91,12 +91,50 @@ entry func scalar (n: U32) : U32 => return do:
 const spent = "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one";
 const argument = "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise";
 const result = "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`";
-const value = "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet";
-const position = "Only a parameter of a top-level named function can be `own`; a lambda, a contract member, an implementation member and a member an operator stands for cannot take one yet";
+const value = "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls";
+const position = "`own` marks a parameter of a function or a lambda, or the parameter of a function type; a contract member, an implementation member and a member an operator stands for cannot take one yet, and no other type can be `own`";
 
 // Each case: the code, its message, the source and the text the diagnostic
 // points at, marked with « and »; a case without marks is about a whole
 // declaration.
+
+Deno.test("a lambda and a function value take a parameter over, in a type that says so", async () => {
+  await compileAndRun(`${declarations}
+func through (step: own Array U32 -> U32 -> Array U32) -> (n: U32): Array U32 => return do:
+  let rows = #[n, 2]
+  rows := step rows 5
+  rows[0] := self + 1
+  break rows
+type Hooks is data = $Hooks { step: own World -> U32 -> World, scale: U32 }
+func each (hooks: Hooks) -> (world: own World): World => return do:
+  for index in 0..world.size:
+    world := hooks.step world index
+  break world
+entry func lambda (n: U32) : U32 => return do:
+  let rows = through (func (rows: own Array U32) -> (k: U32) => return do:
+    rows[1] := k
+    break rows) n
+  break rows[0] * 10 + rows[1]
+entry func inferred (n: U32) : U32 => return do:
+  let rows = through (func rows -> k => return do:
+    rows[1] := k + 1
+    break rows) n
+  break rows[0] * 10 + rows[1]
+entry func named (n: U32) : U32 => return do:
+  let rows = through fill n
+  break rows[0] * 10 + rows[1]
+entry func stored (n: U32) : U32 => return do:
+  let hooks = $Hooks { step: damage, scale: n }
+  let world = each hooks ($World { counts: #[0, 0, 0], size: 3 })
+  world.counts[0] := self + hooks.scale
+  break world.counts[0] * 100 + world.counts[1] * 10 + world.counts[2]
+`, (guest) => {
+    equal(guest.call("lambda", 4), 55);
+    equal(guest.call("inferred", 4), 56);
+    equal(guest.call("named", 4), 65);
+    equal(guest.call("stored", 7), 811);
+  });
+});
 const rejected: [string, string, string, string][] = [
   ["a name read after it was given away", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
@@ -167,13 +205,18 @@ func both (rows: own Array U32) => return do:
   let alias = rows
   break «{ left: rows, right: alias }»
 entry func run (n: U32) : U32 => return (both #[n]).left[0]`],
-  ["an own function used as a value", "own_function_value", value, `
+  ["a value read after a function value took it over", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
-  let apply = «fill»
-  break (apply #[1, 2] n)[0]`],
+  let apply = fill
+  let rows = #[1, 2]
+  let after = apply rows n
+  break after[0] + «rows»[0]`],
+  ["a lambda's own parameter given a borrowed value", "own_argument", argument, `
+func through (step: own Array U32 -> Array U32) -> (rows: Array U32): U32 => return (step «rows»)[0]
+entry func run (n: U32) : U32 => return through (func (rows: own Array U32) => return rows) #[n]`],
   ["an own function partly applied", "own_function_value", value, `
 entry func run (n: U32) : U32 => return do:
-  let with_rows = «fill» #[1, 2]
+  let with_rows = «fill #[1, 2]»
   break (with_rows n)[0]`],
   ["a value read after value.member gave it away", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
@@ -192,10 +235,10 @@ func World.add (left: own World) -> (right: World): World => return do:
 entry func run (n: U32) : U32 => return do:
   let sum = $World { counts: #[0], size: n } + $World { counts: #[1], size: 2 }
   break sum.size`],
-  ["own on a lambda's parameter", "own_parameter", position, `
+  ["own in a type that is not a function's parameter", "own_parameter", position, `
 entry func run (n: U32) : U32 => return do:
-  let put = func «(rows: own Array U32)» => return rows[0]
-  break put #[n]`],
+  let rows: Array («own U32») = #[n]
+  break rows[0]`],
 ];
 
 Deno.test("own arguments, spent names, owned results and own positions are checked", async () => {
@@ -280,7 +323,7 @@ entry func run (n: U32) : U32 => return do:
   equal(diagnostic?.end, main.indexOf("world.counts[1] +") + "world.counts".length);
 });
 
-Deno.test("another module's own function is not a value", async () => {
+Deno.test("another module's own function is a value that takes its argument over", async () => {
   const built = await project({
     main: `import { damage, World } from "./worlds"
 entry func run (n: U32) : U32 => return do:
@@ -290,8 +333,19 @@ entry func run (n: U32) : U32 => return do:
 `,
     worlds: library,
   });
-  equal(built.success, false);
-  equal(built.records.find((record) => record.kind === "diagnostic")?.code, "own_function_value");
+  equal(built.success, true);
+  const main = `import { damage, World } from "./worlds"
+entry func run (n: U32) : U32 => return do:
+  let step = damage
+  let world = $World { counts: #[0, 0], size: 2 }
+  let next = step world 1
+  break world.size + next.size
+`;
+  const spent = await project({ main, worlds: library });
+  equal(spent.success, false);
+  const diagnostic = spent.records.find((record) => record.kind === "diagnostic");
+  equal(diagnostic?.code, "spent_value");
+  equal(diagnostic?.start, main.indexOf("world.size +"));
 });
 
 Deno.test("a value given to another module's member by value.member is spent", async () => {

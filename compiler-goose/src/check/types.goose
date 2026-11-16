@@ -1422,7 +1422,7 @@ recursive fn unifyProjectionArguments<R>(self_:Store&,a:Id,b:Id,reporter:R,aa:co
 }
 fn isRank(tag: Tag) -> bool { match tag { forall, existential, bound, rigid => { return true; }, _ => { return false; }, } }
 fn usageCode(kind: UsageKind) -> u32 { return kind; }
-fn usageFromCode(code: u32) -> UsageKind, Error { if code > 7 { return 0, blot_error::Error.type_mismatch; } return code, blot_error::Error.none; }
+fn usageFromCode(code: u32) -> UsageKind, Error { if code > 8 { return 0, blot_error::Error.type_mismatch; } return code, blot_error::Error.none; }
 fn appendChildren(self_: const Store&, pending: Id[>..<]&, id: Id, scoped_identity: bool) {
     let value = node(self_, id);
     match value.tag {
@@ -1877,7 +1877,7 @@ fn blot_check_types::blotStructuralHash<S>(value: blot_check_types::Operator,sin
 
 fn blot_structural::equal(left: blot_check_types::ObligationKind, right: blot_check_types::ObligationKind) -> bool { return left == right; }
 fn blot_check_types::blotStructuralHash<S>(value: blot_check_types::ObligationKind,sink: S&) { blot_structural::hash(sink, blot_check_types::obligationKindCode(value) as! u8); }
-fn usageKindFromCode(code: u32) -> UsageKind, bool { if code > 7 { return 0, false; } return code, true; }
+fn usageKindFromCode(code: u32) -> UsageKind, bool { if code > 8 { return 0, false; } return code, true; }
 
 
 

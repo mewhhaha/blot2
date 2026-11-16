@@ -463,8 +463,15 @@ recursive fn type_expression(p: Parser&,source: const u8[:],tokens: const Token[
  if parts.len==1&&row!=0 { let __cleanup_result_3_0: Id = add(p,source,tokens,a_type_effect,value,row,0,start); { p.depth--; } let __cleanup_result_29_0: Id = __cleanup_result_3_0; parts.deinit(); return __cleanup_result_29_0; } let __cleanup_result_4_0: Id = value; { p.depth--; } let __cleanup_result_30_0: Id = __cleanup_result_4_0; parts.deinit(); return __cleanup_result_30_0;
  { p.depth--; }  parts.deinit(); }
 recursive fn type_application(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=current(p,source,tokens).start; var value=type_atom(p,source,tokens);
- while p.failure==blot_error::Error.none&&type_atom_tag(current(p,source,tokens).tag) { let arg=type_atom(p,source,tokens); value=add(p,source,tokens,a_type_apply,value,arg,0,start); } return value;
+ let start=current(p,source,tokens).start;
+ // `own T`: the parameter of this type is taken over. `own` is a word only
+ // before a type; alone, or before `->`, it is still a type variable.
+ let taken=at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&type_atom_tag(peek(p,tokens,1));
+ if taken { advance(p,source,tokens); }
+ var value=type_atom(p,source,tokens);
+ while p.failure==blot_error::Error.none&&type_atom_tag(current(p,source,tokens).tag) { let arg=type_atom(p,source,tokens); value=add(p,source,tokens,a_type_apply,value,arg,0,start); }
+ if taken&&p.failure==blot_error::Error.none { let end=p.tree.span(value).end; value=add(p,source,tokens,a_type_usage,blot_parse_ast::usagekind_own as u32,value,0,start); p.tree.spans.items[value].end=end; }
+ return value;
 }
 recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if !enter(p,source,tokens) { return 0; }  let start=current(p,source,tokens).start;
@@ -579,8 +586,8 @@ recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],star
     name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_colon);
     // `own` before the type marks a parameter the function takes over. It is
     // a word only here: alone, or before `->`, it is still a type variable.
-    if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&peek(p,tokens,1)!=t_r_paren&&peek(p,tokens,1)!=t_arrow&&peek(p,tokens,1)!=t_kw_where { advance(p,source,tokens); own=true; }
-    annotation=type_expression(p,source,tokens); constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_r_paren);
+    annotation=type_expression(p,source,tokens);
+    if p.failure==blot_error::Error.none&&p.tree.node(annotation).tag==a_type_usage&&p.tree.node(annotation).a==(blot_parse_ast::usagekind_own as u32) { own=true; annotation=p.tree.node(annotation).b; } constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_r_paren);
    }
   } else { name=lower_identifier(p,source,tokens); }
   var flags: u32=0; if unit { flags=1; } if own { flags|=8; }

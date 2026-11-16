@@ -930,8 +930,8 @@ result is not unique.
 
 ### `own` parameters
 
-A top-level named function can take a parameter over by writing `own`
-before its type. Inside the function the parameter is unique, so `:=`
+A function or a lambda can take a parameter over by writing `own` before
+its type. Inside the function the parameter is unique, so `:=`
 through it writes in place, and it can be returned.
 
 ```blot
@@ -965,17 +965,42 @@ No array is copied in `run`. The rules:
   away, because the next iteration would give it away again. A local the
   loop rebinds each time, as `world` above, is one.
 
+**In a function's type.** `own` is part of the type: `own World -> U32 ->
+World` is a function that takes its first argument over. So an `own`
+function is a value like any other, and a parameter, a record field or a
+local can hold one:
+
+```blot
+type Hooks is data = $Hooks { step: own World -> U32 -> World }
+
+func run (hooks: Hooks) -> (world: own World): World => return do:
+  for index in 0..world.size:
+    world := hooks.step world index
+  break world
+```
+
+A lambda takes a parameter over when it says so, `func (world: own World)
+=> …`, or when it is written where such a function is expected:
+`run_with (func world -> index => …)`. In a parameter's annotation `own`
+goes with the type that follows it, so `(step: own World -> World)` is a
+parameter that holds such a function, and `(world: own World)` is a
+parameter taken over. A function type and its `own` do not match a type
+without it, and no type variable stands for `own T`: a generic function
+cannot be handed an `own` function to call on a value it only borrowed.
+
+A call that gives a parameter that is taken over must give every argument
+of the function's type at once. Given only some, the function would hold
+the value for any number of calls (`own_function_value`); so does
+`value.member` without its arguments.
+
 What is not built yet:
 
-- `own` is accepted only on a parameter of a top-level `func` or
-  `const name = func`. On a lambda, a contract member, an implementation
-  member or a member an operator stands for (`World.add` for `+`) it is
-  `own_parameter`.
-- A function with an `own` parameter must be called with all its
-  arguments, by name (`damage world 2`) or, when it is declared in the
-  type's namespace (`func World.damage …`), as `world.damage 2`. Using it
-  as a value or applying it partly is `own_function_value`, because
-  function types do not carry `own` yet.
+- `own` on a contract member, an implementation member or a member an
+  operator stands for (`World.add` for `+`) is `own_parameter`. So is
+  `own` in a type anywhere but a function type's parameter.
+- A function that takes a parameter over cannot return a function to be
+  called later: its type's arguments are all given in the one call.
+
 
 ### Named owners and explicit copies
 

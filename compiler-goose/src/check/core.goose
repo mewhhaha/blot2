@@ -446,7 +446,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         result_not_owned => { return "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"; },
         lent_result_value => { return "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"; },
         kept_value => { return "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"; },
-        own_function_value => { return "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet"; },
+        own_function_value => { return "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls"; },
     }
 }
 fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {

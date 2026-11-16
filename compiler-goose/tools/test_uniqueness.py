@@ -16,7 +16,9 @@ The programs named g are about the rules every function has: its result is
 the caller's alone, and a call only borrows its arguments. The programs
 named h are about what stays while `=` exists: `lent` functions, what a
 store may keep, function values, and a closure that gives back what it
-captured after the call it was written for.
+captured after the call it was written for. The programs named i are
+about `own` in function types: lambdas and function values that take a
+parameter over.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

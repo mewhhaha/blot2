@@ -78,8 +78,6 @@ struct Value { fact: Fact = 0, origin: u32 = 0, exits: bool = false }
 // at `start` in the shared `carried` stack.
 struct LoopFrame { id: u32, start: i64, len: i64 }
 struct BlockFrame { id: u32, fact: Fact = 0xffffffff, broken: bool = false }
-// A member of a type that takes over a parameter: `value.member` reaches it.
-struct MemberTaker { identity: blot_check_types::NominalIdentity, member: u32, taking: u64 }
 struct Rejection { node: u32, span: blot_check_core::Span, code: blot_check_core::Code = blot_check_core::Code.aliased_update }
 // A nominal being expanded, with whether each type argument holds storage.
 struct Expansion { unit: u32, decl: u32, arguments: bool[16], len: i64 }
@@ -146,15 +144,16 @@ root struct Analyzer {
     merged: Fact[>..<] = [],
     // While positive, loop bodies are only probed: rejections are dropped.
     probing: u32 = 0,
-    // The functions that take over a parameter, by unit and binding: the
-    // parameter mask, and above it how many arguments a call gives.
-    takers: dictionary<u64, u64> = dictionary<u64, u64> {},
+    // The closure that is the whole body of the closure being read, and
+    // the parameters the closures around it took over.
+    chain: u32 = 0,
+    chained: u32[>..<] = [],
+    chained_base: i64[>..<] = [],
     // Nodes in callee position, and applications that are another's callee.
     heads: dictionary<u32, bool> = dictionary<u32, bool> {},
     inner: dictionary<u32, bool> = dictionary<u32, bool> {},
     // References to a `lent` function given as an argument.
     lent_arguments: dictionary<u32, bool> = dictionary<u32, bool> {},
-    member_takers: MemberTaker[>..] = [],
     // Whether this module is free of the store `place = value`. Its
     // functions and closures then return values nothing else holds, and it
     // may not write storage it does not own. A module that still has a
@@ -192,11 +191,6 @@ root struct Analyzer {
 // spent name in `module`.
 fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     var analyzer = Analyzer { .. };
-    for binding in module.bindings {
-        let parameters = binding.capability_parameters;
-        if parameters.own == 0 { continue; }
-        analyzer.takers.insert(((binding.target.unit as u64) << 32) | binding.target.binding, ((parameters.own_count as u64) << 32) | parameters.own);
-    }
     {
         // Migration aid (tasks/MEMORY_MODEL.md, phase 3): with BLOT_REPORT_STORES set,
         // each store whose place is provably unique is reported as `unchecked`,
@@ -227,14 +221,6 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     for member in module.implementation_members {
         if member.target.unit != 0 && member.target.unit != module.unit { continue; }
         if member.target.binding != 0 && member.target.binding < analyzer.member_kind.len { analyzer.member_kind[member.target.binding] = 2; }
-    }
-    if analyzer.takers.count != 0 {
-        for method in module.associated {
-            let found .= analyzer.takers.get(((method.target.unit as u64) << 32) | method.target.binding);
-            if !found { continue; }
-            let taking: u64 = found;
-            analyzer.member_takers.push(MemberTaker { identity: method.identity, member: method.member, taking: taking });
-        }
     }
     for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
     for at in 0..module.nodes.len { analyzer.last_read.push(false); }
@@ -769,7 +755,6 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let target = m.reference(id);
         // A function that takes over a parameter is only ever called in
         // full, which `apply` and `call` see before this.
-        if taker(self_, m, id) != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); return Value { .. }; }
         if !self_.lent_arguments.contains(id) {
             lentValue(self_, m, id);
             {
@@ -853,13 +838,39 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.break_ { return breakNode(self_, m, id); }
     if tag == blot_check_core::Tag.closure {
         // A spent capture is reported where the body reads it.
-        for captured in m.closureCaptures(id) { read(self_, captured, id); kill(self_, captured); }
         let body = m.closure(id).body;
         let parameter = m.closure(id).parameter.binding;
-        if local(self_, parameter) { self_.home[parameter] = body; }
+        // `func (a: own A) -> (b: B) => …` is a closure whose body is a
+        // closure. A call gives all its arguments at once (a parameter
+        // taken over cannot be given without the rest), so the inner one
+        // runs once with what the outer one took: it keeps the fact.
+        let link = self_.chain == id;
+        for captured in m.closureCaptures(id) {
+            read(self_, captured, id);
+            var carried = false;
+            if link { for outer in self_.chained { if outer == captured { carried = true; } } }
+            if carried { self_.home[captured] = body; } else { kill(self_, captured); }
+        }
+        if local(self_, parameter) {
+            self_.home[parameter] = body;
+            if typeTaking(m, n.ty) & 1 != 0 { define(self_, parameter, deep); self_.home[parameter] = body; }
+        }
+        var inner_closure = body;
+        if m.node(inner_closure).tag == blot_check_core::Tag.return_ { inner_closure = m.node(inner_closure).a; }
+        let outer_chain = self_.chain;
+        let chained_mark = self_.chained.len;
+        if !link { self_.chained_base.push(chained_mark); }
+        if m.node(inner_closure).tag == blot_check_core::Tag.closure && local(self_, parameter) && unique(self_.facts[parameter]) {
+            self_.chain = inner_closure;
+            self_.chained.push(parameter);
+        } else {
+            self_.chain = 0;
+        }
         self_.function_roots.push(body);
         let logged = self_.reads.len;
         let value = visit(self_, m, body);
+        self_.chain = outer_chain;
+        if !link { self_.chained.resize(self_.chained_base[self_.chained_base.len - 1]); self_.chained_base.resize(self_.chained_base.len - 1); }
         // The closure's own locals end with its body. What it captured is
         // read again whenever it runs, so those reads are never the last.
         if self_.dry {
@@ -872,7 +883,12 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { .. };
     }
     if tag == blot_check_core::Tag.project {
-        if taker(self_, m, id) != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); }
+        if m.dispatchSignature(id) != 0 {
+            // `value.member` without its arguments would hold a value
+            // the member takes over for any number of calls.
+            let named = calleeBinding(self_, m, id);
+            if named != 0 && m.bindings[named].capability_parameters.own & 1 != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); }
+        }
         let copied, is_copy = memberCopy(self_, m, id);
         if is_copy {
             // `values.copy` is the prelude's spelling of `@storage.copy`.
@@ -945,9 +961,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // Every return of the callee gave a value nothing else holds.
         return Value { fact: deep, exits: exits, .. };
     }
-    if tag == blot_check_core::Tag.apply && self_.takers.count != 0 {
+    if tag == blot_check_core::Tag.apply {
         // `f a b` and `a.f b` reach a function through its value: a
-        // chain of applications, one argument each.
+        // chain of applications, one argument each. Its type says which
+        // parameters it takes over.
         var arguments: u32[32] = [0; 32];
         var count: i64 = 0;
         var callee = id;
@@ -956,20 +973,48 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             count += 1;
             callee = m.node(callee).a;
         }
-        let taking = taker(self_, m, callee);
+        let member = m.node(callee).tag == blot_check_core::Tag.project && m.dispatchSignature(callee) != 0;
+        var taking: u64 = 0;
+        if m.node(callee).tag != blot_check_core::Tag.apply {
+            if member {
+                // The member the value's type selects says it itself; the
+                // signature the checker wrote for the use need not.
+                let named = calleeBinding(self_, m, callee);
+                if named != 0 && m.bindings[named].capability_parameters.own != 0 {
+                    taking = ((m.bindings[named].capability_parameters.own_count as u64) << 32) | m.bindings[named].capability_parameters.own;
+                } else {
+                    taking = typeTaking(m, m.dispatchSignature(callee));
+                }
+            } else {
+                taking = typeTaking(m, m.typeOf(callee));
+            }
+        }
+        let mask = taking as! u32;
         // The value of `value.member` is the first argument.
-        if taking != 0 && count < 32 && m.node(callee).tag == blot_check_core::Tag.project {
+        if mask != 0 && member && count < 32 {
             arguments[count] = m.node(callee).a;
             count += 1;
         }
-        if taking != 0 && count == (taking >> 32) as i64 {
+        if mask != 0 && count == (taking >> 32) as i64 {
             for at in 0..count / 2 {
                 let other = arguments[count - 1 - at];
                 arguments[count - 1 - at] = arguments[at];
                 arguments[at] = other;
             }
-            let exits = ownArguments(self_, m, arguments[..count], taking as! u32);
+            var exits = false;
+            if !member {
+                self_.heads.insert(callee, true);
+                let held = visit(self_, m, callee);
+                exits = held.exits;
+            }
+            exits = ownArguments(self_, m, arguments[..count], mask) || exits;
+            // Every return of the callee gave a value nothing else holds.
             return Value { fact: deep, exits: exits, .. };
+        }
+        // Given a parameter it takes over but not all its arguments, the
+        // function would hold the argument for any number of calls.
+        if mask != 0 && count < (taking >> 32) as i64 && count < 32 && mask & (((1 as u32) << (count as! u32)) - 1) != 0 && !self_.inner.contains(id) {
+            reject(self_, m, id, blot_check_core::Code.own_function_value);
         }
     }
     if tag == blot_check_core::Tag.call || tag == blot_check_core::Tag.apply {
@@ -1479,25 +1524,19 @@ fn lentValue(self_: Analyzer&, m: const Module&, node: u32) {
     if binding == 0 { return; }
     if lentHere(self_, m, binding, calleeType(m, node)) { reject(self_, m, node, blot_check_core::Code.lent_result_value); }
 }
-// The own mask and argument count of the function `node` names, or 0.
-fn taker(self_: const Analyzer&, m: const Module&, node: u32) -> u64 {
-    if self_.takers.count == 0 { return 0; }
-    if m.node(node).tag == blot_check_core::Tag.project {
-        // `value.member`: the member is a function of the value's type.
-        let field = m.projection(m.node(node).b).field;
-        let identity, known = receiverIdentity(m, m.typeOf(m.node(node).a));
-        if !known { return 0; }
-        for method in self_.member_takers {
-            if method.member == field && method.identity.unit == identity.unit && method.identity.decl == identity.decl { return method.taking; }
-        }
-        return 0;
+// Which parameters a function of type `ty` takes over, and how many it
+// has: the count above bit 32, one bit a parameter below.
+fn typeTaking(m: const Module&, ty: u32) -> u64 {
+    var mask: u32 = 0;
+    var arity: u64 = 0;
+    var cursor = ty;
+    while arity < 32 && cursor != 0 && cursor < m.types.nodes.len && m.types.node(cursor).tag == blot_check_types::Tag.function {
+        let parameter = m.types.node(cursor).a;
+        if parameter < m.types.nodes.len && m.types.node(parameter).tag == blot_check_types::Tag.usage && m.types.node(parameter).b == blot_check_types::usageCode(blot_parse_ast::usagekind_own) { mask |= (1 as u32) << (arity as! u32); }
+        arity += 1;
+        cursor = m.types.node(cursor).b;
     }
-    if m.node(node).tag != blot_check_core::Tag.reference { return 0; }
-    let target = m.reference(node);
-    let found .= self_.takers.get(((target.unit as u64) << 32) | target.binding);
-    if !found { return 0; }
-    let value: u64 = found;
-    return value;
+    return (arity << 32) | mask;
 }
 // The arguments of a full call of a function that takes over the parameters
 // in `mask`. An `own` argument must be a fresh value, or a local that holds

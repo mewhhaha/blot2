@@ -944,5 +944,34 @@
  ],
  "h16_member_call_lends": [],
  "h17_lent_generic_argument": [],
- "h18_return_in_loop_moves": []
+ "h18_return_in_loop_moves": [],
+ "i01_lambda_own_parameter": [],
+ "i02_own_function_as_value": [],
+ "i03_function_value_spends": [
+  [
+   "spent_value",
+   143,
+   147,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "i04_function_value_needs_owned": [
+  [
+   "own_argument",
+   93,
+   97,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "i05_lambda_own_from_context": [],
+ "i06_function_value_partly_applied": [
+  [
+   "own_function_value",
+   123,
+   132,
+   "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls"
+  ]
+ ],
+ "i07_own_function_in_record": [],
+ "i09_lambda_two_parameters": []
 }

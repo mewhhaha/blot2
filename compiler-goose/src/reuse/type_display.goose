@@ -25,7 +25,7 @@ fn number<C>(context: C&, bytes: u8[>..<]&, value: u32) -> Error {
     return text(context, bytes, buffer[at..]);
 }
 fn usageName(code: u32) -> const u8[:] {
-    match code { 0 => "unique", 1 => "shared", 2 => "borrow", 3 => "borrow_mut", 4 => "once", 5 => "many", 6 => "cleanup", 7 => "concurrent", _ => { abort("invalid diagnostic usage kind"); } }
+    match code { 0 => "unique", 1 => "shared", 2 => "borrow", 3 => "borrow_mut", 4 => "once", 5 => "many", 6 => "cleanup", 7 => "concurrent", 8 => "own", _ => { abort("invalid diagnostic usage kind"); } }
 }
 recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budget: i64&, stable: bool) -> Error {
     if depth >= 32 || budget == 0 { return text(context, bytes, "..."); }

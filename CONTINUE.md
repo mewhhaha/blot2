@@ -96,8 +96,9 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     caller keeps ownership across calls to functions that still use `=`,
     so this can go one function at a time with Ink's suite and Gdev's
     frame checked at each step.
-  - **Needed on the way:** `own` on lambdas and in function types (Gdev's
-    systems are callbacks); `GrowArray` and `ResizeArray` as owned values
+  - **Built for it:** `own` on lambdas and in function types (Gdev's
+    systems are callbacks): `own World -> U32 -> World`.
+  - **Needed on the way:** `GrowArray` and `ResizeArray` as owned values
     (today they count as borrowing, so `:=` through an `own` handle would
     still be a shared write); a way to take a record apart into owned
     fields (`bind_frame`).

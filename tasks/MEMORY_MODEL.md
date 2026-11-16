@@ -376,6 +376,40 @@ because a captured buffer is given back; the 27 failures are all in 13 of
 those, so they were hidden before, not caused by this. 96 of the 118 are
 `missing_file`.
 
+**`own` in function types (16 November 2026).** Built, because Gdev's
+systems reach the world through callbacks and a continuation.
+
+- A function type's parameter can be `own T`. The checker keeps it as the
+  existing wrapper type node with a ninth kind, `own`, which every type
+  traversal already carried; the usage-contract machinery ignores that
+  kind (`has_usage_contracts` is not set by it).
+- The type of a function or lambda with an `own` parameter has it, so an
+  `own` function is a value. A lambda is `own` by its annotation or by the
+  type expected where it is written. An application gives the parameter
+  the argument's type; `own T` never unifies with `T`, and nothing has a
+  type `own T`, so a generic function cannot call an `own` function on a
+  value it borrowed.
+- `own` now parses as a prefix of a type application, and a parameter is
+  taken over when its whole annotation is `own T`. So `(step: own A -> B)`
+  is a parameter holding a function, where it used to be a function
+  parameter taken over.
+- The pass reads which arguments a call gives away from the callee's
+  type, for `f a b`, a local, a parameter or a record field alike. A
+  member reached as `value.member` is still found by its declaration,
+  because the signature the checker writes at such a use does not always
+  carry the `own`. The tables by binding are gone.
+- A call that gives an `own` argument gives every argument of the type;
+  `own_function_value` is now only that, and `value.member` of an `own`
+  member without arguments.
+- `func (a: own A) -> (b: B) => …` as a lambda is a closure whose body is
+  a closure. The inner one keeps the fact of what the outer one took,
+  since the two only ever run together.
+- Still `own_parameter`: contract members, implementation members,
+  operator members, and `own` in any other type position.
+
+Checked: 155 uniqueness programs (8 new, named `i`), the guest suite
+(1,065 pass), Ink and Gdev unchanged.
+
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark
 the parameter `own`, return it, rebind at the call, and turn its `=` into
