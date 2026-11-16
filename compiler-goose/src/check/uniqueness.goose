@@ -502,7 +502,7 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
 // part that only borrows: a view, a reference, a link, a cursor or a
 // function. Type variables do neither. A shape this cannot read (an opaque
 // type, an effect type) counts as borrowing: its results are not checked
-// and not promised.
+// and not promised. So does growable storage, until `=` is gone.
 fn owns(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
     let known .= self_.owns_cache.get(ty);
     if known { let bit: u8 = known; return bit != 0; }
@@ -529,8 +529,10 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want_owned: bo
     if n.tag == blot_check_types::Tag.unit || n.tag == blot_check_types::Tag.boolean || n.tag == blot_check_types::Tag.unsigned32 || n.tag == blot_check_types::Tag.floating32 || n.tag == blot_check_types::Tag.never { return false; }
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.function { return !want_owned; }
+    // A list is never written in place, so it owns only what its
+    // elements do.
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list {
-        if want_owned { return true; }
+        if want_owned && n.tag == blot_check_types::Tag.array { return true; }
         return partsIn(self_, m, n.a, want_owned, variables, arguments, depth + 1);
     }
     if n.tag == blot_check_types::Tag.product {
@@ -546,15 +548,10 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want_owned: bo
         return false;
     }
     if n.tag != blot_check_types::Tag.nominal { return !want_owned; }
-    let storage = blot_check_storage_types::identity(n.a, n.b);
-    if storage.present {
-        let owner = storage.value == blot_check_storage_types::grow || storage.value == blot_check_storage_types::resize;
-        if want_owned { return owner; }
-        if !owner { return true; }
-        let given = m.types.nominalArguments(n);
-        if given.len != 1 { return !want_owned; }
-        return partsIn(self_, m, given[0], want_owned, variables, arguments, depth + 1);
-    }
+    // Until phase 3 a GrowArray and a ResizeArray are written through `=`
+    // by everything that holds them, as a reference is: they count as
+    // borrowing, with the views, references and links.
+    if blot_check_storage_types::identity(n.a, n.b).present { return !want_owned; }
     if n.a == 0xffffffff { return !want_owned; }
     let index, found = nominalIndex(self_, m, n.a, n.b);
     if !found { return !want_owned; }

@@ -440,40 +440,48 @@ With the switch on:
 
 | With the switch on | |
 | --- | ---: |
-| Guest and host cases failing (of 1,163) | 36, in 18 files |
+| Guest and host cases failing (of 1,163) | 24, in 14 files |
 | Diagnostics in those runs | `result_not_owned`, and `lent_result_value` in 2 files |
-| Distinct sites in std | 4 |
+| Distinct sites in std | 1 (`simd.store` returns the storage it wrote) |
 | The older pass's narrowed rules, for comparison | 75 cases in 39 files |
-| Gdev Main build: rejected returns | 63 (34 in gdev/src, 27 in ink/lib, 2 in std) |
+| Gdev Main build: rejected returns | 56 (34 in gdev/src, 20 in ink/lib, 2 in std) |
 | The older pass's narrowed rules, for comparison | 44 |
-| Ink's 65 test files: distinct rejected returns | 39 (28 in ink/lib, 9 in the tests, 2 in std) |
+| Ink's 65 test files: distinct rejected returns | 33 (22 in ink/lib, 9 in the tests, 2 in std) |
 | The older pass's narrowed rules, for comparison | 27 |
 
-The std sites: `list.splice` and `list.splice_many` return the list they
-were given when nothing changes (2), `iter`'s windows return the buffer
-they hold (1), and `simd.store` returns the storage it wrote (1). The
-other 48 diagnostics are in the test programs themselves.
+Two things are left out of the result rule on purpose:
+
+- **Growable storage.** A `GrowArray` or a `ResizeArray` counts as a part
+  that borrows, like a view or a reference. Ink and Gdev still write
+  these through `=` from every holder, which is the transitional rule 3;
+  a record of such handles is not a value anyone updates in place by
+  `:=`. They become owned values when `=` goes (phase 3). Freezing a
+  local one at its last read gives an owned `Array`.
+- **Lists.** A `List` cannot be written in place at all, so it owns only
+  what its elements own.
+
+In the tests, a text or array literal a function returns is fresh and
+passes; a module constant is one shared array, so `return table` needs
+`table.copy`.
 
 Gdev is measured with
 `BLOT_BORROWED_RULES=1 blotc migrate-stores src/main.blot --project pen.json --dry-run --inference-budget 20000000`
-in ../gdev; the dry run now reports every diagnostic it cannot rewrite, in
-every module, instead of stopping at the first. Of the 63 returns:
+in ../gdev; the dry run reports every diagnostic it cannot rewrite, in
+every module, instead of stopping at the first. Of the 56 returns:
 
-- 27 return a parameter or a field of one (`return index`,
-  `return index.bounds`): `own`, or a copy;
-- 20 build a record or constructor from parameters' array handles
-  (`$Index { base: source.base, bounds: destination.bounds, … }`,
-  `$FrameAccess`, `$Scene`). This is how Ink's storage and Gdev's world
-  share `ResizeArray` handles today, and it is what phase 3 rewrites;
-- 9 are calls, 5 of them in generated or derived code whose span is the
-  top of the file (codecs, `actor_observation`);
-- 4 are `if`/`case` values (`if version == 1 then $Some (identity
-  saved_values) …` returns the parameter), 2 are tuples, and 1 is
-  `simd.store`.
+- about 25 return a parameter, changed or not (`return ground` after
+  `ground.cells := …` in world/trails.blot, `return draws`,
+  `return values`): `own`, or a copy;
+- about 15 build a record from parameters' array handles (`$Scene`,
+  `$FrameAccess`, `$Access`, `$Services`, `$Trails`): the parameters
+  become `own`, or the record is built where the arrays are made;
+- 5 are in generated or derived code whose span is the top of the file
+  (codecs, `actor_observation`);
+- the rest are `if`/`case` values and tuples of the same kinds, a save
+  migration that returns `identity saved_values`, and `simd.store`.
 
 An array whose elements only borrow (Ink's `Draw` holds a view) is owned
-when the array itself is; counting those as shared had put the total at
-101.
+when the array itself is.
 
 The count is higher than the older pass's 44 because that pass only
 rejected borrowed storage; this one also requires the result to be unique
@@ -481,8 +489,7 @@ in itself, which the caller's in-place update relies on.
 
 Ink's tests are measured one file at a time, in ../ink, with the same
 command and each file of `compiler.settings.tests.files` in pen.json as
-the entry; the sites are then counted once each. `lib/scene.blot` has 10
-and `lib/spatial.blot` 5.
+the entry; the sites are then counted once each.
 
 **Why the change cannot be made ahead of the switch.** Most of these
 sites want `own`. With the switch off a call's result is not unique and

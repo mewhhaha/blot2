@@ -83,13 +83,14 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
   "`own` parameters"). Nothing is migrated.
   - **Next:** the same rules for every function. They are in the pass
     behind the environment variable `BLOT_BORROWED_RULES`, for measuring
-    only: with it the guest suite has 36 failing cases in 18 files, std
-    has 4 sites to change and the Gdev build has 63
+    only: with it the guest suite has 24 failing cases in 14 files, std
+    has 1 site to change, Ink's tests 33 and the Gdev build 56
     (tasks/MEMORY_MODEL.md, "Plan for the rest of phase 2" and "The plan,
-    measured"). Still to do before it can be the default: measuring Ink's
-    tests, changing std, the tests, Ink and Gdev (most of the 63 return a
-    parameter or build a record of shared storage handles), then deleting
-    the switch and bringing spec section 10.3 in line.
+    measured"). Still to do before it can be the default: changing std,
+    the tests, Ink and Gdev in their working trees with the switch on
+    (most sites return a parameter or build a record from parameters'
+    arrays), then flipping the default in the three repositories
+    together, deleting the switch and bringing spec section 10.3 in line.
     After that: a temporary holder giving ownership back, `own` in
     function types, and phase 3 (move std, Ink and Gdev off `=`, delete
     `=`).
