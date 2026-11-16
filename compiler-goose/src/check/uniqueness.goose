@@ -74,6 +74,8 @@ struct Value { fact: Fact = 0, origin: u32 = 0, exits: bool = false }
 // at `start` in the shared `carried` stack.
 struct LoopFrame { id: u32, start: i64, len: i64 }
 struct BlockFrame { id: u32, fact: Fact = 0xffffffff, broken: bool = false }
+// A member of a type that takes over a parameter: `value.member` reaches it.
+struct MemberTaker { identity: blot_check_types::NominalIdentity, member: u32, taking: u64 }
 struct Rejection { node: u32, span: blot_check_core::Span, code: blot_check_core::Code = blot_check_core::Code.aliased_update }
 // A nominal being expanded, with whether each type argument holds storage.
 struct Expansion { unit: u32, decl: u32, arguments: bool[16], len: i64 }
@@ -138,6 +140,10 @@ root struct Analyzer {
     merged: Fact[>..<] = [],
     // While positive, loop bodies are only probed: rejections are dropped.
     probing: u32 = 0,
+    // The functions that take over a parameter, by unit and binding: the
+    // parameter mask, and above it how many arguments a call gives.
+    takers: dictionary<u64, u64> = dictionary<u64, u64> {},
+    member_takers: MemberTaker[>..] = [],
     // The root of the function being checked when its result must be owned.
     owned_result: u32 = 0,
     // Blocks whose value is the function's result: `return do: ...`.
@@ -147,10 +153,21 @@ root struct Analyzer {
 // Appends one diagnostic per rejected `:=`, `own` argument and read of a
 // spent name in `module`.
 fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
-    var takes_over = false;
-    for call in module.calls { takes_over = takes_over || call.own != 0; }
-    if module.updates.len == 0 && !takes_over { return; }
     var analyzer = Analyzer { .. };
+    for binding in module.bindings {
+        let parameters = binding.capability_parameters;
+        if parameters.own == 0 { continue; }
+        analyzer.takers.insert(((binding.target.unit as u64) << 32) | binding.target.binding, ((parameters.own_count as u64) << 32) | parameters.own);
+    }
+    if module.updates.len == 0 && analyzer.takers.count == 0 { return; }
+    if analyzer.takers.count != 0 {
+        for method in module.associated {
+            let found .= analyzer.takers.get(((method.target.unit as u64) << 32) | method.target.binding);
+            if !found { continue; }
+            let taking: u64 = found;
+            analyzer.member_takers.push(MemberTaker { identity: method.identity, member: method.member, taking: taking });
+        }
+    }
     for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
     for at in 0..module.nodes.len { analyzer.last_read.push(false); }
     for body, index in module.bodies {
@@ -551,6 +568,9 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.panic { return Value { exits: true, .. }; }
     if tag == blot_check_core::Tag.reference {
         let target = m.reference(id);
+        // A function that takes over a parameter is only ever called in
+        // full, which `apply` and `call` see before this.
+        if taker(self_, m, id) != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); return Value { .. }; }
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
         if !local(self_, target.binding) { return Value { .. }; }
         read(self_, target.binding, id);
@@ -638,6 +658,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { .. };
     }
     if tag == blot_check_core::Tag.project {
+        if taker(self_, m, id) != 0 { reject(self_, m, id, blot_check_core::Code.own_function_value); }
         let copied, is_copy = memberCopy(self_, m, id);
         if is_copy {
             // `values.copy` is the prelude's spelling of `@storage.copy`.
@@ -672,7 +693,38 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
-    if tag == blot_check_core::Tag.call && m.call(id).own != 0 { return ownCall(self_, m, id); }
+    if tag == blot_check_core::Tag.call && m.call(id).own != 0 {
+        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own);
+        // Every return of the callee gave a value nothing else holds.
+        return Value { fact: deep, exits: exits, .. };
+    }
+    if tag == blot_check_core::Tag.apply && self_.takers.count != 0 {
+        // `f a b` and `a.f b` reach a function through its value: a
+        // chain of applications, one argument each.
+        var arguments: u32[32] = [0; 32];
+        var count: i64 = 0;
+        var callee = id;
+        while count < 32 && m.node(callee).tag == blot_check_core::Tag.apply {
+            arguments[count] = m.node(callee).b;
+            count += 1;
+            callee = m.node(callee).a;
+        }
+        let taking = taker(self_, m, callee);
+        // The value of `value.member` is the first argument.
+        if taking != 0 && count < 32 && m.node(callee).tag == blot_check_core::Tag.project {
+            arguments[count] = m.node(callee).a;
+            count += 1;
+        }
+        if taking != 0 && count == (taking >> 32) as i64 {
+            for at in 0..count / 2 {
+                let other = arguments[count - 1 - at];
+                arguments[count - 1 - at] = arguments[at];
+                arguments[at] = other;
+            }
+            let exits = ownArguments(self_, m, arguments[..count], taking as! u32);
+            return Value { fact: deep, exits: exits, .. };
+        }
+    }
     if tag == blot_check_core::Tag.request_loop {
         // A handler loop carries locals the way a loop does, but through
         // its callbacks: each version it names is read by it and shared.
@@ -691,14 +743,51 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     return Value { exits: exits, .. };
 }
 
-// A direct call of a function that takes over some of its parameters. An
-// `own` argument must be a fresh value, or a local that holds its value
-// alone; the local is spent. Inside a loop the local must belong to the same
-// iteration, or the next one would give it away again.
-recursive fn ownCall(self_: Analyzer&, m: const Module&, id: u32) -> Value {
-    let info = m.call(id);
+// The own mask and argument count of the function `node` names, or 0.
+fn taker(self_: const Analyzer&, m: const Module&, node: u32) -> u64 {
+    if self_.takers.count == 0 { return 0; }
+    if m.node(node).tag == blot_check_core::Tag.project {
+        // `value.member`: the member is a function of the value's type.
+        // The identities are the ones the backend's dispatch uses.
+        let field = m.projection(m.node(node).b).field;
+        let receiver = m.typeOf(m.node(node).a);
+        if receiver == 0 || receiver >= m.types.nodes.len { return 0; }
+        let shape = m.types.node(receiver);
+        var identity = blot_check_types::NominalIdentity { unit: 0, decl: receiver };
+        if shape.tag == blot_check_types::Tag.nominal {
+            identity = blot_check_types::NominalIdentity { unit: shape.a, decl: shape.b };
+        } else if shape.tag == blot_check_types::Tag.array {
+            identity.decl = 0xffffffff;
+        } else if shape.tag == blot_check_types::Tag.unsigned32 {
+            identity.decl = blot_check_types::u32_type;
+        } else if shape.tag == blot_check_types::Tag.floating32 {
+            identity.decl = blot_check_types::f32_type;
+        } else if shape.tag == blot_check_types::Tag.boolean {
+            identity.decl = blot_check_types::boolean;
+        } else if shape.tag == blot_check_types::Tag.unit {
+            identity.decl = blot_check_types::unit;
+        } else {
+            return 0;
+        }
+        for method in self_.member_takers {
+            if method.member == field && method.identity.unit == identity.unit && method.identity.decl == identity.decl { return method.taking; }
+        }
+        return 0;
+    }
+    if m.node(node).tag != blot_check_core::Tag.reference { return 0; }
+    let target = m.reference(node);
+    let found .= self_.takers.get(((target.unit as u64) << 32) | target.binding);
+    if !found { return 0; }
+    let value: u64 = found;
+    return value;
+}
+// The arguments of a full call of a function that takes over the parameters
+// in `mask`. An `own` argument must be a fresh value, or a local that holds
+// its value alone; the local is spent. Inside a loop the local must belong
+// to the same iteration, or the next one would give it away again.
+recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u32[:], mask: u32) -> bool {
     var exits = false;
-    for child, position in info.arguments {
+    for child, position in arguments {
         var named: u32 = 0;
         if m.node(child).tag == blot_check_core::Tag.reference {
             let target = m.reference(child);
@@ -708,7 +797,7 @@ recursive fn ownCall(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let value = visit(self_, m, child);
         exits = exits || value.exits;
         let ty = m.typeOf(child);
-        if position >= 32 || (info.own >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) { escape(self_, value); continue; }
+        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) { escape(self_, value); continue; }
         if was_spent { continue; }
         var accepted = false;
         if value.origin == 0 {
@@ -721,8 +810,7 @@ recursive fn ownCall(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
         if accepted && named != 0 { set(self_, named, spent); } else { escape(self_, value); }
     }
-    // Every return of the callee gave a value nothing else holds.
-    return Value { fact: deep, exits: exits, .. };
+    return exits;
 }
 // The value a function with an `own` parameter ends with, when it ends
 // without a `return`.

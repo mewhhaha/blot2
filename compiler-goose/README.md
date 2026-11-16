@@ -69,7 +69,7 @@ Two of them read a model that is edited by hand:
 
 - `deno task test:compiler` is the gate: the tooling's tests, the optimized
   build, the three references below, the package, and the guest and host
-  suite (1,061 cases pass, 101 are ignored). `deno task test:guest` runs
+  suite (1,062 cases pass, 101 are ignored). `deno task test:guest` runs
   only the suite, against the optimized compiler as it is, and
   `deno task test:compiler:dev FILES` builds the debug compiler and runs
   those files.

@@ -285,10 +285,14 @@ tests/guest/store_uniqueness_execution.test.ts and the programs `e…` and
   interfaces and dependency bundles, and Core's `CallInfo.own` carries the
   callee's mask on each direct call. Function types do not carry it.
 - **Where it is allowed.** On a top-level `func` or `const name = func`.
-  Anywhere else it is `own_parameter` (checker). A reference to such a
-  function that is not a direct, full call is `own_function_value` (Core
-  builder), which covers a function value, a partial application, and a
-  call the builder cannot make direct (a function with a `where` clause).
+  Anywhere else it is `own_parameter` (checker). The uniqueness pass
+  knows these functions by unit and binding (`takers`), and the members
+  among them by receiver type and name (`member_takers`). A full call is a
+  `call` node, a chain of `apply` on a reference, or a chain on
+  `value.member`, whose value is the first argument. Any other reference
+  to such a function is `own_function_value`: a function value, a partial
+  application, a call through a dictionary (a function with a `where`
+  clause).
 - **In the function.** The parameter starts unique all the way down
   (`deep`).
 - **At the call** (`ownCall` in uniqueness.goose). An `own` argument must
@@ -338,11 +342,6 @@ needs":
   is rejected too.
 - `own` on lambdas, contract members and implementation members, which
   `State.modify` needs, waits for `own` in function types.
-- The spec's `world.damage 3` needs namespace functions on values (spec
-  section 6.4), which is a separate piece of work; today the call is
-  `damage world 3`.
-- The Pen fixture `owned_storage.blot` still copies; it can take
-  `own owner` now.
 
 ### Plan for the rest of phase 2 (16 November 2026, not built)
 

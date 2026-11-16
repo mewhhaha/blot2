@@ -16,6 +16,10 @@ func fill (rows: own Array U32) -> (n: U32): Array U32 => return do:
     rows[i] := n
   break rows
 const first = func (rows: Array U32) => return rows[0]
+func World.grow (world: own World) -> (amount: U32): World => return do:
+  world.size := world.size + amount
+  world.counts[0] := world.size
+  break world
 `;
 
 Deno.test("an own parameter is updated in place and its result is the caller's to update", async () => {
@@ -60,6 +64,13 @@ entry func each_iteration (n: U32) : U32 => return do:
     let rows = #[i, i]
     sum := sum + total rows
   break sum
+entry func dotted (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 1 }
+  for i in 0..n:
+    world := world.grow 2
+  let grown = World.grow world 10
+  grown.counts[1] := 5
+  break grown.size * 100 + grown.counts[0] * 10 + grown.counts[1]
 entry func scalar (n: U32) : U32 => return do:
   let rows = #[n, 2]
   let read = rows[0]
@@ -73,13 +84,14 @@ entry func scalar (n: U32) : U32 => return do:
     equal(guest.call("arms", 6), 12);
     equal(guest.call("each_iteration", 4), 12);
     equal(guest.call("scalar", 3), 34);
+    equal(guest.call("dotted", 2), 1655);
   });
 });
 
 const spent = "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one";
 const argument = "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise";
 const result = "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise";
-const value = "A function with an `own` parameter must be called by name with all its arguments; it cannot be used as a value or partly applied yet";
+const value = "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet";
 const position = "Only a parameter of a top-level named function can be `own`; a lambda, a contract member and an implementation member cannot take one yet";
 
 // Each case: the code, its message, the source and the text the diagnostic
@@ -162,6 +174,16 @@ entry func run (n: U32) : U32 => return do:
 entry func run (n: U32) : U32 => return do:
   let with_rows = «fill» #[1, 2]
   break (with_rows n)[0]`],
+  ["a value read after value.member gave it away", "spent_value", spent, `
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 1 }
+  let grown = world.grow n
+  break grown.size + «world.size»`],
+  ["value.member of an own function used as a value", "own_function_value", value, `
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 1 }
+  let grow = «world.grow»
+  break (grow n).size`],
   ["own on a lambda's parameter", "own_parameter", position, `
 entry func run (n: U32) : U32 => return do:
   let put = func «(rows: own Array U32)» => return rows[0]
@@ -205,6 +227,9 @@ const library = `type World is data = $World { counts: Array U32, size: U32 }
 func damage (world: own World) -> (index: U32): World => return do:
   world.counts[index] := world.counts[index] + 1
   break world
+func World.grow (world: own World) -> (amount: U32): World => return do:
+  world.size := world.size + amount
+  break world
 `;
 
 Deno.test("a call into another module gives its argument away", async () => {
@@ -214,15 +239,16 @@ entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
   for i in 0..n:
     world := damage world 1
+    world := world.grow 1
   world.counts[0] := 7
-  break world.counts[0] * 10 + world.counts[1]
+  break world.size * 100 + world.counts[0] * 10 + world.counts[1]
 `,
     worlds: library,
   });
   if (!built.success || !built.bytes) throw new Error(JSON.stringify(built.records));
   const guest = await instantiateGuest(built.bytes);
   try {
-    equal(guest.call("run", 3), 73);
+    equal(guest.call("run", 3), 573);
   } finally {
     guest.dispose();
   }
@@ -256,4 +282,18 @@ entry func run (n: U32) : U32 => return do:
   });
   equal(built.success, false);
   equal(built.records.find((record) => record.kind === "diagnostic")?.code, "own_function_value");
+});
+
+Deno.test("a value given to another module's member by value.member is spent", async () => {
+  const main = `import { World } from "./worlds"
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 2 }
+  let next = world.grow n
+  break world.size + next.size
+`;
+  const built = await project({ main, worlds: library });
+  equal(built.success, false);
+  const diagnostic = built.records.find((record) => record.kind === "diagnostic");
+  equal(diagnostic?.code, "spent_value");
+  equal(diagnostic?.start, main.indexOf("world.size +"));
 });

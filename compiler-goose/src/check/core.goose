@@ -444,7 +444,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         spent_value => { return "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"; },
         own_argument => { return "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"; },
         result_not_owned => { return "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise"; },
-        own_function_value => { return "A function with an `own` parameter must be called by name with all its arguments; it cannot be used as a value or partly applied yet"; },
+        own_function_value => { return "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet"; },
     }
 }
 fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effects::Row {

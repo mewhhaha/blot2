@@ -2696,6 +2696,11 @@
      "own",
      "u32",
      "own"
+    ],
+    [
+     "own_count",
+     "u8",
+     "own_count"
     ]
    ],
    "unwired": []

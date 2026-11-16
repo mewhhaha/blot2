@@ -866,9 +866,11 @@ What is not built yet:
 - `own` is accepted only on a parameter of a top-level `func` or
   `const name = func`. On a lambda, a contract member or an implementation
   member it is `own_parameter`.
-- A function with an `own` parameter must be called by name with all its
-  arguments. Using it as a value or applying it partly is
-  `own_function_value`, because function types do not carry `own` yet.
+- A function with an `own` parameter must be called with all its
+  arguments, by name (`damage world 2`) or, when it is declared in the
+  type's namespace (`func World.damage …`), as `world.damage 2`. Using it
+  as a value or applying it partly is `own_function_value`, because
+  function types do not carry `own` yet.
 - Passing a local to an ordinary parameter still ends its uniqueness, so
   `let n = count rows` before `fill rows 0` makes the second call an
   `own_argument`. The results of ordinary functions are not unique yet

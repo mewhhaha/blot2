@@ -2143,6 +2143,8 @@ fn ownParameterHeaders(self_:Engine&)->blot_error::Error {
   binding.capability_parameters.own=ownParameters(self_.tree,body);
   var index:u32=0;var at=body;
   while at!=0 && self_.tree.node(at).tag==blot_parse_ast::tag_lambda && index<32 {named.insert(self_.tree.node(at).a,true);index+=1;at=self_.tree.node(at).b;}
+  // How many arguments a call must give before the function runs.
+  if binding.capability_parameters.own!=0 {binding.capability_parameters.own_count=index as u8;}
  }
  let count=self_.tree.nodes.items.len;
  for id in 0..count {

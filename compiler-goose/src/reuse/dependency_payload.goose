@@ -2833,6 +2833,7 @@ var result=default<blot_check_capability_flow::Parameters>();
 {let copied,error=cloneValue(self_,value.invocation_count);if error!=blot_error::Error.none {return result,error;}result.invocation_count=copied;}
 
 result.own=value.own;
+result.own_count=value.own_count;
 
 return result,blot_error::Error.none;
 
