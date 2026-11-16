@@ -197,24 +197,22 @@ const aliased: [string, string][] = [
   break (func (values: Array U32) => return do:
     values[0] := 1
     break values[0]) rows`],
-  ["aliased later in a loop", `
+  ["aliased later in a loop by a name that lives on", `
   let rows = #[0, 0]
-  let total = 0
+  let held = #[0]
   for i in 0..2:
     rows[i] := n
-    let kept = rows
-    total := self + kept[0]
-  break total`],
+    held := rows
+  break held[0]`],
   ["aliased in a sibling branch of a loop", `
   let rows = #[0, 0]
-  let total = 0
+  let held = #[0]
   for i in 0..2:
     if i == 0:
-      let kept = rows
-      total := self + kept[0]
+      held := rows
     else:
       rows[i] := n
-  break total`],
+  break held[0]`],
   ["iterated by its own loop", `
   let rows = #[1, 2, 3]
   let total = 0
@@ -474,4 +472,65 @@ entry func tuple (n: U32) : U32 => return do:
 `;
   const start = shared.indexOf("left[0] := 9");
   await compileExpectedFailure(shared, "aliased_update", undefined, { span: [start, shared.indexOf("\n", start)] });
+});
+
+Deno.test("a name that borrows gives the value back after its last use", async () => {
+  await compileAndRun(`entry func back (n: U32) : U32 => return do:
+  let world = { counts: #[n, 2], size: 2 }
+  let counts = world.counts
+  let seen = counts[0]
+  world.counts[0] := seen + 1
+  break world.counts[0]
+entry func nested (n: U32) : U32 => return do:
+  let world = { counts: #[n, 2], size: 2 }
+  let counts = world.counts
+  let total = 0
+  if n > 1:
+    total := counts[0]
+  for index in 0..2:
+    total := total + counts[index]
+  world.counts[0] := total
+  break world.counts[0]
+entry func each_round (n: U32) : U32 => return do:
+  let rows = #[0, 0]
+  let total = 0
+  for i in 0..2:
+    rows[i] := n
+    let kept = rows
+    total := self + kept[i]
+  break total
+`, (guest) => {
+    equal(guest.call("back", 4), 5);
+    equal(guest.call("nested", 4), 10);
+    equal(guest.call("each_round", 4), 8);
+  }, { stdRoot });
+  const cases: [string, string][] = [
+    ["read again afterwards", `
+  let world = { counts: #[n, 2], size: 2 }
+  let counts = world.counts
+  world.counts[0] := 9
+  break counts[0]`],
+    ["handed on to another name", `
+  let world = { counts: #[n, 2], size: 2 }
+  let counts = world.counts
+  let other = counts
+  world.counts[0] := 9
+  break other[0]`],
+    ["one of two still in use", `
+  let world = { counts: #[n, 2], more: #[3] }
+  let counts = world.counts
+  let more = world.more
+  let seen = counts[0]
+  world.counts[0] := seen
+  break more[0]`],
+  ];
+  for (const [name, body] of cases) {
+    const source = `entry func run (n: U32) : U32 => return do:${body}\n`;
+    const start = source.indexOf("world.counts[0] :=");
+    try {
+      await compileExpectedFailure(source, "aliased_update", undefined, { span: [start, source.indexOf("\n", start)] });
+    } catch (error) {
+      throw new Error(`${name}: ${error}`);
+    }
+  }
 });

@@ -44,6 +44,7 @@ struct Primitive {
     arity: u8
 }
 enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_ }
+// bind: a = the name's binding, b = its value, c = 1 when `:=` rebinds it.
 struct Node {
     tag: Tag,
     op: Op = Op.none,

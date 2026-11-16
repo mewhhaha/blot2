@@ -857,6 +857,24 @@ function, a type variable. Growable storage (`GrowArray`, `ResizeArray`)
 is owned like an array: a function that returns one returns its own, and
 an `own` parameter of that type takes a growable array nothing else holds.
 
+**Names that borrow.** Binding a name to something a local still holds
+shares it only while the name is in use:
+
+```blot
+let response = access.response     // access is shared from here
+program.append response outgoing   // the last read of response
+access := step access              // access is its holder's own again
+```
+
+That holds when the name's value went nowhere else (it was not bound to
+another name, captured, stored or returned) and nothing else came to hold
+the local meanwhile. A name rebound with `:=` does not give back.
+
+**Taking a value apart.** `let {first, second} = parts ()`, `let (a, b) =
+pair ()` and `let ($Box inside) = box` give each name a value of its own
+when the value taken apart was nothing else's: a fresh value, or a local
+at its last read.
+
 **Generic functions that return what they were lent.** `Array.at`,
 `identity` and `Maybe.unwrap_or` return a value of a variable type that came
 in through a parameter. Called where that type is an array, the result
@@ -980,6 +998,9 @@ func run (hooks: Hooks) -> (world: own World): World => return do:
     world := hooks.step world index
   break world
 ```
+
+A parameter can be taken over without naming its type: `func step (own
+world) -> (dt: F32) => …`.
 
 A lambda takes a parameter over when it says so, `func (world: own World)
 => …`, or when it is written where such a function is expected:

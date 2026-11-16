@@ -1,0 +1,11 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const run = func (n: U32) => return do:
+  let rows = #[0, 0]
+  let total = 0
+  for i in 0..2:
+    rows[i] := n
+    let kept = rows
+    total := @u32.add total kept[i]
+  break total

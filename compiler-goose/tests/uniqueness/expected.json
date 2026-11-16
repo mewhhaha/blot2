@@ -679,8 +679,8 @@
  "e22_result_aliased": [
   [
    "result_not_owned",
-   532,
-   560,
+   540,
+   544,
    "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
   ]
  ],
@@ -819,8 +819,8 @@
  "g10_result_shared_twice": [
   [
    "result_not_owned",
-   534,
-   561,
+   542,
+   546,
    "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
   ]
  ],
@@ -969,5 +969,23 @@
    308,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
- ]
+ ],
+ "j03_borrowing_name_gives_back": [],
+ "j04_borrowing_name_still_read": [
+  [
+   "aliased_update",
+   330,
+   350,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "j05_borrowing_name_handed_on": [
+  [
+   "aliased_update",
+   351,
+   371,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "j06_borrowed_in_a_loop_round": []
 }

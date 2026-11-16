@@ -203,7 +203,7 @@ entry func run (n: U32) : U32 => return (pick #[1] #[n])[0]`],
   ["a result two fields share", "result_not_owned", result, `
 func both (rows: own Array U32) => return do:
   let alias = rows
-  break «{ left: rows, right: alias }»
+  break { left: «rows», right: alias }
 entry func run (n: U32) : U32 => return (both #[n]).left[0]`],
   ["a value read after a function value took it over", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:

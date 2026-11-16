@@ -4688,13 +4688,13 @@
    "exit": 1,
    "records": [
     {
-     "code": "result_not_owned",
-     "end": 2195,
+     "code": "storage_unsupported",
+     "end": 0,
      "filename": "package/mixed-composition.blot",
      "kind": "diagnostic",
-     "message": "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`",
-     "stage": "lower",
-     "start": 2146
+     "message": "Direct backend: the entry module exports nothing",
+     "stage": "emit",
+     "start": 0
     },
     {
      "body_elaborations": 176,

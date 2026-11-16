@@ -79,11 +79,11 @@ Two of them read a model that is edited by hand:
     programs of `tests/fixtures/` and requires the recorded exit code, Wasm
     and records.
   - `python3 compiler-goose/tools/test_uniqueness.py` requires the recorded
-    lowering diagnostics for the 157 programs of `tests/uniqueness/`. The
-    84 named `e…` to `j…` are about `own` parameters, moves at a local's
+    lowering diagnostics for the 161 programs of `tests/uniqueness/`. The
+    88 named `e…` to `j…` are about `own` parameters, moves at a local's
     last read, the rules for every function, what stays while `=` exists
-    (`lent`, kept values, function values), `own` in function types and
-    taking a value apart, which Zig never had; their record is this compiler's, read through by hand. Three of
+    (`lent`, kept values, function values), `own` in function types,
+    taking a value apart and names that borrow, which Zig never had; their record is this compiler's, read through by hand. Three of
     Zig's 73 (`b41`, `c05`, `c10`) are accepted now, because the value
     they alias moves, and `b18` and one site of `c22` because they take a
     fresh tuple apart.

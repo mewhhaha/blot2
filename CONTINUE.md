@@ -104,10 +104,13 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     buffers live in Gdev's `FrameAccess`, made once and emptied each
     frame; the hooks no longer capture it; `bind_frame` is out of the
     session's path.
-  - **Next, in this order:** `with_owners`, Ink's `host.run` and
-    `program.run` take the world with `own`; then the functions that hand
-    out parts of the access go, and the writers convert one at a time
-    from the frame loop down.
+  - **The session owns it:** `world_storage.owners` returns the world,
+    `host.run` takes it with `own` and `program.run` rebinds it round the
+    loop.
+  - **Next, in this order:** `host.frame`, Ink's `app` and `clock`, Gdev's
+    stage lambdas, then each system: `(own access)`, return it, rebind at
+    the call. Test fixtures must hand tests a world they own before a
+    system they call can change.
   - Open: the backend's "never parameter" failure for generic functions
     held in a record (worked around in Gdev's `application`), and the 30
     failing checks in five of Gdev's test modules that compile for the

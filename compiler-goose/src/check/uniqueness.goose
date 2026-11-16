@@ -118,6 +118,25 @@ root struct Analyzer {
     generation: u32 = 0,
     trail: Change[>..<] = [],
     touch: u32[>..] = [],
+    // A name bound to something a local still holds borrows it until its
+    // last read: `loan_source` is the local it borrows from. The local's
+    // fact before its first loan, how many names borrow from it, and how
+    // often it had changed when the last one began.
+    loan_source: u32[>..] = [],
+    loan_live: bool[>..] = [],
+    loan_ended: bool[>..] = [],
+    loan_count: u32[>..] = [],
+    loan_fact: Fact[>..] = [],
+    loan_stamp: u32[>..] = [],
+    // The borrowing names of the blocks being read, innermost last.
+    holders: u32[>..<] = [],
+    // For a message that points at the cause: the first part of a record
+    // literal that was not its own, and the literal a local was bound to.
+    culprits: dictionary<u32, u32> = dictionary<u32, u32> {},
+    blame: u32[>..] = [],
+    // The versions whose value goes on into another: a branch's into the
+    // version after it, a loop's into the next round. They do not borrow.
+    flows: bool[>..] = [],
     captured: Captured[>..<] = [],
     records: Record[>..] = [],
     entries: Entry[>..] = [],
@@ -223,8 +242,16 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         if member.target.unit != 0 && member.target.unit != module.unit { continue; }
         if member.target.binding != 0 && member.target.binding < analyzer.member_kind.len { analyzer.member_kind[member.target.binding] = 2; }
     }
-    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
+    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.loan_source.push(0); analyzer.loan_live.push(false); analyzer.loan_ended.push(false); analyzer.loan_count.push(0); analyzer.loan_fact.push(none); analyzer.loan_stamp.push(0); analyzer.blame.push(0); analyzer.flows.push(false); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
     for at in 0..module.nodes.len { analyzer.last_read.push(false); }
+    for merge in module.merges {
+        if merge.then_binding < analyzer.flows.len { analyzer.flows[merge.then_binding] = true; }
+        if merge.else_binding < analyzer.flows.len { analyzer.flows[merge.else_binding] = true; }
+    }
+    for carry in module.loop_carries {
+        if carry.incoming < analyzer.flows.len { analyzer.flows[carry.incoming] = true; }
+        if carry.backedge < analyzer.flows.len { analyzer.flows[carry.backedge] = true; }
+    }
     for body, index in module.bodies {
         if index == 0 || body.root == 0 { continue; }
         // An `own` parameter arrives unique all the way down: every call
@@ -284,7 +311,58 @@ fn set(self_: Analyzer&, binding: u32, fact: Fact) {
     self_.touch[binding] += 1;
 }
 // A spent version stays spent: nothing gives its storage back.
-fn kill(self_: Analyzer&, binding: u32) { if local(self_, binding) && self_.facts[binding] == spent { return; } set(self_, binding, none); }
+fn kill(self_: Analyzer&, binding: u32) {
+    if !local(self_, binding) { return; }
+    // Something else holds it now, for good: a name that borrowed it took
+    // its value further, so what it borrowed from stays shared too.
+    self_.touch[binding] += 1;
+    if self_.loan_live[binding] {
+        self_.loan_live[binding] = false;
+        let source = self_.loan_source[binding];
+        if self_.loan_count[source] > 0 { self_.loan_count[source] -= 1; }
+        self_.loan_fact[source] = none;
+    }
+    if self_.facts[binding] == spent { return; }
+    set(self_, binding, none);
+}
+// `holder` is bound to a value `source` still holds. The local is shared
+// while the name is in use and gets its fact back afterwards.
+fn borrow(self_: Analyzer&, holder: u32, source: u32) {
+    if !local(self_, holder) || !local(self_, source) || self_.facts[source] == spent { kill(self_, source); return; }
+    if self_.loan_live[holder] {
+        // The same definition read again (a loop).
+        self_.loan_live[holder] = false;
+        let before = self_.loan_source[holder];
+        if self_.loan_count[before] > 0 { self_.loan_count[before] -= 1; }
+    }
+    if self_.loan_count[source] == 0 {
+        self_.loan_fact[source] = self_.facts[source];
+    } else if self_.touch[source] != self_.loan_stamp[source] {
+        self_.loan_fact[source] = none;
+    }
+    let kept = self_.loan_fact[source];
+    kill(self_, source);
+    self_.loan_fact[source] = kept;
+    self_.loan_count[source] += 1;
+    self_.loan_stamp[source] = self_.touch[source];
+    self_.loan_source[holder] = source;
+    self_.loan_live[holder] = true;
+    self_.loan_ended[holder] = false;
+    self_.holders.push(holder);
+}
+// Ends the loans of the block whose names start at `mark`: those whose
+// name has been read for the last time, or all of them when the block ends.
+fn giveBackLoans(self_: Analyzer&, mark: i64, all: bool) {
+    for at in mark..self_.holders.len {
+        let holder = self_.holders[at];
+        if !self_.loan_live[holder] || (!all && !self_.loan_ended[holder]) { continue; }
+        self_.loan_live[holder] = false;
+        let source = self_.loan_source[holder];
+        if self_.loan_count[source] > 0 { self_.loan_count[source] -= 1; }
+        if self_.loan_count[source] == 0 && self_.touch[source] == self_.loan_stamp[source] && self_.facts[source] != spent { set(self_, source, self_.loan_fact[source]); }
+    }
+    if all { self_.holders.resize(mark); }
+}
 // Sets the fact of a version at its definition.
 fn define(self_: Analyzer&, binding: u32, fact: Fact) {
     if local(self_, binding) {
@@ -777,12 +855,15 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if target.unit != 0 && target.unit != m.unit { return Value { .. }; }
         if !local(self_, target.binding) { return Value { .. }; }
         read(self_, target.binding, id);
+        if !self_.dry && self_.last_read[id] && self_.loan_live[target.binding] { self_.loan_ended[target.binding] = true; }
         if self_.facts[target.binding] == spent { reject(self_, m, id, blot_check_core::Code.spent_value); return Value { .. }; }
         return Value { origin: target.binding, .. };
     }
     if tag == blot_check_core::Tag.suite {
         var exits = false;
-        for child in m.children(id) { let value = visit(self_, m, child); exits = value.exits || exits; }
+        let mark = self_.holders.len;
+        for child in m.children(id) { let value = visit(self_, m, child); exits = value.exits || exits; giveBackLoans(self_, mark, false); }
+        giveBackLoans(self_, mark, true);
         return Value { exits: exits, .. };
     }
     if tag == blot_check_core::Tag.block_ { return block_(self_, m, id); }
@@ -791,8 +872,17 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if value.tag == blot_check_core::Tag.update && !m.updateInfo(n.b).store { return update(self_, m, n.b, n.a); }
         var result = Value { .. };
         if value.tag == blot_check_core::Tag.array_op { result = arrayOp(self_, m, n.b, true); } else { result = visit(self_, m, n.b); }
+        if !self_.dry && n.c == 0 && result.origin != 0 && local(self_, n.a) && !self_.flows[n.a] && !moves(self_, m, n.b, result.origin) {
+            // Another name for what a local holds: it borrows. A name
+            // rebound with `:=` does not: its value goes on into later
+            // versions that no reference shows.
+            define(self_, n.a, none);
+            borrow(self_, n.a, result.origin);
+            return Value { exits: result.exits, .. };
+        }
         let fact = taken(self_, m, n.b, result);
         define(self_, n.a, fact);
+        if local(self_, n.a) { self_.blame[n.a] = n.b; }
         return Value { exits: result.exits, .. };
     }
     if tag == blot_check_core::Tag.update { return update(self_, m, id, 0); }
@@ -818,7 +908,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         } else {
             fact = taken(self_, m, n.a, result);
         }
-        if leaves && n.a != 0 && !result.exits && resultChecked(self_, m, n.b, m.typeOf(n.a)) && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { reject(self_, m, n.a, blot_check_core::Code.result_not_owned); }
+        if leaves && n.a != 0 && !result.exits && resultChecked(self_, m, n.b, m.typeOf(n.a)) && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { reject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned); }
         if leaves { return Value { exits: true, .. }; }
         var at = self_.blocks.len;
         while at != 0 {
@@ -954,6 +1044,17 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { fact: fact, exits: exits, .. };
     }
     if tag == blot_check_core::Tag.record { return recordLiteral(self_, m, id); }
+    if tag == blot_check_core::Tag.record_merge {
+        // The merged record holds the parts of both: it is its holder's
+        // own when each side was.
+        let left = visit(self_, m, n.a);
+        let left_fact = taken(self_, m, n.a, left);
+        let right = visit(self_, m, n.b);
+        let right_fact = taken(self_, m, n.b, right);
+        var fact: Fact = none;
+        if ownedAs(self_, m, left_fact, m.typeOf(n.a), 0) && ownedAs(self_, m, right_fact, m.typeOf(n.b), 0) { fact = deep; }
+        return Value { fact: fact, exits: left.exits || right.exits, .. };
+    }
     if tag == blot_check_core::Tag.construct {
         let payload = visit(self_, m, n.b);
         let literal = n.b != 0 && m.node(n.b).tag == blot_check_core::Tag.record;
@@ -1522,6 +1623,30 @@ recursive fn ownPattern(self_: Analyzer&, m: const Module&, pattern: u32, depth:
     if shape.tag == blot_check_core::PatternTag.product { for child in m.patternChildren(pattern) { ownPattern(self_, m, child, depth + 1); } return; }
     if shape.tag == blot_check_core::PatternTag.constructor || shape.tag == blot_check_core::PatternTag.record_payload { ownPattern(self_, m, shape.b, depth + 1); }
 }
+// Where to point for a value that is not its holder's own: the part of
+// the record it was built from that something else holds, if one is known.
+fn culprit(self_: const Analyzer&, m: const Module&, node: u32) -> u32 {
+    var at = node;
+    for step in 0..8 {
+        if at == 0 || at >= m.nodes.len { return node; }
+        let n = m.node(at);
+        var literal = at;
+        if n.tag == blot_check_core::Tag.return_ && n.a != 0 { at = n.a; continue; }
+        if n.tag == blot_check_core::Tag.reference {
+            let target = m.reference(at);
+            if (target.unit != 0 && target.unit != m.unit) || !local(self_, target.binding) || self_.blame[target.binding] == 0 { return at; }
+            literal = self_.blame[target.binding];
+        }
+        if literal < m.nodes.len && m.node(literal).tag == blot_check_core::Tag.construct && m.node(literal).b != 0 { literal = m.node(literal).b; }
+        let found .= self_.culprits.get(literal);
+        // Only a part that was never the record's own explains it; a local
+        // that was shared after it was bound is named where it is used.
+        if !found { return at; }
+        let part: u32 = found;
+        at = part;
+    }
+    return at;
+}
 fn keeperValue(self_: Analyzer&, m: const Module&, node: u32, ty: u32) {
     var result = ty;
     var takes = false;
@@ -1597,7 +1722,7 @@ fn ownedResult(self_: Analyzer&, m: const Module&, node: u32, value: Value) {
         if m.node(node).tag == blot_check_core::Tag.reference { fact = self_.facts[value.origin]; }
     }
     if !owns(self_, m, m.typeOf(node)) { return; }
-    if !ownedAs(self_, m, fact, m.typeOf(node), 0) { reject(self_, m, node, blot_check_core::Code.result_not_owned); }
+    if !ownedAs(self_, m, fact, m.typeOf(node), 0) { reject(self_, m, culprit(self_, m, node), blot_check_core::Code.result_not_owned); }
 }
 // Whether the function or closure with `root` must return a value nothing
 // else holds: one that takes over a parameter, and under the rules being
@@ -1664,7 +1789,9 @@ fn memberCopy(self_: Analyzer&, m: const Module&, id: u32) -> Fact, bool {
 recursive fn block_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     self_.blocks.push(BlockFrame { id: id, .. });
     var exits = false;
-    for child in m.children(id) { let value = visit(self_, m, child); exits = value.exits || exits; }
+    let mark = self_.holders.len;
+    for child in m.children(id) { let value = visit(self_, m, child); exits = value.exits || exits; giveBackLoans(self_, mark, false); }
+    giveBackLoans(self_, mark, true);
     let frame = self_.blocks[self_.blocks.len - 1];
     self_.blocks.resize(self_.blocks.len - 1);
     if frame.broken {
@@ -1686,6 +1813,7 @@ recursive fn recordLiteral(self_: Analyzer&, m: const Module&, id: u32) -> Value
         let value = visit(self_, m, child);
         let fact = taken(self_, m, child, value);
         exits = exits || value.exits;
+        if !self_.dry && !self_.culprits.contains(id) && owns(self_, m, m.typeOf(child)) && !ownedAs(self_, m, fact, m.typeOf(child), 0) { self_.culprits.insert(id, child); }
         if !is_record { continue; }
         let destination = m.recordDestinations(id)[index];
         if destination >= shape.b { continue; }

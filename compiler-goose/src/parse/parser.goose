@@ -582,10 +582,14 @@ recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],star
   if eat(p,source,tokens,t_l_paren) {
    if eat(p,source,tokens,t_r_paren) { unit=true; }
    else if at(p,source,tokens,t_hash) { pattern_parameter=pattern(p,source,tokens); expect(p,source,tokens,t_r_paren); name=collection_name(p,source,tokens,point); }
+   else if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&peek(p,tokens,1)==t_identifier&&peek(p,tokens,2)==t_r_paren {
+    // `(own name)`: a parameter taken over whose type is left to be found.
+    advance(p,source,tokens); own=true; name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
+   }
    else {
     name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_colon);
-    // `own` before the type marks a parameter the function takes over. It is
-    // a word only here: alone, or before `->`, it is still a type variable.
+    // `own` before the whole type marks a parameter the function takes
+    // over; before a function type's first part it belongs to that type.
     annotation=type_expression(p,source,tokens);
     if p.failure==blot_error::Error.none&&p.tree.node(annotation).tag==a_type_usage&&p.tree.node(annotation).a==(blot_parse_ast::usagekind_own as u32) { own=true; annotation=p.tree.node(annotation).b; } constraints=where_clause(p,source,tokens); expect(p,source,tokens,t_r_paren);
    }

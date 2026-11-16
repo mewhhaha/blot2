@@ -20,7 +20,7 @@ store may keep, function values, and a closure that gives back what it
 captured after the call it was written for. The programs named i are
 about `own` in function types: lambdas and function values that take a
 parameter over. The programs named j take a value apart into parts of
-its own.
+its own, and bind names that borrow a value and give it back.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

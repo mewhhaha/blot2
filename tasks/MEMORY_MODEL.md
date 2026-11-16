@@ -451,7 +451,7 @@ of the salt simulation), Gdev's own tests as before (362, 27, 118).
    every buffer as a local, so it owns them, until it built `hooks`: a
    closure that captured the whole record to despawn, reset and stash on
    demand. The hooks are one function that is given the access now.
-2. `with_owners` hands the record to a continuation, and Ink's
+2. Done, see "The session owns the world" below. `with_owners` handed the record to a continuation, and Ink's
    `host.run` hands it on to `program.run`'s loop. Each has to take it
    with `own` and give it back (`own` in function types is there for
    this). An owned value can be rebound across the loop's suspension to
@@ -477,7 +477,7 @@ of the salt simulation), Gdev's own tests as before (362, 27, 118).
    there the writers convert one at a time, and the generated encoders
    (half the stores) with their caller, `host.encode_frame`.
 
-**The world is one value (17 November 2026, steps 1 and 3 of the list
+**The world is one value (16 November 2026, steps 1 and 3 of the list
 above).** Approved by the owner on 16 November ("Sounds good. Do all of
 that.").
 
@@ -510,6 +510,54 @@ that.").
 - The devtools program does not build before or after
   (`storage_unsupported`); its world takes the frame's buffers by a
   record merge so that it still checks.
+
+**The session owns the world (16 November 2026, step 2).** Gdev's
+`world_storage.owners` returns the world as a value, Ink's `host.run`
+takes it with `own`, and `program.run` rebinds it round the loop:
+`access := execute access operation …`. `host.execute` takes it and
+returns it. Everything below still writes through what it is lent.
+
+What the compiler needed for it:
+
+- `(own name)`: a parameter taken over whose type is left to be found.
+  Most of Ink and Gdev is written against "any record with these fields",
+  so most `own` parameters will be this form.
+- A name that borrows gives back (rule 3 of the model). `let response =
+  access.response` shares `access` only until `response` is read for the
+  last time; then `access` has its fact back, provided the name's value
+  went nowhere else and nothing else touched `access`. It is decided at
+  the end of each statement of the block that binds the name, and at the
+  block's end. Only a `let` borrows: a name rebound with `:=` carries its
+  value into later versions that no reference shows (Core's `bind` node
+  now says which it is, in `c`).
+- Merging two records that are each their holder's own gives one that is.
+- `result_not_owned` points at the part of a record literal that is
+  shared, when there is one, instead of at the whole result. That found
+  the two things that kept Gdev's world from being owned: Ink's
+  `services.access` and `platform.access` were `lent` constructors (their
+  parameters are `own` now), and the world held one buffer under two
+  names (`requests` and `persist_requests`).
+
+Checked: gate 1,067 pass; Ink's suite as before; Gdev's first frame
+byte-identical (Wasm 7fab4303…, 2,677,122 bytes); Gdev's tests 376 pass,
+57 fail, 113 do not compile, as before this step.
+
+**Next: the layers under the session.** `host.frame`, then Ink's `app`
+(`begin_frame`, `advance`, `render`, which call the game's stages) and
+`clock.advance`, then Gdev's ten stage lambdas in `game.blot`, then each
+system they call. A stage or a system changes in three places: its
+parameter becomes `(own access)`, it returns the access, and every call
+of it becomes `access := f access …`. Its own callees stay as they are.
+Two things come with it:
+
+- Callers pass parts of the access beside it (`app.advance stages access
+  … access.clock access.control access.wall …`); a part cannot be lent
+  while the whole is given away, so those functions read the parts
+  themselves.
+- Tests reach systems through fixtures that bind their own frames with
+  the `lent` `bind_frame`. A test cannot call a system that takes its
+  access with `own` until its fixture hands it a world it owns
+  (`world.owners`).
 
 **The way from here is top-down.** With one rule set, a function can be
 converted on its own as soon as every caller owns what it passes: mark
