@@ -650,13 +650,30 @@ refers to is moved down, the rest is released.
 
 Not done in this layer:
 
-- `tests/codec_support/counter.blot` and the two tests on it
-  (`persistent`, `traps/persistent_rejects`) do not compile since the
-  session took the world: their `execute` is a closure that holds the
-  world across calls. It has to hand the world to its caller and back.
 - Devtools' and the performance programs' own stage functions are still
   lent ones behind `app.lent`.
 
+Found after it, converting `tests/codec_support/counter.blot` (its
+`execute` held the world across calls; it takes the world and gives it
+back beside the packet now, and its two tests compile again):
+
+- A lambda that takes a parameter over kept it only through one more
+  parameter: `func (world: own World) -> (k: U32) -> (extra: Array U32)`
+  lost it at the third. The chain carries it through any number now
+  (`i13`).
+- **Open: a call that returns the world shares its other arguments for
+  good.** The world's type has parts that only borrow (views in a
+  growable array, the hooks' functions), so the result of `access :=
+  runtime.execute application access operation view outgoing` may hold
+  any argument, and `outgoing` is not its holder's own afterwards
+  (returning `@storage.freeze outgoing` is `result_not_owned`; the
+  fixture returns a copy). The rule is right for a function that builds
+  a view of what it was lent. It is too wide for a function that takes
+  the world with `own` and returns it: the parts that borrow came in
+  with the world. What a store or a push may keep is already checked
+  (`kept_value`), so what is left is a record update that puts a view of
+  a lent argument into the world. Closing that would let such a call
+  leave its other arguments alone.
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes

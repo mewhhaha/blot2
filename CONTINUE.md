@@ -128,9 +128,9 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     conversion of test callers was done by parallel workers from one
     brief; the same works for each system.
   - Open:
-    - `tests/codec_support/counter.blot` in Gdev and the two tests on it
-      do not compile since the session took the world (a closure that
-      holds the world across calls).
+    - A call that returns the world shares its other arguments for good,
+      because the world's type has parts that only borrow
+      (tasks/MEMORY_MODEL.md, "Found after it").
     - The backend's "never parameter" failure for generic functions held
       in a record (worked around in Gdev's `application`).
     - The failing checks in Gdev's test modules that compile for the

@@ -1075,9 +1075,13 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let outer_chain = self_.chain;
         let chained_mark = self_.chained.len;
         if !link { self_.chained_base.push(chained_mark); }
-        if m.node(inner_closure).tag == blot_check_core::Tag.closure && local(self_, parameter) && unique(self_.facts[parameter]) {
+        // The chain goes on through a parameter that is not taken over
+        // (`-> (k: U32)`) while it carries one that was.
+        let takes = local(self_, parameter) && unique(self_.facts[parameter]);
+        let carries = link && self_.chained_base.len != 0 && self_.chained.len > self_.chained_base[self_.chained_base.len - 1];
+        if m.node(inner_closure).tag == blot_check_core::Tag.closure && (takes || carries) {
             self_.chain = inner_closure;
-            self_.chained.push(parameter);
+            if takes { self_.chained.push(parameter); }
         } else {
             self_.chain = 0;
         }

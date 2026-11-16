@@ -1,0 +1,12 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+const step = func (world: own World) -> (n: U32) => return do:
+  world.other[0] := n
+  break world
+const run = func (n: U32) => return do:
+  let scale = #[3]
+  let execute = func (world: own World) -> (k: U32) -> (extra: Array U32) => return do:
+    world := step world (@u32.add k scale[0])
+    break (extra[0], world)
+  let (count, next) = execute ($World { counts: #[n, 2], other: #[3] }) 4 #[1]
+  next.counts[0] := count
+  break @u32.add next.counts[0] next.other[0]
