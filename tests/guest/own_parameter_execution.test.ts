@@ -92,10 +92,11 @@ const spent = "This name was passed to an `own` parameter, so its value now belo
 const argument = "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise";
 const result = "A function with an `own` parameter gives its caller a result nothing else holds, so it must return a fresh value or a local that alone holds its value; return values.copy of it otherwise";
 const value = "A function with an `own` parameter must be called with all its arguments, by name or as value.member; it cannot be used as a value or partly applied yet";
-const position = "Only a parameter of a top-level named function can be `own`; a lambda, a contract member and an implementation member cannot take one yet";
+const position = "Only a parameter of a top-level named function can be `own`; a lambda, a contract member, an implementation member and a member an operator stands for cannot take one yet";
 
 // Each case: the code, its message, the source and the text the diagnostic
-// points at, marked with « and ».
+// points at, marked with « and »; a case without marks is about a whole
+// declaration.
 const rejected: [string, string, string, string][] = [
   ["a name read after it was given away", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
@@ -184,6 +185,13 @@ entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 1 }
   let grow = «world.grow»
   break (grow n).size`],
+  ["own on a member an operator stands for", "own_parameter", position, `
+func World.add (left: own World) -> (right: World): World => return do:
+  left.size := left.size + right.size
+  break left
+entry func run (n: U32) : U32 => return do:
+  let sum = $World { counts: #[0], size: n } + $World { counts: #[1], size: 2 }
+  break sum.size`],
   ["own on a lambda's parameter", "own_parameter", position, `
 entry func run (n: U32) : U32 => return do:
   let put = func «(rows: own Array U32)» => return rows[0]
@@ -196,8 +204,10 @@ Deno.test("own arguments, spent names, owned results and own positions are check
     const start = marked.indexOf("«");
     const end = marked.indexOf("»") - 1;
     const source = marked.replace("«", "").replace("»", "");
+    let span: [number, number] | undefined = [start, end];
+    if (start < 0) span = undefined;
     try {
-      await compileExpectedFailure(source, code, message, { span: [start, end] });
+      await compileExpectedFailure(source, code, message, { span });
     } catch (error) {
       throw new Error(`${name}: ${error}`);
     }

@@ -284,8 +284,10 @@ tests/guest/store_uniqueness_execution.test.ts and the programs `e…` and
   a bit mask of its `own` parameters. It travels with the binding through
   interfaces and dependency bundles, and Core's `CallInfo.own` carries the
   callee's mask on each direct call. Function types do not carry it.
-- **Where it is allowed.** On a top-level `func` or `const name = func`.
-  Anywhere else it is `own_parameter` (checker). The uniqueness pass
+- **Where it is allowed.** On a top-level `func` or `const name = func`
+  that no operator stands for: `a + b` reaches `World.add` through the
+  backend's dispatch, where the pass sees no call. Anywhere else it is
+  `own_parameter` (checker). The uniqueness pass
   knows these functions by unit and binding (`takers`), and the members
   among them by receiver type and name (`member_takers`). A full call is a
   `call` node, a chain of `apply` on a reference, or a chain on

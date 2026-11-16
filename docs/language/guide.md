@@ -864,8 +864,9 @@ No array is copied in `run`. The rules:
 What is not built yet:
 
 - `own` is accepted only on a parameter of a top-level `func` or
-  `const name = func`. On a lambda, a contract member or an implementation
-  member it is `own_parameter`.
+  `const name = func`. On a lambda, a contract member, an implementation
+  member or a member an operator stands for (`World.add` for `+`) it is
+  `own_parameter`.
 - A function with an `own` parameter must be called with all its
   arguments, by name (`damage world 2`) or, when it is declared in the
   type's namespace (`func World.damage …`), as `world.damage 2`. Using it
