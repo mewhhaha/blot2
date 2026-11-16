@@ -1,0 +1,13 @@
+type Box is data = $Box (Array U32)
+type World is data = $World { counts: Array U32, other: Array U32 }
+const scaled = func (rows: Array U32) -> (k: U32) => return #[@u32.mul rows[0] k, @u32.mul rows[1] k]
+const window = func (rows: Array U32) => return &rows[0..1]
+const run = func (n: U32) => return do:
+  let world = $World { counts: #[n, 2], other: #[3] }
+  let seen = window world.counts
+  world.other[0] := seen[0]
+  let got = seen[0]
+  world.counts[0] := got
+  let again = window world.counts
+  world.counts[1] := 7
+  break @u32.add again[0] world.counts[1]

@@ -491,6 +491,19 @@ entry func nested (n: U32) : U32 => return do:
     total := total + counts[index]
   world.counts[0] := total
   break world.counts[0]
+entry func other_field (n: U32) : U32 => return do:
+  let world = { counts: #[n, 2], more: #[3] }
+  let more = world.more
+  world.counts[0] := self + more[0]
+  break world.counts[0] * 10 + more[0]
+func window (rows: Array U32) => return &rows[0..1]
+entry func view (n: U32) : U32 => return do:
+  let world = { counts: #[n, 2], more: #[3] }
+  let seen = window world.counts
+  world.more[0] := seen[0]
+  let got = seen[0]
+  world.counts[0] := got + 1
+  break world.counts[0] * 10 + world.more[0]
 entry func each_round (n: U32) : U32 => return do:
   let rows = #[0, 0]
   let total = 0
@@ -503,6 +516,8 @@ entry func each_round (n: U32) : U32 => return do:
     equal(guest.call("back", 4), 5);
     equal(guest.call("nested", 4), 10);
     equal(guest.call("each_round", 4), 8);
+    equal(guest.call("other_field", 4), 73);
+    equal(guest.call("view", 4), 54);
   }, { stdRoot });
   const cases: [string, string][] = [
     ["read again afterwards", `
@@ -516,13 +531,13 @@ entry func each_round (n: U32) : U32 => return do:
   let other = counts
   world.counts[0] := 9
   break other[0]`],
-    ["one of two still in use", `
+    ["one of two names for the same field still in use", `
   let world = { counts: #[n, 2], more: #[3] }
   let counts = world.counts
-  let more = world.more
+  let again = world.counts
   let seen = counts[0]
   world.counts[0] := seen
-  break more[0]`],
+  break again[0]`],
   ];
   for (const [name, body] of cases) {
     const source = `entry func run (n: U32) : U32 => return do:${body}\n`;

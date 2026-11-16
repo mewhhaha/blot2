@@ -323,20 +323,8 @@
  "b44_many_fields": [
   [
    "aliased_update",
-   369,
-   384,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ],
-  [
-   "aliased_update",
    387,
    402,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ],
-  [
-   "aliased_update",
-   405,
-   420,
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
@@ -987,5 +975,21 @@
    "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
   ]
  ],
- "j06_borrowed_in_a_loop_round": []
+ "j06_borrowed_in_a_loop_round": [],
+ "j07_borrowing_one_field": [
+  [
+   "aliased_update",
+   358,
+   377,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "j08_result_that_borrows_gives_back": [
+  [
+   "aliased_update",
+   502,
+   522,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ]
 }
