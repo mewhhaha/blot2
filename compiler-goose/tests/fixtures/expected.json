@@ -1361,11 +1361,11 @@
      "syntax_nodes": 2339,
      "type_nodes": 5656,
      "type_versions": 900,
-     "wasm_bytes": 3652
+     "wasm_bytes": 3686
     }
    ],
-   "wasm_bytes": 3652,
-   "wasm_sha256": "37049d97bdd83777aa94051128f8f67dc30a98268863df54d61ec5dddeebfffe"
+   "wasm_bytes": 3686,
+   "wasm_sha256": "63e19bc93694f0013207a2a2e37a7a8cc75012eb33ba4f570257d99b61bf528b"
   },
   "direct/calls.blot": {
    "exit": 0,

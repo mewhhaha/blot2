@@ -89,7 +89,7 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     may keep only values it owns (`kept_value`). A function that still
     returns or keeps what it was lent is marked `lent` (55 in Ink and
     Gdev) and nobody relies on it.
-  - **Left:** 1,821 stores in Ink and Gdev (table in
+  - **Left:** 1,619 stores in Ink and Gdev (table in
     tasks/MEMORY_MODEL.md) and 55 `lent` functions. The way is
     top-down from the frame loop: once every caller owns what it passes, a
     writer takes it with `own`, returns it, and its `=` become `:=`. A
@@ -149,6 +149,14 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     `scripts/integration/own_closure.py` picks a set of functions closed
     under their callers and converts it (ownify.py underneath), and
     `unalias.py` works from a tree that already has diagnostics.
+  - **The second layer** (17 November 2026, tasks/MEMORY_MODEL.md, "The
+    second layer of Gdev"): 68 more Gdev functions own the world, and the
+    Ink modules the game does not use are converted except physics, whose
+    conversion (Ink commit `58e6b02`, working branch) waits for a backend
+    release that keeps what an iteration carries out. The pass no longer
+    keeps loans alive after an early return, gives nothing of an untyped
+    value away while a name borrows a field of it, and lets a name read
+    last by an argument give back before the given argument is judged.
   - **Next:** the functions those systems call, level by level (64 at
     the next one), the `present` stage's draw functions, then Ink's
     library writers, which take a part and return it

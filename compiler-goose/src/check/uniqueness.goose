@@ -140,6 +140,10 @@ root struct Analyzer {
     // then (`briefs`).
     brief_node: u32 = 0,
     briefs: Captured[>..<] = [],
+    // The locals whose values are arguments of calls still being read: a
+    // name among them does not give back what it borrowed until its call
+    // is done, even when that was its last read.
+    arguments_held: u32[>..<] = [],
     // The node that is read only for a field of it or to update a field of
     // it, not as a whole.
     base_node: u32 = 0,
@@ -413,6 +417,11 @@ fn giveBackLoans(self_: Analyzer&, mark: i64, all: bool) {
     for at in mark..self_.loans.len {
         let loan = self_.loans[at];
         if !loan.live || (!all && !self_.loan_ended[loan.holder]) { continue; }
+        if !all {
+            var in_use = false;
+            for held in self_.arguments_held { in_use = in_use || held == loan.holder; }
+            if in_use { continue; }
+        }
         self_.loans[at].live = false;
         if self_.loan_holds[loan.holder] != 0 { self_.loan_holds[loan.holder] -= 1; }
         if !local(self_, loan.source) || self_.kills[loan.source] != loan.kills || self_.facts[loan.source] == spent { continue; }
@@ -563,6 +572,17 @@ recursive fn partSpent(self_: const Analyzer&, fact: Fact) -> bool {
     let value = self_.records[fact - first_record];
     if value.default_ == spent { return true; }
     for at in 0..value.len { if partSpent(self_, self_.entries[value.start + at].fact) { return true; } }
+    return false;
+}
+// Whether a field of a value with `fact` is lent or shared: a name still
+// borrows it, or something else holds it.
+recursive fn partShared(self_: const Analyzer&, fact: Fact) -> bool {
+    if fact < first_record || fact == top { return false; }
+    let value = self_.records[fact - first_record];
+    for at in 0..value.len {
+        let part = self_.entries[value.start + at].fact;
+        if part == none || partShared(self_, part) { return true; }
+    }
     return false;
 }
 // The fact of the part of a value with `fact` that `fields` select.
@@ -1110,13 +1130,17 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let target, found = place(self_, m, n.a);
             if found && target.len != 0 && target.binding == result.origin && local(self_, target.binding) { part = target; }
         }
+        // Where the function is left nothing runs after, so the local is
+        // not marked as shared: on an early return inside a branch that
+        // mark would outlive the branch and keep what names borrowed from
+        // the local before it from ever being given back.
         if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.reference && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
             fact = self_.facts[result.origin];
-            kill(self_, result.origin);
+            if !leaves { kill(self_, result.origin); }
         } else if part.len != 0 {
             fact = partFact(self_, self_.facts[result.origin], part.fields[..part.len]);
             if fact == spent { fact = none; }
-            kill(self_, result.origin);
+            if !leaves { kill(self_, result.origin); }
         } else {
             fact = taken(self_, m, n.a, result);
         }
@@ -1493,6 +1517,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             var exits = false;
             let base = self_.captured.len;
             let ends = self_.briefs.len;
+            let held_base = self_.arguments_held.len;
             if tag == blot_check_core::Tag.call {
                 for child in m.call(id).arguments {
                     let value = lend(self_, m, child, holder, lends_to, brief);
@@ -1511,6 +1536,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     // Too long to read as one call.
                     self_.captured.resize(base);
                     self_.briefs.resize(ends);
+                    self_.arguments_held.resize(held_base);
                     let all = visitChildren(self_, m, id);
                     return Value { exits: all, .. };
                 }
@@ -1523,6 +1549,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                     exits = exits || value.exits;
                 }
             }
+            self_.arguments_held.resize(held_base);
             giveBack(self_, base);
             if !holder {
                 endBriefs(self_, ends);
@@ -1863,6 +1890,7 @@ recursive fn lend(self_: Analyzer&, m: const Module&, child: u32, holder: bool, 
     self_.brief_node = 0;
     self_.let_node = 0;
     for at in from..self_.captured.len { self_.captured[at].stamp = self_.touch[self_.captured[at].binding]; }
+    if value.origin != 0 && local(self_, value.origin) { self_.arguments_held.push(value.origin); }
     if holder { held(self_, m, child, value, lends_to, brief); }
     return value;
 }
@@ -2045,6 +2073,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
     let holder = lends(self_, m, result);
     let base = self_.captured.len;
     let ends = self_.briefs.len;
+    let held_base = self_.arguments_held.len;
     var guarded: u32[32] = [0; 32];
     var guard_saved: u32[32] = [0; 32];
     var guard_kills: u32[32] = [0; 32];
@@ -2054,6 +2083,12 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
     // A value is given when the call happens, after its other arguments
     // are computed: those are read first, then the ones given are judged.
     for phase in 0..2 {
+    if phase == 1 && !holder && !self_.dry && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative {
+        // The other arguments are computed. A name they read for the last
+        // time gives back what it borrowed before the given ones are
+        // judged, unless an argument still being read holds it.
+        giveBackLoans(self_, self_.statement_mark, false);
+    }
     for child, position in arguments {
         let ty = m.typeOf(child);
         let open = openType(m, ty, 0);
@@ -2107,10 +2142,13 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
             // What a type variable stands for may hold storage: a name of
             // such a type is given only when it is known to be its own.
             if open && !unique(self_.facts[named]) && self_.facts[named] < first_record { accepted = false; }
+            // Nor while a name still borrows one of its fields.
+            if open && partShared(self_, self_.facts[named]) { accepted = false; }
         } else if part.len != 0 && value.origin == part.binding {
             let fact = partFact(self_, self_.facts[part.binding], part.fields[..part.len]);
             accepted = self_.born[part.binding] == loop_id && fact != spent && ownedAs(self_, m, fact, ty, 0);
             if open && !unique(fact) && fact < first_record { accepted = false; }
+            if open && partShared(self_, fact) { accepted = false; }
         }
         if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
         if accepted && named != 0 {
@@ -2129,6 +2167,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
         let restored = replace(self_, self_.facts[binding], guard_fields[at * 8..at * 8 + guard_len[at]], guard_saved[at]);
         set(self_, binding, restored);
     }
+    self_.arguments_held.resize(held_base);
     giveBack(self_, base);
     if !holder {
         endBriefs(self_, ends);

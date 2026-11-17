@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "6f409107dd724e4448faea326c0ef78535bf2e83ffe8088055ce51d8e42c9b4e",
+  "digest": "20538411306485ff93c7ee2692dcfe28250fc20a52ed28c93afd1e9c85f0164b",
   "goose": "/home/user/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -592,9 +592,9 @@
       "sha256": "5ff3425aa753c5b9640d5c0f48323d02520545ff7f8f1d4e82bd422acaaafab9"
     },
     {
-      "bytes": 148972,
+      "bytes": 151248,
       "path": "src/check/uniqueness.goose",
-      "sha256": "8cecd747d568ad5fab342d1aa3ff2de39e6b12994ab03f28f0949d432a9402c1"
+      "sha256": "0e12269efb4cb9d67b7d310fd36bc42723b219962c4ad492ddbed90ec6a65c81"
     },
     {
       "bytes": 69039,
@@ -632,9 +632,9 @@
       "sha256": "8d94f28fa55d87354de7cfd82c0584dd1c1db3dd94150c53cbd1b8aeb12df763"
     },
     {
-      "bytes": 39306,
+      "bytes": 40009,
       "path": "src/direct/function_control.goose",
-      "sha256": "fcf38f3d337a8a32f25e505324c46d3e726f1ec048c5d7e5a60e60d557469100"
+      "sha256": "f3de6ef891089d4e82f0c9d0ee8da550203a7af823b0e2f8f3720ebb2dde6671"
     },
     {
       "bytes": 48818,

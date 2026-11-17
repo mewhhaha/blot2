@@ -864,6 +864,74 @@ Two limits met on the way, both left for the pass:
   given beside it. Name the borrowed value first
   (`let seen = reader world.a`), as `host.frame` does.
 
+**The second layer of Gdev, and the Ink modules the game does not use
+(17 November 2026).** `scripts/integration/own_closure.py` picked the 68
+functions under the 66 systems that can be converted together (a set
+closed under callers; functions that return a value, are passed as
+values, are `lent`, or are called on a world a closure captured stay out,
+47 of them), converted them and rewrote 249 calls. About 105 places then
+failed the ownership check and needed judgment; four workers fixed them
+on disjoint file lists. Two more workers converted the Ink modules Gdev
+never imports (rigid bodies, joints, physics, springs, task queue,
+retained rendering, word persistence, history, locale): 169 stores.
+
+What the workers' sites had in common, as recipes: read what is needed
+from a borrowed name into plain values before the call that takes the
+world, or read again after it; replace a name for a part by its path;
+pass the plain number a callee needs instead of the record it came out of
+(`crystals.grow_into` and the cannon's `advance_into`/`launch_into` take
+the rock's kind, not the rock); walk indices instead of a view when the
+loop hands the world on.
+
+The pass changed with what they found:
+
+- **An early `return access` kept loans alive for good.** Returning a
+  local marked it shared, and inside a branch that mark outlived the
+  branch, so a name read on both sides of an early return never gave
+  back. A local returned where the function is left is no longer marked.
+- **A hole: an untyped world with a field still lent could be given.**
+  `let owned: Gyros = access.gyros`, `access := step access`, then a store
+  through `owned`, was accepted when `access` had no written type. A
+  value of unknown type is now given only when no name borrows one of its
+  fields. (Stores through such names in functions converted before this
+  are found by it; the fifteen it found went back to `=` until their
+  functions are restructured.)
+- **A name read for the last time by an argument gives back before the
+  given argument is judged** (`step world reading.revision`), unless its
+  value is still an argument of a call being read: the pass keeps the
+  locals whose values are arguments of unfinished calls
+  (`arguments_held`).
+
+Limits met and left, each with a small program in the workers' reports:
+
+- A name captured by a lambda written as an argument never gives back
+  (`array.map (ecs.read view) ids`); a comprehension or a loop does.
+- A function-valued result that holds the world keeps it shared to the
+  end of the function, named or not.
+- A data type with two or more type parameters is treated as holding
+  storage that borrows (`Job [request, value, local]` in Ink's queue).
+- With a written world type, an early `return world` while a name
+  borrows from it is still `result_not_owned`
+  (`n15_name_read_on_both_sides_of_an_early_return`).
+- After one `own_argument` in a function later sites in it are not
+  reported, and store records are not listed while another lowering
+  diagnostic stands, so a list of sites under-reports.
+
+**The backend releases an iteration when the carried record's changed
+words are not addresses of its own memory.** Ink's physics step is now an
+owned value handed round the tick loop. Its buffers' lengths change every
+tick, so "the record came out word for word as it went in" never held,
+nothing was released, and a 2,048-body workload ran out of stack. A word
+that differs now still counts as unchanged when it is below both of the
+iteration's marks (a count, or an address from before the iteration).
+What the open item still asks for is an iteration that carries out
+memory it allocated itself, and that is what Ink's physics needs: with
+the step owned, `tests/prepared-physics.blot` still ran out of stack
+(2,048 bodies rebuilt each tick). So the physics part of the Ink
+conversion (rigid, joints, physics, prepared, springs: 108 stores) is not
+on `main`. It is commit `58e6b02` on Ink's working branch, complete and
+checked, waiting for that release.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes
@@ -889,7 +957,7 @@ moves down from the frame loop one function at a time, with Ink's suite
 and Gdev's frame checked at each step. A `lent` callee is the exception:
 it has to be converted with the caller that needs ownership back.
 
-**What is left: 1,821 stores.** Counted by line shape with
+**What is left: 1,619 stores.** Counted by line shape with
 `python3 scripts/integration/count_stores.py DIR...`.
 `python3 scripts/integration/harvest_stores.py PROJECT ENTRY...` turns
 into `:=` each store the compiler reports as provably unique (it runs
@@ -899,12 +967,12 @@ Gdev build, Gdev's tests or Ink's tests.
 
 | Tree | Stores | Files |
 | --- | ---: | ---: |
-| ink/lib | 352 | 47 |
-| ink/tests | 219 | 51 |
-| gdev/src | 651 | 59 |
-| gdev/tests | 358 | 75 |
+| ink/lib | 291 | 40 |
+| ink/tests | 168 | 46 |
+| gdev/src | 584 | 55 |
+| gdev/tests | 333 | 70 |
 | gdev/pen | 0 | 0 |
-| gdev/test_support | 56 | 13 |
+| gdev/test_support | 57 | 13 |
 | gdev/devtools | 85 | 12 |
 | gdev/performance | 101 | 17 |
 

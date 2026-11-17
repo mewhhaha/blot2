@@ -1,0 +1,12 @@
+type Reading is data = $Reading { rows: Array U32, revision: U32 }
+type World is data = $World { counts: Array U32, revision: U32 }
+lent const reading = func (world: World) => return $Reading { rows: world.counts, revision: world.revision }
+const step = func (world: own World) -> (n: U32) => return do:
+  world.counts[0] := n
+  break world
+const run = func (n: U32) => return do:
+  let world = $World { counts: #[n, 2], revision: 3 }
+  let seen = reading world
+  world := step world seen.revision
+  world.counts[1] := 9
+  break @u32.add world.counts[0] world.counts[1]

@@ -1,0 +1,11 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+const window = func (rows: Array U32) => return &rows[0..1]
+const one = func (n: U32) => return @u32.add n 1
+const three = func (cells: &[U32]) -> (n: U32) -> (world: World) => return @u32.add (@u32.add cells[0] n) world.other[0]
+const step = func (world: own World) => return do:
+  world.counts[0] := 1
+  break world
+const run = func (n: U32) => return do:
+  let world = $World { counts: #[n, 2], other: #[3] }
+  let seen = window world.counts
+  break three seen (one n) (step world)

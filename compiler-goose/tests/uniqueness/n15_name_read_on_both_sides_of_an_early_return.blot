@@ -1,0 +1,16 @@
+type World is data = $World { counts: Array U32, other: Array U32 }
+const window = func (rows: Array U32) => return &rows[0..2]
+const total = func (cells: &[U32]) => return @u32.add cells[0] cells[1]
+const step = func (world: own World) -> (n: U32) => return do:
+  world.other[0] := n
+  break world
+const stepped = func (world: own World) -> (k: U32) => return do:
+  let rows = window world.counts
+  if @u32.eq (total rows) k:
+    return world
+  let sum = total rows
+  return step world sum
+const run = func (n: U32) => return do:
+  let world = stepped ($World { counts: #[n, 2], other: #[3] }) 7
+  world.counts[0] := world.other[0]
+  break world.counts[0]

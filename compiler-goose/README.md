@@ -79,8 +79,8 @@ Two of them read a model that is edited by hand:
     programs of `tests/fixtures/` and requires the recorded exit code, Wasm
     and records.
   - `python3 compiler-goose/tools/test_uniqueness.py` requires the recorded
-    lowering diagnostics for the 209 programs of `tests/uniqueness/`. The
-    136 named `e…` to `n…` are about `own` parameters, moves at a local's
+    lowering diagnostics for the 212 programs of `tests/uniqueness/`. The
+    139 named `e…` to `n…` are about `own` parameters, moves at a local's
     last read, the rules for every function, what stays while `=` exists
     (`lent`, kept values, function values), `own` in function types,
     taking a value apart, names that borrow, borrowed values without a

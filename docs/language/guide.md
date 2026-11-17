@@ -1098,7 +1098,8 @@ func count (own access) => return do:
 
 A value whose type is not known inside a function (a parameter written
 without a type, or a field of one) is read there as plain data, but it is
-given to an `own` parameter only when the function took it over itself:
+given to an `own` parameter only when the function took it over itself
+and no name still borrows one of its fields:
 `func stepped access => return step access` is `own_argument`, and `func
 stepped (own access) => return step access` is not. A function held in a
 field of such a value is called like any function value: the call only
