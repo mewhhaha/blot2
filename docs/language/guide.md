@@ -4,14 +4,10 @@ Read this before writing Blot. This describes the current executable language;
 [DESIGN.md](../../DESIGN.md) records the design direction. Each `blot` code
 block below is an independent, compilable module.
 
-The handwritten Zig compiler implements the source syntax in this guide. Current
-applications use the owned-storage profile described below: named owners, shared
-aliases, explicit copies and invocation-local borrows. Cutover is unfinished:
-some programs still select the counted backend (ABI 2–7, depending on emitted
-features). Its implicit snapshot/collector behavior is being retired under task
-120 and is not the contract for new application code. See
-[the current profile](../compiler/SCOPED_STORAGE.md) for supported forms and
-[the rewrite task](../../tasks/STORAGE_REWRITE.md) for remaining work.
+The Goose compiler emits Wasm directly. Applications use named owners, explicit
+copies and invocation-local borrows with guest ABI 8. The
+[ownership contract](../compiler/CONTRACT.md) describes how values cross calls.
+The [migration handoff](../../CONTINUE.md) tracks the remaining shared writers.
 
 ## Commands
 
@@ -26,10 +22,9 @@ deno task blot check examples/lists.blot
 deno task blot build examples/lists.blot build/lists.wasm
 ```
 
-Blot compiles to Wasm; a host loads the module and calls its entrypoints, the
-`entry func`, `entry const` and `entry let` declarations of the file you
-compile. In the sibling gdev checkout, `just run` starts Deno Desktop/WebGPU
-with source hot reload.
+The host loads the Wasm module and calls the `entry func`, `entry const` and
+`entry let` declarations of the compiled file. In the sibling Gdev checkout,
+`just dev` starts Pen with hot reload. `just run` compiles once and plays.
 
 An edit loop compiles with the development tier (`codegenTier: "development"` in
 a project session), which skips the optional scalar and vector passes and

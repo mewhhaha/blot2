@@ -5,8 +5,8 @@ Usage: python3 scripts/integration/paths_for_parts.py FILE...   (paths under ../
 A block that binds `let NAME: T = WORLD.FIELD` and goes on to read or write
 through NAME, while it also hands WORLD to an `own` parameter, keeps WORLD
 lent for as long as NAME is read. This replaces each use of NAME in the
-block by `WORLD.FIELD` and drops the binding, unless NAME is bound again in
-the block or a lambda in it binds WORLD itself. Stores stay stores; the
+block by `WORLD.FIELD` and drops the binding while both names continue to
+refer to the original values. Stores stay stores; the
 compiler decides later which can be updates. unalias.py does the same in
 functions that take the world with `own`, with a check after each file;
 this one covers test lambdas and leaves the checking to the caller.
@@ -24,6 +24,11 @@ def replace(line,name,path):
     """Each use of `name` in `line` as a value: not a field after a single
     dot, not a record key (`name: value` stays a key), and a shorthand
     field (`{name}`) becomes `name: path`."""
+    parts=re.split(r'("(?:\\.|[^"\\])*(?:"|$)|//.*$)',line)
+    for i in range(0,len(parts),2):
+        parts[i]=replace_code(parts[i],name,path)
+    return ''.join(parts)
+def replace_code(line,name,path):
     out=''; at=0
     for m in re.finditer(r'\b'+re.escape(name)+r'\b',line):
         s,e=m.start(),m.end()
@@ -44,9 +49,8 @@ def rewrite(lines):
         while j<len(lines) and (not lines[j].strip() or indent(lines[j])>=ind): j+=1
         block=lines[k+1:j]
         text='\n'.join(block)
-        if re.search(r'\blet '+name+r'\b|\b'+name+r' :=|\bfunc\b[^=]*\b'+world+r'\b[^=]*=>|\(own '+world+r'\)',text) and not re.search(r'\b'+world+r' :=',text) is None:
-            pass
-        if re.search(r'\blet '+name+r'\b|^\s*'+name+r' :=',text,re.M) or re.search(r'\bfunc\b[^\n]*?\b'+world+r'\b[^\n]*?=>',text):
+        bound=r'(?:'+name+'|'+world+r')'
+        if re.search(r'\blet '+bound+r'\b|^\s*'+bound+r'\s*:=',text,re.M) or re.search(r'\bfunc\b[^\n]*?\b'+bound+r'\b[^\n]*?=>',text):
             k+=1; continue
         new=[replace(l,name,world+'.'+field) for l in block]
         lines[k:j]=new; changed+=1

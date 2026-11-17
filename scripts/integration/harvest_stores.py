@@ -7,36 +7,61 @@ reports the stores whose place is provably the function's own
 (BLOT_REPORT_STORES); each becomes `place := value`. Then the entries are
 checked again: an update the compiler would turn back into a store
 (`"kind":"store"`, an `aliased_update`) goes back to `=`, until none is
-left. Files of std are left alone. It prints how many stores became
-updates and any entry that has a diagnostic afterwards.
+left. Only sites in PROJECT_DIR proposed during this run are rewritten. The
+report lists the successful conversions and any remaining diagnostics.
 """
-import sys,subprocess,json,os,collections
+import argparse
+import collections
+import json
+import os
+import subprocess
 from concurrent.futures import ThreadPoolExecutor
-args=sys.argv[1:]
-C=os.path.join(os.path.dirname(os.path.abspath(__file__)),'../../compiler-goose/build/blotc-goose-dev')
-jobs=4
-if '--compiler' in args:
-    at=args.index('--compiler'); C=os.path.abspath(args[at+1]); del args[at:at+2]
-if '--jobs' in args:
-    at=args.index('--jobs'); jobs=int(args[at+1]); del args[at:at+2]
-d=args[0]; entries=args[1:]
-def run(entry,report):
-    env=dict(os.environ)
-    if report: env['BLOT_REPORT_STORES']='1'
-    out=subprocess.run([C,'migrate-stores',entry,'--project','pen.json','--dry-run','--inference-budget','20000000'],cwd=d,capture_output=True,text=True,env=env).stdout
-    provable=set(); aliased=set(); errors=set()
-    for line in out.splitlines():
-        try: r=json.loads(line)
-        except ValueError: continue
-        if r.get('kind')=='store': aliased.add((r['filename'],r['start']))
-        elif r.get('kind')=='diagnostic' and r.get('code')=='unchecked' and r.get('stage')=='lower': provable.add((r['filename'],r['start']))
-        elif r.get('kind')=='diagnostic' and r.get('code') not in ('dependency_failed','unknown_value','unchecked'): errors.add((entry,r.get('code')))
-    return provable,aliased,errors
+from pathlib import Path
+
+parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+parser.add_argument("project", type=Path)
+parser.add_argument("entries", nargs="+")
+parser.add_argument("--compiler", type=Path, default=Path(__file__).resolve().parents[2] / "compiler-goose/build/blotc-goose-dev")
+parser.add_argument("--jobs", type=int, default=4)
+args = parser.parse_args()
+project = args.project.resolve()
+compiler = args.compiler.resolve()
+
+def run(entry, report):
+    env = os.environ.copy()
+    env.pop("BLOT_REPORT_STORES", None)
+    if report:
+        env["BLOT_REPORT_STORES"] = "1"
+    command = [compiler, "migrate-stores", entry, "--project", "pen.json", "--dry-run", "--inference-budget", "20000000"]
+    process = subprocess.run(command, cwd=project, capture_output=True, text=True, env=env)
+    proven, aliased, errors = set(), set(), set()
+    finished = False
+    for line in process.stdout.splitlines():
+        record = json.loads(line)
+        kind = record["kind"]
+        if kind == "migrate-stores":
+            finished = True
+        elif kind == "store":
+            aliased.add((Path(record["filename"]).resolve(), record["start"]))
+        elif kind == "diagnostic":
+            code = record["code"]
+            if code == "unchecked" and record["stage"] == "lower":
+                proven.add((Path(record["filename"]).resolve(), record["start"]))
+            elif code != "dependency_failed":
+                errors.add((entry, code))
+    if not finished:
+        raise RuntimeError(f"{entry}: incomplete compiler run ({process.returncode}) {process.stderr}")
+    return proven, aliased, errors
+
 def sweep(report):
-    provable=set(); aliased=set(); errors=set()
-    with ThreadPoolExecutor(jobs) as pool:
-        for p,a,e in pool.map(lambda entry: run(entry,report),entries): provable|=p; aliased|=a; errors|=e
-    return provable,aliased,errors
+    proven, aliased, errors = set(), set(), set()
+    with ThreadPoolExecutor(args.jobs) as pool:
+        for found, shared, diagnostics in pool.map(lambda entry: run(entry, report), args.entries):
+            proven.update(found)
+            aliased.update(shared)
+            errors.update(diagnostics)
+    return proven, aliased, errors
+
 def operator(src,start,want):
     """Offset of the statement's `=` (want b'=') or of the `:` of its `:=` (want b':=')."""
     nesting=0; at=start
@@ -58,32 +83,69 @@ def operator(src,start,want):
             if prev not in b':=<>!' and nxt not in b'=>': return at
         at+=1
     return -1
-before,_,errors_before=sweep(False)[0],None,None
-provable,_,_=sweep(True)
-by=collections.defaultdict(set)
-for f,s in provable:
-    if '/std/' in f and '/blot2/' in f: continue
-    by[f].add(s)
-made=0
-for f,starts in by.items():
-    src=open(f,'rb').read()
-    for s in sorted(starts,reverse=True):
-        at=operator(src,s,b'=')
-        if at<0: continue
-        src=src[:at]+b':'+src[at:]; made+=1
-    open(f,'wb').write(src)
-back=0
-for attempt in range(6):
-    _,aliased,errors=sweep(False)
-    if not aliased: break
-    again=collections.defaultdict(set)
-    for f,s in aliased: again[f].add(s)
-    for f,starts in again.items():
-        src=open(f,'rb').read()
-        for s in sorted(starts,reverse=True):
-            at=operator(src,s,b':=')
-            if at<0: continue
-            src=src[:at]+src[at+1:]; back+=1
-        open(f,'wb').write(src)
-print(f'{made-back} stores became updates ({made} tried, {back} put back)')
-for entry,code in sorted(errors): print('  diagnostic after:',entry,code)
+proven, _, baseline_errors = sweep(True)
+proposals = collections.defaultdict(set)
+for path, start in proven:
+    if path.is_relative_to(project):
+        proposals[path].add(start)
+
+# Rebuild from original byte offsets so rejected updates can be retracted
+# individually even after earlier edits shifted the compiler's offsets.
+original = {}
+active = {}
+for path, starts in proposals.items():
+    source = path.read_bytes()
+    sites = {operator(source, start, b'=') for start in starts}
+    sites.discard(-1)
+    if sites:
+        original[path] = source
+        active[path] = sorted(sites)
+
+def edited(path):
+    source = original[path]
+    pieces = []
+    previous = 0
+    for at in active[path]:
+        pieces.extend((source[previous:at], b':'))
+        previous = at
+    pieces.append(source[previous:])
+    return b''.join(pieces)
+
+published = {}
+def publish(path, content):
+    if path.read_bytes() != published.get(path, original[path]):
+        raise RuntimeError(f"{path} changed during the migration")
+    path.write_bytes(content)
+    published[path] = content
+
+made = sum(map(len, active.values()))
+errors = baseline_errors
+try:
+    for path in active:
+        publish(path, edited(path))
+    while any(active.values()):
+        _, aliased, errors = sweep(False)
+        rejected = collections.defaultdict(set)
+        for path, start in aliased:
+            if path in active:
+                rejected[path].add(operator(published[path], start, b':='))
+        changed = False
+        for path, locations in rejected.items():
+            retained = [at for i, at in enumerate(active[path]) if at + i not in locations]
+            if retained != active[path]:
+                active[path] = retained
+                publish(path, edited(path))
+                changed = True
+        if not changed:
+            break
+except BaseException:
+    for path, content in published.items():
+        if path.read_bytes() == content:
+            path.write_bytes(original[path])
+    raise
+kept = sum(map(len, active.values()))
+if not kept:
+    errors = baseline_errors
+print(f"{kept} stores became updates ({made} tried, {made-kept} put back)")
+for entry, code in sorted(errors):
+    print("  diagnostic after:", entry, code)
