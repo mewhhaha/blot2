@@ -1,0 +1,254 @@
+{
+  "date": "2026-11-17",
+  "source": {
+    "blot": "9b7cd3e89305b546c63e440158bf66274bfdff96",
+    "gdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "compilerSha256": "48761d7ce49939d8fb57c55104310ce0baaa18df904c667b9f9d3d08b00ba13f",
+    "compilerProtocolIdentity": "d0b7f52f21fa3d734f92105b138c9bd21793a2105ecc1352e978dc8d47ca8e1e",
+    "wasmSha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
+    "wasmBytes": 2639595,
+    "modules": 264,
+    "syntaxNodes": 354227,
+    "sourceBytes": 2524088,
+    "entry": {
+      "entrySha256": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+      "preludeSha256": "72051ce29e0057bb116809e7bdd6428ebab2cad537763e1cd9b21298dc04f057",
+      "penJsonSha256": "fb1023f9cf0d7f1192061d97a34ce0faf7bf3d67efd5f8d36eddaaae59e1042c"
+    }
+  },
+  "freshMain": {
+    "method": "scripts/integration/build_gdev.ts, fresh release compiler process and project session, warm filesystem, native assets, session open through complete Wasm reply. Workers tested in order. The host was shared for all experiments.",
+    "order": [
+      1,
+      4,
+      2,
+      1,
+      2,
+      4,
+      1
+    ],
+    "msByWorkerCount": {
+      "1": [
+        1954.51,
+        2125.51,
+        2036.32
+      ],
+      "4": [
+        4847.08,
+        5140.88
+      ],
+      "2": [
+        5667.54,
+        5846.25
+      ]
+    },
+    "cachedModules": 0
+  },
+  "compilerStages": {
+    "method": "Materialized all 72 virtual inputs on an isolated copy with the release source native_assets generator, then ran build-project 4 times with original aliases, prelude and inference budget. Native asset discovery and protocol are outside these clocks. All four outputs equal fresh Main. Built-in CLI clocks, without profiling. Teardown can overlap enclosing clocks.",
+    "msMedian": {
+      "load": 168.4,
+      "check": 1350.7,
+      "lower": 219.7,
+      "emit": 111.9,
+      "write": 8.8,
+      "teardown": 1.8
+    },
+    "samplesMs": [
+      {
+        "load": 171.296,
+        "check": 1373.933,
+        "lower": 222.247,
+        "emit": 112.778,
+        "write": 0.331,
+        "teardown": 1.868,
+        "compiler": 1882.464,
+        "process": 1905.25
+      },
+      {
+        "load": 158.372,
+        "check": 1321.751,
+        "lower": 211.56,
+        "emit": 110.929,
+        "write": 11.933,
+        "teardown": 1.883,
+        "compiler": 1816.434,
+        "process": 1839.68
+      },
+      {
+        "load": 174.115,
+        "check": 1362.572,
+        "lower": 228.81,
+        "emit": 122.601,
+        "write": 7.131,
+        "teardown": 1.661,
+        "compiler": 1896.895,
+        "process": 1920.96
+      },
+      {
+        "load": 165.604,
+        "check": 1338.836,
+        "lower": 217.136,
+        "emit": 109.946,
+        "write": 10.499,
+        "teardown": 1.653,
+        "compiler": 1843.679,
+        "process": 1869.03
+      }
+    ]
+  },
+  "checking": {
+    "profile": "Separate --profile build on the ordinary asset and session path, instrumented.",
+    "exclusivePhaseMs": {
+      "other": 11.5,
+      "assets": 131.06,
+      "load": 96.93,
+      "lex": 36.36,
+      "parse": 187.42,
+      "check": 1957.45,
+      "lower": 348.99,
+      "freeze": 0.0,
+      "validation": 0.0,
+      "backend": 190.06
+    },
+    "counters": {
+      "resolve_depth_entries": 3918291,
+      "composite_probes": 1089528,
+      "composite_hits": 326,
+      "composite_collisions": 545418,
+      "row_requests": 1281401
+    },
+    "pendingObligationScans": 2679811,
+    "pendingCandidates": 51120
+  },
+  "lightingEdit": {
+    "method": "Change the proposed Look sun from true to false through a full-file in-memory overlay in src/effects/lighting_look.blot. For each retained trial open a session, build the baseline, build the edit, then drop the overlay. For each fresh trial the edit is the first build. All reverts match the baseline and all edited results match each other. Wall times here exclude open and came from a more contended interval.",
+    "editedWasmSha256": "b43dd9e236176ebec0dcfe844a8dd544c26942670e470bf7d5e92abadd9399a8",
+    "freshModulesPerBuild": 264,
+    "cachedModulesPerBuild": 0,
+    "reusedAssetsOnRetainedEdits": 72,
+    "samples": [
+      {
+        "session": "retained",
+        "step": "baseline",
+        "openMs": 53,
+        "buildMs": 2543
+      },
+      {
+        "session": "retained",
+        "step": "edit",
+        "openMs": 53,
+        "buildMs": 2335
+      },
+      {
+        "session": "retained",
+        "step": "revert",
+        "openMs": 53,
+        "buildMs": 2651
+      },
+      {
+        "session": "fresh",
+        "step": "edit",
+        "openMs": 12,
+        "buildMs": 2903
+      },
+      {
+        "session": "fresh",
+        "step": "edit",
+        "openMs": 28,
+        "buildMs": 2594
+      },
+      {
+        "session": "retained",
+        "step": "baseline",
+        "openMs": 27,
+        "buildMs": 2613
+      },
+      {
+        "session": "retained",
+        "step": "edit",
+        "openMs": 27,
+        "buildMs": 3168
+      },
+      {
+        "session": "retained",
+        "step": "revert",
+        "openMs": 27,
+        "buildMs": 2670
+      },
+      {
+        "session": "retained",
+        "step": "baseline",
+        "openMs": 16,
+        "buildMs": 2965
+      },
+      {
+        "session": "retained",
+        "step": "edit",
+        "openMs": 16,
+        "buildMs": 2656
+      },
+      {
+        "session": "retained",
+        "step": "revert",
+        "openMs": 16,
+        "buildMs": 2685
+      },
+      {
+        "session": "fresh",
+        "step": "edit",
+        "openMs": 17,
+        "buildMs": 2934
+      }
+    ],
+    "graph": {
+      "method": "Trace module CPU clocks in a separate instrumented build. Transitive dependents include the edited module, re-exports and the implicit prelude.",
+      "modules": 264,
+      "reachableFromMain": 264,
+      "transitiveDependentsIncludingSelf": 70,
+      "editedModuleCheckCpuMs": 1.617,
+      "totalModuleCheckCpuMs": 2346.004,
+      "longestImportPathCpuMs": 848.007
+    }
+  },
+  "allocatorControl": {
+    "method": "Alternating native compiler process allocators on the same source, 3 trials each. Shared machine load climbed during this series. All outputs match Main.",
+    "order": [
+      "system",
+      "jemalloc",
+      "tcmalloc",
+      "tcmalloc",
+      "system",
+      "jemalloc",
+      "jemalloc",
+      "tcmalloc",
+      "system"
+    ],
+    "ms": {
+      "system": [
+        2798.78,
+        2936.89,
+        4434.65
+      ],
+      "jemalloc": [
+        2753.9,
+        3025.66,
+        3136.87
+      ],
+      "tcmalloc": [
+        2735.0,
+        2771.82,
+        3654.95
+      ]
+    }
+  },
+  "dependencyBundle": {
+    "method": "Release dependencies command on the same isolated source tree with native asset modules present. The frontend and freeze completed. The portable bundle could not be encoded.",
+    "modulesInFreeze": 263,
+    "interfaceBytesInMemory": 25857820,
+    "coreBytesInMemory": 45664838,
+    "error": "ArtifactLimit",
+    "encodedBytes": 0
+  }
+}

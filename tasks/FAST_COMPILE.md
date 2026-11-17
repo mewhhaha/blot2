@@ -1,8 +1,40 @@
 # Fast compilation: a modular direct backend
 
-Goal: compile Blot at 1M lines/s. Gdev Main (45,335 lines in 264 files, 2.5 MB
-of source with its generated asset modules) should build in about 45 ms; it
-takes 6.6 s today (about 6,900 lines/s) and produces 9.2 MB of Wasm.
+The long-term goal is 1M lines/s. The next milestone is a fresh Gdev Main
+build under one second, from opening the compiler session through receiving
+the complete Wasm with every module checked.
+
+## Goose release measurements, 17 November 2026
+
+Gdev Main took **2.04 s** median on the ordinary one-worker path. All 264
+modules were fresh and all runs produced the same 2,639,595 bytes. Two
+frontend workers took 5.76 s and four took 4.99 s. The
+[measurements](../benchmarks/evidence/measurements/2026-11-17-gdev-subsecond.json)
+pin the compiler, sources, individual trials and output hashes.
+
+Four fresh command-line builds used the same generated asset sources on
+disk. They produced byte-identical Main and exposed these unprofiled medians.
+
+| Stage | Time |
+| --- | ---: |
+| Load, lex and parse | 168 ms |
+| Type check | 1,351 ms |
+| Lower to Core | 220 ms |
+| Emit Wasm | 112 ms |
+
+The session also prepares native assets and transfers the result. A clean
+build needs roughly a second of savings. Start with repeated type resolution.
+One instrumented build recorded 3.92 million visits during resolution. The
+cross-epoch composite cache had 326 hits in 1.09 million probes. Measure the
+same release with that cache off before changing inference rules.
+
+For edits, retain checked module interfaces and Core in the open session.
+Changing the default sunlight setting rechecked all 264 modules. Its own
+module took 1.6 ms of checker CPU in the trace. Seventy modules, including
+the edited one, are reachable through reverse imports. Recheck dependents
+when an interface or an observed compile-time value changes, then emit using
+the new bodies. Compare edits and reverts against fresh Wasm and diagnostics.
+The portable dependency bundle hit `ArtifactLimit` on the full game.
 
 ## Decisions (14 November 2026)
 
@@ -23,6 +55,9 @@ review; until then keep it minimal and runtime-checked.
    may run `wasm-opt`.
 
 ## Why: measured costs
+
+The following profile and implementation stages describe the earlier Zig
+compiler. Its scoped backend took 6.6 s and produced 9.2 MB on that snapshot.
 
 CPU profile of the Zig compiler (dynamically linked `-Dprofiling=true` build,
 SIGPROF sampler) building Gdev Main, grouped by cause:
