@@ -442,7 +442,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
         invalid_call => { return "Typed core requires a resolved named call or compiler primitive"; },
         complexity => { return "Typed core exceeds its nesting or table limit"; },
         aliased_update => { return "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"; },
-        spent_value => { return "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"; },
+        spent_value => { return "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"; },
         own_argument => { return "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"; },
         result_not_owned => { return "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"; },
         lent_result_value => { return "This function may return what it was lent or still holds, which here holds an array, so it cannot be used as a value or partly applied: give it all its arguments in one call, or pass a function that copies the result"; },

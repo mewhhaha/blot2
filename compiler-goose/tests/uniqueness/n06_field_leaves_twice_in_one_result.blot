@@ -1,0 +1,5 @@
+type Parts is data = $Parts { rows: Array U32, marks: Array U32 }
+const twice = func (parts: own Parts): Parts => return $Parts { rows: parts.rows, marks: parts.rows }
+const run = func (n: U32) => return do:
+  let both = twice ($Parts { rows: #[n], marks: #[1] })
+  break both.rows[0]

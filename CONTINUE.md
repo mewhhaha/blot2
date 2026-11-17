@@ -89,7 +89,7 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     may keep only values it owns (`kept_value`). A function that still
     returns or keeps what it was lent is marked `lent` (55 in Ink and
     Gdev) and nobody relies on it.
-  - **Left:** 4,452 stores in Ink and Gdev (table in
+  - **Left:** 1,821 stores in Ink and Gdev (table in
     tasks/MEMORY_MODEL.md) and 55 `lent` functions. The way is
     top-down from the frame loop: once every caller owns what it passes, a
     writer takes it with `own`, returns it, and its `=` become `:=`. A
@@ -132,6 +132,15 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     field of a record that is not known yet, and a parameter without a
     type that was only lent can no longer be given away (it could, and
     Ink and several tests relied on it).
+  - **The generated encoders own their buffer** (17 November 2026):
+    `pen codegen` writes `encode_render_views`, `encode_mesh_frame` and
+    the canonical walk in the explicit form (the buffer is `own`, written
+    with `:=` and returned), and `program.run` owns the world and rebinds
+    it round the loop. That was 2,208 stores. A view now borrows the
+    field it is made of, and a field of a function's own local can leave
+    in its result (tasks/MEMORY_MODEL.md, "The generated encoders").
+    384 provable stores in Gdev's tests became updates
+    (`scripts/integration/harvest_stores.py`).
   - **Next:** the functions those systems call, level by level (64 at
     the next one), the `present` stage's draw functions, then Ink's
     library writers, which take a part and return it
@@ -145,11 +154,17 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
       in a record (worked around in Gdev's `application`).
     - The failing checks in Gdev's test modules that compile for the
       first time since the rules became one set; not looked at yet.
+    - A name that borrowed from a local before a loop that updates the
+      local does not give back to the version after the loop; and a
+      borrowed value without a name holds the whole local, so a field
+      cannot be given beside it (tasks/MEMORY_MODEL.md, "The generated
+      encoders").
   - **Then:** delete `=`, `lent`, `migrate-stores` and
     `BLOT_REPORT_STORES`, and bring spec section 10.3 in line.
   - Tools: `python3 scripts/integration/count_stores.py DIR...` counts
-    what is left; `python3 scripts/integration/stores_to_updates.py
-    PROJECT ENTRY...` converts what the compiler can already prove.
+    what is left; `python3 scripts/integration/harvest_stores.py
+    PROJECT ENTRY...` converts what the compiler can already prove and
+    puts back what a second check does not accept.
 - **Memory model phase 4** (the value restriction for `let`) is measured
   and not built. std, Ink and Gdev need no change and Gdev's frame is
   identical, but 13 guest cases pin the old rule (and 11 of Zig's native

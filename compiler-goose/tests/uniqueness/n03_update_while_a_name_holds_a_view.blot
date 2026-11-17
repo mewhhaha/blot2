@@ -1,0 +1,5 @@
+const run = func (n: U32) => return do:
+  let rows = #[n, 2]
+  let front = &rows[0..1]
+  rows[0] := 7
+  break @u32.add front[0] rows[0]

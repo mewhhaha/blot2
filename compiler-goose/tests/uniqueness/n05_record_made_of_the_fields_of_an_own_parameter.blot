@@ -1,0 +1,10 @@
+type Parts is data = $Parts { rows: Array U32, marks: Array U32 }
+type World is data = $World { rows: Array U32, marks: Array U32, count: U32 }
+const bind = func (parts: own Parts): World => return $World { rows: parts.rows, marks: parts.marks, count: 2 }
+const split = func (world: own World) => return (world.rows, world.marks)
+const run = func (n: U32) => return do:
+  let world = bind ($Parts { rows: #[n], marks: #[1] })
+  world.rows[0] := @u32.add world.rows[0] world.marks[0]
+  let (rows, marks) = split world
+  rows[0] := @u32.add rows[0] marks[0]
+  break rows[0]

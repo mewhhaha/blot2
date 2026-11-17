@@ -1,0 +1,11 @@
+type Stream is data = $Stream { at: U32, output: Array U32 }
+const write = func (stream: own Stream) => return do:
+  stream.output[0] := stream.at
+  break stream
+const run = func (n: U32) => return do:
+  let output = finish n
+  output[0] := @u32.add output[0] 1
+  break output[0]
+const finish = func (n: U32): Array U32 => return do:
+  let stream = write ($Stream { at: n, output: #[0] })
+  return stream.output

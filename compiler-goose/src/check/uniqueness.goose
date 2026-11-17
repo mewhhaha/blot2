@@ -232,6 +232,9 @@ root struct Analyzer {
     exempt_root: u32 = 0,
     // The function a `return` being read leaves, or 0.
     leaving_root: u32 = 0,
+    // The record or tuple a `return` leaves with: its parts may move
+    // fields out of the function's own locals.
+    result_node: u32 = 0,
     lent_constant: bool = false,
     // Blocks whose value is the function's result: `return do: ...`.
     tails: u32[>..<] = []
@@ -319,7 +322,9 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
             analyzer.dry = false;
             undo(analyzer, mark);
         }
+        analyzer.result_node = body.root;
         let value = visit(analyzer, module, body.root);
+        analyzer.result_node = 0;
         if analyzer.owned_result != 0 && !value.exits { ownedResult(analyzer, module, body.root, value); }
         escape(analyzer, value);
         analyzer.function_roots.resize(analyzer.function_roots.len - 1);
@@ -507,6 +512,23 @@ fn taken(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fact {
     }
     escape(self_, value);
     return none;
+}
+// The fact a part of the function's result gets. A field of a local that
+// leaves with the function moves out of it: `return { rows: world.rows }`.
+// The field is spent from there on, so it cannot leave twice.
+fn takenPart(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fact {
+    if value.origin != 0 && !self_.dry && m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.facts[value.origin] != spent {
+        let target, found = place(self_, m, node);
+        if found && target.len != 0 && target.binding == value.origin && self_.home[value.origin] == self_.function_roots[self_.function_roots.len - 1] {
+            let fact = partFact(self_, self_.facts[value.origin], target.fields[..target.len]);
+            if fact != spent && fact != none {
+                let given = replace(self_, self_.facts[value.origin], target.fields[..target.len], spent);
+                set(self_, value.origin, given);
+                return fact;
+            }
+        }
+    }
+    return taken(self_, m, node, value);
 }
 fn reject(self_: Analyzer&, m: const Module&, node: u32, code: blot_check_core::Code) {
     if self_.probing == 0 { self_.rejections.push(Rejection { node: node, span: m.span(node), code: code }); }
@@ -872,6 +894,29 @@ fn place(self_: const Analyzer&, m: const Module&, id: u32) -> Place, bool {
         cursor = n.a;
     }
 }
+// The place a borrowed value comes out of: `world.rows` for `world.rows`,
+// for an element or a field of an element of it, and for a view of it.
+fn source(self_: const Analyzer&, m: const Module&, id: u32) -> Place, bool {
+    var cursor = id;
+    loop {
+        let target, found = place(self_, m, cursor);
+        if found { return target, true; }
+        let n = m.node(cursor);
+        if n.tag == blot_check_core::Tag.project { cursor = n.a; continue; }
+        if n.tag == blot_check_core::Tag.array_op {
+            let operation = m.arrayOperation(cursor);
+            if operation != blot_backend_collection_ops::Op.get && operation != blot_backend_collection_ops::Op.identity { return Place { .. }, false; }
+        } else if n.tag == blot_check_core::Tag.storage {
+            let operation, unknown = blot_check_storage_ops::opFromCode(n.c);
+            if unknown != blot_error::Error.none || (operation != blot_check_storage_ops::Op.view && operation != blot_check_storage_ops::Op.read) { return Place { .. }, false; }
+        } else {
+            return Place { .. }, false;
+        }
+        let children = m.children(cursor);
+        if children.len == 0 { return Place { .. }, false; }
+        cursor = children[0];
+    }
+}
 // `fact` with the storage at `fields` no longer known to own its elements:
 // a store or push put a value there that may be shared.
 recursive fn weaken(self_: Analyzer&, fact: Fact, fields: const u32[:]) -> Fact {
@@ -1035,15 +1080,29 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let logged = self_.reads.len;
         let outer_leaving = self_.leaving_root;
         if leaves { self_.leaving_root = n.b; }
+        let outer_result = self_.result_node;
+        self_.result_node = 0;
+        if n.a != 0 && !tail && (leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b)) { self_.result_node = n.a; }
         let result = visit(self_, m, n.a);
+        self_.result_node = outer_result;
         self_.leaving_root = outer_leaving;
         if tail { self_.tails.resize(self_.tails.len - 1); }
         // Nothing runs after a return: its reads are the last on its path.
         if leaves && self_.dry { lastReads(self_, logged); }
         var fact: Fact = none;
         let ends = leaves || (self_.tails.len != 0 && self_.tails[self_.tails.len - 1] == n.b);
+        // So does a field of such a local: `return stream.output`.
+        var part = Place { .. };
+        if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.project && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
+            let target, found = place(self_, m, n.a);
+            if found && target.len != 0 && target.binding == result.origin && local(self_, target.binding) { part = target; }
+        }
         if result.origin != 0 && ends && !self_.dry && m.node(n.a).tag == blot_check_core::Tag.reference && self_.home[result.origin] == self_.function_roots[self_.function_roots.len - 1] {
             fact = self_.facts[result.origin];
+            kill(self_, result.origin);
+        } else if part.len != 0 {
+            fact = partFact(self_, self_.facts[result.origin], part.fields[..part.len]);
+            if fact == spent { fact = none; }
             kill(self_, result.origin);
         } else {
             fact = taken(self_, m, n.a, result);
@@ -1115,7 +1174,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         }
         self_.function_roots.push(body);
         let logged = self_.reads.len;
+        // A body that is one expression is the function's result.
+        let outer_result = self_.result_node;
+        self_.result_node = body;
         let value = visit(self_, m, body);
+        self_.result_node = outer_result;
         self_.chain = outer_chain;
         if !link { self_.chained.resize(self_.chained_base[self_.chained_base.len - 1]); self_.chained_base.resize(self_.chained_base.len - 1); }
         // The closure's own locals end with its body. What it captured is
@@ -1192,9 +1255,12 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // is fresh or moved in.
         var parts_deep = true;
         var exits = false;
+        let leaving = id == self_.result_node;
         for child in m.children(id) {
+            if leaving { self_.result_node = child; }
             let value = visit(self_, m, child);
-            let fact = taken(self_, m, child, value);
+            var fact: Fact = none;
+            if leaving { fact = takenPart(self_, m, child, value); } else { fact = taken(self_, m, child, value); }
             exits = exits || value.exits;
             parts_deep = parts_deep && ownedAs(self_, m, fact, m.typeOf(child), 0);
         }
@@ -1215,6 +1281,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { fact: fact, exits: left.exits || right.exits, .. };
     }
     if tag == blot_check_core::Tag.construct {
+        if id == self_.result_node { self_.result_node = n.b; }
         let payload = visit(self_, m, n.b);
         let literal = n.b != 0 && m.node(n.b).tag == blot_check_core::Tag.record;
         let held = taken(self_, m, n.b, payload);
@@ -1970,7 +2037,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
             exits = exits || value.exits;
             if !holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
                 var path = Place { .. };
-                let target, found = place(self_, m, child);
+                let target, found = source(self_, m, child);
                 if found && target.binding == value.origin { path = target; }
                 let saved = partFact(self_, self_.facts[value.origin], path.fields[..path.len]);
                 let shared = replace(self_, self_.facts[value.origin], path.fields[..path.len], none);
@@ -2047,7 +2114,14 @@ fn ownedResult(self_: Analyzer&, m: const Module&, node: u32, value: Value) {
     var fact = value.fact;
     if value.origin != 0 {
         fact = none;
-        if m.node(node).tag == blot_check_core::Tag.reference { fact = self_.facts[value.origin]; }
+        if m.node(node).tag == blot_check_core::Tag.reference {
+            fact = self_.facts[value.origin];
+        } else if m.node(node).tag == blot_check_core::Tag.project && local(self_, value.origin) && self_.function_roots.len != 0 && self_.home[value.origin] == self_.function_roots[self_.function_roots.len - 1] {
+            // A field of a local of its own leaves with the function.
+            let target, found = place(self_, m, node);
+            if found && target.len != 0 && target.binding == value.origin { fact = partFact(self_, self_.facts[value.origin], target.fields[..target.len]); }
+            if fact == spent { fact = none; }
+        }
     }
     if !owns(self_, m, m.typeOf(node)) { return; }
     if !ownedAs(self_, m, fact, m.typeOf(node), 0) { reject(self_, m, culprit(self_, m, node), blot_check_core::Code.result_not_owned); }
@@ -2165,9 +2239,12 @@ recursive fn recordLiteral(self_: Analyzer&, m: const Module&, id: u32) -> Value
     let is_record = shape.tag == blot_check_types::Tag.record;
     let mark = self_.scratch.len;
     var exits = false;
+    let leaving = id == self_.result_node;
     for child, index in m.children(id) {
+        if leaving { self_.result_node = child; }
         let value = visit(self_, m, child);
-        let fact = taken(self_, m, child, value);
+        var fact: Fact = none;
+        if leaving { fact = takenPart(self_, m, child, value); } else { fact = taken(self_, m, child, value); }
         exits = exits || value.exits;
         if !self_.dry && !self_.culprits.contains(id) && owns(self_, m, m.typeOf(child)) && !ownedAs(self_, m, fact, m.typeOf(child), 0) { self_.culprits.insert(id, child); }
         if !is_record { continue; }
@@ -2378,6 +2455,14 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             let exits = container.exits || index.exits;
             if holds(self_, m, n.ty) { return Value { origin: container.origin, exits: exits, .. }; }
             return Value { exits: exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.view {
+            // A view borrows the storage it names, as a value read out of
+            // it does: it is given back where the view is last used.
+            let container = visit(self_, m, children[0]);
+            var exits = container.exits;
+            for child in children[1..] { let value = visitEscaping(self_, m, child); exits = value.exits || exits; }
+            return Value { origin: container.origin, exits: exits, .. };
         }
         if operation == blot_check_storage_ops::Op.push {
             let container = visit(self_, m, children[0]);

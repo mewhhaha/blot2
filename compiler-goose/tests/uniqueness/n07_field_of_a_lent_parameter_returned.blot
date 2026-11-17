@@ -1,0 +1,8 @@
+type Parts is data = $Parts { rows: Array U32, marks: Array U32 }
+const rows_of = func (parts: Parts): Array U32 => return parts.rows
+const bind = func (parts: Parts): Parts => return $Parts { rows: parts.rows, marks: parts.marks }
+const run = func (n: U32) => return do:
+  let parts = $Parts { rows: #[n], marks: #[1] }
+  let rows = rows_of parts
+  let again = bind parts
+  break @u32.add rows[0] again.marks[0]

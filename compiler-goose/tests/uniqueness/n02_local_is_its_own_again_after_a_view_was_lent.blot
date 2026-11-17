@@ -1,0 +1,6 @@
+const total = func (rows: &[U32]) => return @u32.add rows[0] rows[1]
+const run = func (n: U32) => return do:
+  let rows = #[n, 2]
+  let sum = total (&rows[0..2])
+  rows[0] := sum
+  break rows[0]

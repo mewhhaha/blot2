@@ -88,7 +88,7 @@ entry func scalar (n: U32) : U32 => return do:
   });
 });
 
-const spent = "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one";
+const spent = "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one";
 const argument = "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise";
 const result = "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`";
 const value = "A function that takes over a parameter must be given all its arguments in one call; given only some, it would hold that value for any number of calls";
@@ -208,6 +208,61 @@ entry func lent_beside (n: U32) : U32 => return do:
     equal(guest.call("later", 6), 36);
     equal(guest.call("rounds", 3), 808);
     equal(guest.call("lent_beside", 7), 74);
+  });
+});
+
+// A view borrows the field it is made of, for the call it is given to: the
+// other fields stay the record's own and can be given in the same call. A
+// field of a local that leaves with the function moves out of it.
+Deno.test("a view of one field is lent beside another given, and fields leave in a result", async () => {
+  await compileAndRun(`${declarations}
+type Frame is data = $Frame { rows: ResizeArray U32, out: ResizeArray U32, count: U32 }
+type Sides is data = $Sides { left: ResizeArray U32, right: ResizeArray U32 }
+func doubled (rows: &[U32]) -> (out: own ResizeArray U32): ResizeArray U32 => return do:
+  @storage.truncate out 0
+  for value in rows:
+    @storage.push out (value * 2)
+  break out
+func encode (frame: own Frame): Frame => return do:
+  frame.out := doubled (&frame.rows[0..frame.rows.length]) frame.out
+  frame.rows[0] := frame.out[1]
+  break frame
+func made (n: U32): Frame => return do:
+  let rows: ResizeArray U32 = #[n, 3]
+  let out: ResizeArray U32 = #[]
+  break encode ($Frame { rows, out, count: 2 })
+func out_of (frame: own Frame): ResizeArray U32 => return frame.out
+func parts (frame: own Frame) => return (frame.rows, frame.out)
+func swapped (sides: own Sides): Sides => return $Sides { left: sides.right, right: sides.left }
+entry func beside (n: U32) : U32 => return do:
+  let frame = made n
+  break frame.rows[0] * 100 + frame.out[0]
+entry func leaving (n: U32) : U32 => return do:
+  let out = out_of (made n)
+  out[0] := out[0] + 1
+  break out[0] * 10 + out[1]
+entry func apart (n: U32) : U32 => return do:
+  let (rows, out) = parts (made n)
+  rows[1] := rows[1] + out[0]
+  break rows[0] * 100 + rows[1]
+entry func swap (n: U32) : U32 => return do:
+  let left: ResizeArray U32 = #[n]
+  let right: ResizeArray U32 = #[9]
+  let sides = swapped ($Sides { left, right })
+  sides.left[0] := sides.left[0] + 1
+  break sides.left[0] * 10 + sides.right[0]
+entry func after_view (n: U32) : U32 => return do:
+  let rows: ResizeArray U32 = #[n, 3]
+  let out: ResizeArray U32 = #[]
+  let twice = doubled (&rows[0..2]) out
+  rows[0] := twice[1]
+  break rows[0] * 10 + rows[1]
+`, (guest) => {
+    equal(guest.call("beside", 5), 610);
+    equal(guest.call("leaving", 5), 116);
+    equal(guest.call("apart", 5), 613);
+    equal(guest.call("swap", 4), 104);
+    equal(guest.call("after_view", 5), 63);
   });
 });
 

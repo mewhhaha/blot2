@@ -31,6 +31,8 @@ a local to an `own` parameter and put something back in it. The programs
 named m are about values whose type is not known yet: a parameter without
 a type is given only when it was taken over, and a function held in a
 field of a record that is not known yet is called like any function value.
+The programs named n are about a view, which borrows the field it is made
+of, and about fields of a function's own local that leave in its result.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

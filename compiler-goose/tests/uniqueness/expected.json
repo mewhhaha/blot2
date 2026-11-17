@@ -566,7 +566,7 @@
    "spent_value",
    556,
    560,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "e04_own_aliased": [
@@ -600,7 +600,7 @@
    "spent_value",
    621,
    625,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "e10_own_record": [],
@@ -617,7 +617,7 @@
    "spent_value",
    576,
    580,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "e13_own_twice": [
@@ -625,7 +625,7 @@
    "spent_value",
    558,
    562,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "e14_own_field": [],
@@ -637,7 +637,7 @@
    "spent_value",
    543,
    547,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "e19_own_returned": [],
@@ -913,7 +913,7 @@
    "spent_value",
    143,
    147,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "i04_function_value_needs_owned": [
@@ -1060,7 +1060,7 @@
    "spent_value",
    846,
    857,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "l04_whole_read_while_a_field_is_given": [
@@ -1068,7 +1068,7 @@
    "spent_value",
    848,
    853,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "l05_field_given_twice": [
@@ -1076,7 +1076,7 @@
    "spent_value",
    854,
    865,
-   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
   ]
  ],
  "l06_field_given_each_round_of_a_loop_that_keeps_it": [
@@ -1129,6 +1129,40 @@
    203,
    209,
    "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "n01_view_of_a_field_lent_beside_a_field_given": [],
+ "n02_local_is_its_own_again_after_a_view_was_lent": [],
+ "n03_update_while_a_name_holds_a_view": [
+  [
+   "aliased_update",
+   89,
+   101,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ]
+ ],
+ "n04_field_of_an_own_local_returned": [],
+ "n05_record_made_of_the_fields_of_an_own_parameter": [],
+ "n06_field_leaves_twice_in_one_result": [
+  [
+   "spent_value",
+   155,
+   165,
+   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
+  ]
+ ],
+ "n07_field_of_a_lent_parameter_returned": [
+  [
+   "result_not_owned",
+   123,
+   133,
+   "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
+  ],
+  [
+   "result_not_owned",
+   199,
+   209,
+   "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
   ]
  ]
 }

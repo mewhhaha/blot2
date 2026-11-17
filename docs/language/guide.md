@@ -887,6 +887,10 @@ for stack in stacks_of access:                          // what a loop walks,
 access := step access
 ```
 
+A view (`&rows[a..b]`) is such a borrowed value: given to a call that
+keeps nothing, `rows` is its holder's own again after the call; bound to a
+name, after that name's last read.
+
 It is kept, as before, where it is put into a record, a tuple or an
 array, given to a `lent` function or a function value, or where a loop
 carries an element that holds storage out of the loop.
@@ -1048,6 +1052,22 @@ world.robots := ecs.insert world.entities world.robots index robot
 The other arguments of such a call are lent as in any call and are their
 holder's own again after it. One call cannot be both lent a value and
 given it: `mixed world.robots world.robots` is `own_argument`.
+
+A view borrows the field it is made of, so one field can be lent as a view
+while another is given in the same call:
+
+```blot
+world.out := write (&world.rows[0..world.rows.length]) world.out
+```
+
+A field also leaves with the function. `return stream.output` hands the
+caller that field of a local of the function's own, and a returned record,
+constructor or tuple may be made of such fields. Each can leave once:
+
+```blot
+func bind (parts: own Parts): World => return $World { rows: parts.rows, marks: parts.marks }
+func split (world: own World) => return (world.rows, world.marks)
+```
 
 A function written against any record with certain fields can index and
 update through them without saying what kind of array each is; the element

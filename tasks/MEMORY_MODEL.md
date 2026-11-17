@@ -783,6 +783,64 @@ variable as possibly holding storage everywhere, which today rejects
 `const insert_many = insert_selected` and other uses of generic functions
 as values across std and Ink.
 
+**The generated encoders (17 November 2026).** Half of the stores that
+were left (2,208 of 4,412) were in two files `pen codegen` writes, once
+for Gdev and once for Ink's fixtures. The generator now writes them in
+the explicit form:
+
+- `encode_render_views … (encoded: own ResizeArray F32)` and
+  `encode_mesh_frame … (encoded: own ResizeArray F32)` take the packet
+  buffer, write it with `encoded[i] := v` and return it. Ink's
+  `host.encode_frame` does the same with its `destination`, and the frame
+  gives the world's buffer and puts it back:
+  `access.response := encode_frame … access.response`.
+- The canonical walk (tests only) threads one value,
+  `type Stream = { at, output, children, extras }`: each record writer is
+  `func draw_into canonical -> (stream: own Stream): Stream`, and
+  `render_packet_from_canonical canonical (output: own …)` returns the
+  packet.
+- The program loop owns the world: `program.run execute acknowledge
+  (own access) …` calls `access := execute (own access) operation payload
+  outgoing`, so a game's `execute` takes the world over and returns it.
+  Ink's did already. Pen's template and its `bounce` example hold their
+  world as a plain field (`access.world := step access.world input`), no
+  longer as a one-element array.
+
+That needed two rules in the ownership pass:
+
+- **A view borrows the field it is made of.** `&world.rows[a..b]` used to
+  share `world` for good. It now borrows like a value read out of the
+  storage: given to a call that keeps nothing, it is given back when the
+  call ends; bound to a name, it is given back at the name's last read.
+  While another argument of the same call is lent, only the field it
+  comes out of is held (through a view, an element or a field of an
+  element), so `world.out := write (&world.rows[0..n]) world.out` gives
+  `out` while `rows` is lent.
+- **Fields leave in a result.** `return stream.output` returns a field of
+  a local that leaves with the function with that field's own fact. So do
+  the parts of a returned record, constructor or tuple:
+  `return { rows: parts.rows, marks: parts.marks }` moves both fields out
+  of an `own` parameter. A field that left is spent, so it cannot leave
+  twice (`spent_value`).
+
+The provable stores in Gdev's tests, support files, devtools and
+performance programs went the same day: 384 `=` became `:=`
+(`scripts/integration/harvest_stores.py`, which converts what the
+compiler reports as provably unique across many entries and puts back
+whatever a second check does not accept).
+
+Two limits met on the way, both left for the pass:
+
+- A local updated inside a loop is a new version after it. A name that
+  borrowed a field of the old version before the loop (`let residents =
+  ecs.rows access.resident`, read inside the loop) does not give it back
+  to the new one, so the local is not its own after the loop. One store in
+  `gdev/tests/shared_upgrades.blot` stays `=` for it.
+- A borrowed value without a name (`f (reader world.a) world.b`, with `b`
+  given) still holds the whole of `world` for the call, so `b` cannot be
+  given beside it. Name the borrowed value first
+  (`let seen = reader world.a`), as `host.frame` does.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes
@@ -808,34 +866,33 @@ moves down from the frame loop one function at a time, with Ink's suite
 and Gdev's frame checked at each step. A `lent` callee is the exception:
 it has to be converted with the caller that needs ownership back.
 
-**What is left: 4,452 stores.** Counted by line shape with
+**What is left: 1,821 stores.** Counted by line shape with
 `python3 scripts/integration/count_stores.py DIR...`.
-`python3 scripts/integration/stores_to_updates.py PROJECT ENTRY...` turns
+`python3 scripts/integration/harvest_stores.py PROJECT ENTRY...` turns
 into `:=` each store the compiler reports as provably unique (it runs
-`blotc migrate-stores --dry-run` with `BLOT_REPORT_STORES` set); none is
-left in the Gdev build or Ink's tests.
+`blotc migrate-stores --dry-run` with `BLOT_REPORT_STORES` set) and puts
+back any the compiler would turn into a store again; none is left in the
+Gdev build, Gdev's tests or Ink's tests.
 
 | Tree | Stores | Files |
 | --- | ---: | ---: |
 | ink/lib | 352 | 47 |
-| ink/tests | 1,323 (1,104 in two generated protocol files) | 53 |
-| gdev/src | 691 | 62 |
-| gdev/tests | 701 | 131 |
-| gdev/pen | 1,104 (the same two generated files) | 2 |
-| gdev/test_support | 92 | 16 |
+| ink/tests | 219 | 51 |
+| gdev/src | 651 | 59 |
+| gdev/tests | 358 | 75 |
+| gdev/pen | 0 | 0 |
+| gdev/test_support | 56 | 13 |
 | gdev/devtools | 85 | 12 |
-| gdev/performance | 104 | 17 |
+| gdev/performance | 101 | 17 |
 
 None of these is a local the compiler can already see as unique. They are
 of three kinds, and each needs the code restructured, not a token changed:
 
 - **Output parameters.** A function fills an array or a growable buffer
-  its caller handed it (`encoded[at] = …` in the generated protocol
-  encoders, `out`, `output`, `destination`, `p` and `v` in Ink's motion
-  code). The immutable form takes the buffer `own` and returns it, and the
-  caller rebinds. The generated files come from `pen codegen`
-  (pen/crates/pen-codegen/src/blot.rs): changing the generator converts
-  2,208 of the sites, and then its callers in Ink and Gdev.
+  its caller handed it (`out`, `output`, `destination`, `p` and `v` in
+  Ink's motion code). The immutable form takes the buffer `own` and
+  returns it, and the caller rebinds. The generated protocol encoders,
+  which were 2,208 of these sites, are done (above).
 - **World state reached through shared records.** `access.x[i] = v`,
   `owners.…`, `frame.…`: records of array handles (`FrameAccess`) that
   every system is handed and writes through. Each system has to take the

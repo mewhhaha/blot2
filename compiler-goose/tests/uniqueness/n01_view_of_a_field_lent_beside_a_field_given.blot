@@ -1,0 +1,10 @@
+type World is data = $World { rows: Array U32, out: Array U32 }
+const write = func (rows: &[U32]) -> (out: own Array U32) => return do:
+  out[0] := rows[0]
+  break out
+const step = func (world: own World) => return do:
+  world.out := write (&world.rows[0..1]) world.out
+  break world
+const run = func (n: U32) => return do:
+  let world = step ($World { rows: #[n, 2], out: #[0] })
+  break world.out[0]
