@@ -1,4 +1,10 @@
-# Owned-storage rewrite: active task index
+# Owned-storage rewrite history
+
+For the current owned-world conversion, start with [CONTINUE.md](../CONTINUE.md)
+and the [memory model](MEMORY_MODEL.md). The November 2026 checkpoints below
+record the earlier Zig backend and the Goose port before the switch.
+
+## Historical priorities and measurements
 
 Current user priority: finish the Goose compiler experiment: repair lifetimes,
 build the real executable, then qualify request OOM/retention and differential
