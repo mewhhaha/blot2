@@ -230,6 +230,9 @@ root struct Analyzer {
     // and of a contract's member, whose result is its implementation's.
     owned_result: u32 = 0,
     exempt_root: u32 = 0,
+    // The root of a contract's member, which may keep what it is lent as
+    // its implementation may.
+    keeps_root: u32 = 0,
     // The function a `return` being read leaves, or 0.
     leaving_root: u32 = 0,
     // The record or tuple a `return` leaves with: its parts may move
@@ -300,6 +303,7 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         analyzer.owned_result = 0;
         let kind = analyzer.member_kind[body.binding];
         analyzer.exempt_root = 0;
+        analyzer.keeps_root = 0;
         // An entry's result goes to the host, which copies it.
         // So may a `lent` function return what it shares, while `=` exists.
         let named = module.bindings[body.binding];
@@ -308,6 +312,7 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         // `lent const again = same` names a `lent` function: not a use of it as a value.
         analyzer.lent_constant = !body.is_function && named.kind == blot_reuse_principal_interface::Kind.global && !named.capability_parameters.owned_results;
         if kind == 1 || to_host { analyzer.exempt_root = body.root; }
+        if kind == 1 { analyzer.keeps_root = body.root; }
         if kind != 1 && !to_host && body.is_function { analyzer.owned_result = body.root; }
         analyzer.function_roots.push(body.root);
         // The dry run: log the reads, judge nothing, keep no fact.
@@ -529,6 +534,14 @@ fn takenPart(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Fac
         }
     }
     return taken(self_, m, node, value);
+}
+// The value of an arm that names a local at its last read is that local's
+// own value, moved out: `_ => world` beside arms that return a new world.
+fn armValue(self_: Analyzer&, m: const Module&, node: u32, value: Value) -> Value {
+    if node == 0 || value.origin == 0 || !moves(self_, m, node, value.origin) { return value; }
+    let fact = self_.facts[value.origin];
+    kill(self_, value.origin);
+    return Value { fact: fact, exits: value.exits, .. };
 }
 fn reject(self_: Analyzer&, m: const Module&, node: u32, code: blot_check_core::Code) {
     if self_.probing == 0 { self_.rejections.push(Rejection { node: node, span: m.span(node), code: code }); }
@@ -1435,6 +1448,15 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         let head_tag = m.node(head).tag;
         var unresolved = false;
         var known = !lent_given && trusted(self_, m, binding);
+        // A `lent` function (and an entry called like any function) may
+        // return what it was lent but keeps nothing: `kept_value` holds in
+        // it too. With all its arguments, its result holds them as a
+        // result with a part that borrows does, and is never unique.
+        var returns_lent = false;
+        if !known && !lent_given && tag == blot_check_core::Tag.call && binding != 0 && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.local && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.parameter {
+            known = true;
+            returns_lent = true;
+        }
         // A `lent` or entry function given only some of its arguments is
         // a function value too.
         if !known && !lent_given && tag == blot_check_core::Tag.apply && head_tag == blot_check_core::Tag.reference && binding != 0 && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.local && m.bindings[binding].kind != blot_reuse_principal_interface::Kind.parameter && !self_.inner.contains(id) && finalOwns(self_, m, n.ty) {
@@ -1467,7 +1489,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             // With all its arguments the call only borrows them. A part
             // of the result that borrows (a function, when arguments are
             // still missing) may hold them, so then they are shared.
-            let holder = lends(self_, m, n.ty) || (unresolved && openType(m, n.ty, 0));
+            let holder = lends(self_, m, n.ty) || (unresolved && openType(m, n.ty, 0)) || (returns_lent && (holds(self_, m, n.ty) || openType(m, n.ty, 0)));
             var exits = false;
             let base = self_.captured.len;
             let ends = self_.briefs.len;
@@ -1510,7 +1532,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             }
             var fact: Fact = none;
             // (a result of a type that is not known yet is its caller's too)
-            if owns(self_, m, n.ty) || openType(m, n.ty, 0) { fact = deep; }
+            if !returns_lent && (owns(self_, m, n.ty) || openType(m, n.ty, 0)) { fact = deep; }
             return Value { fact: fact, exits: exits, .. };
         }
     }
@@ -1809,7 +1831,7 @@ fn calleeType(m: const Module&, node: u32) -> u32 {
 // Whether the function being read is one that may keep what it was lent:
 // a `lent` function or an entry, outside any closure in it.
 fn keeping(self_: const Analyzer&) -> bool {
-    return self_.function_roots.len != 0 && self_.exempt_root != 0 && self_.function_roots[self_.function_roots.len - 1] == self_.exempt_root;
+    return self_.function_roots.len != 0 && self_.keeps_root != 0 && self_.function_roots[self_.function_roots.len - 1] == self_.keeps_root;
 }
 // Whether a caller would take the result of a function value of type `ty`,
 // given all its arguments, to be its own: it owns an array and has no part
@@ -2029,10 +2051,15 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
     var guard_fields: u32[256] = [0; 256];
     var guard_len: i64[32] = [0; 32];
     var guards: i64 = 0;
+    // A value is given when the call happens, after its other arguments
+    // are computed: those are read first, then the ones given are judged.
+    for phase in 0..2 {
     for child, position in arguments {
         let ty = m.typeOf(child);
         let open = openType(m, ty, 0);
-        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || (!holds(self_, m, ty) && !open) {
+        let lent = position >= 32 || (mask >> (position as! u32)) & 1 == 0 || (!holds(self_, m, ty) && !open);
+        if lent != (phase == 0) { continue; }
+        if lent {
             let value = lend(self_, m, child, holder, lends_to, brief);
             exits = exits || value.exits;
             if !holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
@@ -2094,6 +2121,7 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
         } else {
             escape(self_, value);
         }
+    }
     }
     for at in 0..guards {
         let binding = guarded[at];
@@ -2505,10 +2533,12 @@ recursive fn conditional(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     let condition = visitEscaping(self_, m, n.a);
     var join = joinInit(self_, m.branchMerges(id));
     self_.tentative += 1;
-    let first = visit(self_, m, n.b);
+    var first = visit(self_, m, n.b);
+    if n.tag == blot_check_core::Tag.if_value { first = armValue(self_, m, n.b, first); }
     arm(self_, join, 0, first);
     var second = Value { .. };
     if n.c != 0 { second = visit(self_, m, n.c); }
+    if n.tag == blot_check_core::Tag.if_value { second = armValue(self_, m, n.c, second); }
     arm(self_, join, 1, second);
     self_.tentative -= 1;
     let value = finish(self_, join);
@@ -2528,6 +2558,7 @@ recursive fn match_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         if case_.guard_ != 0 { let guarded = visitEscaping(self_, m, case_.guard_); guard_exits = guarded.exits; }
         var body = Value { .. };
         if case_.body != 0 { body = visit(self_, m, case_.body); }
+        body = armValue(self_, m, case_.body, body);
         body.exits = body.exits || guard_exits;
         arm(self_, join, index, body);
     }

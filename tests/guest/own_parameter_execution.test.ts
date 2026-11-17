@@ -48,6 +48,10 @@ entry func copied (n: U32) : U32 => return do:
   let rows = #[1, 2, 3]
   let after = fill rows.copy n
   break rows[0] * 100 + after[0]
+entry func read_first (n: U32) : U32 => return do:
+  let rows = #[n, 2]
+  let after = fill rows (first rows + 1)
+  break after[0] * 10 + after[1]
 entry func arms (n: U32) : U32 => return do:
   let rows = #[1, 2]
   let result = 0
@@ -266,6 +270,76 @@ entry func after_view (n: U32) : U32 => return do:
   });
 });
 
+// An arm that names the world at its last read hands it on unchanged, beside
+// arms that return a new one. A value is given when the call happens, so
+// another argument of the same call may read it first.
+Deno.test("an arm that names an owned local moves it", async () => {
+  await compileAndRun(`${declarations}
+func stepped (world: own World) -> (kind: U32): World => return do:
+  world := case kind of
+    0 => damage world 0
+    1 => do:
+      let next = damage world 0
+      break damage next 1
+    _ => world
+  break world
+func picked (world: own World) -> (kind: U32): World => return case kind of
+  0 => damage world 1
+  _ => world
+func either (world: own World) -> (flag: Bool): World => return if flag then damage world 1 else world
+entry func read_first (n: U32) : U32 => return do:
+  let rows = #[n, 2]
+  let after = fill rows (first rows + 1)
+  break after[0] * 10 + after[1]
+entry func arms (n: U32) : U32 => return do:
+  let world = either (picked (stepped ($World { counts: #[0, 0], size: 2 }) n) n) (n == 2)
+  world.counts[0] := world.counts[0] + 5
+  break world.counts[0] * 10 + world.counts[1]
+`, (guest) => {
+    equal(guest.call("read_first", 4), 55);
+    equal(guest.call("arms", 0), 61);
+    equal(guest.call("arms", 1), 61);
+    equal(guest.call("arms", 2), 51);
+    equal(guest.call("arms", 3), 50);
+  });
+});
+
+// A `lent` function returns what it was lent and keeps nothing, so a name
+// bound to its result borrows the argument and gives it back at its last read.
+Deno.test("a lent reader's result gives the world back at its last read", async () => {
+  await compileAndRun(`${declarations}
+lent func counts_of (world: World): Array U32 => return world.counts
+entry func read_then_step (n: U32) : U32 => return do:
+  let world = $World { counts: #[n, 2], size: 2 }
+  let counts = counts_of world
+  let seen = counts[0] + counts[1]
+  world := damage world 1
+  world.counts[0] := seen
+  break world.counts[0] * 10 + world.counts[1]
+`, (guest) => {
+    equal(guest.call("read_then_step", 4), 63);
+  });
+  const kept = `${declarations}
+lent func counts_of (world: World): Array U32 => return world.counts
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[n, 2], size: 2 }
+  let counts = counts_of world
+  let after = damage world 1
+  break counts[0] + after.counts[1]
+`;
+  await compileExpectedFailure(kept, "own_argument", argument, { span: [kept.indexOf("damage world 1") + 7, kept.indexOf("damage world 1") + 12] });
+  const keeps = `${declarations}
+lent func remember (rows: Array U32) -> (into: GrowArray (Array U32)): Array U32 => return do:
+  @storage.push into rows
+  break rows
+entry func run (n: U32) : U32 => return do:
+  let into: GrowArray (Array U32) = #[]
+  let rows = remember #[n] into
+  break rows[0]
+`;
+  await compileExpectedFailure(keeps, "kept_value", undefined, { span: [keeps.indexOf("@storage.push"), keeps.indexOf("@storage.push") + "@storage.push into rows".length] });
+});
+
 // A record too wide for registers is a block of memory. Handing it round a
 // loop, updating through it and returning it beside another value must not
 // use a new block each time: 300,000 rounds of 288 bytes would not fit the
@@ -324,13 +398,13 @@ entry func run (n: U32) : U32 => return do:
     let after = fill rows n
     seen := after[0]
   break seen + «rows»[0]`],
-  ["a name given away and read in a later argument", "spent_value", spent, `
-func put (rows: own Array U32) -> (n: U32): Array U32 => return do:
-  rows[0] := n
+  ["a name given away and still held by a later argument", "own_argument", argument, `
+func put (rows: own Array U32) -> (seen: Array U32): Array U32 => return do:
+  rows[0] := seen[1]
   break rows
 entry func run (n: U32) : U32 => return do:
   let rows = #[1, 2]
-  let after = put rows (first «rows»)
+  let after = put «rows» rows
   break after[0]`],
   ["a closure that reads a name given away", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:

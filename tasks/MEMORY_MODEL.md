@@ -806,7 +806,7 @@ the explicit form:
   world as a plain field (`access.world := step access.world input`), no
   longer as a one-element array.
 
-That needed two rules in the ownership pass:
+That needed these rules in the ownership pass:
 
 - **A view borrows the field it is made of.** `&world.rows[a..b]` used to
   share `world` for good. It now borrows like a value read out of the
@@ -822,6 +822,29 @@ That needed two rules in the ownership pass:
   `return { rows: parts.rows, marks: parts.marks }` moves both fields out
   of an `own` parameter. A field that left is spent, so it cannot leave
   twice (`spent_value`).
+
+- **An arm moves a local.** The value of an arm of a `case` or an `if`
+  that names a local at its last read is that local's own value, so
+  `world := case k of 0 => step world; _ => world` and `return if flag
+  then step world else world` are the caller's alone. (`b25` of Zig's
+  programs is accepted for it: `let mixed = if flag then other else
+  #[3, 4]` with `other` not read again.)
+
+- **A value is given when the call happens.** The other arguments of a
+  call are read first, then the ones given are judged, so `access := step
+  access (count access)` is accepted when `count` returns plain data
+  (`e18` recorded `spent_value` for it). An argument whose value still
+  holds the given one is `own_argument`, as before.
+
+- **A `lent` function only returns.** A call to a `lent` function used
+  to share its arguments for good, because the function might keep them.
+  None in std, Ink or Gdev does, so `kept_value` now holds in `lent` and
+  entry functions too, and a call to one holds its arguments in its
+  result like any borrowing call: `let before = trails.read_state access`
+  gives `access` back at the last read of `before`. The result is still
+  never unique. This is what lets a function that owns the world call
+  the 22 readers of Gdev that are still `lent` and then hand the world
+  on.
 
 The provable stores in Gdev's tests, support files, devtools and
 performance programs went the same day: 384 `=` became `:=`

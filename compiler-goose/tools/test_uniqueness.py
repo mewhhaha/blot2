@@ -6,7 +6,7 @@ prelude. It may not get a lex, parse or check diagnostic, and its lowering
 diagnostics must be those in tests/uniqueness/expected.json: code, span,
 message, count and order. For the 73 programs named a, b, c and d the record
 holds what the Zig compiler reported on 15 November 2026, the day it was
-removed, except b41, c05 and c10, which moves at a last read now accept, and
+removed, except b25, b41, c05 and c10, which moves at a last read now accept, and
 b18 and the second site of c22, which take a fresh tuple apart, and two
 sites of b44, where a name borrows one field of a record, and c07, where
 rows that a loop walked are the array's own again after it. The
@@ -32,7 +32,10 @@ named m are about values whose type is not known yet: a parameter without
 a type is given only when it was taken over, and a function held in a
 field of a record that is not known yet is called like any function value.
 The programs named n are about a view, which borrows the field it is made
-of, and about fields of a function's own local that leave in its result.
+of, about fields of a function's own local that leave in its result, and
+about an arm of a `case` or an `if` that names a local at its last read,
+which moves it, and about a `lent` function, whose result borrows its
+arguments and which may not keep them.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

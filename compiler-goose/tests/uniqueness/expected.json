@@ -220,14 +220,7 @@
   ]
  ],
  "b24_case_value_fresh": [],
- "b25_if_value": [
-  [
-   "aliased_update",
-   444,
-   457,
-   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
-  ]
- ],
+ "b25_if_value": [],
  "b26_record_replace_field": [],
  "b27_nested_record": [
   [
@@ -632,14 +625,7 @@
  "e15_own_scalar": [],
  "e16_own_carried": [],
  "e17_own_both_arms": [],
- "e18_own_argument_reads": [
-  [
-   "spent_value",
-   543,
-   547,
-   "This value was given away, to an `own` parameter or into the function's result, so it is no longer this name's; use what the call returned, or give away values.copy of it to keep this one"
-  ]
- ],
+ "e18_own_argument_reads": [],
  "e19_own_returned": [],
  "e20_own_rebound": [],
  "e21_result_borrowed": [
@@ -1163,6 +1149,38 @@
    199,
    209,
    "A function's result belongs to its caller alone, so it must be a fresh value or a local that alone holds its value; return values.copy of it, or take the parameter it comes from with `own`"
+  ]
+ ],
+ "n08_arm_that_names_the_local_moves_it": [],
+ "n09_arm_that_names_a_local_read_again": [
+  [
+   "own_argument",
+   394,
+   400,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "n10_lent_function_result_borrows_its_argument": [],
+ "n11_lent_function_result_still_read": [
+  [
+   "aliased_update",
+   351,
+   371,
+   "This := writes through storage that something else may still observe; store in place with = (aliases see the write), or take values.copy first to keep the old value"
+  ],
+  [
+   "own_argument",
+   392,
+   397,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "n12_lent_function_keeps_what_it_was_lent": [
+  [
+   "kept_value",
+   90,
+   113,
+   "What is stored here is kept by something this function does not own, so it must be a value nothing else holds: store values.copy of it, or take the parameter it comes from with `own`"
   ]
  ]
 }

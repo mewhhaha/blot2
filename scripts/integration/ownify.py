@@ -134,6 +134,9 @@ def convert(mod,fn,name='access',dry=False,report=print):
     if not at: report(f'DEF? {mod}.{fn}: cannot place parameter'); return None
     start=len(prefix)+at.start()
     line=line[:start]+new+line[start+len(params[position]):]
+    # it returns the world now, whatever it said it returned
+    if re.search(r'\) *: *Unit ! ',line): report(f'DEF? {mod}.{fn}: result with effects'); return None
+    line=re.sub(r'(\)) *: *Unit => return',r'\1 => return',line)
     j=f.end(k)
     body=f.lines[k+1:j]
     out=[]
@@ -180,8 +183,12 @@ def convert(mod,fn,name='access',dry=False,report=print):
         expr=line[cut+len('=> return'):].strip()
         line=line[:cut]+'=> return do:'
         if expr.startswith('@panic'): report(f'DEF? {mod}.{fn}: one-line panic'); return None
-        out.append('  '+expr)
-        for l in body: out.append(('  '+l) if l.strip() else l)
+        if expr:
+            out.append('  '+expr)
+            for l in body: out.append(('  '+l) if l.strip() else l)
+        else:
+            # the expression starts on the next line, already indented
+            for l in body: out.append(l)
         out.append('  return '+name)
     if not dry:
         f.lines[k:j]=[line]+out; f.dirty=True

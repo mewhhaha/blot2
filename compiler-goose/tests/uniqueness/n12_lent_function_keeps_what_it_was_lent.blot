@@ -1,0 +1,8 @@
+lent const kept = func (rows: Array U32) -> (into: GrowArray (Array U32)) => return do:
+  @storage.push into rows
+  break rows
+const run = func (n: U32) => return do:
+  let rows = #[n, 2]
+  let into: GrowArray (Array U32) = #[]
+  let same = kept rows into
+  break same[0]

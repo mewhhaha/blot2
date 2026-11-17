@@ -141,6 +141,14 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     in its result (tasks/MEMORY_MODEL.md, "The generated encoders").
     384 provable stores in Gdev's tests became updates
     (`scripts/integration/harvest_stores.py`).
+  - **More of the pass, for the next level** (17 November 2026): an arm
+    of a `case` or an `if` that names a local at its last read moves it;
+    a value is given when the call happens, so another argument may read
+    it first; a `lent` function may return what it was lent but not keep
+    it (`kept_value` holds there too), so a call to one only borrows.
+    `scripts/integration/own_closure.py` picks a set of functions closed
+    under their callers and converts it (ownify.py underneath), and
+    `unalias.py` works from a tree that already has diagnostics.
   - **Next:** the functions those systems call, level by level (64 at
     the next one), the `present` stage's draw functions, then Ink's
     library writers, which take a part and return it

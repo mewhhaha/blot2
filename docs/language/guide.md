@@ -892,8 +892,8 @@ keeps nothing, `rows` is its holder's own again after the call; bound to a
 name, after that name's last read.
 
 It is kept, as before, where it is put into a record, a tuple or an
-array, given to a `lent` function or a function value, or where a loop
-carries an element that holds storage out of the loop.
+array, given to a function value, or where a loop carries an element that
+holds storage out of the loop.
 
 **Taking a value apart.** `let {first, second} = parts ()`, `let (a, b) =
 pair ()` and `let ($Box inside) = box` give each name a value of its own
@@ -938,9 +938,13 @@ only names one (`lent const refit = refit_dense`):
 lent func ground_of (world: World) => return world.ground
 ```
 
-Its result and what it keeps are not checked. In exchange nobody can rely
-on it: a call to it shares its arguments, and its result is not unique.
-So does a call that is given a `lent` function as an argument. A `lent`
+Its result is not checked, so it may be what the function was lent. In
+exchange its result is never unique, and it holds the arguments of the
+call: a name bound to it borrows them and gives them back at its last
+read, as with any borrowed value. It may not keep what it was lent
+anywhere else (storing or pushing it is `kept_value`, as in every
+function). A call that is given a `lent` function as an argument shares
+its arguments. A `lent`
 function cannot otherwise be used as a value, or applied partly, where
 its result owns an array and has no part that borrows
 (`lent_result_value`). `lent` is the list of what is left to convert: it
@@ -1051,13 +1055,25 @@ world.robots := ecs.insert world.entities world.robots index robot
 
 The other arguments of such a call are lent as in any call and are their
 holder's own again after it. One call cannot be both lent a value and
-given it: `mixed world.robots world.robots` is `own_argument`.
+given it: `mixed world.robots world.robots` is `own_argument`. A value is
+given when the call happens, so another argument may read it first when
+what it computes keeps nothing of it: `world := step world (count world)`.
 
 A view borrows the field it is made of, so one field can be lent as a view
 while another is given in the same call:
 
 ```blot
 world.out := write (&world.rows[0..world.rows.length]) world.out
+```
+
+An arm of a `case` or an `if` that just names a local at its last read
+hands that value on, so a world can be rebound from arms that change it
+and arms that do not:
+
+```blot
+world := case kind of
+  0 => damage world 0
+  _ => world
 ```
 
 A field also leaves with the function. `return stream.output` hands the

@@ -81,10 +81,21 @@ def check():
     for line in out.split('\n'):
         try: r=json.loads(line)
         except ValueError: continue
-        if r.get('kind')=='diagnostic' and r['code'] not in ('dependency_failed','unknown_value'): bad.append((os.path.normpath(r['filename']),r['start'],r['code']))
+        if r.get('kind')=='diagnostic' and r['code'] not in ('dependency_failed','unknown_value'): bad.append((os.path.normpath(r['filename']),r['start'],r['code'],r.get('stage')))
         # migrate-stores reports an update it would turn back into a store this way
-        if r.get('kind')=='store': bad.append((os.path.normpath(r['filename']),r['start'],'aliased_update'))
+        if r.get('kind')=='store': bad.append((os.path.normpath(r['filename']),r['start'],'aliased_update','lower'))
     return bad
+def per_function(lines,bad):
+    """How many diagnostics point into each function, by its definition line."""
+    import collections
+    offsets=[0]
+    for l in lines: offsets.append(offsets[-1]+len(l.encode())+1)
+    spans=list(functions(lines)); count=collections.Counter()
+    for _,start,code,stage in bad:
+        row=max(i for i,o in enumerate(offsets) if o<=start)
+        for k,j in spans:
+            if k<=row<j: count[lines[k]]+=1
+    return count
 def main():
     args=sys.argv[1:]; dry='--dry' in args
     if dry: args.remove('--dry')
@@ -98,28 +109,35 @@ def main():
             if changed or dropped: edits.append([k,j,lines[k+1:j],body,changed]); lines[k+1:j]=body
         if not edits: continue
         if dry: total+=sum(e[4] for e in edits); continue
+        # What there was before: a function is put back only when it got
+        # worse, or when diagnostics appeared in other files (a caller that
+        # no longer type checks) and putting it back takes them away.
+        here=os.path.normpath(path)
+        def state(text):
+            # A type error anywhere hides every later diagnostic, so one
+            # that was not there before counts for more than all of them.
+            bad=check(); mine=[b for b in bad if b[0]==here]
+            return per_function(text,mine),len(bad)-len(mine)+10000*sum(1 for b in bad if b[3]!='lower')
+        before,elsewhere=state(original)
         open(path,'w').write('\n'.join(lines))
-        bad=[b for b in check() if b[0]==os.path.normpath(path)]
-        attempts=0
-        while bad and attempts<len(edits)+1:
-            # put back each function a diagnostic points into
-            text='\n'.join(lines); offsets=[0]
-            for l in lines: offsets.append(offsets[-1]+len(l.encode())+1)
-            hit=set()
-            for _,start,code in bad:
-                row=max(i for i,o in enumerate(offsets) if o<=start)
-                for k,j in functions(lines):
-                    if k<=row<j: hit.add(lines[k])
-            if not hit: break
+        applied={original[e[0]]:e for e in edits}
+        def put_back(head):
+            nonlocal back
             for k,j in list(functions(lines))[::-1]:
-                if lines[k] in hit:
-                    for e in edits:
-                        if original[e[0]]==lines[k]:
-                            lines[k+1:j]=e[2]; back+=1; print(f'  put back {rel}: {lines[k][:90]}  ({", ".join(sorted(set(c for _,_,c in bad)))})'); e[4]=0
+                if lines[k]==head and head in applied:
+                    e=applied.pop(head); lines[k+1:j]=e[2]; e[4]=0; back+=1
+                    print(f'  put back {rel}: {head[:90]}')
             open(path,'w').write('\n'.join(lines))
-            bad=[b for b in check() if b[0]==os.path.normpath(path)]; attempts+=1
-        if bad:
-            open(path,'w').write('\n'.join(original)); print(f'  {rel}: put back whole file ({bad[0][2]})'); continue
+        for attempt in range(len(edits)+2):
+            now,other=state(lines)
+            hit=[head for head,n in now.items() if n>before.get(head,0) and head in applied]
+            if not hit and other<=elsewhere: break
+            if not hit and not applied: break
+            if not hit: hit=[next(iter(applied))]
+            for head in hit: put_back(head)
+        now,other=state(lines)
+        if other>elsewhere or any(n>before.get(head,0) for head,n in now.items()):
+            open(path,'w').write('\n'.join(original)); print(f'  {rel}: put back whole file'); continue
         total+=sum(e[4] for e in edits)
     print(f'{total} stores became updates; {back} functions put back')
 if __name__=='__main__': main()

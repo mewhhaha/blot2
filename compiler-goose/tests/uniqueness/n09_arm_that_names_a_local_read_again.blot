@@ -1,0 +1,12 @@
+type World is data = $World { counts: Array U32, size: U32 }
+const bump = func (world: own World) -> (n: U32) => return do:
+  world.counts[0] := @u32.add world.counts[0] n
+  break world
+const run = func (n: U32) => return do:
+  let world = $World { counts: #[0], size: 1 }
+  let fresh = $World { counts: #[5], size: 1 }
+  let chosen = case n of
+    0 => fresh
+    _ => world
+  let after = bump chosen 1
+  break @u32.add after.counts[0] world.counts[0]
