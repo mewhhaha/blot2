@@ -140,6 +140,9 @@ root struct Analyzer {
     // then (`briefs`).
     brief_node: u32 = 0,
     briefs: Captured[>..<] = [],
+    // The node that is read only for a field of it or to update a field of
+    // it, not as a whole.
+    base_node: u32 = 0,
     // The statement being read: where its block's loans start, and how
     // deep in loops and functions it stands. A call that has run in that
     // same place ends the loans of names read there for the last time.
@@ -352,6 +355,8 @@ fn kill(self_: Analyzer&, binding: u32) {
         self_.loan_holds[binding] = 0;
     }
     if self_.facts[binding] == spent { return; }
+    // A part that was given away stays given away.
+    if partSpent(self_, self_.facts[binding]) { set(self_, binding, spent); return; }
     set(self_, binding, none);
 }
 // `holder` is bound to what `source` still holds: the whole of it, or its
@@ -515,8 +520,25 @@ fn undo(self_: Analyzer&, mark: i64) {
     }
 }
 fn unique(fact: Fact) -> bool { return fact == shell || fact == deep; }
+// Whether some part of a value with `fact` was given away: the whole of
+// it, or a field that an `own` parameter took and nothing was put back in.
+recursive fn partSpent(self_: const Analyzer&, fact: Fact) -> bool {
+    if fact == spent { return true; }
+    if fact < first_record || fact == top { return false; }
+    let value = self_.records[fact - first_record];
+    if value.default_ == spent { return true; }
+    for at in 0..value.len { if partSpent(self_, self_.entries[value.start + at].fact) { return true; } }
+    return false;
+}
+// The fact of the part of a value with `fact` that `fields` select.
+fn partFact(self_: const Analyzer&, fact: Fact, fields: const u32[:]) -> Fact {
+    var part = fact;
+    for symbol in fields { part = field(self_, part, symbol); }
+    return part;
+}
 fn record(self_: const Analyzer&, fact: Fact) -> Record { return self_.records[fact - first_record]; }
 fn field(self_: const Analyzer&, fact: Fact, symbol: u32) -> Fact {
+    if fact == spent { return spent; }
     if fact < first_record { if fact == deep { return deep; } return none; }
     let value = record(self_, fact);
     for at in 0..value.len { let entry = self_.entries[value.start + at]; if entry.field == symbol { return entry.fact; } }
@@ -547,6 +569,7 @@ fn pushSorted(self_: Analyzer&, mark: i64, entry: Entry) {
     }
 }
 fn withField(self_: Analyzer&, fact: Fact, symbol: u32, replacement: Fact) -> Fact {
+    if fact == spent { return spent; }
     let mark = self_.scratch.len;
     var default_: Fact = none;
     if fact == deep { default_ = deep; }
@@ -854,6 +877,7 @@ fn place(self_: const Analyzer&, m: const Module&, id: u32) -> Place, bool {
 recursive fn weaken(self_: Analyzer&, fact: Fact, fields: const u32[:]) -> Fact {
     if fields.len == 0 {
         if fact == deep { return shell; }
+        if fact == spent { return spent; }
         if fact >= first_record { return none; }
         return fact;
     }
@@ -919,6 +943,11 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         brief = self_.brief_node == id;
         self_.brief_node = 0;
     }
+    var based = false;
+    if self_.base_node != 0 {
+        based = self_.base_node == id;
+        self_.base_node = 0;
+    }
     if tag == blot_check_core::Tag.state_provider || tag == blot_check_core::Tag.effect_provider || tag == blot_check_core::Tag.handle {
         // A provider names the operations it answers; that is not a use
         // of them as functions.
@@ -957,6 +986,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         read(self_, target.binding, id);
         if !self_.dry && self_.last_read[id] && self_.loan_holds[target.binding] != 0 { self_.loan_ended[target.binding] = true; }
         if self_.facts[target.binding] == spent { reject(self_, m, id, blot_check_core::Code.spent_value); return Value { .. }; }
+        // Read as a whole while a field of it is given away.
+        if !based && !self_.dry && partSpent(self_, self_.facts[target.binding]) { reject(self_, m, id, blot_check_core::Code.spent_value); return Value { .. }; }
         return Value { origin: target.binding, .. };
     }
     if tag == blot_check_core::Tag.suite {
@@ -1135,6 +1166,15 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             lentValue(self_, m, id);
         }
         let value = receiver(self_, m, n.a, n.ty, brief, lends_to);
+        if !self_.dry && value.origin != 0 {
+            // A field that an `own` parameter took is read again only
+            // after something was put back in it.
+            let target, found = place(self_, m, id);
+            if found && target.binding == value.origin && local(self_, target.binding) && self_.facts[target.binding] != spent && partFact(self_, self_.facts[target.binding], target.fields[..target.len]) == spent {
+                reject(self_, m, id, blot_check_core::Code.spent_value);
+                return Value { exits: value.exits, .. };
+            }
+        }
         if !holds(self_, m, n.ty) { return Value { exits: value.exits, .. }; }
         return Value { origin: value.origin, exits: value.exits, .. };
     }
@@ -1191,7 +1231,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false, brief, lends_to); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }
     if tag == blot_check_core::Tag.call && m.call(id).own != 0 {
-        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own);
+        let exits = ownArguments(self_, m, m.call(id).arguments, m.call(id).own, n.ty, lends_to, brief);
         // Every return of the callee gave a value nothing else holds.
         return Value { fact: deep, exits: exits, .. };
     }
@@ -1241,7 +1281,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 let held = visit(self_, m, callee);
                 exits = held.exits;
             }
-            exits = ownArguments(self_, m, arguments[..count], mask) || exits;
+            exits = ownArguments(self_, m, arguments[..count], mask, n.ty, lends_to, brief) || exits;
             // Every return of the callee gave a value nothing else holds.
             return Value { fact: deep, exits: exits, .. };
         }
@@ -1748,15 +1788,19 @@ recursive fn receiver(self_: Analyzer&, m: const Module&, child: u32, ty: u32, b
     if ty == 0 || !holds(self_, m, ty) {
         let ends = self_.briefs.len;
         self_.brief_node = child;
+        self_.base_node = child;
         let value = visit(self_, m, child);
         self_.brief_node = 0;
+        self_.base_node = 0;
         endBriefs(self_, ends);
         return value;
     }
     if brief { self_.brief_node = child; } else if lends_to != 0 { self_.let_node = child; self_.let_holder = lends_to; }
+    self_.base_node = child;
     let value = visit(self_, m, child);
     self_.brief_node = 0;
     self_.let_node = 0;
+    self_.base_node = 0;
     return value;
 }
 fn giveBack(self_: Analyzer&, base: i64) {
@@ -1877,30 +1921,91 @@ fn typeTaking(m: const Module&, ty: u32) -> u64 {
 // in `mask`. An `own` argument must be a fresh value, or a local that holds
 // its value alone; the local is spent. Inside a loop the local must belong
 // to the same iteration, or the next one would give it away again.
-recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u32[:], mask: u32) -> bool {
+// The other arguments are lent as in any call. While the call's arguments
+// are read, what a lent one names counts as shared, so the same value
+// cannot be lent and given in one call; it has its fact back after the call.
+recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u32[:], mask: u32, result: u32, lends_to: u32, brief: bool) -> bool {
     var exits = false;
+    let holder = lends(self_, m, result);
+    let base = self_.captured.len;
+    let ends = self_.briefs.len;
+    var guarded: u32[32] = [0; 32];
+    var guard_saved: u32[32] = [0; 32];
+    var guard_kills: u32[32] = [0; 32];
+    var guard_fields: u32[256] = [0; 256];
+    var guard_len: i64[32] = [0; 32];
+    var guards: i64 = 0;
     for child, position in arguments {
+        let ty = m.typeOf(child);
+        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) {
+            let value = lend(self_, m, child, holder, lends_to, brief);
+            exits = exits || value.exits;
+            if !holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
+                var path = Place { .. };
+                let target, found = place(self_, m, child);
+                if found && target.binding == value.origin { path = target; }
+                let saved = partFact(self_, self_.facts[value.origin], path.fields[..path.len]);
+                let shared = replace(self_, self_.facts[value.origin], path.fields[..path.len], none);
+                set(self_, value.origin, shared);
+                guarded[guards] = value.origin;
+                guard_saved[guards] = saved;
+                guard_kills[guards] = self_.kills[value.origin];
+                guard_len[guards] = path.len;
+                for at in 0..path.len { guard_fields[guards * 8 + at] = path.fields[at]; }
+                guards += 1;
+            } else if !holder {
+                escape(self_, value);
+            }
+            continue;
+        }
         var named: u32 = 0;
         if m.node(child).tag == blot_check_core::Tag.reference {
             let target = m.reference(child);
             if (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding) { named = target.binding; }
         }
-        let was_spent = named != 0 && self_.facts[named] == spent;
+        // A field of a local can be given too: `world.pool := grown
+        // world.pool`. The field is spent until something is put back.
+        var part = Place { .. };
+        if named == 0 {
+            let target, found = place(self_, m, child);
+            if found && target.len != 0 && local(self_, target.binding) { part = target; }
+        }
+        var was_spent = named != 0 && self_.facts[named] == spent;
+        if part.len != 0 && partFact(self_, self_.facts[part.binding], part.fields[..part.len]) == spent { was_spent = true; }
         let value = visit(self_, m, child);
         exits = exits || value.exits;
-        let ty = m.typeOf(child);
-        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) { escape(self_, value); continue; }
         if was_spent { continue; }
         var accepted = false;
+        var loop_id: u32 = 0;
+        if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
         if value.origin == 0 {
             accepted = ownedAs(self_, m, value.fact, ty, 0);
         } else if named != 0 {
-            var loop_id: u32 = 0;
-            if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
             accepted = self_.born[named] == loop_id && ownedAs(self_, m, self_.facts[named], ty, 0);
+        } else if part.len != 0 && value.origin == part.binding {
+            let fact = partFact(self_, self_.facts[part.binding], part.fields[..part.len]);
+            accepted = self_.born[part.binding] == loop_id && fact != spent && ownedAs(self_, m, fact, ty, 0);
         }
         if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
-        if accepted && named != 0 { set(self_, named, spent); } else { escape(self_, value); }
+        if accepted && named != 0 {
+            set(self_, named, spent);
+        } else if accepted && part.len != 0 && value.origin == part.binding {
+            let given = replace(self_, self_.facts[part.binding], part.fields[..part.len], spent);
+            set(self_, part.binding, given);
+        } else {
+            escape(self_, value);
+        }
+    }
+    for at in 0..guards {
+        let binding = guarded[at];
+        if self_.kills[binding] != guard_kills[at] || self_.facts[binding] == spent { continue; }
+        let restored = replace(self_, self_.facts[binding], guard_fields[at * 8..at * 8 + guard_len[at]], guard_saved[at]);
+        set(self_, binding, restored);
+    }
+    giveBack(self_, base);
+    if !holder {
+        endBriefs(self_, ends);
+        if !self_.dry && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
     }
     return exits;
 }
@@ -2039,7 +2144,9 @@ recursive fn recordLiteral(self_: Analyzer&, m: const Module&, id: u32) -> Value
 recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32) -> Value {
     let info = m.updateInfo(id);
     let selectors = m.updateSelectors(id);
+    self_.base_node = info.root;
     let root = visit(self_, m, info.root);
+    self_.base_node = 0;
     for step in selectors { if step.kind == blot_check_core::UpdateKind.index { visitEscaping(self_, m, step.index); } }
     // `self` in the value is the old leaf, which this update replaces: it
     // is unique when every array the path goes through is, and a value

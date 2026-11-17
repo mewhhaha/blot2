@@ -628,14 +628,7 @@
    "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
   ]
  ],
- "e14_own_field": [
-  [
-   "own_argument",
-   565,
-   577,
-   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
-  ]
- ],
+ "e14_own_field": [],
  "e15_own_scalar": [],
  "e16_own_carried": [],
  "e17_own_both_arms": [],
@@ -1059,5 +1052,64 @@
    "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
   ]
  ],
- "k15_last_read_before_a_fallback_that_leaves": []
+ "k15_last_read_before_a_fallback_that_leaves": [],
+ "l01_field_given_and_put_back": [],
+ "l02_field_put_back_in_a_later_statement": [],
+ "l03_field_read_before_it_is_put_back": [
+  [
+   "spent_value",
+   846,
+   857,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "l04_whole_read_while_a_field_is_given": [
+  [
+   "spent_value",
+   848,
+   853,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "l05_field_given_twice": [
+  [
+   "spent_value",
+   854,
+   865,
+   "This name was passed to an `own` parameter, so its value now belongs to that call; use the call's result, or pass values.copy there to keep this one"
+  ]
+ ],
+ "l06_field_given_each_round_of_a_loop_that_keeps_it": [
+  [
+   "own_argument",
+   839,
+   850,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "l07_field_given_while_a_name_borrows_it": [
+  [
+   "own_argument",
+   834,
+   845,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "l08_lent_and_given_in_one_call": [
+  [
+   "own_argument",
+   916,
+   927,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "l09_whole_lent_and_a_field_given_in_one_call": [
+  [
+   "own_argument",
+   916,
+   927,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "l10_argument_lent_beside_one_given_is_its_holders_own_after": []
 }

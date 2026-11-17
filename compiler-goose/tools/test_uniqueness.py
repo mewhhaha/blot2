@@ -26,7 +26,8 @@ its own, and bind names that borrow a value and give it back. The
 programs named k are about a borrowed value without a name (an argument,
 what a plain value is read out of, what a loop walks), which is given
 back when the expression or the loop around it is done, and about two
-names that borrow from one local.
+names that borrow from one local. The programs named l give a field of
+a local to an `own` parameter and put something back in it.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

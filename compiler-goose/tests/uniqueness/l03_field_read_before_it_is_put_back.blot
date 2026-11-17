@@ -1,0 +1,15 @@
+type Pool is data = $Pool { rows: Array U32, meta: Array U32 }
+type World is data = $World { entities: Array U32, robot: Pool, other: Pool, count: Array U32 }
+const insert = func (entities: Array U32) -> (pool: own Pool) -> (index: U32) -> (value: U32) => return do:
+  pool.rows[index] := value
+  break pool
+const first = func (pool: Pool) => return pool.rows[0]
+const counted = func (world: World) => return world.count[0]
+const step = func (world: own World) -> (extra: Array U32) => return do:
+  world.count[0] := extra[0]
+  break world
+const fresh = func (n: U32) => return $World { entities: #[1, 1], robot: $Pool { rows: #[n, 0], meta: #[0] }, other: $Pool { rows: #[0, 0], meta: #[0] }, count: #[0] }
+const run = func (n: U32) => return do:
+  let world = fresh n
+  let grown = insert world.entities world.robot 0 n
+  break @u32.add (first world.robot) grown.rows[0]

@@ -661,19 +661,43 @@ back beside the packet now, and its two tests compile again):
   parameter: `func (world: own World) -> (k: U32) -> (extra: Array U32)`
   lost it at the third. The chain carries it through any number now
   (`i13`).
-- **Open: a call that returns the world shares its other arguments for
-  good.** The world's type has parts that only borrow (views in a
-  growable array, the hooks' functions), so the result of `access :=
-  runtime.execute application access operation view outgoing` may hold
-  any argument, and `outgoing` is not its holder's own afterwards
-  (returning `@storage.freeze outgoing` is `result_not_owned`; the
-  fixture returns a copy). The rule is right for a function that builds
-  a view of what it was lent. It is too wide for a function that takes
-  the world with `own` and returns it: the parts that borrow came in
-  with the world. What a store or a push may keep is already checked
-  (`kept_value`), so what is left is a record update that puts a view of
-  a lent argument into the world. Closing that would let such a call
-  leave its other arguments alone.
+- **A call that takes something over shared its other arguments for
+  good**, as a guard against lending and giving the same value in one
+  call. Now they are lent as in any call: what a lent argument names
+  counts as shared only while the call's arguments are read, and has its
+  fact back after the call (`ownArguments`).
+- **Open: where the result has a part that only borrows, it still holds
+  the lent arguments.** The world's type has such parts (views in a
+  growable array, the hooks' functions), so after `access :=
+  runtime.execute application access operation view outgoing` the
+  buffer `outgoing` is not its holder's own (the fixture returns a
+  copy). The rule is right for a function that builds a view of what it
+  was lent. For a function that takes the world with `own` and returns
+  it, the parts that borrow came in with the world; a store or a push
+  cannot keep a lent value (`kept_value`), so what is left is an update
+  that puts a view of a lent argument, or a closure over one, into the
+  world. Forbidding that in a function that takes a parameter over would
+  let such a call leave its other arguments alone.
+
+**A field can be given (17 November 2026).** The owner chose the explicit
+form for the layers below ("I think option 1 and we can always abstract
+on that with effects/monads"): a writer takes what it changes with `own`
+and returns it. Gdev's systems mostly write through Ink's library on
+parts of the world (`ecs.insert access.entities access.robot
+access.robot_meta index robot`), so the library's writers take a part and
+return it, and the call puts it back:
+
+```blot
+access.robot := ecs.insert access.entities access.robot index robot
+```
+
+The pass allows a field of a local as an `own` argument when the local
+alone holds its value. The field's fact is `spent` inside the local's
+record fact until an update puts something back; reading the field, or
+the local as a whole, is `spent_value` meanwhile; other fields stay
+usable. In a loop the local must be one the loop carries. tests/uniqueness
+`l01` to `l10`; `e14` is accepted now.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes

@@ -170,6 +170,47 @@ entry func run (n: U32) : U32 => return do:
 `;
   await compileExpectedFailure(lent, "type_mismatch");
 });
+// A field of a local that alone holds its value can be given to an `own`
+// parameter. It is spent until something is put back in it; the other
+// fields, and an argument that is only lent in the same call, stay their
+// holder's own.
+Deno.test("a field is given to an own parameter and put back", async () => {
+  await compileAndRun(`${declarations}
+type Pair is data = $Pair { left: Array U32, right: Array U32 }
+func copied (from: Array U32) -> (rows: own Array U32): Array U32 => return do:
+  rows[0] := from[0]
+  break rows
+entry func put_back (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 2 }
+  world.counts := fill world.counts n
+  world := damage world 1
+  break world.counts[0] * 10 + world.counts[1]
+entry func later (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: n }
+  let filled = fill world.counts 3
+  let size = world.size
+  world.counts := filled
+  break world.counts[1] * 10 + size
+entry func rounds (n: U32) : U32 => return do:
+  let pair = $Pair { left: #[1, 1], right: #[5, 5] }
+  for i in 0 .. n:
+    pair.left := fill pair.left (pair.right[0] + i)
+    pair.right := copied pair.left pair.right
+  break pair.left[1] * 100 + pair.right[0]
+entry func lent_beside (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 2 }
+  let seen = #[n, 9]
+  world.counts := copied seen world.counts
+  seen[0] := 4
+  break world.counts[0] * 10 + seen[0]
+`, (guest) => {
+    equal(guest.call("put_back", 4), 45);
+    equal(guest.call("later", 6), 36);
+    equal(guest.call("rounds", 3), 808);
+    equal(guest.call("lent_beside", 7), 74);
+  });
+});
+
 // A record too wide for registers is a block of memory. Handing it round a
 // loop, updating through it and returning it beside another value must not
 // use a new block each time: 300,000 rounds of 288 bytes would not fit the
@@ -265,11 +306,25 @@ entry func run (n: U32) : U32 => return do:
   let world = $World { counts: counts, size: 2 }
   let next = damage «world» 0
   break next.counts[0] + counts[0]`],
-  ["a part of a local", "own_argument", argument, `
+  ["a part of a local read after it was given", "spent_value", spent, `
 entry func run (n: U32) : U32 => return do:
   let world = $World { counts: #[0, 0], size: 2 }
-  let after = fill «world.counts» n
-  break after[0]`],
+  let after = fill world.counts n
+  break after[0] + «world.counts»[1]`],
+  ["a local read as a whole while a part of it is given", "spent_value", spent, `
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: 2 }
+  let after = fill world.counts n
+  let next = damage «world» 0
+  break after[0] + next.size`],
+  ["a part lent and given in one call", "own_argument", argument, `
+func mixed (seen: Array U32) -> (rows: own Array U32): Array U32 => return do:
+  rows[0] := seen[1]
+  break rows
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, n], size: 2 }
+  world.counts := mixed world.counts «world.counts»
+  break world.counts[0]`],
   ["a result that is a borrowed parameter", "result_not_owned", result, `
 func pick (rows: own Array U32) -> (other: Array U32): Array U32 => return «other»
 entry func run (n: U32) : U32 => return (pick #[1] #[n])[0]`],

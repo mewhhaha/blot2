@@ -1036,6 +1036,19 @@ func twice step -> (own state) => return do:
   break state
 ```
 
+A field of a local can be given as well, when the local alone holds its
+value. The field is spent until something is put back in it, usually by
+the same statement; the other fields stay usable meanwhile, and the local
+cannot be read as a whole:
+
+```blot
+world.robots := ecs.insert world.entities world.robots index robot
+```
+
+The other arguments of such a call are lent as in any call and are their
+holder's own again after it. One call cannot be both lent a value and
+given it: `mixed world.robots world.robots` is `own_argument`.
+
 Because `own` before a name marks what follows it, `own` itself names
 nothing: a local, a parameter or a constant called `own` is
 `own_parameter`.
