@@ -1,0 +1,291 @@
+{
+  "date": "2026-11-17",
+  "reference": {
+    "blot": "67621d16",
+    "gdev": "c42efef",
+    "ink": "d689527",
+    "pen": "1dfca8a0b8956ea861d31e042b589c4fc93b0457",
+    "compilerSha256": "6aa519642989dd061d9ad50d78c80f65887eeb8cf974263a58161a89d5ec5554"
+  },
+  "qualified": {
+    "ink": "efd978a1c20b9c110d56a13e43f41cc07fb8fd2a",
+    "gdev": "f658a1e091d870aee21799ed39622e9adeba3fc6",
+    "compilerSha256": "35d871cf65642dc8586bd19e60dede0796dcff5ecce68a3a6a8d4a4adcb0f422",
+    "penSha256": "2f8dd35cf58efbf91c727c5143ce400ea871b84e4b7c88622272dadaec414f2b",
+    "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "blot2": "2daea2b0c0841709fb48db6f0ae0d5e38f1b4893",
+    "pen": "1dfca8a0b8956ea861d31e042b589c4fc93b0457"
+  },
+  "gdev": {
+    "before": {
+      "passed": 919,
+      "failed": 112,
+      "modules": 209,
+      "unbuilt": 44
+    },
+    "after": {
+      "passed": 1220,
+      "failed": 108,
+      "modules": 210,
+      "unbuilt": 0
+    },
+    "namedChange": {
+      "passedThenFailed": 0,
+      "failedThenPassed": 34,
+      "previouslyPassingNowAbsent": 0,
+      "newPassed": 267,
+      "newFailed": 30,
+      "newlyBuiltModules": 44,
+      "newlyUnbuiltModules": 0
+    }
+  },
+  "ink": {
+    "blot": {
+      "passed": 280,
+      "failed": 0,
+      "modules": 73
+    },
+    "native": {
+      "passed": 110,
+      "failed": 3,
+      "failingNames": [
+        "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+        "simd_batches::prepared_client_executes_ordered_waves_and_validates_before_effects",
+        "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+      ]
+    },
+    "start": {
+      "blotPassed": 268,
+      "blotFailed": 1,
+      "blotUnbuilt": 3,
+      "blotModules": 73
+    },
+    "preparedPhysics": {
+      "matchingExports": 136,
+      "mismatches": [],
+      "largestBodyCount": 2048
+    },
+    "towers": {
+      "matchingTickPackets": 1800,
+      "replayedTicks": 600
+    },
+    "uiAndGraphMatchingCases": 12
+  },
+  "main": {
+    "method": "Four fresh session builds of each frozen compiler/source pair on this host, alternating which goes first. Elapsed includes session open. No module cache. See raw data for the separate concurrent-suite samples.",
+    "pairs": {
+      "order": [
+        "reference",
+        "final",
+        "final",
+        "reference",
+        "reference",
+        "final",
+        "final",
+        "reference"
+      ],
+      "runs": {
+        "reference": [
+          {
+            "ms": 2524.594,
+            "bytes": 2633057,
+            "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2173.895,
+            "bytes": 2633057,
+            "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2298.377,
+            "bytes": 2633057,
+            "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2233.596,
+            "bytes": 2633057,
+            "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
+            "freshModules": 264,
+            "cachedModules": 0
+          }
+        ],
+        "final": [
+          {
+            "ms": 2307.902,
+            "bytes": 2639139,
+            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2358.506,
+            "bytes": 2639139,
+            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2502.352,
+            "bytes": 2639139,
+            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "freshModules": 264,
+            "cachedModules": 0
+          },
+          {
+            "ms": 2255.989,
+            "bytes": 2639139,
+            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "freshModules": 264,
+            "cachedModules": 0
+          }
+        ]
+      }
+    },
+    "medianMs": {
+      "reference": 2265.9865,
+      "final": 2333.2039999999997
+    },
+    "wasmBytes": 2639139,
+    "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+    "devtoolsBytes": 1086991,
+    "assetsChecked": 545
+  },
+  "game": {
+    "matchedInputPackets": 120,
+    "matchedOutputPackets": 120,
+    "matchedFiles": 242,
+    "frame": {
+      "width": 640,
+      "height": 480,
+      "sha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+      "sceneSha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+      "checks": {
+        "exit_zero": true,
+        "one_completed_guest_trace": true,
+        "one_headless_step": true,
+        "first_guest_frame": true,
+        "complete_render": true,
+        "screenshot_640x480": true
+      },
+      "inspected": true
+    },
+    "bench": {
+      "frames": 200000,
+      "warmup": 120,
+      "guestMedianMs": 0.12,
+      "guestP95Ms": 0.99,
+      "context": "Other workloads shared this host."
+    }
+  },
+  "compilerGates": {
+    "from": {
+      "elapsedSeconds": 310.67,
+      "phases": {
+        "harness": 2.98,
+        "release-build": 248.08,
+        "reference-direct": 0.25,
+        "reference-uniqueness": 3.73,
+        "reference-fixtures": 5.66,
+        "pack": 0.73,
+        "guests": 49.23
+      },
+      "guestsAndHosts": [
+        1077,
+        0,
+        100
+      ]
+    },
+    "contract": {
+      "elapsedSeconds": 296.94,
+      "phases": {
+        "harness": 3.0,
+        "release-build": 240.69,
+        "reference-direct": 0.24,
+        "reference-uniqueness": 3.11,
+        "reference-fixtures": 4.81,
+        "pack": 0.69,
+        "guests": 44.37
+      },
+      "guestsAndHosts": [
+        1078,
+        0,
+        100
+      ]
+    },
+    "terminal": {
+      "elapsedSeconds": 307.34,
+      "phases": {
+        "harness": 3.0,
+        "release-build": 249.93,
+        "reference-direct": 0.23,
+        "reference-uniqueness": 3.2,
+        "reference-fixtures": 4.89,
+        "pack": 0.7,
+        "guests": 45.38
+      },
+      "guestsAndHosts": [
+        1080,
+        0,
+        100
+      ]
+    }
+  },
+  "recordedFixtures": 189,
+  "storeInventory": {
+    "treeHeads": {
+      "gdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
+      "ink": "efd978a1c20b9c110d56a13e43f41cc07fb8fd2a"
+    },
+    "candidateStoreLines": 1196,
+    "lentDeclarations": 25,
+    "baseline": [
+      1558,
+      55
+    ]
+  },
+  "compilerChanges": {
+    "resultConversion": "All 34 former result-selection blockers emit Wasm. Caller-selected overloads remain polymorphic.",
+    "contracts": "Direct calls and first-class values for pure methods use checked lexical/instance evidence. Effectful methods still reject because the experimental path reordered callbacks.",
+    "terminalScratch": {
+      "witness": 16837,
+      "lanes": 16384,
+      "iterations": 150,
+      "isolatedStackBytes": 69632,
+      "isolatedOwnerSlots": 256,
+      "referenceDefaultStackBytes": 8388608,
+      "referenceResult": "runtime.stack",
+      "uncheckedGeneralization": "Non-terminal lifetimes and arbitrarily escaping owners use the existing allocation policy.",
+      "broadPrototype": {
+        "mainGrowthBytes": 20256,
+        "smallLoopMedianUs": [
+          17.9,
+          24.8
+        ],
+        "landed": false
+      }
+    },
+    "historicalPreparedPhysics": "The restored current library passes the original-size workload. Replaying the historical 58e6b02 implementation still exhausts runtime.stack inside source_values."
+  },
+  "open": {
+    "defaultLinearMemoryBytes": 49348608,
+    "simdTrapProbe": {
+      "ownersBefore": 0,
+      "ownersAfterTrapAndTransportReset": 6,
+      "ownersAfterNextEntry": 0
+    },
+    "sharedModuleCapsBytes": {
+      "smallestText": 524288,
+      "ui": 4194304
+    },
+    "contract": "Keep ABI 8, session protocol 2 and save schema 26."
+  },
+  "raw": "2026-11-17-owned-runtime.raw.json.gz",
+  "rawSha256": "f40d88fbcbfd44ab8670b0f0227c242b7dd59cc358aa37cb8d9b58d6bdbbc7ff"
+}
