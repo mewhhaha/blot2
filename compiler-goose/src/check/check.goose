@@ -2416,7 +2416,12 @@ fn schemeRequirements<O>(self_:Engine&,candidates:const SchemeCandidate[:],captu
 struct SchemeWork {candidates:SchemeCandidates=SchemeCandidates{..},outer:IdBuffer=IdBuffer{..},outer_rows:IdBuffer=IdBuffer{..},variables:IdBuffer=IdBuffer{..},row_variables:IdBuffer=IdBuffer{..},protected_rows:IdBuffer=IdBuffer{..},outer_index:blot_check_ordered_membership::PooledIndex=blot_check_ordered_membership::PooledIndex{..},outer_rows_index:blot_check_ordered_membership::PooledIndex=blot_check_ordered_membership::PooledIndex{..},variables_index:blot_check_ordered_membership::PooledIndex=blot_check_ordered_membership::PooledIndex{..},row_variables_index:blot_check_ordered_membership::PooledIndex=blot_check_ordered_membership::PooledIndex{..},protected_rows_index:blot_check_ordered_membership::PooledIndex=blot_check_ordered_membership::PooledIndex{..}}
 fn deinit(self_:SchemeWork&) {self_.protected_rows_index.deinit();self_.row_variables_index.deinit();self_.variables_index.deinit();self_.outer_rows_index.deinit();self_.outer_index.deinit();self_.protected_rows.deinit(equation_type_ids);self_.row_variables.deinit(equation_type_ids);self_.variables.deinit(equation_type_ids);self_.outer_rows.deinit(equation_type_ids);self_.outer.deinit(equation_type_ids);self_.candidates.deinit();}
 recursive fn scheme(self_:Engine&,root:u32,excluded:const u32[:],group:const u32[:],capture:bool,certificate_owner:u32,scope:u32)->blot_check_types::Scheme,blot_error::Error {return self_.schemeInto(root,excluded,group,capture,certificate_owner,scope,self_.obligations,null);}
-recursive fn schemeInto<O>(self_:Engine&,root:u32,excluded:const u32[:],group:const u32[:],capture:bool,certificate_owner:u32,scope:u32,output:O&,suspensions:Suspensions?)->blot_check_types::Scheme,blot_error::Error {let err=self_.solveFields();if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}if capture {let err=self_.expandInformedUses(group,false);if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}}let resolved,err=self_.types.resolve(root,0);if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}let free,err=freeVariableRun(self_.types,resolved);if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}var work=SchemeWork{..};let enabled=self_.execution.indexed_scheme_membership;work.outer_index.enabled=enabled;work.outer_rows_index.enabled=enabled;work.variables_index.enabled=enabled;work.row_variables_index.enabled=enabled;work.protected_rows_index.enabled=enabled;let result,error=schemeIntoWork(self_,resolved,free,excluded,group,capture,certificate_owner,scope,output,suspensions,work);work.deinit();equation_type_ids.free_slice(free);return result,error;}
+recursive fn schemeInto<O>(self_:Engine&,root:u32,excluded:const u32[:],group:const u32[:],capture:bool,certificate_owner:u32,scope:u32,output:O&,suspensions:Suspensions?)->blot_check_types::Scheme,blot_error::Error {let err=self_.solveFields();if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}if capture {
+    let err=self_.expandInformedUses(group,false);
+    if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}
+    let err=self_.inferResultOperands(group,0,0);
+    if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}
+}let resolved,err=self_.types.resolve(root,0);if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}let free,err=freeVariableRun(self_.types,resolved);if err!=blot_error::Error.none {return blot_check_types::Scheme{..},err;}var work=SchemeWork{..};let enabled=self_.execution.indexed_scheme_membership;work.outer_index.enabled=enabled;work.outer_rows_index.enabled=enabled;work.variables_index.enabled=enabled;work.row_variables_index.enabled=enabled;work.protected_rows_index.enabled=enabled;let result,error=schemeIntoWork(self_,resolved,free,excluded,group,capture,certificate_owner,scope,output,suspensions,work);work.deinit();equation_type_ids.free_slice(free);return result,error;}
 fn freeRowRun(store:blot_check_types::Store&,root:u32)->u32[:],blot_error::Error {let values,err=store.freeRowVariables(root);if err!=blot_error::Error.none {return default<u32[:]>(),err;}let result=equation_type_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}return result,blot_error::Error.none;}
 fn environmentRows(self_:Engine&)->u32[:],blot_error::Error {var free=IdBuffer{..};let error=environmentRowValues(self_,free);if error!=blot_error::Error.none {free.deinit(equation_type_ids);return default<u32[:]>(),error;}let result=equation_type_ids.alloc_slice(free.items.len);for value,index in free.items {result[index]=value;}free.deinit(equation_type_ids);return result,blot_error::Error.none;}
 fn environmentRowValues(self_:Engine&,free:IdBuffer&)->blot_error::Error {for entry in self_.env {let binding=self_.bindings[entry.binding];var root=binding.ty;if binding.scheme.root!=0 {root=binding.scheme.root;}let variables,err=self_.types.freeRowVariables(root);if err!=blot_error::Error.none {return err;}for variable in variables {if !inList(self_.types.list(binding.scheme.row_variables),variable) && !inList(free.items,variable) {let err=free.append(variable);if err!=blot_error::Error.none {return err;}}}}for binding in self_.active {let variables,err=self_.types.freeRowVariables(self_.bindings[binding].ty);if err!=blot_error::Error.none {return err;}for variable in variables {if !inList(free.items,variable) {let err=free.append(variable);if err!=blot_error::Error.none {return err;}}}}return blot_error::Error.none;}
@@ -2809,7 +2814,14 @@ recursive fn resolverComplete(self_:Engine&,source:u32,value:u32,result:u32,dept
 fn resolverMethod(self_:Engine&,source:u32,kind:ResolverKind,input:u32,result:u32,parameter:u32,explicit:bool)->u32,blot_error::Error {var name:const u8[:]=default<const u8[:]>();match kind {pure=>{name="pure";},bind=>{name="bind";},iterate=>{name="iterate";},_=>{abort("invalid resolver method kind");},}let lookup,present=self_.pool.lookup(name);var member:u32=0;if present {member=lookup;}let function,err=self_.invocation(input,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.resolverShape(source,result);if err!=blot_error::Error.none {return 0,err;}let op,err=self_.addResolverOp(ResolverOp{ node:source, kind:kind, member:member, resolver:self_.resolver_scope.resolver, method_type:function, payload:input, result:result, continuation_parameter:parameter, .. },explicit);if err!=blot_error::Error.none {return 0,err;}let err=self_.appendPending(PendingObligation{ metadata:op, value:blot_check_types::Obligation{ ty:self_.resolver_scope.owner_type, kind:blot_check_types::ObligationKind.resolver_dispatch, source:source, name:member, result:result, other:function, .. }, owner:self_.current, .. });return op,err;}
 recursive fn definitelyPanic(self_:const Engine&,id:u32,depth:i64)->bool {if id==0 || depth>=1024 {return false;}let node=self_.tree.node(id);match node.tag {blot_parse_ast::tag_group=>{return self_.definitelyPanic(node.a,depth+1);},blot_parse_ast::tag_apply=>{return self_.tree.node(node.a).tag==blot_parse_ast::tag_intrinsic && self_.pool.get(self_.tree.node(node.a).a)=="@panic";},blot_parse_ast::tag_if_expr=>{return self_.definitelyPanic(node.a,depth+1) || (self_.definitelyPanic(node.b,depth+1) && self_.definitelyPanic(node.c,depth+1));},blot_parse_ast::tag_case_expr=>{let inputs=checkedAstRange(self_.tree,node.a,node.a+2);let ast_walk_29_source=blot_parse_ast::List{self_.tree.list(inputs)[0],self_.tree.list(inputs)[1], ..};let ast_walk_29_count=self_.tree.list(ast_walk_29_source).len;for ast_walk_29_index in 0..ast_walk_29_count {let input=self_.tree.list(ast_walk_29_source)[ast_walk_29_index];if self_.definitelyPanic(input,depth+1) {return true;}}let ast_walk_30_source=blot_parse_ast::List{node.b,node.c, ..};let ast_walk_30_count=self_.tree.list(ast_walk_30_source).len;for ast_walk_30_index in 0..ast_walk_30_count {let arm=self_.tree.list(ast_walk_30_source)[ast_walk_30_index];let metadata=checkedAstRange(self_.tree,self_.tree.node(arm).c,self_.tree.node(arm).c+2);if !self_.definitelyPanic(self_.tree.list(metadata)[1],depth+1) {return false;}}return true;},_=>{return false;},}}
 recursive fn letStatement(self_:Engine&,id:u32)->Flow,blot_error::Error {let type_scope=self_.type_env.items.len;let row_scope=self_.row_env.items.len;let annotation_binding=self_.annotation_binding;let inherited_types=self_.inherited_types;let inherited_rows=self_.inherited_rows;let qualification=self_.qualification_scope;let computed_values=self_.computed_variables.len;let computed_rows=self_.computed_rows.len;let local_qualification=self_.local_qualification_scope;let local_requirements=self_.local_requirements_start;let result,error=letStatementBody(self_,id);self_.type_env.resize(type_scope);self_.row_env.resize(row_scope);self_.annotation_binding=annotation_binding;self_.inherited_types=inherited_types;self_.inherited_rows=inherited_rows;self_.qualification_scope=qualification;self_.computed_variables.resize(computed_values);self_.computed_rows.resize(computed_rows);self_.local_qualification_scope=local_qualification;self_.local_requirements_start=local_requirements;return result,error;}
-recursive fn letStatementBody(self_:Engine&,id:u32)->Flow,blot_error::Error {let written=self_.tree.binding(id);let computation_scope=self_.computation_annotations.len;if written.where_node!=0 {self_.qualification_scope=id;}self_.annotation_binding=id;self_.inherited_types=self_.type_env.items.len;self_.inherited_rows=self_.row_env.items.len;for source in [written.annotation,written.where_node,written.value,written.fallback] {let err=self_.collectAnnotationNames(source,0);if err!=blot_error::Error.none {return Flow{..},err;}}var required:u32=0;if written.annotation!=0 {let root,err=self_.annotation(written.annotation);if err!=blot_error::Error.none {return Flow{..},err;}required=root;}let qualification_index=self_.qualifications.len;let requirement_start=self_.pending.len;let err=self_.beginQualification(id,written.where_node,written.annotation,written.value);if err!=blot_error::Error.none {return Flow{..},err;}var contextual:u32=0;if required!=0 {var needed=blot_check_storage_types::isArray(self_.types,self_.types.head(required,0));if !needed {let nominal,err=blot_check_usage_check::containsNominal(self_.types,self_.nominals,required);if err!=blot_error::Error.none {return Flow{..},err;}needed=nominal;}if needed {contextual=required;}}let inferred,err=self_.pureExpression(written.value,contextual);if err!=blot_error::Error.none {return Flow{..},err;}if required!=0 {let err=self_.constrain(inferred,required,id);if err!=blot_error::Error.none {return Flow{..},err;}}var value=inferred;if required!=0 {value=required;}if written.where_node!=0 {let err=self_.checkQualification(qualification_index);if err!=blot_error::Error.none {return Flow{..},err;}}if written.annotation!=0 || written.where_node!=0 {self_.computation_annotations.resize(computation_scope);}if !self_.templateValue(written.value) {let err=self_.blockComputedRequirements(requirement_start,written.where_node!=0);if err!=blot_error::Error.none {return Flow{..},err;}}let root,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;let scope=self_.env.len;self_.local_qualification_scope=0;if written.where_node!=0 {self_.local_qualification_scope=id;}self_.local_requirements_start=requirement_start;var generalize=written.fallback==0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name;if generalize {let holds,err=self_.holdsStorage(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if holds {let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if !self_.types.knownClosed(resolved) {generalize=false;}}}let saved=self_.let_pattern_source;self_.let_pattern_source=id;let total,error=self_.pattern(written.pattern,value,scope,[],generalize);self_.let_pattern_source=saved;if error!=blot_error::Error.none {return Flow{..},error;}
+recursive fn letStatementBody(self_:Engine&,id:u32)->Flow,blot_error::Error {let written=self_.tree.binding(id);let computation_scope=self_.computation_annotations.len;if written.where_node!=0 {self_.qualification_scope=id;}self_.annotation_binding=id;self_.inherited_types=self_.type_env.items.len;self_.inherited_rows=self_.row_env.items.len;for source in [written.annotation,written.where_node,written.value,written.fallback] {let err=self_.collectAnnotationNames(source,0);if err!=blot_error::Error.none {return Flow{..},err;}}var required:u32=0;if written.annotation!=0 {let root,err=self_.annotation(written.annotation);if err!=blot_error::Error.none {return Flow{..},err;}required=root;}let qualification_index=self_.qualifications.len;let requirement_start=self_.pending.len;let err=self_.beginQualification(id,written.where_node,written.annotation,written.value);if err!=blot_error::Error.none {return Flow{..},err;}var contextual:u32=0;if required!=0 {var needed=blot_check_storage_types::isArray(self_.types,self_.types.head(required,0));if !needed {let nominal,err=blot_check_usage_check::containsNominal(self_.types,self_.nominals,required);if err!=blot_error::Error.none {return Flow{..},err;}needed=nominal;}if needed {contextual=required;}}let inferred,err=self_.pureExpression(written.value,contextual);if err!=blot_error::Error.none {return Flow{..},err;}if required!=0 {let err=self_.constrain(inferred,required,id);if err!=blot_error::Error.none {return Flow{..},err;}}var value=inferred;if required!=0 {value=required;}if written.where_node!=0 {let err=self_.checkQualification(qualification_index);if err!=blot_error::Error.none {return Flow{..},err;}}if written.annotation!=0 || written.where_node!=0 {self_.computation_annotations.resize(computation_scope);}if !self_.templateValue(written.value) {
+    if written.where_node==0 {
+        let err=self_.inferComputedResultOperands(requirement_start,value);
+        if err!=blot_error::Error.none {return Flow{..},err;}
+    }
+    let err=self_.blockComputedRequirements(requirement_start,written.where_node!=0);
+    if err!=blot_error::Error.none {return Flow{..},err;}
+}let root,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}let exits=self_.types.node(root).tag==blot_check_types::Tag.never;let scope=self_.env.len;self_.local_qualification_scope=0;if written.where_node!=0 {self_.local_qualification_scope=id;}self_.local_requirements_start=requirement_start;var generalize=written.fallback==0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name;if generalize {let holds,err=self_.holdsStorage(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if holds {let resolved,err=self_.types.resolve(value,0);if err!=blot_error::Error.none {return Flow{..},err;}if !self_.types.knownClosed(resolved) {generalize=false;}}}let saved=self_.let_pattern_source;self_.let_pattern_source=id;let total,error=self_.pattern(written.pattern,value,scope,[],generalize);self_.let_pattern_source=saved;if error!=blot_error::Error.none {return Flow{..},error;}
  if written.fallback!=0 {let success=global_entry_runs.alloc_slice(self_.env.len);for entry,index in self_.env {success[index]=entry;}self_.env.resize(scope);let saved_result=self_.resolver_scope.result;let flow,error=self_.suite(written.fallback);self_.resolver_scope.result=saved_result;if error!=blot_error::Error.none {if success.len!=0 {global_entry_runs.free_slice(success);}return Flow{..},error;}if !flow.exits {let err=self_.diagnostic(Code.guard_fallthrough,id);if err!=blot_error::Error.none {if success.len!=0 {global_entry_runs.free_slice(success);}return Flow{..},err;}self_.diagnostics[self_.diagnostics.len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.env.clear();self_.env.append(success);if success.len!=0 {global_entry_runs.free_slice(success);}}
  if !total && written.fallback==0 {let err=self_.diagnostic(Code.non_exhaustive_match,id);if err!=blot_error::Error.none {return Flow{..},err;}self_.diagnostics[self_.diagnostics.len-1].span.end=self_.diagnostics[self_.diagnostics.len-1].span.start;}self_.resolved[id]=self_.resolved[written.pattern];if self_.resolved[id]!=0 && self_.tree.node(written.pattern).tag==blot_parse_ast::tag_pattern_name {var source=written.value;while self_.tree.node(source).tag==blot_parse_ast::tag_group {source=self_.tree.node(source).a;}self_.bindings[self_.resolved[id]].operation_ref=self_.operation_refs[source];if self_.tree.has_numeric_proofs || self_.types.has_proof_kinds {let error=self_.proof_body.alias(self_.resolved[id],written.value);if error!=blot_error::Error.none {let ignored,err=self_.proofHeaderFailure(error,id);if err!=blot_error::Error.none {return Flow{..},err;}}}}self_.expr_types[id]=blot_check_types::unit;if exits {self_.expr_types[id]=blot_check_types::never;}return Flow{exits:exits,breaks:exits, ..},blot_error::Error.none;}
 fn deadRebindings(self_:Engine&,scope:i64,first_binding:i64,carried:i64)->blot_error::Error {for entry,offset in self_.env[scope..] {let index=scope+offset;if entry.name==self_.self_name {continue;}let binding=self_.bindings[entry.binding];if binding.predecessor==0 || binding.read {continue;}var writes_storage=false;for version in self_.bindings[first_binding..] {if version.name!=entry.name || version.declaration>=self_.rebindings.len {continue;}let selectors=checkedTypeList(self_.types,self_.access_nodes[version.declaration]);let path_types=checkedTypeList(self_.types,self_.access_types[version.declaration]);let type_span_107=selectors;for part in 0..(type_span_107.len as i64) {let access=self_.types.list(type_span_107)[part];if self_.tree.node(access).tag!=blot_parse_ast::tag_index_access || part>=(path_types.len as i64) {continue;}let owner=self_.types.head(self_.types.list(path_types)[part],0);if self_.types.node(owner).tag==blot_check_types::Tag.array {writes_storage=true;break;}let storage=blot_check_storage_types::info(self_.types,owner);if storage.present && (storage.value.kind==blot_check_storage_types::grow || storage.value.kind==blot_check_storage_types::resize) {writes_storage=true;break;}}if writes_storage {break;}}if writes_storage {continue;}var last=true;for next in self_.env[index+1..] {if next.name==entry.name {last=false;break;}}if !last {continue;}var root=binding.predecessor;var enclosing=false;for step in 0..64 {if root==0 {break;}for prior in self_.env[carried..scope] {if prior.binding==root {enclosing=true;break;}}if enclosing {break;}root=self_.bindings[root].predecessor;}if !enclosing {continue;}var read=false;for version in self_.bindings[first_binding..] {if version.name==entry.name && version.read {read=true;break;}}if !read {let err=self_.diagnostic(Code.dead_rebinding,binding.declaration);if err!=blot_error::Error.none {return err;}}}return blot_error::Error.none;}
@@ -2916,6 +2928,183 @@ recursive fn conditional(self_:Engine&,id:u32)->Flow,blot_error::Error {let node
 recursive fn conditionalBody(self_:Engine&,id:u32,node:blot_parse_ast::Node,patterned:bool,subject:u32,bodies:u32[2],base:const Entry[:],left:u32[:],right:u32[:],joins:IdBuffer&)->Flow,blot_error::Error {let resolver_head=self_.resolver_scope.result;let monadic=self_.resolver_scope.block_!=0;var suffix:u32=0;if monadic {let fresh,err=self_.types.fresh();if err!=blot_error::Error.none {return Flow{..},err;}suffix=fresh;}if patterned {let total,err=self_.pattern(node.a,subject,base.len,[],false);if err!=blot_error::Error.none {return Flow{..},err;}}let then_flow,err=self_.suite(bodies[0]);if err!=blot_error::Error.none {return Flow{..},err;}if monadic && !then_flow.exits {let err=self_.constrain(self_.resolver_scope.result,suffix,id);if err!=blot_error::Error.none {return Flow{..},err;}}for entry,index in base {left[index]=self_.latestSuccessor(entry.binding);}self_.env.clear();self_.env.append(base);if monadic {self_.resolver_scope.result=resolver_head;}var else_flow=Flow{..};if bodies[1]!=0 {let flow,err=self_.suite(bodies[1]);if err!=blot_error::Error.none {return Flow{..},err;}else_flow=flow;}if monadic && !else_flow.exits {let err=self_.constrain(self_.resolver_scope.result,suffix,id);if err!=blot_error::Error.none {return Flow{..},err;}}for entry,index in base {right[index]=self_.latestSuccessor(entry.binding);}self_.env.clear();self_.env.append(base);
  for entry,index in base {let a=left[index];let b=right[index];var shadowed=false;for later in base[index+1..] {if later.name==entry.name {shadowed=true;break;}}if shadowed || (a==entry.binding && b==entry.binding) || (then_flow.exits && else_flow.exits) {continue;}if then_flow.exits && !monadic {self_.env.push(Entry{entry.name,b, ..});continue;}if else_flow.exits && !monadic {self_.env.push(Entry{entry.name,a, ..});continue;}if !then_flow.exits && !else_flow.exits {let err=self_.constrain(self_.bindings[a].ty,self_.bindings[b].ty,id);if err!=blot_error::Error.none {return Flow{..},err;}}var selected=a;if then_flow.exits {selected=b;}let ty=self_.bindings[selected].ty;let merged,err=self_.addBinding(Binding{name:entry.name,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:ty,predecessor:entry.binding, ..});if err!=blot_error::Error.none {return Flow{..},err;}self_.env.push(Entry{entry.name,merged, ..});self_.merges.push(Merge{node:id,result:merged,then_binding:a,else_binding:b, ..});if monadic {let err=joins.append(ty);if err!=blot_error::Error.none {return Flow{..},err;}}}
  if monadic {var join_type=blot_check_types::unit;if joins.items.len!=0 {let tuple,err=self_.types.product(joins.items);if err!=blot_error::Error.none {return Flow{..},err;}join_type=tuple;}var parameter:u32=0;if joins.items.len!=0 {let binding,err=self_.addBinding(Binding{name:0,declaration:id,owner:self_.owner,kind:blot_reuse_principal_interface::Kind.local,ty:join_type,scheme:blot_check_types::Scheme{root:join_type, ..}, ..});if err!=blot_error::Error.none {return Flow{..},err;}parameter=binding;}if self_.resolver_joins.len>=0xffffffff {return Flow{..},blot_error::Error.type_limit;}self_.resolver_joins.push(ResolverJoin{node:id,parameter:parameter,ty:join_type,result:suffix, ..});self_.resolver_join_ids[id]=self_.resolver_joins.len as u32;self_.resolver_scope.result=suffix;}self_.expr_types[id]=blot_check_types::unit;return Flow{exits:then_flow.exits && else_flow.exits,returns:then_flow.returns || else_flow.returns,breaks:then_flow.breaks || else_flow.breaks, ..},blot_error::Error.none;
+}
+recursive fn inferComputedResultOperands(self_:Engine&,start:i64,result:u32)->blot_error::Error {
+    let count=self_.pending.len;
+    for index in start..count {
+        let pending=self_.pending[index];
+        if pending.owner!=self_.current || pending.solved || pending.suspended {continue;}
+        let goal=pending.value;
+        var has_operand=false;
+        if goal.kind==blot_check_types::ObligationKind.result_dispatch {
+            let output=self_.types.head(goal.result,0);
+            if self_.types.node(output).tag==blot_check_types::Tag.variable {
+                let exposed,err=self_.resultOperandExposed([],result,output);
+                if err!=blot_error::Error.none {return err;}
+                has_operand=!exposed;
+            }
+        }
+        if goal.kind==blot_check_types::ObligationKind.callee_use {
+            let summary=self_.bindings[goal.identity.decl].summary;
+            if !summary.only_result_selected || !self_.calleeSettled(goal.identity.decl) {continue;}
+            let product=self_.types.node(self_.types.head(goal.ty,0));
+            for slot in 0..(summary.public_outputs.len as i64) {
+                if self_.types.list(summary.public_outputs)[slot]==0 {continue;}
+                let actual=self_.types.list(blot_check_types::List{product.a,product.b})[slot];
+                let output=self_.types.head(actual,0);
+                if self_.types.node(output).tag!=blot_check_types::Tag.variable {continue;}
+                let exposed,err=self_.resultOperandExposed([],result,output);
+                if err!=blot_error::Error.none {return err;}
+                if !exposed {has_operand=true;break;}
+            }
+        }
+        if has_operand {
+            let err=self_.expandInformedUses([self_.current],false);
+            if err!=blot_error::Error.none {return err;}
+            return self_.inferResultOperands([self_.current],start,result);
+        }
+    }
+    return blot_error::Error.none;
+}
+// A concrete homogeneous operator can supply the expected type of a
+// result-selected operand. Consider this after ordinary constraints settle:
+// the other operand may itself be inferred, and an explicit destination wins.
+recursive fn inferResultOperands(self_:Engine&,group:const u32[:],start:i64,exposed_root:u32)->blot_error::Error {
+    var changed=true;
+    while changed {
+        changed=false;
+        let count=self_.pending.len;
+        for index in start..count {
+            if self_.selected_globals.len!=0 {return blot_error::Error.none;}
+            let pending=self_.pending[index];
+            if pending.solved || pending.suspended || !inList(group,pending.owner) {continue;}
+            let goal=pending.value;
+            if goal.kind!=blot_check_types::ObligationKind.dispatch || goal.name==0 || goal.operator==blot_check_types::Operator.none {continue;}
+            let left=self_.types.head(goal.ty,0);
+            let right=self_.types.head(goal.other,0);
+            let missing_left=self_.types.node(left).tag==blot_check_types::Tag.variable;
+            var known=left;
+            var missing=right;
+            if missing_left {known=right;missing=left;}
+            if known!=blot_check_types::u32_type && known!=blot_check_types::f32_type && known!=blot_check_types::boolean {continue;}
+            if self_.types.node(missing).tag!=blot_check_types::Tag.variable {continue;}
+            let exposed,err=self_.resultOperandExposed(group,exposed_root,missing);
+            if err!=blot_error::Error.none {return err;}
+            if exposed {continue;}
+            let member,expanded,err=self_.resultOperandMember(pending.owner,missing);
+            if err!=blot_error::Error.none {return err;}
+            if expanded {changed=true;continue;}
+            if member==0 {continue;}
+            let unique,err=self_.uniqueResultOperand(goal,known,missing_left,member);
+            if err!=blot_error::Error.none {return err;}
+            if unique {let err=self_.types.unify(missing,known);if err!=blot_error::Error.none {return err;}changed=true;}
+        }
+        if changed {
+            let err=self_.solveFields();
+            if err!=blot_error::Error.none {return err;}
+            let err=self_.expandInformedUses(group,false);
+            if err!=blot_error::Error.none {return err;}
+        }
+    }
+    return blot_error::Error.none;
+}
+// Keep a caller's ability to constrain the conversion through a parameter or
+// through another part of the enclosing result.
+fn resultOperandExposed(self_:Engine&,group:const u32[:],exposed_root:u32,missing:u32)->bool,blot_error::Error {
+    if exposed_root!=0 {
+        let variables,err=self_.types.freeVariables(exposed_root);
+        if err!=blot_error::Error.none {return false,err;}
+        if inList(variables,missing) {return true,blot_error::Error.none;}
+    }
+    for binding in group {
+        let variables,err=self_.types.freeVariables(self_.bindings[binding].ty);
+        if err!=blot_error::Error.none {return false,err;}
+        if inList(variables,missing) {return true,blot_error::Error.none;}
+    }
+    return false,blot_error::Error.none;
+}
+fn resultOperandMember(self_:Engine&,owner:u32,missing:u32)->u32,bool,blot_error::Error {
+    let count=self_.pending.len;
+    for index in 0..count {
+        let candidate=self_.pending[index];
+        if candidate.owner!=owner || candidate.solved || candidate.suspended {continue;}
+        let goal=candidate.value;
+        if goal.kind==blot_check_types::ObligationKind.result_dispatch {
+            let output,err=self_.types.resolve(goal.result,0);
+            if err!=blot_error::Error.none {return 0,false,err;}
+            if output==missing {return goal.name,false,blot_error::Error.none;}
+        }
+        if goal.kind!=blot_check_types::ObligationKind.callee_use {continue;}
+        let summary=self_.bindings[goal.identity.decl].summary;
+        if !summary.only_result_selected || !self_.calleeSettled(goal.identity.decl) {continue;}
+        let product,err=self_.types.resolve(goal.ty,0);
+        if err!=blot_error::Error.none {return 0,false,err;}
+        let node=self_.types.node(product);
+        for slot in 0..(summary.public_outputs.len as i64) {
+            if self_.types.list(summary.public_outputs)[slot]==0 {continue;}
+            let actual=self_.types.list(blot_check_types::List{node.a,node.b})[slot];
+            let output,err=self_.types.resolve(actual,0);
+            if err!=blot_error::Error.none {return 0,false,err;}
+            if output!=missing {continue;}
+            self_.pending[index].solved=true;
+            self_.counters.use_expansions+=1;
+            let err=self_.expandUse(candidate,0);
+            return 0,true,err;
+        }
+    }
+    return 0,false,blot_error::Error.none;
+}
+// Stay conservative about open signatures and members on alternative
+// conversion destinations. They can participate in ordinary left/right
+// dispatch and may provide a different expected operand type.
+recursive fn uniqueResultOperand(self_:Engine&,goal:blot_check_types::Obligation,known:u32,missing_left:bool,member:u32)->bool,blot_error::Error {
+    let identity=Identity{0,known};
+    if !self_.catalogs.associated_members.contains(AssociatedMember{identity,member}) {return false,blot_error::Error.none;}
+    let selected .= self_.catalogs.associated_members.get(AssociatedMember{identity,goal.name});
+    if !selected {return false,blot_error::Error.none;}
+    let selected_index:u32=selected;
+    let parameters,result,err=self_.binaryMemberSignature(selected_index);
+    if err!=blot_error::Error.none {return false,err;}
+    if parameters[0]!=known || parameters[1]!=known {return false,blot_error::Error.none;}
+    let expected,err=self_.types.resolve(goal.result,0);
+    if err!=blot_error::Error.none {return false,err;}
+    if self_.types.knownClosed(expected) && self_.types.knownClosed(result) {
+        let same,err=self_.types.equalClosed(expected,result);
+        if err!=blot_error::Error.none || !same {return false,err;}
+    }
+    let count=self_.associated.len;
+    for index in 0..count {
+        let candidate=self_.associated[index];
+        if candidate.member!=goal.name || candidate.identity==identity {continue;}
+        if !self_.catalogs.associated_members.contains(AssociatedMember{candidate.identity,member}) {continue;}
+        let parameters,result,err=self_.binaryMemberSignature(index as u32);
+        if err!=blot_error::Error.none {return false,err;}
+        var parameter=parameters[0];
+        if missing_left {parameter=parameters[1];}
+        if self_.types.knownClosed(parameter) {
+            let same,err=self_.types.equalClosed(parameter,known);
+            if err!=blot_error::Error.none {return false,err;}
+            if !same {continue;}
+        }
+        if self_.types.knownClosed(expected) && self_.types.knownClosed(result) {
+            let same,err=self_.types.equalClosed(expected,result);
+            if err!=blot_error::Error.none {return false,err;}
+            if !same {continue;}
+        }
+        return false,blot_error::Error.none;
+    }
+    return true,blot_error::Error.none;
+}
+recursive fn binaryMemberSignature(self_:Engine&,index:u32)->u32[2],u32,blot_error::Error {
+    let binding,err=self_.associatedBinding(index);
+    if err!=blot_error::Error.none {return [0,0],0,err;}
+    let prepared,err=self_.prepareSelectedGlobal(binding);
+    if err!=blot_error::Error.none || !prepared {return [0,0],0,err;}
+    let first=self_.types.node(self_.types.head(self_.bindings[binding].ty,0));
+    if first.tag!=blot_check_types::Tag.function {return [0,0],0,blot_error::Error.none;}
+    let second=self_.types.node(self_.types.head(first.b,0));
+    if second.tag!=blot_check_types::Tag.function {return [0,0],0,blot_error::Error.none;}
+    return [self_.types.head(first.a,0),self_.types.head(second.a,0)],self_.types.head(second.b,0),blot_error::Error.none;
 }
 recursive fn solveFields(self_:Engine&)->blot_error::Error {return self_.solveFieldsFrom(0);}
 recursive fn solveFieldsFrom(self_:Engine&,start:i64)->blot_error::Error {var progress=true;while progress {progress=false;var cursor=start;loop {if self_.selected_globals.len!=0 {return blot_error::Error.none;}let err=self_.syncPendingQueue();if err!=blot_error::Error.none {return err;}let selected=self_.pending_queue.take(cursor);if !selected.present {break;}let index=selected.value;cursor=index+1;let pending=self_.pending[index];if pending.solved {self_.pending_queue.complete(index);continue;}if pending.suspended {self_.pending_queue.requeue(index);continue;}if pending.wait_target!=0 {let state .= self_.global_states.get(pending.wait_target);assert(state);if state.state!=State.complete {self_.pending_queue.requeue(index);continue;}self_.pending[index].wait_target=0;}let made,err=self_.attemptPending(index,pending);if err!=blot_error::Error.none {return err;}progress=progress || made;let err=self_.syncPendingQueue();if err!=blot_error::Error.none {return err;}if index>=self_.pending.len {continue;}let after=self_.pending[index];if after.solved {self_.pending_queue.complete(index);}else if after.value.kind==blot_check_types::ObligationKind.effect_operation && !after.suspended {let err=self_.pending_queue.watch(self_.types,index,[after.value.other,after.value.signature],false,false);if err!=blot_error::Error.none {return err;}}else if after.value.kind==blot_check_types::ObligationKind.callee_use && !after.suspended && self_.calleeSettled(after.value.identity.decl) {let err=self_.pending_queue.watch(self_.types,index,[after.value.ty],false,false);if err!=blot_error::Error.none {return err;}}else {let input,err=self_.pendingSelectionInput(after);if err!=blot_error::Error.none {return err;}if input.present {let err=self_.pending_queue.watch(self_.types,index,[input.value],false,false);if err!=blot_error::Error.none {return err;}}else {self_.pending_queue.requeue(index);}}}}return blot_error::Error.none;}

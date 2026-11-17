@@ -1,0 +1,18 @@
+// The concrete operand supplies the conversion's destination on either side.
+entry func normalized (value: U32) => return from value / 2.0
+entry func matches (value: U32): Bool => return 21.0 == from value
+entry func scaled (rows: U32) => return do:
+  let height = 126.0 + from rows * 54.0
+  return height * 0.5
+
+// The destination remains polymorphic when the caller can see it in the result.
+type Other is data = $Other U32
+func Other.from (value: U32): Other => return $Other value
+func Other.add ($Other value) -> (right: U32): U32 => return U32.add value (U32.mul right 2)
+func pair (value: U32) => return do:
+  let converted = from value
+  return (converted, converted + 2)
+entry func caller_selects (value: U32): U32 => return do:
+  let (_, custom): (Other, U32) = pair value
+  let (_, primitive): (U32, U32) = pair value
+  return U32.add (U32.mul custom 100) primitive

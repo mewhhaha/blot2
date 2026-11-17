@@ -108,8 +108,7 @@ entry const answer = func () => return do (@effect.provider Read (func () => ret
   );
 });
 
-// Direct backend gap: a `from` result typed through an operator operand is an unresolved type variable (tasks/DELETE_SCOPED.md).
-Deno.test.ignore("staged nested conversions infer their destination from the surrounding operator", async () => {
+Deno.test("staged nested conversions infer their destination from the surrounding operator", async () => {
   await compileAndRun(
     `
 const count = 42
@@ -122,6 +121,47 @@ entry const floating: F32 = from (ceil (sqrt (from count))) + 2.5
     },
     {
       prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    },
+  );
+});
+
+Deno.test("an operator supplies the expected type of a conversion on either side", async () => {
+  const source = await Deno.readTextFile(new URL(
+    "../../compiler-goose/tests/fixtures/result_selected_operand.blot",
+    import.meta.url,
+  ));
+  await compileAndRun(
+    source,
+    (guest) => {
+      equal(guest.call("normalized", 42), 21);
+      equal(guest.call("matches", 21), true);
+      equal(guest.call("matches", 20), false);
+      equal(guest.call("scaled", 4), 171);
+      equal(guest.call("caller_selects", 38), 4240);
+    },
+  );
+});
+
+Deno.test("a competing conversion leaves the destination open until the caller constrains it", async () => {
+  const overload = `
+type Other is data = $Other U32
+func Other.from (value: U32): Other => return $Other value
+func Other.add ($Other value) -> (right: U32): U32 => return U32.add value (U32.mul right 2)
+`;
+  await compileExpectedFailure(
+    overload + "entry func answer (value: U32) => return from value + 2\n",
+    "entry_type",
+  );
+  await compileAndRun(
+    overload + `
+entry func answer (value: U32): U32 => return do:
+  let converted: Other = from value
+  return converted + 2
+entry func floating (value: U32) => return 2.0 + from value
+`,
+    (guest) => {
+      equal(guest.call("answer", 38), 42);
+      equal(guest.call("floating", 40), 42);
     },
   );
 });
