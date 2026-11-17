@@ -2527,6 +2527,46 @@
    "wasm_bytes": 3963,
    "wasm_sha256": "85bf0d3ab42c2fe3cad7e90a75b6c3cdfbabc8b147b9f5b2d9bc0ca33cb1a21d"
   },
+  "direct/terminal_scratch_reads.blot": {
+   "exit": 0,
+   "records": [
+    {
+     "body_elaborations": 173,
+     "body_lowerings": 173,
+     "check_occurs_steps": 2161,
+     "checker": {
+      "associated_steps": 0,
+      "inference_steps": 3680,
+      "instantiations": 338,
+      "memo_declined": 0,
+      "memo_hits": 35,
+      "memo_misses": 20,
+      "obligations_appended": 111,
+      "pending_peak": 57,
+      "projection_memo_hits": 0,
+      "shared_uses": 61,
+      "use_expansions": 58
+     },
+     "core_nodes": 1341,
+     "effect_rows": 3372,
+     "emitted_functions": 49,
+     "filename": "direct/terminal_scratch_reads.blot",
+     "files": 2,
+     "imported_schemes": 33,
+     "kind": "compilation",
+     "row_versions": 638,
+     "source_bytes": 17913,
+     "stage": "build-project",
+     "success": true,
+     "syntax_nodes": 2679,
+     "type_nodes": 6662,
+     "type_versions": 1142,
+     "wasm_bytes": 8947
+    }
+   ],
+   "wasm_bytes": 8947,
+   "wasm_sha256": "30948659a3fb36dfecb3d9bf61d242d2e9a20b3bc93ec50357454378b53f741d"
+  },
   "direct/unused_generic_fields.blot": {
    "exit": 0,
    "records": [

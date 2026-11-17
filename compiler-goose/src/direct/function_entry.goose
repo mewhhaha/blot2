@@ -196,6 +196,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     var value = neverVal();
     match key.kind {
         named, lambda => {
+            f.scratch_body = scratchBody(m, root);
             let made, error = stmt(g, f, root);
             if error != blot_direct_types::Error.none { return error; }
             value = made;

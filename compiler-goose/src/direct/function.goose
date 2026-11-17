@@ -47,7 +47,10 @@ type TId = blot_check_types::Id;
 type ValType = blot_direct_writer::ValType;
 type Chars = const u8[:];
 
+struct ScratchCut { target: u32 = 0, owner: u32 = 0, stack: u32 = 0 }
 struct Fn {
+    scratch_body: u32 = 0,
+    scratch_cut: ScratchCut = ScratchCut {},
     // The module of this body, as `g.units[unit - 1]`.
     unit: u32,
     // The instance's type variables, refined as emission learns the concrete
@@ -299,8 +302,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         block_ => { return block_(g, f, id); },
         suite => {
             var last = unitVal();
-            let children = m.children(id);
-            for child in children {
+            for child in m.children(id) {
                 let value, error = stmt(g, f, child);
                 if error != blot_direct_types::Error.none { return value, error; }
                 last = value;

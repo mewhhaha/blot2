@@ -74,6 +74,201 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return neverVal(), blot_direct_types::Error.none;
 }
 
+// Only visit a block whose value is returned by the function itself. Once a
+// return starts, another block's continuation cannot run before the exit.
+fn scratchBody(m: const Module&, root: u32) -> u32 {
+    var current = root;
+    for step in 0..8 {
+        let node = m.node(current);
+        if node.tag == blot_check_core::Tag.return_ { current = node.a; continue; }
+        if node.tag != blot_check_core::Tag.block_ { return 0; }
+        if node.b != 1 { return current; }
+        let only = m.children(current)[0];
+        if m.node(only).tag != blot_check_core::Tag.return_ { return 0; }
+        current = only;
+    }
+    return 0;
+}
+
+// The block ends by returning scalar reads from freshly produced storage.
+// The array literal commits the result after those reads finish.
+fn scratchLiteral(g: Generator&, f: Fn&, tail: const u32[:]) -> u32 {
+    let m .= g.units[f.unit - 1];
+    let producer = m.node(tail[0]);
+    if producer.tag != blot_check_core::Tag.bind || producer.c != 0 { return 0; }
+    let init = m.node(producer.b);
+    if init.tag != blot_check_core::Tag.array_op { return 0; }
+    let operation = m.arrayOperation(producer.b);
+    if operation != blot_backend_collection_ops::Op.generate && operation != blot_backend_collection_ops::Op.fill { return 0; }
+    let shape = m.types.node(init.ty);
+    if shape.tag != blot_check_types::Tag.array || !scratchScalarType(m, shape.a) { return 0; }
+    let next = m.node(tail[1]);
+    var literal: u32 = 0;
+    if tail.len == 2 && next.tag == blot_check_core::Tag.return_ { literal = next.a; }
+    else if tail.len == 3 && next.tag == blot_check_core::Tag.bind && m.node(next.b).tag == blot_check_core::Tag.update {
+        let returned = m.node(tail[2]);
+        if returned.tag != blot_check_core::Tag.return_ || localRef(m, returned.a) != next.a { return 0; }
+        let update = m.updateInfo(next.b);
+        if update.store || !scratchFieldUpdate(m, update, next.b) { return 0; }
+        let root = localRef(m, update.root);
+        if root == 0 || root == producer.a { return 0; }
+        let value, found = bindGet(g, f, root);
+        // A structural record reaches the replacement once. A sum can
+        // emit the replacement separately in several branches.
+        if !found || tagOf(g, value.ty) != blot_direct_types::Tag.record { return 0; }
+        literal = update.value;
+    } else { return 0; }
+    if m.node(literal).tag != blot_check_core::Tag.array { return 0; }
+    var reads = false;
+    for element in m.children(literal) {
+        if !scratchScalar(g, f, m, element, producer.a, 0, reads, 0) { return 0; }
+    }
+    if !reads { return 0; }
+    let arguments = m.children(producer.b);
+    var ignored = false;
+    if arguments.len != 2 || !scratchScalar(g, f, m, arguments[0], 0, 0, ignored, 0) { return 0; }
+    if operation == blot_backend_collection_ops::Op.fill {
+        if !scratchScalar(g, f, m, arguments[1], 0, 0, ignored, 0) { return 0; }
+    } else {
+        let mapper = arguments[1];
+        if m.node(mapper).tag != blot_check_core::Tag.closure { return 0; }
+        let info = m.closure(mapper);
+        if !scratchScalarType(m, info.parameter.ty) { return 0; }
+        for capture in m.closureCaptures(mapper) {
+            let value, found = bindGet(g, f, capture);
+            if !found || !isScalarTag(tagOf(g, value.ty)) { return 0; }
+        }
+        if !scratchScalar(g, f, m, scratchReturned(m, info.body), 0, info.parameter.binding, ignored, 0) { return 0; }
+    }
+    if scratchEscapes(m, producer.a) { return 0; }
+    return literal;
+}
+
+fn localRef(m: const Module&, id: u32) -> u32 {
+    if m.node(id).tag != blot_check_core::Tag.reference { return 0; }
+    let ref = m.reference(id);
+    if ref.unit != 0 && ref.unit != m.unit { return 0; }
+    return ref.binding;
+}
+
+fn scratchFieldUpdate(m: const Module&, update: blot_check_core::UpdateInfo, id: u32) -> bool {
+    let selectors = m.updateSelectors(id);
+    if selectors.len == 0 { return update.path.len == 1; }
+    return selectors.len == 1 && selectors[0].kind == blot_check_core::UpdateKind.field;
+}
+
+// A block-local binding cannot outlive its terminal return. Reject synthetic
+// bindings that could be transported separately from that return value.
+fn scratchEscapes(m: const Module&, binding: u32) -> bool {
+    for closure in m.closures {
+        for capture in m.extra[closure.captures.start..closure.captures.start + closure.captures.len] {
+            if capture == binding { return true; }
+        }
+    }
+    for carry in m.loop_carries {
+        if carry.incoming == binding || carry.iteration == binding || carry.backedge == binding || carry.outgoing == binding { return true; }
+    }
+    for merge in m.merges {
+        if merge.result == binding || merge.then_binding == binding || merge.else_binding == binding { return true; }
+    }
+    return false;
+}
+
+fn scratchScalarType(m: const Module&, ty: u32) -> bool {
+    let tag = m.types.node(ty).tag;
+    return tag == blot_check_types::Tag.unsigned32 || tag == blot_check_types::Tag.floating32 || tag == blot_check_types::Tag.boolean;
+}
+
+fn scratchReturned(m: const Module&, id: u32) -> u32 {
+    var current = id;
+    for step in 0..8 {
+        let n = m.node(current);
+        if n.tag == blot_check_core::Tag.return_ { current = n.a; }
+        else if n.tag == blot_check_core::Tag.block_ && n.b == 1 { current = m.children(current)[0]; }
+        else { break; }
+    }
+    return current;
+}
+
+// Use the same scalar forwarding shape as call emission. Such a call
+// reads only its proved scalar operands and has no storage operation.
+fn scratchScalarCallee(g: const Generator&, m: const Module&, call: blot_check_core::Call) -> bool {
+    let target = g.resolve(m, call.target);
+    if !g.hasUnit(target.unit) { return false; }
+    let owner .= g.units[target.unit - 1];
+    let alias, present = primitiveAlias(owner, target.binding);
+    if present {
+        let primitive = owner.primitive(alias);
+        return primitive.kind == blot_check_core::PrimitiveKind.scalar && primitive.arity == call.arguments.len;
+    }
+    let body .= owner.body(target.binding);
+    if !body || !body.is_function { return false; }
+    let parameters = owner.bodyParameters(body);
+    if parameters.len != call.arguments.len { return false; }
+    let node = owner.node(scratchReturned(owner, body.root));
+    if node.tag != blot_check_core::Tag.associated || node.op == blot_check_core::Op.none { return false; }
+    for operand in [node.a, node.b] {
+        if operand == 0 { continue; }
+        if owner.node(operand).tag != blot_check_core::Tag.reference { return false; }
+        let ref = owner.reference(operand);
+        if ref.unit != 0 && ref.unit != owner.unit { return false; }
+        var found = false;
+        for parameter in parameters {
+            if parameter.binding == ref.binding { found = true; break; }
+        }
+        if !found { return false; }
+    }
+    return node.a != 0;
+}
+recursive fn scratchScalar(g: Generator&, f: Fn&, m: const Module&, id: u32, binding: u32, parameter: u32, reads: bool&, depth: i64) -> bool {
+    if depth >= 32 || !scratchScalarType(m, m.typeOf(id)) { return false; }
+    let n = m.node(id);
+    match n.tag {
+        constant => { return true; },
+        reference => {
+            let local = localRef(m, id);
+            if local == 0 { return false; }
+            if local == parameter { return true; }
+            let value, found = bindGet(g, f, local);
+            return found && isScalarTag(tagOf(g, value.ty));
+        },
+        scalar, associated, logical => {
+            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            return scratchScalar(g, f, m, n.a, binding, parameter, reads, depth + 1) &&
+                (n.b == 0 || scratchScalar(g, f, m, n.b, binding, parameter, reads, depth + 1));
+        },
+        call => {
+            let call = m.call(id);
+            if !scratchScalarCallee(g, m, call) { return false; }
+            for arg in call.arguments {
+                if !scratchScalar(g, f, m, arg, binding, parameter, reads, depth + 1) { return false; }
+            }
+            return true;
+        },
+        array_op => {
+            if binding == 0 { return false; }
+            let op = m.arrayOperation(id);
+            if op != blot_backend_collection_ops::Op.get && op != blot_backend_collection_ops::Op.length { return false; }
+            let args = m.children(id);
+            if args.len == 0 || localRef(m, args[0]) != binding { return false; }
+            reads = true;
+            return args.len == 1 || scratchScalar(g, f, m, args[1], binding, parameter, reads, depth + 1);
+        },
+        _ => { return false; },
+    }
+}
+
+fn markScratchPair(g: Generator&, f: Fn&, contents: const u32[:], at: i64) {
+    let remaining = contents.len - at;
+    if f.scratch_cut.target != 0 || remaining < 2 || remaining > 3 { return; }
+    let target = scratchLiteral(g, f, contents[at..]);
+    if target == 0 { return; }
+    let owner = local32(g, f);
+    let stack = local32(g, f);
+    markInto(g, g.s.code, owner, stack);
+    f.scratch_cut = ScratchCut { target, owner, stack };
+}
+
 recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let result = g.newSlot();
@@ -83,13 +278,16 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     s.labels.push(blot_direct_emit::Label { target: id, depth: depth, result: result });
     var last = unitVal();
     let children = m.children(id);
-    for child in children {
+    let saved = f.scratch_cut;
+    for child, at in children {
         // Statements after one that always diverges are unreachable.
         if last.ty == blot_direct_types::never { break; }
+        if id == f.scratch_body { markScratchPair(g, f, children, at); }
         let value, error = stmt(g, f, child);
-        if error != blot_direct_types::Error.none { s.labels.resize(mark); return value, error; }
+        if error != blot_direct_types::Error.none { f.scratch_cut = saved; s.labels.resize(mark); return value, error; }
         last = value;
     }
+    f.scratch_cut = saved;
     s.labels.resize(mark);
     close(g, f);
     if g.s.slots[result].present { return g.s.slots[result].value, blot_direct_types::Error.none; }

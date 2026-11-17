@@ -320,6 +320,10 @@ recursive fn arrayLiteral(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;
     }
+    if f.scratch_cut.target == id {
+        releaseTo(g, f.scratch_cut.owner, f.scratch_cut.stack);
+        f.scratch_cut = ScratchCut {};
+    }
     let count = constLocal(g, f, children.len as u32);
     let handle, error = create(g, f, ty, count, id);
     if error != blot_direct_types::Error.none { return handle, error; }
