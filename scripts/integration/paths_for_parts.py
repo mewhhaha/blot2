@@ -16,6 +16,20 @@ sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))
 import ownify
 ROOT=ownify.ROOT
 def indent(l): return len(l)-len(l.lstrip(' '))
+def replace(line,name,path):
+    """Each use of `name` in `line` as a value: not a field after a single
+    dot, not a record key (`name: value` stays a key), and a shorthand
+    field (`{name}`) becomes `name: path`."""
+    out=''; at=0
+    for m in re.finditer(r'\b'+re.escape(name)+r'\b',line):
+        s,e=m.start(),m.end()
+        before=line[:s]
+        if re.search(r'[\w$]$',before) or (before.endswith('.') and not before.endswith('..')): continue
+        after=line[e:]
+        if re.match(r'\s*:(?!=)',after): continue
+        shorthand=re.search(r'[{,]\s*$',before) and re.match(r'\s*[,}]',after)
+        out+=line[at:s]+(f'{name}: {path}' if shorthand else path); at=e
+    return out+line[at:]
 def rewrite(lines):
     changed=0; k=0
     while k<len(lines):
@@ -30,7 +44,7 @@ def rewrite(lines):
             pass
         if re.search(r'\blet '+name+r'\b|^\s*'+name+r' :=',text,re.M) or re.search(r'\bfunc\b[^\n]*?\b'+world+r'\b[^\n]*?=>',text):
             k+=1; continue
-        new=[re.sub(r'(?<![\w.$])'+name+r'\b',world+'.'+field,l) for l in block]
+        new=[replace(l,name,world+'.'+field) for l in block]
         lines[k:j]=new; changed+=1
     return changed
 if __name__=='__main__':

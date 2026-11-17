@@ -207,6 +207,8 @@ def call_sites(mod,fn,position,dry=False,report=print):
             if not names: continue
             for k,l in enumerate(f.lines):
                 code=l.split('//')[0]
+                # the expression a definition returns, written on the next line, is no statement
+                if k>0 and f.lines[k-1].rstrip().endswith('=> return'): continue
                 for nm in names:
                     for m in re.finditer(r'(?<![\w.$])'+re.escape(nm)+r'(?![\w.])',code):
                         if nm==fn and os.path.normpath(path)==target and re.match(r'^(lent )?(entry )?func ',l): continue
