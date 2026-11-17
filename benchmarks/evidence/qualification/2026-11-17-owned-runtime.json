@@ -1,20 +1,22 @@
 {
   "date": "2026-11-17",
   "reference": {
-    "blot": "67621d16",
-    "gdev": "c42efef",
-    "ink": "d689527",
+    "blot": "1ff5c88e115d5f1d4e1f8f99a3329407dad988ad",
+    "reviewedHandoff": "67621d16",
+    "gdev": "c42efef4e9ba8fa4f2ca3701cb5b17af246854da",
+    "ink": "d68952763dcb8e25afdab9a4de7fe3ea9ec119d0",
     "pen": "1dfca8a0b8956ea861d31e042b589c4fc93b0457",
-    "compilerSha256": "6aa519642989dd061d9ad50d78c80f65887eeb8cf974263a58161a89d5ec5554"
+    "compilerSha256": "6aa519642989dd061d9ad50d78c80f65887eeb8cf974263a58161a89d5ec5554",
+    "penSha256": "2f8dd35cf58efbf91c727c5143ce400ea871b84e4b7c88622272dadaec414f2b"
   },
   "qualified": {
-    "ink": "efd978a1c20b9c110d56a13e43f41cc07fb8fd2a",
-    "gdev": "f658a1e091d870aee21799ed39622e9adeba3fc6",
-    "compilerSha256": "35d871cf65642dc8586bd19e60dede0796dcff5ecce68a3a6a8d4a4adcb0f422",
-    "penSha256": "2f8dd35cf58efbf91c727c5143ce400ea871b84e4b7c88622272dadaec414f2b",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "gdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
+    "compilerSha256": "48761d7ce49939d8fb57c55104310ce0baaa18df904c667b9f9d3d08b00ba13f",
+    "penSha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
     "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
-    "blot2": "2daea2b0c0841709fb48db6f0ae0d5e38f1b4893",
-    "pen": "1dfca8a0b8956ea861d31e042b589c4fc93b0457"
+    "blot2": "9b7cd3e89305b546c63e440158bf66274bfdff96",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
   },
   "gdev": {
     "before": {
@@ -37,6 +39,12 @@
       "newFailed": 30,
       "newlyBuiltModules": 44,
       "newlyUnbuiltModules": 0
+    },
+    "runtimeFailureKinds": {
+      "runtime.stack": 18,
+      "assertions": 70,
+      "named.require": 9,
+      "runtime.heap_alloc": 11
     }
   },
   "ink": {
@@ -46,11 +54,10 @@
       "modules": 73
     },
     "native": {
-      "passed": 110,
-      "failed": 3,
+      "passed": 111,
+      "failed": 2,
       "failingNames": [
         "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
-        "simd_batches::prepared_client_executes_ordered_waves_and_validates_before_effects",
         "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
       ]
     },
@@ -69,7 +76,14 @@
       "matchingTickPackets": 1800,
       "replayedTicks": 600
     },
-    "uiAndGraphMatchingCases": 12
+    "uiAndGraphMatchingCases": 12,
+    "contactPhysicsOutputExact": {
+      "prepared": true,
+      "physics": true,
+      "cache": true,
+      "matchingTowers": 1800,
+      "matchingPreparedExports": 136
+    }
   },
   "main": {
     "method": "Four fresh session builds of each frozen compiler/source pair on this host, alternating which goes first. Elapsed includes session open. No module cache. See raw data for the separate concurrent-suite samples.",
@@ -87,28 +101,28 @@
       "runs": {
         "reference": [
           {
-            "ms": 2524.594,
+            "ms": 1988.038,
             "bytes": 2633057,
             "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2173.895,
+            "ms": 1886.802,
             "bytes": 2633057,
             "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2298.377,
+            "ms": 1938.126,
             "bytes": 2633057,
             "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2233.596,
+            "ms": 1927.205,
             "bytes": 2633057,
             "sha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
             "freshModules": 264,
@@ -117,30 +131,30 @@
         ],
         "final": [
           {
-            "ms": 2307.902,
-            "bytes": 2639139,
-            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "ms": 1978.203,
+            "bytes": 2639595,
+            "sha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2358.506,
-            "bytes": 2639139,
-            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "ms": 2044.863,
+            "bytes": 2639595,
+            "sha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2502.352,
-            "bytes": 2639139,
-            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "ms": 2007.127,
+            "bytes": 2639595,
+            "sha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
             "freshModules": 264,
             "cachedModules": 0
           },
           {
-            "ms": 2255.989,
-            "bytes": 2639139,
-            "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
+            "ms": 1978.033,
+            "bytes": 2639595,
+            "sha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
             "freshModules": 264,
             "cachedModules": 0
           }
@@ -148,12 +162,12 @@
       }
     },
     "medianMs": {
-      "reference": 2265.9865,
-      "final": 2333.2039999999997
+      "reference": 1932.6655,
+      "final": 1992.665
     },
-    "wasmBytes": 2639139,
-    "sha256": "76344a3c1a682f68b084223b65f3536bfce5b034ea2b48c25216e376d487775f",
-    "devtoolsBytes": 1086991,
+    "wasmBytes": 2639595,
+    "sha256": "c6d7f9e1401430de4f91566896600ba60c21b49580e347045e9adc7ea2fc1634",
+    "devtoolsBytes": 1087072,
     "assetsChecked": 545
   },
   "game": {
@@ -179,8 +193,8 @@
     "bench": {
       "frames": 200000,
       "warmup": 120,
-      "guestMedianMs": 0.12,
-      "guestP95Ms": 0.99,
+      "guestMedianMs": 0.14,
+      "guestP95Ms": 1.0,
       "context": "Other workloads shared this host."
     }
   },
@@ -196,11 +210,11 @@
         "pack": 0.73,
         "guests": 49.23
       },
-      "guestsAndHosts": [
-        1077,
-        0,
-        100
-      ]
+      "guestsAndHosts": {
+        "passed": 1077,
+        "failed": 0,
+        "ignored": 100
+      }
     },
     "contract": {
       "elapsedSeconds": 296.94,
@@ -213,11 +227,11 @@
         "pack": 0.69,
         "guests": 44.37
       },
-      "guestsAndHosts": [
-        1078,
-        0,
-        100
-      ]
+      "guestsAndHosts": {
+        "passed": 1078,
+        "failed": 0,
+        "ignored": 100
+      }
     },
     "terminal": {
       "elapsedSeconds": 307.34,
@@ -230,21 +244,38 @@
         "pack": 0.7,
         "guests": 45.38
       },
-      "guestsAndHosts": [
-        1080,
-        0,
-        100
-      ]
+      "guestsAndHosts": {
+        "passed": 1080,
+        "failed": 0,
+        "ignored": 100
+      }
+    },
+    "invocation": {
+      "elapsedSeconds": 611.04,
+      "phases": {
+        "harness": 3.45,
+        "release-build": 459.12,
+        "reference-direct": 0.43,
+        "reference-uniqueness": 5.55,
+        "reference-fixtures": 7.88,
+        "pack": 1.07,
+        "guests": 133.52
+      },
+      "guestsAndHosts": {
+        "passed": 1082,
+        "failed": 0,
+        "ignored": 100
+      }
     }
   },
   "recordedFixtures": 189,
   "storeInventory": {
     "treeHeads": {
       "gdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
-      "ink": "efd978a1c20b9c110d56a13e43f41cc07fb8fd2a"
+      "ink": "3f2e60322d6d60d5395be32280debaba1852caf9"
     },
     "candidateStoreLines": 1196,
-    "lentDeclarations": 25,
+    "lentDeclarations": 18,
     "baseline": [
       1558,
       55
@@ -271,21 +302,48 @@
         "landed": false
       }
     },
-    "historicalPreparedPhysics": "The restored current library passes the original-size workload. Replaying the historical 58e6b02 implementation still exhausts runtime.stack inside source_values."
+    "historicalPreparedPhysics": "The restored current library passes the original-size workload. Replaying the historical 58e6b02 implementation still exhausts runtime.stack inside source_values.",
+    "postInvocation": {
+      "optionalExport": "blot:finish_invocation",
+      "countedOwnersAfterFault": [
+        6,
+        0
+      ],
+      "hostedFault": {
+        "ownersBeforeAfter": [
+          3,
+          0
+        ],
+        "occupiedGuestCallbackSlotsBeforeAfter": [
+          1,
+          0
+        ]
+      },
+      "compatibility": "Old ABI 8 modules, AOT packages, scalar-only modules, native callbacks, JSPI, and SharedArrayBuffer Worker adapter checked. Worker and JSPI adapter tests used Deno.",
+      "wasmReferencesChanged": 93,
+      "existingFixtureBodiesIdentical": true
+    }
   },
   "open": {
     "defaultLinearMemoryBytes": 49348608,
-    "simdTrapProbe": {
-      "ownersBefore": 0,
-      "ownersAfterTrapAndTransportReset": 6,
-      "ownersAfterNextEntry": 0
-    },
     "sharedModuleCapsBytes": {
       "smallestText": 524288,
       "ui": 4194304
     },
-    "contract": "Keep ABI 8, session protocol 2 and save schema 26."
+    "contract": "Keep ABI 8, session protocol 2 and save schema 26.",
+    "demandAllocatorTrial": {
+      "landed": false,
+      "onePageAtStartup": true,
+      "allSevenUnchangedWorkloadCapChecks": true,
+      "warmedRuntimeRegressionsPercent": [
+        37,
+        55
+      ],
+      "mainGrowthBytes": 866,
+      "gdevMatchedFiles": 242,
+      "stateAndScene10kOriginalBytes": true
+    }
   },
   "raw": "2026-11-17-owned-runtime.raw.json.gz",
-  "rawSha256": "f40d88fbcbfd44ab8670b0f0227c242b7dd59cc358aa37cb8d9b58d6bdbbc7ff"
+  "rawSha256": "c325c255dbf3ed2558edb46e2a5c8e9289b77eec0449394e7cf225ad1e8f8f1d"
 }

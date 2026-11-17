@@ -42,11 +42,11 @@
   compiler as it is. `deno task test:compiler` is the full gate: the tooling's
   tests, the optimized build, the recorded references, the package and every
   guest and host test. Run it before committing compiler changes.
-- The recorded references hold what the Zig compiler produced:
-  `python3 compiler-goose/tools/test_fixtures.py` (187 programs: Wasm and
-  records), `test_uniqueness.py` (lowering diagnostics) and `test_direct.py`
-  (backend bytes). A deliberate change of behavior re-records them with
-  `--record`; say so in the commit.
+- The recorded references preserve the original Zig results and reviewed
+  changes from the Goose compiler. Run
+  `python3 compiler-goose/tools/test_fixtures.py` for Wasm and result records,
+  `test_uniqueness.py` for lowering diagnostics and `test_direct.py` for backend
+  bytes. Use `--record` for deliberate updates and document them in the commit.
 - After a module, a struct or a field is added or removed, regenerate the
   adapters as `compiler-goose/README.md` lists, then build.
 - Keep semantic regression laws in the recorded references and in

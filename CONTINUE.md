@@ -1,70 +1,80 @@
 # Continue the Blot ownership conversion
 
-All 210 Gdev test modules now reach execution. The compiler recovered all 34
-modules blocked by `from`. The scene and editor hooks return their successor
-world, and Ink runs the original 2,048-body prepared-physics workload under
-the existing memory limits. The active compiler is Goose in `compiler-goose/`.
+All 44 previously unbuilt Gdev test modules now execute. This includes the 34
+blocked on result selection for `from`. The starting-salt, scene, terrain
+restore and editor hooks now pass their successor world to their callers.
+Ink runs its original 2,048-body prepared-physics workload. Pen releases
+invocation-scoped owners and callbacks immediately after a return or a trap.
 
+The qualified release uses the Goose compiler in `compiler-goose/` at Blot
+`9b7cd3e8`, Pen `ad9766c`, Ink `3f2e603` and Gdev `42e005c`.
 The [qualification record](benchmarks/evidence/qualification/2026-11-17-owned-runtime.json)
-pins Blot `2daea2b0`, Gdev `f658a1e`, Ink `efd978a` and Pen `1dfca8a`.
-The subsequent Gdev commit `42e005c` makes both terrain restore sections own
-their world. Its eight affected modules had the same 29 passes and four
-failures, and all 482 files of a 240-frame Enter/Tab/Tab replay matched.
+pins the sources, binaries, experiments and measurements.
 
 ## Current results
 
-| Suite | Previous | Qualified |
+| Suite | Starting checkpoint | Qualified release |
 | --- | --- | --- |
-| Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, 0 unbuilt |
-| Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, 0 failed, 0 unbuilt |
-| Ink native | 92 passed, 21 failed on the pre-services reference | 110 passed, 3 failed |
-| Compiler | | 189 recorded fixtures, 1,080 guest and host tests passed, 100 ignored |
+| Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
+| Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
+| Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
+| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, 1,082 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
-Another 267 newly executable checks pass and 30 newly executable checks fail.
-The village renderer alone cleared 38 bounds traps by iterating over the shared
-prefix of its ECS columns. Six independent hauling witnesses now run in Pen.
+Another 267 newly executable checks pass and 30 fail. The remaining 108
+failures comprise 70 assertions, 18 stack traps, 11 heap traps and 9 failed
+`require` calls. Six independent hauling scenarios now run in Pen.
 
-Four interleaved fresh-process pairs put Gdev Main at **2.33 s median** and
-**2,639,139 bytes**, compared with **2.27 s** and **2,633,057 bytes** at the
-previous checkpoint. Each process compiled all 264 modules afresh. Pen checked
-545 assets. All 242 packet, schema and snapshot files from 120 frames matched
-the reference. The inspected 640×480 hardware frame and trace also matched.
+Four alternating fresh-process pairs measured **1.993 s** median for Gdev Main,
+up from **1.933 s**. Wasm grew from **2,633,057** to **2,639,595 bytes**.
+All 264 modules were fresh in every run. Pen checked Main, Devtools and 545
+assets. All 242 files of a 120-frame replay matched the reference, including
+the final snapshot. The inspected 640×480 hardware frame and trace also matched.
+A 200,000-frame run measured 0.14 ms median and 1.00 ms p95 guest time while
+other workloads shared the host.
+
+All 136 prepared-physics exports and 1,800 tower tick packets matched the
+reference. Two 16,384-lane compiler witnesses return 16,837 in a 68 KiB
+temporary stack after releasing the last read of a terminal scalar producer.
+The historical Ink physics source at `58e6b02` still exhausts its stack in
+`source_values`.
 
 ## Remaining work
 
-1. Migrate the remaining shared writers and borrowed returns. At Gdev
-   `42e005c` and Ink `efd978a`, the source scan finds **1,196 candidate store
-   lines and 25 `lent` declarations**, down from 1,558 and 55. The counts are
-   approximate. The remaining terrain readers return live views into their
-   owners. Preserve snapshot independence when converting them. Retire the
-   mutation form of `=`, `lent` and the migration tooling once callers move.
-2. Reduce the remaining Ink memory failures using their existing assertions.
-   ABI 8 initially exposes 49,348,608 bytes of Wasm linear memory. The same
-   UI/text module must fit a 512 KiB text run and support a larger UI run.
-   Enabling Gdev's old fixed 2 MiB temporary budget exhausts its stack on the
-   first frame. The SIMD callback law also found six scoped owners surviving a
-   trap until the next entry. It needs immediate invocation cleanup.
-3. Preserve lexical and effect order in the backend. Pure checked contract
+1. Migrate the remaining shared writers and borrowed returns. The
+   [source scan](scripts/integration/count_stores.py) finds **1,196 candidate
+   store lines and 18 `lent` declarations**, down from 1,558 and 55. The
+   [world-writer scan](scripts/integration/world_writers.py) finds 20 writers
+   each in `player/hand` and `world/salt`. Follow their callers as a group and
+   preserve snapshot independence when replacing live terrain views. Retire
+   the mutation form of `=`, `lent` and their migration tools once callers move.
+2. Reduce committed linear memory while preserving the contiguous scratch
+   allocation fast path. The two remaining Ink native failures enforce memory
+   limits for dense bodies, snapshots, UI and text. Default modules start at
+   49,348,608 bytes. An on-demand allocator started at 64 KiB and passed the
+   seven original workload limits, including 256 KiB for the 4,096-segment
+   join against a 512 KiB cap. It slowed four warmed workloads by 37–55%.
+   The release retains the current allocator. Measure the per-allocation checks
+   before replacing it. Gdev exhausts its stack with the old fixed 2 MiB budget.
+3. Preserve effect order and owning result types in lowering. Pure contract
    methods now run both original codec fixtures. Effectful methods still
-   reject. The prototype reordered callbacks. A reduced case with two
-   consecutive `persist.restore_into` calls still loses a branch result in a
-   structurally inferred owning wrapper. Gdev names its concrete world at that
-   boundary.
-4. Track the 108 runtime failures by test name, retaining every passing case.
-   The [raw evidence](benchmarks/evidence/qualification/2026-11-17-owned-runtime.raw.json.gz)
-   includes the suite logs, named comparisons, memory probes, packet hashes,
-   frame and actual rejected experiments. The [compile-speed plan](tasks/FAST_COMPILE.md)
-   retains the subsecond and Wasm-size targets.
+   reject, and an experimental lowering reordered callbacks. A structurally
+   inferred wrapper around two `persist.restore_into` calls can lose the branch
+   result. The attempted compiler fix trapped on real resident and picking
+   restores. Gdev names its concrete `FrameAccess` at this boundary.
+4. Work through the remaining Gdev failures by name. Compare the affected
+   tests and the 120-frame replay against the pinned reference. The
+   [raw evidence](benchmarks/evidence/qualification/2026-11-17-owned-runtime.raw.json.gz)
+   includes all named outcomes, memory probes, replay hashes, PNG and trap
+   cleanup receipts. The [compile-speed plan](tasks/FAST_COMPILE.md) retains
+   the subsecond and Wasm-size targets.
 
-The terminal scratch pass releases an unaliased scalar producer after its last
-reads and before the returned array allocates. Both 16,384-lane witnesses
-return 16,837 with a 68 KiB stack. The general carry-compaction prototype
-increased Main by 20,256 bytes and slowed a small loop, so it stayed isolated.
-The historical Ink physics implementation at `58e6b02` can still exhaust its
-stack inside `source_values`.
+Keep guest ABI 8, session protocol 2 and save schema 26. The optional
+`blot:finish_invocation` export released all six owners after the SIMD fault.
+Native, JSPI and worker checks cover callback lifetime across suspension.
+The JSPI and worker adapters ran under Deno. The export changed 93 Wasm
+references, with every existing fixture function body byte-identical.
 
 Use `deno task test:compiler` for compiler changes and the tracked
 [Main build](scripts/integration/build_gdev.ts) and
-[frame runner](scripts/integration/run_pen.py) for integration. Keep guest ABI 8,
-session protocol 2 and save schema 26.
+[frame runner](scripts/integration/run_pen.py) for integration.
