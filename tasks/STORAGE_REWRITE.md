@@ -6,25 +6,23 @@ record the earlier Zig backend and the Goose port before the switch.
 
 ## Historical priorities and measurements
 
-Current user priority: finish the Goose compiler experiment: repair lifetimes,
-build the real executable, then qualify request OOM/retention and differential
-behavior against Zig. Use large coherent source families and bounded verification
-at their boundaries. Native component laws do not qualify the compiler runtime.
-See [the current frontier](../CONTINUE.md).
+The Goose port originally called for repairing lifetimes, building the executable,
+then checking request OOM, retention and behavior against Zig. Batches were
+qualified at the boundary between source families.
 
-The language [RFC #46](https://github.com/mewhhaha/blot2/issues/46) continues to
-follow Zig first, then Goose. Track its complete remaining target in
+The original [RFC #46](https://github.com/mewhhaha/blot2/issues/46) migration
+used Zig first, then Goose. Its scope is recorded in
 [the language migration](../docs/language/NEXT_MIGRATION.md).
 The named-function source migration covers std, Ink and Gdev: 8,964 functions
 across 782 source files, with 776 frontend/API passes and six expected rejections.
 See [the qualified scope](../benchmarks/evidence/qualification/2026-11-08-named-source-migration.json).
-This completes the named-function migration; the remaining RFC stages and full
-release/Main qualification are pending.
-The Goose compiler remains an experiment; isolated parser checks do not qualify
-the whole port. Preserve the original pinned Zig oracle for old-language work.
+This checkpoint completed the named-function migration. The remaining RFC
+stages and full release/Main qualification were pending. Zig supplied the
+pinned oracle for the old language.
 
-The current priorities are shared-kernel runtime, Gdev Wasm size and short
-iterations. Subsecond compilation, sub-five-second Main and 1–2MB remain unmet.
+The priorities at this checkpoint were shared-kernel runtime, Gdev Wasm size
+and short iterations. Subsecond compilation, sub-five-second Main and 1–2 MB
+were still open.
 The
 [array engines checkpoint](../benchmarks/goose/results/2026-11-04-array-engines.md)
 improves unchanged merge/custom hash/Sieve another **1.19/7.00/1.16x** across

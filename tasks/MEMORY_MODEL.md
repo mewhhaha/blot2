@@ -1,5 +1,8 @@
 # Memory model A: immutable values, reused in place
 
+The active migration count, next caller family and executed Gdev comparison
+are in [CONTINUE.md](../CONTINUE.md). Counts below belong to their source checkpoints.
+
 The owner's direction (14 November 2026): "Just immutable and then our goal
 is to reuse as much memory as possible", aiming at "efficient immutability.
 Maybe even more efficient than mutable languages." The syntax is in
@@ -1002,7 +1005,7 @@ what they call. A system changes in three places: its parameter becomes
 calls a system directly rebinds too, so each system goes with the tests
 that call it. A system that returns a value returns it beside the world.
 
-Its size, counted by `python3 scripts/integration/world_writers.py`: of
+At the original systems checkpoint, `python3 scripts/integration/world_writers.py` found that of
 the 628 functions in gdev/src that take the world, 340 write through it
 themselves and 371 do counting the ones they call, in 65 modules
 (`ui/station` 24, `world/salt` 23, `player/hand` 21, `world/trails` 19,
@@ -1020,7 +1023,7 @@ moves down from the frame loop one function at a time, with Ink's suite
 and Gdev's frame checked at each step. A `lent` callee is the exception:
 it has to be converted with the caller that needs ownership back.
 
-**What is left: 1,619 stores.** Counted by line shape with
+**Earlier store inventory.** This snapshot counted 1,619 stores by line shape with
 `python3 scripts/integration/count_stores.py DIR...`.
 `python3 scripts/integration/harvest_stores.py PROJECT ENTRY...` turns
 into `:=` each store the compiler reports as provably unique (it runs

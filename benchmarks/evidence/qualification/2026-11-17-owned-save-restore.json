@@ -1,0 +1,416 @@
+{
+  "date": "2026-11-17",
+  "workload": "Owned game state and scene save/restore, Gdev Main and Pen tests",
+  "source": {
+    "blotCompiler": "1ff5c88e115d5f1d4e1f8f99a3329407dad988ad",
+    "reviewedHandoff": "90a8400ad3f18336f477f9082c3c95a1b8828fdb",
+    "pen": "1dfca8a0b8956ea861d31e042b589c4fc93b0457",
+    "ink": "d68952763dcb8e25afdab9a4de7fe3ea9ec119d0",
+    "gdev": "c42efef4e9ba8fa4f2ca3701cb5b17af246854da",
+    "gdevBeforeTestLayout": "2cbb2489f0f371e43f73826e215f1c23cdc198e8",
+    "beforeRepair": {
+      "gdev": "78abf6b04602bd670e6af11213b6e3fb6a1b13cc",
+      "ink": "15b107a880a4be863c184bffabae2983082df5cc"
+    },
+    "pairedReference": {
+      "gdev": "e431d43cb3e74f3bdf3938b312c75d155e63dd2f",
+      "ink": "719e0c709af624aa655186c3a41b3220aca24499"
+    }
+  },
+  "toolchain": {
+    "compilerSha256": "6aa519642989dd061d9ad50d78c80f65887eeb8cf974263a58161a89d5ec5554",
+    "protocolCompilerIdentity": "2c12af22703d5661af4b88b58efe362813e734813e8c6c424e8ee0541a7e73cb",
+    "sourceBuildDigest": "3d0fb42f613920f7bf0326c7a8ff1fd8466a169cb095123815be1297a9ec58b3",
+    "gooseSha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "cc": "/usr/bin/clang-23",
+    "ccSha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "penSha256": "2f8dd35cf58efbf91c727c5143ce400ea871b84e4b7c88622272dadaec414f2b",
+    "blotPluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601"
+  },
+  "gdevMain": {
+    "measurement": "Three sequential release-compiler processes on a warm filesystem, session open through Wasm build. Each checked all modules afresh. Pen startup, assets and rendering are separate.",
+    "sampleMs": [
+      2153.166,
+      2271.968,
+      2287.569
+    ],
+    "medianMs": 2271.968,
+    "wasmBytes": 2633057,
+    "wasmSha256": "1f8ba4e8a0b63d2b1a844310fc02eb1783fa1c990e10b0f3c4a7269c9dc40f21",
+    "freshModules": 264,
+    "cachedModules": 0,
+    "sourceBytes": 2528120,
+    "emittedFunctions": 6885,
+    "penJsonSha256": "fb1023f9cf0d7f1192061d97a34ce0faf7bf3d67efd5f8d36eddaaae59e1042c"
+  },
+  "devtools": {
+    "totalCompileMs": 1842.154,
+    "wasmBytes": 1084228,
+    "wasmSha256": "ce90dff923dacef842c042c0cc2e5e6b0a97efc5b95988f905e3fbf63bfc2c58",
+    "freshModules": 72,
+    "cachedModules": 0,
+    "sourceBytes": 979134,
+    "emittedFunctions": 2093,
+    "penJsonSha256": "d6a1bbe9e9ac859c94bc7514fce502d09f322c624231e9b0d289af8042597426",
+    "originalBuild": "result_associated rejected release Wasm in the paired reference; explicit F32 conversion in the current source builds the real entry"
+  },
+  "gdevPen": {
+    "runs": {
+      "original": {
+        "passed": 391,
+        "failed": 67,
+        "moduleRuns": 209,
+        "unbuilt": 107,
+        "firstBuildDiagnostic": {
+          "missing_file": 92,
+          "missing_associated": 2,
+          "storage_unsupported": 12,
+          "aliased_update": 1
+        }
+      },
+      "saveRestore": {
+        "passed": 497,
+        "failed": 61,
+        "moduleRuns": 209,
+        "unbuilt": 105,
+        "firstBuildDiagnostic": {
+          "missing_file": 90,
+          "missing_associated": 2,
+          "storage_unsupported": 12,
+          "aliased_update": 1
+        }
+      },
+      "referenceTestLayout": {
+        "passed": 890,
+        "failed": 123,
+        "moduleRuns": 209,
+        "unbuilt": 46,
+        "firstBuildDiagnostic": {
+          "missing_associated": 4,
+          "storage_unsupported": 40,
+          "result_not_owned": 1,
+          "aliased_update": 1
+        }
+      },
+      "finalTestLayout": {
+        "passed": 919,
+        "failed": 112,
+        "moduleRuns": 209,
+        "unbuilt": 44,
+        "firstBuildDiagnostic": {
+          "missing_associated": 4,
+          "storage_unsupported": 38,
+          "result_not_owned": 1,
+          "aliased_update": 1
+        }
+      }
+    },
+    "comparedByNamedTest": {
+      "originalToSaveRestore": {
+        "passedThenFailed": 0,
+        "failedThenPassed": 6,
+        "previouslyPassingNowAbsent": 0,
+        "newPassed": 100,
+        "newFailed": 0,
+        "newlyBuiltModules": 2,
+        "newlyUnbuiltModules": 0
+      },
+      "originalToFinal": {
+        "passedThenFailed": 0,
+        "failedThenPassed": 6,
+        "previouslyPassingNowAbsent": 0,
+        "newPassed": 522,
+        "newFailed": 51,
+        "newlyBuiltModules": 63,
+        "newlyUnbuiltModules": 0
+      },
+      "saveRestoreToFinal": {
+        "passedThenFailed": 0,
+        "failedThenPassed": 0,
+        "previouslyPassingNowAbsent": 0,
+        "newPassed": 422,
+        "newFailed": 51,
+        "newlyBuiltModules": 61,
+        "newlyUnbuiltModules": 0
+      },
+      "sameTestLayout": {
+        "passedThenFailed": 0,
+        "failedThenPassed": 11,
+        "previouslyPassingNowAbsent": 0,
+        "newPassed": 18,
+        "newFailed": 0,
+        "newlyBuiltModules": 2,
+        "newlyUnbuiltModules": 0
+      }
+    },
+    "referenceTestLayout": "Archived Gdev with the same test-only entry setting and equivalent fixture imports. The exact reference patch is in the raw bundle.",
+    "finalResultAssociatedFirstDiagnostic": 34
+  },
+  "inkPen": {
+    "pairedReference": {
+      "passed": 268,
+      "failed": 1,
+      "moduleRuns": 73,
+      "unbuilt": 3
+    },
+    "current": {
+      "passed": 268,
+      "failed": 1,
+      "moduleRuns": 73,
+      "unbuilt": 3
+    },
+    "changedDetailedModuleReports": 0,
+    "focusedPersistence": {
+      "passed": 33,
+      "failed": 0
+    },
+    "additionalFixtures": [
+      "tests/codec.blot",
+      "tests/word-persist.blot"
+    ],
+    "additionalFixtureResult": "Both pass check-project on both source pairs. Both fail build-project on direct-backend contract_method expressions on both pairs.",
+    "nativeSuites": "Pen skips native project tests when Blot tests fail."
+  },
+  "frontend": {
+    "method": "migrate-stores --dry-run --inference-budget 20000000. Clean requires success, no rewrites, no outside-file suggestions and no non-dependency diagnostics. The reference comparison covers current exceptions. Five final entries were rechecked after the test-layout change.",
+    "scope": "Tracked Gdev entries under src, devtools, tests, test_support and performance. Ink configured entry files plus tests/codec.blot and tests/word-persist.blot.",
+    "gdev": {
+      "entries": 246,
+      "clean": 237,
+      "expectedRejections": {
+        "tests/rejected/actor_and_home_ids.blot": "type_mismatch",
+        "tests/rejected/app_update_of_the_wrong_type.blot": "type_mismatch",
+        "tests/rejected/typed_service_answer.blot": "type_mismatch"
+      },
+      "otherExistingFailures": [
+        "performance/algorithm-audit.blot",
+        "performance/modernize/clearings.blot",
+        "performance/reservation_threshold.blot",
+        "tests/blocked/salt_hauling_split.blot",
+        "tests/gizmos.blot",
+        "tests/traps/codec_domains.blot"
+      ]
+    },
+    "ink": {
+      "entries": 67,
+      "clean": 64,
+      "expectedRejections": {
+        "tests/rejected/app_update_of_the_wrong_type.blot": "type_mismatch",
+        "tests/rejected/derived_effectful.blot": "effect_mismatch",
+        "tests/rejected/handles_wrong_kind.blot": "type_mismatch"
+      },
+      "otherExistingFailures": []
+    }
+  },
+  "persistence": {
+    "actors": 10000,
+    "heapCapBytes": 33554432,
+    "pinnedPeakBytes": 30560224,
+    "initialMigrationFailedAttemptBytes": 34366432,
+    "finalPeakBytes": 31024064,
+    "fullSaveAndSceneByteWitnesses": {
+      "state": {
+        "lanes": 722502,
+        "sha256": "fbd3e570aca9da9bc5d05777cc696c8e3b8b98fb138123f3225c98ac3b148372"
+      },
+      "scene": {
+        "lanes": 291491,
+        "sha256": "b616635cd0f5f59a7dcacdaf65a7e064b6805bee61d0dc583c9f030bb1c398fe"
+      }
+    },
+    "witnessMethod": "Diagnostic Wasm records the produced lanes and allocator high-water. Uninstrumented Wasm passes the original round-trip test."
+  },
+  "sparseActors": {
+    "wasmBytes": 2640751,
+    "wasmSha256": "19441663f8f26386e9edb38cdaa0785e2a142ea99e9ebe5c438c905e899514d5",
+    "reference": "All four sparse exports trapped before their first frame.",
+    "final": "Two executions matched every frame and final save for each export.",
+    "exports": [
+      {
+        "name": "frames400",
+        "frames": 40,
+        "actors": 50,
+        "controller": "Walking",
+        "haulingLoad": 0,
+        "finalPiles": 400,
+        "finalTick": 940,
+        "packetStreamSha256": "709e86529b15c9f8d7d8042b234657476775bcbeb6a8eb834ee40279d8e1fe6a",
+        "saveSha256": "dec05af9b92a6112569564e179ed2696574f73fea3f7654132ec372011007ecd",
+        "saveBytes": 52564,
+        "frameBytes": 2257564
+      },
+      {
+        "name": "frames2000",
+        "frames": 40,
+        "actors": 50,
+        "controller": "Walking",
+        "haulingLoad": 0,
+        "finalPiles": 1999,
+        "finalTick": 940,
+        "packetStreamSha256": "b49c458e048dc9b5de147b0ae30e507ed67d38f381ae271e1e03013ed021f6b2",
+        "saveSha256": "a6331a006c36249a230abc22bc28028ce96846d738f284b02ad7d5bdde1c2739",
+        "saveBytes": 129408,
+        "frameBytes": 2673392
+      },
+      {
+        "name": "haulers400",
+        "frames": 40,
+        "actors": 50,
+        "controller": "Hauling",
+        "haulingLoad": 0,
+        "finalPiles": 400,
+        "finalTick": 940,
+        "packetStreamSha256": "0dcbcb96c09cd31ba87bab0aa86e08f3ec2d368c43a496c330e3f3b8c4ac5f20",
+        "saveSha256": "ec77110aeaadf7c654cb1cf43b9be0ebb6245f115ae67655fa66deea4b57648a",
+        "saveBytes": 47940,
+        "frameBytes": 2449564
+      },
+      {
+        "name": "haulers2000",
+        "frames": 40,
+        "actors": 50,
+        "controller": "Hauling",
+        "haulingLoad": 0,
+        "finalPiles": 1999,
+        "finalTick": 940,
+        "packetStreamSha256": "8a5bda66ef4f2312bf962d5e214dc335ac076d6e1b05041885f49785008d5786",
+        "saveSha256": "59e7d96776703c6e22a5663a8462e1c1f5aaf5980d10380aa102a55fc61ca094",
+        "saveBytes": 124784,
+        "frameBytes": 2759936
+      }
+    ]
+  },
+  "gameIntegration": {
+    "inputPackets": 120,
+    "outputPackets": 120,
+    "treeFiles": 242,
+    "changedFiles": 0,
+    "manifestSha256": "d499c1da937cb2e4c0a3918cec47607307eb86cd2fa78c0ba5bdf895f5b2d463",
+    "manifestEncoding": "Compact JSON, sorted keys, no trailing newline; file names map to byte counts and SHA-256.",
+    "framePngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "sceneSha256": "156d9f802916ce2bbe1b5d85da494b9da8237282c4f0318bf487c2a3ab67f9af",
+    "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "inspectedPngSize": [
+      640,
+      480
+    ],
+    "penFrameChecks": {
+      "exit_zero": true,
+      "one_completed_guest_trace": true,
+      "one_headless_step": true,
+      "first_guest_frame": true,
+      "complete_render": true,
+      "screenshot_640x480": true
+    },
+    "projectChecks": [
+      {
+        "command": [
+          "/home/jacobt/src/pen/target/release/pen",
+          "codegen",
+          "--check"
+        ],
+        "exit": 0,
+        "seconds": 0.0498
+      },
+      {
+        "command": [
+          "/home/jacobt/src/pen/target/release/pen",
+          "check"
+        ],
+        "exit": 0,
+        "seconds": 10.9547
+      }
+    ],
+    "benchShortReference": {
+      "format": 1,
+      "pen": "0.1.0",
+      "build": null,
+      "runtime": "wasmtime 49.0.3, engine 9f4580cb07cde3e0",
+      "game": "a3168c17bd3374f7",
+      "frames": 300,
+      "warmup": 120,
+      "runs": 3,
+      "metrics": {
+        "guest_mean_ms": 0.17351024444444446,
+        "guest_median_ms": 0.12270400000000001,
+        "guest_p95_ms": 0.438646,
+        "load_ms": 4682.426489,
+        "snapshot_median_ms": 0.591958
+      }
+    },
+    "benchShortCurrent": {
+      "format": 1,
+      "pen": "0.1.0",
+      "build": null,
+      "runtime": "wasmtime 49.0.3, engine 9f4580cb07cde3e0",
+      "game": "057d588367bc2381",
+      "frames": 300,
+      "warmup": 120,
+      "runs": 3,
+      "metrics": {
+        "guest_mean_ms": 0.12078573333333335,
+        "guest_median_ms": 0.111302,
+        "guest_p95_ms": 0.167148,
+        "load_ms": 4099.770833,
+        "snapshot_median_ms": 0.5406299999999999
+      }
+    },
+    "benchLongCurrent": {
+      "format": 1,
+      "pen": "0.1.0",
+      "build": null,
+      "runtime": "wasmtime 49.0.3, engine 9f4580cb07cde3e0",
+      "game": "057d588367bc2381",
+      "frames": 200000,
+      "warmup": 120,
+      "runs": 1,
+      "metrics": {
+        "guest_mean_ms": 0.1736788741444862,
+        "guest_median_ms": 0.113466,
+        "guest_p95_ms": 0.471899,
+        "load_ms": 4535.432274,
+        "snapshot_median_ms": 0.556631
+      }
+    },
+    "timingContext": "Short frame samples shared the host with other work. Compare outputs or retention here. Use isolated repetitions for a speed claim."
+  },
+  "compilerGate": {
+    "firstInvocationPassed": false,
+    "phaseWallSeconds": {
+      "harness": 4.977,
+      "release-build": 313.709,
+      "reference-direct": 0.318,
+      "reference-uniqueness": 4.708,
+      "reference-fixtures": 6.731,
+      "pack": 0.953,
+      "guests": 27.543
+    },
+    "initialGuestFailure": "native_asset_client transient ETXTBSY spawning its temporary peer after 995 passed, 1 failed and 99 ignored",
+    "retry": {
+      "command": "deno task test:guest --jobs 2",
+      "sameCompiler": true,
+      "passed": 1074,
+      "failed": 0,
+      "ignored": 101,
+      "wallSeconds": 60.016
+    }
+  },
+  "ownershipInventory": {
+    "approximateStoreLines": 1558,
+    "lentFunctions": 55,
+    "scope": "Ink lib/tests; Gdev src/tests/test_support/devtools/performance",
+    "gdevSrcFunctionScan": {
+      "functions": 1853,
+      "takeAccess": 647,
+      "directWriters": 278,
+      "includingTransitiveWriters": 320,
+      "alreadyOwn": 108
+    }
+  },
+  "raw": {
+    "path": "2026-11-17-owned-save-restore.raw.json.gz",
+    "sha256": "60401d12886910d5ac4448c5279101a3602610629a06be8ea7fefe771c49a681",
+    "bytes": 363103,
+    "contents": "Per-module and per-test outcomes, baseline patch and logs, packet manifest, encoded first-frame PNG, release and retry receipts, heap and sparse witnesses."
+  }
+}

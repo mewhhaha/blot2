@@ -8,13 +8,16 @@ are matched by name through the module's imports, so it is approximate). The
 list goes to build/scratch/gdev-writers.json. It sizes the systems layer of
 tasks/MEMORY_MODEL.md.
 """
-import re,glob,os,collections,json
-root='/home/user/gdev/src'
+import re,os,collections,json
+from pathlib import Path
+
+checkout = Path(__file__).resolve().parents[2]
+root = (checkout.parent / 'gdev/src').resolve(strict=True)
 defs={}   # (module, name) -> dict
 mods={}
-for f in sorted(glob.glob(root+'/**/*.blot',recursive=True)):
+for f in sorted(root.rglob('*.blot')):
     mod=os.path.relpath(f,root)[:-5]
-    s=open(f).read(); L=s.split('\n')
+    s=f.read_text(); L=s.split('\n')
     imports={}
     for m in re.finditer(r'^import \* as (\w+) from "([^"]+)"',s,re.M):
         t=m.group(2)
@@ -60,4 +63,6 @@ while changed:
 print('writers through calls too',len(W),'already own',sum(defs[k]['own'] for k in W))
 bym=collections.Counter(k[0] for k in W)
 print(len(bym),'modules;', bym.most_common(12))
-json.dump(sorted([list(k) for k in W]),open('/home/user/blot2/build/scratch/gdev-writers.json','w'))
+output = checkout / 'build/scratch/gdev-writers.json'
+output.parent.mkdir(parents=True, exist_ok=True)
+output.write_text(json.dumps(sorted(W)) + '\n')
