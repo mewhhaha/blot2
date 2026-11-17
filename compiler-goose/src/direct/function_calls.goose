@@ -3,6 +3,161 @@
 namespace blot_direct_function;
 import .function;
 
+// Generic requirements specialize in the caller's evidence context. A
+// closed use in a body can instead select its defining module's evidence.
+fn requiresEvidence(g: const Generator&, target: BindingRef) -> bool {
+    if !g.hasUnit(target.unit) { return false; }
+    let m .= g.units[target.unit - 1];
+    if target.binding >= m.bindings.len { return false; }
+    let body .= m.body(target.binding);
+    if !body { return false; }
+    if m.node(body.root).tag == blot_check_core::Tag.contract_method { return true; }
+    let goals = body.scheme.obligations;
+    for obligation in m.obligations[goals.start..goals.start + goals.len] {
+        if obligation.kind == blot_check_types::ObligationKind.contract { return true; }
+    }
+    return false;
+}
+fn evidenceContext(g: Generator&, f: const Fn&, target: BindingRef, id: u32) -> u32 {
+    if !requiresEvidence(g, target) { return 0; }
+    if f.evidence_context == 0 { return f.unit; }
+    if id != 0 && f.unit != f.evidence_context {
+        let m .= g.units[f.unit - 1];
+        var signature = m.typeOf(id);
+        if m.node(id).tag == blot_check_core::Tag.call { signature = m.call(id).callee_type; }
+        let _, error = g.types.lower(m, signature, Env {});
+        if error == blot_direct_types::Error.none { return f.unit; }
+    }
+    return f.evidence_context;
+}
+
+// Effectful dictionary applications need closure sequencing through binding,
+// partial application and return. Only the pure signatures use this path.
+fn pureContractMethod(m: const Module&, index: u32) -> bool {
+    var ty = m.binding(m.member_templates[index].binding).ty;
+    while true {
+        let shape = m.types.node(ty);
+        match shape.tag {
+            forall, usage => { ty = shape.a; },
+            function => {
+                let row = m.types.row(shape.c);
+                if row.tail != blot_check_effects::Tail.closed || row.labels.len != 0 { return false; }
+                ty = shape.b;
+            },
+            _ => { return true; },
+        }
+    }
+    return false;
+}
+
+// Contract member symbols are local to each Core module. The members in
+// both copies of the declaration follow the original declaration order.
+fn memberName(origin: const Module&, context: const Module&, template: blot_reuse_principal_interface::MemberTemplate) -> u32 {
+    if origin.unit == context.unit { return template.name; }
+    for declared in origin.contracts {
+        if declared.identity != template.contract { continue; }
+        for member, index in origin.contract_members[declared.members.start..declared.members.start + declared.members.len] {
+            if member.name != template.name { continue; }
+            for observed in context.contracts {
+                if observed.identity == template.contract && index < observed.members.len {
+                    return context.contract_members[observed.members.start + index].name;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+// Lowered Wasm function types omit effect rows. Comparing them would merge
+// separate implementation heads and could select the wrong proof.
+recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64) -> bool {
+    if depth >= 256 { return false; }
+    let shape = g.types.node(ty);
+    match shape.tag {
+        unit, boolean, u32_, f32_ => { return true; },
+        function, provider, state_provider, never => { return false; },
+        array, list, cursor, grow, resize, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
+        tuple => {
+            for child in g.types.words[shape.a..shape.a + shape.b] {
+                if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
+            }
+        },
+        record => {
+            for index in 0..shape.b {
+                if !hasContractArgumentIdentity(g, g.types.recordField(ty, index).ty, depth + 1) { return false; }
+            }
+        },
+        nominal => {
+            for child in g.types.words[shape.a + 2..shape.a + 2 + shape.b] {
+                if !hasContractArgumentIdentity(g, child, depth + 1) { return false; }
+            }
+        },
+    }
+    return true;
+}
+
+fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Error {
+    let m .= g.units[f.unit - 1];
+    let template = m.member_templates[m.node(id).a];
+    var context = f.evidence_context;
+    if context == 0 { context = f.unit; }
+    let catalog .= g.units[context - 1];
+    let name = memberName(m, catalog, template);
+    for contract in m.contracts {
+        if contract.identity == template.contract && contract.row_parameters.len != 0 {
+            return BindingRef { 0, 0 }, g.fail(m, id, "a contract method with effect row arguments");
+        }
+    }
+    var parameters: Ty[>..<] = [];
+    for argument in m.types.list(template.arguments) {
+        let resolved, error = g.types.lower(m, argument, f.env);
+        if error != blot_direct_types::Error.none { return BindingRef { 0, 0 }, g.typeFailure(m, id); }
+        if !hasContractArgumentIdentity(g, resolved, 0) {
+            return BindingRef { 0, 0 }, g.fail(m, id, "a contract method whose type arguments are not first-order data");
+        }
+        parameters.push(resolved);
+    }
+    var target = BindingRef { 0, 0 };
+    for proof in catalog.selected_proofs {
+        if proof.kind != blot_reuse_principal_interface::SelectedProofKind.implementation || proof.contract != template.contract || proof.context != context { continue; }
+        let actual = catalog.types.list(proof.arguments);
+        if actual.len != parameters.len { continue; }
+        var matches = true;
+        for argument, index in actual {
+            let resolved, error = g.types.lower(catalog, argument, Env {});
+            if error != blot_direct_types::Error.none || resolved != parameters[index] { matches = false; break; }
+        }
+        if !matches { continue; }
+        for member in catalog.selected_members[proof.members.start..proof.members.start + proof.members.len] {
+            if member.name != name || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+            let candidate = g.resolve(catalog, BindingRef { member.target.unit, member.target.binding });
+            if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
+            target = candidate;
+        }
+    }
+    if target.binding == 0 {
+        return BindingRef { 0, 0 }, g.fail(m, id, "contract method has no selected implementation in its evidence context");
+    }
+    return target, blot_direct_types::Error.none;
+}
+recursive fn staticContractMethod(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let target, error = staticContractTarget(g, f, id);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    let arguments = m.children(id);
+    let values = g.reserveVals(arguments.len);
+    for argument, index in arguments {
+        let value, error = expr(g, f, argument);
+        if error != blot_direct_types::Error.none { return value, error; }
+        g.s.vals[values.start + index] = value;
+    }
+    let result, error = typeOf(g, f, id);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    let signature, error = curried(g, values, result);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    return callTarget(g, f, target, values, signature, result, id);
+}
+
 // Marks a primitive node (rather than a binding) as a partial target.
 let primitive_node_bit: u32 = 0x80000000;
 
@@ -66,7 +221,7 @@ fn primitiveFunction(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 // A global array constant: one persistent owner per instance, initialized on
 // first use.
 fn pool(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Error {
-    let key = InstanceKey { blot_direct_emit::InstanceKind.pool, target.unit, target.binding, ty, 0 };
+    let key = InstanceKey { blot_direct_emit::InstanceKind.pool, target.unit, target.binding, ty, 0, 0 };
     var instance, present = g.find(key);
     if !present {
         let created, error = g.addInstanceWith(key, Env {}, Tys {}, ty, false, Tys {}, g.units[f.unit - 1], id);
@@ -440,7 +595,8 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
         // itself) ends in an ordinary call.
         var value = neverVal();
         var has_value = false;
-        if f.forward_depth < 8 {
+        let evidence_context = evidenceContext(g, f, target, id);
+        if f.forward_depth < 8 && evidence_context == 0 {
             f.forward_depth += 1;
             let forwarded, was_forwarded, error = forward(g, f, tm, body, direct, callee, after, id);
             f.forward_depth -= 1;
@@ -449,7 +605,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             has_value = was_forwarded;
         }
         if !has_value {
-            let instance, error = g.named(target, callee, m, id);
+            let instance, error = g.namedWith(target, callee, false, m, id, evidence_context);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             if g.s.instances[instance].inferring { return neverVal(), g.fail(m, id, "recursion through a function whose result type its body determines"); }
             let instance_parameters = g.s.instances[instance].parameters;
@@ -496,7 +652,7 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
     return value, blot_direct_types::Error.none;
 }
 fn namedValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, id: u32) -> Val, Error {
-    let instance, error = g.named(target, ty, g.units[f.unit - 1], id);
+    let instance, error = g.namedWith(target, ty, false, g.units[f.unit - 1], id, evidenceContext(g, f, target, id));
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     callf(g, g.s.instances[instance].function);
     return received(g, f, ty, id);
@@ -606,9 +762,11 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
     var env = Env {};
     g.types.match_(tm, tm.binding(body.binding).ty, callee, env);
     let inner = tm.call(root);
+    let target = g.resolve(tm, inner.target);
+    if requiresEvidence(g, target) { return neverVal(), false, blot_direct_types::Error.none; }
     let inner_type, error = g.types.lower(tm, inner.callee_type, env);
     if error != blot_direct_types::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
-    let value, error = callTarget(g, f, g.resolve(tm, inner.target), forwarded, inner_type, result, id);
+    let value, error = callTarget(g, f, target, forwarded, inner_type, result, id);
     return value, true, error;
 }
 // The curried function type taking `arguments` and returning `result`.

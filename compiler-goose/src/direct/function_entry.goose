@@ -151,6 +151,7 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     if !g.hasUnit(unit) { unit = g.s.instances[id].site; }
     var f = newFn(g, unit, id);
     f.env = g.s.instances[id].env;
+    f.evidence_context = key.evidence_context;
     let m .= g.units[unit - 1];
     let closure = g.s.instances[id].closure;
     let parameters = g.s.instances[id].parameters;

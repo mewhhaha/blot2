@@ -7,6 +7,60 @@ const executable = Deno.args[0] ??
   new URL("../../compiler-goose/build/blotc-goose", import.meta.url);
 const prelude = new URL("../../std/prelude.blot", import.meta.url).pathname;
 
+Deno.test("contract methods select caller evidence and preserve a defining module's private implementation", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  try {
+    await Deno.writeTextFile(`${directory}/convert.blot`, `
+type Read a is contract = { const read: a -> U32 }
+private impl Inside : Read U32 = {
+  const read = func (value: U32) => return value + 1,
+}
+func generic (value: a): U32 where { Read a } => return Read.read value
+func closed (value: U32): U32 => return Read.read value
+`);
+    await Deno.writeTextFile(entry, `
+import * as convert from "./convert"
+type Wrapped is data = $Wrapped U32
+func doubled (value: Wrapped): U32 => return case value of
+  $Wrapped number => number * 2
+impl Outside : convert.Read Wrapped = {
+  const read = func value => return doubled value,
+}
+func invoke (callback: Wrapped -> U32) -> (value: Wrapped): U32 => return callback value
+entry func run (value: U32): U32 => return convert.generic ($Wrapped value) + convert.closed value
+entry func as_value (value: U32): U32 => return invoke convert.Read.read ($Wrapped value)
+`);
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude,
+    });
+    try {
+      const product = await compiler.build();
+      ok(product.success, JSON.stringify(product));
+      for (const asynchronous of [false, true]) {
+        const guest = await instantiateGuest(product.bytes, { asynchronous });
+        try {
+          if (asynchronous) {
+            equal(await guest.callAsync("run", 42), 127);
+            equal(await guest.callAsync("as_value", 42), 84);
+          } else {
+            equal(guest.call("run", 42), 127);
+            equal(guest.call("as_value", 42), 84);
+          }
+        } finally {
+          guest.dispose();
+        }
+      }
+    } finally {
+      await compiler.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
 Deno.test.ignore("named contracts compose ordinary operations and shaped field requirements without sharing instances", async () => {
   await compileAndRun(

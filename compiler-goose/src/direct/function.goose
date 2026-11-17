@@ -10,6 +10,7 @@
 namespace blot_direct_function;
 import std;
 import check.core;
+import check.effects;
 import check.types;
 import check.storage_ops;
 import check.storage_types;
@@ -53,6 +54,7 @@ struct Fn {
     // type of each expression (dependent field/element results).
     env: Env = Env {},
     instance_id: u32 = 0,
+    evidence_context: u32 = 0,
     // Distinguishes this body's entries in the generator's shared tables.
     serial: u32 = 0,
     // The call node whose arguments are being typed.
@@ -324,6 +326,12 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         storage => { return storageOp(g, f, id); },
         record_merge => { return recordMerge(g, f, id); },
         result_associated => { return resultAssociated(g, f, id); },
+        contract_method => {
+            if !pureContractMethod(m, n.a) {
+                return neverVal(), g.fail(m, id, "contract_method expressions are not supported yet");
+            }
+            return staticContractMethod(g, f, id);
+        },
         operation_value => { return operationValue(g, f, id); },
         effect_provider => { return effectProvider(g, f, id); },
         state_provider => { return stateProvider(g, f, id); },
@@ -500,7 +508,7 @@ recursive fn bindingValue(g: Generator&, f: Fn&, target: BindingRef, ty: Ty, unu
             _ => {},
         }
         // A constant: its instance computes the value.
-        let instance, error = g.namedWith(target, ty, unused, m, id);
+        let instance, error = g.namedWith(target, ty, unused, m, id, evidenceContext(g, f, target, id));
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         opIndex(g, OP_call, g.s.instances[instance].function);
         return received(g, f, ty, id);
@@ -604,7 +612,7 @@ recursive fn layoutFree(g: Generator&, ty: Ty, depth: i64) -> bool {
 // A closure of a type no use determines: calling it traps.
 fn trapClosure(g: Generator&, f: Fn&, ty: Ty, id: u32) -> Val, Error {
     // Never called, so one shared `(env) -> ()` body serves every type.
-    let key = InstanceKey { blot_direct_emit::InstanceKind.trap, f.unit, 0, blot_direct_types::unit, 0 };
+    let key = InstanceKey { blot_direct_emit::InstanceKind.trap, f.unit, 0, blot_direct_types::unit, 0, 0 };
     var instance, present = g.find(key);
     if !present {
         let made, error = g.addInstanceWith(key, Env {}, g.saveTys([blot_direct_types::unit]), blot_direct_types::unit, true, Tys {}, g.units[f.unit - 1], id);
@@ -732,7 +740,9 @@ fn partial(g: Generator&, f: Fn&, kind: InstanceKind, target: BindingRef, ty: Ty
 // The closure taking argument `count` of `target` at function type `full`.
 fn adapter(g: Generator&, f: const Fn&, kind: InstanceKind, target: BindingRef, full: Ty, count: i64, id: u32) -> u32, Error {
     let m .= g.units[f.unit - 1];
-    let key = InstanceKey { kind, target.unit, target.binding, full, count as u32 };
+    var evidence_context: u32 = 0;
+    if kind == blot_direct_emit::InstanceKind.partial { evidence_context = evidenceContext(g, f, target, id); }
+    let key = InstanceKey { kind, target.unit, target.binding, full, count as u32, evidence_context };
     let found, present = g.find(key);
     if present { return found, blot_direct_types::Error.none; }
     let captures = Tys { g.s.tys.len as u32, count as u32 };
@@ -811,7 +821,7 @@ recursive fn closureNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         g.s.vals[captures.start + at] = value;
     }
-    let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, ty, f.instance_id };
+    let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, ty, f.instance_id, f.evidence_context };
     var instance, present = g.find(key);
     if !present {
         let capture_types = Tys { g.s.tys.len as u32, captures.len };
@@ -840,7 +850,7 @@ recursive fn inferredClosure(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     let marker, error = g.types.function(parameter, blot_direct_types::never);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, marker, f.instance_id };
+    let key = InstanceKey { blot_direct_emit::InstanceKind.lambda, m.unit, id, marker, f.instance_id, f.evidence_context };
     var instance, present = g.find(key);
     if !present {
         let capture_types = Tys { g.s.tys.len as u32, captures.len };
@@ -867,7 +877,7 @@ fn operationValue(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let arrow = g.types.node(signature);
     if arrow.tag != blot_direct_types::Tag.function { return neverVal(), g.fail(m, id, "operation of a non-function type"); }
     let operation_id = g.operationId(operation);
-    let key = InstanceKey { blot_direct_emit::InstanceKind.operation, 0, operation_id, signature, 0 };
+    let key = InstanceKey { blot_direct_emit::InstanceKind.operation, 0, operation_id, signature, 0, 0 };
     var instance, present = g.find(key);
     if !present {
         let made, error = g.addInstanceWith(key, Env {}, g.saveTys([arrow.a]), arrow.b, true, Tys {}, m, id);

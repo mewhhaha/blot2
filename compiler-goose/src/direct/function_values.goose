@@ -120,7 +120,7 @@ recursive fn scalar(g: Generator&, f: Fn&, id: u32) -> Val, Error {
 fn calleeOf(g: Generator&, f: const Fn&, target: BindingRef, arguments: Vals, id: u32) -> Ty, Error {
     let types = Tys { g.s.tys.len as u32, arguments.len };
     for at in 0..(arguments.len as i64) { g.s.tys.push(g.s.vals[arguments.start + at].ty); }
-    return g.calleeFromArguments(target, types, g.units[f.unit - 1], id);
+    return g.calleeFromArguments(target, types, g.units[f.unit - 1], id, evidenceContext(g, f, target, id));
 }
 // The machine operation an operator or member `member` (a symbol, or zero to
 // look up `op`'s operator) applies to a U32, F32 or Bool receiver. The

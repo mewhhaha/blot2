@@ -77,16 +77,18 @@ fn kindName(kind: InstanceKind) -> Chars {
         operation => { return "operation"; }, state_get => { return "state_get"; }, state_set => { return "state_set"; },
     }
 }
-struct InstanceKey { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0 }
+struct InstanceKey { kind: InstanceKind, unit: u32, id: u32, ty: Ty, parent: u32 = 0, evidence_context: u32 = 0 }
 fn sameKey(left: InstanceKey, right: InstanceKey) -> bool {
-    return left.kind == right.kind && left.unit == right.unit && left.id == right.id && left.ty == right.ty && left.parent == right.parent;
+    return left.kind == right.kind && left.unit == right.unit && left.id == right.id && left.ty == right.ty && left.parent == right.parent && left.evidence_context == right.evidence_context;
 }
 fn hashKey(key: InstanceKey) -> u64 {
     var h = ::hash(kindCode(key.kind));
     h = ::hash_combine(h, ::hash(key.unit));
     h = ::hash_combine(h, ::hash(key.id));
     h = ::hash_combine(h, ::hash(key.ty));
-    return ::hash_combine(h, ::hash(key.parent));
+    h = ::hash_combine(h, ::hash(key.parent));
+    if key.evidence_context == 0 { return h; }
+    return ::hash_combine(h, ::hash(key.evidence_context));
 }
 struct Instance {
     key: InstanceKey,
@@ -739,10 +741,10 @@ fn within(g: Generator&, m: const Module&, ty: TId, reach: i64) -> bool {
 // --- Instances ----------------------------------------------------------
 
 // The instance of a named function at concrete function type `ty`.
-recursive fn named(g: Generator&, target: BindingRef, ty: Ty, site: const Module&, site_id: u32) -> u32, Error { return namedWith(g, target, ty, false, site, site_id); }
+recursive fn named(g: Generator&, target: BindingRef, ty: Ty, site: const Module&, site_id: u32) -> u32, Error { return namedWith(g, target, ty, false, site, site_id, 0); }
 // `named`, where `unused_holes` says every hole of `ty` is unused.
-recursive fn namedWith(g: Generator&, target: BindingRef, ty: Ty, unused_holes: bool, site: const Module&, site_id: u32) -> u32, Error {
-    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, 0 };
+recursive fn namedWith(g: Generator&, target: BindingRef, ty: Ty, unused_holes: bool, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
+    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, ty, 0, evidence_context };
     let found, present = find(g, key);
     if present { return found, blot_direct_types::Error.none; }
     let m .= unitModule(g, target.unit);
@@ -860,7 +862,7 @@ fn nameFunction(g: Generator&, function: u32, key: InstanceKey) {
 // The concrete type of `target` when applied to arguments of the types
 // `arguments`: its parameter types fix its variables, obligations the
 // dependent ones.
-recursive fn calleeFromArguments(g: Generator&, target: BindingRef, arguments: Tys, site: const Module&, site_id: u32) -> Ty, Error {
+recursive fn calleeFromArguments(g: Generator&, target: BindingRef, arguments: Tys, site: const Module&, site_id: u32, evidence_context: u32) -> Ty, Error {
     let m .= unitModule(g, target.unit);
     let binding = m.binding(target.binding);
     var env = Env {};
@@ -890,7 +892,7 @@ recursive fn calleeFromArguments(g: Generator&, target: BindingRef, arguments: T
     if !body { return 0, typeFailure(g, site, site_id); }
     let parameters = m.bodyParameters(body);
     if !body.is_function || arguments.len < parameters.len { return 0, typeFailure(g, site, site_id); }
-    let instance_id, error = namedByParameters(g, target, Tys { arguments.start, parameters.len as u32 }, site, site_id);
+    let instance_id, error = namedByParameters(g, target, Tys { arguments.start, parameters.len as u32 }, site, site_id, evidence_context);
     if error != blot_direct_types::Error.none { return 0, error; }
     var full = g.s.instances[instance_id].result;
     var at = parameters.len;
@@ -900,10 +902,10 @@ recursive fn calleeFromArguments(g: Generator&, target: BindingRef, arguments: T
         if error != blot_direct_types::Error.none { return 0, error; }
         full = wrapped;
     }
-    indexPut(g, InstanceKey { InstanceKind.named, target.unit, target.binding, full, 0 }, instance_id);
+    indexPut(g, InstanceKey { InstanceKind.named, target.unit, target.binding, full, 0, evidence_context }, instance_id);
     return full, blot_direct_types::Error.none;
 }
-recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys, site: const Module&, site_id: u32) -> u32, Error {
+recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys, site: const Module&, site_id: u32, evidence_context: u32) -> u32, Error {
     var marker = blot_direct_types::never;
     var at = arguments.len as i64;
     while at != 0 {
@@ -912,7 +914,7 @@ recursive fn namedByParameters(g: Generator&, target: BindingRef, arguments: Tys
         if error != blot_direct_types::Error.none { return 0, error; }
         marker = wrapped;
     }
-    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, marker, 0 };
+    let key = InstanceKey { InstanceKind.named, target.unit, target.binding, marker, 0, evidence_context };
     let found, present = find(g, key);
     if present { return found, blot_direct_types::Error.none; }
     let m .= unitModule(g, target.unit);
@@ -992,7 +994,7 @@ recursive fn solveObligations(g: Generator&, m: const Module&, goals_span: blot_
             let target, has_target = dispatchTarget(g, m, identity, goal.name, blot_check_types::Operator.none);
             if !has_target { continue; }
             g.s.solve_depth += 1;
-            let callee, error = calleeFromArguments(g, target, saveTys(g, [receiver]), m, 0);
+            let callee, error = calleeFromArguments(g, target, saveTys(g, [receiver]), m, 0, 0);
             g.s.solve_depth -= 1;
             if error != blot_direct_types::Error.none {
                 if error == blot_direct_types::Error.unsupported { dropFailure(g); continue; }

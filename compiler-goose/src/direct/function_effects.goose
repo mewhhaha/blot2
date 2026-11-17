@@ -165,7 +165,7 @@ fn pushFrame(g: Generator&, f: Fn&, operation_id: u32, slot: u32, environment: u
 }
 // A local holding the table slot of a state cell accessor closure.
 fn stateAccessor(g: Generator&, f: Fn&, kind: InstanceKind, state: Ty, id: u32) -> u32, Error {
-    let key = InstanceKey { kind, 0, 0, state, 0 };
+    let key = InstanceKey { kind, 0, 0, state, 0, 0 };
     var parameter = state;
     var result = blot_direct_types::unit;
     if kind == blot_direct_emit::InstanceKind.state_get { parameter = blot_direct_types::unit; result = state; }
