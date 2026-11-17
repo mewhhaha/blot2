@@ -10,6 +10,10 @@ the block or a lambda in it binds WORLD itself. Stores stay stores; the
 compiler decides later which can be updates. unalias.py does the same in
 functions that take the world with `own`, with a check after each file;
 this one covers test lambdas and leaves the checking to the caller.
+
+Do not use it where a name gives a growable field its type: pushes and
+slices through `WORLD.FIELD.rows` do not type check when WORLD has no
+written type. Bind the name again after the hand-over instead.
 """
 import re,sys,os
 sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)))

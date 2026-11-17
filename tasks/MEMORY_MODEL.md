@@ -957,6 +957,44 @@ needed, beyond the recipes above:
   `scripts/integration/paths_for_parts.py` replaces names for parts by
   paths in any block, test lambdas included.
 
+**Saving and restoring (17 November 2026).** About 40 of the functions
+`own_closure.py` left out were the `decode_into` and `reset_storage`
+functions the save schema hands to `persist.restore_into` as values. The
+whole path now takes the world over:
+
+- Ink's `persist` restore helpers take what they restore with `own` and
+  return it; `restore_into` hands the world to its `decode_into` and
+  `reset` and returns it; `persist.decode_state schema values decode_schema
+  (own access)` returns `(report, access)` and keeps its section, outcome
+  and report buffers to itself.
+- The host calls `initialize`, `keep`, `decode_state` and `decode_scene`
+  with the world given (`(own access)`); the decoders return the report
+  beside the world, and the host appends the report.
+- The scene history no longer decodes for its caller: `step_to` returns
+  the index and a copy of the lanes, `moved` makes it current, `stashed`
+  copies the stash. The copy is the price of decoding while the history is
+  part of the world being replaced; it happens on undo, redo and leaving
+  play, not per frame.
+- The hooks record (a function value the world holds) only lends the
+  world, so its `restore_scene` became a request that
+  `world.restored_after` carries out right after the call that made it;
+  `reset_salt` keeps a lent twin (`reset_starting_salt_into`), and so does
+  `robots.reset_builders_storage` (`reset_builders_into`) for
+  `construction.relocate`, which the build bar holds as a value.
+- `brush_codec` captured the world's face buffer while the brush pools
+  were given away; the faces are now decoded into a buffer of their own
+  and copied in after.
+
+A backend limit met on the way: a function value whose world parameter
+has no written type, handed to a generic helper (`persist.decode_scene …
+decode_scene_schema access`), can leave its type open
+(`storage_unsupported`); writing the parameter's type settles it.
+
+`paths_for_parts.py` is not for names that give a growable field its type:
+`@storage.push access.part.rows v` and `&access.part.rows[a..b]` do not
+type check when the world has no written type. Bind the name again after
+the hand-over instead.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes
