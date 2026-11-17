@@ -9,6 +9,22 @@ has no counted ownership hooks, resource adapters, cleanup schemas or language
 tasks. Hosts reject a module that combines this version with those extensions.
 Pen native metadata version 2 requires older packages to be rebuilt.
 
+### ABI 8 invocation finish
+
+An ABI 8 module can declare a single `blot:invocation` custom section with
+the payload byte `1`. It then exports `blot:finish_invocation` with no
+parameters and one WebAssembly `i32` result. Scalar-only modules can declare
+the hook without exporting a packet arena. Existing ABI 8 modules without the
+section or hook still load and reclaim a trapped invocation on the next entry.
+
+A host calls the hook after the invocation returns and its result has been
+copied out, or after the invocation traps. A suspended host callback is still
+part of the active invocation. The hook releases temporary owners, rewinds
+scratch and effect frames, and clears the guest's host callback references.
+It leaves application pools and packet transport alone. The result counts
+the temporary owners reclaimed by that call. Calling it again while idle
+reclaims zero additional owners. The host resets the packet arena separately.
+
 During the compiler migration, ordinary programs can still emit earlier
 profiles. The sections below document those existing profiles as well as the
 shared scalar, packet and callback representation. Unconditional data-stack

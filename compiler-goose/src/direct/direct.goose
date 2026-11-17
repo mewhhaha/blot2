@@ -129,6 +129,7 @@ fn build(g: Generator&, entry: u32, bytes: u8[>..<]&) -> Error {
     blot_direct_writer::uleb(abi, inits.len as! u64);
     blot_direct_writer::raw(abi, constants[..]);
     g.module.custom("blot:abi", abi[..]);
+    if count != 0 { blot_direct_function::emitInvocationFinish(g, m); }
     blot_direct_writer::assemble(g.module, bytes);
     return blot_direct_types::Error.none;
 }

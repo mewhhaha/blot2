@@ -144,7 +144,7 @@ entry const checked = func (index: U32) => return do:
       equal(WebAssembly.Module.imports(module).length, 0);
       equal(
         WebAssembly.Module.exports(module).every(({ name }) =>
-          ["answer", "resized", "frozen", "checked"]
+          ["answer", "resized", "frozen", "checked", "blot:finish_invocation"]
             .includes(name)
         ),
         true,

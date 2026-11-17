@@ -56,6 +56,7 @@ Deno.test("explicit capabilities implement source effects, with no domain import
     equal(guest.read("count"), 12);
     equal(guest.abi, {
       version: 8,
+      invocationFinish: true,
       functions: [
         {
           name: "main",

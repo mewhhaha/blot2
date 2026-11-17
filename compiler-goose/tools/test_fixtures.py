@@ -13,6 +13,11 @@ The record of `direct/boxed_records.blot` is this compiler's (16 November
 block, and a loop that carries a boxed value releases an iteration's memory
 when the value came out as it went in. tests/guest runs the program.
 
+The ABI 8 invocation-finish extension (17 November 2026) re-recorded the Wasm
+bytes and function counts of exported programs. The audit compared the same
+sources before and after the change: it added the hook, its optional ABI
+section and any required signature without changing existing function bodies.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

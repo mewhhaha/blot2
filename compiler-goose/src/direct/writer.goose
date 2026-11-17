@@ -95,6 +95,7 @@ let OP_f32_convert_i32_s: Op = 0xb2;
 let OP_f32_convert_i32_u: Op = 0xb3;
 let OP_i32_reinterpret_f32: Op = 0xbc;
 let OP_f32_reinterpret_i32: Op = 0xbe;
+let OP_ref_null: Op = 0xd0;
 let OP_prefix_fc: Op = 0xfc;
 let OP_prefix_fd: Op = 0xfd;
 

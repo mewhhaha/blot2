@@ -385,6 +385,30 @@ fn releaseEntry(g: Generator&) {
     callf(g, release);
 }
 
+// Called by the host after the final result has been copied, or after a trap.
+fn emitInvocationFinish(g: Generator&, m: const Module&) {
+    let function = g.module.addFunction(g.module.signature([], [VT_i32]));
+    var f = newFn(g, m.unit, 0);
+    let owner_top = g.runtime_().owner_top;
+    let before = local(g, f, VT_i32);
+    gget(g, owner_top);
+    lset(g, before);
+    resetEntry(g);
+    for slot in 0..g.module.host_slots {
+        i32Const(g, slot);
+        op(g, blot_direct_writer::OP_ref_null);
+        op(g, VT_externref);
+        opIndex(g, OP_table_set, 1);
+    }
+    lget(g, before);
+    gget(g, owner_top);
+    op(g, OP_i32_sub);
+    op(g, OP_end);
+    finish(g, function, f);
+    g.module.exportItem("blot:finish_invocation", blot_direct_writer::EXPORT_function, function);
+    g.module.custom("blot:invocation", [1]);
+}
+
 // An exported scalar constant: a global its init function sets from the
 // constant's instance. Returns the init function; the caller writes the ABI.
 fn emitConstantExport(g: Generator&, m: const Module&, body: const blot_check_core::Body&, abi: u8[>..<]&) -> u32, Error {

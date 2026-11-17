@@ -80,6 +80,7 @@ export interface GuestAbi {
   readonly resourceAdapterCount?: number;
   readonly resourceTransfer?: boolean;
   readonly publicOwners?: boolean;
+  readonly invocationFinish?: true;
 }
 
 const dataTypeBrand = Symbol("CleanupDataType");
@@ -555,6 +556,20 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
     transferImports.add("drain");
   }
   const actualExports = WebAssembly.Module.exports(module);
+  const invocation = WebAssembly.Module.customSections(
+    module,
+    "blot:invocation",
+  );
+  if (invocation.length !== 0) {
+    const versionBytes = new Uint8Array(invocation[0]);
+    if (
+      version !== 8 || invocation.length !== 1 ||
+      versionBytes.length !== 1 || versionBytes[0] !== 1
+    ) {
+      throw new GuestError("invalid_abi", "Invalid invocation finish section");
+    }
+    declare("blot:finish_invocation", "function");
+  }
   const ownership = WebAssembly.Module.customSections(module, "blot:ownership");
   if (version === 8 && ownership.length !== 0) {
     throw new GuestError(
@@ -687,6 +702,9 @@ export function readGuestAbi(module: WebAssembly.Module): GuestAbi {
   }
   if (version === 6 || version === 7) {
     Object.assign(result, { resourceTransfer: transfer, publicOwners });
+  }
+  if (invocation.length !== 0) {
+    Object.assign(result, { invocationFinish: true });
   }
   if (dataSchemas) abiDataSchemas.set(result, dataSchemas);
   return Object.freeze(result);
@@ -884,6 +902,8 @@ type InvokeCallback = (value: GuestValue | DataValue) => unknown;
 export interface Guest {
   /** Committed linear-memory bytes, including temporary allocation capacity. */
   memoryBytes(): number;
+  /** Temporary owners reclaimed by the previous invocation's finish hook. */
+  lastReclaimedOwners(): number | undefined;
   readonly abi: GuestAbi;
   capability<P extends ValueType, R extends ValueType>(
     callback: HostCallback<P, R>,
@@ -1670,6 +1690,33 @@ export async function instantiateGuest(
       });
     }
   }
+  let finishInvocation: (() => number) | undefined;
+  let reclaimedOwners: number | undefined;
+  if (abi.invocationFinish) {
+    const exit = instance.exports["blot:finish_invocation"];
+    if (typeof exit !== "function") {
+      throw new GuestError("invalid_abi", "Missing invocation finish hook");
+    }
+    try {
+      new WebAssembly.Instance(
+        resourceModule([[1, 96, 0, 1, 127], [
+          1,
+          ...resourceName("g"),
+          ...resourceName("f"),
+          0,
+          0,
+        ]]),
+        { g: { f: exit } },
+      );
+    } catch (cause) {
+      throw new GuestError(
+        "invalid_abi",
+        "Invalid invocation finish signature",
+        { cause },
+      );
+    }
+    finishInvocation = exit as () => number;
+  }
   let entered = false;
   const memory = instance.exports["blot:memory"];
   const allocate = instance.exports["blot:allocate"];
@@ -2082,6 +2129,15 @@ export async function instantiateGuest(
           failure = cause;
         }
       }
+      reclaimedOwners = undefined;
+      try {
+        reclaimedOwners = finishInvocation?.();
+      } catch (cause) {
+        if (!failed) {
+          failed = true;
+          failure = cause;
+        }
+      }
       try {
         arena?.reset(0);
       } catch (cause) {
@@ -2123,6 +2179,7 @@ export async function instantiateGuest(
 
   return {
     abi,
+    lastReclaimedOwners: () => reclaimedOwners,
     memoryBytes: () => {
       if (memory instanceof WebAssembly.Memory) return memory.buffer.byteLength;
       return 0;

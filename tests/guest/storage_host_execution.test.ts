@@ -223,7 +223,7 @@ entry const next = func () => return do:
       );
       assert.deepEqual(
         WebAssembly.Module.exports(module).map(({ name }) => name),
-        ["next"],
+        ["next", "blot:finish_invocation"],
       );
       assert.equal(guest.call("next", null), 42);
       assert.equal(guest.call("next", null), 43);
