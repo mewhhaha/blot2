@@ -18,6 +18,90 @@ zig compiler". Both are done: the compiler is the Goose one in
 compiler-goose/, and compiler/ (Zig) is gone. The record is in
 [tasks/GOOSE_PORT.md](tasks/GOOSE_PORT.md). Next is compile times.
 
+## Where it stopped (17 November 2026, evening)
+
+The owner said "Stop now and push everything to main with a CONTINUE.md".
+Everything below was pushed to `main` in blot2, Ink, Gdev and Pen as it
+stood, mid-round. Read this before anything else.
+
+**The thread:** removing the `=` mutation store (the owner chose the
+explicit form: a writer takes what it changes with `own`, returns it, and
+the caller rebinds; `let x = …` stays). Notes and rules:
+[tasks/MEMORY_MODEL.md](tasks/MEMORY_MODEL.md), sections from "The
+generated encoders" on. About 1,580 stores were left before the round in
+progress (count with `python3 scripts/integration/count_stores.py ../ink/lib
+../ink/tests ../gdev/src ../gdev/tests ../gdev/test_support ../gdev/devtools
+../gdev/performance`).
+
+**Verified and on main before the stop:** the generated Pen encoders, the
+second and third layers of Gdev functions that own the world, the Ink
+modules the game does not use (except physics), and the compiler rules
+those needed (blot2 gate: 1,175 cases, 0 failures). At each of those steps
+Gdev's packets over 120 frames were byte-identical, Gdev's tests were
+391 passed / 67 failed / 107 did not compile module by module as before,
+and Ink's were 268 passed / 1 failed / 3 did not compile.
+
+**The round in progress (the save/restore vertical), not fully verified:**
+the save schema, the ~40 `decode_into`/`reset_storage` functions it hands to
+`persist.restore_into`, Ink's `persist` helpers, the host's `initialize`/
+`keep`/`decode_state`/`decode_scene` hooks and the scene history now take
+the world with `own` (tasks/MEMORY_MODEL.md, "Saving and restoring").
+Then seven workers brought Gdev's tests, fixtures, devtools and
+performance programs in line. What was checked:
+
+- `gdev/src/main.blot` and `devtools/main.blot` check clean, and Gdev's
+  packets over 120 frames are byte-identical (checked mid-round, before the
+  test conversions; the game's code did not change after that).
+- Ink checks 62 of 65 clean (as before) and its suite was at baseline
+  (268/1/3) with Ink's side of the round in.
+- Gdev's check over all entries: 219 of 231 clean. Besides the six known
+  failures (salt_hauling_split, gizmos, codec_domains, three rejected
+  tests), these still call `world.decode_state`/`decode_scene` in the old
+  shape (`world.decode_state access values destination`); they need
+  `let (report, access) = world.decode_state access values` and the
+  enclosing function owning the world:
+  `test_support/rocket_mornings.blot` (99),
+  `test_support/traps_codec_rejects_fixture.blot` (81, 120, 131),
+  `tests/codec_saved_state.blot` (87, 102, 626),
+  `tests/restore_game.blot` (30, 36); `tests/rocket_mornings.blot`,
+  `traps/codec_rejects.blot` and `traps/codec_values.blot` fail only
+  because of those fixtures.
+- **Not run for this round:** Gdev's test suite (`cd ../gdev &&
+  ../pen/target/release/pen test-blot`; compare module by module with
+  `build/scratch/tcmp4.py build/scratch/gdev-test-l3.txt NEW` against the
+  third layer's run), the benchmark, the long run, the blot2 gate. Do those
+  first, after fixing the files above.
+- The workers reported their choices (all claimed to keep values the
+  same): a few tests copy what they used to pass as views of the world;
+  `tests/progression.blot` rebuilds a research record with a copied order
+  view; several helpers moved reads before or after a hand-over. A worker
+  warned that commit 379e1f6 caught `tests/recruit_notices.blot` mid-edit;
+  the pushed tree has the finished file.
+
+**Held back on Ink's working branch:** the physics conversion (rigid,
+joints, physics, prepared, springs), commit 58e6b02: with the step owned
+round the tick loop the backend releases nothing per iteration and
+`tests/prepared-physics.blot` runs out of stack (task: a backend release
+that keeps what an iteration carries out; tasks/MEMORY_MODEL.md).
+
+**Next, in order:** fix the five files above; run the verification above;
+then the functions `own_closure.py` still leaves out (those that return a
+value need `(result, access)`; those called on a world a closure captures
+need restructuring; the hooks record and Ink's editor chain, which still
+lend the world); Ink's library modules the game uses; then delete `=`,
+`lent`, `migrate-stores` and the report switches and bring spec 10.3 in
+line. Open limits of the ownership pass that the workers met are listed
+in tasks/MEMORY_MODEL.md and in the task list (a name bound to a result
+that passes a borrow through, names captured by lambdas, names read last
+in nested loops, a comprehension over a view of an untyped world's field).
+
+Tools (scripts/integration/): `own_closure.py` (pick and convert a closed
+set of functions), `ownify.py`, `unalias.py`, `harvest_stores.py`,
+`own_restores.py`, `paths_for_parts.py` (not for names that type a
+growable field), `count_stores.py`. Worker briefs that worked well are in
+the session scratchpad, not in the repository; the rules they state are in
+tasks/MEMORY_MODEL.md.
+
 ## State on main (16 November 2026)
 
 - **One compiler, written in Goose** (compiler-goose/). The Zig compiler it
