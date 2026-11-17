@@ -1049,6 +1049,17 @@ The other arguments of such a call are lent as in any call and are their
 holder's own again after it. One call cannot be both lent a value and
 given it: `mixed world.robots world.robots` is `own_argument`.
 
+A function written against any record with certain fields can index and
+update through them without saying what kind of array each is; the element
+type comes from the record it is called with:
+
+```blot
+func count (own access) => return do:
+  access.log[0] := access.log[0] + 1    // an Array, a GrowArray or a ResizeArray
+  access.log.push 7                      // then it must be one that grows
+  break access
+```
+
 Because `own` before a name marks what follows it, `own` itself names
 nothing: a local, a parameter or a constant called `own` is
 `own_parameter`.

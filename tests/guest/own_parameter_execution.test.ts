@@ -423,6 +423,51 @@ func World.grow (world: own World) -> (amount: U32): World => return do:
   break world
 `;
 
+// A function written against "any record with these fields" reads and
+// updates through a field without saying what kind of array it is: the
+// element type waits for the record. A list is still not indexed.
+const systems = `type Item is data = $Item { open: Bool, count: U32 }
+func bump (own access) => return do:
+  let item: Item = access.items[0]
+  item.count := item.count + access.log[0] + access.fixed[1]
+  access.items[0] := item
+  access.log[0] := item.count
+  access.log.push 7
+  access.fixed[0] := access.log.length
+  break access
+func first r => return r.items[0]
+`;
+Deno.test("a field of a record that is not known yet is indexed and updated in place", async () => {
+  const body = `entry func run (n: U32) : U32 => return do:
+  let log: ResizeArray U32 = #[1]
+  let items: ResizeArray Item = #[$Item { open: true, count: n }]
+  let world = { items, log, fixed: #[0, 2] }
+  world := bump world
+  break world.items[0].count * 100 + world.log[0] * 10 + world.fixed[0]
+entry func fixed (n: U32) : U32 => return first { items: #[n, 2] }
+`;
+  await compileAndRun(`${systems}${body}`, (guest) => {
+    equal(guest.call("run", 4), 772);
+    equal(guest.call("fixed", 9), 9);
+  });
+  const built = await project({ main: `import { bump, first, Item } from "./systems"\n${body}`, systems });
+  if (!built.success || !built.bytes) throw new Error(JSON.stringify(built.records));
+  const guest = await instantiateGuest(built.bytes);
+  try {
+    equal(guest.call("run", 4), 772);
+    equal(guest.call("fixed", 9), 9);
+  } finally {
+    guest.dispose();
+  }
+  const list = `entry func run (n: U32) : U32 => return do:
+  let items: List U32 = [n, 2]
+  break first { items }
+`;
+  await compileExpectedFailure(`${systems}${list}`, "type_mismatch");
+  const across = await project({ main: `import { first } from "./systems"\n${list}`, systems });
+  if (across.success) throw new Error("a list was indexed through another module's function");
+});
+
 Deno.test("a call into another module gives its argument away", async () => {
   const built = await project({
     main: `import { damage, World } from "./worlds"

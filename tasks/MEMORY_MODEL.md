@@ -698,6 +698,40 @@ the local as a whole, is `spent_value` meanwhile; other fields stay
 usable. In a loop the local must be one the loop carries. tests/uniqueness
 `l01` to `l10`; `e14` is accepted now.
 
+**The systems the stages call (17 November 2026).** The 66 functions
+that the reset, begin, normalize, interface, event and update stages call
+with the whole world take it with `own` and return it, and the stages
+rebind (`access := salt.update access seconds`). They are converted by
+`python3 scripts/integration/ownify.py MODULE.FUNCTION...`, which rewrites
+the parameter, every way out of the body and every call that stands as a
+statement anywhere in Gdev, and prints what it cannot place. What it had
+to learn about bodies: a `break` with a value ends the block it stands
+in, also inside a loop (a bare `break` leaves the loop); a lambda's body
+is not the function's; a tail `case` whose arms end with `break` stays
+an expression (`let _ = case … of`). Their bodies are unchanged: they
+still write through names for parts of the world and through Ink's
+library. The game's 120 frames of render packets and its final snapshot
+are byte-identical to before (`pen packets`), and 19 test files needed a
+local fix, each because the test's world was not its own at the call.
+
+Still to convert at this level: the `present` stage's draw functions,
+which are given `access.frame` beside `access` (a part cannot be lent
+beside the whole that is given), so they lose that parameter.
+
+**Indexing a field of a record that is not known yet.** A system is
+written against "any record with these fields". `access.log[0]` on such
+a record used to make `log` a fixed `Array`, whatever the caller's record
+held, which is why every system names its parts with a type first (`let
+log: ResizeArray U32 = access.log`) and stores through the name. A name
+borrows, so the write through it cannot become an update of the owned
+world. Now the element type of an indexed field waits for the record's
+type (`constrainIndexed`, a `collection` obligation whose signature is
+`unit`: indexing, unlike a loop, does not take a list), and a field that
+an update goes through has one type wherever the same value's field is
+named in the function (`sharedField`). So `access.log[0] := value` and
+`access.log.push value` work on the untyped owned world, in the same
+module and across modules.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes

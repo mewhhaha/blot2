@@ -2519,7 +2519,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2403,
-     "type_nodes": 5648,
+     "type_nodes": 5647,
      "type_versions": 914,
      "wasm_bytes": 3963
     }
