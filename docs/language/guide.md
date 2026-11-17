@@ -1060,6 +1060,17 @@ func count (own access) => return do:
   break access
 ```
 
+A value whose type is not known inside a function (a parameter written
+without a type, or a field of one) is read there as plain data, but it is
+given to an `own` parameter only when the function took it over itself:
+`func stepped access => return step access` is `own_argument`, and `func
+stepped (own access) => return step access` is not. A function held in a
+field of such a value is called like any function value: the call only
+borrows its arguments. What it returns is not known either, so a name
+bound to it borrows the arguments unless its type is written (`let
+context: EventContext = stages.route access event`). A call that stands
+as a statement gives back what it was lent when the statement ends.
+
 Because `own` before a name marks what follows it, `own` itself names
 nothing: a local, a parameter or a constant called `own` is
 `own_parameter`.

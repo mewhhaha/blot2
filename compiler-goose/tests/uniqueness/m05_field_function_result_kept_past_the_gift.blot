@@ -1,0 +1,12 @@
+const step = func (own access) => return do:
+  access.cells[0] := 7
+  break access
+const held = func application -> (own access) => return do:
+  let context = application.route access 3
+  access := step access
+  break (context, access)
+const run = func (n: U32) => return do:
+  let world = { cells: #[n] }
+  let application = { route: func w -> k => return k }
+  let (context, after) = held application world
+  break @u32.add context after.cells[0]

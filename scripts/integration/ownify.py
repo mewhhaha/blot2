@@ -205,6 +205,9 @@ def call_sites(mod,fn,position,dry=False,report=print):
                         if nm==fn and os.path.normpath(path)==target and re.match(r'^(lent )?(entry )?func ',l): continue
                         st=code.strip(); rel=os.path.relpath(path,ROOT)
                         if re.match(r'^\w+ := '+re.escape(nm)+r'\b',st): continue
+                        # `use f args` runs `f args` for what it does
+                        used=st.startswith('use '+nm+' ')
+                        if used: st=st[4:]
                         if not st.startswith(nm+' ') and st!=nm:
                             # a bare name is a call only when arguments follow it
                             if '.' in nm or re.match(r' +[\w(]',code[m.end():]) and not re.match(r' +(=|:=|\+|-|\*|/|<|>|!=|and\b|or\b|then\b|else\b)',code[m.end():]): report(f'CALL? {rel}:{k+1}: {st[:120]}')
@@ -213,7 +216,9 @@ def call_sites(mod,fn,position,dry=False,report=print):
                         if len(a)<=position or not re.fullmatch(r'[a-z_]\w*',a[position]):
                             report(f'CALL? {rel}:{k+1}: {st[:120]}'); continue
                         if not dry:
-                            f.lines[k]=l[:indent(l)]+a[position]+' := '+l[indent(l):]; f.dirty=True
+                            rest=l[indent(l):]
+                            if used: rest=rest[4:]
+                            f.lines[k]=l[:indent(l)]+a[position]+' := '+rest; f.dirty=True
                         changed+=1
     return changed
 def save():
@@ -229,5 +234,17 @@ if __name__=='__main__':
         position=convert(mod,fn,dry=dry)
         if position is None: continue
         done+=1; sites+=call_sites(mod,fn,position,dry=dry)
+    # A converted body may call a function converted earlier as a statement
+    # now (the tail `return f access` it had became `f access`): rebind those.
+    quiet=lambda text: None
+    for path in glob.glob(os.path.join(ROOT,'src','**','*.blot'),recursive=True):
+        f=File.get(path); mod=os.path.relpath(path,ROOT)[:-5]
+        for k,l in enumerate(list(f.lines)):
+            m=re.match(r'^(?:entry )?func ([\w.]+) ',l)
+            if not m or not re.search(r'\(own access\)|\(access: own ',l): continue
+            h=header(l)
+            if not h: continue
+            for at,a in enumerate(h[0]):
+                if a=='(own access)' or re.match(r'^\(access: own ',a): sites+=call_sites(mod,m.group(1),at,dry=dry,report=quiet)
     save()
     print(f'{done} definitions, {sites} calls rewritten')

@@ -1,0 +1,11 @@
+const step = func (own access) => return do:
+  access.cells[0] := 7
+  break access
+const stepped = func (own access) => return do:
+  access := step access
+  access := step access
+  break access
+const run = func (n: U32) => return do:
+  let world = { cells: #[n] }
+  world := stepped world
+  break world.cells[0]

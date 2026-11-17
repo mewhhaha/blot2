@@ -991,10 +991,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { origin: target.binding, .. };
     }
     if tag == blot_check_core::Tag.suite {
-        var exits = false;
-        let mark = self_.loans.len;
-        for child in m.children(id) { let value = visit(self_, m, child); exits = value.exits || exits; giveBackLoans(self_, mark, false); }
-        giveBackLoans(self_, mark, true);
+        let exits = statements(self_, m, id);
         return Value { exits: exits, .. };
     }
     if tag == blot_check_core::Tag.block_ { return block_(self_, m, id); }
@@ -1369,6 +1366,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // function's is, except an entry function's. A constructor keeps
         // its argument, and so may a primitive.
         let head_tag = m.node(head).tag;
+        var unresolved = false;
         var known = !lent_given && trusted(self_, m, binding);
         // A `lent` or entry function given only some of its arguments is
         // a function value too.
@@ -1385,6 +1383,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if head_tag == blot_check_core::Tag.closure { known = true; }
             if plain && (head_tag == blot_check_core::Tag.call || head_tag == blot_check_core::Tag.if_value || head_tag == blot_check_core::Tag.match_ || head_tag == blot_check_core::Tag.block_) { known = true; }
             if plain && head_tag == blot_check_core::Tag.project && m.dispatchSignature(head) == 0 { known = true; }
+            // A field of a record whose type is not known yet holds a
+            // function value like any other. What it returns is not known
+            // either, so it may borrow the arguments (`unresolved`).
+            if plain && head_tag == blot_check_core::Tag.project && m.dispatchSignature(head) != 0 && binding == 0 { known = true; unresolved = true; }
             if head_tag == blot_check_core::Tag.reference && binding != 0 {
                 let kind = m.bindings[binding].kind;
                 if plain && (kind == blot_reuse_principal_interface::Kind.local || kind == blot_reuse_principal_interface::Kind.parameter) { known = true; }
@@ -1398,7 +1400,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             // With all its arguments the call only borrows them. A part
             // of the result that borrows (a function, when arguments are
             // still missing) may hold them, so then they are shared.
-            let holder = lends(self_, m, n.ty);
+            let holder = lends(self_, m, n.ty) || (unresolved && openType(m, n.ty, 0));
             var exits = false;
             let base = self_.captured.len;
             let ends = self_.briefs.len;
@@ -1440,7 +1442,8 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
                 if !self_.dry && self_.statement_mark >= 0 && self_.loops.len == self_.statement_loops && self_.function_roots.len == self_.statement_roots && self_.tentative == self_.statement_tentative { giveBackLoans(self_, self_.statement_mark, false); }
             }
             var fact: Fact = none;
-            if owns(self_, m, n.ty) { fact = deep; }
+            // (a result of a type that is not known yet is its caller's too)
+            if owns(self_, m, n.ty) || openType(m, n.ty, 0) { fact = deep; }
             return Value { fact: fact, exits: exits, .. };
         }
     }
@@ -1567,6 +1570,30 @@ recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth:
         return false;
     }
     return true;
+}
+// Whether `ty` has a type variable where data is: a value of such a type
+// may hold storage once the variable has its type. Inside a generic body it
+// is read as plain data, but it is not given to an `own` parameter out of
+// what the function was only lent.
+recursive fn openType(m: const Module&, ty: u32, depth: i64) -> bool {
+    if ty == 0 || ty >= m.types.nodes.len { return false; }
+    if depth > 64 { return true; }
+    let n = m.types.node(ty);
+    if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return true; }
+    if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return openType(m, n.a, depth + 1); }
+    if n.tag == blot_check_types::Tag.product {
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if openType(m, item, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.record {
+        for index in 0..n.b { if openType(m, m.types.recordField(n, index).ty, depth + 1) { return true; } }
+        return false;
+    }
+    if n.tag == blot_check_types::Tag.nominal {
+        for argument in m.types.nominalArguments(n) { if openType(m, argument, depth + 1) { return true; } }
+        return false;
+    }
+    return false;
 }
 // Whether `variable` occurs in `ty` inside growable storage, a reference or
 // a link: storage a function can put a value into for later.
@@ -1937,7 +1964,8 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
     var guards: i64 = 0;
     for child, position in arguments {
         let ty = m.typeOf(child);
-        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || !holds(self_, m, ty) {
+        let open = openType(m, ty, 0);
+        if position >= 32 || (mask >> (position as! u32)) & 1 == 0 || (!holds(self_, m, ty) && !open) {
             let value = lend(self_, m, child, holder, lends_to, brief);
             exits = exits || value.exits;
             if !holder && guards < 32 && local(self_, value.origin) && self_.facts[value.origin] != spent {
@@ -1982,9 +2010,13 @@ recursive fn ownArguments(self_: Analyzer&, m: const Module&, arguments: const u
             accepted = ownedAs(self_, m, value.fact, ty, 0);
         } else if named != 0 {
             accepted = self_.born[named] == loop_id && ownedAs(self_, m, self_.facts[named], ty, 0);
+            // What a type variable stands for may hold storage: a name of
+            // such a type is given only when it is known to be its own.
+            if open && !unique(self_.facts[named]) && self_.facts[named] < first_record { accepted = false; }
         } else if part.len != 0 && value.origin == part.binding {
             let fact = partFact(self_, self_.facts[part.binding], part.fields[..part.len]);
             accepted = self_.born[part.binding] == loop_id && fact != spent && ownedAs(self_, m, fact, ty, 0);
+            if open && !unique(fact) && fact < first_record { accepted = false; }
         }
         if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
         if accepted && named != 0 {
@@ -2082,8 +2114,10 @@ fn memberCopy(self_: Analyzer&, m: const Module&, id: u32) -> Fact, bool {
     if !blot_check_storage_types::arrayElement(m.types, m.typeOf(n.a)).present || !blot_check_storage_types::arrayElement(m.types, n.ty).present { return none, false; }
     return freshContainer(self_, m, n.ty, false), true;
 }
-recursive fn block_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
-    self_.blocks.push(BlockFrame { id: id, .. });
+// The statements of a block or a suite, one after another. Each is the
+// place where the loans of names it read for the last time end, and the
+// result of a call that stands as a statement is gone with it.
+recursive fn statements(self_: Analyzer&, m: const Module&, id: u32) -> bool {
     var exits = false;
     let mark = self_.loans.len;
     let outer_mark = self_.statement_mark;
@@ -2095,7 +2129,12 @@ recursive fn block_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         self_.statement_loops = self_.loops.len;
         self_.statement_roots = self_.function_roots.len;
         self_.statement_tentative = self_.tentative;
+        let discarded = m.node(child).tag == blot_check_core::Tag.call || m.node(child).tag == blot_check_core::Tag.apply;
+        let ends = self_.briefs.len;
+        if discarded { self_.brief_node = child; }
         let value = visit(self_, m, child);
+        self_.brief_node = 0;
+        if discarded { endBriefs(self_, ends); }
         exits = value.exits || exits;
         giveBackLoans(self_, mark, false);
     }
@@ -2104,6 +2143,11 @@ recursive fn block_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     self_.statement_loops = outer_loops;
     self_.statement_roots = outer_roots;
     self_.statement_tentative = outer_tentative;
+    return exits;
+}
+recursive fn block_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
+    self_.blocks.push(BlockFrame { id: id, .. });
+    let exits = statements(self_, m, id);
     let frame = self_.blocks[self_.blocks.len - 1];
     self_.blocks.resize(self_.blocks.len - 1);
     if frame.broken {

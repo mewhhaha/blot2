@@ -123,10 +123,20 @@ compiler-goose/, and compiler/ (Zig) is gone. The record is in
     Open: an iteration that puts a new array into the carried world
     releases nothing; that needs a release that keeps survivors
     (tasks/MEMORY_MODEL.md, "What the backend needed").
-  - **Next:** each system the stages call: `(own access)`, return it,
-    rebind at the call, with the tests that call it directly. The
-    conversion of test callers was done by parallel workers from one
-    brief; the same works for each system.
+  - **The systems the stages call own it** (17 November 2026): 66
+    functions of Gdev take the world and return it
+    (`scripts/integration/ownify.py`), and where nothing else borrows,
+    their stores through names for parts are updates of the world
+    (`scripts/integration/unalias.py`). The pass lets a field of a local
+    be given to an `own` parameter and put back, the checker indexes a
+    field of a record that is not known yet, and a parameter without a
+    type that was only lent can no longer be given away (it could, and
+    Ink and several tests relied on it).
+  - **Next:** the functions those systems call, level by level (64 at
+    the next one), the `present` stage's draw functions, then Ink's
+    library writers, which take a part and return it
+    (`access.robot := ecs.insert access.entities access.robot index
+    robot`).
   - Open:
     - A call that returns the world shares its other arguments for good,
       because the world's type has parts that only borrow

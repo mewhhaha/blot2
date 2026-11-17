@@ -1111,5 +1111,24 @@
    "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
   ]
  ],
- "l10_argument_lent_beside_one_given_is_its_holders_own_after": []
+ "l10_argument_lent_beside_one_given_is_its_holders_own_after": [],
+ "m01_lent_untyped_parameter_given": [
+  [
+   "own_argument",
+   142,
+   148,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ],
+ "m02_own_untyped_parameter_given": [],
+ "m03_field_function_called_as_a_statement": [],
+ "m04_field_function_result_with_its_type": [],
+ "m05_field_function_result_kept_past_the_gift": [
+  [
+   "own_argument",
+   203,
+   209,
+   "An `own` parameter takes a value that nothing else holds: a fresh value, or a local that alone holds it and, inside a loop, was bound in the same iteration; pass values.copy of it otherwise"
+  ]
+ ]
 }

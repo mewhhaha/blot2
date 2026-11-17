@@ -317,6 +317,18 @@ entry func run (n: U32) : U32 => return do:
   let after = fill world.counts n
   let next = damage «world» 0
   break after[0] + next.size`],
+  ["a parameter without a type that was only lent", "own_argument", argument, `
+func settle (own access) => return do:
+  access.counts[0] := access.size
+  break access
+func settled access => return do:
+  access := settle «access»
+  break access
+entry func run (n: U32) : U32 => return do:
+  let world = $World { counts: #[0, 0], size: n }
+  let kept = world
+  let after = settled world
+  break kept.counts[0] + after.counts[0]`],
   ["a part lent and given in one call", "own_argument", argument, `
 func mixed (seen: Array U32) -> (rows: own Array U32): Array U32 => return do:
   rows[0] := seen[1]

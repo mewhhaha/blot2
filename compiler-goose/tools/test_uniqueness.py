@@ -27,7 +27,10 @@ programs named k are about a borrowed value without a name (an argument,
 what a plain value is read out of, what a loop walks), which is given
 back when the expression or the loop around it is done, and about two
 names that borrow from one local. The programs named l give a field of
-a local to an `own` parameter and put something back in it.
+a local to an `own` parameter and put something back in it. The programs
+named m are about values whose type is not known yet: a parameter without
+a type is given only when it was taken over, and a function held in a
+field of a record that is not known yet is called like any function value.
 
 Usage: python3 compiler-goose/tools/test_uniqueness.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.

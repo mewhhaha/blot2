@@ -1,0 +1,12 @@
+const step = func (own access) => return do:
+  access.cells[0] := 7
+  break access
+const frame = func application -> (own access) => return do:
+  application.before access 3
+  access := step access
+  break access
+const run = func (n: U32) => return do:
+  let world = { cells: #[n] }
+  let application = { before: func w -> k => return k }
+  world := frame application world
+  break world.cells[0]

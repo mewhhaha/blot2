@@ -732,6 +732,57 @@ named in the function (`sharedField`). So `access.log[0] := value` and
 `access.log.push value` work on the untyped owned world, in the same
 module and across modules.
 
+**Stores through names for parts (17 November 2026).** In a function
+that owns the world, `python3 scripts/integration/unalias.py FILE...`
+replaces each name for a part (`let stacks: Array Stack =
+access.salt.stacks`) by the path, and the stores through it by updates
+(`access.salt.stacks[i] := stack`). It checks each file through
+`src/main.blot` and puts back any function that no longer checks. On the
+66 systems it turned 26 stores into updates and put 10 functions back,
+each with `aliased_update`: a name that borrows from the world (a view
+from `ecs.rows`, a `read_state`) is still read after the update. Those
+need the read moved before the write, or the value read into a plain
+one, by hand. gdev/src went from 691 stores to 652.
+
+`blotc migrate-stores --dry-run` reports an update that would be
+`aliased_update` as a `"kind":"store"` record, not as a diagnostic; a
+check that reads only diagnostics passes it. Both tools read the record.
+
+**A value whose type is not known yet (17 November 2026).** Inside a
+generic body a type variable is plain data (rule 2 checks at the call).
+That let a parameter written without a type, which was only lent, go to
+an `own` parameter: `func stepped access => return step access` compiled,
+`step` updated in place, and a second name for the caller's world saw the
+change. The systems are written without types, so this was the common
+case, and Ink's own stage runners and several test helpers had come to
+rely on it. Now:
+
+- A name whose type has a type variable where data is, is given to an
+  `own` parameter only when it is known to be its holder's own (an `own`
+  parameter, or bound to an owned result). The result of a call whose
+  type is not known yet is its caller's own, like any result.
+- A function held in a field of a record whose type is not known yet
+  (`application.set_viewport access width height`) is called like any
+  function value: the call only borrows. Before, such a call shared its
+  arguments for good, which the gap hid. What it returns is not known
+  either, so a `let` bound to it borrows the arguments unless its type
+  is written.
+- A call that stands as a statement gives back what it was lent when
+  the statement ends; a suite of statements (a `case` arm's) is handled
+  like a block.
+
+Ink: the routed event of the stage contract is an `EventContext`
+(`run_event` writes its type), and `host.execute` uses `access.response`
+where it had a name for it. tests/uniqueness `m01` to `m05`.
+
+Still open in the same corner, and smaller: a lent value of unknown type
+wrapped in a record literal, or passed through a generic function that
+returns its argument, is not followed (`consume (own {state: lent})`,
+`consume (own (identity lent))`). Following it means treating a type
+variable as possibly holding storage everywhere, which today rejects
+`const insert_many = insert_selected` and other uses of generic functions
+as values across std and Ink.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes
