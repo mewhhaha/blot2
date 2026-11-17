@@ -22,19 +22,44 @@ disk. They produced byte-identical Main and exposed these unprofiled medians.
 | Lower to Core | 220 ms |
 | Emit Wasm | 112 ms |
 
-The session also prepares native assets and transfers the result. A clean
-build needs roughly a second of savings. Start with repeated type resolution.
-One instrumented build recorded 3.92 million visits during resolution. The
-cross-epoch composite cache had 326 hits in 1.09 million probes. Measure the
-same release with that cache off before changing inference rules.
+### Proposed architecture
 
-For edits, retain checked module interfaces and Core in the open session.
-Changing the default sunlight setting rechecked all 264 modules. Its own
-module took 1.6 ms of checker CPU in the trace. Seventy modules, including
-the edited one, are reachable through reverse imports. Recheck dependents
-when an interface or an observed compile-time value changes, then emit using
-the new bodies. Compare edits and reverts against fresh Wasm and diagnostics.
-The portable dependency bundle hit `ArtifactLimit` on the full game.
+Give each module an immutable interface for its callers and retain its
+checked bodies in the existing Core IR. Keep mutable inference state local
+to the checker that owns it. Use the same boundary for two milestones.
+
+1. **A real edit under one second.** Keep the last successful module results
+   in the open session. The lighting edit currently checks all 264 modules.
+   Checking just its 70 transitive dependents, including the edited module,
+   would still repeat 60–62% of checker CPU in two traces. Recompute the
+   changed module, propagate changes to types, effects, ownership, dispatch
+   choices and observed compile-time values, and stop when the facts a caller
+   used are equal. Re-emit the full Wasm. Give declarations stable identities
+   or fall back to a fresh check when their slots move. Test edit, rejection,
+   recovery and revert against the same compiler's fresh bytes and diagnostics.
+   The in-memory experiment can reuse Core owners. The portable dependency
+   bundle hit `ArtifactLimit` on Main. [Incremental query precedent](https://rustc-dev-guide.rust-lang.org/queries/incremental-compilation-in-detail.html#improving-accuracy-the-red-green-algorithm)
+2. **A fresh build under one second.** Build public interfaces from source
+   before checking bodies. Pilot `ui/station`, `world/salt` and `actors/robots`,
+   with explicit public constraints and inference inside each body. Let
+   long-lived workers read the interfaces, check bodies and lower them into
+   Core. Today's four-worker path forks 264 times in 29 batches and writes
+   139,332,884 bytes of checked state through pipes. The pilot must charge
+   header construction, worker coordination and result transfer to the measured
+   build. Keep source-order diagnostics and check every declaration.
+
+In two timing traces of the same import graph, publishing those three
+interfaces early reduced the modeled longest serial chain from 36% to 22–23%
+of checker work. In the second trace, the observed session took 1.930 s,
+including 1.340 s checking. A four-worker schedule on the pilot graph took
+350 ms in the model. Substituting that schedule gives **0.941 s** assuming
+free interface construction and worker handoff. That leaves only 59 ms of
+margin. Overlapping the roughly 220 ms of Core lowering can increase it.
+
+Full type resolution accounted for 601 of 2,632 checker CPU samples across
+four fresh builds. The composite cache's 326 hits in 1.09 million probes make
+it a small A/B experiment. The architectural pilot addresses a larger share
+of the build. [Samples, worker replies and scheduling inputs](../benchmarks/evidence/measurements/2026-11-17-gdev-architecture.raw.json.gz)
 
 ## Decisions (14 November 2026)
 

@@ -250,5 +250,70 @@
     "coreBytesInMemory": 45664838,
     "error": "ArtifactLimit",
     "encodedBytes": 0
+  },
+  "architectureReview": {
+    "scope": "Same pinned release and Gdev Main. Probes observed the ordinary compiler; no compiler or language change is included. Scheduling is a model, not a benchmark of an implemented compiler.",
+    "parallelChecker": {
+      "method": "A four-worker session profiled coordinator batches. A separate four-worker run counted actual bytes written by forked checker children to pipes, excluding stdout and stderr. Every job published a response.",
+      "forks": 264,
+      "readyBatches": 29,
+      "retries": 0,
+      "profiledSessionMs": 4970.2,
+      "batchWallMs": 4325.8,
+      "sumWorkerBodyCpuMs": 2080.3,
+      "pipeResponseBytes": 139332884,
+      "largestResponseBytes": 5920371,
+      "sumWorkerWriteWallMs": 6277.9,
+      "pipeRunMs": 4765.2,
+      "writeCostNote": "Summed write times include blocked and overlapping child time."
+    },
+    "checkerSamples": {
+      "freshBuilds": 4,
+      "allCpuSamples": 3775,
+      "checkerCpuSamples": 2632,
+      "fullTypeResolutionWithinChecker": 601,
+      "ownershipUsageOrUniquenessWithinChecker": 395,
+      "moduleHeaderCollectionWithinChecker": 339,
+      "method": "Inclusive stack samples in an optimized binary; inlining can hide individual helpers. Phase shares and inclusive groups must not be added."
+    },
+    "coldSchedule": {
+      "model": "Bodies carry traced CPU cost. Wait for direct imports and the implicit prelude. For early interfaces, remove waits on the selected producer bodies; all 264 bodies must still finish. Header availability, worker dispatch and transfer are free in this model. The four-worker list schedule prioritizes remaining critical path.",
+      "chainModules": [
+        23,
+        25
+      ],
+      "earlyInterfacePilot": [
+        "gdev/src/ui/station.blot",
+        "gdev/src/world/salt.blot",
+        "gdev/src/actors/robots.blot"
+      ],
+      "spanPercentageOfSerialChecker": [
+        {
+          "current": 36.1,
+          "pilot": 22.1
+        },
+        {
+          "current": 36.1,
+          "pilot": 22.5
+        }
+      ],
+      "secondTraceMs": {
+        "session": 1930.4,
+        "checker": 1340.2,
+        "currentSpan": 472.3,
+        "pilotSpan": 294.8,
+        "pilotFourWorkerCheck": 350.4,
+        "zeroOverheadSessionEstimateAtFour": 940.6
+      }
+    },
+    "warmLighting": {
+      "reverseImportModules": 70,
+      "percentOfCheckerCpuInCone": [
+        62.2,
+        60.3
+      ]
+    },
+    "raw": "2026-11-17-gdev-architecture.raw.json.gz",
+    "rawSha256": "69c021f9241034de425ad0dc695cab8c27515dfa41d6df0ebc6b3bc5a2a1f6cb"
   }
 }
