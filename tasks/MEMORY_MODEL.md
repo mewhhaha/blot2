@@ -932,6 +932,31 @@ conversion (rigid, joints, physics, prepared, springs: 108 stores) is not
 on `main`. It is commit `58e6b02` on Ink's working branch, complete and
 checked, waiting for that release.
 
+**The third layer (17 November 2026).** `own_closure.py` found 35 more
+functions to convert together (mostly resets, small writers and test
+helpers), and 37 more stores became updates. What the remaining sites
+needed, beyond the recipes above:
+
+- A loop that hands the world on inside its body must not read a name
+  that borrows from the world in a nested loop: the loan of a name read
+  last inside a nested loop only ends with the block that bound it. Bind
+  such names in a `do:` block that ends before the hand-over
+  (`cannon.launch_into`).
+- A loop range written with a borrowed name (`for i in 0 .. built.sites.length`)
+  keeps the name for the whole loop; read the count into a plain value
+  first.
+- Updates that `unalias.py` made while another diagnostic hid the store
+  records can be aliased once the file checks; five in `build_bar.update`
+  went back to `=`.
+- In tests, a fixture that calls its consumer with `consume access` only
+  lends the world; `consume (own access)` hands it over. A record built
+  from a field of an owned value is not owned (`{salt: root.salt, …}`);
+  take the value apart first (`let { salt: s, world_ground: _, … } = root`).
+  Grounds that are views of the world's own storage are passed as keys and
+  read again after the hand-over (`robot_flocking.with_owned_world`).
+  `scripts/integration/paths_for_parts.py` replaces names for parts by
+  paths in any block, test lambdas included.
+
 **Next: the systems.** Each of Gdev's systems that the stages call, then
 what they call. A system changes in three places: its parameter becomes
 `(own access)`, it returns the access, and every call of it becomes
