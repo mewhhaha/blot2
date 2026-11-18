@@ -108,7 +108,7 @@ fn relocate(prefix:u32, names:const u32[:], symbol: u32&) -> bool {
     let index=symbol-prefix-1;
     if index>=names.len {return false;}
     symbol=names[index];
-    return true;
+    return symbol!=0;
 }
 fn relocate_tree(tree: Tree&, prefix:u32, names:const u32[:]) -> bool {
     for &node in tree.nodes.items {
@@ -164,7 +164,7 @@ fn read_names(packet: const u8[:], at:i64, count:u32, symbols: Pool&, names:u32[
     return true;
 }
 
-fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&) -> bool {
+fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&,recorded:blot_parse_parser::ScratchIdBuffer?=null) -> bool {
     if packet.len<9 {return false;}
     let prefix=blot_bytes::get_u32(packet,0);
     let count=blot_bytes::get_u32(packet,4);
@@ -178,6 +178,7 @@ fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&) -> bool {
         parsed.deinit();
         return false;
     }
+    if recorded {recorded.append(names[..]);}
     parsed.has_typed_staging=(flags&1)!=0;
     parsed.has_numeric_proofs=(flags&2)!=0;
     tree.deinit();

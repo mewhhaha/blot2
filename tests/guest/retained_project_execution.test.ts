@@ -259,7 +259,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
       "entry func answer (): U32 => return left () - right () - 1\n",
   );
   await Deno.writeTextFile(first, original);
-  await Deno.writeTextFile(last, "func right () => return 3\n");
+  await Deno.writeTextFile(last, "func right () => return do:\n  let first = 3\n  return { other: 99, first: first }.first\n");
   await Deno.utime(first, stamp, stamp);
   const options = {
     executable: Deno.args[0],
@@ -298,7 +298,7 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
     await expect(16, 3);
     // The edited local preserves the symbol count but changes a spelling.
     await Deno.writeTextFile(first, original.replaceAll("first", "other"));
-    await expect(6, 2);
+    await expect(6, 3);
     await Deno.writeTextFile(prelude, operator.replace("infixl", "infixr"));
     await expect(8, 0);
     if (Deno.build.os !== "windows") {

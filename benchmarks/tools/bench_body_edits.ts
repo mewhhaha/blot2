@@ -164,7 +164,6 @@ try {
   await candidate.dispose();
 }
 const pairs = [];
-const entryRenames = [];
 for (let pair = 0; pair < 10; pair++) {
   const order = ["previous", "candidate"];
   if (pair % 2) order.reverse();
@@ -198,37 +197,38 @@ for (let pair = 0; pair < 10; pair++) {
     }
   }
 }
-// Time the rename directly from the original scene in a separate session.
-for (let pair = 0; pair < 10; pair++) {
-  const order = ["previous", "candidate"];
-  if (pair % 2) order.reverse();
-  for (const treatment of order) {
-    const c = await open(
-      treatment === "previous" ? oldPath : newPath,
-      pair >= 8,
-    );
-    try {
-      verify("base", await build(c, "base"));
-      const rename = await build(c, "entryRename");
-      verify("entryRename", rename);
-      if (treatment === "candidate") {
-        assert.equal(rename.fresh, 1);
-        assert.equal(
-          rename.sourceLoad?.reusedSyntaxModules,
-          rename.modules! - 1,
-        );
+// Start each rename from the original project in its own session.
+async function measureRename(label: "entryRename" | "dependencyRename") {
+  const rows = [];
+  for (let pair = 0; pair < 10; pair++) {
+    const order = ["previous", "candidate"];
+    if (pair % 2) order.reverse();
+    for (const treatment of order) {
+      const c = await open(
+        treatment === "previous" ? oldPath : newPath,
+        pair >= 8,
+      );
+      try {
+        verify("base", await build(c, "base"));
+        const rename = await build(c, label);
+        verify(label, rename);
+        if (treatment === "candidate") {
+          if (label === "entryRename") assert.equal(rename.fresh, 1);
+          assert.equal(
+            rename.sourceLoad?.reusedSyntaxModules,
+            rename.modules! - 1,
+          );
+        }
+        rows.push({ pair: pair + 1, profiled: pair >= 8, treatment, rename });
+      } finally {
+        await c.dispose();
       }
-      entryRenames.push({
-        pair: pair + 1,
-        profiled: pair >= 8,
-        treatment,
-        rename,
-      });
-    } finally {
-      await c.dispose();
     }
   }
+  return rows;
 }
+const entryRenames = await measureRename("entryRename");
+const dependencyRenames = await measureRename("dependencyRename");
 console.log(JSON.stringify(
   {
     compiler: {
@@ -243,6 +243,7 @@ console.log(JSON.stringify(
     transitions,
     pairs,
     entryRenames,
+    dependencyRenames,
   },
   null,
   2,

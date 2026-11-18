@@ -22,7 +22,7 @@ fn deinit(batch:ParseBatch&) {
     blot_support_pooled_buffer::deinit(batch.inputs,parse_inputs);
     batch.shared=0;
 }
-fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_parse_symbols::Pool&,tree:blot_parse_ast::Tree&)->bool {
+fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_parse_symbols::Pool&,tree:blot_parse_ast::Tree&,recorded:blot_parse_parser::ScratchIdBuffer&)->bool {
     if batch.shared==0 {return false;}
     let index .= batch.paths.get(path);
     if !index || batch.inputs.items[index].source!=source {return false;}
@@ -31,7 +31,7 @@ fn adopt(batch:ParseBatch&,path:const u8[:],source:const u8[:],symbols:blot_pars
     if size<=1 {return false;}
     var bytes:u8[>..<]=[];bytes.resize(size,0);
     if !blot_native::persist_read(batch.shared,id,2,bytes[0],size as u64) {return false;}
-    return blot_reuse_parse_packet::decode(bytes[..],symbols,tree);
+    return blot_reuse_parse_packet::decode(bytes[..],symbols,tree,recorded);
 }
 fn addParseInput<P>(loader:Loader<P>&,path:const u8[:]) {
     let batch .= loader.parse_batch;

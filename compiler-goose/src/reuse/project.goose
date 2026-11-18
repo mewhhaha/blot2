@@ -63,7 +63,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
     }
 }
 struct Import { declaration: DeclarationId, target: UnitId=0, path: Symbol, namespace_: Symbol, bindings: blot_parse_ast::List, span: Span }
-struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0 }
+struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0, parse_names:const u32[:]=default<const u32[:]>() }
 reusable[] var owned_source: u8[>..]=[];
 reusable[] var owned_lexical: blot_parse_lexer::Diagnostic[>..]=[];
 fn copySource(bytes: const u8[:]) -> const u8[:] { let result=owned_source.alloc_slice(bytes.len); for byte,index in bytes {result[index]=byte;} return result; }
@@ -85,8 +85,8 @@ fn canonicalOwnedDiagnostic(value:Diagnostic)->Diagnostic {
  return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:cause,lex_code:value.lex_code,parse_code:value.parse_code,publication:publication,parse_detail:value.parse_detail,lexical_details:lexical};
 }
 fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
-fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end};}
-fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=default<const u8[:]>();}
+fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end,parse_names:value.parse_names};}
+fn deinit(self_: Unit&) {self_.tree.deinit();blot_reuse_project_check::releaseOwned(self_.parse_names);releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
 var inactive_UnitBuffer:UnitBuffer=UnitBuffer {..};
@@ -129,7 +129,7 @@ fn append(self_:DiagnosticBuffer&,values:const Diagnostic[:])->Error {let length
 fn resize(self_:DiagnosticBuffer&,length:i64) {assert(length>=0 && length<=self_.items.len);for &item in self_.items[length..] {item.deinit();}blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
 fn clear(self_:DiagnosticBuffer&) {for &item in self_.items {item.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
 fn deinit(self_:DiagnosticBuffer&) {self_.clear();blot_support_pooled_buffer::deinit(self_,project_DiagnosticBuffer_runs);}
-struct ProjectState {entry_packet:const u8[:]=default<const u8[:]>(),owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {..},order:WordBuffer=WordBuffer {..},imports:ImportBuffer=ImportBuffer {..},diagnostics:DiagnosticBuffer=DiagnosticBuffer {..}}
+struct ProjectState {parser_seed:i64=0,entry_packet:const u8[:]=default<const u8[:]>(),owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {..},order:WordBuffer=WordBuffer {..},imports:ImportBuffer=ImportBuffer {..},diagnostics:DiagnosticBuffer=DiagnosticBuffer {..}}
 reusable var projects:ProjectState[>..]=[];
 struct Lowering { io: bool=false, workers:u8=1 }
 struct Project {
@@ -186,7 +186,7 @@ reusable[] var loader_visit_runs:Visit[>..]=[];
 reusable[] var loader_frame_runs:Frame[>..]=[];
 reusable[] var loader_fixity_runs:blot_parse_parser::InheritedFixity[>..]=[];
 struct Loader<P> {
-    previous:const Project?=null, verified_symbols:i64=0, reading_entry:bool=false,
+    previous:const Project?=null, verified_symbols:i64=0, stable_prefix:bool=true, parser_seed:i64=0, remap:WordBuffer=WordBuffer{}, reading_entry:bool=false,
     parse_batch:ParseBatch=ParseBatch{},options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,inherited_fixities:LoaderFixities,prelude_ready:bool=false,
 }
 fn starts(text: const u8[:], prefix: const u8[:]) -> bool {return prefix.len<=text.len&&text[..prefix.len]==prefix;}
@@ -263,7 +263,7 @@ fn probeSource(self_:FileInputs&,path:const u8[:],maximum:i64,name:u8[>..<]&,byt
     return self_.readOpen(fd,maximum,bytes)==blot_error::Error.none;
 }
 fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=default<const u8[:]>();return resolveImportPath(source_filename,raw,options,output);}
-fn deinitScratch<P>(self_:Loader<P>&) {self_.parse_batch.deinit();self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);blot_support_pooled_buffer::deinit(self_.inherited_fixities,loader_fixity_runs);}
+fn deinitScratch<P>(self_:Loader<P>&) {self_.remap.deinit();self_.parse_batch.deinit();self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);blot_support_pooled_buffer::deinit(self_.inherited_fixities,loader_fixity_runs);}
 fn report<P>(self_:Loader<P>&,origin:Origin,code:Code,target:const u8[:],cause:blot_support::Option<const u8[:]>)->Error {
     var name:Symbol=0;let interned,error=self_.project.symbols.intern(target);
     if error==blot_error::Error.out_of_memory {return error;}if error==blot_error::Error.none {name=interned;}
@@ -281,6 +281,7 @@ fn validateAliases<P>(self_:Loader<P>&)->bool,Error {
     return true,blot_error::Error.none;
 }
 fn sameParserPrefix<P>(loader:const Loader<P>&,previous:const Project&,end:i64)->bool {
+    if end>previous.symbols.entries.len {return false;}
     for i in loader.verified_symbols..end {
         let id=(i+1) as Symbol;
         if previous.symbols.get(id)!=loader.project.symbols.get(id) {return false;}
@@ -290,19 +291,41 @@ fn sameParserPrefix<P>(loader:const Loader<P>&,previous:const Project&,end:i64)-
 
 // Parsed trees store project-wide symbol IDs. Verify any names produced by
 // intervening fresh parses before adopting a tree, then replay its new IDs.
-fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot_parse_ast::Tree&)->bool,Error {
+fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot_parse_ast::Tree&,recorded:blot_parse_parser::ScratchIdBuffer&)->bool,Error {
     let previous .= loader.previous;
     let index=loader.project.units.len;
     if !previous || index>=previous.units.len {return false,blot_error::Error.none;}
+    if index+1==previous.entry && entryPacket(previous).len!=0 {return false,blot_error::Error.none;}
     let old=previous.units.items[index];
     let symbols .= loader.project.symbols;
-    if old.filename!=filename || old.parse_start!=symbols.entries.len ||
-       old.implicit_prelude!=loader.prelude_ready || old.source!=source {
-        return false,blot_error::Error.none;
-    }
-    if !sameParserPrefix(loader,previous,old.parse_start) {
-        loader.previous .= null;
-        return false,blot_error::Error.none;
+    if old.implicit_prelude!=loader.prelude_ready || old.source!=source ||
+       previous.symbols.get(old.filename)!=symbols.get(filename) {return false,blot_error::Error.none;}
+    if !loader.stable_prefix || old.parse_start!=symbols.entries.len ||
+       !sameParserPrefix(loader,previous,old.parse_start) {
+        loader.stable_prefix=false;
+        // The seed owns the inherited operators. Later spellings can move, even
+        // when this file saw them only because another module used them first.
+        let seed=loader.parser_seed;
+        if loader.options.prelude_path.present && !loader.prelude_ready {return false,blot_error::Error.none;}
+        let map .= loader.remap;
+        if map.len==0 {
+            let failure=map.ensure(previous.symbols.entries.len);
+            if failure!=blot_error::Error.none {return false,failure;}
+            map.items=map.storage[..previous.symbols.entries.len];
+            map.len=map.items.len;
+            for &word in map.items {word=0;}
+        }
+        for old_id in old.parse_names {
+            let actual,error=symbols.intern_hashed(previous.symbols.get(old_id),previous.symbols.entries.items[old_id-1].hash);
+            if error!=blot_error::Error.none {return false,error;}
+            map.items[old_id-1]=actual;
+            recorded.push(actual);
+        }
+        let copied=tree.copyParsed(old.tree);
+        if copied!=blot_error::Error.none {return false,copied;}
+        if !blot_reuse_parse_packet::relocate_tree(tree,seed as u32,map.items[seed..]) {return false,blot_error::Error.invalid_artifact;}
+        loader.project.reused_syntax++;
+        return true,recorded.failure;
     }
     for i in old.parse_start..old.parse_end {
         let id=(i+1) as Symbol;
@@ -310,6 +333,7 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
         if error!=blot_error::Error.none {return false,error;}
         assert(actual==id);
     }
+    recorded.append(old.parse_names);
     loader.verified_symbols=old.parse_end;
     let error=tree.copyParsed(old.tree);
     if error!=blot_error::Error.none {return false,error;}
@@ -369,11 +393,12 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
     let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {return no,tree_error;}var tree=initialized;
     var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
     let parse_start=self_.project.symbols.entries.len;
+    var recorded=blot_parse_parser::ScratchIdBuffer{};
     var cached=false;var reuse_error=blot_error::Error.none;
     if self_.reading_entry {cached=readEntryPacket(self_,filename,source,tree);}
-    else {cached,reuse_error=self_.reuseSyntax(filename,source,tree);}
-    if reuse_error!=blot_error::Error.none {tree.deinit();return no,reuse_error;}
-    if !cached && !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree) {
+    else {cached,reuse_error=self_.reuseSyntax(filename,source,tree,recorded);}
+    if reuse_error!=blot_error::Error.none {recorded.deinit();tree.deinit();return no,reuse_error;}
+    if !cached && !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree,recorded) {
         var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
         let lex_scope=blot_phase_profile::enter(blot_phase_profile::Phase.lex);let lex_error=blot_parse_lexer::lex(source,lexed);lex_scope.exit();
         if lex_error!=blot_error::Error.none {
@@ -383,12 +408,14 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
         }
         if diagnostics.len==0 {
             let parse_scope=blot_phase_profile::enter(blot_phase_profile::Phase.parse);
-            let parse_error=blot_parse_parser::parse_with_fixities(source,tokens,self_.project.symbols,tree,self_.inherited_fixities.items);
-            parse_scope.exit();if parse_error!=blot_error::Error.none {tree.deinit();return no,parse_error;}
+            let parse_error=blot_parse_parser::parse_with_fixities(source,tokens,self_.project.symbols,tree,self_.inherited_fixities.items,recorded);
+            parse_scope.exit();if parse_error!=blot_error::Error.none {recorded.deinit();tree.deinit();return no,parse_error;}
         }
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
-    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,parse_start:parse_start,parse_end:self_.project.symbols.entries.len, ..};
+    if recorded.failure!=blot_error::Error.none {let error=recorded.failure;recorded.deinit();tree.deinit();return no,error;}
+    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,parse_start:parse_start,parse_end:self_.project.symbols.entries.len,parse_names:blot_reuse_project_check::copyOwned(recorded.items), ..};
+    recorded.deinit();
     if reserved.present {self_.project.units.items[id-1]=canonicalUnit(loaded);}
     else {let appended=self_.project.units.push(loaded);if appended!=blot_error::Error.none {loaded.deinit();return no,appended;}}
     let finished,failure=self_.finishRead(id,diagnostics,tokens);
@@ -489,11 +516,16 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
         }
         // The prelude root supplies every inherited fixity to the next parses.
         let previous .= loader.previous;
-        if previous && (previous.prelude_unit!=prelude.value ||
+        if previous && (!loader.stable_prefix || previous.prelude_unit!=prelude.value ||
             previous.unit(prelude.value).source!=loader.project.unit(prelude.value).source ||
             previous.filename(prelude.value)!=loader.project.filename(prelude.value)) {loader.previous .= null;}
         loader.prelude_ready=true;
     }
+    loader.parser_seed=loader.project.symbols.entries.len;
+    projects[loader.project.lease-1].parser_seed=loader.parser_seed;
+    let seed_source .= loader.previous;
+    if seed_source && (projects[seed_source.lease-1].parser_seed!=loader.parser_seed ||
+       !sameParserPrefix(loader,seed_source,loader.parser_seed)) {loader.previous .= null;}
     let parallel=context.parse_workers!=1 && loader.options.input_mode==InputMode.project;
     let previous .= loader.previous;
     if parallel && !previous {F(loader,context.entrypath,context.parse_workers);}

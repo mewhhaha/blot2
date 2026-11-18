@@ -24,7 +24,7 @@ struct Where { predicates: List=List {}, node: Id=0 }
 struct LambdaParameter { node: Id, pattern: Id, name: Symbol, start: u32 }
 struct Qualifier { kind: u32, name: Symbol=0, value: Id, start: u32 }
 struct Parser {
- pool: blot_parse_symbols::Pool&, tree: Tree&,
+ pool: blot_parse_symbols::Pool&, tree: Tree&, recorded:ScratchIdBuffer?=null,
  fixities: ScratchFixityBuffer&, index: i64=0, expression_end: i64=0x7fffffffffffffff,
  depth: i64=0, declaration_origin: Span=Span {}, collection_names: u32=0,
  failure: Error=blot_error::Error.none
@@ -84,7 +84,10 @@ fn intern(p: Parser&,source: const u8[:],tokens: const Token[:],bytes: const u8[
  if p.failure!=blot_error::Error.none { return 0; }
  let symbol,err=blot_parse_symbols::intern(p.pool,bytes);
  if err==blot_error::Error.symbol_limit { return fail(p,source,tokens,c_table_limit); }
- if err!=blot_error::Error.none { p.failure=err; return 0; } return symbol;
+ if err!=blot_error::Error.none { p.failure=err; return 0; }
+ let recorded .= p.recorded;
+ if recorded {recorded.push(symbol);if recorded.failure!=blot_error::Error.none {p.failure=recorded.failure;}}
+ return symbol;
 }
 fn identifier_syntax_at(p: Parser&,t: Token) -> Id {
  if p.failure!=blot_error::Error.none { return 0; }
@@ -986,8 +989,8 @@ fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag
 fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&,fixities: ScratchFixityBuffer&) -> Parser {
  return Parser {pool:pool,tree:tree,fixities:fixities};
 }
-fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:],fixities: ScratchFixityBuffer&) -> Error {
- var p=parser_context(pool,tree,fixities);
+fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:],fixities: ScratchFixityBuffer&,recorded:ScratchIdBuffer?) -> Error {
+ var p=parser_context(pool,tree,fixities);p.recorded .= recorded;
  for f in inherited { fixities.push(Fixity {f.operator,f.precedence,f.association,f.named,true}); }
  var declarations_seen=false; var body_declarations_seen=false;
  while !at(p,source,tokens,t_eof) {
@@ -1000,9 +1003,9 @@ fn parse_work(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbol
  }
  return tree.failure();
 }
-fn parse_with_fixities(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:]) -> Error {
+fn parse_with_fixities(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&,inherited: const InheritedFixity[:],recorded:ScratchIdBuffer?=null) -> Error {
  var fixities=ScratchFixityBuffer {};
- let error=parse_work(source,tokens,pool,tree,inherited,fixities);
+ let error=parse_work(source,tokens,pool,tree,inherited,fixities,recorded);
  fixities.deinit(); return error;
 }
 fn parse(source: const u8[:],tokens: const Token[:],pool: blot_parse_symbols::Pool&,tree: Tree&) -> Error { return parse_with_fixities(source,tokens,pool,tree,[]); }
