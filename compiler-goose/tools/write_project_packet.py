@@ -177,6 +177,39 @@ for t in sorted(STRUCTS):
   else:parts.append('get(self,value.'+f+');')
  code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}'+''.join(parts)+'self.depth--;}')
 code=[line.replace('fn put(self:Writer&','fn put<PacketWriter>(self:PacketWriter&').replace('fn get(self:Reader&','fn get<PacketReader>(self:PacketReader&') for line in code]
+# Contiguous tables selected by profiling copied worker packets. Goose checks
+# that their records have a flat representation and verifies the decoded image.
+FLAT_SLICES = (
+    'blot_check_core::Associated',
+    'blot_check_core::Binding',
+    'blot_check_core::BindingRef',
+    'blot_check_core::Body',
+    'blot_check_core::CallInfo',
+    'blot_check_core::Constructor',
+    'blot_check_core::DeclarationDependencies',
+    'blot_check_core::FieldName',
+    'blot_check_core::List',
+    'blot_check_core::Node',
+    'blot_check_core::Nominal',
+    'blot_check_core::Obligation',
+    'blot_check_core::Parameter',
+    'blot_check_core::Projection',
+    'blot_check_effects::Row',
+    'blot_check_parameter_patterns::Node',
+    'blot_check_types::Node',
+    'blot_check_types::Obligation',
+    'blot_parse_ast::Span',
+    'blot_reuse_principal_interface::Associated',
+    'blot_reuse_principal_interface::Binding',
+    'blot_reuse_principal_interface::Constructor',
+    'blot_reuse_principal_interface::Nominal',
+    'u32',
+    'u8',
+)
+for t in FLAT_SLICES:
+ assert t in SLICES, t
+ code.append(f'fn put(receiver:Writer&,value:const {t}[:]) {{putFlat(receiver,value);}}')
+ code.append(f'fn get(receiver:Reader&,value:{t}[:]& ) {{getFlat(receiver,value);}}')
 syntax_types=PRIM|{name.split('::')[-1] for name in D}
 (R/'support/project_packet_codecs.goose').write_text(finish_syntax(normalize('\n'.join(code)+'\n',syntax_types)))
 # Every family is concrete; no generic cast, byte arena or ownership erasure.

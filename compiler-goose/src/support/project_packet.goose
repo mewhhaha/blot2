@@ -96,29 +96,3 @@ fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
     value=run;
     receiver.at=end;
 }
-fn put(receiver:Writer&,value:const u8[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:u8[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const u32[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:u32[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_types::Node[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_types::Node[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_parameter_patterns::Node[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_parameter_patterns::Node[:]& ) {getFlat(receiver,value);}
-
-// The largest regular Core tables travel as checked Goose array images.
-fn put(receiver:Writer&,value:const blot_check_core::Node[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::Node[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_parse_ast::Span[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_parse_ast::Span[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::Binding[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::Binding[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::BindingRef[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::BindingRef[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::CallInfo[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::CallInfo[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::Body[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::Body[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::Parameter[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::Parameter[:]& ) {getFlat(receiver,value);}
-fn put(receiver:Writer&,value:const blot_check_core::DeclarationDependencies[:]) {putFlat(receiver,value);}
-fn get(receiver:Reader&,value:blot_check_core::DeclarationDependencies[:]& ) {getFlat(receiver,value);}
