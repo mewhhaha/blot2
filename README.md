@@ -17,13 +17,14 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-The release compiles Gdev Main’s 46,109 lines in **797.5 ms** median across
-16 fresh sessions with eight worker slots. A lighting preset edit rebuilds
-in **229.9 ms** median across eight retained sessions. A fresh compile checks
+The release compiles Gdev Main’s 46,109 lines in **845.0 ms** median across
+20 fresh sessions with eight worker slots. A lighting preset edit rebuilds
+in **246.1 ms** median across ten retained sessions. The previous release
+took 850.0 ms and 247.8 ms in the same runs. A fresh compile checks
 all 269 modules and produces 2,639,228 bytes of Wasm.
-[Gdev measurements](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.json)
+[Gdev measurements](benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.json)
 
-![Resolver visits and fresh compile times for Gdev Main](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.svg)
+![Type-list encoding and compilation times for Gdev Main](benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.svg)
 
 An earlier compiler took **938 ms** for ordinary lighting and **1,015 ms** for
 `#run true` in the same field. Both produced identical Wasm.

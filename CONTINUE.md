@@ -6,24 +6,20 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `6b223a73`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. It built all 46,109 Gdev lines in
-**782 ms** and **784 ms** median in two windows of 18 fresh builds.
-Both windows produced the same 2,639,228-byte Wasm.
+The qualified compiler is Blot `78d616bd`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. In the final confirmation window it compiled 46,109 Gdev
+lines in **845.0 ms** median and rebuilt a lighting edit in **246.1 ms**.
+The 269-module output is still 2,639,228 bytes.
 
-Four function-unification prototypes kept fresh Gdev near **0.80 s**.
-Capturing both functions’ fields and reusing their resolved children reduced
-recursive visits from 842,642 to 601,703. Two native regression tests caught
-changes to the existing depth and store-size limits. The narrower version
-preserved both limits and split its fresh-build timing windows. The qualified
-compiler stays at `6b223a73`.
-
-Across 12 fresh builds of the release, encoding and decoding project packets
-accounted for **7.4% of 27,894 CPU samples**. Four allocation-observer
-functions accounted for another **5.8%**. The two-word type-list descriptor
-alone accounted for 431 packet samples. Try reading and writing its start
-and length together, then compare fresh builds and retained edits.
-[Measurements and probes](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.json) · [Compiler work](tasks/FAST_COMPILE.md)
+Transferring a type list’s start and length together cut encoding from
+**12.5 to 4.1 ns** and decoding from **1.7 to 1.0 ns** per list.
+On real Gdev the list codec fell from 1.77% to 0.48% of sampled CPU.
+Fresh build times varied across windows, and lighting edits showed no
+consistent speedup.
+The checked compiler passed the full gate, matched every named Gdev and Ink
+outcome and reproduced the 120-frame replay and inspected hardware frame.
+Core module packets and imported binding arrays account for the largest remaining codec samples. Profile their field and array costs before widening the fast path.
+[Measurements and CPU samples](benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 

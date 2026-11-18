@@ -5,6 +5,43 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+### Two-word list packets
+
+The worker codec transfers the type-list descriptor’s start and length together. One fixed-width transfer encodes the same eight
+little-endian bytes. Near a packet limit it uses the field-by-field path. A complete first word survives a missing second word. Both compilers passed the same depth, alignment and truncation tests.
+
+| Paired workload | Previous release | Candidate | Median paired saving | Wins |
+| --- | ---: | ---: | ---: | ---: |
+| Fresh, contended host | 1857.9 ms | 1767.3 ms | +29.8 ms | 13/20 |
+| Fresh, starting order reversed | 837.7 ms | 841.4 ms | -2.9 ms | 9/20 |
+| Fresh, independent confirmation | 850.0 ms | 845.0 ms | +8.8 ms | 12/20 |
+| Lighting edit | 256.8 ms | 259.9 ms | -3.7 ms | 2/8 |
+| Lighting edit, confirmation | 247.8 ms | 246.1 ms | -0.5 ms | 5/10 |
+| Total child CPU, fresh confirmation | 2820.0 ms | 2795.5 ms | +8.8 ms | 10/20 |
+
+![Descriptor codec and Gdev compile times](../benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.svg)
+
+The isolated native benchmark alternated 20 pairs of fresh processes, each
+writing and reading 262,144 descriptors. Encoding took **12.52 → 4.13 ns**
+per descriptor and decoding took **1.67 → 0.99 ns**.
+In eight separately sampled fresh compiles per binary, **386 of 21,806**
+release CPU samples and **118 of 24,718** candidate samples landed in the list
+codec. Inlining can move samples into a caller. Backend output and checker
+reply sizes match across compilers, including all **72,858,303** reply bytes.
+
+The first timing window started with host CPU pressure at 63%. The second
+started at 2%. The final timing window ran separately after integration.
+Each fresh run checked all 269 modules. A valid retained edit rechecked one.
+The codec shipped in `78d616bd`. Fresh build times varied across windows,
+and lighting edits showed no consistent speedup.
+The full gate passed 190 Wasm fixtures, 212 lowering references, both direct
+references and 1,088 guest and host tests. The Gdev and Ink named outcomes,
+all 242 replay files and the inspected Pen frame matched the qualified release.
+Core module packets and imported binding arrays account for the largest remaining codec samples. Profile their field and array costs before widening the fast path.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.json)
+· [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.raw.json.gz)
+· [Codec patch, microbenchmark and probes](../benchmarks/evidence/measurements/2026-11-18-gdev-packet-list-probes.tar.gz)
+
 ### Function-pair unification
 
 The qualified release compiled all 46,109 lines in **797.5 ms** median,

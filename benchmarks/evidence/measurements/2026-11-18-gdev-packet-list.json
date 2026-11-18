@@ -1,0 +1,320 @@
+{
+  "date": "2026-11-18",
+  "baseGit": "944bbfcb94ce0348bce3800a695fb47af48423e8",
+  "releaseSource": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "releaseBinary": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+  "candidateBinary": "ed6eaba5a69bd6f01da5692c3999ad7b74d1784230a1502762ff29796a82eb55",
+  "candidateSourceIdentity": "dbe4c1042a61c880e2bf3df4f2bdc40dd36edbbe2d92dfc378992f86c49a9176",
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "workers": {
+    "slots": 8,
+    "processes": 7,
+    "jobs": 269,
+    "replyBytes": 72858303
+  },
+  "method": "Compiler built and compared with the same pinned workload. The two fresh windows alternate order and swap the starting executable for the second window. Retained sessions, profiling and CPU sampling are separate from fresh timings. Positive paired savings favor the candidate.",
+  "micro": {
+    "recordsPerProcess": 262144,
+    "pairedProcesses": 20,
+    "writeNsPerRecord": {
+      "pairs": 20,
+      "release": 12.519,
+      "candidate": 4.128,
+      "medianPairedSaving": 8.382,
+      "wins": 20
+    },
+    "readNsPerRecord": {
+      "pairs": 20,
+      "release": 1.673,
+      "candidate": 0.995,
+      "medianPairedSaving": 0.688,
+      "wins": 18
+    },
+    "method": "Native Goose and clang -O2, 2 MiB of descriptors in little-endian order. Encoding includes growing the output, decoding consumes both fields in a checksum. Copy to stable input outside both timers."
+  },
+  "freshMs": {
+    "first": {
+      "pairs": 20,
+      "release": 1857.913,
+      "candidate": 1767.293,
+      "medianPairedSaving": 29.807,
+      "wins": 13
+    },
+    "otherStart": {
+      "pairs": 20,
+      "release": 837.661,
+      "candidate": 841.431,
+      "medianPairedSaving": -2.932,
+      "wins": 9
+    },
+    "combinedFirstTwo": {
+      "pairs": 40,
+      "release": 888.213,
+      "candidate": 872.478,
+      "medianPairedSaving": 9.149,
+      "wins": 22
+    },
+    "independentConfirmation": {
+      "pairs": 20,
+      "release": 849.976,
+      "candidate": 844.982,
+      "medianPairedSaving": 8.835,
+      "wins": 12
+    }
+  },
+  "retainedMs": {
+    "fresh": {
+      "pairs": 8,
+      "release": 897.782,
+      "candidate": 869.301,
+      "medianPairedSaving": 31.368,
+      "wins": 8
+    },
+    "edit": {
+      "pairs": 8,
+      "release": 256.828,
+      "candidate": 259.928,
+      "medianPairedSaving": -3.687,
+      "wins": 2
+    },
+    "reject": {
+      "pairs": 8,
+      "release": 393.341,
+      "candidate": 389.578,
+      "medianPairedSaving": 0.719,
+      "wins": 4
+    },
+    "syntax": {
+      "pairs": 8,
+      "release": 121.441,
+      "candidate": 120.302,
+      "medianPairedSaving": 0.825,
+      "wins": 4
+    },
+    "lex": {
+      "pairs": 8,
+      "release": 120.578,
+      "candidate": 120.016,
+      "medianPairedSaving": 0.789,
+      "wins": 4
+    },
+    "recover": {
+      "pairs": 8,
+      "release": 257.72,
+      "candidate": 258.294,
+      "medianPairedSaving": -1.317,
+      "wins": 4
+    }
+  },
+  "retainedConfirmMs": {
+    "fresh": {
+      "pairs": 10,
+      "release": 858.302,
+      "candidate": 821.655,
+      "medianPairedSaving": 22.97,
+      "wins": 9
+    },
+    "edit": {
+      "pairs": 10,
+      "release": 247.848,
+      "candidate": 246.134,
+      "medianPairedSaving": -0.515,
+      "wins": 5
+    },
+    "reject": {
+      "pairs": 10,
+      "release": 379.005,
+      "candidate": 379.085,
+      "medianPairedSaving": -0.084,
+      "wins": 5
+    },
+    "syntax": {
+      "pairs": 10,
+      "release": 117.948,
+      "candidate": 114.025,
+      "medianPairedSaving": 3.344,
+      "wins": 8
+    },
+    "lex": {
+      "pairs": 10,
+      "release": 118.427,
+      "candidate": 116.101,
+      "medianPairedSaving": 0.466,
+      "wins": 5
+    },
+    "recover": {
+      "pairs": 10,
+      "release": 255.609,
+      "candidate": 249.961,
+      "medianPairedSaving": 5.723,
+      "wins": 7
+    }
+  },
+  "phasesMs": {
+    "assets": {
+      "pairs": 4,
+      "release": 86.227,
+      "candidate": 74.189,
+      "medianPairedSaving": 13.2,
+      "wins": 4
+    },
+    "load": {
+      "pairs": 4,
+      "release": 76.807,
+      "candidate": 80.861,
+      "medianPairedSaving": -7.475,
+      "wins": 1
+    },
+    "check": {
+      "pairs": 4,
+      "release": 535.009,
+      "candidate": 521.989,
+      "medianPairedSaving": 10.554,
+      "wins": 3
+    },
+    "lower": {
+      "pairs": 4,
+      "release": 45.232,
+      "candidate": 50.477,
+      "medianPairedSaving": -6.529,
+      "wins": 0
+    },
+    "backend": {
+      "pairs": 4,
+      "release": 122.182,
+      "candidate": 117.714,
+      "medianPairedSaving": 4.468,
+      "wins": 3
+    }
+  },
+  "aggregateCheckingWorkerCpuMs": {
+    "pairs": 4,
+    "release": 2197.57,
+    "candidate": 2168.869,
+    "medianPairedSaving": 29.12,
+    "wins": 4
+  },
+  "sampledCpu": {
+    "method": "Separate eight fresh runs per binary with process CPU interval sampling rearmed on fork. Exclusive samples in emitted codec symbols. Inlined operations can move into the enclosing symbol. These runs do not contribute to wall time medians.",
+    "counts": {
+      "release": {
+        "all": 21806,
+        "typeList": 386,
+        "packet": 1591
+      },
+      "candidate": {
+        "all": 24718,
+        "typeList": 118,
+        "packet": 1391
+      }
+    }
+  },
+  "qualification": {
+    "gateSeconds": 309.67109505199994,
+    "gatePhases": [
+      [
+        "harness",
+        0
+      ],
+      [
+        "release-build",
+        0
+      ],
+      [
+        "reference-direct",
+        0
+      ],
+      [
+        "reference-uniqueness",
+        0
+      ],
+      [
+        "reference-fixtures",
+        0
+      ],
+      [
+        "pack",
+        0
+      ],
+      [
+        "guests",
+        0
+      ]
+    ],
+    "fixturePrograms": 190,
+    "uniquenessReferences": 212,
+    "directReferences": 2,
+    "wire": "Both codecs passed byte order, 8 alignments, 9 truncations per alignment, nesting limit and partial first-word tests. In separate native builds with a 16-byte packet limit, both writers preserved complete prefixes and exact failure state for 19 starting sizes.",
+    "gdev": [
+      1220,
+      108
+    ],
+    "inkPen": [
+      280,
+      0
+    ],
+    "inkNative": [
+      111,
+      2
+    ],
+    "allNamedOutcomesMatch": true,
+    "penAssets": 545,
+    "packetFiles": 242,
+    "packetFrames": 120,
+    "frameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+  },
+  "decision": "Shipped the codec for its measured reduction in packet work. Fresh wall-time results varied by window, and the lighting edit showed no consistent speedup.",
+  "trials": "2026-11-18-gdev-packet-list.raw.json.gz",
+  "reproducers": "2026-11-18-gdev-packet-list-probes.tar.gz",
+  "wholeSessionCpuMs": {
+    "confirm": {
+      "pairs": 20,
+      "release": 2819.956,
+      "candidate": 2795.523,
+      "medianPairedSaving": 8.848,
+      "wins": 10
+    },
+    "edit-confirm": {
+      "pairs": 10,
+      "release": 5604.494,
+      "candidate": 5487.744,
+      "medianPairedSaving": 126.673,
+      "wins": 8
+    }
+  },
+  "wholeSessionCpuMethod": "Linux getrusage(RUSAGE_CHILDREN) in the Deno caller, immediately before open and after disposing the compiler. Sums reported user and system CPU for waited child processes. The edit series covers the full six-build session.",
+  "candidateSourceGit": "78d616bd3f3b5b0e3d7c2bf35ea42d8011d5bd46"
+}
