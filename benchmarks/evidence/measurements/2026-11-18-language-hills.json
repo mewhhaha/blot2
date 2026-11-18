@@ -1,0 +1,594 @@
+{
+  "date": "2026-11-18",
+  "qualifiedGit": {
+    "blot": "1a60f88075879a94382cbb2a7fe8ca9747982c2d",
+    "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "baselineGdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+  "baselineCompiler": "1e122293bfb7ff8e504178711edad6df0712b13d",
+  "abi": 8,
+  "sessionProtocol": 2,
+  "freshGdev": {
+    "method": "Eight alternating AB/BA pairs, fresh session/process with warm files, eight frontend slots, same host wrapper and std, ordinary source overlay on lighting_look, session open through receipt of Wasm. Shared machine. Baseline is the previous Gdev tree and compiler.",
+    "compilerSha256": {
+      "baseline": "6070336a083d8188d91bcb339ee410c78846a93b98a382c59027709097b2acef",
+      "candidate": "4596feef82837fd6d696b70917a6159a62a60f7be0b12e02e6bccbc35f1d1299"
+    },
+    "samples": [
+      {
+        "pair": 1,
+        "treatment": "baseline",
+        "ms": 781.410163,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 1,
+        "treatment": "candidate",
+        "ms": 726.032565,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 2,
+        "treatment": "candidate",
+        "ms": 721.33246,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 2,
+        "treatment": "baseline",
+        "ms": 797.132882,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 3,
+        "treatment": "baseline",
+        "ms": 809.960368,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 3,
+        "treatment": "candidate",
+        "ms": 743.734067,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 4,
+        "treatment": "candidate",
+        "ms": 720.9844979999999,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 4,
+        "treatment": "baseline",
+        "ms": 781.682108,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 5,
+        "treatment": "baseline",
+        "ms": 783.340421,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 5,
+        "treatment": "candidate",
+        "ms": 745.469334,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 6,
+        "treatment": "candidate",
+        "ms": 726.622104,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 6,
+        "treatment": "baseline",
+        "ms": 792.229428,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 7,
+        "treatment": "baseline",
+        "ms": 774.6091,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "pair": 7,
+        "treatment": "candidate",
+        "ms": 735.62531,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 8,
+        "treatment": "candidate",
+        "ms": 708.569423,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 8,
+        "treatment": "baseline",
+        "ms": 765.70343,
+        "fresh": 269,
+        "bytes": 2639228,
+        "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      }
+    ],
+    "baselineMedianMs": 782.5112644999999,
+    "candidateMedianMs": 726.3273345,
+    "pairedMedianDifferenceMs": -58.915808500000026,
+    "candidateFasterPairs": 8
+  },
+  "stagedCatalog": {
+    "command": "deno run -A benchmarks/language/staged_catalog.ts",
+    "fixture": "Gdev src/assets/catalog.json, aim.png and checker.png; independent source overlay using the shipped std/build.include. Reads metadata from catalog length and the selected image signature. Production readers are separate.",
+    "catalogBytes": 15899,
+    "transitions": [
+      {
+        "ms": 3.345841,
+        "choice": "aim.png",
+        "edit": null,
+        "cached": false,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "aim.png",
+            "sha256": "d085b357e1a3e098b56bb3c2d7366f0aef2ab82e53aab13742fba4d26a9b60d3"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 352
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input1.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      },
+      {
+        "ms": 0.8458279999999974,
+        "choice": "aim.png",
+        "edit": "checker.png",
+        "cached": true,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "aim.png",
+            "sha256": "d085b357e1a3e098b56bb3c2d7366f0aef2ab82e53aab13742fba4d26a9b60d3"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 352
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input1.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      },
+      {
+        "ms": 0.7574699999999979,
+        "choice": "aim.png",
+        "edit": "aim.png",
+        "cached": false,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "aim.png",
+            "sha256": "700e489b5be7bc68ad1f09844d59f2b244c8e7dcc25168fb03b7f2e3026c4f47"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 352
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input1.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      },
+      {
+        "ms": 1.2966049999999996,
+        "choice": "checker.png",
+        "edit": null,
+        "cached": false,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "checker.png",
+            "sha256": "c0798f50372ec8114b1104f1e156d4d00bec201473758e4c1a443bd9b403f1dc"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 351
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input2.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      },
+      {
+        "ms": 0.7519199999999984,
+        "choice": "checker.png",
+        "edit": "aim.png",
+        "cached": true,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "checker.png",
+            "sha256": "c0798f50372ec8114b1104f1e156d4d00bec201473758e4c1a443bd9b403f1dc"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 351
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input2.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      },
+      {
+        "ms": 1.0723279999999988,
+        "choice": "aim.png",
+        "edit": null,
+        "cached": false,
+        "read": [
+          {
+            "name": "catalog.json",
+            "sha256": "fc990981b60487fe41e63d491592b57df4ac8015263eb97c5278ea1321429350"
+          },
+          {
+            "name": "aim.png",
+            "sha256": "d085b357e1a3e098b56bb3c2d7366f0aef2ab82e53aab13742fba4d26a9b60d3"
+          }
+        ],
+        "definitions": [
+          {
+            "filename": "gdev/src/assets/stage-catalog-probe.blot",
+            "start": 161,
+            "end": 352
+          },
+          {
+            "filename": "blot2/std/build.blot",
+            "start": 77,
+            "end": 139
+          },
+          {
+            "filename": "gdev/src/assets/input0.blot",
+            "start": 0,
+            "end": 19
+          },
+          {
+            "filename": "gdev/src/assets/input1.blot",
+            "start": 0,
+            "end": 19
+          }
+        ],
+        "wasm": 1779
+      }
+    ]
+  },
+  "terrain": {
+    "command": "deno run -A benchmarks/language/terrain_owner.ts",
+    "workload": "One marked tile changed on a 169-tile surface with an independent owned snapshot, using the real trails module.",
+    "checksum": 35,
+    "observations": [
+      {
+        "marker": 101,
+        "owners": [
+          {
+            "slot": 1,
+            "address": 5243920,
+            "length": 169,
+            "generation": 0,
+            "change": 17
+          },
+          {
+            "slot": 2,
+            "address": 13634544,
+            "length": 169,
+            "generation": 0,
+            "change": 17
+          },
+          {
+            "slot": 3,
+            "address": 5245280,
+            "length": 169,
+            "generation": 0,
+            "change": 17
+          }
+        ]
+      },
+      {
+        "marker": 102,
+        "owners": [
+          {
+            "slot": 1,
+            "address": 5243920,
+            "length": 169,
+            "generation": 0,
+            "change": 18
+          },
+          {
+            "slot": 2,
+            "address": 13634544,
+            "length": 169,
+            "generation": 0,
+            "change": 17
+          },
+          {
+            "slot": 3,
+            "address": 5245280,
+            "length": 169,
+            "generation": 0,
+            "change": 17
+          }
+        ]
+      }
+    ]
+  },
+  "remainingOwnershipSites": {
+    "method": "scripts/integration/count_stores.py over Ink lib and tests and Gdev src, tests, test_support, devtools and performance; candidate source lines, not known violations.",
+    "previousStores": 1196,
+    "currentStores": 1190,
+    "previousLent": 18,
+    "currentLent": 15
+  },
+  "packedList": {
+    "record": "2026-11-18-intent-layout.json",
+    "shippingLayout": "fixed stride",
+    "source": "performance/modernize/pile_handles.blot",
+    "initial": {
+      "counts": [
+        144,
+        144,
+        0,
+        0
+      ],
+      "elements": 65536,
+      "rounds": 9,
+      "medians": [
+        {
+          "name": "fixed",
+          "bytesPerElement": 20,
+          "tagUs": 23.651049999999714,
+          "fullUs": 214.62045999999987,
+          "concatUs": 29.413919999999507
+        },
+        {
+          "name": "inline",
+          "bytesPerElement": 9,
+          "tagUs": 202.37930000000006,
+          "fullUs": 250.59413999999947,
+          "concatUs": 14.269329999999627
+        },
+        {
+          "name": "split",
+          "bytesPerElement": 9,
+          "tagUs": 20.00342000000046,
+          "fullUs": 200.38530000000037,
+          "concatUs": 13.563380000000507
+        }
+      ]
+    },
+    "afterPlannerMigration": {
+      "counts": [
+        144,
+        144,
+        0,
+        0
+      ],
+      "elements": 65536,
+      "rounds": 9,
+      "medians": [
+        {
+          "name": "fixed",
+          "bytesPerElement": 20,
+          "tagUs": 36.909670000000006,
+          "fullUs": 369.47944000000007,
+          "concatUs": 35.30902000000424
+        },
+        {
+          "name": "inline",
+          "bytesPerElement": 9,
+          "tagUs": 226.16135999999642,
+          "fullUs": 402.6123299999995,
+          "concatUs": 15.481840000002194
+        },
+        {
+          "name": "split",
+          "bytesPerElement": 9,
+          "tagUs": 31.271449999999277,
+          "fullUs": 347.30847999999924,
+          "concatUs": 16.020260000000235
+        }
+      ]
+    }
+  },
+  "qualification": {
+    "compilerSha256": "4596feef82837fd6d696b70917a6159a62a60f7be0b12e02e6bccbc35f1d1299",
+    "mainBytes": 2639648,
+    "mainSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (114.0 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (10.2 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameMatchesPrevious": true,
+    "compilerGate": {
+      "directReferences": 2,
+      "loweringReferences": 212,
+      "wasmReferences": 191,
+      "guestAndHostPassed": 1092,
+      "failed": 0,
+      "ignored": 100
+    },
+    "penCheck": {
+      "entries": [
+        "Main",
+        "Devtools"
+      ],
+      "assets": 545
+    },
+    "codegenCheck": true,
+    "testLogSha256": {
+      "gdev": "6015512e832b8919a1dce77320613dbfe793629e151c1072a65785d78b5695dd",
+      "ink": "3c8af5bd5202cd1d86ead9cce813d2bd23580743062aa65d7850631c764d2ae1"
+    }
+  }
+}

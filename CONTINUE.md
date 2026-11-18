@@ -6,13 +6,28 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `3476218d`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. With eight worker slots it compiled all 46,109
-lines in **886.0 ms** median across 40 fresh pairs on a lightly loaded host,
-down from **916.8 ms**. Under heavier CPU contention the medians were
-1539.5 ms and 1572.6 ms respectively. Across all three windows the
-new compiler won 44 of 56 fresh pairs.
-Lighting edits showed no consistent speedup. Main emits 2,639,228 bytes of Wasm.
+The qualified compiler is Blot `1a60f880`, with Gdev `0e0d772`, Ink
+`3f2e603` and Pen `ad9766c`. Fresh Gdev Main compiled in **726.3 ms** median,
+down from **782.5 ms** in eight alternating pairs with eight frontend slots.
+The combined changes won all eight pairs in this window. Main emits
+**2,639,648 bytes** across 270 modules, up 420 bytes. A previous 40-pair
+window on different source measured 886.0 ms.
+[Measurements and qualification](benchmarks/evidence/measurements/2026-11-18-language-hills.json)
+
+Ordinary `#run` functions can construct records, tuples, constructors, arrays
+and lists. `std/build.include` reads project-declared files. A real Gdev
+asset probe changed the selected image and observed a new read set. Unselected
+file edits reused the complete Wasm. Gdev's existing asset readers are still
+in use. Scene consumers check against `SceneHooks world`; a storage edit
+rechecked four modules, down from six. A terrain update reused the allocation
+for all 169 tiles and preserved a copied snapshot.
+[Scene interface](benchmarks/evidence/measurements/2026-11-18-gdev-scene-interface.json)
+
+Separate tag and payload buffers used 9 bytes per intent in a Wasm layout
+experiment, down from 20. Copying two spans fell from 29.4 to 13.6 µs.
+Blot lists still use their existing layout. The next layout test should
+measure constructing and concatenating Blot lists with shared tails.
+[Intent layout and reproduction](benchmarks/intent/README.md)
 
 Workers transfer 13 more Core and interface tables as verified Goose arrays.
 Across all 269 modules, writing the captured Core records fell from
@@ -42,7 +57,7 @@ edits, changed compile-time branches and snapshot replacement before enabling it
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 190 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,088 guest and host tests passed, 100 ignored |
+| Compiler | | 191 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,092 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108
@@ -66,8 +81,8 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
 ## Remaining work
 
 1. Migrate the remaining shared writers and borrowed returns. The
-   [source scan](scripts/integration/count_stores.py) finds **1,196 candidate
-   store lines and 18 `lent` declarations**, down from 1,558 and 55. The
+   [source scan](scripts/integration/count_stores.py) finds **1,190 candidate
+   store lines and 15 `lent` declarations**, down from 1,558 and 55. The
    [world-writer scan](scripts/integration/world_writers.py) finds 20 writers
    each in `player/hand` and `world/salt`. Follow their callers as a group and
    preserve snapshot independence when replacing live terrain views. Retire

@@ -5,6 +5,26 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+### Scene callbacks and compile-time inputs
+
+Eight fresh, alternating process pairs measured **782.5 → 726.3 ms** for the
+combined compiler and Gdev changes. In a separate source-only test on the same
+compiler, the scene callback interface reduced a storage edit from six checked
+modules to four. A one-worker fresh build was effectively flat. The strongest
+reason to keep the interface is that scenes can be checked while the storage
+implementation is broken.
+
+`#run` can now build structured constants and read declared files. An edit to
+an unselected file reused the previous Wasm. Changed source still goes through
+the existing module checks. Run the two real-source probes from the Blot root.
+
+```sh
+deno run -A benchmarks/language/terrain_owner.ts
+deno run -A benchmarks/language/staged_catalog.ts
+```
+
+[Paired measurements and integration checks](../benchmarks/evidence/measurements/2026-11-18-language-hills.json)
+
 ### Reusing emitted function bodies after a scalar edit
 
 The shipping compiler compiled Gdev Main in **879 ms** and rebuilt the lighting
