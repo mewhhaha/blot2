@@ -1,0 +1,210 @@
+{
+  "releaseCompiler": "20fed71392c3ae278ffe57b6e37c6f10f5912b67",
+  "compilerSha256": "ad7f75009948a575fd608d850328ec5199b51de1fdfbfb46e734a39de6d6ad1b",
+  "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+  "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+  "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads",
+  "entry": "gdev/src/main.blot",
+  "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+  "wasmBytes": 2639228,
+  "releaseEvidence": "2026-11-18-gdev-compiler-workers.json",
+  "lineCount": {
+    "convention": "Physical source lines, including blanks and comments, counted once per reachable module in the release trace. Gdev, Ink and std files were read at the pinned commits. For the 55 virtual modules, materialized generated source matched the traced byte lengths and produced identical whole-project Wasm as source overlays with native asset generation disabled. Timing runs used normal native asset generation.",
+    "all": {
+      "modules": 269,
+      "bytes": 2527266,
+      "lines": 46109,
+      "nonblank": 44018
+    },
+    "byOrigin": {
+      "std": {
+        "modules": 6,
+        "bytes": 33688,
+        "lines": 738,
+        "nonblank": 681
+      },
+      "ink": {
+        "modules": 73,
+        "bytes": 696776,
+        "lines": 14965,
+        "nonblank": 14102
+      },
+      "gdev": {
+        "modules": 135,
+        "bytes": 1739902,
+        "lines": 30092,
+        "nonblank": 28921
+      },
+      "generated": {
+        "modules": 55,
+        "bytes": 56900,
+        "lines": 314,
+        "nonblank": 314
+      }
+    }
+  },
+  "throughput": {
+    "qualifyingFreshMedianMs": 888.59,
+    "qualifyingPhysicalLinesPerSecond": 51890,
+    "millionLinesPerSecondTargetMs": 46.109,
+    "requiredSpeedup": 19.27,
+    "serialModuleCheckerCpuMs": 1100.886,
+    "cpuBudgetAtTargetOnEightCoresMs": 368.872,
+    "minimumCheckerOnlyCpuReductionFactor": 2.984,
+    "profiledWallOutsideParallelCheckAndLowerMs": 433.664
+  },
+  "workerCountSweep": {
+    "method": "Four interleaved unprofiled fresh processes per width, same binary and sources. End-to-end session startup through returned Wasm on the shared 8-core / 16-thread host. This separate timing window had slower wall times than release qualification. Width is worker count including the parent.",
+    "results": {
+      "1": {
+        "medianMs": 2482.8,
+        "trialsMs": [
+          3442.06,
+          2644.45,
+          2321.15,
+          2146.13
+        ]
+      },
+      "2": {
+        "medianMs": 1819.45,
+        "trialsMs": [
+          2375.16,
+          1957.22,
+          1679.5,
+          1681.68
+        ]
+      },
+      "4": {
+        "medianMs": 1470.3,
+        "trialsMs": [
+          1665.4,
+          1506.44,
+          1434.15,
+          1186.28
+        ]
+      },
+      "8": {
+        "medianMs": 1298.77,
+        "trialsMs": [
+          1664.51,
+          1387.94,
+          1124.69,
+          1209.61
+        ]
+      },
+      "16": {
+        "medianMs": 1495.42,
+        "trialsMs": [
+          1498.15,
+          1492.7,
+          1519.36,
+          1177.89
+        ]
+      }
+    }
+  },
+  "sourceCheckerModel": {
+    "method": "Measured one-worker per-module CPU from this release. Topological source imports include multiline re-exports and implicit prelude and match the prior path-level graph. All 269 bodies run. The dependency-ready simulation prioritizes longest remaining path. The early-interface scenario gives the selected producer interfaces to importers at time zero. Header construction, process communication, parallel overhead, parsing, Core lowering and emission are excluded. These are checker schedule estimates.",
+    "currentImportsMs": {
+      "4": 330.708,
+      "8": 307.273,
+      "16": 306.288,
+      "unlimited": 306.288
+    },
+    "allHeadersAtTimeZeroMs": {
+      "4": 275.289,
+      "8": 137.774,
+      "16": 68.844,
+      "unlimited": 59.879
+    },
+    "greedyEarlyProducers": [
+      {
+        "producer": "gdev/src/world_storage.blot",
+        "eightWorkerCheckMs": 274.87,
+        "headers": {
+          "named": 45,
+          "public": 45,
+          "publicWithoutResult": 42,
+          "writtenParamAndResultTypes": 1
+        }
+      },
+      {
+        "producer": "gdev/src/world/salt.blot",
+        "eightWorkerCheckMs": 244.88,
+        "headers": {
+          "named": 132,
+          "public": 132,
+          "publicWithoutResult": 94,
+          "writtenParamAndResultTypes": 28
+        }
+      },
+      {
+        "producer": "gdev/src/actors/robots.blot",
+        "eightWorkerCheckMs": 225.48,
+        "headers": {
+          "named": 141,
+          "public": 141,
+          "publicWithoutResult": 124,
+          "writtenParamAndResultTypes": 12
+        }
+      }
+    ],
+    "longestImportChain": [
+      "std/prelude.blot",
+      "std/vector.blot",
+      "ink/math.blot",
+      "ink/lanes.blot",
+      "ink/transform.blot",
+      "ink/render.blot",
+      "ink/brush.blot",
+      "ink/editor.blot",
+      "gdev/src/effects/celebrations.blot",
+      "gdev/src/world/salt_simulation.blot",
+      "gdev/src/world/salt.blot",
+      "gdev/src/world/pile_batch.blot",
+      "gdev/src/actors/robots.blot",
+      "gdev/src/actors/minors.blot",
+      "gdev/src/actors/village.blot",
+      "gdev/src/world_storage.blot",
+      "gdev/src/progression/scenes.blot",
+      "gdev/src/ui/title.blot",
+      "gdev/src/game.blot",
+      "gdev/src/main.blot"
+    ],
+    "maximumModuleCpuMs": 59.879,
+    "publicHeaderAudit": {
+      "method": "Count top-level named func declarations lexically across traced sources. Public includes public-by-default declarations whether or not imported. Explicit results and typed parameter lists are counted from declaration syntax. Constants assigned lambdas are excluded. This does not establish whether effects, constraints or compile-time values can be published early.",
+      "named": 3307,
+      "public": 3281,
+      "publicWithoutResult": 2923,
+      "writtenParamAndResultTypes": 270,
+      "private": 26
+    }
+  },
+  "staging": {
+    "unusedOverlay": "Append private const throughput_probe: Bool = true to src/effects/lighting_look.blot. Replace true with (#run true) in the staged variant. Fresh profiled sessions at width eight, alternating in ABBA order. Both variants emitted the qualifying Wasm.",
+    "unusedMedianMs": {
+      "ordinary": 1317.34,
+      "staged": 2736.18
+    },
+    "ordinaryWorkerJobs": 269,
+    "stagedWorkerJobs": 0,
+    "usedOverlay": "Replacing true with (#run true) in the proposed lighting Look record rejected at Wasm emission at both widths 1 and 8 (storage_unsupported, staging expressions)."
+  },
+  "qualifyingTrace": {
+    "other": 16.538,
+    "assets": 72.8,
+    "load": 12.451,
+    "lex": 22.355,
+    "parse": 121.165,
+    "check": 446.697,
+    "lower": 53.843,
+    "freeze": 0.0,
+    "validation": 0.0,
+    "backend": 112.549
+  },
+  "workerPacketBytes": 72858303,
+  "chart": "2026-11-18-gdev-multicore.svg",
+  "raw": "2026-11-18-gdev-multicore.raw.json.gz"
+}

@@ -56,6 +56,39 @@ salt from 53 to 35.
 [Source split and serial edit measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
 · [Worker prototype and rejected experiments](../benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
 
+### What one million lines per second would take
+
+Main has 46,109 physical source lines, including 314 generated lines. The
+889 ms release median is **51,890 lines/s**. One million lines/s on this input
+allows **46 ms** to receive complete Wasm. The release trace spent 434 ms
+outside parallel checking and worker-side lowering. In a separate, slower
+timing window the same binary took 2.48 s with one worker, 1.30 s with eight
+and 1.50 s with sixteen on eight physical cores.
+[Worker scaling graph](../benchmarks/evidence/measurements/2026-11-18-gdev-multicore.svg)
+· [Source counts and raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-multicore.json)
+
+1. **Publish interfaces before checking bodies.** Start with `world_storage`,
+   `world/salt` and `actors/robots`. Make the types, effects, ownership and
+   constraints that callers observe available from the declaration. Keep local
+   inference. A model using measured per-module CPU takes 307 ms on eight
+   workers with today's imports, 225 ms with those three interfaces ready at
+   startup, and 138 ms with all interfaces ready. These are checker-only
+   estimates with free headers. Of 3,281 visible named functions, 2,923 omit
+   the result type. Measure a pilot before requiring annotations throughout.
+   [Rust's type collection and body checking](https://rustc-dev-guide.rust-lang.org/hir-typeck/summary.html)
+2. **Keep compile-time execution local to its dependencies.** Adding an unused
+   private `#run true` to one Gdev file reduced parallel checker jobs from 269
+   to zero and still emitted identical Wasm. Using it for the actual lighting
+   field instead reached a `storage_unsupported` diagnostic at Wasm emission.
+   Evaluate the required body and make its value available to consumers. The
+   other modules can continue independently.
+3. **Reduce work per line and parallelize the rest of the pipeline.** The
+   checker alone used 1,101 ms of single-core CPU. At the throughput target,
+   eight cores have 369 ms of CPU for the entire compile. Measure repeated
+   type resolution and the 72.9 MB of worker replies. Parse files independently
+   and reserve stable Wasm indices so workers can emit function bodies in
+   parallel. [Go's per-function backend queue](https://go.dev/src/cmd/compile/internal/gc/compile.go)
+
 ## Goose release measurements, 17 November 2026
 
 Gdev Main took **2.04 s** median on the ordinary one-worker path. All 264
