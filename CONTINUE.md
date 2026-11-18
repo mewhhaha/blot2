@@ -6,13 +6,15 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `0c4bc0eb`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. Parallel parsing reduced fresh Main from
-**919 to 823 ms** and a retained lighting preset edit from **280 to 234 ms**.
-The new compiler won all twelve fresh pairs and all five edit pairs. Main
-still emits the same 2,639,228 Wasm bytes. Type checking consumed 68% of
-checker worker CPU. The next experiment is to reduce repeated type resolution.
-[Measurements and profile](benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.json) · [Compiler work](tasks/FAST_COMPILE.md)
+The qualified compiler is Blot `6b223a73`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. On 18 alternating fresh pairs, Main fell from
+**890 to 868 ms**. The retained lighting edit took **255 and 257 ms**.
+The new resolver reached its full node traversal 2.15 million times, down
+from 3.65 million. All Main builds emitted the same 2,639,228 Wasm bytes.
+An extra cache improved serial checking and lost the eight-worker comparison.
+Next, identify which type shapes and callers account for the 405,857 nodes
+still allocated during resolution.
+[Measurements and probes](benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 

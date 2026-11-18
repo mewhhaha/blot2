@@ -1,0 +1,719 @@
+{
+  "date": "2026-11-18",
+  "baselineGit": "1dbabdb89a33b331e25ffca63d12c8a83628c77f",
+  "candidateCodeGit": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "host": {
+    "cpu": "AMD Ryzen 7 3800X, eight cores and 16 logical CPUs",
+    "kernel": "7.3.4-1-cachyos x86_64",
+    "deno": "2.9.8",
+    "clang": "23.1.5",
+    "sharedHost": true
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "binaries": {
+    "before": "b60f158e6b3d7e6cd35d89c0627eae662ae20329822a5c20212bf82ef38ac495",
+    "after": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+    "memo": "bde019c09c3b85454928478ac99ced2fbcd53c221bfa57e7a461605dd6ec5b67",
+    "probeBefore": "d3b47b290e605cb32194c8b1af31347233a80b2042dd9cc3a045cfe2cf2095fe",
+    "probeAfter": "251b8e0bbc6e669a925cec26cec27edabb5f4452b14867e3e956381dfa306a9b",
+    "candidateSourceManifest": "b91f4eadfcd0a6da98ba0a16d2825b789e9de796579c1b8ceaba60cf406a809d"
+  },
+  "method": "Normal Gdev Main. Three compilers use all six build orders, repeated three times for fresh, once for edits and once for phase profiling. Each trial opens a fresh process with warm filesystem pages, runs the ordinary project protocol, includes native assets and reads complete Wasm. Cross-compiler equality is checked after the timer. Edits retain the same open process. The separate trace and compiler gate are excluded from latency trials.",
+  "edits": {
+    "fresh": {
+      "rounds": 6,
+      "medians": {
+        "before": 1027.463,
+        "after": 994.75,
+        "memo": 957.836
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": 0.429,
+        "wins": 3
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 41.028,
+        "wins": 5
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 77.545,
+        "wins": 5
+      }
+    },
+    "edit": {
+      "rounds": 6,
+      "medians": {
+        "before": 281.643,
+        "after": 287.384,
+        "memo": 283.427
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": -3.536,
+        "wins": 2
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 14.953,
+        "wins": 5
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 2.88,
+        "wins": 3
+      }
+    },
+    "reject": {
+      "rounds": 6,
+      "medians": {
+        "before": 449.293,
+        "after": 425.785,
+        "memo": 419.565
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": 8.872,
+        "wins": 3
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 8.755,
+        "wins": 4
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 14.207,
+        "wins": 6
+      }
+    },
+    "syntax": {
+      "rounds": 6,
+      "medians": {
+        "before": 130.434,
+        "after": 133.02,
+        "memo": 124.781
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": -3.323,
+        "wins": 3
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 2.804,
+        "wins": 5
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 4.279,
+        "wins": 4
+      }
+    },
+    "lex": {
+      "rounds": 6,
+      "medians": {
+        "before": 139.343,
+        "after": 139.631,
+        "memo": 129.215
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": -3.007,
+        "wins": 3
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 2.797,
+        "wins": 3
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 9.858,
+        "wins": 5
+      }
+    },
+    "recover": {
+      "rounds": 6,
+      "medians": {
+        "before": 284.816,
+        "after": 297.637,
+        "memo": 280.93
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": -11.715,
+        "wins": 1
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 21.072,
+        "wins": 5
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": -3.4,
+        "wins": 2
+      }
+    }
+  },
+  "fresh": {
+    "rounds": 18,
+    "medians": {
+      "before": 1261.872,
+      "after": 1217.049,
+      "memo": 1244.251
+    },
+    "shippingVsPrevious": {
+      "medianWithinPairSaved": 8.022,
+      "wins": 12
+    },
+    "memoVsShipping": {
+      "medianWithinPairSaved": 5.407,
+      "wins": 9
+    },
+    "memoVsPrevious": {
+      "medianWithinPairSaved": 24.7,
+      "wins": 13
+    }
+  },
+  "profile": {
+    "checkWallMs": {
+      "rounds": 6,
+      "medians": {
+        "before": 549.897,
+        "after": 538.406,
+        "memo": 551.713
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": -1.946,
+        "wins": 3
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 5.677,
+        "wins": 4
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": -6.899,
+        "wins": 2
+      }
+    },
+    "workerCpuMs": {
+      "rounds": 6,
+      "medians": {
+        "before": 2342.65,
+        "after": 2293.869,
+        "memo": 2271.628
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": 52.559,
+        "wins": 6
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": -46.894,
+        "wins": 2
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": -6.434,
+        "wins": 3
+      }
+    },
+    "workerCpuCoverage": "Summed per-module checking, interface freezing and worker Core lowering. Concurrent with other workers.",
+    "work": {
+      "before": {
+        "visits": 3909874,
+        "resolutionNodesAdded": 405857,
+        "typeNodes": 1334708,
+        "viewsCreated": 222515,
+        "typeBinders": 222515,
+        "replyBytes": 72858303,
+        "jobs": 269,
+        "compositeProbes": 1087915,
+        "compositeHits": 317
+      },
+      "after": {
+        "visits": 3695637,
+        "resolutionNodesAdded": 405857,
+        "typeNodes": 1334708,
+        "viewsCreated": 222515,
+        "typeBinders": 222515,
+        "replyBytes": 72858303,
+        "jobs": 269,
+        "compositeProbes": 873678,
+        "compositeHits": 317
+      },
+      "memo": {
+        "visits": 3254884,
+        "resolutionNodesAdded": 405857,
+        "typeNodes": 1334708,
+        "viewsCreated": 222515,
+        "typeBinders": 222515,
+        "replyBytes": 72858303,
+        "jobs": 269,
+        "compositeProbes": 724187,
+        "compositeHits": 317
+      }
+    }
+  },
+  "perVisit": {
+    "method": "One observational build per source revision on the same hashed complete Main. Full keys per checker module and stage include store identity, type node, cursor, recursion depth, type/effect mutation epochs, current inference clock, effect physical epoch, closed generation and depth limit. A second measurement drops recursion depth. Primitive IDs and already-closed inputs are counted separately. Per-stage totals overlap. Histograms count entries, not CPU or expected savings.",
+    "before": {
+      "root": {
+        "primitive": {
+          "visits": 768458,
+          "repeatedExact": 623527,
+          "repeatedIgnoringDepth": 623527,
+          "atDepthZero": 768458,
+          "atCursorZero": 768458,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 523873,
+          "repeatedExact": 276968,
+          "repeatedIgnoringDepth": 276968,
+          "atDepthZero": 523873,
+          "atCursorZero": 523873,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 825879,
+          "repeatedExact": 326083,
+          "repeatedIgnoringDepth": 326083,
+          "atDepthZero": 825879,
+          "atCursorZero": 825879,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 843062,
+          "repeatedExact": 257221,
+          "repeatedIgnoringDepth": 257221,
+          "atDepthZero": 843062,
+          "atCursorZero": 843062,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 2961272,
+          "repeatedExact": 1483799,
+          "repeatedIgnoringDepth": 1483799,
+          "atDepthZero": 2961272,
+          "atCursorZero": 2961272,
+          "usesProjections": 0
+        }
+      },
+      "depth": {
+        "primitive": {
+          "visits": 882507,
+          "repeatedExact": 650121,
+          "repeatedIgnoringDepth": 724148,
+          "atDepthZero": 6049,
+          "atCursorZero": 833963,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 413114,
+          "repeatedExact": 116825,
+          "repeatedIgnoringDepth": 238285,
+          "atDepthZero": 0,
+          "atCursorZero": 370806,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 1187379,
+          "repeatedExact": 156495,
+          "repeatedIgnoringDepth": 391095,
+          "atDepthZero": 341932,
+          "atCursorZero": 1111698,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 1426874,
+          "repeatedExact": 259496,
+          "repeatedIgnoringDepth": 404367,
+          "atDepthZero": 745666,
+          "atCursorZero": 1379207,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 3909874,
+          "repeatedExact": 1182937,
+          "repeatedIgnoringDepth": 1757895,
+          "atDepthZero": 1093647,
+          "atCursorZero": 3695674,
+          "usesProjections": 0
+        }
+      },
+      "node": {
+        "primitive": {
+          "visits": 882507,
+          "repeatedExact": 650121,
+          "repeatedIgnoringDepth": 724148,
+          "atDepthZero": 6049,
+          "atCursorZero": 833963,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 413114,
+          "repeatedExact": 116825,
+          "repeatedIgnoringDepth": 238285,
+          "atDepthZero": 0,
+          "atCursorZero": 370806,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 1030884,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 234600,
+          "atDepthZero": 341932,
+          "atCursorZero": 956678,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 1327427,
+          "repeatedExact": 160049,
+          "repeatedIgnoringDepth": 304920,
+          "atDepthZero": 745666,
+          "atCursorZero": 1279813,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 3653932,
+          "repeatedExact": 926995,
+          "repeatedIgnoringDepth": 1501953,
+          "atDepthZero": 1093647,
+          "atCursorZero": 3441260,
+          "usesProjections": 0
+        }
+      }
+    },
+    "after": {
+      "root": {
+        "primitive": {
+          "visits": 768458,
+          "repeatedExact": 623527,
+          "repeatedIgnoringDepth": 623527,
+          "atDepthZero": 768458,
+          "atCursorZero": 768458,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 523873,
+          "repeatedExact": 276968,
+          "repeatedIgnoringDepth": 276968,
+          "atDepthZero": 523873,
+          "atCursorZero": 523873,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 825879,
+          "repeatedExact": 326083,
+          "repeatedIgnoringDepth": 326083,
+          "atDepthZero": 825879,
+          "atCursorZero": 825879,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 843062,
+          "repeatedExact": 257221,
+          "repeatedIgnoringDepth": 257221,
+          "atDepthZero": 843062,
+          "atCursorZero": 843062,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 2961272,
+          "repeatedExact": 1483799,
+          "repeatedIgnoringDepth": 1483799,
+          "atDepthZero": 2961272,
+          "atCursorZero": 2961272,
+          "usesProjections": 0
+        }
+      },
+      "depth": {
+        "primitive": {
+          "visits": 882507,
+          "repeatedExact": 650121,
+          "repeatedIgnoringDepth": 724148,
+          "atDepthZero": 6049,
+          "atCursorZero": 833963,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 413114,
+          "repeatedExact": 116825,
+          "repeatedIgnoringDepth": 238285,
+          "atDepthZero": 0,
+          "atCursorZero": 370806,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 973142,
+          "repeatedExact": 156495,
+          "repeatedIgnoringDepth": 296054,
+          "atDepthZero": 127695,
+          "atCursorZero": 897461,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 1426874,
+          "repeatedExact": 259496,
+          "repeatedIgnoringDepth": 404367,
+          "atDepthZero": 745666,
+          "atCursorZero": 1379207,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 3695637,
+          "repeatedExact": 1182937,
+          "repeatedIgnoringDepth": 1662854,
+          "atDepthZero": 879410,
+          "atCursorZero": 3481437,
+          "usesProjections": 0
+        }
+      },
+      "node": {
+        "primitive": {
+          "visits": 6049,
+          "repeatedExact": 5780,
+          "repeatedIgnoringDepth": 5780,
+          "atDepthZero": 6049,
+          "atCursorZero": 6049,
+          "usesProjections": 0
+        },
+        "closed": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "variable": {
+          "visits": 816647,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 139559,
+          "atDepthZero": 127695,
+          "atCursorZero": 742441,
+          "usesProjections": 0
+        },
+        "projectedComposite": {
+          "visits": 0,
+          "repeatedExact": 0,
+          "repeatedIgnoringDepth": 0,
+          "atDepthZero": 0,
+          "atCursorZero": 0,
+          "usesProjections": 0
+        },
+        "openComposite": {
+          "visits": 1327427,
+          "repeatedExact": 160049,
+          "repeatedIgnoringDepth": 304920,
+          "atDepthZero": 745666,
+          "atCursorZero": 1279813,
+          "usesProjections": 0
+        },
+        "all": {
+          "visits": 2150123,
+          "repeatedExact": 165829,
+          "repeatedIgnoringDepth": 450259,
+          "atDepthZero": 879410,
+          "atCursorZero": 2028303,
+          "usesProjections": 0
+        }
+      }
+    }
+  },
+  "qualification": {
+    "gateSeconds": 381.56176288,
+    "hostGuestPassed": 1088,
+    "ignored": 100,
+    "recordedWasm": 190,
+    "loweringReferences": 212,
+    "directReferences": 2,
+    "engineLaw": "resolution_views passed, including a future cursor, changed compound record, restoring a suspended store, rollback/rebinding and a depth rejection",
+    "gdevPen": {
+      "passed": 1220,
+      "existingFailures": 108,
+      "modules": 210
+    },
+    "inkPen": {
+      "passed": 280,
+      "failed": 0,
+      "modules": 73
+    },
+    "inkNative": {
+      "passed": 111,
+      "existingFailures": 2
+    },
+    "cachePrototypeBudgetTests": 5,
+    "sameNamedOutcomes": true,
+    "replayFrames": 120,
+    "identicalReplayFiles": 242,
+    "framePngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTraceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+  },
+  "rawTrials": "2026-11-18-gdev-type-resolution.raw.json.gz",
+  "probes": "2026-11-18-gdev-type-resolution-probes.tar.gz",
+  "directReleaseComparison": {
+    "method": "A further 18 alternating pairs of the two releases alone after compiler and integration work completed. This confirmation was scheduled after the three-way window showed noisy wall times. Both windows are retained.",
+    "conditions": {
+      "pressureAvg10Before": [
+        0.1,
+        0.08
+      ],
+      "load": "8.17 14.64 9.23 5/1777 1259586\n"
+    },
+    "previousMedianMs": 889.845,
+    "candidateMedianMs": 867.723,
+    "pairedMedianSavedMs": 21.78,
+    "wins": 14,
+    "pairs": 18
+  },
+  "directEdits": {
+    "fresh": {
+      "pairs": 6,
+      "medians": {
+        "before": 875.948,
+        "after": 862.157
+      },
+      "pairedMedianSavedMs": 5.968,
+      "wins": 3
+    },
+    "edit": {
+      "pairs": 6,
+      "medians": {
+        "before": 255.37,
+        "after": 257.047
+      },
+      "pairedMedianSavedMs": 0.535,
+      "wins": 4
+    },
+    "reject": {
+      "pairs": 6,
+      "medians": {
+        "before": 391.738,
+        "after": 387.768
+      },
+      "pairedMedianSavedMs": -0.153,
+      "wins": 3
+    },
+    "syntax": {
+      "pairs": 6,
+      "medians": {
+        "before": 125.6,
+        "after": 123.309
+      },
+      "pairedMedianSavedMs": -0.569,
+      "wins": 3
+    },
+    "lex": {
+      "pairs": 6,
+      "medians": {
+        "before": 120.88,
+        "after": 122.692
+      },
+      "pairedMedianSavedMs": -1.1,
+      "wins": 2
+    },
+    "recover": {
+      "pairs": 6,
+      "medians": {
+        "before": 266.499,
+        "after": 261.77
+      },
+      "pairedMedianSavedMs": 2.596,
+      "wins": 4
+    }
+  },
+  "serialControl": {
+    "method": "One frontend worker in all three compilers, six balanced profiled rounds; serial check phase excludes Core lowering.",
+    "checkWallMs": {
+      "rounds": 6,
+      "medians": {
+        "before": 1301.328,
+        "after": 1264.362,
+        "memo": 1224.709
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": 40.367,
+        "wins": 6
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 26.3,
+        "wins": 6
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 77.606,
+        "wins": 6
+      }
+    },
+    "completeMs": {
+      "rounds": 6,
+      "medians": {
+        "before": 1953.932,
+        "after": 1907.502,
+        "memo": 1855.714
+      },
+      "shippingVsPrevious": {
+        "medianWithinPairSaved": 36.382,
+        "wins": 6
+      },
+      "memoVsShipping": {
+        "medianWithinPairSaved": 43.344,
+        "wins": 5
+      },
+      "memoVsPrevious": {
+        "medianWithinPairSaved": 80.905,
+        "wins": 6
+      }
+    }
+  },
+  "directMemoComparison": {
+    "before": "shipped direct variable views",
+    "after": "additional identity cache",
+    "pairs": 18,
+    "medians": {
+      "before": 855.609,
+      "after": 864.074
+    },
+    "pairedMedianSavedMs": -1.49,
+    "wins": 8,
+    "decision": "Keep the narrower cache as a probe. It reduced recursive visits and single-worker checking time. In the direct eight-worker comparison it was slower in ten of eighteen pairs and in the median paired build."
+  }
+}

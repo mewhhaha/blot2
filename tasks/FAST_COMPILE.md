@@ -5,6 +5,46 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+Blot `6b223a73` compiled Main in **868 ms**, down from **890 ms** for
+`0c4bc0eb` on the same 18 alternating fresh pairs. The median paired gain
+was 22 ms, with 14 wins. In an earlier, busier three-way window the same
+change won 12 of 18 rounds with an 8 ms median paired gain. Filesystem pages
+were warm and compiler processes were fresh throughout.
+
+![Gdev compilation and resolver calls before and after direct type-variable lookup](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.svg)
+
+| Operation | Previous | Shipped |
+| --- | ---: | ---: |
+| Fresh Gdev compile, eight workers | 890 ms | 868 ms |
+| Retained lighting edit | 255 ms | 257 ms |
+| Profiled check phase with one worker | 1,301 ms | 1,264 ms |
+| Full node-resolution calls on Main | 3,653,932 | 2,150,123 |
+
+The baseline made 3,909,874 recursive visits. Of these, 1,182,937 repeated
+the exact type, cursor, depth and inference state. A visit can already be
+cheap. Of 926,995 exact repeats that reached full node resolution, 766,946
+were primitives or proven-closed types. The shipped checker returns closed
+subtrees directly, keeps a variable's principal view on its binder and
+allocates scratch for compound fields only when a child changes. Historical
+views retain their cursor. The invalid edit diagnostics, inference budget
+boundary and valid Wasm bytes matched the previous release.
+
+A 64-slot cache for unchanged roots avoided another 440,753 recursive visits.
+It improved serial checking by 26 ms median within pairs across all six rounds.
+With eight workers, the initial comparison split 9–9. In 18 further direct
+pairs it won eight, took 864 ms versus 856 ms for the shipped resolver, and
+lost 1.5 ms in the median pair. The prototype is archived.
+
+**Next experiment.** Attribute the 405,857 type nodes created during resolution
+to their callers and shapes. That count was identical across all three
+compilers. Check how often a rebuilt record, function or nominal type duplicates
+an already constructed shape before choosing which construction to eliminate.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.json)
+· [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.raw.json.gz)
+· [Counter and cache source](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution-probes.tar.gz)
+
+### Parallel parser release
+
 Blot `0c4bc0eb` compiled 46,109 lines to complete Wasm in **823 ms**
 median on eight cores, about **56,000 lines/s**. The previous release took
 **919 ms** on the same alternating twelve pairs. Each fresh build checked
@@ -31,13 +71,6 @@ layouts and rejected speculative parses use the ordinary parser.
 [Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.json)
 · [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.raw.json.gz)
 · [Benchmark runner](../scripts/integration/time_gdev_parse.ts)
-
-**Next experiment.** Reduce repeated work in `resolveRoot`, `resolveDepth`
-and `resolveNode`. The checker made 3.91 million recursive resolution visits,
-and these three functions accounted for 1,194 of 8,406 exclusive CPU samples
-during type checking. Count visits by type node and inference cursor before
-changing cache invalidation. Preserve inferred types, budget rejections and
-the order of diagnostics when testing reuse of a resolved type.
 
 Four separately metered builds spent **1,413 ms of aggregate worker CPU**
 in type checking (68%), 264 ms lowering to Core, 165 ms freezing and encoding
