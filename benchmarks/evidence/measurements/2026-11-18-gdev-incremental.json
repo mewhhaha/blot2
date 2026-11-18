@@ -1,0 +1,402 @@
+{
+  "date": "2026-11-18",
+  "source": {
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+    "penSha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "blot2": "ea110ae6c2a0946fb14dd4c05bfae8ef7c43bbe3",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "protocolIdentity": "ae1b6b867d9dd18cfe094b75061011e09ebc8ad1166cb35d16f67488599869e5",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "23.1.5",
+    "deno": "2.9.8",
+    "processor": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "comparison": {
+    "previousBlot": "9b7cd3e89305b546c63e440158bf66274bfdff96",
+    "compilerSha256": "48761d7ce49939d8fb57c55104310ce0baaa18df904c667b9f9d3d08b00ba13f",
+    "firstImplementationBlot": "0f63a4cfd4bce46b3b7fec3e5cd633234140901a",
+    "firstCompilerSha256": "7f964c72d22d14f1534ed6335ecefc2919be6d12aa9fe3970930e51ded32aecb",
+    "sameGdevSourceForAllCompilerTimings": true,
+    "entryFiles": {
+      "entrySha256": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+      "preludeSha256": "72051ce29e0057bb116809e7bdd6428ebab2cad537763e1cd9b21298dc04f057",
+      "penJsonSha256": "fb1023f9cf0d7f1192061d97a34ce0faf7bf3d67efd5f8d36eddaaae59e1042c"
+    }
+  },
+  "workload": {
+    "entry": "src/main.blot",
+    "sourceBytes": 2527266,
+    "syntaxNodes": 354194,
+    "modules": 269,
+    "bodyElaborations": 5994,
+    "bodyLowerings": 6010,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "lightingEditWasmSha256": "4e4fba58869dbd87e760919247d52afebc1c4fae443512747b9c06f61c27e757"
+  },
+  "fresh": {
+    "method": "Four alternating runs per compiler and worker setting on one shared Linux host with warm filesystem pages. Each opens a new native session, generates assets, checks all 269 modules with zero cache hits, emits and receives complete Wasm. Includes session open, excludes hashing and writing the result.",
+    "results": {
+      "previous1": {
+        "trialsMs": [
+          1781.42,
+          1727.71,
+          1687.87,
+          1687.23
+        ],
+        "medianMs": 1707.79
+      },
+      "candidate1": {
+        "trialsMs": [
+          1634.22,
+          1598.91,
+          1557.29,
+          1552.84
+        ],
+        "medianMs": 1578.1
+      },
+      "candidate2": {
+        "trialsMs": [
+          1803.79,
+          1806.07,
+          1838.89,
+          1744.47
+        ],
+        "medianMs": 1804.93
+      },
+      "candidate4": {
+        "trialsMs": [
+          1770.55,
+          1860.55,
+          1845.17,
+          1700.37
+        ],
+        "medianMs": 1807.86
+      },
+      "candidate8": {
+        "trialsMs": [
+          1883.06,
+          1951.24,
+          1970.51,
+          1845.58
+        ],
+        "medianMs": 1917.15
+      },
+      "previous4": {
+        "trialsMs": [
+          4492.94,
+          4517.68,
+          4456.84,
+          4342.0
+        ],
+        "medianMs": 4474.89
+      }
+    },
+    "profiledSerialStagesMs": {
+      "other": 4.23,
+      "assets": 69.26,
+      "load": 10.43,
+      "lex": 20.9,
+      "parse": 111.33,
+      "check": 1057.26,
+      "lower": 191.85,
+      "freeze": 0.0,
+      "validation": 0.0,
+      "backend": 102.09
+    },
+    "fourWorkerTransport": {
+      "previousForks": 269,
+      "previousReplyBytes": 139074873,
+      "candidateForks": 60,
+      "candidateReplyBytes": 76725092,
+      "candidateBatches": 27
+    }
+  },
+  "warm": {
+    "method": "Three interleaved extended-workload comparisons per compiler. A fresh process also compiles each baseline, edit and rejection as a control. The lighting edit toggles sun on the proposed Look record. Each successful result is hashed after timing. Failures compare the complete diagnostic and revision. A revert removes the overlay.",
+    "previous": {
+      "open": {
+        "trialsMs": [
+          1738.13,
+          1747.22,
+          2059.75
+        ],
+        "medianMs": 1747.22,
+        "freshModules": 269,
+        "cachedModules": 0,
+        "bodyElaborations": 5994,
+        "bodyLowerings": 6010
+      },
+      "edit": {
+        "trialsMs": [
+          2350.43,
+          1624.83,
+          1580.53
+        ],
+        "medianMs": 1624.83,
+        "freshModules": 269,
+        "cachedModules": 0,
+        "bodyElaborations": 5994,
+        "bodyLowerings": 6010
+      },
+      "reject": {
+        "trialsMs": [
+          473.55,
+          299.78,
+          303.3
+        ],
+        "medianMs": 303.3
+      },
+      "recover": {
+        "trialsMs": [
+          2561.59,
+          1602.17,
+          1630.78
+        ],
+        "medianMs": 1630.78,
+        "freshModules": 269,
+        "cachedModules": 0,
+        "bodyElaborations": 5994,
+        "bodyLowerings": 6010
+      },
+      "revert": {
+        "trialsMs": [
+          1738.94,
+          1596.4,
+          1628.25
+        ],
+        "medianMs": 1628.25,
+        "freshModules": 269,
+        "cachedModules": 0,
+        "bodyElaborations": 5994,
+        "bodyLowerings": 6010
+      }
+    },
+    "candidate": {
+      "open": {
+        "trialsMs": [
+          1629.94,
+          1578.51,
+          1605.16
+        ],
+        "medianMs": 1605.16,
+        "freshModules": 269,
+        "cachedModules": 0,
+        "bodyElaborations": 5994,
+        "bodyLowerings": 6010
+      },
+      "edit": {
+        "trialsMs": [
+          259.84,
+          258.1,
+          262.07
+        ],
+        "medianMs": 259.84,
+        "freshModules": 1,
+        "cachedModules": 268,
+        "bodyElaborations": 6,
+        "bodyLowerings": 6
+      },
+      "reject": {
+        "trialsMs": [
+          367.51,
+          283.78,
+          289.11
+        ],
+        "medianMs": 289.11
+      },
+      "recover": {
+        "trialsMs": [
+          384.83,
+          248.65,
+          250.43
+        ],
+        "medianMs": 250.43,
+        "freshModules": 0,
+        "cachedModules": 269,
+        "bodyElaborations": 0,
+        "bodyLowerings": 0
+      },
+      "revert": {
+        "trialsMs": [
+          388.02,
+          250.74,
+          255.53
+        ],
+        "medianMs": 255.53,
+        "freshModules": 1,
+        "cachedModules": 268,
+        "bodyElaborations": 6,
+        "bodyLowerings": 6
+      }
+    },
+    "memory": {
+      "unit": "RSS in MiB observed after returning a result on Linux",
+      "previousEndMiB": 319.45,
+      "candidateEndMiB": 353.59,
+      "twelveCycleRevertsMiB": [
+        353.81,
+        353.81,
+        355.81,
+        355.82,
+        355.82,
+        355.82,
+        355.82,
+        355.82,
+        355.82,
+        355.82,
+        355.89,
+        355.89
+      ]
+    }
+  },
+  "sourcePilot": {
+    "previousGdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
+    "currentGdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "method": "Independent ordinary source modules and actual Main import graph. Same pinned release compiler, three single-worker builds and two old four-worker builds per source in alternation on a shared host. Fresh sessions charged through receipt of complete Wasm. The trace-weighted DAG schedules exclude worker overhead. Six new authored modules and one eliminated unused Ink import give 269 checked modules; all remaining loaded declarations are checked.",
+    "dependencyGraph": {
+      "baseline": {
+        "criticalPathShare": 0.3598,
+        "transitiveDependentsIncludingSelf": {
+          "gdev/src/world/salt.blot": 53,
+          "gdev/src/actors/robots.blot": 31,
+          "gdev/src/ui/station.blot": 12
+        }
+      },
+      "pilot": {
+        "criticalPathShare": 0.2868,
+        "transitiveDependentsIncludingSelf": {
+          "gdev/src/world/salt.blot": 35,
+          "gdev/src/actors/robots.blot": 20,
+          "gdev/src/ui/station.blot": 3
+        }
+      }
+    }
+  },
+  "eventScheduleModel": {
+    "method": "Current serial module CPU times and measured source import graph. Each available worker takes the ready unit with longest remaining downstream CPU path. No communication, symbol reconstruction or OS costs are charged; this is a lower-overhead scheduling model, not a cold compile measurement.",
+    "totalCheckerCpuMs": 1048.96,
+    "criticalPathMs": 292.43,
+    "fourWorkersMs": 315.69,
+    "eightWorkersMs": 292.9
+  },
+  "qualification": {
+    "compilerGate": {
+      "guestsAndHostsPassed": 1084,
+      "ignored": 100,
+      "wasmFixtures": 189,
+      "uniquenessFixtures": 212,
+      "directBackendReferences": 2
+    },
+    "projects": {
+      "gdev": {
+        "passed": 1220,
+        "failed": 108,
+        "matchingNamedOutcomes": 1328,
+        "modules": 210,
+        "unbuilt": 0
+      },
+      "ink": {
+        "passed": 280,
+        "failed": 0,
+        "matchingNamedOutcomes": 280,
+        "modules": 73,
+        "unbuilt": 0
+      }
+    },
+    "inkNative": {
+      "passed": 111,
+      "preexistingFailures": [
+        "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+        "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+      ]
+    },
+    "penCheck": {
+      "game": true,
+      "devtools": true,
+      "assetsLinted": 545,
+      "codegenCheck": true
+    },
+    "replay": {
+      "frames": 120,
+      "identicalFiles": 242
+    },
+    "inspectedHardwareFrame": {
+      "frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "frames.trace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+    }
+  },
+  "perModulePacketProbe": {
+    "compilerSha256": "6b8735efed2434e7dbd118d959b5cc5d0eadeab7d469a3c0d5e520a3be88b75c",
+    "method": "Each serial producer was checked and lowered normally. An optimized native probe measured per-module task-thread CPU for creating the frozen interface, encoding its interface and exports, and decoding them into a receiver-owned table, then encoding and decoding the finished Core. Three timing trials per module, one separate byte-for-byte re-encoding check for every packet. All five process runs emitted the current Main hash. This probe did not use its packets for checking consumers.",
+    "measured": {
+      "interface": {
+        "units": 269,
+        "bytes": 26154047,
+        "freezeCpuMs": 69.7,
+        "encodeCpuMs": 44.74,
+        "decodeCpuMs": 14.96
+      },
+      "core": {
+        "units": 269,
+        "bytes": 48166621,
+        "freezeCpuMs": 0.0,
+        "encodeCpuMs": 91.46,
+        "decodeCpuMs": 25.05
+      }
+    },
+    "schedule": {
+      "method": "Trace-derived per-unit checker CPU and normalized local lowering cost, critical-path scheduling with interface publication as each producer finishes. Counts one decode per import per consuming lane, caches direct imports there and gathers Core on a coordinator. Includes the measurement of the remaining serial session work. OS scheduling, IPC, transitive service lookups, live-to-frozen behavior, symbol reconstruction and backpressure were unmeasured.",
+      "fixedSerialMs": 337.83,
+      "endToEndModelMs": {
+        "1": 1782.14,
+        "2": 1105.65,
+        "4": 769.87,
+        "8": 681.43
+      },
+      "endToEndModelGatherAfterWorkersMs": {
+        "1": 1807.18,
+        "2": 1130.69,
+        "4": 794.91,
+        "8": 706.33
+      }
+    }
+  },
+  "isolatedExperiments": {
+    "twoLayerReadyGroups": {
+      "build": "matched debug compilers, 4 workers, ABBA, instrumented fork calls",
+      "controlMedianMs": 6544.02,
+      "candidateMedianMs": 6298.45,
+      "forks": [
+        60,
+        42
+      ],
+      "readyBatches": [
+        27,
+        20
+      ],
+      "replyBytes": [
+        76725092,
+        81732533
+      ],
+      "retries": [
+        0,
+        0
+      ],
+      "decision": "Kept the simpler one-layer release groups."
+    },
+    "lazyTypeListScratch": {
+      "gdev": "42e005c394d2bc54b9c26099fe5b322309623e7d",
+      "build": "matched debug compilers, 264 modules, three interleaved pairs",
+      "pooledAllocations": [
+        3114221,
+        2828615
+      ],
+      "decision": "No repeatable Gdev wall-time improvement."
+    }
+  },
+  "raw": "2026-11-18-gdev-incremental.raw.json.gz"
+}

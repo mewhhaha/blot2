@@ -1,4 +1,4 @@
-# Continue the Blot ownership conversion
+# Working on Blot and Gdev
 
 All 44 previously unbuilt Gdev test modules now execute. This includes the 34
 blocked on result selection for `from`. The starting-salt, scene, terrain
@@ -6,10 +6,13 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified release uses the Goose compiler in `compiler-goose/` at Blot
-`9b7cd3e8`, Pen `ad9766c`, Ink `3f2e603` and Gdev `42e005c`.
-The [qualification record](benchmarks/evidence/qualification/2026-11-17-owned-runtime.json)
-pins the sources, binaries, experiments and measurements.
+The current qualified compiler is Blot `ea110ae6`, with Gdev `45748aba`,
+Ink `3f2e603` and Pen `ad9766c`. On the same Gdev source the median lighting
+edit fell from **1.625 s to 0.260 s**. Fresh Main fell from **1.708 s to
+1.578 s** with the default single worker. All 269 modules check and produce
+2,639,228 bytes of Wasm. The current performance target is a fresh build
+under one second. [Measurements](benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
+· [Compiler work and next experiment](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -18,20 +21,20 @@ pins the sources, binaries, experiments and measurements.
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, 1,082 guest and host tests passed, 100 ignored |
+| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,084 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108
 failures comprise 70 assertions, 18 stack traps, 11 heap traps and 9 failed
 `require` calls. Six independent hauling scenarios now run in Pen.
 
-Four alternating fresh-process pairs measured **1.993 s** median for Gdev Main,
-up from **1.933 s**. Wasm grew from **2,633,057** to **2,639,595 bytes**.
-All 264 modules were fresh in every run. Pen checked Main, Devtools and 545
-assets. All 242 files of a 120-frame replay matched the reference, including
-the final snapshot. The inspected 640×480 hardware frame and trace also matched.
-A 200,000-frame run measured 0.14 ms median and 1.00 ms p95 guest time while
-other workloads shared the host.
+The current candidate matches every named Gdev and Ink outcome from the
+ownership release. Pen checked Main, Devtools and 545 assets. All 242 files
+of the 120-frame replay matched, including the final snapshot. The inspected
+640×480 hardware frame and trace also matched. The earlier ownership release
+used Blot `9b7cd3e8` and Gdev `42e005c`. Its 200,000-frame run measured
+0.14 ms median and 1.00 ms p95 guest time on a shared host.
+[Ownership qualification](benchmarks/evidence/qualification/2026-11-17-owned-runtime.json)
 
 All 136 prepared-physics exports and 1,800 tower tick packets matched the
 reference. Two 16,384-lane compiler witnesses return 16,837 in a 68 KiB

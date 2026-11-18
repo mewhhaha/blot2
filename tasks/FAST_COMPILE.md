@@ -4,6 +4,62 @@ The long-term goal is 1M lines/s. The next milestone is a fresh Gdev Main
 build under one second, from opening the compiler session through receiving
 the complete Wasm with every module checked.
 
+## Gdev Main, 18 November 2026
+
+Blot `ea110ae6` builds a real lighting edit in **260 ms** and a fresh Main
+in **1.578 s**. Both compilers below used Gdev `45748aba`, Ink `3f2e603` and
+Pen `ad9766c`. Fresh builds include session startup, asset generation, checking
+all 269 modules and receiving the complete 2,639,228-byte Wasm.
+[Pinned measurements and raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
+
+| Operation, median | Previous compiler | Current compiler |
+| --- | ---: | ---: |
+| Fresh Main, 1 worker | 1,708 ms | 1,578 ms |
+| Fresh Main, 4 workers | 4,475 ms | 1,808 ms |
+| Edit the lighting preset in an open session | 1,625 ms | 260 ms |
+| Reject an invalid lighting edit | 303 ms | 289 ms |
+| Restore the last valid edit | 1,631 ms | 250 ms |
+| Revert to the original source | 1,628 ms | 256 ms |
+
+### Live edits
+
+The session retains checked modules and Core from its most recent successful
+build. A Boolean literal change inside a closed data initializer can stop at
+the producer. The Gdev edit rechecked one module and lowered six bodies.
+Ordinary function edits recheck the changed module and its transitive
+importers. A change the session cannot prove safe takes the full path.
+Failed edits preserve the last successful revision. The
+[edit benchmark](../scripts/integration/time_gdev_edits.ts) compares all
+successful outputs and rejection diagnostics against fresh sessions. Retaining
+the results raised median process RSS after one cycle from 319 to 354 MiB.
+
+### Fresh builds
+
+Gdev now exposes station state and layout, robot data and picking, and salt
+appearance through small ordinary modules. The number of transitive dependents,
+including each producer, fell from 12 to 3 for station, 31 to 20 for robots
+and 53 to 35 for salt. The compiler shares ownership traversal scratch across
+queries and groups ready modules across checker processes. At four workers
+the parent does one group's work. Forks fell from 269 to 60 and reply traffic
+from 139.1 to 76.7 MB. One worker remains fastest on the measured host.
+
+A fresh serial profile spent 1,057 ms checking, 192 ms lowering, 142 ms
+loading, lexing and parsing, 102 ms emitting Wasm, and 69 ms on assets.
+An isolated two-level grouping experiment reduced four-worker debug time from
+6.544 to 6.299 s and raised reply traffic to 81.7 MB. Allocating type-list
+scratch lazily cut pooled allocations by 9.2% without a repeatable wall-time gain. Both remain
+outside the release.
+
+The next cold-build experiment gives each long-lived worker its own checker.
+It can publish a module's interface as soon as the checker finishes, then
+lower that module while another worker checks its callers. An optimized
+probe created, encoded and decoded all 269 interfaces and all 269 Core units.
+Applying those measured costs to the import graph gives **0.770 s** with four
+workers under ideal scheduling. That leaves **230 ms** for process coordination,
+symbol handling, extra cross-module lookups and differences between live and
+frozen imports. Time a fresh process through complete Wasm before adopting
+the design.
+
 ## Goose release measurements, 17 November 2026
 
 Gdev Main took **2.04 s** median on the ordinary one-worker path. All 264
@@ -22,7 +78,7 @@ disk. They produced byte-identical Main and exposed these unprofiled medians.
 | Lower to Core | 220 ms |
 | Emit Wasm | 112 ms |
 
-### Proposed architecture
+### Architecture proposed on 17 November
 
 Give each module an immutable interface for its callers and retain its
 checked bodies in the existing Core IR. Keep mutable inference state local
