@@ -1,6 +1,7 @@
 // Process-local project/check/lower wire images. Only typed data crosses this
 // boundary; owner leases, callbacks and references are rebuilt in the child.
 namespace blot_project_packet;
+import binary;
 import support.error;
 import support.native;
 import support.option;
@@ -33,6 +34,35 @@ fn putOptional<T>(receiver:Writer&,value:T?) {put(receiver,value!=null);if value
 fn readOptional<T>(receiver:Reader&,witness:T)->T? {var present=false;get(receiver,present);if receiver.failure!=blot_error::Error.none||!present {return null;}let run,error=allocate(receiver.owner,1,default<T>());if error!=blot_error::Error.none {receiver.failure=error;return null;}get(receiver,run[0]);if receiver.failure!=blot_error::Error.none {return null;}return run[0];}
 fn put<K,V>(receiver:Writer&,value:dictionary_slot<K,V>) {put(receiver,value.tag);if value.tag!=0 {put(receiver,value.key);put(receiver,value.val);}}
 fn get<K,V>(receiver:Reader&,value:dictionary_slot<K,V>&) {get(receiver,value.tag);if value.tag!=0 {get(receiver,value.key);get(receiver,value.val);}}
+
+// A list is exactly two little-endian words. At the packet boundary the
+// scalar codec can still complete the first word before the second fails.
+fn put(writer: Writer&, value: blot_check_types::List) {
+    if !writer.enter() { return; }
+    if writer.output.len <= limit - 8 {
+        let words = (value.len as u64 << 32) | value.start;
+        var bytes: u8[8] = [0; 8];
+        for index in 8 { bytes[index] = (words >> (index * 8)) as! u8; }
+        writer.output.append(bytes);
+    } else {
+        put(writer, value.start);
+        put(writer, value.len);
+    }
+    writer.depth--;
+}
+fn get(reader: Reader&, value: blot_check_types::List&) {
+    if !reader.enter() { return; }
+    if reader.at <= reader.bytes.len - 8 {
+        let words = binary::u64le(reader.bytes, reader.at);
+        value.start = words as! u32;
+        value.len = (words >> 32) as u32;
+        reader.at += 8;
+    } else {
+        get(reader, value.start);
+        get(reader, value.len);
+    }
+    reader.depth--;
+}
 
 // These regular arrays use Goose's verified flat image. The parent and fork
 // use the same executable and allocator layout.

@@ -166,6 +166,10 @@ for t in sorted(STRUCTS):
  if t in private or t in SPECIAL:continue
  owner=D[t.split('<')[0]][3]
  fields=[(f,resolve(q(ty,owner),owner)) for f,ty in STRUCTS[t] if f not in SPECIAL.get(t,set())]
+ # The hot two-word descriptor has a handwritten wire-compatible codec.
+ if t == 'blot_check_types::List':
+  assert fields == [('start', 'u32'), ('len', 'u32')]
+  continue
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in fields)+'self.depth--;}')
  parts=[]
  for f,ty in fields:
