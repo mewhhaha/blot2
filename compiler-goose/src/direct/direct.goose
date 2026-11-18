@@ -27,12 +27,12 @@ type Code = blot_check_diagnostic_code::Code;
 // holds its detail. Otherwise `bytes` holds the Wasm module.
 struct Result { failed: bool = false, unit: u32 = 0, span: blot_check_core::Span = blot_check_core::Span { 0, 0 }, code: Code = blot_check_diagnostic_code::Code.storage_unsupported, emitted_functions: i64 = 0 }
 
-fn compile(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..<]&) -> Result {
+fn compile(units: const Module[:], entry: u32, bytes: u8[>..<]&, message: u8[>..<]&, build_inputs:i64 = -1) -> Result {
     var types = blot_direct_types::Types { units: units, .. };
     blot_direct_types::init(types);
     var module = blot_direct_writer::Module { .. };
     var state = blot_direct_emit::State { .. };
-    var g = Generator { types: types, module: module, s: state, units: units };
+    var g = Generator { types: types, module: module, s: state, units: units, build_inputs:build_inputs };
     let error = build(g, entry, bytes);
     if error != blot_direct_types::Error.none {
         if !state.has_failure {

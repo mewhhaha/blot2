@@ -18,8 +18,8 @@ fn message(self_: Diagnostic, detail: const u8[:]) -> const u8[:] { return blot_
 // holds the diagnostic's detail.
 struct Result { has_diagnostic: bool = false, diagnostic: Diagnostic = Diagnostic {}, emitted_functions: i64 = 0 }
 
-fn compile(units: const blot_check_core::Module[:], entry: u32, bytes: u8[>..<]&, detail: u8[>..<]&) -> Result {
-    let built = blot_direct::compile(units, entry, bytes, detail);
+fn compile(units: const blot_check_core::Module[:], entry: u32, bytes: u8[>..<]&, detail: u8[>..<]&, build_inputs:i64 = -1) -> Result {
+    let built = blot_direct::compile(units, entry, bytes, detail, build_inputs);
     if built.failed { return Result { has_diagnostic: true, diagnostic: Diagnostic { unit: built.unit, span: built.span, code: built.code } }; }
     return Result { emitted_functions: built.emitted_functions };
 }

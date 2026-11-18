@@ -1,0 +1,405 @@
+{
+  "date": "2026-11-18",
+  "compilerBaseGit": "1e122293bfb7ff8e504178711edad6df0712b13d",
+  "gdevBaseGit": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+  "inkGit": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "penGit": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+  "compiler": {
+    "previousReleaseSha256": "6070336a083d8188d91bcb339ee410c78846a93b98a382c59027709097b2acef",
+    "candidateReleaseSha256": "dd2fd26ebf0c3f4c34f43e507450faedc3477c78f0f47a1fccc18d8901305a76",
+    "candidateDebugSha256": "df9d97b459ac658c4e3c491646c326d062ae8b4b883cbb5b094b87033e30bd44",
+    "changedGooseSourceSha256": {
+      "check.goose": "22340c4fe66fa456bbd0646ae173d69f9111e240d80a0ff251e98729a4489143",
+      "usage_check.goose": "2fad31fab57be8952b1b638fe374a945448d535ab310d261212107e8fce3cfc4"
+    },
+    "method": "Isolated copy of compiler base plus the two nominal usage checker changes. Compiler binary hashes and source hashes identify this experiment; native executables used the compiler base source-identity constant. Each cold measurement creates a new process and session."
+  },
+  "gdevCandidateSourceSha256": {
+    "src/world/scene_hooks.blot": "a54a438648502d586510196b4555d1b531c3b86e6d36b5a00e5a5f74b6a34782",
+    "src/world_storage.blot": "f1947b47ac22830969898961e8babffcfb61c2d3cabc9b7ce2b4266df715b807",
+    "src/progression/scenes.blot": "69af238baea6ce202b1f2b2e0c1f2ac7a1827f3b5b2e59603de51984312adfb3",
+    "src/ui/title.blot": "25f0defaf0bdf696d227c86ae1d4a1b3ebfd4a2dee4be90d73e4cbfbb5ac8e95",
+    "src/game.blot": "4f312b74fb8ea7a82aa6f83df14a074189e688004b2d25a4b6bd547499f2f55e",
+    "performance/economy.blot": "e3fd6eca311f9596b1ea739d876c5fc7763a7f79da5e09c5d46c26b428c3db41",
+    "performance/maxed_support.blot": "49159b1eaac5f1ad2206b08c8e914f21badf7a54f0b957f70c7cef573e6697f9"
+  },
+  "checker": {
+    "cause": "A declared own callback enabled the nominal usage fixed point. It re-derived imported constructor facts and repeatedly scanned the full nominal catalog for each referenced type. The bounded walk exhausted its 65536 operations.",
+    "change": "Propagate through only locally defined constructors, reuse producer-checked usage and affinity flags, and look up nominal nodes in the checker identity index. The 65536 bound remains.",
+    "regression": "tests/guest/wide_ownership_execution.test.ts runs an owned callback using 256 imported record definitions and 256 fields. The previous release rejects with TypeLimit. The corrected compiler emits Wasm that returns 42 and rejects a Bool-returning implementation."
+  },
+  "adopted": "Six-line SceneHooks world declaration is imported by scenes and the storage producer. The producer checks the concrete SceneHooks FrameAccess binding. No declaration of FrameAccess or function bodies move; game and both performance fixtures supply the callbacks.",
+  "coldMethod": "Actual Gdev Main on two on-disk snapshots with native assets. Same optimized candidate executable, no source overlays, warm filesystem, fresh compiler process and session, wall clock from before opening through receipt of Wasm. Eight alternating pairs per worker count on a shared eight-core Ryzen 7 3800X; other workloads were running. Profiled builds are separate.",
+  "coldPairs": {
+    "1": {
+      "baseMs": [
+        2187.69,
+        1821.47,
+        1817.0,
+        1776.05,
+        1786.89,
+        1815.78,
+        1789.6,
+        1837.43
+      ],
+      "declaredMs": [
+        1909.33,
+        1812.56,
+        1801.79,
+        1816.23,
+        1824.68,
+        1902.63,
+        1796.99,
+        1793.65
+      ],
+      "baseMedianMs": 1816.39,
+      "declaredMedianMs": 1814.39,
+      "medianPairedDeltaMs": -0.76,
+      "declaredFasterPairs": 4
+    },
+    "8": {
+      "baseMs": [
+        884.43,
+        839.51,
+        828.95,
+        879.42,
+        875.69,
+        849.89,
+        889.2,
+        858.54
+      ],
+      "declaredMs": [
+        847.02,
+        813.9,
+        839.47,
+        887.36,
+        872.11,
+        856.18,
+        831.2,
+        818.97
+      ],
+      "baseMedianMs": 867.12,
+      "declaredMedianMs": 843.25,
+      "medianPairedDeltaMs": -14.59,
+      "declaredFasterPairs": 5
+    }
+  },
+  "wasm": {
+    "base": {
+      "bytes": 2639228,
+      "sha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+      "modules": 269
+    },
+    "declared": {
+      "bytes": 2639215,
+      "sha256": "6f0a70c1b32c49b736ec3b907a8a70cd9ac00924c807b4409ce1db4360808e56",
+      "modules": 270
+    }
+  },
+  "profiledStorageEdit": {
+    "edit": "world_storage.reset_starting_salt changes the stash salt initialization from 0 to 1, then reverts to 0.",
+    "runs": [
+      {
+        "kind": "base",
+        "step": "fresh",
+        "ms": 823.57,
+        "fresh": 269,
+        "cached": 0,
+        "checking": {
+          "parallel_jobs": 269,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 269,
+          "parallel_worker_processes": 7,
+          "parallel_worker_reply_bytes": 72146668
+        }
+      },
+      {
+        "kind": "base",
+        "step": "edited",
+        "ms": 438.17,
+        "fresh": 6,
+        "cached": 263,
+        "checking": {
+          "parallel_jobs": 0,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 0,
+          "parallel_worker_processes": 0,
+          "parallel_worker_reply_bytes": 0
+        }
+      },
+      {
+        "kind": "base",
+        "step": "revert",
+        "ms": 440.45,
+        "fresh": 6,
+        "cached": 263,
+        "checking": {
+          "parallel_jobs": 0,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 0,
+          "parallel_worker_processes": 0,
+          "parallel_worker_reply_bytes": 0
+        }
+      },
+      {
+        "kind": "declared",
+        "step": "fresh",
+        "ms": 826.48,
+        "fresh": 270,
+        "cached": 0,
+        "checking": {
+          "parallel_jobs": 270,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 270,
+          "parallel_worker_processes": 7,
+          "parallel_worker_reply_bytes": 72135646
+        }
+      },
+      {
+        "kind": "declared",
+        "step": "edited",
+        "ms": 416.99,
+        "fresh": 4,
+        "cached": 266,
+        "checking": {
+          "parallel_jobs": 0,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 0,
+          "parallel_worker_processes": 0,
+          "parallel_worker_reply_bytes": 0
+        }
+      },
+      {
+        "kind": "declared",
+        "step": "revert",
+        "ms": 413.56,
+        "fresh": 4,
+        "cached": 266,
+        "checking": {
+          "parallel_jobs": 0,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 0,
+          "parallel_worker_processes": 0,
+          "parallel_worker_reply_bytes": 0
+        }
+      }
+    ]
+  },
+  "debugControls": {
+    "previous": [
+      {
+        "scenario": "minimal",
+        "entry": "world/scene_hooks",
+        "poison": "",
+        "workers": 1,
+        "ok": false,
+        "diagnostic": {
+          "stage": "build-project",
+          "code": "TypeLimit",
+          "message": "Compiler operation failed",
+          "start": 0,
+          "end": 0,
+          "file": "src/declared_probe.blot"
+        }
+      },
+      {
+        "scenario": "minimal",
+        "entry": "world/scene_hooks",
+        "poison": "",
+        "workers": 8,
+        "ok": false,
+        "diagnostic": {
+          "stage": "build-project",
+          "code": "TypeLimit",
+          "message": "Compiler operation failed",
+          "start": 0,
+          "end": 0,
+          "file": "src/declared_probe.blot"
+        }
+      },
+      {
+        "scenario": "baseline",
+        "entry": "progression/scenes",
+        "poison": "broken",
+        "workers": 8,
+        "ok": false,
+        "diagnostic": {
+          "stage": "check-project",
+          "code": "unknown_value",
+          "message": "unknown value: missing_storage_name",
+          "start": 15,
+          "end": 15,
+          "file": "src/world_storage.blot"
+        }
+      }
+    ],
+    "candidate": [
+      {
+        "scenario": "landing",
+        "entry": "progression/scenes",
+        "poison": "broken",
+        "workers": 1,
+        "ok": true,
+        "modules": 226,
+        "bytes": 1774,
+        "wasmSha256": "64d2d4f3e31b3ab5a2e9b0f74b929b280ed6d52419808db8224df2c145cdc932"
+      },
+      {
+        "scenario": "landing",
+        "entry": "progression/scenes",
+        "poison": "broken",
+        "workers": 8,
+        "ok": true,
+        "modules": 226,
+        "bytes": 1774,
+        "wasmSha256": "64d2d4f3e31b3ab5a2e9b0f74b929b280ed6d52419808db8224df2c145cdc932"
+      },
+      {
+        "scenario": "landing",
+        "entry": "main",
+        "poison": "mismatch",
+        "workers": 1,
+        "ok": false,
+        "diagnostic": {
+          "stage": "check-project",
+          "code": "type_mismatch",
+          "message": "Types do not match; one side: { despawn: (own FrameAccess -> (U32 -> FrameAccess)), reset_salt: (own FrameAccess -> FrameAccess), stash_scene: (own FrameAccess -> FrameAccess), restore_scene: (own FrameAccess -> FrameAccess) }; other side: { despawn: (own FrameAccess -> (U32 -> FrameAccess ! { | ?e}) ! { | ?e}), reset_salt: (own FrameAccess -> Bool ! { | ?e}), stash_scene: (own FrameAccess -> FrameAccess ! { | ?e}), restore_scene: (own FrameAccess -> FrameAccess ! { | ?e}) }",
+          "start": 54198,
+          "end": 54333,
+          "file": "src/world_storage.blot"
+        }
+      },
+      {
+        "scenario": "landing",
+        "entry": "main",
+        "poison": "mismatch",
+        "workers": 8,
+        "ok": false,
+        "diagnostic": {
+          "stage": "check-project",
+          "code": "type_mismatch",
+          "message": "Types do not match; one side: { despawn: (own FrameAccess -> (U32 -> FrameAccess)), reset_salt: (own FrameAccess -> FrameAccess), stash_scene: (own FrameAccess -> FrameAccess), restore_scene: (own FrameAccess -> FrameAccess) }; other side: { despawn: (own FrameAccess -> (U32 -> FrameAccess ! { | ?e}) ! { | ?e}), reset_salt: (own FrameAccess -> Bool ! { | ?e}), stash_scene: (own FrameAccess -> FrameAccess ! { | ?e}), restore_scene: (own FrameAccess -> FrameAccess ! { | ?e}) }",
+          "start": 54198,
+          "end": 54333,
+          "file": "src/world_storage.blot"
+        }
+      },
+      {
+        "scenario": "minimal",
+        "entry": "world/scene_hooks",
+        "poison": "",
+        "workers": 8,
+        "ok": true,
+        "modules": 86,
+        "bytes": 1774,
+        "wasmSha256": "64d2d4f3e31b3ab5a2e9b0f74b929b280ed6d52419808db8224df2c145cdc932"
+      },
+      {
+        "scenario": "baseline",
+        "entry": "progression/scenes",
+        "poison": "broken",
+        "workers": 8,
+        "ok": false,
+        "diagnostic": {
+          "stage": "check-project",
+          "code": "unknown_value",
+          "message": "unknown value: missing_storage_name",
+          "start": 15,
+          "end": 15,
+          "file": "src/world_storage.blot"
+        }
+      }
+    ],
+    "concreteAlternative": [
+      {
+        "scenario": "concrete",
+        "entry": "world/scene_hooks",
+        "poison": "",
+        "workers": 8,
+        "ok": true,
+        "modules": 235,
+        "bytes": 1774,
+        "wasmSha256": "64d2d4f3e31b3ab5a2e9b0f74b929b280ed6d52419808db8224df2c145cdc932"
+      },
+      {
+        "scenario": "concrete",
+        "entry": "progression/scenes",
+        "poison": "broken",
+        "workers": 8,
+        "ok": true,
+        "modules": 239,
+        "bytes": 1774,
+        "wasmSha256": "64d2d4f3e31b3ab5a2e9b0f74b929b280ed6d52419808db8224df2c145cdc932"
+      },
+      {
+        "scenario": "concrete",
+        "entry": "main",
+        "poison": "",
+        "workers": 8,
+        "ok": true,
+        "modules": 270,
+        "bytes": 2638690,
+        "wasmSha256": "a45e264f2fe11a50b5bc9bfb35b9ad791702cf6432631c3ff89d6f92db538b43"
+      },
+      {
+        "scenario": "concrete",
+        "entry": "main",
+        "poison": "mismatch",
+        "workers": 8,
+        "ok": false,
+        "diagnostic": {
+          "stage": "check-project",
+          "code": "type_mismatch",
+          "message": "Types do not match; one side: { despawn: (own FrameAccess -> (U32 -> FrameAccess)), reset_salt: (own FrameAccess -> FrameAccess), stash_scene: (own FrameAccess -> FrameAccess), restore_scene: (own FrameAccess -> FrameAccess) }; other side: { despawn: (own FrameAccess -> (U32 -> FrameAccess ! { | ?e}) ! { | ?e}), reset_salt: (own FrameAccess -> Bool ! { | ?e}), stash_scene: (own FrameAccess -> FrameAccess ! { | ?e}), restore_scene: (own FrameAccess -> FrameAccess ! { | ?e}) }",
+          "start": 54243,
+          "end": 54361,
+          "file": "src/world_storage.blot"
+        }
+      }
+    ]
+  },
+  "runtime": {
+    "compiler": "candidateDebugSha256",
+    "replayFilesMatching": 242,
+    "replayFrames": 120,
+    "snapshotSha256": "eaa7be919a72149cc86a81e8678ca16239e715b0ef5cd0d839e9ec72fd5e5781",
+    "pngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameChecks": {
+      "exit_zero": true,
+      "one_completed_guest_trace": true,
+      "one_headless_step": true,
+      "first_guest_frame": true,
+      "complete_render": true,
+      "screenshot_640x480": true
+    },
+    "frameInspection": "Centered title tiles on black, identical to the qualified 640x480 reference PNG.",
+    "affectedTests": {
+      "files": [
+        "tests/world_hooks.blot",
+        "tests/title.blot"
+      ],
+      "before": {
+        "passed": 22,
+        "failed": 1
+      },
+      "after": {
+        "passed": 22,
+        "failed": 1
+      },
+      "existingFailure": "tests/title.blot: test_settings_returns_to_title_and_keeps_the_game_paused"
+    },
+    "performanceCallerBuild": {
+      "entry": "performance/economy.blot",
+      "imports": "performance/maxed_support.blot",
+      "before": {
+        "bytes": 2314988,
+        "freshModules": 270
+      },
+      "after": {
+        "bytes": 2314951,
+        "freshModules": 271
+      }
+    }
+  }
+}

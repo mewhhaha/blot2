@@ -118,7 +118,7 @@ fn opCode(value: Op) -> u32 {
         describe => { return 5; },
         same => { return 6; },
         fields => { return 7; },
-        evaluate => { return 8; },
+        evaluate => { return 8; }, read_input => { return 9; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -131,7 +131,7 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         5 => { return Op.describe, blot_error::Error.none; },
         6 => { return Op.same, blot_error::Error.none; },
         7 => { return Op.fields, blot_error::Error.none; },
-        8 => { return Op.evaluate, blot_error::Error.none; },
+        8 => { return Op.evaluate, blot_error::Error.none; }, 9 => { return Op.read_input, blot_error::Error.none; },
         _ => { return Op.quote, blot_error::Error.invalid_artifact; },
     }
 }

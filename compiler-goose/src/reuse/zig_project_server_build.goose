@@ -3,9 +3,16 @@ namespace blot_reuse_zig_project_server;
 import .zig_project_server;
 struct AssetRange {id:u32,path:const u8[:],mediaType:const u8[:],sha256:const u8[:],start:u32,length:u32}
 struct AssetDependency {path:const u8[:],sha256:Text}
-struct BuildStats {frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,phaseProfile:blot_phase_profile::Record}
+struct DefinitionRead {filename:const u8[:],start:u32,end:u32}
+struct BuildStats {reusedStagedWasm:bool=false,stagedDefinitions:const DefinitionRead[:]=default<const DefinitionRead[:]>(),frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,phaseProfile:blot_phase_profile::Record}
 struct BuildReply {id:u32,revision:u64,stats:BuildStats,wasm_bytes:i64,ranges:const AssetRange[:]=default<const AssetRange[:]>(),dependencies:const AssetDependency[:]=default<const AssetDependency[:]>(),assets:blot_backend_native_assets::Candidate?=null}
-fn jsonStringify(self_:BuildReply,writer:Writer&)->Error {writer.beginObject();writer.field("kind","build");writer.field("id",self_.id);writer.field("epoch",epoch);writer.field("revision",self_.revision);writer.field("success",true);writer.field("stats",self_.stats);let assets .= self_.assets;if assets {writer.field("wasmBytes",self_.wasm_bytes);writer.field("assets",self_.ranges);writer.field("assetDependencies",self_.dependencies);writer.field("assetStats",assets.stats);}writer.endObject();return writer.failure;}
+fn jsonStringify(self_:BuildReply,writer:Writer&)->Error {writer.beginObject();writer.field("kind","build");writer.field("id",self_.id);writer.field("epoch",epoch);writer.field("revision",self_.revision);writer.field("success",true);writer.key("stats");writer.beginObject();
+    writer.field("frontend",self_.stats.frontend);writer.field("sourceBytes",self_.stats.sourceBytes);
+    writer.field("freshModules",self_.stats.freshModules);writer.field("cachedModules",self_.stats.cachedModules);
+    writer.field("emittedFunctions",self_.stats.emittedFunctions);writer.field("phaseProfile",self_.stats.phaseProfile);
+    let inputs .= self_.assets;
+    if inputs && inputs.tracks_inputs {writer.field("reusedStagedWasm",self_.stats.reusedStagedWasm);writer.field("stagedDefinitions",self_.stats.stagedDefinitions);}
+    writer.endObject();let assets .= self_.assets;if assets {writer.field("wasmBytes",self_.wasm_bytes);writer.field("assets",self_.ranges);writer.field("assetDependencies",self_.dependencies);writer.field("assetStats",assets.stats);}writer.endObject();return writer.failure;}
 // Profiled sessions clock this build until its stats are published.
 fn build(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const Source[:],asset_sources:const Source[:])->Error {
     var trace=blot_phase_profile::Trace{..};if opened.profile_trace {trace=blot_phase_profile::initTrace(id);}var trace_ref:blot_phase_profile::Trace?=null;if trace.key.slot!=0 {trace_ref .= trace;}let trace_installation=blot_phase_profile::installTrace(trace_ref);
@@ -54,16 +61,36 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         inactive=>{return false,blot_error::Error.missing_rejection_diagnostic;},
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
         ready payload=>{
-            let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);var result,error=payload.value.emit();timing.exit();if error!=blot_error::Error.none {return false,error;}
+            let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);
+            var inputs:i64=-1;
+            if assets {
+                inputs=assets.allocation_index;
+                let previous .= opened.assets.value.last;
+                if previous && reused && payload.value.cachedCount()==payload.value.units.len && assets.reuseStagedWasm(previous) {
+                    timing.exit();
+                    let result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:blot_reuse_dependency_consumer::Compiled{bytes:blot_reuse_dependency_consumer::ownBytes(previous.cached_wasm),emitted_functions:previous.cached_functions,..},stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,cached_modules:payload.value.units.len,..};
+                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value);var owned=result;owned.deinit();return committed,error;
+                }
+            }
+            var result,error=payload.value.emit(inputs);timing.exit();if error!=blot_error::Error.none {return false,error;}
             if reused && result.result.compiled.failed {result.deinit();retry=true;return false,blot_error::Error.none;}
-            let committed,error=buildEmitted(writer,opened,id,assets,profile,result);result.deinit();return committed,error;
+            let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value);result.deinit();return committed,error;
         }
     }
 }
-fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&)->bool,Error {
+fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&,prepared:const blot_reuse_partial_dependency::Prepared&)->bool,Error {
     if result.result.compiled.failed {let diagnostic,error=issue(result,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);}
     let wasm:const u8[:]=result.result.compiled.bytes;var phases=blot_phase_profile::Record{..};if profile.key.slot!=0 {phases=profile.record();}
-    let stats=BuildStats{frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,phaseProfile:phases};
+    var reads:DefinitionRead[>..]=[];var reused_wasm=false;
+    if assets {
+        reused_wasm=assets.reused_wasm;
+        for use in assets.read_definitions.items {
+            let span=prepared.units[use.unit-1].binding(use.binding).span;
+            reads.push(DefinitionRead{prepared.paths[use.unit-1],span.start,span.end});
+        }
+        let saved=assets.keepStagedWasm(wasm,result.result.compiled.emitted_functions);if saved!=blot_error::Error.none {return false,saved;}
+    }
+    let stats=BuildStats{reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,phaseProfile:phases};
     var ranges:AssetRange[>..]=[];var dependencies:AssetDependency[>..]=[];var payload_size=wasm.len;
     if assets {
         if payload_size>blot_reuse_zig_project_frames::max_frame_bytes-8 {return false,operationFailure(writer,opened,id,"response_limit","Build reply exceeds protocol limits");}

@@ -1717,8 +1717,10 @@ receive `unsupported_attribute`.
 ## Modules, constants, current limits
 
 `#run expression` evaluates a pure expression during compilation. Parentheses
-delimit it inside a larger expression. The direct backend folds reached scalar
-expressions to Wasm constants. It supports Unit, Bool, U32 and F32 literals,
+delimit it inside a larger expression. Scalar results become Wasm constants. A staged function can build
+arrays, named records, tuples and data constructors, select a field and read
+an array element. Its returned data uses the same layout as a literal.
+The evaluator supports Unit, Bool, U32 and F32 literals,
 scalar arithmetic and comparisons, conditionals, short-circuit logic, global
 constants and fully applied named functions, including imports. Integer
 arithmetic wraps as in Wasm. Integer division by zero fails compilation.
@@ -1735,8 +1737,29 @@ entry func answer () => return #do:
 Both forms can use bindings created inside the staged expression. A runtime
 parameter, host effect, unsupported operation or exhausted evaluation budget
 fails the build. Each evaluation has a budget of 65,536 Core node visits and a
-depth limit of 256. Collection construction and quoted code still need backend
-support.
+depth limit of 256. Embedding the result has a separate 65,536-value budget.
+Quoted code still needs backend support.
+
+A project can grant a named file to a build by declaring a native asset with
+kind `input`. Its module exports `file`. Pass that value to the ordinary
+`include` function from `std/build` inside `#run`.
+
+```blot
+import { include } from "std/build"
+import { file as icon } from "./icon"
+func header file => return do:
+  let bytes = include file
+  return { magic: @array.get bytes 0, size: @array.length bytes }
+entry func icon_size () => return #do:
+  let image = header icon
+  break image.size
+```
+
+The project records the selected files and definitions from the branches it
+evaluated. If all checked modules are reused and those files still match, it
+can return the previous Wasm. A changed source definition currently goes
+through emission even when it is outside the recorded branch. [Project build
+inputs](../host/assets.md#files-read-by-run)
 
 `#if` is still pending. The initial scoped storage profile uses the same array
 literal for all length modes:

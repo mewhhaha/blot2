@@ -313,3 +313,22 @@ func twice (n: U32): U32 => return sum n n
   await answer("#run (if false then @u32.div 1 0 else 42)", 42);
   await answer("#run (@f32.add 1.5 2.25)", 3.75);
 });
+
+Deno.test("#run constructs nested arrays, records and variants across ordinary function calls", async () => {
+  await compileAndRun(`
+type Catalog is data = $Catalog { ids: Array U32, enabled: Bool }
+func build (n: U32): Catalog => return $Catalog {enabled: true, ids: #[n, @u32.add n 1]}
+func first (value: Catalog): U32 => return @array.get value.ids 0
+entry func answer () => return #run (first (build 42))
+entry func rows () => return do:
+  let value = #run (build 41)
+  return value.ids
+entry func field () => return #do:
+  let values = { z: #[40, 42], a: false }
+  break @array.get values.z 1
+`, guest => {
+    equal(guest.call("answer", null), 42);
+    equal(guest.call("field", null), 42);
+    deepStrictEqual(Array.from(guest.call("rows", null) as Uint32Array), [41,42]);
+  }, {prelude:"none"});
+});

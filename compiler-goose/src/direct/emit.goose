@@ -219,7 +219,7 @@ root struct State {
 // `g.units[unit - 1]` in place: a module reference returned by a helper is
 // bounded by `g` for the lifetime checker and then conflicts with every
 // stack truncation (Goose spec 5.2).
-struct Generator { types: blot_direct_types::Types&, module: blot_direct_writer::Module&, s: State&, units: const Module[:] }
+struct Generator { types: blot_direct_types::Types&, module: blot_direct_writer::Module&, s: State&, units: const Module[:], build_inputs:i64 = -1 }
 
 fn key64(high: u32, low: u32) -> u64 { let wide: u64 = high; return (wide << 32) | low; }
 

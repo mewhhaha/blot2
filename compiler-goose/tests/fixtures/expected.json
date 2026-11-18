@@ -8298,6 +8298,46 @@
      "wasm_bytes": 0
     }
    ]
+  },
+  "staged_catalog.blot": {
+   "exit": 0,
+   "records": [
+    {
+     "body_elaborations": 161,
+     "body_lowerings": 161,
+     "check_occurs_steps": 1634,
+     "checker": {
+      "associated_steps": 0,
+      "inference_steps": 2971,
+      "instantiations": 217,
+      "memo_declined": 0,
+      "memo_hits": 5,
+      "memo_misses": 8,
+      "obligations_appended": 57,
+      "pending_peak": 57,
+      "projection_memo_hits": 0,
+      "shared_uses": 19,
+      "use_expansions": 16
+     },
+     "core_nodes": 924,
+     "effect_rows": 2626,
+     "emitted_functions": 22,
+     "filename": "staged_catalog.blot",
+     "files": 2,
+     "imported_schemes": 21,
+     "kind": "compilation",
+     "row_versions": 455,
+     "source_bytes": 15018,
+     "stage": "build-project",
+     "success": true,
+     "syntax_nodes": 2094,
+     "type_nodes": 5139,
+     "type_versions": 779,
+     "wasm_bytes": 1777
+    }
+   ],
+   "wasm_bytes": 1777,
+   "wasm_sha256": "d6ef321b3782d8af984be38825f80523575fa28be598abae0fd1490764fae16e"
   }
  }
 }

@@ -33,6 +33,7 @@
 // changed bindings) is a run on one of the Analyzer's stacks here, popped
 // before the visit returns.
 namespace blot_check_uniqueness;
+import check.typed_staging;
 import std;
 import dictionary;
 import check.core;
@@ -1328,6 +1329,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // and a payload nothing else holds stays that way inside it.
         if n.b == 0 || ownedAs(self_, m, held, m.typeOf(n.b), 0) { fact = deep; }
         return Value { fact: fact, exits: payload.exits, .. };
+    }
+    if tag == blot_check_core::Tag.staging && (n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.read_input) || n.c == blot_check_typed_staging::opCode(blot_check_typed_staging::Op.evaluate)) {
+        let input = visit(self_, m, n.a);
+        return Value { fact: deep, exits: input.exits, .. };
     }
     if tag == blot_check_core::Tag.array_op { return arrayOp(self_, m, id, false, brief, lends_to); }
     if tag == blot_check_core::Tag.storage { return storageOp(self_, m, id); }

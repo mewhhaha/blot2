@@ -170,3 +170,27 @@ compiler rejects waiting builds promptly. Parsers receive a signal that also
 aborts on disposal. Stopping the parser's own work is cooperative; it must
 observe that signal. A parser result arriving after cancellation cannot publish
 a native revision or asset manifest.
+
+## Files read by `#run`
+
+Grant an input by mapping a virtual module to its file when opening a project.
+
+```ts
+const compiler = await createCompiler({
+  entry: "./main.blot",
+  nativeAssets: { imports: [{ module: "./icon", path: "./icon.png", kind: "input" }] },
+});
+```
+
+The generated module exports a session-local U32 named `file`.
+`std/build.include` takes this handle and returns the file bytes as an
+`Array U32` inside a staged computation. The evaluator opens a file on its
+first read. Repeated reads see one snapshot. Unsaved overlays use the same
+paths and take precedence over disk. The usual native input size limits apply.
+
+Successful builds report file hashes in `assetDependencies` and binding
+locations in `stats.stagedDefinitions`. The locations use UTF-8 byte offsets
+in the current source revision. `stats.reusedStagedWasm` reports whether the
+project reused the complete output. Reuse requires an unchanged checked graph
+and matching bytes for every previously selected input. A failed build
+preserves the last successful revision.

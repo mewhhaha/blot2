@@ -189,8 +189,8 @@ fn text(self_:const Compiled&)->const u8[:] {return self_.diagnostic.code.messag
 struct Result {compiled:Compiled=Compiled{..},stats:Stats=Stats{},diagnostic:blot_support::Option<Diagnostic> =blot_support::none<Diagnostic>()}
 fn deinit(self_:Result&) {freeBytes(self_.compiled.bytes);freeBytes(self_.compiled.message);if self_.diagnostic.present {self_.diagnostic.value.deinit();}self_=Result{};}
 // Runs the backend and takes ownership of what it produced.
-fn compileUnits(units:const Core[:],entry:u32)->Compiled,Error {
- var bytes:u8[>..<]=[];var message:u8[>..<]=[];let outcome=blot_compile::compile(units,entry,bytes,message);
+fn compileUnits(units:const Core[:],entry:u32,build_inputs:i64 = -1)->Compiled,Error {
+ var bytes:u8[>..<]=[];var message:u8[>..<]=[];let outcome=blot_compile::compile(units,entry,bytes,message,build_inputs);
  if outcome.has_diagnostic {return Compiled{failed:true,diagnostic:outcome.diagnostic,message:ownBytes(message[..]),emitted_functions:outcome.emitted_functions, ..},blot_error::Error.none;}
  return Compiled{bytes:ownBytes(bytes[..]),emitted_functions:outcome.emitted_functions, ..},blot_error::Error.none;
 }

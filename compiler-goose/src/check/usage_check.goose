@@ -63,7 +63,18 @@ fn shape<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node) ->
     for index in 0..count { let error = self_.work.charge(1); if error != blot_error::Error.none { return error; } if !self_.valid(values[first + index * stride]) { return blot_error::Error.type_limit; } } return blot_error::Error.none;
 }
 fn nominalProperty<S,N>(self_: const NominalStore<S,N>&, value: blot_check_types::Node, mode: Mode) -> bool, Error {
-    for nominal in self_.nominals { let error = self_.work.charge(1); if error != blot_error::Error.none { return false, error; } if nominal.identity.unit == value.a && nominal.identity.decl == value.b { if mode == Mode.any { return nominal.has_usage, blot_error::Error.none; } return nominal.affine, blot_error::Error.none; } } return false, blot_error::Error.none;
+    return lookupNominalProperty(self_.nominals, value, mode, self_.work);
+}
+fn lookupNominalProperty(nominals, value: blot_check_types::Node, mode: Mode, work: Work&) -> bool, Error {
+    for nominal in nominals { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } if nominal.identity.unit == value.a && nominal.identity.decl == value.b { if mode == Mode.any { return nominal.has_usage, blot_error::Error.none; } return nominal.affine, blot_error::Error.none; } } return false, blot_error::Error.none;
+}
+fn lookupNominalProperty(engine: const blot_check_check::Engine&, value: blot_check_types::Node, mode: Mode, work: Work&) -> bool, Error {
+    let error = work.charge(1);
+    if error != blot_error::Error.none { return false, error; }
+    let index = engine.nominalIndex(blot_check_types::NominalIdentity { value.a, value.b, .. });
+    if !index.present { return false, blot_error::Error.none; }
+    if mode == Mode.any { return engine.nominals[index.value].has_usage, blot_error::Error.none; }
+    return engine.nominals[index.value].affine, blot_error::Error.none;
 }
 fn nominalShape(store, nominals, node: blot_check_types::Node, work: Work&) -> Error { let context = NominalStore { store, nominals, work , ..}; let error = work.charge(1); if error != blot_error::Error.none { return error; } return shape(context, node); }
 fn affine(store, root: Id) -> bool, Error { var work = Work {..}; let empty: const blot_check_core::Nominal[:] = default<const blot_check_core::Nominal[:]>(); let context = NominalStore { store, empty, work , ..}; return inspectWithMemo(context, root, Mode.affine, work, null); }

@@ -1,0 +1,2 @@
+// file is a declared build input. #run records the files it actually reads.
+func include (file: U32): Array U32 => return @build.read file

@@ -324,10 +324,14 @@ recursive fn arrayLiteral(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         releaseTo(g, f.scratch_cut.owner, f.scratch_cut.stack);
         f.scratch_cut = ScratchCut {};
     }
-    let count = constLocal(g, f, children.len as u32);
+    return arrayFromValues(g, f, ty, values, id);
+}
+
+fn arrayFromValues(g: Generator&, f: Fn&, ty: Ty, values: Vals, id: u32) -> Val, Error {
+    let count = constLocal(g, f, values.len);
     let handle, error = create(g, f, ty, count, id);
     if error != blot_direct_types::Error.none { return handle, error; }
-    if children.len == 0 { return handle, blot_direct_types::Error.none; }
+    if values.len == 0 { return handle, blot_direct_types::Error.none; }
     let base = baseOf(g, f, handle);
     let element, error = elementOf(g, f, ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }

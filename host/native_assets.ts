@@ -7,6 +7,7 @@ import type {
 } from "./assets.ts";
 
 export type NativeAssetKind =
+  | "input"
   | "json"
   | "catalog"
   | "text"
@@ -112,7 +113,7 @@ export function captureNativeAssets(
     modules.add(module);
     if (
       typeof item.kind !== "string" ||
-      !["json", "catalog", "text", "tunables", "wgsl", "reference"].includes(
+      !["input", "json", "catalog", "text", "tunables", "wgsl", "reference"].includes(
         item.kind,
       )
     ) {

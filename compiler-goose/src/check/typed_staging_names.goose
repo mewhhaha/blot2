@@ -1,7 +1,8 @@
 // Shared syntax names; no semantic checker dependencies.
 namespace blot_check_typed_staging;
-enum Op { quote, splice, lift, emit, run, describe, same, fields, evaluate }
+enum Op { quote, splice, lift, emit, run, describe, same, fields, evaluate, read_input }
 fn lookup(name: const u8[:]) -> Op, bool {
+    if name == "@build.read" { return Op.read_input, true; }
     if name == "@code.evaluate" { return Op.evaluate, true; }
     if name == "@code.quote" { return Op.quote, true; }
     if name == "@code.splice" { return Op.splice, true; }

@@ -4,20 +4,22 @@ import reuse.source_overlays;
 import support.option;
 import support.error;
 import support.json;
-enum Kind {json,catalog,text,tunables,wgsl,reference}
+enum Kind {json,catalog,text,tunables,wgsl,reference,input}
 struct Definition {module: const u8[:],path: const u8[:],kind: Kind,ty: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>(),export_name: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>(),mediaType: blot_support::Option<const u8[:]> = blot_support::none<const u8[:]>()}
 struct Options {imports: const Definition[:] = default<const Definition[:]>(),roots: const (const u8[:])[:] = default<const (const u8[:])[:]>()}
 struct Stats {parsed: i64 = 0,reused: i64 = 0,inputBytes: i64 = 0,generatedBytes: i64 = 0}
 struct Dependency {path: const u8[:],sha256: blot_support::Option<u8[64]>}
 struct Resource {id: u32,path: const u8[:],mediaType: const u8[:],sha256: u8[64],bytes: const u8[:],key: const u8[:]}
 struct Issue {filename: const u8[:],start: u32 = 0,end: u32 = 0,code: const u8[:],message: const u8[:]}
-struct Module {module: const u8[:],definition: Definition,canonical: const u8[:],bytes: const u8[:],source: const u8[:]}
+struct Module {module: const u8[:],definition: Definition,canonical: const u8[:],bytes: const u8[:],source: const u8[:],overlaid:bool=false,hidden:bool=false,read:bool=false}
 struct Modules {storage: Module[:] = default<Module[:]>(),items: Module[:] = default<Module[:]>()}
 struct Sources {storage: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>(),items: blot_reuse_source_overlays::Source[:] = default<blot_reuse_source_overlays::Source[:]>()}
 struct Dependencies {storage: Dependency[:] = default<Dependency[:]>(),items: Dependency[:] = default<Dependency[:]>()}
 struct Resources {storage: Resource[:] = default<Resource[:]>(),items: Resource[:] = default<Resource[:]>()}
 struct Texts {storage: const u8[:][:] = default<const u8[:][:]>(),items: const u8[:][:] = default<const u8[:][:]>()}
-struct Candidate {owner_id: u64 = 0,allocation_index:i64=-1,modules: Modules = Modules {..},sources: Sources = Sources {..},dependencies: Dependencies = Dependencies {..},resources: Resources = Resources {..},texts: Texts = Texts {..},stats: Stats = Stats {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>()}
+struct DefinitionRead {unit:u32,binding:u32}
+reusable[] var definition_read_runs:DefinitionRead[>..]=[];
+struct Candidate {tracks_inputs:bool=false,reused_wasm:bool=false,cached_wasm:const u8[:]=default<const u8[:]>(),cached_functions:i64=0,read_definitions:blot_support_pooled_buffer::Buffer<DefinitionRead> = blot_support_pooled_buffer::Buffer<DefinitionRead>{..},owner_id: u64 = 0,allocation_index:i64=-1,modules: Modules = Modules {..},sources: Sources = Sources {..},dependencies: Dependencies = Dependencies {..},resources: Resources = Resources {..},texts: Texts = Texts {..},stats: Stats = Stats {..},issue: blot_support::Option<Issue> = blot_support::none<Issue>()}
 struct Session {options: Options = Options {..},last: Candidate? = null,texts: Texts = Texts {..},owned_definitions: Definition[:] = default<Definition[:]>(),owned_roots: const u8[:][:] = default<const u8[:][:]>()}
 fn jsonStringify(self_: Definition,writer: blot_json::Writer&) -> blot_error::Error {writer.beginObject();writer.field("module",self_.module);writer.field("path",self_.path);writer.field("kind",self_.kind);writer.field("type",self_.ty);writer.field("export",self_.export_name);writer.field("mediaType",self_.mediaType);writer.endObject();return writer.failure;}
 import dictionary;
@@ -58,11 +60,11 @@ fn registeredDefinition(texts:Texts,value:Definition)->Definition {
  var media=blot_support::none<const u8[:]>();if value.mediaType.present {media=blot_support::some<const u8[:]>(registeredText(texts,value.mediaType.value));}
  return Definition{module:registeredText(texts,value.module),path:registeredText(texts,value.path),kind:value.kind,ty:ty,export_name:export_name,mediaType:media};
 }
-fn push(self_:Modules&,value:Module,texts:Texts)->Error {let canonical=Module{module:registeredText(texts,value.module),definition:registeredDefinition(texts,value.definition),canonical:registeredText(texts,value.canonical),bytes:registeredText(texts,value.bytes),source:registeredText(texts,value.source)};return blot_support_pooled_buffer::push(self_,canonical,module_runs);}
+fn push(self_:Modules&,value:Module,texts:Texts)->Error {let canonical=Module{module:registeredText(texts,value.module),definition:registeredDefinition(texts,value.definition),canonical:registeredText(texts,value.canonical),bytes:registeredText(texts,value.bytes),source:registeredText(texts,value.source),overlaid:value.overlaid,hidden:value.hidden,read:value.read};return blot_support_pooled_buffer::push(self_,canonical,module_runs);}
 fn push(self_:Sources&,value:Source,texts:Texts)->Error {var contents=blot_support::none<const u8[:]>();if value.contents.present {contents=blot_support::some<const u8[:]>(registeredText(texts,value.contents.value));}let canonical=Source{path:registeredText(texts,value.path),contents:contents};return blot_support_pooled_buffer::push(self_,canonical,source_runs);}
 fn push(self_:Dependencies&,value:Dependency,texts:Texts)->Error {let canonical=Dependency{path:registeredText(texts,value.path),sha256:value.sha256};return blot_support_pooled_buffer::push(self_,canonical,dependency_runs);}
 fn push(self_:Resources&,value:Resource,texts:Texts)->Error {let canonical=Resource{id:value.id,path:registeredText(texts,value.path),mediaType:registeredText(texts,value.mediaType),sha256:value.sha256,bytes:registeredText(texts,value.bytes),key:registeredText(texts,value.key)};return blot_support_pooled_buffer::push(self_,canonical,resource_runs);}
-fn deinit(self_: Candidate&) {if self_.owner_id == 0 {return;}let index=self_.allocation_index;assert(index>=0 && index<candidates.len);let canonical:Candidate& =candidates[index];assert(self_ .== canonical);blot_support_pooled_buffer::deinit(self_.modules,module_runs);blot_support_pooled_buffer::deinit(self_.sources,source_runs);blot_support_pooled_buffer::deinit(self_.dependencies,dependency_runs);blot_support_pooled_buffer::deinit(self_.resources,resource_runs);self_.texts.freeTexts();self_ = Candidate {..};candidates.free(index);}
+fn deinit(self_: Candidate&) {if self_.owner_id == 0 {return;}let index=self_.allocation_index;assert(index>=0 && index<candidates.len);let canonical:Candidate& =candidates[index];assert(self_ .== canonical);blot_support_pooled_buffer::deinit(self_.read_definitions,definition_read_runs);blot_support_pooled_buffer::deinit(self_.modules,module_runs);blot_support_pooled_buffer::deinit(self_.sources,source_runs);blot_support_pooled_buffer::deinit(self_.dependencies,dependency_runs);blot_support_pooled_buffer::deinit(self_.resources,resource_runs);self_.texts.freeTexts();self_ = Candidate {..};candidates.free(index);}
 fn fail(self_: Candidate&,filename: const u8[:],code: const u8[:],message: const u8[:]) {self_.issue = blot_support::some(Issue {filename: registeredText(self_.texts,filename),code: code,message: message,..});}
 fn validPath(path: const u8[:]) -> bool {if path.len == 0 || path[0] != '/' || !blot_reuse_source_overlays::utf8_valid(path) {return false;}for byte in path {if byte == 0 {return false;}}return true;}
 fn validMediaType(value: const u8[:]) -> bool {if value.len == 0 || value.len > 1024 {return false;}for byte in value {if byte == '\r' || byte == '\n' || byte == 0 {return false;}}var at: i64 = 0;var units: i64 = 0;while at < value.len {let point,length,valid = blot_backend_native_asset_readers::decodePoint(value,at);if !valid {return false;}at += length;units++;if point > 65535 {units++;}if units > 256 {return false;}}return true;}
@@ -132,6 +134,85 @@ fn readInput(candidate: Candidate&,filename: const u8[:],path: const u8[:]) -> c
     }
     let bytes_out,present,error = capture();blot_native::close(fd);return bytes_out,present,error;
 }
+// Only the project which owns this candidate can supply files. The read set is
+// discarded with a rejected build. Repeated reads see the same bytes.
+fn readBuildInput(candidate_id:i64,key:u32)->const u8[:],bool {
+    let empty=default<const u8[:]>();
+    if candidate_id<0 {return empty,false;}
+    let candidate .= candidates[candidate_id];
+    if key==0 || key>candidate.modules.items.len {return empty,false;}
+    let module=candidate.modules.items[key-1];
+    if module.definition.kind!=Kind.input || module.hidden {return empty,false;}
+    if module.read {return module.bytes,true;}
+    var bytes=module.bytes;
+    if !module.overlaid {
+        let captured,present,error=readInput(candidate,module.definition.path,module.canonical);
+        if !present || error!=blot_error::Error.none {return empty,false;}bytes=captured;
+    }
+    if bytes.len>maximum_file || bytes.len>maximum_total-candidate.stats.inputBytes {return empty,false;}
+    let hash=digest(bytes);
+    var recorded=false;
+    for dep in candidate.dependencies.items {if dep.path==module.definition.path {recorded=true;break;}}
+    if !recorded {
+        let added=candidate.dependencies.push(Dependency{path:module.definition.path,sha256:blot_support::some(hash)},candidate.texts);
+        if added!=blot_error::Error.none {return empty,false;}
+    }
+    candidate.stats.inputBytes+=bytes.len;candidate.stats.parsed++;
+    candidate.modules.items[key-1].bytes=registeredText(candidate.texts,bytes);
+    candidate.modules.items[key-1].read=true;
+    return candidate.modules.items[key-1].bytes,true;
+}
+fn stageDefinition(candidate_id:i64,unit:u32,binding:u32) {
+    if candidate_id<0 {return;}
+    let c .= candidates[candidate_id];
+    if !c.tracks_inputs {return;}
+    for use in c.read_definitions.items {if use.unit==unit && use.binding==binding {return;}}
+    blot_support_pooled_buffer::push(c.read_definitions,DefinitionRead{unit,binding},definition_read_runs);
+}
+
+// All Core in this build came from precisely the preceding source graph. Probe
+// its old file reads before reusing code. On a miss, emission starts a new read
+// set, but uses the same file snapshots as the probe.
+fn reuseStagedWasm(c:Candidate&,last:const Candidate&)->bool {
+    if last.cached_wasm.len==0 || c.modules.items.len!=last.modules.items.len {return false;}
+    for previous,index in last.modules.items {
+        if !previous.read {continue;}
+        let m=c.modules.items[index];
+        if m.definition.kind!=Kind.input || m.canonical!=previous.canonical || m.module!=previous.module || m.hidden {return false;}
+        if !m.overlaid {
+            let bytes,present,error=readInput(c,m.definition.path,m.canonical);
+            if error!=blot_error::Error.none || !present {
+                // The new branch might bypass this file.
+                c.issue=blot_support::none<Issue>();c.modules.items[index].hidden=true;return false;
+            }
+            c.modules.items[index].bytes=registeredText(c.texts,bytes);
+            c.modules.items[index].overlaid=true;
+        }
+        if c.modules.items[index].bytes!=previous.bytes {return false;}
+    }
+    for previous,index in last.modules.items {
+        if previous.read {
+            let ignored,found=readBuildInput(c.allocation_index,(index+1) as u32);
+            if !found {return false;}
+            c.stats.parsed--;c.stats.reused++;
+        }
+    }
+    for use in last.read_definitions.items {blot_support_pooled_buffer::push(c.read_definitions,use,definition_read_runs);}
+    c.reused_wasm=true;
+    return true;
+}
+
+fn keepStagedWasm(c:Candidate&,wasm:const u8[:],functions:i64)->Error {
+    if !c.tracks_inputs {return blot_error::Error.none;}
+    for m in c.modules.items {
+        if !m.read {continue;}
+        let owned,error=c.own(wasm);
+        if error!=blot_error::Error.none {return error;}
+        c.cached_wasm=registeredText(c.texts,owned);c.cached_functions=functions;break;
+    }
+    return blot_error::Error.none;
+}
+
 fn digest(bytes: const u8[:]) -> u8[64] {var state = blot_support_sha256::init();blot_support_sha256::update(state,bytes);let hash = blot_support_sha256::final(state);let alphabet = "0123456789abcdef";var result: u8[64] = [0;64];for byte,index in hash {result[index * 2] = alphabet[byte >> 4];result[index * 2 + 1] = alphabet[byte & 15];}return result;}
 fn resourceKey(candidate: Candidate&,path: const u8[:],media: const u8[:],digest: const u8[:]) -> const u8[:],Error {var bytes: u8[>..] = [];var writer = blot_json::Writer {out: bytes,options: blot_json::Options {..},..};writer.beginArray();writer.element(path);writer.element(media);writer.element(digest);writer.endArray();if writer.failure != blot_error::Error.none {return default<const u8[:]>(),writer.failure;}return candidate.own(bytes);}
 fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sources: const Source[:]) -> Candidate?,Error {
@@ -145,7 +226,20 @@ fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sou
         for position in 0..order.items.len {
             let borrowed_definition=definitions.definitionAt(order.items[position]);
             let owned,definition_error = candidate.copyDefinition(borrowed_definition);if definition_error != blot_error::Error.none {return definition_error;}let definition = owned;let module_path,module_error = candidate.canonical(definition.module);if module_error != blot_error::Error.none {return module_error;}if !validPath(module_path) {return blot_error::Error.invalid_native_assets;}if module_names.get(module_path) || source_names.get(module_path) || module_path == canonical_entry {return blot_error::Error.duplicate_asset_module;}module_names.insert(module_path,true);
-            let input_path,input_error = candidate.canonical(definition.path);if input_error != blot_error::Error.none {return input_error;}if !validPath(input_path) {return blot_error::Error.invalid_native_assets;}let input:const u8[:] = {
+            let input_path,input_error = candidate.canonical(definition.path);if input_error != blot_error::Error.none {return input_error;}if !validPath(input_path) {return blot_error::Error.invalid_native_assets;}if definition.kind == Kind.input {
+                candidate.tracks_inputs=true;
+                var text:u8[>..]=[];format(text,"const file: U32 = ",candidate.modules.items.len+1,"\n");
+                let source,error=candidate.own(text);if error!=blot_error::Error.none {return error;}
+                let override .= overrides.files().get(input_path);
+                var bytes:const u8[:]=default<const u8[:]>();var hidden=false;var overlaid=false;
+                if override {
+                    overlaid=true;hidden=!override.present;
+                    if !hidden {let copied,error=candidate.own(override.value);if error!=blot_error::Error.none {return error;}bytes=copied;}
+                }
+                let added=candidate.modules.push(Module{module:module_path,canonical:input_path,definition:definition,source:source,bytes:bytes,overlaid:overlaid,hidden:hidden,..},candidate.texts);
+                if added!=blot_error::Error.none {return added;}continue;
+            }
+            let input:const u8[:] = {
                 let old .= loads.get(input_path);
                 if old {let cached:const u8[:]=old;cached}
                 else {
@@ -186,7 +280,7 @@ fn prepare(self_: Session&,entry: const u8[:],sources: const Source[:],asset_sou
                     candidate.stats.parsed++;
                 }
             }
-            let appended = candidate.modules.push(Module {module: module_path,definition: definition,canonical: input_path,bytes: input,source: source},candidate.texts);if appended != blot_error::Error.none {return appended;}
+            let appended = candidate.modules.push(Module {module: module_path,definition: definition,canonical: input_path,bytes: input,source: source,..},candidate.texts);if appended != blot_error::Error.none {return appended;}
         }
         for index in 1..candidate.resources.items.len {let item = candidate.resources.items[index];var at = index;while at > 0 && resourceLess(item,candidate.resources.items[at - 1]) {candidate.resources.items[at] = candidate.resources.items[at - 1];at--;}candidate.resources.items[at] = item;}for index in 0..candidate.resources.items.len {candidate.resources.items[index].id = (index + 1) as u32;}
         for index in 0..candidate.modules.items.len {

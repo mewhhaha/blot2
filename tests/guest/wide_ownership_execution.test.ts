@@ -152,3 +152,66 @@ entry const run = func (mode: U32) => return do:
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("declared callbacks use checked usage facts from a large imported catalog", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = directory + "/main.blot";
+  const catalog = Array.from({ length: 256 }, (_, index) => {
+    let part = "U32";
+    if (index > 0) part = `Layer${index - 1}`;
+    return `type Layer${index} is data = $Layer${index} { part: ${part} }`;
+  }).join("\n");
+  const fields = Array.from(
+    { length: 256 },
+    (_, index) => `f${index}: Array catalog.Layer${index}`,
+  ).join(", ");
+  try {
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude: null,
+    });
+    const sources = {
+      [directory + "/catalog.blot"]: catalog,
+      [directory + "/scene.blot"]: `import * as catalog from "./catalog"
+type Parts is data = $Parts {${fields}}
+type Frame is data = $Frame { parts: Array Parts, count: U32 }
+type Hooks = { reset: own Frame -> Frame }
+func run (hooks: Hooks) -> (frame: own Frame): Frame => return hooks.reset frame
+`,
+      [entry]: `import * as scene from "./scene"
+func update (frame: own scene.Frame): scene.Frame => return do:
+  frame.count := @u32.add frame.count 1
+  return frame
+const hooks: scene.Hooks = {reset: update}
+entry func run (value: U32): U32 => return (scene.run hooks ($scene.Frame {parts: #[], count: value})).count
+`,
+    };
+    try {
+      const result = await compiler.build({ sources });
+      assert(result.success, JSON.stringify(result));
+      const guest = await instantiateGuest(result.bytes);
+      try {
+        assert.equal(guest.call("run", 41), 42);
+      } finally {
+        guest.dispose();
+      }
+      const invalid = sources[entry].replace(
+        "reset: update",
+        "reset: func (frame: own scene.Frame) => return false",
+      );
+      const rejected = await compiler.build({
+        sources: { ...sources, [entry]: invalid },
+      });
+      assert(!rejected.success);
+      assert(
+        rejected.diagnostics.some((issue) => issue.code === "type_mismatch"),
+        JSON.stringify(rejected.diagnostics),
+      );
+    } finally {
+      await compiler.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
