@@ -1,0 +1,676 @@
+{
+  "date": "2026-11-18",
+  "previousSource": "78d616bd3f3b5b0e3d7c2bf35ea42d8011d5bd46",
+  "previousBinary": "ed6eaba5a69bd6f01da5692c3999ad7b74d1784230a1502762ff29796a82eb55",
+  "sourceGit": "3476218dac0cfd17d259923fc750e80aeeb4a5f7",
+  "candidateBinary": "6070336a083d8188d91bcb339ee410c78846a93b98a382c59027709097b2acef",
+  "candidateSourceDigest": "6bff036f5341c5fc90f652575e2effcae353186c8f7b108e5ebb780bbfd01415",
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "method": "Complete Wasm from a fresh compiler process on warm filesystem pages; alternating order, reversed starting executable in the second window. Edits share an open project session. Runs with compiler profiling, CPU instruction sampling, and packet capture are independent from ordinary wall times. A positive paired difference favors the new compiler.",
+  "freshMs": {
+    "fresh": {
+      "rounds": 20,
+      "previous": 943.45,
+      "candidate": 888.549,
+      "pairedMedianSaved": 28.408,
+      "wins": 15
+    },
+    "reverse": {
+      "rounds": 20,
+      "previous": 904.131,
+      "candidate": 882.894,
+      "pairedMedianSaved": 24.333,
+      "wins": 17
+    },
+    "confirm": {
+      "rounds": 16,
+      "previous": 1572.644,
+      "candidate": 1539.538,
+      "pairedMedianSaved": 58.78,
+      "wins": 12
+    }
+  },
+  "retainedMs": {
+    "edits": {
+      "fresh": {
+        "rounds": 8,
+        "previous": 966.958,
+        "candidate": 939.878,
+        "pairedMedianSaved": 46.964,
+        "wins": 5
+      },
+      "edit": {
+        "rounds": 8,
+        "previous": 271.921,
+        "candidate": 286.359,
+        "pairedMedianSaved": -13.121,
+        "wins": 3
+      },
+      "reject": {
+        "rounds": 8,
+        "previous": 435.903,
+        "candidate": 424.636,
+        "pairedMedianSaved": 16.199,
+        "wins": 5
+      },
+      "syntax": {
+        "rounds": 8,
+        "previous": 131.198,
+        "candidate": 130.17,
+        "pairedMedianSaved": -0.467,
+        "wins": 4
+      },
+      "lex": {
+        "rounds": 8,
+        "previous": 128.796,
+        "candidate": 132.753,
+        "pairedMedianSaved": -4.305,
+        "wins": 4
+      },
+      "recover": {
+        "rounds": 8,
+        "previous": 271.138,
+        "candidate": 279.003,
+        "pairedMedianSaved": -5.349,
+        "wins": 3
+      }
+    },
+    "edit-confirm": {
+      "fresh": {
+        "rounds": 8,
+        "previous": 1517.633,
+        "candidate": 1417.247,
+        "pairedMedianSaved": 44.307,
+        "wins": 5
+      },
+      "edit": {
+        "rounds": 8,
+        "previous": 446.351,
+        "candidate": 414.895,
+        "pairedMedianSaved": 8.103,
+        "wins": 5
+      },
+      "reject": {
+        "rounds": 8,
+        "previous": 659.393,
+        "candidate": 638.922,
+        "pairedMedianSaved": -17.032,
+        "wins": 3
+      },
+      "syntax": {
+        "rounds": 8,
+        "previous": 200.545,
+        "candidate": 197.236,
+        "pairedMedianSaved": -6.3,
+        "wins": 3
+      },
+      "lex": {
+        "rounds": 8,
+        "previous": 195.01,
+        "candidate": 196.405,
+        "pairedMedianSaved": -8.795,
+        "wins": 2
+      },
+      "recover": {
+        "rounds": 8,
+        "previous": 443.314,
+        "candidate": 435.252,
+        "pairedMedianSaved": 5.346,
+        "wins": 4
+      }
+    }
+  },
+  "childCpuMs": {
+    "fresh": {
+      "rounds": 20,
+      "previous": 3222.696,
+      "candidate": 3054.986,
+      "pairedMedianSaved": 89.017,
+      "wins": 17
+    },
+    "edits": {
+      "rounds": 8,
+      "previous": 6492.062,
+      "candidate": 6450.64,
+      "pairedMedianSaved": 29.233,
+      "wins": 5
+    },
+    "profile": {
+      "rounds": 6,
+      "previous": 3067.431,
+      "candidate": 2973.499,
+      "pairedMedianSaved": 114.372,
+      "wins": 5
+    },
+    "reverse": {
+      "rounds": 20,
+      "previous": 3020.558,
+      "candidate": 2888.586,
+      "pairedMedianSaved": 136.385,
+      "wins": 18
+    },
+    "confirm": {
+      "rounds": 16,
+      "previous": 4283.107,
+      "candidate": 4184.086,
+      "pairedMedianSaved": 183.762,
+      "wins": 13
+    },
+    "edit-confirm": {
+      "rounds": 8,
+      "previous": 8402.976,
+      "candidate": 8307.462,
+      "pairedMedianSaved": 224.158,
+      "wins": 6
+    }
+  },
+  "phaseMs": {
+    "assets": {
+      "rounds": 6,
+      "previous": 74.773,
+      "candidate": 77.826,
+      "pairedMedianSaved": -0.459,
+      "wins": 1
+    },
+    "load": {
+      "rounds": 6,
+      "previous": 79.833,
+      "candidate": 82.797,
+      "pairedMedianSaved": -2.657,
+      "wins": 1
+    },
+    "check": {
+      "rounds": 6,
+      "previous": 527.005,
+      "candidate": 515.34,
+      "pairedMedianSaved": 4.131,
+      "wins": 3
+    },
+    "lower": {
+      "rounds": 6,
+      "previous": 47.774,
+      "candidate": 37.748,
+      "pairedMedianSaved": 9.439,
+      "wins": 5
+    },
+    "backend": {
+      "rounds": 6,
+      "previous": 126.475,
+      "candidate": 129.066,
+      "pairedMedianSaved": -1.345,
+      "wins": 1
+    }
+  },
+  "workerCpuMs": {
+    "rounds": 6,
+    "previous": 2207.539,
+    "candidate": 2145.336,
+    "pairedMedianSaved": 85.593,
+    "wins": 5
+  },
+  "workerPackets": {
+    "modules": 269,
+    "packetCount": 538,
+    "workerSlots": 8,
+    "forkedProcesses": 7,
+    "beforeBytes": 72858303,
+    "afterBytes": 71856423,
+    "regularTables": [
+      {
+        "type": "blot_check_core::List",
+        "oldBytes": 1846760,
+        "newBytes": 1849431,
+        "elements": 230576,
+        "oldWriteNs": 2715108,
+        "newWriteNs": 73889,
+        "oldReadNs": 1372271,
+        "newReadNs": 320192
+      },
+      {
+        "type": "blot_check_core::FieldName",
+        "oldBytes": 1642876,
+        "newBytes": 1645592,
+        "elements": 136727,
+        "oldWriteNs": 2393968,
+        "newWriteNs": 60479,
+        "oldReadNs": 815776,
+        "newReadNs": 213190
+      },
+      {
+        "type": "blot_check_core::Obligation",
+        "oldBytes": 1620362,
+        "newBytes": 1677635,
+        "elements": 27901,
+        "oldWriteNs": 10626216,
+        "newWriteNs": 75203,
+        "oldReadNs": 1405508,
+        "newReadNs": 483329
+      },
+      {
+        "type": "blot_check_core::Nominal",
+        "oldBytes": 1933692,
+        "newBytes": 1847277,
+        "elements": 29716,
+        "oldWriteNs": 4797852,
+        "newWriteNs": 69572,
+        "oldReadNs": 1748461,
+        "newReadNs": 314768
+      },
+      {
+        "type": "blot_check_core::Constructor",
+        "oldBytes": 2522344,
+        "newBytes": 2525095,
+        "elements": 39378,
+        "oldWriteNs": 2523558,
+        "newWriteNs": 75302,
+        "oldReadNs": 1945946,
+        "newReadNs": 308382
+      },
+      {
+        "type": "blot_check_core::Associated",
+        "oldBytes": 961792,
+        "newBytes": 844527,
+        "elements": 39985,
+        "oldWriteNs": 2908695,
+        "newWriteNs": 43978,
+        "oldReadNs": 1091896,
+        "newReadNs": 164748
+      },
+      {
+        "type": "blot_check_core::Projection",
+        "oldBytes": 752712,
+        "newBytes": 754637,
+        "elements": 23474,
+        "oldWriteNs": 1329956,
+        "newWriteNs": 33005,
+        "oldReadNs": 570746,
+        "newReadNs": 136641
+      },
+      {
+        "type": "blot_check_effects::Row",
+        "oldBytes": 1173620,
+        "newBytes": 1001680,
+        "elements": 58637,
+        "oldWriteNs": 3502829,
+        "newWriteNs": 46466,
+        "oldReadNs": 567495,
+        "newReadNs": 260087
+      },
+      {
+        "type": "blot_reuse_principal_interface::Binding",
+        "oldBytes": 7963793,
+        "newBytes": 7488149,
+        "elements": 89085,
+        "oldWriteNs": 14755583,
+        "newWriteNs": 176163,
+        "oldReadNs": 7163692,
+        "newReadNs": 1299813
+      },
+      {
+        "type": "blot_reuse_principal_interface::Constructor",
+        "oldBytes": 2758612,
+        "newBytes": 2761363,
+        "elements": 39378,
+        "oldWriteNs": 3214247,
+        "newWriteNs": 84840,
+        "oldReadNs": 2540926,
+        "newReadNs": 454431
+      },
+      {
+        "type": "blot_reuse_principal_interface::Nominal",
+        "oldBytes": 2528012,
+        "newBytes": 2441614,
+        "elements": 29716,
+        "oldWriteNs": 3944598,
+        "newWriteNs": 79107,
+        "oldReadNs": 2331745,
+        "newReadNs": 397390
+      },
+      {
+        "type": "blot_check_types::Obligation",
+        "oldBytes": 1280992,
+        "newBytes": 1338528,
+        "elements": 27812,
+        "oldWriteNs": 3829763,
+        "newWriteNs": 64586,
+        "oldReadNs": 1311138,
+        "newReadNs": 484126
+      },
+      {
+        "type": "blot_reuse_principal_interface::Associated",
+        "oldBytes": 801852,
+        "newBytes": 684587,
+        "elements": 39985,
+        "oldWriteNs": 2334791,
+        "newWriteNs": 41560,
+        "oldReadNs": 970391,
+        "newReadNs": 139906
+      }
+    ],
+    "bindings": 89085,
+    "placeholderBindings": 34447,
+    "fullyMaterializedBindingTable": true,
+    "canonicalRecords": 538,
+    "canonicalFormat": "BLOTDEP1 with the same zero key, hashed independently per module and interface. Includes every portable field and excludes invocation-local ownership metadata. Each decoder also reproduced the original prefix under its own worker packet format.",
+    "replayMs": {
+      "readInterfaces": {
+        "rounds": 12,
+        "previous": 12.969,
+        "candidate": 3.308,
+        "pairedMedianSaved": 9.525,
+        "wins": 12
+      },
+      "readCore": {
+        "rounds": 12,
+        "previous": 12.518,
+        "candidate": 6.109,
+        "pairedMedianSaved": 6.39,
+        "wins": 12
+      },
+      "writeInterfaces": {
+        "rounds": 12,
+        "previous": 31.837,
+        "candidate": 1.187,
+        "pairedMedianSaved": 30.595,
+        "wins": 12
+      },
+      "writeCore": {
+        "rounds": 12,
+        "previous": 36.155,
+        "candidate": 4.611,
+        "pairedMedianSaved": 31.588,
+        "wins": 12
+      }
+    },
+    "fieldScreen": "Initial per-field timings are one instrumented pass over the captured release packets. Excludes disk I/O and Wasm generation. Complete record timings are from twelve subsequent paired processes per compiler, each reading and writing every record once."
+  },
+  "sampledCpu": {
+    "before": {
+      "total": 33624,
+      "packet": 1928,
+      "accounting": 2005,
+      "hottest": [
+        [
+          "libc",
+          4324
+        ],
+        [
+          "blot_support_pooled_buffer_ensure",
+          1095
+        ],
+        [
+          "blot_check_types_resolveDepth",
+          978
+        ],
+        [
+          "blot_project_packet_get",
+          975
+        ],
+        [
+          "gs_spans_free",
+          846
+        ],
+        [
+          "blot_check_types_resolveRoot",
+          824
+        ],
+        [
+          "blot_project_packet_put",
+          812
+        ],
+        [
+          "gs_spans_alloc",
+          692
+        ],
+        [
+          "blot_check_types_resolveNode",
+          652
+        ],
+        [
+          "gs_observer_pool_commit",
+          632
+        ],
+        [
+          "blot_check_effects_resolve",
+          519
+        ],
+        [
+          "blot_parse_lexer_compare_decimal",
+          496
+        ]
+      ]
+    },
+    "after": {
+      "total": 31850,
+      "packet": 620,
+      "accounting": 2024,
+      "hottest": [
+        [
+          "libc",
+          4348
+        ],
+        [
+          "blot_support_pooled_buffer_ensure",
+          1025
+        ],
+        [
+          "blot_check_types_resolveDepth",
+          955
+        ],
+        [
+          "blot_check_types_resolveRoot",
+          796
+        ],
+        [
+          "gs_spans_free",
+          784
+        ],
+        [
+          "blot_check_types_resolveNode",
+          661
+        ],
+        [
+          "gs_spans_alloc",
+          655
+        ],
+        [
+          "gs_observer_pool_commit",
+          644
+        ],
+        [
+          "event",
+          510
+        ],
+        [
+          "blot_check_effects_resolve",
+          495
+        ],
+        [
+          "blot_parse_lexer_compare_decimal",
+          465
+        ],
+        [
+          "gs_observer_attempt",
+          462
+        ]
+      ]
+    }
+  },
+  "sampleMethod": "Eight additional fresh builds per compiler. One-millisecond CPU interval sampler across processes. Packet includes all symbols starting blot_project_packet_. The four allocation accounting symbols are attempt, event, gs_observer_attempt and gs_observer_pool_commit. Inlining and linked-library work may change instruction attribution.",
+  "qualification": {
+    "fullGateSeconds": 315.347252189,
+    "gatePhases": [
+      "harness",
+      "release-build",
+      "reference-direct",
+      "reference-uniqueness",
+      "reference-fixtures",
+      "pack",
+      "guests"
+    ],
+    "nativeLaws": [
+      "packet_arrays",
+      "packet_list"
+    ],
+    "recordedFixtures": 190,
+    "loweringReferences": 212,
+    "directReferences": 2,
+    "guestAndHostPassed": 1088,
+    "ignored": 100,
+    "gdevPen": [
+      1220,
+      108
+    ],
+    "inkPen": [
+      280,
+      0
+    ],
+    "inkNative": [
+      111,
+      2
+    ],
+    "allNamedOutcomesMatch": true,
+    "projectCheckAssets": 545,
+    "replayFiles": 242,
+    "replayFrames": 120,
+    "frameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+  },
+  "raw": "2026-11-18-gdev-worker-tables.raw.json.gz",
+  "probes": "2026-11-18-gdev-worker-tables-probes.tar.gz",
+  "pooledMs": {
+    "freshLowerLoad": {
+      "rounds": 40,
+      "previous": 916.847,
+      "candidate": 886.042,
+      "pairedMedianSaved": 26.264,
+      "wins": 32
+    },
+    "freshAll": {
+      "rounds": 56,
+      "previous": 953.099,
+      "candidate": 905.342,
+      "pairedMedianSaved": 32.771,
+      "wins": 44
+    },
+    "editAll": {
+      "rounds": 16,
+      "previous": 328.312,
+      "candidate": 352.467,
+      "pairedMedianSaved": -0.905,
+      "wins": 8
+    }
+  },
+  "hostConditions": {
+    "fresh": {
+      "cpuPressure": "some avg10=2.37 avg60=4.53 avg300=5.80 total=1947617087",
+      "load": "5.95 5.65 4.61 5/1473 2022677"
+    },
+    "edits": {
+      "cpuPressure": "some avg10=8.88 avg60=5.01 avg300=5.70 total=1949687722",
+      "load": "8.75 6.36 4.89 9/1488 2023476"
+    },
+    "profile": {
+      "cpuPressure": "some avg10=8.61 avg60=7.90 avg300=6.42 total=1954273454",
+      "load": "11.55 7.40 5.29 7/1485 2024542"
+    },
+    "reverse": {
+      "cpuPressure": "some avg10=4.06 avg60=6.93 avg300=6.27 total=1954500104",
+      "load": "10.61 7.33 5.30 5/1475 2024793"
+    },
+    "confirm": {
+      "cpuPressure": "some avg10=25.04 avg60=61.09 avg300=40.24 total=2115903134",
+      "load": "50.82 33.58 16.57 6/1494 2186747"
+    },
+    "edit-confirm": {
+      "cpuPressure": "some avg10=27.31 avg60=40.20 avg300=37.37 total=2125863741",
+      "load": "32.80 31.26 16.67 21/1541 2187871"
+    }
+  },
+  "retainedBodyComparison": {
+    "freshSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "editSha256": "4e4fba58869dbd87e760919247d52afebc1c4fae443512747b9c06f61c27e757",
+    "definedFunctions": 6859,
+    "changedBodyOrdinals": [
+      98
+    ],
+    "changedSections": [
+      10
+    ],
+    "freshBodyBytes": 2427221,
+    "editBodyBytes": 2427221,
+    "identicalBodyBytes": 2427162
+  },
+  "retainedProfile": {
+    "assets": {
+      "rounds": 6,
+      "previous": 13.519,
+      "candidate": 13.248,
+      "pairedMedianSaved": 0.598,
+      "wins": 4
+    },
+    "load": {
+      "rounds": 6,
+      "previous": 167.762,
+      "candidate": 163.805,
+      "pairedMedianSaved": 4.672,
+      "wins": 3
+    },
+    "check": {
+      "rounds": 6,
+      "previous": 3.989,
+      "candidate": 3.471,
+      "pairedMedianSaved": 0.615,
+      "wins": 5
+    },
+    "lower": {
+      "rounds": 6,
+      "previous": 0.885,
+      "candidate": 0.875,
+      "pairedMedianSaved": -0.022,
+      "wins": 2
+    },
+    "backend": {
+      "rounds": 6,
+      "previous": 207.493,
+      "candidate": 216.094,
+      "pairedMedianSaved": 1.675,
+      "wins": 3
+    },
+    "workerJobs": [
+      0
+    ]
+  }
+}

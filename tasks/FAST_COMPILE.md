@@ -5,6 +5,65 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+### Verified arrays in worker packets
+
+Tracing the previous compiler on Gdev located slow field-by-field serialization
+in Core merge ranges, field names, obligations and nominals, and in imported
+binding arrays. Thirteen measured tables now use the existing verified Goose
+array image. A shared generator emits the typed encoders and decoders. This
+changes the private representation exchanged between workers running the same
+executable. Guest Wasm, the project protocol and portable BLOTDEP1 records keep
+their formats.
+
+| Paired workload | Previous compiler | Bulk transfers | Median paired saving | Wins |
+| --- | ---: | ---: | ---: | ---: |
+| Fresh Gdev, first window | 943.5 ms | 888.5 ms | +28.4 ms | 15/20 |
+| Fresh Gdev, reversed order | 904.1 ms | 882.9 ms | +24.3 ms | 17/20 |
+| Fresh Gdev, confirmation | 1572.6 ms | 1539.5 ms | +58.8 ms | 12/16 |
+| Lighting edit, first window | 271.9 ms | 286.4 ms | -13.1 ms | 3/8 |
+| Lighting edit, confirmation | 446.4 ms | 414.9 ms | +8.1 ms | 5/8 |
+| Child CPU, fresh confirmation | 4283.1 ms | 4184.1 ms | +183.8 ms | 13/16 |
+
+The first two fresh windows had 4.5–6.9% one-minute CPU pressure at the start.
+The confirmation window started at 61.1%. The new compiler won
+44 of 56 fresh pairs, with a median paired saving of 32.8 ms.
+Lighting edits were 13.1 ms slower per pair in the first window and
+8.1 ms faster in the second.
+
+![Worker packet replay and end-to-end Gdev timings](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.svg)
+
+Twelve alternating replay pairs each processed one interface and one Core
+module for all 269 Gdev modules. The timings exclude file I/O.
+
+| Captured records | Previous compiler | Bulk transfers |
+| --- | ---: | ---: |
+| Write Core | 36.16 ms | 4.61 ms |
+| Read Core | 12.52 ms | 6.11 ms |
+| Write interfaces | 31.84 ms | 1.19 ms |
+| Read interfaces | 12.97 ms | 3.31 ms |
+
+Together the worker replies shrank by **1,001,880 bytes (1.38%)**. Every
+decoded record matched its counterpart after independent BLOTDEP1 encoding.
+The checker dispatched all 269 modules across eight slots. The packet codec occupied 5.7% of
+sampled CPU on the prior release and 1.9% on the new one.
+The sampler attributes the interrupted instruction to its compiled symbol.
+
+Each confirmed fresh build returned the same 2,639,228-byte Main. A valid
+lighting edit checked one module and reused 268. The full compiler gate
+passed 190 Wasm fixtures, 212 lowering references, both direct references
+and 1,088 guest and host tests. The 120-frame replay matched all 242 files,
+and every named Gdev and Ink outcome matched.
+
+In six separately profiled lighting edits under contention, project loading
+took 164 ms and the backend took 216 ms. Checking took just 3.5 ms and never
+dispatched a worker. The edit changed only the code section, and only the
+59-byte body at defined-function ordinal 98. All other 6,858 bodies matched
+byte for byte at the same ordinal. Next, test reusing unaffected function
+bodies across edits and compare the emitted Wasm with a fresh compile.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.json)
+· [Raw trials and record hashes](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.raw.json.gz)
+· [Packet capture and replay tools](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables-probes.tar.gz)
+
 ### Two-word list packets
 
 The worker codec transfers the type-list descriptor’s start and length together. One fixed-width transfer encodes the same eight

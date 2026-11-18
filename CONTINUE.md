@@ -6,20 +6,26 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `78d616bd`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. In the final confirmation window it compiled 46,109 Gdev
-lines in **845.0 ms** median and rebuilt a lighting edit in **246.1 ms**.
-The 269-module output is still 2,639,228 bytes.
+The qualified compiler is Blot `3476218d`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. With eight worker slots it compiled all 46,109
+lines in **886.0 ms** median across 40 fresh pairs on a lightly loaded host,
+down from **916.8 ms**. Under heavier CPU contention the medians were
+1539.5 ms and 1572.6 ms respectively. Across all three windows the
+new compiler won 44 of 56 fresh pairs.
+Lighting edits showed no consistent speedup. Main emits 2,639,228 bytes of Wasm.
 
-Transferring a type list’s start and length together cut encoding from
-**12.5 to 4.1 ns** and decoding from **1.7 to 1.0 ns** per list.
-On real Gdev the list codec fell from 1.77% to 0.48% of sampled CPU.
-Fresh build times varied across windows, and lighting edits showed no
-consistent speedup.
-The checked compiler passed the full gate, matched every named Gdev and Ink
-outcome and reproduced the 120-frame replay and inspected hardware frame.
-Core module packets and imported binding arrays account for the largest remaining codec samples. Profile their field and array costs before widening the fast path.
-[Measurements and CPU samples](benchmarks/evidence/measurements/2026-11-18-gdev-packet-list.json) · [Compiler work](tasks/FAST_COMPILE.md)
+Workers transfer 13 more Core and interface tables as verified Goose arrays.
+Across all 269 modules, writing the captured Core records fell from
+**36.2 to 4.6 ms**. All 538 portable records matched, and total
+checker replies fell from 72,858,303 to 71,856,423 bytes. The full compiler
+gate, named Gdev and Ink outcomes, 120-frame replay and inspected frame
+qualified the release.
+
+A lighting edit changed **one of 6,859 Wasm function bodies**. The compiler
+rechecked one module and dispatched zero checker jobs. Under contention the
+backend took 216 ms and project loading took 164 ms. Next, test reusing
+unchanged function bodies and compare the whole result with a fresh build.
+[Measurements and reproducers](benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
