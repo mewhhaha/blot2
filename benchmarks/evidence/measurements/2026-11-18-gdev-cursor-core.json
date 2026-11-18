@@ -178,5 +178,388 @@
   "broadLimit": "Expression types may be read by ownership analysis, coverage, scope checking and editor queries before Core. The broad experiment omits those consumer guards.",
   "trials": "2026-11-18-gdev-cursor-core.raw.json.gz",
   "probes": "2026-11-18-gdev-cursor-core-probes.tar.gz",
-  "decision": "Broad candidate measured off-tree. The qualified release remains the baseline."
+  "guarded": {
+    "binarySha256": "2165ad436ec87928d24e63c1bd75df4a90254d1653afaba5c92fe95413719227",
+    "conditions": {
+      "fresh": {
+        "pressure": "some avg10=9.98 avg60=22.58 avg300=13.39 total=1651433127",
+        "load": "18.65 10.56 8.12 2/1609 1664088"
+      },
+      "edits": {
+        "pressure": "some avg10=1.61 avg60=14.34 avg300=12.24 total=1651924588",
+        "load": "13.40 10.05 8.03 3/1607 1664709"
+      },
+      "profile": {
+        "pressure": "some avg10=0.28 avg60=9.71 avg300=11.30 total=1652152289",
+        "load": "10.72 9.69 7.96 2/1607 1665476"
+      },
+      "confirm": {
+        "pressure": "some avg10=0.45 avg60=8.57 avg300=11.00 total=1652223720",
+        "load": "10.02 9.56 7.93 2/1606 1665643"
+      }
+    },
+    "freshMs": {
+      "pairs": 18,
+      "before": 828.919,
+      "after": 834.606,
+      "pairedMedianSaved": 5.427,
+      "wins": 10
+    },
+    "retainedMs": {
+      "fresh": {
+        "pairs": 6,
+        "before": 840.696,
+        "after": 823.644,
+        "pairedMedianSaved": -4.554,
+        "wins": 3
+      },
+      "edit": {
+        "pairs": 6,
+        "before": 243.305,
+        "after": 250.656,
+        "pairedMedianSaved": -8.149,
+        "wins": 0
+      },
+      "reject": {
+        "pairs": 6,
+        "before": 373.298,
+        "after": 377.817,
+        "pairedMedianSaved": -3.009,
+        "wins": 1
+      },
+      "syntax": {
+        "pairs": 6,
+        "before": 115.473,
+        "after": 113.94,
+        "pairedMedianSaved": 1.703,
+        "wins": 4
+      },
+      "lex": {
+        "pairs": 6,
+        "before": 116.956,
+        "after": 115.677,
+        "pairedMedianSaved": 2.233,
+        "wins": 4
+      },
+      "recover": {
+        "pairs": 6,
+        "before": 248.899,
+        "after": 246.325,
+        "pairedMedianSaved": 2.262,
+        "wins": 5
+      }
+    },
+    "work": {
+      "before": {
+        "resolve_nodes_added": 405857,
+        "resolve_depth_entries": 3695637,
+        "type_nodes": 1334708,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 72858303
+      },
+      "after": {
+        "resolve_nodes_added": 350984,
+        "resolve_depth_entries": 3554925,
+        "type_nodes": 1279835,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 72925803
+      }
+    },
+    "phaseMs": {
+      "assets": {
+        "pairs": 4,
+        "before": 75.264,
+        "after": 74.375,
+        "pairedMedianSaved": 0.747,
+        "wins": 2
+      },
+      "load": {
+        "pairs": 4,
+        "before": 76.721,
+        "after": 72.661,
+        "pairedMedianSaved": 2.717,
+        "wins": 3
+      },
+      "check": {
+        "pairs": 4,
+        "before": 494.625,
+        "after": 473.026,
+        "pairedMedianSaved": 25.904,
+        "wins": 3
+      },
+      "lower": {
+        "pairs": 4,
+        "before": 35.402,
+        "after": 40.907,
+        "pairedMedianSaved": -5.77,
+        "wins": 1
+      },
+      "backend": {
+        "pairs": 4,
+        "before": 120.874,
+        "after": 119.869,
+        "pairedMedianSaved": 1.005,
+        "wins": 2
+      }
+    },
+    "workerCpuMs": {
+      "pairs": 4,
+      "before": 1978.727,
+      "after": 1981.597,
+      "pairedMedianSaved": 11.208,
+      "wins": 3
+    },
+    "reversedFreshMs": {
+      "pairs": 18,
+      "before": 840.139,
+      "after": 824.614,
+      "pairedMedianSaved": 17.457,
+      "wins": 14
+    }
+  },
+  "decision": "Keep the qualified release. The two direct Core readers can change a published effect. The alternatives with the ordinary Core reader reduce allocations, but the stronger alternative split the first 18 fresh pairs evenly and regressed retained lighting edits.",
+  "candidateSource": "guarded.patch",
+  "qualification": {
+    "sourceDigest": "075a3bc5a14c9b686284708e10b7cb37cc0c67920234992a91ef21b3e9b3a75e",
+    "gateSeconds": 302.562978079,
+    "fixturePrograms": 190,
+    "fixtureChanges": "Only type_nodes and effect_rows decreased",
+    "loweringReferences": 212,
+    "directReferences": 2,
+    "guestAndHostPassed": 1088,
+    "ignored": 100,
+    "matchedGdevNamedOutcomes": true,
+    "gdevPasses": 1220,
+    "gdevExistingFailures": 108,
+    "inkPenPasses": 280,
+    "inkNativePasses": 111,
+    "inkNativeExistingFailures": 2,
+    "matchedReplayFiles": 242,
+    "frames": 120,
+    "framePngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTraceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "candidate": "guarded direct reader, subsequently rejected on the late-row witness"
+  },
+  "lateRowWitness": {
+    "stage": "Store and actual Core builder",
+    "beforeLateWrite": "Check and publish Unit -> Unit with an open effect row r.",
+    "afterLateWrite": "Bind r to the empty row. The ordinary Core projector retains the published open tail. Both experimental cursor-reading routes can follow the later write and silently produce a closed tail.",
+    "sourceWitness": false,
+    "evidence": "late-row-witness.patch in the probe archive"
+  },
+  "corePreserving": {
+    "settled": {
+      "nodes": 401968,
+      "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+      "fixtureOutputsAndDiagnosticsMatched": 190,
+      "screenBinary": "d42952791714c8cb5cfa421bc66c9a070a4f971bce93197d10d0ae4a29dada2d"
+    },
+    "stable-tails": {
+      "nodes": 395401,
+      "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+      "fixtureOutputsAndDiagnosticsMatched": 190,
+      "screenBinary": "01714b3d9ce65233cdfe1737dda8ff24b6318eb6bf88d671b875eb5ba1b3ae0f"
+    }
+  },
+  "stableRelease": {
+    "binarySha256": "8ff04ad16b4dd133dc07f2ffee345f1e63549cb162c7716499c0dbab13858365",
+    "conditions": {
+      "fresh": {
+        "pressure": "some avg10=0.00 avg60=0.49 avg300=2.83 total=1657955375",
+        "load": "1.97 4.02 5.80 1/1596 1667325"
+      },
+      "edits": {
+        "pressure": "some avg10=0.00 avg60=0.29 avg300=2.55 total=1658159907",
+        "load": "3.04 4.09 5.77 2/1598 1667933"
+      },
+      "profile": {
+        "pressure": "some avg10=0.00 avg60=0.20 avg300=2.36 total=1658313022",
+        "load": "3.69 4.15 5.75 1/1597 1668642"
+      },
+      "confirm": {
+        "pressure": "some avg10=0.00 avg60=0.17 avg300=2.30 total=1658364088",
+        "load": "3.19 4.03 5.69 1/1598 1668776"
+      }
+    },
+    "freshMs": {
+      "pairs": 18,
+      "before": 782.001,
+      "after": 778.414,
+      "pairedMedianSaved": 0.182,
+      "wins": 9
+    },
+    "retainedMs": {
+      "fresh": {
+        "pairs": 6,
+        "before": 773.74,
+        "after": 776.564,
+        "pairedMedianSaved": 3.307,
+        "wins": 3
+      },
+      "edit": {
+        "pairs": 6,
+        "before": 226.446,
+        "after": 232.756,
+        "pairedMedianSaved": -6.163,
+        "wins": 2
+      },
+      "reject": {
+        "pairs": 6,
+        "before": 349.14,
+        "after": 349.053,
+        "pairedMedianSaved": 0.825,
+        "wins": 4
+      },
+      "syntax": {
+        "pairs": 6,
+        "before": 108.616,
+        "after": 108.367,
+        "pairedMedianSaved": -0.479,
+        "wins": 2
+      },
+      "lex": {
+        "pairs": 6,
+        "before": 109.062,
+        "after": 106.135,
+        "pairedMedianSaved": 2.511,
+        "wins": 6
+      },
+      "recover": {
+        "pairs": 6,
+        "before": 233.212,
+        "after": 231.208,
+        "pairedMedianSaved": 0.312,
+        "wins": 3
+      }
+    },
+    "work": {
+      "before": {
+        "resolve_nodes_added": 405857,
+        "resolve_depth_entries": 3695637,
+        "type_nodes": 1334708,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 72858303
+      },
+      "after": {
+        "resolve_nodes_added": 395401,
+        "resolve_depth_entries": 3668867,
+        "type_nodes": 1324252,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 72857611
+      }
+    },
+    "phaseMs": {
+      "assets": {
+        "pairs": 4,
+        "before": 80.481,
+        "after": 77.401,
+        "pairedMedianSaved": 3.08,
+        "wins": 2
+      },
+      "load": {
+        "pairs": 4,
+        "before": 66.53,
+        "after": 69.005,
+        "pairedMedianSaved": -3.525,
+        "wins": 1
+      },
+      "check": {
+        "pairs": 4,
+        "before": 445.288,
+        "after": 455.208,
+        "pairedMedianSaved": -8.762,
+        "wins": 0
+      },
+      "lower": {
+        "pairs": 4,
+        "before": 45.353,
+        "after": 33.38,
+        "pairedMedianSaved": 10.814,
+        "wins": 4
+      },
+      "backend": {
+        "pairs": 4,
+        "before": 111.966,
+        "after": 110.041,
+        "pairedMedianSaved": 1.503,
+        "wins": 3
+      }
+    },
+    "workerCpuMs": {
+      "pairs": 4,
+      "before": 1802.772,
+      "after": 1846.901,
+      "pairedMedianSaved": -32.331,
+      "wins": 1
+    },
+    "reversedFreshMs": {
+      "pairs": 18,
+      "before": 783.764,
+      "after": 776.243,
+      "pairedMedianSaved": 13.553,
+      "wins": 10
+    },
+    "description": "Stable leaves and unchanged empty row tails, using the original Core reader. Optimized with the release compiler flags, timed against the qualified binary. The expression optimization excludes modules with intermediate expression readers."
+  },
+  "unificationProbe": {
+    "base": "Qualified release sources",
+    "method": "Count both completed operand resolutions per type pair, grouped by the two resolved outer tags and identities. Pairs include work later rolled back; a call failing during operand resolution is not classified. Recursion entries and allocated nodes are actual counters measured before and after both resolver calls. Effect-row pairs are outside the count. A separate observational compiler produced identical Gdev Main Wasm.",
+    "columns": [
+      "pairs",
+      "depthEntries",
+      "nodesAdded",
+      "identicalRawIdPairs"
+    ],
+    "groups": {
+      "sameResolvedId": [
+        125823,
+        10002,
+        50,
+        97382
+      ],
+      "never": [
+        157,
+        11,
+        1,
+        0
+      ],
+      "distinctVariables": [
+        29078,
+        232,
+        0,
+        0
+      ],
+      "variableAndConcrete": [
+        153011,
+        180155,
+        8842,
+        0
+      ],
+      "distinctFunctions": [
+        89108,
+        599250,
+        29225,
+        0
+      ],
+      "otherSameTag": [
+        59379,
+        52482,
+        965,
+        0
+      ],
+      "differentTags": [
+        727,
+        510,
+        0,
+        0
+      ]
+    },
+    "totals": [
+      457283,
+      842642,
+      39083,
+      97382
+    ],
+    "binarySha256": "d9e8eed50807067a030029cca0ebdeb4aef91e10400cd70cc3a540bedb9810cd"
+  }
 }

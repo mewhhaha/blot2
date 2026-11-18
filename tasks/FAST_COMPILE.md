@@ -5,6 +5,58 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+Direct projection of expression and dispatch signatures avoided 115,982 of
+405,857 resolver allocations. In 18 alternating fresh pairs it won 15 and
+saved **14.9 ms** at the median within-pair difference. Gdev exercised 310,236
+admitted facts across 269 modules. The eager and experimental types agreed on
+all of them and produced byte-identical Wasm.
+
+| Gdev Main | Release median | Experiment median | Median paired saving | Wins |
+| --- | ---: | ---: | ---: | ---: |
+| Direct reader | 849 ms | 837 ms | +14.9 ms | 15/18 |
+| Guarded reader | 829 ms | 835 ms | +5.4 ms | 10/18 |
+| Guarded, starting order reversed | 840 ms | 825 ms | +17.5 ms | 14/18 |
+| Stable leaves and rows | 782 ms | 778 ms | +0.2 ms | 9/18 |
+| Stable, starting order reversed | 784 ms | 776 ms | +13.6 ms | 10/18 |
+
+![Resolver allocations and fresh paired compile times](../benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core.svg)
+
+A native test reached the same function through two substitution cursors.
+The direct reader preserved the distinct `u32` and `bool` results and their
+different effect rows. A second test published a function with an open effect,
+then bound that effect to the empty row. Ordinary Core observed the published
+open tail. The experimental reader observed the later closed tail. This is a
+store-level counterexample. No Gdev or Blot-source failure was observed.
+
+The guarded reader excluded expression types needed by ownership, editor,
+scope and coverage checks. It still reproduced the effect-row divergence.
+Its complete gate passed 1,088 guest and host tests, 190 Wasm fixtures, 212
+lowering references, both direct backend references and the package check.
+Gdev and Ink retained every named outcome, including 108 Gdev failures and two existing
+Ink native failures. The 120-frame replay matched all 242 files and the
+inspected hardware frame and trace matched the release hashes.
+
+Two further experiments kept ordinary Core projection. Requiring fully
+settled leaves and physical closed rows avoided 3,889 allocations. Admitting
+stable free variables and unmodified empty row tails avoided 10,456 (2.6%).
+Both preserved all 190 fixture outputs and diagnostics. The latter won 19 of
+36 fresh pairs and two of six retained lighting edits. The median edit rose
+from **226 to 233 ms**, and all four profiled checks took longer. The
+qualified compiler stays at `6b223a73`.
+
+The release unifier fully resolves both operands before it examines their
+outer constructors. Of 457,283 type pairs, **89,108 function pairs** accounted
+for **599,250 of 842,642** recursive resolver visits (71.1%) and **29,225 of
+39,083** new nodes (74.8%) during operand resolution. A prototype can capture
+the resolved input types, outputs and effects of both functions at pair entry,
+then feed those six facts to the existing worklist. Preserve the behavior
+when solving an argument writes a variable also present in the result.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core.json)
+· [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core.raw.json.gz)
+· [Patches and native witnesses](../benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core-probes.tar.gz)
+
+### Earlier signature-sharing experiment
+
 The signature-sharing experiment reduced resolver allocations **19%**, from
 405,857 to 329,686. Both executables compiled the same 46,109 lines into
 2,639,228 Wasm bytes. The prototype remains in the measurement archive.
@@ -30,8 +82,7 @@ preserved Main's Wasm. All 190 fixtures retained the same output and diagnostics
 A store-level witness exposes the constraint on this shortcut. If a parent is
 bound between two writes to a child's variable, the resolver selects the later
 `bool` replacement. Restarting the child's lookup at cursor zero selects the
-earlier `u32`. The next experiment is to carry the effective substitution
-position through Core projection and memoize by source type and position.
+earlier `u32`. That witness motivated the cursor-aware projection experiments above.
 [Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.json)
 · [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.raw.json.gz)
 · [Patches and cursor witness](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions-prototypes.tar.gz)

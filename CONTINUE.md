@@ -7,15 +7,18 @@ Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
 The qualified compiler is Blot `6b223a73`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. An experiment reusing final function signatures
-reduced resolver allocations from **405,857 to 329,686**.
-Across two windows of 24 alternating fresh pairs, the baseline and candidate
-medians were **893 and 893 ms**, then **3,121 and 2,895 ms** under heavy CPU
-contention. The prototype remains in the measurement archive.
-The retained lighting edit took 281 and 283 ms. Both compilers emitted the
-same 2,639,228-byte module. Next, project expression and dispatch types
-directly into Core while carrying the substitution cursor into every child.
-[Measurements and prototypes](benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.json) · [Compiler work](tasks/FAST_COMPILE.md)
+`3f2e603` and Pen `ad9766c`. It built all 46,109 Gdev lines in
+**782 ms** and **784 ms** median in two windows of 18 fresh builds.
+Both windows produced the same 2,639,228-byte Wasm.
+
+Reading inferred function types directly into Core saved 14.9 ms per pair
+in the broad experiment. A store-level regression test shows a published
+open effect becoming closed after a later write. The guarded reader passed the
+compiler and Pen suites but reproduced that divergence. The unification trace
+gives the next target. Comparing function pairs accounts for **599,250 of
+842,642** recursive operand-resolution visits. Try resolving their arguments,
+results and effects once at pair entry, before the first child can add a write.
+[Measurements and experiments](benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
