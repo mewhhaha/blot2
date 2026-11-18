@@ -137,6 +137,36 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
   }
 });
 
+Deno.test("parallel import discovery skips pipes and preserves the serial syntax diagnostic", async () => {
+  if (Deno.build.os !== "linux") return;
+  const directory = await Deno.makeTempDir({ prefix: "blot-import-discovery-" });
+  try {
+    const files = await project(directory, Array(modules).fill(0));
+    const entry = directory + "/main.blot";
+    // Neither a hidden overlay nor a FIFO named by a malformed module is an input.
+    files[entry] = 'import * as ignored from "./pipe"\n' +
+      'import * as hidden from "./absent"\n' + files[entry] + "func invalid => )\n";
+    const pipe = await new Deno.Command("mkfifo", { args: [directory + "/pipe.blot"] }).output();
+    assert(pipe.success);
+    const sources = { ...files, [directory + "/absent.blot"]: null };
+    let serial;
+    for (const frontendWorkers of [1, 8]) {
+      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, frontendWorkers });
+      try {
+        const result = await compiler.build({ sources, signal: AbortSignal.timeout(5000) });
+        assert(!result.success);
+        assert.equal(result.diagnostics[0].stage, "parse-project");
+        if (frontendWorkers === 1) serial = result.diagnostics;
+        else assert.deepEqual(result.diagnostics, serial);
+      } finally {
+        await compiler.dispose();
+      }
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("project workers preserve the exact associated type budget across imports", async () => {
   const directory = await Deno.makeTempDir({ prefix: "blot-worker-budget-" });
   try {

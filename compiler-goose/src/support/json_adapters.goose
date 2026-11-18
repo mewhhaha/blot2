@@ -142,6 +142,7 @@ import reuse.global_references;
 import reuse.hole_diagnostics;
 import reuse.module_abstraction_validation;
 import reuse.module_visibility;
+import reuse.parse_batch;
 import reuse.partial_dependency;
 import reuse.persistent_names;
 import reuse.persistent_unit;
@@ -1228,6 +1229,8 @@ fn blot_reuse_project::blotJsonWrite<JsonWriter,P>(value:blot_reuse_project::Loa
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::Lowering,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::Options,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::Origin,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::ParseBatch,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::ParseInput,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::Project,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::ProjectState,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_project::blotJsonWrite<JsonWriter>(value:blot_reuse_project::Range,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}

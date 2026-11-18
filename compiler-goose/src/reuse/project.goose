@@ -20,6 +20,7 @@ import support.path;
 import support.pooled_buffer;
 import support.pooled_map;
 import reuse.project_check;
+import reuse.parse_batch;
 type Error = blot_error::Error;
 type UnitId = u32;
 type Symbol = blot_parse_symbols::Symbol;
@@ -182,7 +183,7 @@ reusable[] var loader_visit_runs:Visit[>..]=[];
 reusable[] var loader_frame_runs:Frame[>..]=[];
 reusable[] var loader_fixity_runs:blot_parse_parser::InheritedFixity[>..]=[];
 struct Loader<P> {
-    options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,inherited_fixities:LoaderFixities,prelude_ready:bool=false,
+    parse_batch:ParseBatch=ParseBatch{},options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,inherited_fixities:LoaderFixities,prelude_ready:bool=false,
 }
 fn starts(text: const u8[:], prefix: const u8[:]) -> bool {return prefix.len<=text.len&&text[..prefix.len]==prefix;}
 fn ends(text: const u8[:], suffix: const u8[:]) -> bool {return suffix.len<=text.len&&text[text.len-suffix.len..]==suffix;}
@@ -236,6 +237,9 @@ fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error 
     self_.last_cause=default<const u8[:]>();if contains(path,0) {self_.last_cause="BadPathName";return blot_error::Error.io;}
     var terminated:u8[>..<]=[];terminated.append(path);terminated.push(0);
     let fd=blot_native::open_read(terminated[0]);if fd<0 {return self_.ioFailure(fd);}
+    return self_.readOpen(fd,maximum,output);
+}
+fn readOpen(self_:FileInputs&,fd:i32,maximum:i64,output:u8[>..<]&)->Error {
     let before=output.len;var chunk:u8[65536];var failure=blot_error::Error.none;
     loop {
         let count=blot_native::read(fd,chunk[0],65536);
@@ -247,8 +251,15 @@ fn read(self_:FileInputs&,path:const u8[:],maximum:i64,output:u8[>..<]&)->Error 
     let closed=blot_native::close(fd);
     if failure!=blot_error::Error.none {output.resize(before);}return failure;
 }
+fn probeSource(self_:FileInputs&,path:const u8[:],maximum:i64,name:u8[>..<]&,bytes:u8[>..<]&)->bool {
+    if self_.canonical(path,name)!=blot_error::Error.none {return false;}
+    var terminated:u8[>..<]=[];terminated.append(name[..]);terminated.push(0);
+    let fd=blot_native::open_regular(terminated[0],maximum as u64);
+    if fd<0 {return false;}
+    return self_.readOpen(fd,maximum,bytes)==blot_error::Error.none;
+}
 fn resolve(self_:FileInputs&,source_filename:const u8[:],raw:const u8[:],options:Options,output:u8[>..<]&)->Error {self_.last_cause=default<const u8[:]>();return resolveImportPath(source_filename,raw,options,output);}
-fn deinitScratch<P>(self_:Loader<P>&) {self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);blot_support_pooled_buffer::deinit(self_.inherited_fixities,loader_fixity_runs);}
+fn deinitScratch<P>(self_:Loader<P>&) {self_.parse_batch.deinit();self_.files.deinit(loader_file_slots);blot_support_pooled_buffer::deinit(self_.visits,loader_visit_runs);blot_support_pooled_buffer::deinit(self_.stack,loader_frame_runs);blot_support_pooled_buffer::deinit(self_.inherited_fixities,loader_fixity_runs);}
 fn report<P>(self_:Loader<P>&,origin:Origin,code:Code,target:const u8[:],cause:blot_support::Option<const u8[:]>)->Error {
     var name:Symbol=0;let interned,error=self_.project.symbols.intern(target);
     if error==blot_error::Error.out_of_memory {return error;}if error==blot_error::Error.none {name=interned;}
@@ -291,19 +302,21 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
         let reported=self_.report(origin,code,canonical,blot_support::some(self_.inputs.cause(source_error)));return no,reported;
     }
     if source.len>allowed {let reported=self_.report(origin,Code.source_limit,canonical,blot_support::none<const u8[:]>());return no,reported;}
-    var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
-    var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
-    let lex_scope=blot_phase_profile::enter(blot_phase_profile::Phase.lex);let lex_error=blot_parse_lexer::lex(source,lexed);lex_scope.exit();
-    if lex_error!=blot_error::Error.none {
-        if lex_error==blot_error::Error.out_of_memory {return no,lex_error;}
-        if lex_error!=blot_error::Error.source_limit {return no,lex_error;}
-        let reported=self_.report(origin,Code.source_limit,canonical,blot_support::some(blot_error::error_name(lex_error)));return no,reported;
-    }
     let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {return no,tree_error;}var tree=initialized;
-    if diagnostics.len==0 {
-        let parse_scope=blot_phase_profile::enter(blot_phase_profile::Phase.parse);
-        let parse_error=blot_parse_parser::parse_with_fixities(source,tokens,self_.project.symbols,tree,self_.inherited_fixities.items);
-        parse_scope.exit();if parse_error!=blot_error::Error.none {tree.deinit();return no,parse_error;}
+    var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
+    if !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree) {
+        var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
+        let lex_scope=blot_phase_profile::enter(blot_phase_profile::Phase.lex);let lex_error=blot_parse_lexer::lex(source,lexed);lex_scope.exit();
+        if lex_error!=blot_error::Error.none {
+            if lex_error==blot_error::Error.out_of_memory {tree.deinit();return no,lex_error;}
+            if lex_error!=blot_error::Error.source_limit {tree.deinit();return no,lex_error;}
+            let reported=self_.report(origin,Code.source_limit,canonical,blot_support::some(blot_error::error_name(lex_error)));tree.deinit();return no,reported;
+        }
+        if diagnostics.len==0 {
+            let parse_scope=blot_phase_profile::enter(blot_phase_profile::Phase.parse);
+            let parse_error=blot_parse_parser::parse_with_fixities(source,tokens,self_.project.symbols,tree,self_.inherited_fixities.items);
+            parse_scope.exit();if parse_error!=blot_error::Error.none {tree.deinit();return no,parse_error;}
+        }
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
     var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready, ..};
@@ -360,7 +373,7 @@ fn walk<P>(self_:Loader<P>&,root:UnitId)->Error {
     return blot_error::Error.none;
 }
 struct LoadContext {
-    entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
+    parse_workers:u8=1,entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
 }
 fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_reuse_frozen_dependency::Module[:]) {
  if context.reuse.present {context.result=blot_support::some<Project>(canonicalLoaded(project,modules,context.reuse.value));}
@@ -382,10 +395,19 @@ fn load(entrypath:const u8[:],options:Options)->Project,Error {
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
 fn loadWithInputs<P>(entrypath:const u8[:],options:Options,inputs:P&)->Project,Error {
-    var context=LoadContext {entrypath:entrypath,provided:true, ..};let error=withLoader(options,inputs,context,loadSource);
+    var context=LoadContext {entrypath:entrypath,provided:true, ..};
+    let error=withLoader(options,inputs,context,loadSource);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
-fn loadSource<P>(context:LoadContext&,loader:Loader<P>&)->Error {
+fn loadWithParseWorkers<P>(entrypath:const u8[:],options:Options,inputs:P&,workers:u8)->Project,Error {
+    var context=LoadContext {parse_workers:workers,entrypath:entrypath,provided:true, ..};
+    let error=withLoader(options,inputs,context,loadSourceParallel);
+    if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
+}
+fn loadSource<P>(context:LoadContext&,loader:Loader<P>&)->Error {return loadSourceUsing(context,loader,serialParser);}
+fn loadSourceParallel<P>(context:LoadContext&,loader:Loader<P>&)->Error {return loadSourceUsing(context,loader,prepareParseBatch);}
+fn serialParser<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {}
+fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
     let valid,error=loader.validateAliases();if error!=blot_error::Error.none {return error;}if !valid {return blot_error::Error.none;}
     if loader.options.prelude_path.present {
         let prelude,failure=loader.read(loader.options.prelude_path.value,Origin {..});if failure!=blot_error::Error.none {return failure;}if !prelude.present {return blot_error::Error.none;}
@@ -398,6 +420,7 @@ fn loadSource<P>(context:LoadContext&,loader:Loader<P>&)->Error {
         }
         loader.prelude_ready=true;
     }
+    if context.parse_workers!=1 && loader.options.input_mode==InputMode.project {F(loader,context.entrypath,context.parse_workers);}
     let entry,failure=loader.read(context.entrypath,Origin {..});if failure!=blot_error::Error.none {return failure;}if !entry.present {return blot_error::Error.none;}
     loader.project.entry=entry.value;
     if loader.options.input_mode==InputMode.source {

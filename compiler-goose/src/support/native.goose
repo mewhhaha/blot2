@@ -10,6 +10,7 @@ extern fn f64_from_bits(value: u64) -> f64 = "blot_f64_from_bits";
 extern fn read(fd: i32, first: u8&, count: u64) -> i64 = "blot_read";
 extern fn write(fd: i32, first: const u8&, count: u64) -> i64 = "blot_write";
 extern fn open_read(path: const u8&) -> i32 = "blot_open_read";
+extern fn open_regular(path: const u8&, maximum:u64) -> i32 = "blot_open_regular";
 extern fn open_write(path: const u8&, exclusive: bool) -> i32 = "blot_open_write";
 extern fn close(fd: i32) -> i32 = "blot_close";
 extern fn sync(fd: i32) -> i32 = "blot_sync";

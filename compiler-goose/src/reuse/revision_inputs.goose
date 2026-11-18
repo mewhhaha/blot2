@@ -124,6 +124,23 @@ fn provider(self_:Snapshot&)->Provider {assert(self_.valid());return Provider{se
 fn canonical(self_:Provider&,path:const u8[:],output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.canonical(path);if error!=blot_error::Error.none {return error;}output.append(bytes);return blot_error::Error.none;}
 fn read(self_:Provider&,path:const u8[:],limit:i64,output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.read(path);if error!=blot_error::Error.none {return error;}if bytes.len>limit {self_.snapshot.setCause("StreamTooLong");return blot_error::Error.stream_too_long;}output.append(bytes);return blot_error::Error.none;}
 fn resolve(self_:Provider&,source:const u8[:],request:const u8[:],options:Options,output:u8[>..<]&)->Error {let bytes,error=self_.snapshot.resolve(source,request);if error!=blot_error::Error.none {return error;}output.append(bytes);return blot_error::Error.none;}
+// Discovery borrows overlay bytes and samples ordinary files. The loader
+// alone records canonical names, reads, import decisions and error causes.
+fn probeSource(self_:Provider&,path:const u8[:],maximum:i64,name:u8[>..<]&,bytes:u8[>..<]&)->bool {
+    let overlays=self_.snapshot.state().sources;
+    if overlays.present {
+        if blot_reuse_source_overlays::canonicalPath(path,name)!=blot_error::Error.none {return false;}
+        let file .= overlays.value.files().get(name[..]);
+        if file {
+            if !file.present || file.value.len>maximum {return false;}
+            bytes.append(file.value);
+            return true;
+        }
+        name.clear();
+    }
+    var disk=blot_reuse_project::FileInputs{};
+    return disk.probeSource(path,maximum,name,bytes);
+}
 fn cause(self_:const Provider&,error:Error)->const u8[:] {if self_.snapshot.state().last_cause.len!=0 {return self_.snapshot.state().last_cause;}return blot_error::error_name(error);}
 fn optionalTextEqual(left:Text,right:Text)->bool {if left.present!=right.present {return false;}if !left.present {return true;}return left.value==right.value;}
 fn entryPathEqualsPrevious(self_:Snapshot&,requested:const u8[:],old_canonical:const u8[:])->bool,Error {let path,error=self_.canonical(requested);if error==blot_error::Error.out_of_memory {return false,error;}if error!=blot_error::Error.none {return false,blot_error::Error.none;}return path==old_canonical,blot_error::Error.none;}

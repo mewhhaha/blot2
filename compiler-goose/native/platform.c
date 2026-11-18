@@ -65,6 +65,21 @@ int32_t blot_open_read(const uint8_t *path) {
     if (fd < 0) return -errno;
     return fd;
 }
+/* Import discovery may look ahead of the parser. Only sample bounded regular
+   files, and never wait for a pipe that the real project might not import. */
+int32_t blot_open_regular(const uint8_t *path, uint64_t maximum) {
+    int fd;
+    do { fd = open((const char *)path, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOCTTY); }
+    while (fd < 0 && errno == EINTR);
+    if (fd < 0) return -errno;
+    struct stat status;
+    if (fstat(fd, &status) || !S_ISREG(status.st_mode) || status.st_size < 0 ||
+        (uint64_t)status.st_size > maximum) {
+        close(fd);
+        return -EINVAL;
+    }
+    return fd;
+}
 int32_t blot_open_write(const uint8_t *path, _Bool exclusive) {
     int flags = O_WRONLY | O_CREAT | O_CLOEXEC;
     if (exclusive) flags |= O_EXCL;

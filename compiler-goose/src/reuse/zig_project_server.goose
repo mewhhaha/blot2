@@ -135,7 +135,7 @@ fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
 // reported by the fresh check of every module.
 fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&,candidate:Retained&,allow_reuse:bool,reused:bool&)->Preparation,Error {
     if self_.seed.present {let seeded,error=prepareSeeded(self_,snapshot);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}match seeded {ready payload=>{return seeded,blot_error::Error.none;},_=>{var unused=seeded;unused.deinit();}}}
-    var provider=snapshot.provider();let loaded,error=blot_reuse_project::loadWithInputs(self_.entry,snapshot.options(),provider);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}var source=loaded;self_.configure(source);
+    var provider=snapshot.provider();let loaded,error=blot_reuse_project::loadWithParseWorkers(self_.entry,snapshot.options(),provider,self_.policy.frontend_workers);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}var source=loaded;self_.configure(source);
     if self_.seed.present {
         let empty=Frozen{..};let value,failure=blot_reuse_partial_dependency::prepareProject(source,self_.entry,blot_support::none<const u8[:]>(),empty);source.deinit();return value,failure;
     }

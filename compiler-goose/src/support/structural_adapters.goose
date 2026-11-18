@@ -135,6 +135,7 @@ import reuse.global_references;
 import reuse.hole_diagnostics;
 import reuse.module_abstraction_validation;
 import reuse.module_visibility;
+import reuse.parse_batch;
 import reuse.partial_dependency;
 import reuse.persistent_names;
 import reuse.persistent_unit;
@@ -2303,6 +2304,10 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::Options)-
 fn blot_reuse_project::blotStructuralHash<StructuralSink>(value:blot_reuse_project::Options,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::Origin)->bool {return equalFields(left,right);}
 fn blot_reuse_project::blotStructuralHash<StructuralSink>(value:blot_reuse_project::Origin,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::ParseBatch)->bool {return equalFields(left,right);}
+fn blot_reuse_project::blotStructuralHash<StructuralSink>(value:blot_reuse_project::ParseBatch,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::ParseInput)->bool {return equalFields(left,right);}
+fn blot_reuse_project::blotStructuralHash<StructuralSink>(value:blot_reuse_project::ParseInput,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::Project)->bool {return equalFields(left,right);}
 fn blot_reuse_project::blotStructuralHash<StructuralSink>(value:blot_reuse_project::Project,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_project::ProjectState)->bool {return equalFields(left,right);}
