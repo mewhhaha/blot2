@@ -1,0 +1,182 @@
+{
+  "date": "2026-11-18",
+  "baseGit": "e2fe7ac3e6ffb956e90f52419c0c9723149101a3",
+  "baselineSource": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "baselineBinary": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "method": "Fresh native compiler processes with warm filesystem pages. Pairs alternate the starting executable each round. The timed project protocol returns the complete Wasm. Retained edit, rejection and recovery reuse one session. Worker phase measurements use separate profiled runs.",
+  "broad": {
+    "binarySha256": "b8e814a2c73303a45457cc3ce07d8f6565dc4d51c73a84949d4be4c958ad7471",
+    "conditions": {
+      "fresh": {
+        "pressure": "some avg10=0.00 avg60=0.45 avg300=2.71 total=1589391569",
+        "load": "2.18 4.17 9.05 3/1517 1648601"
+      },
+      "edits": {
+        "pressure": "some avg10=2.01 avg60=1.07 avg300=2.64 total=1590188129",
+        "load": "2.58 4.09 8.86 1/1515 1649211"
+      },
+      "profile": {
+        "pressure": "some avg10=2.08 avg60=1.38 avg300=2.58 total=1590757304",
+        "load": "2.19 3.87 8.66 2/1521 1649936"
+      }
+    },
+    "freshMs": {
+      "pairs": 18,
+      "before": 849.102,
+      "after": 836.507,
+      "pairedMedianSaved": 14.872,
+      "wins": 15
+    },
+    "retainedMs": {
+      "fresh": {
+        "pairs": 6,
+        "before": 874.981,
+        "after": 855.222,
+        "pairedMedianSaved": 26.6,
+        "wins": 5
+      },
+      "edit": {
+        "pairs": 6,
+        "before": 249.562,
+        "after": 243.577,
+        "pairedMedianSaved": -0.941,
+        "wins": 2
+      },
+      "reject": {
+        "pairs": 6,
+        "before": 377.038,
+        "after": 364.466,
+        "pairedMedianSaved": 9.171,
+        "wins": 5
+      },
+      "syntax": {
+        "pairs": 6,
+        "before": 116.28,
+        "after": 117.418,
+        "pairedMedianSaved": -1.564,
+        "wins": 2
+      },
+      "lex": {
+        "pairs": 6,
+        "before": 116.387,
+        "after": 115.698,
+        "pairedMedianSaved": 3.786,
+        "wins": 4
+      },
+      "recover": {
+        "pairs": 6,
+        "before": 248.467,
+        "after": 251.305,
+        "pairedMedianSaved": -0.143,
+        "wins": 3
+      }
+    },
+    "work": {
+      "before": {
+        "resolve_nodes_added": 405857,
+        "resolve_depth_entries": 3695637,
+        "type_nodes": 1334708,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 72858303
+      },
+      "after": {
+        "resolve_nodes_added": 289875,
+        "resolve_depth_entries": 3387652,
+        "type_nodes": 1218726,
+        "parallel_worker_jobs": 269,
+        "parallel_worker_reply_bytes": 73103603
+      }
+    },
+    "phaseMs": {
+      "assets": {
+        "pairs": 4,
+        "before": 77.421,
+        "after": 79.895,
+        "pairedMedianSaved": -1.752,
+        "wins": 1
+      },
+      "load": {
+        "pairs": 4,
+        "before": 77.69,
+        "after": 79.505,
+        "pairedMedianSaved": -1.016,
+        "wins": 1
+      },
+      "check": {
+        "pairs": 4,
+        "before": 519.802,
+        "after": 503.536,
+        "pairedMedianSaved": 14.238,
+        "wins": 4
+      },
+      "lower": {
+        "pairs": 4,
+        "before": 42.01,
+        "after": 41.163,
+        "pairedMedianSaved": 1.16,
+        "wins": 2
+      },
+      "backend": {
+        "pairs": 4,
+        "before": 129.764,
+        "after": 129.803,
+        "pairedMedianSaved": 2.248,
+        "wins": 2
+      }
+    },
+    "workerCpuMs": {
+      "pairs": 4,
+      "before": 2083.027,
+      "after": 2112.097,
+      "pairedMedianSaved": -21.891,
+      "wins": 2
+    }
+  },
+  "oracle": {
+    "modules": 269,
+    "expressions": 305111,
+    "eligibleExpressions": 290746,
+    "expressionMismatches": 0,
+    "dispatch": 19766,
+    "eligibleDispatch": 19490,
+    "dispatchMismatches": 0,
+    "test": "Compared closed subtrees, free variable identities, every function argument and result and terminal label-free effect rows with materialized facts in the same inference store. The Core collision law compared the same function ID at two positions with intervening type and effect writes."
+  },
+  "broadLimit": "Expression types may be read by ownership analysis, coverage, scope checking and editor queries before Core. The broad experiment omits those consumer guards.",
+  "trials": "2026-11-18-gdev-cursor-core.raw.json.gz",
+  "probes": "2026-11-18-gdev-cursor-core-probes.tar.gz",
+  "decision": "Broad candidate measured off-tree. The qualified release remains the baseline."
+}
