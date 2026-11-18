@@ -6,13 +6,13 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `1a60f880`, with Gdev `0e0d772`, Ink
-`3f2e603` and Pen `ad9766c`. Fresh Gdev Main compiled in **726.3 ms** median,
-down from **782.5 ms** in eight alternating pairs with eight frontend slots.
-The combined changes won all eight pairs in this window. Main emits
-**2,639,648 bytes** across 270 modules, up 420 bytes. A previous 40-pair
-window on different source measured 886.0 ms.
-[Measurements and qualification](benchmarks/evidence/measurements/2026-11-18-language-hills.json)
+The qualified compiler is Blot `a58f287d`, with Gdev
+`0e0d772`, Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took
+**793.4 ms** median across eight alternating pairs with eight frontend
+slots. The previous compiler took **794.7 ms** on the same source. Both
+emitted the same **2,639,648 bytes** across 270 modules.
+[Current measurements and qualification](benchmarks/evidence/measurements/2026-11-18-exclusive-appends.json)
+· [Earlier language changes](benchmarks/evidence/measurements/2026-11-18-language-hills.json)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev
@@ -28,10 +28,11 @@ lists of Gdev intents. Joining 128 chunks and traversing them fell from
 **169.7 to 14.7 µs** using chunk references. Bulk copies fell from 5,282,560
 to 1,008 bytes. Grouping the packed payloads by width reserved **45.5 KiB**
 for a 4,096-intent tail and two prefixes, down from 160 KiB. Packing still
-costs Wasm bytes and the shipping layout remains fixed stride. Next, qualify
-the compiler’s private append optimization across mutually exclusive case arms.
-On a scalar control two append sites copied 2,740,140 bytes against 8,176
-for one append after the match.
+costs Wasm bytes and the shipping layout remains fixed stride. A private
+list can now grow through exclusive tail appends in `case` and `if` arms.
+Selecting 1,171 home IDs copied **8,176 bytes** and kept **one owner**, down
+from 2,740,140 bytes and 1,172 owners. The saved-prefix and callback-order
+laws pass, and the 8,192-input regression now returns its complete array.
 [Blot builder experiments](benchmarks/intent/README.md#building-and-sharing-lists-in-blot)
 
 Workers transfer 13 more Core and interface tables as verified Goose arrays.
@@ -62,7 +63,7 @@ edits, changed compile-time branches and snapshot replacement before enabling it
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 191 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,092 guest and host tests passed, 100 ignored |
+| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,095 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

@@ -75,20 +75,34 @@ medians were 162, 158 and 158 ms across 18 fresh builds per layout. All
 three still use Blot's regular List operations. The shipping list layout is
 fixed stride. The main game uses a different planner.
 
-### Two append sites can copy every prefix
-
-On 4,096 mixed inputs, two mutually exclusive `case` arms appended the same
-1,171 home IDs as a single append after the match. The first spelling copied
-**2,740,140 bytes** and retained 1,172 owners. The second copied **8,176 bytes**
-and retained one. The larger count equals four bytes times the sum of all
-prior list lengths. Blot’s in-place append optimization uses a syntactic
-reference count. The next compiler experiment should test that two exclusive
-arms may grow the same private owner while preserving the copy path for
-observably shared inputs.
-
 Each checksum includes every active payload word in order. Small controls
 cover empty inputs, all tag alignments, partial tag words and saved operands.
 Three processes timed unmodified release Wasm with rotated variant order.
 A separate instrumented guest verified the same checksum and counted
 `memory.copy` bytes. Sub-microsecond join timings include the callback
 boundary. [Measurements](../evidence/measurements/2026-11-18-blot-list-builders.json) · [Per-process samples](../evidence/measurements/2026-11-18-blot-list-builders.raw.json.gz)
+
+### Growing one list across case arms
+
+Two `case` arms select Deliver and Rest home IDs from 4,096 mixed Gdev intents.
+Both spellings return the same 1,171 words in order.
+
+![Copy traffic and build time for 1,171 home IDs](../evidence/measurements/2026-11-18-exclusive-appends.png)
+
+| Compiler and source | Time to build | Bulk bytes copied | List owners at end of build |
+| --- | ---: | ---: | ---: |
+| Previous, append in each arm | 110.8 µs | 2,740,140 | 1,172 |
+| Current, append in each arm | 21.2 µs | 8,176 | 1 |
+| Previous, append after the match | 20.7 µs | 8,176 | 1 |
+| Current, append after the match | 20.2 µs | 8,176 | 1 |
+
+The previous compiler copied the accumulated prefix at every append. The
+backend now follows the list each branch returns to the next loop iteration.
+When every use of the incoming list is a terminal append on an exclusive
+path, that append can grow the same owner. Other reads keep the existing
+lowering. The 8,192-input regression covers nested branches, a guarded arm
+and a path that skips the append.
+
+Three pairs of processes timed the two optimized compiler outputs with the
+same source. Each build time excludes input construction and the final scan.
+The game uses a different planner. [Samples and qualification](../evidence/measurements/2026-11-18-exclusive-appends.json)

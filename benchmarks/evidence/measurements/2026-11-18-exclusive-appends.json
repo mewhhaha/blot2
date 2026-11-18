@@ -1,0 +1,1048 @@
+{
+  "date": "2026-11-18",
+  "baselineBlot": "4f9884db6c7328354a375734ee4571ff2d2253ef",
+  "candidateBlot": "a58f287d2a513783f099302c7861a444c24ba8b2",
+  "candidateCompilerSourceSha256": "f600da59ead7f7c286e376c2f1a59c1afeeb41fb13c445d96dbb0d881fa2007d",
+  "releaseConfiguration": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "siblings": {
+    "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "benchmark": "deno run -A benchmarks/intent/persistent.ts [compiler]",
+  "benchmarkSha256": "ab52e7d70971e7c8a1123be715fd95af61e2cd9b7f6a73fdd8bd50a31174da02",
+  "workloadSha256": "a3601e05b5f0aa5761174f40b2b8905a9945df543f4b42945e3669dad76dc977",
+  "method": "Three pairs of independent Deno processes in AB, BA, AB order. Each process rotates the two variants and times uninstrumented Wasm after four warmup rounds, using four medians of nine calls. Table entries are medians of the three process medians. A separately instrumented guest checks the same ordered hash and counts memory.copy bytes and live owner entries from the input-ready callback to the completed builder. Both treatments use the same sources.",
+  "summary": {
+    "baseline": {
+      "256": {
+        "test_homes_in_arms": {
+          "hash": 2671498479,
+          "buildUs": 9.228,
+          "totalUs": 9.969,
+          "buildCopy": 10804,
+          "joinCopy": 0,
+          "buildReserved": 11100,
+          "joinReserved": 0,
+          "buildOwners": 75,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 2671498479,
+          "buildUs": 5.195,
+          "totalUs": 5.927,
+          "buildCopy": 496,
+          "joinCopy": 0,
+          "buildReserved": 512,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      },
+      "1024": {
+        "test_homes_in_arms": {
+          "hash": 2571797382,
+          "buildUs": 15.875,
+          "totalUs": 18.044,
+          "buildCopy": 171112,
+          "joinCopy": 0,
+          "buildReserved": 172284,
+          "joinReserved": 0,
+          "buildOwners": 294,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 2571797382,
+          "buildUs": 5.28,
+          "totalUs": 7.434,
+          "buildCopy": 2032,
+          "joinCopy": 0,
+          "buildReserved": 2048,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      },
+      "4096": {
+        "test_homes_in_arms": {
+          "hash": 3530685604,
+          "buildUs": 110.841,
+          "totalUs": 114.602,
+          "buildCopy": 2740140,
+          "joinCopy": 0,
+          "buildReserved": 2744824,
+          "joinReserved": 0,
+          "buildOwners": 1172,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 3530685604,
+          "buildUs": 20.695,
+          "totalUs": 25.488,
+          "buildCopy": 8176,
+          "joinCopy": 0,
+          "buildReserved": 8192,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      }
+    },
+    "candidate": {
+      "256": {
+        "test_homes_in_arms": {
+          "hash": 2671498479,
+          "buildUs": 4.979,
+          "totalUs": 5.701,
+          "buildCopy": 496,
+          "joinCopy": 0,
+          "buildReserved": 512,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 2671498479,
+          "buildUs": 5.07,
+          "totalUs": 5.801,
+          "buildCopy": 496,
+          "joinCopy": 0,
+          "buildReserved": 512,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      },
+      "1024": {
+        "test_homes_in_arms": {
+          "hash": 2571797382,
+          "buildUs": 5.23,
+          "totalUs": 7.354,
+          "buildCopy": 2032,
+          "joinCopy": 0,
+          "buildReserved": 2048,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 2571797382,
+          "buildUs": 5.135,
+          "totalUs": 7.259,
+          "buildCopy": 2032,
+          "joinCopy": 0,
+          "buildReserved": 2048,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      },
+      "4096": {
+        "test_homes_in_arms": {
+          "hash": 3530685604,
+          "buildUs": 21.151,
+          "totalUs": 25.924,
+          "buildCopy": 8176,
+          "joinCopy": 0,
+          "buildReserved": 8192,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        },
+        "test_homes_after_match": {
+          "hash": 3530685604,
+          "buildUs": 20.224,
+          "totalUs": 27.858,
+          "buildCopy": 8176,
+          "joinCopy": 0,
+          "buildReserved": 8192,
+          "joinReserved": 0,
+          "buildOwners": 1,
+          "joinOwners": 0
+        }
+      }
+    }
+  },
+  "runs": {
+    "baseline": {
+      "compilerSha256": "4596feef82837fd6d696b70917a6159a62a60f7be0b12e02e6bccbc35f1d1299",
+      "wasmBytes": 45261,
+      "wasmSha256": "16ecf12cc4fa7a5361508b6f9c011ccce4c9d000e117f6e93db7a6396b63c9ea",
+      "hostCpu": "AMD Ryzen 7 3800X 8-Core Processor",
+      "tools": {
+        "deno": "2.9.8",
+        "v8": "15.0.245.2-rusty",
+        "typescript": "6.0.3"
+      },
+      "sourceTraceSha256": "1daa0988ec7753bce631f26c7ad0b9e714ccb963d5854cd891043a705ebb0a17",
+      "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+      "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+      "timingSampleColumns": [
+        "inputs",
+        "source",
+        "process",
+        "buildUsRounds",
+        "totalUsRounds"
+      ],
+      "timingSamples": [
+        [
+          256,
+          "test_homes_in_arms",
+          1,
+          [
+            9.117,
+            9.158,
+            9.137,
+            9.128
+          ],
+          [
+            9.838,
+            9.879,
+            9.858,
+            9.849
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          1,
+          [
+            5.08,
+            5.11,
+            5.14,
+            5.07
+          ],
+          [
+            5.801,
+            5.831,
+            5.851,
+            5.791
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          1,
+          [
+            15.199,
+            15.209,
+            15.199,
+            15.229
+          ],
+          [
+            17.303,
+            17.303,
+            17.283,
+            17.333
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          1,
+          [
+            5.07,
+            5.07,
+            5.07,
+            5.07
+          ],
+          [
+            7.164,
+            7.164,
+            7.154,
+            7.154
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          1,
+          [
+            104.328,
+            105.851,
+            106.743,
+            106.683
+          ],
+          [
+            112.103,
+            109.368,
+            108.256,
+            108.196
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          1,
+          [
+            19.587,
+            19.557,
+            19.948,
+            20.168
+          ],
+          [
+            27.282,
+            27.202,
+            21.44,
+            21.651
+          ]
+        ],
+        [
+          256,
+          "test_homes_in_arms",
+          2,
+          [
+            9.268,
+            9.288,
+            9.478,
+            9.338
+          ],
+          [
+            10.019,
+            10.029,
+            10.229,
+            10.089
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          2,
+          [
+            5.18,
+            5.17,
+            5.21,
+            5.22
+          ],
+          [
+            5.911,
+            5.901,
+            5.942,
+            5.951
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          2,
+          [
+            16.652,
+            16.662,
+            16.672,
+            16.662
+          ],
+          [
+            18.816,
+            18.826,
+            18.866,
+            18.856
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          2,
+          [
+            5.31,
+            5.31,
+            5.27,
+            5.27
+          ],
+          [
+            7.484,
+            7.474,
+            7.425,
+            7.424
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          2,
+          [
+            112.804,
+            123.345,
+            123.544,
+            122.744
+          ],
+          [
+            121.03,
+            125.859,
+            126.049,
+            125.238
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          2,
+          [
+            21.17,
+            21.13,
+            27.663,
+            27.653
+          ],
+          [
+            29.376,
+            29.216,
+            30.167,
+            30.157
+          ]
+        ],
+        [
+          256,
+          "test_homes_in_arms",
+          3,
+          [
+            9.228,
+            9.228,
+            9.228,
+            9.228
+          ],
+          [
+            9.969,
+            9.969,
+            9.969,
+            9.979
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          3,
+          [
+            5.4,
+            5.32,
+            5.35,
+            5.23
+          ],
+          [
+            6.141,
+            6.062,
+            6.091,
+            5.971
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          3,
+          [
+            15.88,
+            15.89,
+            15.86,
+            15.87
+          ],
+          [
+            18.044,
+            18.045,
+            18.015,
+            18.044
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          3,
+          [
+            5.28,
+            5.28,
+            5.29,
+            5.28
+          ],
+          [
+            7.434,
+            7.434,
+            7.444,
+            7.434
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          3,
+          [
+            110.851,
+            110.831,
+            110.8,
+            111.011
+          ],
+          [
+            118.976,
+            116.571,
+            112.453,
+            112.634
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          3,
+          [
+            20.639,
+            20.61,
+            20.77,
+            20.75
+          ],
+          [
+            28.704,
+            28.664,
+            22.312,
+            22.302
+          ]
+        ]
+      ]
+    },
+    "candidate": {
+      "compilerSha256": "fadd8090a10e7f7be8584da87b9f3836508c6b8985a36e82302359406a4ada6f",
+      "wasmBytes": 44926,
+      "wasmSha256": "be56623cb4724c634f4a9cdbbffa9815e45e1c932e3df32e510bd8865bdee61e",
+      "hostCpu": "AMD Ryzen 7 3800X 8-Core Processor",
+      "tools": {
+        "deno": "2.9.8",
+        "v8": "15.0.245.2-rusty",
+        "typescript": "6.0.3"
+      },
+      "sourceTraceSha256": "1daa0988ec7753bce631f26c7ad0b9e714ccb963d5854cd891043a705ebb0a17",
+      "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+      "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+      "timingSampleColumns": [
+        "inputs",
+        "source",
+        "process",
+        "buildUsRounds",
+        "totalUsRounds"
+      ],
+      "timingSamples": [
+        [
+          256,
+          "test_homes_in_arms",
+          1,
+          [
+            5.24,
+            5.25,
+            5.23,
+            5.24
+          ],
+          [
+            5.981,
+            5.981,
+            5.972,
+            5.981
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          1,
+          [
+            5.34,
+            5.33,
+            5.33,
+            5.33
+          ],
+          [
+            6.072,
+            6.062,
+            6.061,
+            6.072
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          1,
+          [
+            5.34,
+            5.34,
+            5.34,
+            5.341
+          ],
+          [
+            7.494,
+            7.504,
+            7.504,
+            7.515
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          1,
+          [
+            5.25,
+            5.25,
+            5.24,
+            5.25
+          ],
+          [
+            7.414,
+            7.414,
+            7.404,
+            7.414
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          1,
+          [
+            21.01,
+            20.98,
+            21.291,
+            21.31
+          ],
+          [
+            28.895,
+            28.825,
+            22.784,
+            22.814
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          1,
+          [
+            20.068,
+            20.079,
+            20.069,
+            20.058
+          ],
+          [
+            27.913,
+            27.933,
+            21.561,
+            21.551
+          ]
+        ],
+        [
+          256,
+          "test_homes_in_arms",
+          2,
+          [
+            4.9,
+            4.899,
+            4.88,
+            4.89
+          ],
+          [
+            5.62,
+            5.601,
+            5.591,
+            5.591
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          2,
+          [
+            5.0,
+            5.02,
+            5.0,
+            5.009
+          ],
+          [
+            5.721,
+            5.741,
+            5.711,
+            5.721
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          2,
+          [
+            5.22,
+            5.21,
+            5.21,
+            5.22
+          ],
+          [
+            7.304,
+            7.294,
+            7.304,
+            7.314
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          2,
+          [
+            5.07,
+            5.069,
+            5.08,
+            5.069
+          ],
+          [
+            7.164,
+            7.154,
+            7.173,
+            7.154
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          2,
+          [
+            20.599,
+            21.33,
+            20.409,
+            20.409
+          ],
+          [
+            28.214,
+            28.975,
+            28.053,
+            21.912
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          2,
+          [
+            21.08,
+            20.88,
+            19.567,
+            19.567
+          ],
+          [
+            35.107,
+            28.504,
+            27.212,
+            21.541
+          ]
+        ],
+        [
+          256,
+          "test_homes_in_arms",
+          3,
+          [
+            4.97,
+            4.98,
+            4.979,
+            4.989
+          ],
+          [
+            5.701,
+            5.701,
+            5.701,
+            5.72
+          ]
+        ],
+        [
+          256,
+          "test_homes_after_match",
+          3,
+          [
+            5.069,
+            5.07,
+            5.08,
+            5.07
+          ],
+          [
+            5.801,
+            5.801,
+            5.791,
+            5.801
+          ]
+        ],
+        [
+          1024,
+          "test_homes_in_arms",
+          3,
+          [
+            5.23,
+            5.24,
+            5.23,
+            5.23
+          ],
+          [
+            7.354,
+            7.364,
+            7.354,
+            7.354
+          ]
+        ],
+        [
+          1024,
+          "test_homes_after_match",
+          3,
+          [
+            5.14,
+            5.14,
+            5.13,
+            5.13
+          ],
+          [
+            7.264,
+            7.264,
+            7.254,
+            7.254
+          ]
+        ],
+        [
+          4096,
+          "test_homes_in_arms",
+          3,
+          [
+            21.091,
+            21.221,
+            21.241,
+            21.241
+          ],
+          [
+            29.005,
+            29.166,
+            22.843,
+            22.763
+          ]
+        ],
+        [
+          4096,
+          "test_homes_after_match",
+          3,
+          [
+            26.741,
+            20.239,
+            20.349,
+            20.339
+          ],
+          [
+            36.43,
+            28.154,
+            28.314,
+            21.872
+          ]
+        ]
+      ]
+    }
+  },
+  "freshGdev": {
+    "method": "Eight alternating AB/BA pairs, fresh session/process with warm files, eight frontend slots, same host wrapper and std, ordinary source overlay on lighting_look, session open through receipt of Wasm. Shared machine. Identical Gdev, Ink, std and host. Compare the previous and candidate optimized compiler.",
+    "compilerSha256": {
+      "baseline": "4596feef82837fd6d696b70917a6159a62a60f7be0b12e02e6bccbc35f1d1299",
+      "candidate": "fadd8090a10e7f7be8584da87b9f3836508c6b8985a36e82302359406a4ada6f"
+    },
+    "samples": [
+      {
+        "pair": 1,
+        "treatment": "baseline",
+        "ms": 788.569929,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 1,
+        "treatment": "candidate",
+        "ms": 774.55976,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 2,
+        "treatment": "candidate",
+        "ms": 782.045865,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 2,
+        "treatment": "baseline",
+        "ms": 807.827624,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 3,
+        "treatment": "baseline",
+        "ms": 782.644593,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 3,
+        "treatment": "candidate",
+        "ms": 822.642463,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 4,
+        "treatment": "candidate",
+        "ms": 778.9330550000001,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 4,
+        "treatment": "baseline",
+        "ms": 800.844076,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 5,
+        "treatment": "baseline",
+        "ms": 770.984451,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 5,
+        "treatment": "candidate",
+        "ms": 821.9591919999999,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 6,
+        "treatment": "candidate",
+        "ms": 795.5305920000001,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 6,
+        "treatment": "baseline",
+        "ms": 835.846858,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 7,
+        "treatment": "baseline",
+        "ms": 781.186348,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 7,
+        "treatment": "candidate",
+        "ms": 792.0461670000001,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 8,
+        "treatment": "candidate",
+        "ms": 794.774133,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      },
+      {
+        "pair": 8,
+        "treatment": "baseline",
+        "ms": 809.14679,
+        "fresh": 270,
+        "bytes": 2639648,
+        "wasmSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae"
+      }
+    ],
+    "baselineMedianMs": 794.7070025,
+    "candidateMedianMs": 793.41015,
+    "pairedMedianDifferenceMs": -14.191413000000011,
+    "candidateFasterPairs": 5
+  },
+  "qualification": {
+    "mainBytes": 2639648,
+    "mainSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (117.8 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (10.7 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "mainMatchesPrevious": true,
+    "frameAndTraceMatchPrevious": true
+  },
+  "compilerGate": {
+    "phases": [
+      "harness: 2.98s, exit 0",
+      "release-build: 273.77s, exit 0",
+      "reference-direct: 0.23s, exit 0",
+      "reference-uniqueness: 3.41s, exit 0",
+      "reference-fixtures: 4.95s, exit 0",
+      "pack: 0.71s, exit 0",
+      "guests: 49.67s, exit 0"
+    ],
+    "wasmFixtures": 192,
+    "uniquenessFixtures": 212,
+    "directFixtures": 2,
+    "guestsAndHost": {
+      "passed": 1095,
+      "failed": 0,
+      "ignored": 100
+    }
+  },
+  "regression": "The previous compiler exhausts the guest stack during the nested, guarded 8,192-item run. The candidate returns the complete ordered array. Additional laws cover callback order, independent results and rejection of a live alias."
+}

@@ -17,12 +17,17 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-The release compiles Gdev Main’s 46,109 lines in **886.0 ms** median
+Fresh Gdev Main builds took **793.4 ms** median across eight pairs with
+eight frontend slots. The previous compiler took 794.7 ms on the same
+270 modules. Both produced identical Wasm (2,639,648 bytes). A Gdev intent
+benchmark that appends inside two case arms now builds its list in
+**21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms) · [Fresh-build samples](benchmarks/evidence/measurements/2026-11-18-exclusive-appends.json)
+
+An earlier 269-module snapshot compiled 46,109 lines in 886.0 ms median
 across 40 fresh builds on a lightly loaded host, down from 916.8 ms.
-With heavier CPU contention the same build took **1539.5 ms**, down from
-1572.6 ms across 16 paired runs. Lighting edits took **286.4 ms**
-and **414.9 ms** in the two edit windows and showed no consistent speedup.
-A fresh build checks 269 modules with eight worker slots and produces 2,639,228 bytes of Wasm.
+Under heavier CPU contention the same snapshot took 1,539.5 ms, down from
+1,572.6 ms across 16 pairs. Lighting edits took 286.4 and 414.9 ms in
+those two windows and showed no consistent speedup.
 [Gdev measurements](benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.json)
 
 ![Worker packet transfers and Gdev compile times](benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.svg)
