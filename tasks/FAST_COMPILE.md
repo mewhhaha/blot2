@@ -5,6 +5,59 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+### Function-pair unification
+
+The qualified release compiled all 46,109 lines in **797.5 ms** median,
+about 57,800 lines/s, and rebuilt a lighting edit in **229.9 ms**. Every
+successful fresh run returned the same 2,639,228-byte Wasm. The comparison
+rotated four compilers through all four starting positions.
+
+| Compiler | Recursive visits | Fresh median | Median saving within round | Wins |
+| --- | ---: | ---: | ---: | ---: |
+| Release | 842,642 | 797.5 ms | — | — |
+| Capture fields at pair entry | 702,176 | 803.5 ms | −4.2 ms | 6/16 |
+| Reuse resolved child IDs | 732,106 | 791.8 ms | −6.5 ms | 6/16 |
+| Combine both | 601,703 | 803.4 ms | +12.8 ms | 10/16 |
+
+![Recursive resolver visits and fresh Gdev compile time](../benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.svg)
+
+The combined path made 8,627 fewer type-node allocations during unification.
+All 252,160 child IDs eligible for reuse on Gdev agreed with eager resolution.
+All four prototypes matched the release on 190 fixtures and 4,096 generated
+unification cases. Two targeted native tests found the boundary of that
+agreement. Interning a selection can return an older descriptor with 1,025
+nested arrays. Reusing its ID skips the depth check. Omitting a parent
+allocation can also let a full store accept a type. Both cases now run
+in the native regression suite.
+
+A fourth prototype kept ordinary root resolution and specialized its
+immediate returns. It passed both limit tests and reproduced every named Gdev
+and Ink outcome, all 242 replay files, and the inspected Pen frame. Across
+two windows of 20 fresh pairs, its median paired saving was **−5.0 ms**
+then **+16.9 ms**. Release and candidate medians for the retained lighting
+edit were **237.9 and 245.0 ms** over eight pairs. The full gate was
+interrupted during native linking. These results use the independently
+completed binary. The release and packaged compiler remain at `6b223a73`.
+
+A separate 1 ms CPU sampling run covered 12 fresh release builds with phase
+profiling disabled. Of 27,894 samples, 2,059 (7.4%) landed directly in the
+project packet encoder and decoder, and 1,624 (5.8%) in four allocation
+observer functions. The release sent **72,858,303 bytes** in checker worker
+replies per build. All 35 sampled codec specializations mapped to release
+source types. Core modules accounted for 562 samples, two-word type-list
+descriptors for 431, and reads of principal-interface binding arrays for 330.
+The type-list codec checks its two U32 fields separately. Try one bounds
+check and one fixed-width transfer, preserving field order, depth limits and
+failure behavior. Allocation accounting is a second candidate for reducing
+call overhead while preserving counters and fault injection. The sampled
+shares describe CPU time across processes. End-to-end savings require a
+fresh timing comparison.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.json)
+· [Raw trials and samples](../benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.raw.json.gz)
+· [Patches, sampler and reproducers](../benchmarks/evidence/measurements/2026-11-18-gdev-function-unification-probes.tar.gz)
+
+### Earlier direct Core type reader
+
 Direct projection of expression and dispatch signatures avoided 115,982 of
 405,857 resolver allocations. In 18 alternating fresh pairs it won 15 and
 saved **14.9 ms** at the median within-pair difference. Gdev exercised 310,236

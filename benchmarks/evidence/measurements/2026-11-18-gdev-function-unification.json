@@ -1,0 +1,1120 @@
+{
+  "date": "2026-11-18",
+  "baseGit": "b5d57724a1a3e8363662a6eb04831adcc07824ef",
+  "baselineSource": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "baselineBinary": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "method": "Fresh native processes with warm filesystem pages. Measure from project session open to receipt of complete Wasm. The first comparison rotates four executables using a balanced Latin square. The narrower candidate uses two alternating-pair windows with reversed starting order. Fresh builds, retained revisions, phase timings and sampled builds use independent runs. A positive paired difference favors the candidate. Shared host.",
+  "fourWay": {
+    "release": {
+      "unify_pairs": 457283,
+      "unify_resolve_calls": 914566,
+      "unify_resolve_entries": 842642,
+      "unify_resolve_nodes": 39083,
+      "resolve_nodes_added": 405857,
+      "row_requests": 1281762,
+      "labels": 17,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_slots": 8,
+      "parallel_worker_processes": 7,
+      "parallel_worker_reply_bytes": 72858303
+    },
+    "fields": {
+      "unify_pairs": 457283,
+      "unify_resolve_calls": 914578,
+      "unify_resolve_entries": 702176,
+      "unify_resolve_nodes": 30456,
+      "resolve_nodes_added": 397127,
+      "row_requests": 1284478,
+      "labels": 17,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_slots": 8,
+      "parallel_worker_processes": 7,
+      "parallel_worker_reply_bytes": 72857423,
+      "freshMs": {
+        "rounds": 16,
+        "releaseMedian": 797.498,
+        "candidateMedian": 803.487,
+        "medianWithinRoundSaving": -4.177,
+        "wins": 6
+      },
+      "retainedMs": {
+        "fresh": {
+          "rounds": 8,
+          "releaseMedian": 784.647,
+          "candidateMedian": 801.886,
+          "medianWithinRoundSaving": -16.628,
+          "wins": 2
+        },
+        "edit": {
+          "rounds": 8,
+          "releaseMedian": 229.882,
+          "candidateMedian": 230.579,
+          "medianWithinRoundSaving": 0.823,
+          "wins": 4
+        },
+        "reject": {
+          "rounds": 8,
+          "releaseMedian": 353.119,
+          "candidateMedian": 351.8,
+          "medianWithinRoundSaving": 0.849,
+          "wins": 4
+        },
+        "syntax": {
+          "rounds": 8,
+          "releaseMedian": 107.243,
+          "candidateMedian": 107.906,
+          "medianWithinRoundSaving": -0.114,
+          "wins": 4
+        },
+        "lex": {
+          "rounds": 8,
+          "releaseMedian": 108.714,
+          "candidateMedian": 108.617,
+          "medianWithinRoundSaving": 2.628,
+          "wins": 5
+        },
+        "recover": {
+          "rounds": 8,
+          "releaseMedian": 234.996,
+          "candidateMedian": 230.398,
+          "medianWithinRoundSaving": 2.583,
+          "wins": 7
+        }
+      },
+      "phaseMs": {
+        "assets": {
+          "rounds": 4,
+          "releaseMedian": 69.953,
+          "candidateMedian": 71.329,
+          "medianWithinRoundSaving": -1.187,
+          "wins": 1
+        },
+        "load": {
+          "rounds": 4,
+          "releaseMedian": 68.37,
+          "candidateMedian": 66.754,
+          "medianWithinRoundSaving": 2.107,
+          "wins": 3
+        },
+        "check": {
+          "rounds": 4,
+          "releaseMedian": 452.993,
+          "candidateMedian": 442.836,
+          "medianWithinRoundSaving": 8.546,
+          "wins": 3
+        },
+        "lower": {
+          "rounds": 4,
+          "releaseMedian": 32.342,
+          "candidateMedian": 35.827,
+          "medianWithinRoundSaving": -3.138,
+          "wins": 2
+        },
+        "backend": {
+          "rounds": 4,
+          "releaseMedian": 112.538,
+          "candidateMedian": 111.25,
+          "medianWithinRoundSaving": 2.997,
+          "wins": 3
+        }
+      },
+      "aggregateCheckingWorkerCpuMs": {
+        "rounds": 4,
+        "releaseMedian": 1825.271,
+        "candidateMedian": 1847.052,
+        "medianWithinRoundSaving": -39.581,
+        "wins": 1
+      },
+      "nativeCompilerSha256": "b485b8dcbc95d66b8277416a011c5756f7278e32b04d3aedab75b0afcffaea5e",
+      "fixtureScreenSha256": "7d92105982494efc11a3103d97d667784acdc07a8eba20b1043f2fd1b4713fa9",
+      "typeSourceSha256": "be11d0bb057be2f80a60f48b69cc53a497d0ab901804e5a5eb8b3ad3e2ad8148"
+    },
+    "worklist": {
+      "unify_pairs": 457283,
+      "unify_resolve_calls": 662406,
+      "unify_resolve_entries": 732106,
+      "unify_resolve_nodes": 39083,
+      "resolve_nodes_added": 405857,
+      "row_requests": 1260136,
+      "labels": 17,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_slots": 8,
+      "parallel_worker_processes": 7,
+      "parallel_worker_reply_bytes": 72858303,
+      "freshMs": {
+        "rounds": 16,
+        "releaseMedian": 797.498,
+        "candidateMedian": 791.834,
+        "medianWithinRoundSaving": -6.496,
+        "wins": 6
+      },
+      "retainedMs": {
+        "fresh": {
+          "rounds": 8,
+          "releaseMedian": 784.647,
+          "candidateMedian": 789.303,
+          "medianWithinRoundSaving": -5.429,
+          "wins": 3
+        },
+        "edit": {
+          "rounds": 8,
+          "releaseMedian": 229.882,
+          "candidateMedian": 229.789,
+          "medianWithinRoundSaving": -0.273,
+          "wins": 4
+        },
+        "reject": {
+          "rounds": 8,
+          "releaseMedian": 353.119,
+          "candidateMedian": 349.343,
+          "medianWithinRoundSaving": 2.696,
+          "wins": 5
+        },
+        "syntax": {
+          "rounds": 8,
+          "releaseMedian": 107.243,
+          "candidateMedian": 107.51,
+          "medianWithinRoundSaving": 0.579,
+          "wins": 6
+        },
+        "lex": {
+          "rounds": 8,
+          "releaseMedian": 108.714,
+          "candidateMedian": 107.826,
+          "medianWithinRoundSaving": 1.088,
+          "wins": 5
+        },
+        "recover": {
+          "rounds": 8,
+          "releaseMedian": 234.996,
+          "candidateMedian": 230.684,
+          "medianWithinRoundSaving": 4.097,
+          "wins": 7
+        }
+      },
+      "phaseMs": {
+        "assets": {
+          "rounds": 4,
+          "releaseMedian": 69.953,
+          "candidateMedian": 74.637,
+          "medianWithinRoundSaving": -4.706,
+          "wins": 1
+        },
+        "load": {
+          "rounds": 4,
+          "releaseMedian": 68.37,
+          "candidateMedian": 66.049,
+          "medianWithinRoundSaving": 0.863,
+          "wins": 3
+        },
+        "check": {
+          "rounds": 4,
+          "releaseMedian": 452.993,
+          "candidateMedian": 454.563,
+          "medianWithinRoundSaving": -1.57,
+          "wins": 2
+        },
+        "lower": {
+          "rounds": 4,
+          "releaseMedian": 32.342,
+          "candidateMedian": 33.88,
+          "medianWithinRoundSaving": -0.14,
+          "wins": 2
+        },
+        "backend": {
+          "rounds": 4,
+          "releaseMedian": 112.538,
+          "candidateMedian": 113.977,
+          "medianWithinRoundSaving": 1.326,
+          "wins": 3
+        }
+      },
+      "aggregateCheckingWorkerCpuMs": {
+        "rounds": 4,
+        "releaseMedian": 1825.271,
+        "candidateMedian": 1848.271,
+        "medianWithinRoundSaving": -13.002,
+        "wins": 0
+      },
+      "nativeCompilerSha256": "c0fa7a2991832980fadff98dd434aa39a389213be7c8c7c6d6661d7605449b01",
+      "fixtureScreenSha256": "7bb84f19f11b127ecbcf3bc1b4657942bffcdb957ae75c97dc3b0df205778816",
+      "typeSourceSha256": "e77bc2761584ad17d2ba5c0dde9838281af5c39bb8d773ee836b93d939ff3fef"
+    },
+    "combined": {
+      "unify_pairs": 457283,
+      "unify_resolve_calls": 662410,
+      "unify_resolve_entries": 601703,
+      "unify_resolve_nodes": 30456,
+      "resolve_nodes_added": 397127,
+      "row_requests": 1261631,
+      "labels": 17,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_slots": 8,
+      "parallel_worker_processes": 7,
+      "parallel_worker_reply_bytes": 72857423,
+      "freshMs": {
+        "rounds": 16,
+        "releaseMedian": 797.498,
+        "candidateMedian": 803.353,
+        "medianWithinRoundSaving": 12.761,
+        "wins": 10
+      },
+      "retainedMs": {
+        "fresh": {
+          "rounds": 8,
+          "releaseMedian": 784.647,
+          "candidateMedian": 786.6,
+          "medianWithinRoundSaving": -3.384,
+          "wins": 2
+        },
+        "edit": {
+          "rounds": 8,
+          "releaseMedian": 229.882,
+          "candidateMedian": 227.778,
+          "medianWithinRoundSaving": 0.508,
+          "wins": 4
+        },
+        "reject": {
+          "rounds": 8,
+          "releaseMedian": 353.119,
+          "candidateMedian": 349.906,
+          "medianWithinRoundSaving": 1.066,
+          "wins": 4
+        },
+        "syntax": {
+          "rounds": 8,
+          "releaseMedian": 107.243,
+          "candidateMedian": 107.504,
+          "medianWithinRoundSaving": 0.608,
+          "wins": 4
+        },
+        "lex": {
+          "rounds": 8,
+          "releaseMedian": 108.714,
+          "candidateMedian": 107.794,
+          "medianWithinRoundSaving": 0.846,
+          "wins": 5
+        },
+        "recover": {
+          "rounds": 8,
+          "releaseMedian": 234.996,
+          "candidateMedian": 229.725,
+          "medianWithinRoundSaving": 2.357,
+          "wins": 6
+        }
+      },
+      "phaseMs": {
+        "assets": {
+          "rounds": 4,
+          "releaseMedian": 69.953,
+          "candidateMedian": 70.24,
+          "medianWithinRoundSaving": -0.222,
+          "wins": 2
+        },
+        "load": {
+          "rounds": 4,
+          "releaseMedian": 68.37,
+          "candidateMedian": 67.153,
+          "medianWithinRoundSaving": 1.217,
+          "wins": 2
+        },
+        "check": {
+          "rounds": 4,
+          "releaseMedian": 452.993,
+          "candidateMedian": 461.514,
+          "medianWithinRoundSaving": -2.165,
+          "wins": 2
+        },
+        "lower": {
+          "rounds": 4,
+          "releaseMedian": 32.342,
+          "candidateMedian": 45.599,
+          "medianWithinRoundSaving": -10.224,
+          "wins": 0
+        },
+        "backend": {
+          "rounds": 4,
+          "releaseMedian": 112.538,
+          "candidateMedian": 111.368,
+          "medianWithinRoundSaving": 0.419,
+          "wins": 2
+        }
+      },
+      "aggregateCheckingWorkerCpuMs": {
+        "rounds": 4,
+        "releaseMedian": 1825.271,
+        "candidateMedian": 1859.304,
+        "medianWithinRoundSaving": -20.748,
+        "wins": 0
+      },
+      "nativeCompilerSha256": "2b53acbf5ceae108b411c379a1f537362438a0c4990edefa65f8af7ee23c30f7",
+      "fixtureScreenSha256": "9fe563e0dd9d2dbcfc3d8a3ef6f1a8a55b3de35a6aa257fbc7cac58d81838f72",
+      "typeSourceSha256": "2e39a2d0db66db126cc060d2a65272eea2b0f3db3b7951f3b40a492637ecb511"
+    }
+  },
+  "ordinaryRoots": {
+    "freshMs": {
+      "rounds": 20,
+      "releaseMedian": 792.127,
+      "candidateMedian": 802.849,
+      "medianWithinRoundSaving": -5.044,
+      "wins": 9
+    },
+    "retainedMs": {
+      "fresh": {
+        "rounds": 8,
+        "releaseMedian": 821.786,
+        "candidateMedian": 816.575,
+        "medianWithinRoundSaving": 13.165,
+        "wins": 5
+      },
+      "edit": {
+        "rounds": 8,
+        "releaseMedian": 237.915,
+        "candidateMedian": 245.01,
+        "medianWithinRoundSaving": 3.089,
+        "wins": 5
+      },
+      "reject": {
+        "rounds": 8,
+        "releaseMedian": 365.27,
+        "candidateMedian": 366.759,
+        "medianWithinRoundSaving": 2.45,
+        "wins": 6
+      },
+      "syntax": {
+        "rounds": 8,
+        "releaseMedian": 114.559,
+        "candidateMedian": 115.477,
+        "medianWithinRoundSaving": 0.403,
+        "wins": 4
+      },
+      "lex": {
+        "rounds": 8,
+        "releaseMedian": 115.4,
+        "candidateMedian": 114.815,
+        "medianWithinRoundSaving": 1.427,
+        "wins": 5
+      },
+      "recover": {
+        "rounds": 8,
+        "releaseMedian": 251.01,
+        "candidateMedian": 245.927,
+        "medianWithinRoundSaving": 4.426,
+        "wins": 5
+      }
+    },
+    "phaseMs": {
+      "assets": {
+        "rounds": 4,
+        "releaseMedian": 93.835,
+        "candidateMedian": 82.179,
+        "medianWithinRoundSaving": 8.718,
+        "wins": 2
+      },
+      "load": {
+        "rounds": 4,
+        "releaseMedian": 101.595,
+        "candidateMedian": 80.839,
+        "medianWithinRoundSaving": 25.308,
+        "wins": 3
+      },
+      "check": {
+        "rounds": 4,
+        "releaseMedian": 567.894,
+        "candidateMedian": 565.376,
+        "medianWithinRoundSaving": 2.518,
+        "wins": 2
+      },
+      "lower": {
+        "rounds": 4,
+        "releaseMedian": 41.023,
+        "candidateMedian": 42.482,
+        "medianWithinRoundSaving": 0.743,
+        "wins": 3
+      },
+      "backend": {
+        "rounds": 4,
+        "releaseMedian": 126.88,
+        "candidateMedian": 137.784,
+        "medianWithinRoundSaving": -10.904,
+        "wins": 1
+      }
+    },
+    "aggregateCheckingWorkerCpuMs": {
+      "rounds": 4,
+      "releaseMedian": 2251.96,
+      "candidateMedian": 2315.788,
+      "medianWithinRoundSaving": -63.828,
+      "wins": 2
+    },
+    "reversedFreshMs": {
+      "rounds": 20,
+      "releaseMedian": 818.126,
+      "candidateMedian": 805.531,
+      "medianWithinRoundSaving": 16.949,
+      "wins": 13
+    },
+    "counters": {
+      "unify_pairs": 457283,
+      "unify_resolve_calls": 914566,
+      "unify_resolve_entries": 842642,
+      "unify_resolve_nodes": 39083,
+      "resolve_nodes_added": 405857,
+      "row_requests": 1281278,
+      "labels": 17,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_slots": 8,
+      "parallel_worker_processes": 7,
+      "parallel_worker_reply_bytes": 72858303
+    },
+    "compilerSha256": "1f72ae88e1498b0659b6eac6007ab9c5bb7ba2a169e9a878c6047ea9619952ad",
+    "typeSourceSha256": "1cca06e70d74caee41eada24a089b435026972013d13c3a0278627cf8e742b8b",
+    "sourceDigest": "8592e1aa22df1833829a23d60a57ea19f6c940ab0bde00410ddc3584e3399d80",
+    "dispatchProbe": {
+      "immediateOperands": 656114,
+      "fullOperandReads": 258452,
+      "bothPhysicalRowZero": 242,
+      "atLeastOneNonzeroRow": 88866
+    }
+  },
+  "eagerChildOracle": {
+    "moduleCount": 269,
+    "matchingIds": 252160,
+    "differingIds": 0
+  },
+  "validation": {
+    "generatedCases": 4096,
+    "comparison": "Outcomes, rollback and observed substitutions",
+    "caseDigest": "46589ca784055e40db58ac87b6d0556196b4202c8a95dc2cc2b6018e9a15ab28",
+    "caseOutcomes": {
+      "typeMismatch": 1978,
+      "success": 1228,
+      "infiniteType": 585,
+      "typeLimit": 256,
+      "effectMismatch": 49
+    },
+    "fixtures": 190,
+    "fixtureSemantics": "All candidates matched all recorded Wasm, outcomes and diagnostics. Physical node/row counters differed for the fields and combined screens.",
+    "selectionWitnesses": [
+      "1025 nested arrays returned through an older interned descriptor",
+      "store starts with 65535 type nodes"
+    ],
+    "selectionOutcomes": {
+      "baseline": [
+        "TypeLimit",
+        "TypeLimit"
+      ],
+      "fields": [
+        "TypeLimit",
+        "success"
+      ],
+      "worklist": [
+        "success",
+        "TypeLimit"
+      ],
+      "combined": [
+        "success",
+        "success"
+      ],
+      "safe": [
+        "TypeLimit",
+        "TypeLimit"
+      ]
+    },
+    "negativeControl": "Removing substitution epoch checks makes the shared argument/result regression fail.",
+    "nativeLawCommits": [
+      "648abad3",
+      "c2fd3dd2"
+    ],
+    "releaseNativeLaws": "resolution_views passed on restored release sources, including both cutoff tests."
+  },
+  "ordinaryRootIntegration": {
+    "projectCheck": true,
+    "codegen": true,
+    "allNamedOutcomesMatched": true,
+    "gdevPassed": 1220,
+    "gdevExistingFailures": 108,
+    "inkPenPassed": 280,
+    "inkNativePassed": 111,
+    "inkNativeExistingFailures": 2,
+    "replayFrames": 120,
+    "replayFiles": 242,
+    "inspectedPngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameInput": "Precompiled candidate Main in pinned Pen; both the PNG and trace matched the release.",
+    "gate": "Tooling passed. Release-build gate was interrupted during native linking (exit 130); the link finished independently. Used that exact binary for ordinary-root integration and timing."
+  },
+  "sampledRelease": {
+    "compilerSha256": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+    "freshBuilds": 12,
+    "totalSamples": 27894,
+    "processCounts": [
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15,
+      15
+    ],
+    "topSymbols": [
+      [
+        "libc",
+        3797
+      ],
+      [
+        "blot_project_packet_put",
+        1115
+      ],
+      [
+        "blot_project_packet_get",
+        944
+      ],
+      [
+        "blot_support_pooled_buffer_ensure",
+        877
+      ],
+      [
+        "blot_check_types_resolveDepth",
+        749
+      ],
+      [
+        "gs_spans_free",
+        717
+      ],
+      [
+        "blot_check_types_resolveRoot",
+        681
+      ],
+      [
+        "gs_observer_pool_commit",
+        586
+      ],
+      [
+        "blot_check_types_resolveNode",
+        531
+      ],
+      [
+        "gs_spans_alloc",
+        514
+      ],
+      [
+        "blot_parse_lexer_compare_decimal",
+        454
+      ],
+      [
+        "blot_check_effects_resolve",
+        427
+      ],
+      [
+        "event",
+        374
+      ],
+      [
+        "gs_observer_attempt",
+        366
+      ],
+      [
+        "blot_check_uniqueness_visit",
+        362
+      ],
+      [
+        "blot_check_check_collectModuleHeaders",
+        344
+      ],
+      [
+        "gs_sp_near",
+        335
+      ],
+      [
+        "attempt",
+        298
+      ],
+      [
+        "blot_support_pooled_buffer_push",
+        287
+      ],
+      [
+        "blot_check_types_closedNodeHeight",
+        256
+      ],
+      [
+        "blot_reuse_parse_packet_encode",
+        249
+      ],
+      [
+        "blot_check_types_add",
+        229
+      ],
+      [
+        "blot_check_effects_resolveUncached",
+        223
+      ],
+      [
+        "blot_check_check_solveFieldsFrom",
+        192
+      ],
+      [
+        "blot_check_core_builder_projectType",
+        190
+      ],
+      [
+        "gs_sp_release",
+        187
+      ],
+      [
+        "blot_check_check_schemeCandidateScan",
+        172
+      ],
+      [
+        "blot_check_types_unifyInner",
+        171
+      ],
+      [
+        "blot_parse_symbols_find",
+        168
+      ],
+      [
+        "blot_check_types_freeRowVariablesMode",
+        160
+      ],
+      [
+        "blot_check_solver_worklist_observe",
+        159
+      ],
+      [
+        "blot_check_types_head",
+        158
+      ],
+      [
+        "blot_check_check_scheme_import_copy",
+        158
+      ],
+      [
+        "blot_reuse_dependency_snapshot_projectType",
+        135
+      ],
+      [
+        "blot_direct_map_find",
+        133
+      ],
+      [
+        "blot_check_types_insert",
+        132
+      ],
+      [
+        "blot_check_core_builder_finish",
+        131
+      ],
+      [
+        "blot_support_wyhash_update",
+        130
+      ],
+      [
+        "blot_reuse_project_check_valueImport",
+        129
+      ],
+      [
+        "blot_reuse_dependency_snapshot_push",
+        126
+      ],
+      [
+        "blot_check_core_builder_lowerOwned",
+        122
+      ],
+      [
+        "blot_support_wyhash_final",
+        119
+      ],
+      [
+        "blot_check_check_instantiate",
+        116
+      ],
+      [
+        "blot_check_types_resolveOperationRow",
+        116
+      ],
+      [
+        "blot_check_usage_check_captures",
+        115
+      ]
+    ],
+    "topModules": [
+      [
+        "blot_check_types",
+        4419
+      ],
+      [
+        "native and runtime",
+        3839
+      ],
+      [
+        "libc",
+        3797
+      ],
+      [
+        "blot_check_check",
+        2891
+      ],
+      [
+        "blot_project_packet",
+        2171
+      ],
+      [
+        "blot_support_pooled_buffer",
+        1260
+      ],
+      [
+        "blot_check_uniqueness",
+        981
+      ],
+      [
+        "blot_check_core_builder",
+        957
+      ],
+      [
+        "blot_check_effects",
+        956
+      ],
+      [
+        "blot_reuse_dependency_snapshot",
+        557
+      ],
+      [
+        "blot_direct_function",
+        493
+      ],
+      [
+        "blot_parse_lexer",
+        463
+      ],
+      [
+        "blot_parse_parser",
+        443
+      ],
+      [
+        "blot_direct_types",
+        399
+      ],
+      [
+        "blot_reuse_project_check",
+        378
+      ],
+      [
+        "blot_check_solver_worklist",
+        331
+      ],
+      [
+        "blot_check_check_scheme_import",
+        327
+      ],
+      [
+        "blot_check_usage_check",
+        299
+      ],
+      [
+        "blot_reuse_parse_packet",
+        280
+      ],
+      [
+        "blot_parse_symbols",
+        266
+      ],
+      [
+        "blot_support_wyhash",
+        249
+      ],
+      [
+        "blot_parse_ast",
+        212
+      ],
+      [
+        "blot_backend_native_asset_wgsl",
+        211
+      ],
+      [
+        "blot_parse_source_operators",
+        183
+      ],
+      [
+        "blot_direct_map",
+        169
+      ],
+      [
+        "blot_reuse_dependency_payload",
+        115
+      ],
+      [
+        "blot_backend_native_asset_numbers",
+        110
+      ],
+      [
+        "blot_support_zigmap",
+        100
+      ],
+      [
+        "blot_check_frozen_types",
+        98
+      ],
+      [
+        "blot_reuse_epoch_resolution_cache",
+        93
+      ]
+    ],
+    "targetSamples": {
+      "packetEncodeAndDecode": 2059,
+      "allocationObserver": 1624
+    },
+    "method": "Linux/x86-64 ITIMER_PROF, 1 ms nominal process CPU interval, rearmed in forked children. Each record contains only the interrupted instruction address. Relative executable offsets were matched to nm symbol extents and merged across Goose specializations. Counts are exclusive. Inlining, library work, and timer granularity limit attribution. Phase profiling was disabled; these trials are excluded from latency medians.",
+    "packetSpecializations": [
+      {
+        "symbol": "blot_project_packet_put_g19_13057",
+        "operand": "blot_check_core_Module_g15",
+        "samples": 419
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7238",
+        "operand": "r_sl_blot_reuse_principal_interface_Binding_g30",
+        "samples": 330
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_12483",
+        "operand": "blot_reuse_principal_interface_Interface_g30",
+        "samples": 246
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_11335",
+        "operand": "blot_check_types_List_g16",
+        "samples": 217
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7219",
+        "operand": "r_blot_check_types_List_g16",
+        "samples": 148
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_13233",
+        "operand": "r_blot_check_core_Module_g15",
+        "samples": 143
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7205",
+        "operand": "r_sl_blot_check_types_Node_g16",
+        "samples": 121
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_13115",
+        "operand": "blot_check_types_List_g16",
+        "samples": 66
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_11399",
+        "operand": "blot_check_types_Obligation_g16",
+        "samples": 40
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7209",
+        "operand": "r_sl_blot_check_effects_Row_g18",
+        "samples": 35
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_11509",
+        "operand": "blot_reuse_principal_interface_Nominal_g30",
+        "samples": 35
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7256",
+        "operand": "r_sl_blot_reuse_principal_interface_Nominal_g30",
+        "samples": 32
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7229",
+        "operand": "r_blot_check_types_Operator_g16",
+        "samples": 31
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_11291",
+        "operand": "gs_u64",
+        "samples": 30
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_11350",
+        "operand": "blot_check_types_NominalIdentity_g16",
+        "samples": 29
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7218",
+        "operand": "r_blot_check_types_NominalIdentity_g16",
+        "samples": 25
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7262",
+        "operand": "r_sl_blot_reuse_principal_interface_Constructor_g30",
+        "samples": 22
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_13063",
+        "operand": "gs_u64",
+        "samples": 21
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7273",
+        "operand": "r_sl_blot_reuse_principal_interface_Associated_g30",
+        "samples": 12
+      },
+      {
+        "symbol": "blot_project_packet_put_g19_13095",
+        "operand": "blot_check_types_Operator_g16",
+        "samples": 12
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7225",
+        "operand": "r_sl_blot_check_types_Obligation_g16",
+        "samples": 11
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_13258",
+        "operand": "r_blot_check_core_List_g15",
+        "samples": 8
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7228",
+        "operand": "r_blot_check_types_ObligationKind_g16",
+        "samples": 4
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7170",
+        "operand": "r_u64",
+        "samples": 4
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7215",
+        "operand": "r_sl_blot_check_types_Operation_g16",
+        "samples": 4
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7234",
+        "operand": "r_sl_blot_check_parameter_patterns_Node_g29",
+        "samples": 3
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7193",
+        "operand": "r_sl_blot_check_capability_contracts_Term_g31",
+        "samples": 2
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7203",
+        "operand": "r_blot_check_frozen_types_Graph_g23",
+        "samples": 2
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7287",
+        "operand": "r_sl_blot_reuse_principal_interface_Implementation_g30",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7167",
+        "operand": "r_sl_u32",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_13384",
+        "operand": "r_u64",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7251",
+        "operand": "r_sl_blot_parse_ast_Span_g14",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_7277",
+        "operand": "r_sl_blot_reuse_principal_interface_Contract_g30",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_13245",
+        "operand": "r_sl_blot_check_core_BindingRef_g15",
+        "samples": 1
+      },
+      {
+        "symbol": "blot_project_packet_get_g19_13340",
+        "operand": "r_sl_blot_reuse_principal_interface_ImplementationMember_g30",
+        "samples": 1
+      }
+    ],
+    "packetMapping": "Matched all 35 sampled get/put symbol names in the release ELF to parameter types in C regenerated from its sources using the pinned Goose compiler. A specialization can include inlined work.",
+    "packetOperandSamples": {
+      "blot_check_core_Module_g15": 562,
+      "sl_blot_reuse_principal_interface_Binding_g30": 330,
+      "blot_reuse_principal_interface_Interface_g30": 246,
+      "blot_check_types_List_g16": 431,
+      "sl_blot_check_types_Node_g16": 121,
+      "blot_check_types_Obligation_g16": 40,
+      "sl_blot_check_effects_Row_g18": 35,
+      "blot_reuse_principal_interface_Nominal_g30": 35,
+      "sl_blot_reuse_principal_interface_Nominal_g30": 32,
+      "blot_check_types_Operator_g16": 43,
+      "gs_u64": 51,
+      "blot_check_types_NominalIdentity_g16": 54,
+      "sl_blot_reuse_principal_interface_Constructor_g30": 22,
+      "sl_blot_reuse_principal_interface_Associated_g30": 12,
+      "sl_blot_check_types_Obligation_g16": 11,
+      "blot_check_core_List_g15": 8,
+      "blot_check_types_ObligationKind_g16": 4,
+      "u64": 5,
+      "sl_blot_check_types_Operation_g16": 4,
+      "sl_blot_check_parameter_patterns_Node_g29": 3,
+      "sl_blot_check_capability_contracts_Term_g31": 2,
+      "blot_check_frozen_types_Graph_g23": 2,
+      "sl_blot_reuse_principal_interface_Implementation_g30": 1,
+      "sl_u32": 1,
+      "sl_blot_parse_ast_Span_g14": 1,
+      "sl_blot_reuse_principal_interface_Contract_g30": 1,
+      "sl_blot_check_core_BindingRef_g15": 1,
+      "sl_blot_reuse_principal_interface_ImplementationMember_g30": 1
+    }
+  },
+  "decision": "Keep the qualified release. The first three candidates change store limits and the ordinary-root path had opposite timing outcomes between windows. Next measure a fixed-width codec for types.List (start and length), preserving encoded bytes, nesting budget and failed reads.",
+  "trials": "2026-11-18-gdev-function-unification.raw.json.gz",
+  "probes": "2026-11-18-gdev-function-unification-probes.tar.gz"
+}

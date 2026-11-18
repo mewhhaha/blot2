@@ -11,14 +11,19 @@ The qualified compiler is Blot `6b223a73`, with Gdev `45748aba`, Ink
 **782 ms** and **784 ms** median in two windows of 18 fresh builds.
 Both windows produced the same 2,639,228-byte Wasm.
 
-Reading inferred function types directly into Core saved 14.9 ms per pair
-in the broad experiment. A store-level regression test shows a published
-open effect becoming closed after a later write. The guarded reader passed the
-compiler and Pen suites but reproduced that divergence. The unification trace
-gives the next target. Comparing function pairs accounts for **599,250 of
-842,642** recursive operand-resolution visits. Try resolving their arguments,
-results and effects once at pair entry, before the first child can add a write.
-[Measurements and experiments](benchmarks/evidence/measurements/2026-11-18-gdev-cursor-core.json) · [Compiler work](tasks/FAST_COMPILE.md)
+Four function-unification prototypes kept fresh Gdev near **0.80 s**.
+Capturing both functions’ fields and reusing their resolved children reduced
+recursive visits from 842,642 to 601,703. Two native regression tests caught
+changes to the existing depth and store-size limits. The narrower version
+preserved both limits and split its fresh-build timing windows. The qualified
+compiler stays at `6b223a73`.
+
+Across 12 fresh builds of the release, encoding and decoding project packets
+accounted for **7.4% of 27,894 CPU samples**. Four allocation-observer
+functions accounted for another **5.8%**. The two-word type-list descriptor
+alone accounted for 431 packet samples. Try reading and writing its start
+and length together, then compare fresh builds and retained edits.
+[Measurements and probes](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 

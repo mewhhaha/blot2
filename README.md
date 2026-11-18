@@ -17,13 +17,17 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Gdev Main compiles from a fresh project session in **0.938 s** median
-and rebuilds a lighting preset edit in **291 ms**. Using `#run true` for the
-lighting field took **1.015 s** median and produced the same 2,639,228 Wasm
-bytes. Both fresh builds check all 269 modules.
-[Same-source measurements](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json)
+The release compiles Gdev Main’s 46,109 lines in **797.5 ms** median across
+16 fresh sessions with eight worker slots. A lighting preset edit rebuilds
+in **229.9 ms** median across eight retained sessions. A fresh compile checks
+all 269 modules and produces 2,639,228 bytes of Wasm.
+[Gdev measurements](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.json)
 
-![Fresh Gdev Main compile times with ordinary and staged lighting](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.svg)
+![Resolver visits and fresh compile times for Gdev Main](benchmarks/evidence/measurements/2026-11-18-gdev-function-unification.svg)
+
+An earlier compiler took **938 ms** for ordinary lighting and **1,015 ms** for
+`#run true` in the same field. Both produced identical Wasm.
+[Compile-time execution benchmark](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json)
 
 Blot versus Goose's direct Wasm backend, measured on 2026-11-04. Seven adapted
 pairs now pass: six original-numeric workloads and a Mandelbrot F32 control.
