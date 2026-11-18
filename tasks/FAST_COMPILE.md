@@ -120,9 +120,8 @@ sources came from in-memory inputs. In two separately profiled pairs,
 load time fell from 92.9 to 14.5 ms.
 The client timer includes delivery of the complete Wasm image. All eight
 lighting pairs improved. A fresh build spent 426.6 ms in checking across two
-profiles. Renaming an entry parameter rechecked all 270 modules. A candidate
-for the next experiment is to give modules stable local symbol IDs and resolve
-them when importing an interface.
+profiles. At this checkpoint, renaming an entry parameter rechecked all 270
+modules.
 
 Tests cover on-disk edits with the same size and timestamp, retargeted symlinks,
 changed identifier spellings, inherited operator associativity, overlay removal
@@ -130,6 +129,36 @@ and recovery after a rejection. The benchmark compared every revision with an
 independent fresh build and compared the replay, hardware frame and named
 Gdev and Ink outcomes with their references.
 [Raw pairs, profiles and qualification](../benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.json) · [Runnable edit comparison](../benchmarks/tools/bench_body_edits.ts)
+
+### Checking the entry after its dependencies
+
+The entry parses into its own symbol table. Import paths enter the shared
+table before traversal. Once dependencies have contributed their source and
+checker-generated names, the loader maps the entry syntax into the shared
+table. An unchanged entry can replay its parse packet. Parallel checker
+workers restrict name lookup to the dependency prefix. For an entry-only edit,
+the session checks the dependency bytes, import graph and prefix spellings,
+then checks and lowers the edited entry using the retained interfaces.
+
+| Gdev Main, eight alternating pairs | Previous | Current |
+| --- | ---: | ---: |
+| Rename the entry parameter | 710.8 ms | 45.2 ms |
+| Edit the lighting preset | 36.8 ms | 37.3 ms |
+| Start a fresh session | 768.0 ms | 763.8 ms |
+
+The rename checked one module, down from 270. It reused 269 syntax trees and
+returned the same Wasm SHA-256 as a fresh build on the previous release.
+Across two separately profiled pairs, checking fell from **435.5 to 6.2 ms**
+and backend work fell from **109.0 to 0.7 ms**.
+The same private rename in the imported world-storage module rechecked
+270 modules. Extending name isolation to imported modules is the next experiment.
+
+A 16-module executed fixture covers moving between fresh and existing names,
+shadowing an imported function, adding a local declaration, changing a
+dependency, and recovery from syntax and name errors. All 21 Gdev session
+transitions matched independent release builds or their diagnostics. The
+hardware frame, 120-frame replay and named Gdev and Ink outcomes also matched.
+[Paired trials and profiles](../benchmarks/evidence/measurements/2026-11-18-gdev-entry-symbols.json) · [Runnable comparison](../benchmarks/tools/bench_body_edits.ts)
 
 ### Verified arrays in worker packets
 

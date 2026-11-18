@@ -1,0 +1,2189 @@
+{
+  "date": "2026-11-18",
+  "candidateBlot": "27476846ae16012086681d9a3d4c048070492452",
+  "baselineBlot": "22dfd9df34b000582a7727cf678bb8d7eb0086c4",
+  "projects": {
+    "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "workload": "Gdev Main, 8 frontend workers, warm file cache. Eight unprofiled AB/BA pairs plus two profiled pairs per workload. Fresh includes startup and receipt of complete Wasm. Both edits start in a new session immediately after compiling the original entry. Compared each successful revision or rejection to an independently compiled previous-release build with identical source.",
+  "medianMs": {
+    "previous": {
+      "fresh": 768.05,
+      "changed": 36.79,
+      "entryRename": 710.81
+    },
+    "candidate": {
+      "fresh": 763.8,
+      "changed": 37.26,
+      "entryRename": 45.23
+    }
+  },
+  "paired": {
+    "fresh": {
+      "fasterPairs": 4,
+      "pairs": 8,
+      "medianPairedSavingMs": 0.9
+    },
+    "changed": {
+      "fasterPairs": 3,
+      "pairs": 8,
+      "medianPairedSavingMs": -1.09
+    },
+    "entryRename": {
+      "fasterPairs": 8,
+      "pairs": 8,
+      "medianPairedSavingMs": 663.66
+    }
+  },
+  "phaseMedianMs": {
+    "previous": {
+      "entryRename": {
+        "other": 17.45,
+        "assets": 6.48,
+        "load": 94.42,
+        "lex": 0.01,
+        "parse": 0.03,
+        "check": 435.5,
+        "lower": 31.67,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 108.99
+      },
+      "fresh": {
+        "other": 20.14,
+        "assets": 79.32,
+        "load": 70.78,
+        "lex": 0.15,
+        "parse": 0.78,
+        "check": 422.49,
+        "lower": 42.59,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 114.29
+      },
+      "lighting": {
+        "other": 5.38,
+        "assets": 6.82,
+        "load": 14.75,
+        "lex": 0.07,
+        "parse": 0.1,
+        "check": 1.48,
+        "lower": 0.35,
+        "freeze": 0.2,
+        "validation": 0.0,
+        "backend": 0.74
+      }
+    },
+    "candidate": {
+      "entryRename": {
+        "other": 5.92,
+        "assets": 6.49,
+        "load": 14.62,
+        "lex": 0.0,
+        "parse": 0.0,
+        "check": 6.24,
+        "lower": 1.69,
+        "freeze": 1.81,
+        "validation": 0.0,
+        "backend": 0.67
+      },
+      "fresh": {
+        "other": 18.6,
+        "assets": 71.66,
+        "load": 70.23,
+        "lex": 0.15,
+        "parse": 0.76,
+        "check": 432.21,
+        "lower": 35.62,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 112.69
+      },
+      "lighting": {
+        "other": 5.55,
+        "assets": 6.75,
+        "load": 14.55,
+        "lex": 0.06,
+        "parse": 0.1,
+        "check": 1.53,
+        "lower": 0.37,
+        "freeze": 0.21,
+        "validation": 0.0,
+        "backend": 0.77
+      }
+    }
+  },
+  "qualification": {
+    "compilerSha256": "91cfd53703211aa58daa256f8944c7cc8f562ca051b76796595584197a8e9713",
+    "mainBytes": 2639648,
+    "mainSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (109.5 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (8.2 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameMatchesPrevious": true
+  },
+  "compilerGate": {
+    "exit": 0,
+    "recordedWasmFixtures": 192,
+    "loweringFixtures": 212,
+    "directReferences": 2,
+    "passedGuestAndHost": 1098,
+    "ignoredGuestAndHost": 100
+  },
+  "compiler": {
+    "previous": "8556db16a2e1c5070ebbbacf17dc911bf4a42d823f004fcb03a4c554377fe871",
+    "candidate": "91cfd53703211aa58daa256f8944c7cc8f562ca051b76796595584197a8e9713"
+  },
+  "sources": {
+    "entry": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+    "lighting": "a112162fde2fc19484fbe7f562c57127908b2b8fcb76f8c183ef46eb3ee48ce1",
+    "world": "f766be72c7e801c72b80ad3d2e4fb8528a388b364248367627e240a05d660bd8"
+  },
+  "transitions": [
+    {
+      "label": "base",
+      "ms": 737.1061409999984,
+      "revision": 1,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 0
+      }
+    },
+    {
+      "label": "dark",
+      "ms": 36.24208499999986,
+      "revision": 2,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "both",
+      "ms": 32.98537299999953,
+      "revision": 3,
+      "sha256": "14c742bbeeb671f6e6e90ffbab28149587b52a88558eb0ad496a7d447175fd6c",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "rejected",
+      "ms": 389.292555,
+      "revision": 3,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: no_such_flag",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "label": "dark",
+      "ms": 35.937605999999505,
+      "revision": 4,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "base",
+      "ms": 34.058273000000554,
+      "revision": 5,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "scalar",
+      "ms": 957.5477100000007,
+      "revision": 6,
+      "sha256": "e153a494652c4c73b96ea80c8fdbd9973daf8796d741bc3855a0004c1448a500",
+      "bytes": 2639659,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "wide",
+      "ms": 930.4361749999989,
+      "revision": 7,
+      "sha256": "b147fa05371025ed1b857d2e4b332edc3a1bcf77b74f93b3ed217e6d4d10c2ad",
+      "bytes": 2639660,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "scalar",
+      "ms": 907.739012,
+      "revision": 8,
+      "sha256": "e153a494652c4c73b96ea80c8fdbd9973daf8796d741bc3855a0004c1448a500",
+      "bytes": 2639659,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "stageOn",
+      "ms": 795.0440319999998,
+      "revision": 9,
+      "sha256": "7e93db5375d1a55397445a5dcbc123d6aa164f4d3f46bb64cffd7022629665b7",
+      "bytes": 2639829,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "stageOff",
+      "ms": 137.6104290000003,
+      "revision": 10,
+      "sha256": "01afdaa15f4ad5eac1a392eba056a2e2b90b56d3e24e3d87b40835d32005789a",
+      "bytes": 2639829,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "stageOn",
+      "ms": 136.7143759999999,
+      "revision": 11,
+      "sha256": "7e93db5375d1a55397445a5dcbc123d6aa164f4d3f46bb64cffd7022629665b7",
+      "bytes": 2639829,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "base",
+      "ms": 809.5842569999986,
+      "revision": 12,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "entryRename",
+      "ms": 45.82212799999979,
+      "revision": 13,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 0
+    },
+    {
+      "label": "rejectedEntry",
+      "ms": 1584.3058520000013,
+      "revision": 13,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/gdev/src/main.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 467,
+          "end": 467,
+          "message": "unknown value: missing_host",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "label": "renamedDark",
+      "ms": 35.51426100000026,
+      "revision": 14,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "entryRename",
+      "ms": 34.45224199999939,
+      "revision": 15,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "base",
+      "ms": 38.20513800000117,
+      "revision": 16,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 0
+    },
+    {
+      "label": "dependencyRename",
+      "ms": 768.7863399999987,
+      "revision": 17,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "base",
+      "ms": 792.8546599999972,
+      "revision": 18,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "dark",
+      "ms": 35.477020000002085,
+      "revision": 19,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    }
+  ],
+  "pairs": [
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 782.4598970000006,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.56973899999866,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 786.6499619999995,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.11068599999999,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 746.2383009999976,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.55999900000097,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 780.2752419999997,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.09092899999814,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 755.833713,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.48757100000148,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 739.1394440000004,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 38.555593000000954,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 762.8153079999975,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.403943999997864,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 740.4484819999998,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 39.0080229999985,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 780.8809029999975,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.62135699999999,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 790.680134000002,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 39.81915499999741,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 732.0975949999993,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.75467900000149,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 738.0920419999966,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 35.59457399999883,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 738.9202360000018,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.07370399999854,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 792.821014000001,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.098872999999,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 764.7782369999986,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 40.900400999998965,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 783.263973000001,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.24629300000015,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 784.3633339999978,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 19868,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 89359,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5368
+          },
+          "load": {
+            "us": 71963,
+            "requested_bytes": 34617449,
+            "allocations": 59803,
+            "rss_growth_kib": 42772
+          },
+          "lex": {
+            "us": 157,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 767,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 424392,
+            "requested_bytes": 88620005,
+            "allocations": 333826,
+            "rss_growth_kib": 44360
+          },
+          "lower": {
+            "us": 42587,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 122624
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 114809,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 37.63922099999763,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5369,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6644,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 15173,
+            "requested_bytes": 25879079,
+            "allocations": 31020,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 71,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 99,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1483,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 346,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 198,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 746,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 745.4088919999995,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 16667,
+            "requested_bytes": 3082736,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 71644,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5752
+          },
+          "load": {
+            "us": 72742,
+            "requested_bytes": 35585164,
+            "allocations": 64200,
+            "rss_growth_kib": 44296
+          },
+          "lex": {
+            "us": 156,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 763,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 423881,
+            "requested_bytes": 92760168,
+            "allocations": 340533,
+            "rss_growth_kib": 58512
+          },
+          "lower": {
+            "us": 28983,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 117540
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 112625,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 37.0693969999993,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5529,
+            "requested_bytes": 4137688,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6509,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14602,
+            "requested_bytes": 25921161,
+            "allocations": 31454,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 66,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 103,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1533,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 372,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 215,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 783,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 775.5613589999994,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 20538,
+            "requested_bytes": 3082736,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 71674,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5528
+          },
+          "load": {
+            "us": 67722,
+            "requested_bytes": 34132667,
+            "allocations": 56891,
+            "rss_growth_kib": 43560
+          },
+          "lex": {
+            "us": 154,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 751,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 440543,
+            "requested_bytes": 83906482,
+            "allocations": 314758,
+            "rss_growth_kib": 39960
+          },
+          "lower": {
+            "us": 42253,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 123964
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 112762,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 40.899869999993825,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5564,
+            "requested_bytes": 4137688,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6982,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14503,
+            "requested_bytes": 25921161,
+            "allocations": 31454,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 57,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 103,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1532,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 376,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 210,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 756,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 752.1375540000008,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 20412,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 69290,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5308
+          },
+          "load": {
+            "us": 69595,
+            "requested_bytes": 34781037,
+            "allocations": 58704,
+            "rss_growth_kib": 42984
+          },
+          "lex": {
+            "us": 152,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 802,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 420592,
+            "requested_bytes": 75545987,
+            "allocations": 284888,
+            "rss_growth_kib": 38484
+          },
+          "lower": {
+            "us": 42595,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 125088
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 113770,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 37.580307999996876,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5388,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 7001,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14319,
+            "requested_bytes": 25879079,
+            "allocations": 31020,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 62,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 100,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1484,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 353,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 192,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 738,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    }
+  ],
+  "entryRenames": [
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 705.4718009999997,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 43.41326800000388,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 45.37979699999414,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 710.6396659999955,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 699.1524260000006,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 46.147256000003836,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 49.53882399999566,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 710.9872969999997,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 764.4968399999998,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 45.076561000001675,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 45.02483199999551,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 731.0008760000055,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 717.397533000003,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 46.4012189999994,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 44.57054799999605,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "previous",
+      "rename": {
+        "ms": 694.0583490000063,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "previous",
+      "rename": {
+        "ms": 694.8889779999954,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        },
+        "phases": {
+          "other": {
+            "us": 16449,
+            "requested_bytes": 3081787,
+            "allocations": 18923,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6384,
+            "requested_bytes": 1066734,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 95470,
+            "requested_bytes": 28843370,
+            "allocations": 32800,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 6,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 34,
+            "requested_bytes": 3789,
+            "allocations": 67,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 435888,
+            "requested_bytes": 74303607,
+            "allocations": 268028,
+            "rss_growth_kib": 11140
+          },
+          "lower": {
+            "us": 27716,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 124016
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 106882,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 43.929620000002615,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0,
+        "phases": {
+          "other": {
+            "us": 5747,
+            "requested_bytes": 4538477,
+            "allocations": 19475,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6468,
+            "requested_bytes": 1066734,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14175,
+            "requested_bytes": 25955382,
+            "allocations": 31551,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 6074,
+            "requested_bytes": 5751932,
+            "allocations": 12382,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 1641,
+            "requested_bytes": 793716,
+            "allocations": 4790,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 1774,
+            "requested_bytes": 1944601,
+            "allocations": 6299,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 670,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 45.74582299999747,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 0,
+        "phases": {
+          "other": {
+            "us": 6097,
+            "requested_bytes": 4538477,
+            "allocations": 19475,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6502,
+            "requested_bytes": 1066734,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 15067,
+            "requested_bytes": 25955382,
+            "allocations": 31551,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 6413,
+            "requested_bytes": 5751932,
+            "allocations": 12382,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 1730,
+            "requested_bytes": 793716,
+            "allocations": 4790,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 1852,
+            "requested_bytes": 1944601,
+            "allocations": 6299,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 677,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "previous",
+      "rename": {
+        "ms": 706.7966669999951,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        },
+        "phases": {
+          "other": {
+            "us": 18458,
+            "requested_bytes": 3081787,
+            "allocations": 18923,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6571,
+            "requested_bytes": 1066734,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 93371,
+            "requested_bytes": 28765950,
+            "allocations": 32630,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 6,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 35,
+            "requested_bytes": 3789,
+            "allocations": 67,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 435114,
+            "requested_bytes": 93979917,
+            "allocations": 347166,
+            "rss_growth_kib": 12348
+          },
+          "lower": {
+            "us": 35622,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 120508
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 111102,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    }
+  ]
+}
