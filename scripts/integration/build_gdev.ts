@@ -1,18 +1,19 @@
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
+import { gdevProject } from "./gdev_project.ts";
 
 const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     compiler: { type: "string" },
     entry: { type: "string" },
+    "gdev-root": { type: "string", default: "../gdev" },
     "std-root": { type: "string", default: "std" },
     "timeout-ms": { type: "string", default: "5000" },
     profile: { type: "boolean", default: false },
     trace: { type: "boolean", default: false },
-    // Without it the compiler chooses: Zig checks on four threads, the Goose
-    // compiler on one.
+    // Omission uses the production compiler's default.
     "frontend-workers": { type: "string" },
   },
 });
@@ -38,17 +39,16 @@ if (!Number.isInteger(timeoutMs) || timeoutMs < 100 || timeoutMs > 3_600_000) {
 const parent = resolve(parentArg);
 await Deno.mkdir(parent, { recursive: true });
 const evidence = await Deno.makeTempDir({ dir: parent, prefix: "main-" });
-const root = resolve("../gdev");
-const project = JSON.parse(await Deno.readTextFile(`${root}/pen.json`));
-const settings = project.compiler.settings;
-const compilerPath = resolve(
-  values.compiler ??
-    resolve(root, project.plugins[project.compiler.plugin].run.blotc),
-);
-const entryPath = resolve(root, values.entry ?? "src/main.blot");
+const root = resolve(values["gdev-root"]);
 const stdRoot = resolve(values["std-root"]);
-const preludePath = resolve(stdRoot, "prelude.blot");
-const preludeBytes = await Deno.readFile(preludePath);
+const project = await gdevProject(
+  root,
+  stdRoot,
+  values.entry ?? "src/main.blot",
+  values.compiler,
+);
+const { executable: compilerPath, entry: entryPath } = project;
+const preludeBytes = await Deno.readFile(project.prelude);
 const entryBytes = await Deno.readFile(entryPath);
 const penBytes = await Deno.readFile(`${root}/pen.json`);
 const sha256 = async (bytes: BufferSource) =>
@@ -64,29 +64,7 @@ let compiler: Awaited<ReturnType<typeof createZigProjectCompiler>> | undefined;
 let report: Record<string, unknown>;
 try {
   compiler = await createZigProjectCompiler({
-    executable: compilerPath,
-    entry: entryPath,
-    prelude: preludePath,
-    stdRoot,
-    imports: Object.fromEntries(
-      Object.entries(settings.imports).map((
-        [key, path],
-      ) => [key, resolve(root, path as string)]),
-    ),
-    nativeAssets: {
-      roots: settings.nativeAssets.roots.map((path: string) =>
-        resolve(root, path)
-      ),
-      imports: settings.nativeAssets.imports.map((
-        item: Record<string, string>,
-      ) => ({
-        ...item,
-        module: resolve(root, item.module),
-        path: resolve(root, item.path),
-      })),
-    },
-    inferenceBudget: settings.inferenceBudget,
-    storage: settings.storage,
+    ...project,
     startupTimeoutMs: Math.min(timeoutMs, 5000),
     profileBackend: values.profile || values.trace,
     profileTrace: values.trace,

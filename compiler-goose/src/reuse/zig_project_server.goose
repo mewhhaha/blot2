@@ -1,5 +1,5 @@
 // One owned project and serial build stream per child process. Each build
-// loads, checks, lowers and compiles its revision from the sources it names.
+// resolves current inputs and emits a complete module.
 // A revision is committed only after its complete reply has been encoded and
 // bounded. Failure delivering a committed reply terminates this process.
 namespace blot_reuse_zig_project_server;
@@ -39,6 +39,8 @@ type Options=blot_reuse_project::Options;
 type Source=blot_reuse_source_overlays::Source;
 type Emission=blot_reuse_partial_dependency::Result;
 type Preparation=blot_reuse_partial_dependency::Preparation;
+type Retained=blot_reuse_partial_dependency::Retained;
+type Prepared=blot_reuse_partial_dependency::Prepared;
 type Frozen=blot_reuse_frozen_dependency::FrozenDependency;
 type OwnedFrozen=blot_reuse_dependency_payload::Owned<Frozen>;
 type Owner=blot_reuse_dependency_payload::Owner;
@@ -90,8 +92,15 @@ fn validateOpen(request:Request)->Options,Error {
 // `seed_settings` the settings key they were checked with. A build takes the
 // modules whose sources are unchanged and checks the rest. `revisions` counts
 // the successful builds so far; each one is a revision.
-struct OpenProject {profile_trace:bool=false,profile_backend:bool=false,entry:const u8[:]=default<const u8[:]>(),options_owner:blot_reuse_revision_inputs::Snapshot=blot_reuse_revision_inputs::Snapshot{..},seed:blot_support::Option<OwnedFrozen> =blot_support::none<OwnedFrozen>(),seed_settings:Digest=[0;32],assets:blot_support::Option<blot_backend_native_assets::Session> =blot_support::none<blot_backend_native_assets::Session>(),policy:Policy=Policy{..},revisions:u64=0,owner:Owner=Owner{..}}
-fn deinit(self_:OpenProject&) {if self_.seed.present {self_.seed.value.deinit();}if self_.assets.present {self_.assets.value.deinit();}self_.options_owner.deinit();self_.owner.deinit();self_=OpenProject{..};}
+struct OpenProject {
+    profile_trace:bool=false,profile_backend:bool=false,entry:const u8[:]=default<const u8[:]>(),
+    options_owner:blot_reuse_revision_inputs::Snapshot=blot_reuse_revision_inputs::Snapshot{..},
+    seed:blot_support::Option<OwnedFrozen> =blot_support::none<OwnedFrozen>(),seed_settings:Digest=[0;32],
+    assets:blot_support::Option<blot_backend_native_assets::Session> =blot_support::none<blot_backend_native_assets::Session>(),
+    policy:Policy=Policy{..},revisions:u64=0,owner:Owner=Owner{..},
+    checked:Retained=Retained{..},core:Prepared=Prepared{..},
+}
+fn deinit(self_:OpenProject&) {self_.core.deinit();self_.checked.deinit();if self_.seed.present {self_.seed.value.deinit();}if self_.assets.present {self_.assets.value.deinit();}self_.options_owner.deinit();self_.owner.deinit();self_=OpenProject{..};}
 fn initOpen(request:Request,compiler:Digest,policy:Policy)->OpenProject,Error {
     let raw,error=validateOpen(request);if error!=blot_error::Error.none {return OpenProject{..},error;}var result=OpenProject{profile_trace:request.profileTrace,profile_backend:request.profileBackend,policy:policy,..};
     if request.nativeAssets.present {let assets,error=blot_backend_native_assets::init(request.nativeAssets.value);if error!=blot_error::Error.none {result.deinit();return OpenProject{..},error;}result.assets=blot_support::some(assets);}
@@ -112,10 +121,18 @@ fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {sour
 // Loads, checks and lowers this revision's sources. With a dependency bundle,
 // the bundle's unchanged modules are taken as checked; a rejection there is
 // reported by the fresh check of every module.
-fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&)->Preparation,Error {
+fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&,candidate:Retained&,allow_reuse:bool,reused:bool&)->Preparation,Error {
     if self_.seed.present {let seeded,error=prepareSeeded(self_,snapshot);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}match seeded {ready payload=>{return seeded,blot_error::Error.none;},_=>{var unused=seeded;unused.deinit();}}}
     var provider=snapshot.provider();let loaded,error=blot_reuse_project::loadWithInputs(self_.entry,snapshot.options(),provider);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}var source=loaded;self_.configure(source);
-    let empty=Frozen{..};let value,failure=blot_reuse_partial_dependency::prepareProject(source,self_.entry,blot_support::none<const u8[:]>(),empty);source.deinit();return value,failure;
+    if self_.seed.present {
+        let empty=Frozen{..};let value,failure=blot_reuse_partial_dependency::prepareProject(source,self_.entry,blot_support::none<const u8[:]>(),empty);source.deinit();return value,failure;
+    }
+    if allow_reuse && self_.core.units.len!=0 {
+        let retained,failure=blot_reuse_partial_dependency::prepareRetainedProject(source,self_.checked,self_.core);
+        if failure!=blot_error::Error.none {source.deinit();return blot_reuse_partial_dependency::Preparation.inactive,failure;}
+        match retained {ready=>{reused=true;source.deinit();return retained,blot_error::Error.none;},_=>{var unused=retained;unused.deinit();}}
+    }
+    let value,failure=blot_reuse_partial_dependency::prepareRetainableProject(source,self_.entry,candidate);source.deinit();return value,failure;
 }
 // Inactive when the bundle cannot be used for this revision; only running out
 // of memory is an error.

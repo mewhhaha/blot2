@@ -21,6 +21,7 @@ import parse.syntax_diagnostics;
 import phase_profile;
 import support.error;
 import support.option;
+import .retained_project;
 type Error=blot_error::Error;
 type Core=blot_check_core::Module;
 type Frozen=blot_reuse_frozen_dependency::FrozenDependency;
@@ -91,6 +92,9 @@ fn prepare(entry_path:const u8[:],output_identity:blot_support::Option<const u8[
 // entirely fresh checked Project. A rejection publishes only the first
 // diagnostic.
 fn prepareProject(source:Project&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,dependency:const Frozen&)->Preparation,Error {
+ return prepareProjectMode(source,entry_path,output_identity,dependency,null);
+}
+fn prepareProjectMode(source:Project&,entry_path:const u8[:],output_identity:blot_support::Option<const u8[:]>,dependency:const Frozen&,retained:Retained?)->Preparation,Error {
  if source.compiled_modules.len!=dependency.modules.len {return Preparation.inactive,blot_error::Error.invalid_artifact;}
  if source.diagnostics.len!=0 {
   let issue=source.diagnostics.items[0];
@@ -104,8 +108,26 @@ fn prepareProject(source:Project&,entry_path:const u8[:],output_identity:blot_su
  }
  if output_identity.present {for unit in source.units.items {if output_identity.value==source.symbols.get(unit.filename) {return Preparation.inactive,blot_error::Error.output_is_source;}}}
  // Checking stops at the first module that reports a diagnostic.
- var checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticWithWorkers(source);if error!=blot_error::Error.none {return Preparation.inactive,error;}
- let value,failure=prepareChecked(source,entry_path,checked);checked.deinit();return value,failure;
+ let parsed_symbols=source.symbols.entries.len;
+ var debits=default<ModuleDebit[:]>();
+ var checked=CheckedProject{..};
+ var error=blot_error::Error.none;
+ if retained!=null && source.checking.workers<=1 {
+  debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
+  checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticTracked(source,debits);
+ } else {
+  checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticWithWorkers(source);
+ }
+ if error!=blot_error::Error.none {blot_reuse_project_check::releaseModuleDebits(debits);return Preparation.inactive,error;}
+ let value,failure=prepareChecked(source,entry_path,checked);
+ if retained {
+  match value {
+   ready payload=>{retained.adopt(source,checked,parsed_symbols,debits);debits=default<ModuleDebit[:]>();},
+   _=>{},
+  }
+ }
+ blot_reuse_project_check::releaseModuleDebits(debits);
+ checked.deinit();return value,failure;
 }
 fn prepareChecked(source:Project&,entry_path:const u8[:],checked:CheckedProject&)->Preparation,Error {
  if checked.diagnostics.len!=0 {return rejectChecked(source,entry_path,checked.diagnostics[0]);}
@@ -118,10 +140,7 @@ fn prepareChecked(source:Project&,entry_path:const u8[:],checked:CheckedProject&
 // Fills `ready` in unit order. A lowering diagnostic stops at its unit.
 fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_support::Option<ConsumerDiagnostic>,Error {
  let count=source.units.len;
- let units,error=blot_reuse_dependency_payload::alloc<Core>(ready.catalog_owner,count);if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ready.units=units;for &unit in ready.units {unit=default<Core>();}
- ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=Owner{};}
- let borrowed,error=blot_reuse_dependency_payload::alloc<bool>(ready.catalog_owner,count);if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ready.borrowed=borrowed;for &flag in ready.borrowed {flag=false;}
- let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(ready.catalog_owner,count);if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ready.paths=paths;for &path in ready.paths {path=default<const u8[:]>();}
+ let error=allocateCatalog(ready,count);if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}
  for unit,index in source.units.items {
   let id=(index+1) as u32;let path,error=ready.catalog_owner.copy(source.filename(id));if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ready.paths[index]=path;
   let compiled .= source.compiledModule(id);var ir:OwnedCore;
@@ -135,6 +154,13 @@ fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_sup
   if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}return blot_support::some(diagnostic),blot_error::Error.none;}
  }
  return blot_support::none<ConsumerDiagnostic>(),blot_error::Error.none;
+}
+fn allocateCatalog(ready:Prepared&,count:i64)->Error {
+ let units,error=blot_reuse_dependency_payload::alloc<Core>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.units=units;for &unit in ready.units {unit=default<Core>();}
+ ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=Owner{};}
+ let borrowed,error=blot_reuse_dependency_payload::alloc<bool>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.borrowed=borrowed;for &flag in ready.borrowed {flag=false;}
+ let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.paths=paths;for &path in ready.paths {path=default<const u8[:]>();}
+ return blot_error::Error.none;
 }
 fn coreCodeName(code:blot_check_core::Code)->const u8[:] {match code {const for <N,V> in variants<blot_check_core::Code> {V=>{return N;},}}}
 struct HoleDetails {hole:blot_reuse_hole_diagnostics::Snapshot}

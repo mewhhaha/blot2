@@ -19,6 +19,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/file.h>
+#include <sys/mman.h>
 #include <dirent.h>
 #ifdef __linux__
 #include <sys/prctl.h>
@@ -412,18 +413,51 @@ void blot_sleep_ms(uint64_t milliseconds) {
     while (nanosleep(&pause, &pause) < 0 && errno == EINTR) {}
 }
 int64_t blot_fork(void) { pid_t pid = fork(); if (pid < 0) return -(int64_t)errno; return pid; }
-/* One check job in a copy of this process. The copy has the whole compiler
- * state as it stood here, and answers on a pipe. The parent gets the copy's
- * pid and the read end; the copy gets 0 and the write end. */
-int64_t blot_job_fork(int32_t *descriptor) {
-    int ends[2];
-    if (pipe(ends) < 0) return -(int64_t)errno;
-    pid_t pid = fork();
-    if (pid < 0) { int saved = errno; close(ends[0]); close(ends[1]); return -(int64_t)saved; }
-    if (pid == 0) { close(ends[0]); *descriptor = ends[1]; return 0; }
-    close(ends[1]); *descriptor = ends[0]; return pid;
+
+/* Each checker process gets one bounded, demand-paged reply area. It writes
+ * frames in order. The parent reads them only after joining that process. */
+#define CHECK_REPLY_CAPACITY (128u * 1024u * 1024u)
+struct check_reply {
+    uint64_t used;
+    uint8_t bytes[];
+};
+uint64_t blot_check_reply_open(void) {
+    void *mapping = mmap(NULL, sizeof(struct check_reply) + CHECK_REPLY_CAPACITY,
+                         PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (mapping == MAP_FAILED) return 0;
+    return (uint64_t)(uintptr_t)mapping;
 }
-/* Ends a job's copy at once: it releases nothing and flushes nothing. */
+void blot_check_reply_close(uint64_t handle) {
+    munmap((void *)(uintptr_t)handle, sizeof(struct check_reply) + CHECK_REPLY_CAPACITY);
+}
+_Bool blot_check_reply_append(uint64_t handle, const uint8_t *bytes, uint64_t length) {
+    struct check_reply *reply = (void *)(uintptr_t)handle;
+    const uint64_t offset = reply->used;
+    if (length == 0 || offset > CHECK_REPLY_CAPACITY ||
+        CHECK_REPLY_CAPACITY - offset < sizeof(length) ||
+        length > CHECK_REPLY_CAPACITY - offset - sizeof(length)) return 0;
+    memcpy(reply->bytes + offset, &length, sizeof(length));
+    memcpy(reply->bytes + offset + sizeof(length), bytes, length);
+    reply->used = offset + sizeof(length) + length;
+    return 1;
+}
+int64_t blot_check_reply_size(uint64_t handle, uint64_t offset) {
+    const struct check_reply *reply = (const void *)(uintptr_t)handle;
+    if (reply->used > CHECK_REPLY_CAPACITY || offset > reply->used) return -1;
+    if (offset == reply->used) return 0;
+    if (reply->used - offset < sizeof(uint64_t)) return -1;
+    uint64_t length;
+    memcpy(&length, reply->bytes + offset, sizeof(length));
+    if (length == 0 || length > reply->used - offset - sizeof(length)) return -1;
+    return (int64_t)length;
+}
+int64_t blot_check_reply_copy(uint64_t handle, uint64_t offset, uint8_t *bytes, uint64_t length) {
+    if (length == 0 || blot_check_reply_size(handle, offset) != (int64_t)length) return -1;
+    const struct check_reply *reply = (const void *)(uintptr_t)handle;
+    memcpy(bytes, reply->bytes + offset + sizeof(length), length);
+    return (int64_t)(offset + sizeof(length) + length);
+}
+/* A checker copy releases nothing and flushes nothing at exit. */
 _Noreturn void blot_job_exit(int32_t status) { _exit(status); }
 int32_t blot_detach_session(void) { if (setsid() < 0) return -errno; return 0; }
 _Bool blot_wait_success(uint32_t pid) {

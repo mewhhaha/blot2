@@ -5,6 +5,8 @@ import support.error;
 import support.native;
 import support.option;
 import support.bytes;
+import check.types;
+import check.parameter_patterns;
 import .project_packet_owners;
 import .project_packet_codecs;
 import .project_packet_contexts;
@@ -31,3 +33,44 @@ fn putOptional<T>(receiver:Writer&,value:T?) {put(receiver,value!=null);if value
 fn readOptional<T>(receiver:Reader&,witness:T)->T? {var present=false;get(receiver,present);if receiver.failure!=blot_error::Error.none||!present {return null;}let run,error=allocate(receiver.owner,1,default<T>());if error!=blot_error::Error.none {receiver.failure=error;return null;}get(receiver,run[0]);if receiver.failure!=blot_error::Error.none {return null;}return run[0];}
 fn put<K,V>(receiver:Writer&,value:dictionary_slot<K,V>) {put(receiver,value.tag);if value.tag!=0 {put(receiver,value.key);put(receiver,value.val);}}
 fn get<K,V>(receiver:Reader&,value:dictionary_slot<K,V>&) {get(receiver,value.tag);if value.tag!=0 {get(receiver,value.key);get(receiver,value.val);}}
+
+// These regular arrays use Goose's verified flat image. The parent and fork
+// use the same executable and allocator layout.
+fn putFlat<T>(receiver:Writer&,values:const T[:]) {
+    count(receiver,values.len);
+    if values.len==0 {return;}
+    let payload=bytes_of(values).len;
+    var width:i64=1;
+    var rest=payload;
+    while rest>=128 {width++;rest>>=7;}
+    let size=payload+width;
+    if !receiver.room(8+size) {return;}
+    put(receiver,size as u64);
+    to_bytes(values,receiver.output);
+}
+fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
+    let length=count(receiver);
+    if receiver.failure!=blot_error::Error.none {return;}
+    if length==0 {value=default<T[:]>();return;}
+    var size:u64=0;
+    get(receiver,size);
+    if size>limit as u64 {receiver.failure=blot_error::Error.invalid_artifact;return;}
+    let bytes=size as i64;
+    if !receiver.available(bytes) {return;}
+    let end=receiver.at+bytes;
+    let values,valid=from_bytes<T[>..]>(receiver.bytes[receiver.at..end]);
+    if !valid || values.len!=length {receiver.failure=blot_error::Error.invalid_artifact;return;}
+    let run,error=allocate(receiver.owner,length,default<T>());
+    if error!=blot_error::Error.none {receiver.failure=error;return;}
+    run.move_from(values[..]);
+    value=run;
+    receiver.at=end;
+}
+fn put(receiver:Writer&,value:const u8[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:u8[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const u32[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:u32[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_types::Node[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_types::Node[:]& ) {getFlat(receiver,value);}
+fn put(receiver:Writer&,value:const blot_check_parameter_patterns::Node[:]) {putFlat(receiver,value);}
+fn get(receiver:Reader&,value:blot_check_parameter_patterns::Node[:]& ) {getFlat(receiver,value);}

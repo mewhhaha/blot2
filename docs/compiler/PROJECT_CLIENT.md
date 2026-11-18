@@ -101,7 +101,8 @@ Concurrent builds queue in order. A successful build returns
 `{ success: true, revision, bytes, stats }`. `stats` is
 `{ frontend, sourceBytes, freshModules, cachedModules, emittedFunctions, phaseProfile }`:
 the frontend's work counts for the modules this build checked, source bytes
-read, the modules checked for this build and those taken from `dependencies`,
+read, the modules checked for this build and those reused from the session or
+its dependency bundle,
 the number of emitted functions, and the optional phase profile. A
 `nativeAssets` session also returns `assets`, `assetStats` and
 `assetDependencies`. A failure returns

@@ -94,6 +94,12 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
             };
             assert(profile.checking.parallel_jobs >= modules);
             assert.equal(profile.checking.parallel_retries, 0);
+            assert(profile.checking.parallel_worker_processes > 0);
+            assert(
+              profile.checking.parallel_worker_processes <
+                profile.checking.parallel_worker_jobs,
+            );
+            assert(profile.checking.parallel_worker_reply_bytes > 0);
           }
           bytes.push(result.bytes);
         }

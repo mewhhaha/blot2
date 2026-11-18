@@ -21,19 +21,42 @@ fn buildAssets(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const S
     }
     let committed,error=buildSources(writer,opened,id,sources,assets,profile);if assets {if !committed {assets.deinit();}}return error;
 }
-// True once the asset session owns the candidate.
+// All successful builds commit a revision. The asset session takes its
+// candidate at that same point.
 fn buildSources(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const Source[:],assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&)->bool,Error {
     var merged:Source[>..]=[];let complete_sources=composeSources(sources,assets,merged);
     var snapshot,error=blot_reuse_revision_inputs::initWithSources(opened.options_owner.options(),complete_sources);if error!=blot_error::Error.none {if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
-    var preparation,error=opened.prepare(snapshot);if error!=blot_error::Error.none {snapshot.deinit();if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
-    let committed,error=buildPrepared(writer,opened,id,assets,profile,preparation);preparation.deinit();snapshot.deinit();return committed,error;
+    let committed,failure=buildSnapshot(writer,opened,id,assets,profile,snapshot);snapshot.deinit();return committed,failure;
 }
-fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&)->bool,Error {
+fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,snapshot:blot_reuse_revision_inputs::Snapshot&)->bool,Error {
+    var allow_reuse=true;
+    loop {
+        var candidate=Retained{..};var reused=false;
+        var preparation,error=opened.prepare(snapshot,candidate,allow_reuse,reused);
+        if error!=blot_error::Error.none {candidate.deinit();if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
+        var retry=false;
+        let committed,failure=buildPrepared(writer,opened,id,assets,profile,preparation,reused,retry);
+        if committed && !opened.seed.present && !reused {
+            // Keep a single fully checked checkpoint. A later revision may
+            // reuse any combination of its modules without a chain of owners.
+            match preparation {ready payload=>{
+                opened.core.deinit();opened.checked.deinit();
+                opened.checked=candidate;candidate=Retained{..};
+                opened.core=payload.value;preparation=blot_reuse_partial_dependency::Preparation.inactive;
+            },_=>{abort("committed revision requires prepared Core");}}
+        }
+        preparation.deinit();candidate.deinit();
+        if !retry {return committed,failure;}
+        allow_reuse=false;
+    }
+}
+fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&,reused:bool,retry:bool&)->bool,Error {
     match preparation {
         inactive=>{return false,blot_error::Error.missing_rejection_diagnostic;},
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
         ready payload=>{
             let timing=blot_phase_profile::enter(blot_phase_profile::Phase.backend);var result,error=payload.value.emit();timing.exit();if error!=blot_error::Error.none {return false,error;}
+            if reused && result.result.compiled.failed {result.deinit();retry=true;return false,blot_error::Error.none;}
             let committed,error=buildEmitted(writer,opened,id,assets,profile,result);result.deinit();return committed,error;
         }
     }
@@ -55,6 +78,6 @@ fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_ba
     // Metadata and all segment lengths are encoded and bounded before the
     // revision commits. The asset commit keeps the borrowed asset bytes
     // through the final write.
-    opened.revisions+=1;var committed=false;if assets {opened.assets.value.commit(assets);committed=true;}
-    if parts.len!=0 {return committed,blot_reuse_zig_project_frames::writeParts(writer,metadata[..],parts[..]);}return committed,blot_reuse_zig_project_frames::write(writer,metadata[..],wasm);
+    opened.revisions+=1;if assets {opened.assets.value.commit(assets);}
+    if parts.len!=0 {return true,blot_reuse_zig_project_frames::writeParts(writer,metadata[..],parts[..]);}return true,blot_reuse_zig_project_frames::write(writer,metadata[..],wasm);
 }

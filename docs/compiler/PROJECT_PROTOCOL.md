@@ -204,6 +204,13 @@ bundle cannot be used for a build, or loading, checking or lowering with it
 rejects, the build loads and checks every module from source, and that result is
 the reply.
 
+A session opened without a bundle retains its last fully checked project.
+Each build resolves and reads the current inputs again. It can reuse checked
+modules and Core when the module graph and symbol slots still match. A changed
+module is checked and lowered again. Its importers are checked when the edit
+can change the facts they observe. A failed build preserves the checkpoint.
+Every successful build emits the complete Wasm.
+
 `@mewhhaha/blot`'s `createCompiler` passes its own `std/` as `stdRoot` and
 `std/prelude.blot` as `prelude`, unless the caller passes `null`.
 
@@ -307,7 +314,8 @@ been encoded and bounded; a rejection leaves both as they were.
   and `imported_schemes` for the modules this build checked and lowered, and
   `normalization`, an object of checker normalization counters;
 - integers: `sourceBytes`, `freshModules` (modules this build checked),
-  `cachedModules` (modules taken from `dependencies`) and `emittedFunctions`;
+  `cachedModules` (modules reused from the session or its dependency bundle)
+  and `emittedFunctions`;
 - `phaseProfile`: an object, empty unless the session opened with
   `profileBackend`.
 

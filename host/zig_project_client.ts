@@ -44,7 +44,7 @@ export type ZigProjectStats = { [key: string]: Json };
 export interface ZigProjectBuildStats extends ZigProjectStats {
   frontend: ZigProjectStats;
   sourceBytes: number;
-  /** Modules checked for this build and modules taken from `dependencies`. */
+  /** Modules checked for this build and modules reused from a session or bundle. */
   freshModules: number;
   cachedModules: number;
   emittedFunctions: number;
@@ -122,7 +122,7 @@ export interface ZigProjectCompilerOptions {
   storage?: Readonly<StorageBudgets>;
   /** Lowers modules on 1..16 workers; default stays serial. */
   semanticWorkers?: number;
-  /** Independent frontend module workers (1..16; default 4). */
+  /** Independent frontend module workers (1..16). Omit for the compiler default. */
   frontendWorkers?: number;
   /** Process-local inference limit, included in compiler identity. */
   inferenceBudget?: number;

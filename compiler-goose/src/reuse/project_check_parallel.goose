@@ -62,8 +62,8 @@ fn parallelBatches<E>(self_:Engine&,executor:E&,remaining:i64,resolution:i64,ass
  while left!=0 {let error=prepareReadyUnits(self_.source,done,ready);if error!=blot_error::Error.none {return false,error;}
  if ready.items.len==0 {self_.discardParallel(resolution,associated);return false,blot_error::Error.none;}let prepared,error=prepareParallelNames(self_,ready.items);if error!=blot_error::Error.none {return false,error;}if !prepared {self_.discardParallel(resolution,associated);return false,blot_error::Error.none;}
  let error=prepareWorkOrder(self_.source,ready.items,work_order);if error!=blot_error::Error.none {return false,error;}
- // This static executor copies the full immutable input image, joins every
- // process/worker before returning, and imports owned replies into jobs[unit-1].
+ // The executor joins its children before returning and stages owned replies
+ // in jobs[unit-1]. Each job sees the same already-published dependencies.
  // Preparation, charging and publication below keep dependency traversal order.
  let width=min(self_.source.checking.workers as i64,min(ready.items.len,16));let counts,error=executor.runProjectChecks(self_,work_order.items,width,jobs);if error!=blot_error::Error.none {executor.cancelProjectChecks();self_.discardParallel(resolution,associated);return false,error;}
  blot_phase_profile::recordChecking(counts);blot_phase_profile::recordChecking(blot_work_counters::Frontend{parallel_batches:1, ..});var retry=false;var out_of_memory=false;

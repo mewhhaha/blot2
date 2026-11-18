@@ -12,7 +12,7 @@ fn producerCapability(self_:const Engine&,target:ExternalTarget)->blot_support::
 // importing module through another module's catalog.
 fn producerInterface(self_:const Engine&,target:ExternalTarget)->blot_support::Option<blot_check_check::SchemeInterface> {
  if self_.source_validation {return blot_support::none<blot_check_check::SchemeInterface>();}let module=self_.catalogModule(target.unit);if !module.present {return blot_support::none<blot_check_check::SchemeInterface>();}match module.value.owner {
- typed payload=>{let owner .= payload.value;if target.binding>=owner.bindings.len || owner.bindings[target.binding].external.present {return blot_support::none<blot_check_check::SchemeInterface>();}return blot_support::some(self_.result.interface(target));},
+ typed payload=>{let owner .= payload.value;if target.binding>=owner.bindings.len || owner.bindings[target.binding].external.present {return blot_support::none<blot_check_check::SchemeInterface>();}return blot_support::some(checkedInterface(owner,target));},
  frozen payload=>{let owner .= payload.value;if target.binding>=owner.bindings.len || owner.bindings[target.binding].external.present {return blot_support::none<blot_check_check::SchemeInterface>();}return blot_support::some(blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(owner)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.interface(target.binding));},
  _=>{return blot_support::none<blot_check_check::SchemeInterface>();},
  }}

@@ -21,6 +21,8 @@ struct Frontend {
     parallel_worker_cpu_samples: u64 = 0,
     parallel_worker_slots: u64 = 0,
     parallel_worker_jobs: u64 = 0,
+    parallel_worker_processes: u64 = 0,
+    parallel_worker_reply_bytes: u64 = 0,
     modules: u64 = 0,
     scheme_calls: u64 = 0,
     closed_array_locals: u64 = 0,
@@ -50,6 +52,8 @@ fn merge(self_: Frontend&, other: Frontend) {
     self_.parallel_worker_cpu_samples = saturating_add(self_.parallel_worker_cpu_samples, other.parallel_worker_cpu_samples);
     self_.parallel_worker_slots = saturating_add(self_.parallel_worker_slots, other.parallel_worker_slots);
     self_.parallel_worker_jobs = saturating_add(self_.parallel_worker_jobs, other.parallel_worker_jobs);
+    self_.parallel_worker_processes = saturating_add(self_.parallel_worker_processes, other.parallel_worker_processes);
+    self_.parallel_worker_reply_bytes = saturating_add(self_.parallel_worker_reply_bytes, other.parallel_worker_reply_bytes);
     self_.modules = saturating_add(self_.modules, other.modules);
     self_.scheme_calls = saturating_add(self_.scheme_calls, other.scheme_calls);
     self_.closed_array_locals = saturating_add(self_.closed_array_locals, other.closed_array_locals);

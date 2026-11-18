@@ -1,14 +1,10 @@
-// The executor of project checks. A project that asks for more than one
-// checker has its ready modules checked in forked copies of this process.
-// A copy holds the whole compiler state as it stood at the fork, so only its
-// answer crosses a pipe: the checked module, or word that the module has to
-// be checked here instead. A module with a diagnostic is always checked here,
-// so diagnostics never depend on the number of checkers.
+// A ready batch shares one immutable input image. Each fork owns its checker
+// pools and checks a group of modules. The parent works on one group directly
+// and consumes the other groups' replies after joining them.
 namespace blot_reuse_project_check;
 import .project_check;
 import support.project_packet;
 import support.native;
-import support.io;
 import phase_profile;
 struct Workers {requested:u8=1}
 let job_signature:u32=0x424a4f42;
@@ -16,7 +12,6 @@ let job_signature:u32=0x424a4f42;
 let job_accepted:u32=0;
 let job_out_of_memory:u32=1;
 let job_failed:u32=2;
-struct RunningJob {unit:u32,pid:i64,descriptor:i32}
 fn putModule(writer:blot_project_packet::Writer&,module:Module) {blot_project_packet::put(writer,module.checked);blot_project_packet::put(writer,module.exports);blot_project_packet::put(writer,module.valid);}
 fn getModule(reader:blot_project_packet::Reader&)->Module,Error {
  var checked=default<Checked>();var exports:Export[:]=default<Export[:]>();var valid=false;blot_project_packet::get(reader,checked);blot_project_packet::get(reader,exports);blot_project_packet::get(reader,valid);
@@ -40,38 +35,119 @@ fn decodeJob(unit:u32,bytes:const u8[:],job:ParallelJob&)->Error {
 }
 // Runs in the copy: check, answer and end. The copy releases nothing; its
 // memory goes with its process.
-fn answerJob(parent:Engine&,unit:u32,descriptor:i32) {
- blot_phase_profile::installTrace(null);var job=ParallelJob{..};let wall=blot_native::clock_ns();let cpu=blot_native::thread_cpu_ns();let error=executeProjectJob(parent,unit,job);let stopped=blot_native::clock_ns();let cpu_stopped=blot_native::thread_cpu_ns();
- if stopped>=wall {job.work.parallel_worker_us=blot_work_counters::saturating_add(job.work.parallel_worker_us,(stopped-wall)/1000);}
- if cpu_stopped>=cpu && blot_native::thread_cpu_available() {job.work.parallel_worker_cpu_us=blot_work_counters::saturating_add(job.work.parallel_worker_cpu_us,(cpu_stopped-cpu)/1000);job.work.parallel_worker_cpu_samples++;}
- var status:i32=1;var output:u8[>..<]=[];if error==blot_error::Error.none {if encodeJob(unit,job,output)==blot_error::Error.none {if blot_io::write_all(blot_io::Writer{descriptor},output[..])==blot_error::Error.none {status=0;}}}
- blot_native::job_exit(status);
+fn checkTimedJob(parent:Engine&,unit:u32,job:ParallelJob&) {
+    job.deinit();
+    let wall=blot_native::clock_ns();
+    let cpu=blot_native::thread_cpu_ns();
+    let error=executeProjectJob(parent,unit,job);
+    let stopped=blot_native::clock_ns();
+    let cpu_stopped=blot_native::thread_cpu_ns();
+    if error!=blot_error::Error.none {job.failure=error;}
+    if stopped>=wall {job.work.parallel_worker_us=(stopped-wall)/1000;}
+    if cpu_stopped>=cpu && blot_native::thread_cpu_available() {
+        job.work.parallel_worker_cpu_us=(cpu_stopped-cpu)/1000;
+        job.work.parallel_worker_cpu_samples=1;
+    }
 }
-// Reads a copy's whole answer and waits for the copy to end.
-fn collectJob(running:RunningJob,job:ParallelJob&) {
- var bytes:u8[>..]=[];var chunk:u8[65536];var failed=false;
- loop {let count=blot_native::read(running.descriptor,chunk[0],65536);if count<0 {failed=true;break;}if count==0 {break;}bytes.append(chunk[..count]);}
- blot_native::close(running.descriptor);let succeeded=blot_native::wait_success(running.pid as u32);job.deinit();
- if failed || !succeeded {job.failure=blot_error::Error.invalid_artifact;return;}let error=decodeJob(running.unit,bytes[..],job);if error!=blot_error::Error.none {job.deinit();job.failure=error;}
+
+fn answerBatch(parent:Engine&,order:const u32[:],groups:const u8[:],group:u8,reply:u64) {
+    blot_phase_profile::installTrace(null);
+    var job=ParallelJob{..};
+    var output:u8[>..<]=[];
+    for unit,index in order {
+        if groups[index]!=group {continue;}
+        output.clear();
+        checkTimedJob(parent,unit,job);
+        if encodeJob(unit,job,output)!=blot_error::Error.none || output.len==0 {
+            blot_native::job_exit(1);
+        }
+        if !blot_native::check_reply_append(reply,output[0],output.len as u64) {
+            blot_native::job_exit(1);
+        }
+    }
+    blot_native::job_exit(0);
 }
-// At most `width` copies run at a time. A job that cannot run or answer is
-// marked failed, and the caller checks its module here.
+
+fn collectBatch(reply:u64,order:const u32[:],groups:const u8[:],group:u8,jobs:ParallelJob[:])->i64 {
+    var packet:u8[>..]=[];
+    var offset:u64=0;
+    for unit,index in order {
+        if groups[index]!=group {continue;}
+        let size=blot_native::check_reply_size(reply,offset);
+        if size<=0 {return -1;}
+        packet.resize(size,0);
+        let next=blot_native::check_reply_copy(reply,offset,packet[0],size as u64);
+        if next<0 {return -1;}
+        offset=next as u64;
+        let job:ParallelJob& =jobs[unit-1];
+        job.deinit();
+        let error=decodeJob(unit,packet[..],job);
+        if error!=blot_error::Error.none {
+            job.deinit();
+            job.failure=error;
+        }
+    }
+    if blot_native::check_reply_size(reply,offset)!=0 {return -1;}
+    return offset as i64;
+}
+
+fn checkBatchLocally(parent:Engine&,order:const u32[:],groups:const u8[:],group:u8,jobs:ParallelJob[:]) {
+    for unit,index in order {
+        if groups[index]==group {checkTimedJob(parent,unit,jobs[unit-1]);}
+    }
+}
+
 fn runProjectChecks(self_:Workers&,parent:Engine&,order:const u32[:],width:i64,jobs:ParallelJob[:])->blot_work_counters::Frontend,Error {
- var totals=blot_work_counters::Frontend{..};if width<1 || width>16 || jobs.len!=parent.source.units.len {return totals,blot_error::Error.invalid_request;}
- for unit,position in order {if unit==0 || unit>jobs.len {return totals,blot_error::Error.invalid_request;}for previous in order[..position] {if previous==unit {return totals,blot_error::Error.invalid_request;}}}
- let started=blot_native::clock_ns();var running:RunningJob[>..]=[];var next:i64=0;var oldest:i64=0;
- while next<order.len || oldest<running.len {
-  while next<order.len && running.len-oldest<width {
-   let unit=order[next];next++;var descriptor:i32=-1;let pid=blot_native::job_fork(descriptor);
-   if pid<0 {jobs[unit-1].deinit();jobs[unit-1].failure=blot_error::Error.io;continue;}
-   if pid==0 {answerJob(parent,unit,descriptor);}
-   running.push(RunningJob{unit,pid,descriptor});
-  }
-  if oldest<running.len {let job=running[oldest];oldest++;collectJob(job,jobs[job.unit-1]);}
- }
- let ended=blot_native::clock_ns();if ended>=started {totals.parallel_batch_us=(ended-started)/1000;}totals.parallel_worker_slots=width as u64;totals.parallel_worker_jobs=order.len as u64;return totals,blot_error::Error.none;
+    var totals=blot_work_counters::Frontend{..};
+    if width<1 || width>16 || jobs.len!=parent.source.units.len {return totals,blot_error::Error.invalid_request;}
+    let started=blot_native::clock_ns();
+    // The caller orders larger syntax trees first. Balance their estimated
+    // work across groups and give the first group to the parent.
+    var groups:u8[>..<]=[];
+    var load:i64[16]=[0;16];
+    for unit,position in order {
+        if unit==0 || unit>jobs.len {return totals,blot_error::Error.invalid_request;}
+        for previous in order[..position] {if previous==unit {return totals,blot_error::Error.invalid_request;}}
+        var group:i64=0;
+        for index in 1..width {if load[index]<load[group] {group=index;}}
+        let count=parent.source.unit(unit).tree.nodes.len;
+        load[group]+=min(0x7fffffffffffffff-load[group],count);
+        groups.push(group as u8);
+    }
+    var pids:i64[16]=[0;16];
+    var replies:u64[16]=[0;16];
+    for group in 1..width {
+        let reply=blot_native::check_reply_open();
+        if reply==0 {continue;}
+        let pid=blot_native::fork_process();
+        if pid==0 {answerBatch(parent,order,groups[..],group as u8,reply);}
+        if pid<0 {blot_native::check_reply_close(reply);continue;}
+        pids[group]=pid;
+        replies[group]=reply;
+        totals.parallel_worker_processes++;
+    }
+    checkBatchLocally(parent,order,groups[..],0,jobs);
+    for group in 1..width {
+        var received:i64=-1;
+        if pids[group]>0 {
+            if blot_native::wait_success(pids[group] as u32) {
+                received=collectBatch(replies[group],order,groups[..],group as u8,jobs);
+            }
+            blot_native::check_reply_close(replies[group]);
+        }
+        if received<0 {
+            checkBatchLocally(parent,order,groups[..],group as u8,jobs);
+        }else {
+            totals.parallel_worker_reply_bytes+=received as u64;
+        }
+    }
+    let ended=blot_native::clock_ns();
+    if ended>=started {totals.parallel_batch_us=(ended-started)/1000;}
+    totals.parallel_worker_slots=width as u64;
+    totals.parallel_worker_jobs=order.len as u64;
+    return totals,blot_error::Error.none;
 }
-// Every copy has ended by the time runProjectChecks returns.
+// All child processes have ended by the time runProjectChecks returns.
 fn cancelProjectChecks(self_:Workers&) {}
 fn checkProjectWithWorkers(source:Project)->CheckedProject,Error {var executor=Workers{..};return checkProject(executor,source);}
 fn checkProjectForEditorWithWorkers(source:Project,query:EditorQuery)->CheckedProject,Error {var executor=Workers{..};return checkProjectForEditor(executor,source,query);}

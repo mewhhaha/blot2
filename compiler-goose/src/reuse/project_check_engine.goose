@@ -21,6 +21,7 @@ enum Editor {none,query{value:EditorQuery}}
 struct DiagnosticBuffer {storage:Diagnostic[:]=default<Diagnostic[:]>(),items:Diagnostic[:]=default<Diagnostic[:]>()}
 struct Engine {
  source:Project=Project{..},result:CheckedProject=CheckedProject{..},diagnostics:DiagnosticBuffer=DiagnosticBuffer{..},
+ retained:const CheckedProject?=null,
  source_validation:bool=false,prepare_names:bool=false,execution:blot_check_check::PrivateExecution=blot_check_check::PrivateExecution{..},resolution_remaining:i64=1000000,associated_remaining:i64=1000000,editor:Editor=Editor.none,
  source_modules:blot_support::Option<SourceModule>[:]=default<blot_support::Option<SourceModule>[:]>(),compiled_catalogs:CompiledCatalog[:]=default<CompiledCatalog[:]>(),
 }
@@ -44,15 +45,21 @@ fn deinitSourceModules(self_:Engine&) {
 }
 fn deinitDiagnostics(self_:Engine&) {for &item in self_.diagnostics.items {item.deinit();}blot_support_pooled_buffer::deinit(self_.diagnostics,owned_Diagnostic);}
 fn deinit(self_:Engine&) {self_.deinitDiagnostics();self_.deinitSourceModules();self_.result.deinit();self_=Engine{..};}
+fn checkedModule(self_:const Engine&,unit:u32)->const Module? {
+ if unit<=self_.result.modules.len && self_.result.modules[unit-1].present {return self_.result.modules[unit-1].value;}
+ let retained .= self_.retained;
+ if retained {return retained.module(unit);}
+ return null;
+}
 fn catalogModule(self_:const Engine&,unit:u32)->blot_support::Option<CatalogModule> {
  if unit==0 || unit>self_.source.units.len {return blot_support::none<CatalogModule>();}let compiled .= self_.source.compiledModule(unit);if compiled {return blot_support::some(CatalogModule{CatalogOwner.frozen{compiled.interface},self_.compiled_catalogs[unit-1].exports,true, ..});}
  if self_.source_validation {if unit<=self_.source_modules.len && self_.source_modules[unit-1].present {let source:const SourceModule& =self_.source_modules[unit-1].value;return blot_support::some(CatalogModule{CatalogOwner.source{source.validation},source.exports,source.valid, ..});}}
- else if unit<=self_.result.modules.len && self_.result.modules[unit-1].present {let module:const Module& =self_.result.modules[unit-1].value;return blot_support::some(CatalogModule{CatalogOwner.typed{module.checked},module.exports,module.valid, ..});}
+ else {let module .= self_.checkedModule(unit);if module {return blot_support::some(CatalogModule{CatalogOwner.typed{module.checked},module.exports,module.valid, ..});}}
  return blot_support::none<CatalogModule>();
 }
 fn valueImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::ImportedBinding {
  assert(!self_.source_validation);let compiled .= self_.source.compiledModule(target.unit);var interface=default<blot_check_check::SchemeInterface>();
- if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(compiled.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {interface=self_.result.interface(target);}return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. };
+ if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(compiled.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {let module .= self_.checkedModule(target.unit);assert(module);interface=checkedInterface(module.checked,target);}return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. };
 }
 fn headerImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::SourceHeader {
  assert(self_.source_validation);let module=self_.catalogModule(target.unit);assert(module.present);let declaration=module.value.declaration(target.binding);return blot_check_check::SourceHeader{ capability_flow:declaration.capability_flow, capability_parameters:declaration.capability_parameters, target:target, named_function:declaration.named_function, origin:origin, .. };
@@ -66,4 +73,71 @@ fn diagnostic(self_:Engine&,unit:u32,span:Span,code:Code)->Error {return self_.d
 fn checkOrdered(self_:Engine&,unit:u32)->bool,Error {
  if self_.source.input_mode==blot_reuse_project::InputMode.source && unit==self_.source.entry {let issue=blot_check_check::sourceImportDiagnostic(self_.source.unit(unit).tree);if issue.present {if self_.diagnostics.items.len==0 {let error=self_.diagnostics.push(Diagnostic{unit:unit,span:issue.value.span,code:Code.semantic,semantic:blot_support::some(issue.value.code), ..});if error!=blot_error::Error.none {return false,error;}}return false,blot_error::Error.none;}}
  let error=self_.checkModule(unit);return error==blot_error::Error.none,error;
+}
+
+struct ModuleDebit {resolution:i64=0,associated:i64=0,symbols_after:i64=0}
+reusable[] var module_debit_runs:ModuleDebit[>..]=[];
+fn allocateModuleDebits(count:i64)->ModuleDebit[:] {
+ let debits=module_debit_runs.alloc_slice(count);
+ for &debit in debits {debit=ModuleDebit{};}
+ return debits;
+}
+fn canonicalModuleDebits(debits:const ModuleDebit[:])->ModuleDebit[:] {
+ if debits.len==0 {return default<ModuleDebit[:]>();}
+ let run=module_debit_runs.realloc_slice(debits,debits.len);
+ assert(blot_support::same_slice_identity(run,debits));
+ return run;
+}
+fn releaseModuleDebits(debits:const ModuleDebit[:]) {if debits.len!=0 {module_debit_runs.free_slice(debits);}}
+
+// The caller has verified that every skipped module's checker inputs are
+// equivalent to the checkpoint. Replay its global budget and symbol changes
+// at exactly its original position, including for independent modules.
+fn checkRetainedModules(source:Project,retained:const CheckedProject&,changed:const bool[:],debits:const ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->CheckedProject,Error {
+ let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);
+ var engine,error=initEngine(source,blot_check_check::PrivateExecution{..},Editor.none);
+ if error!=blot_error::Error.none {timing.exit();return CheckedProject{..},error;}
+ engine.retained .= retained;
+ let error=checkChangedModules(engine,changed,debits,symbols);
+ if error!=blot_error::Error.none {engine.deinit();timing.exit();return CheckedProject{..},error;}
+ let result=finishProject(engine);
+ engine.deinit();timing.exit();
+ return result,blot_error::Error.none;
+}
+
+fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->Error {
+ let error=self_.result.allocateModules(changed.len);
+ if error!=blot_error::Error.none {return error;}
+ for unit in self_.source.order.items {
+  let before=self_.source.symbols.entries.len;
+  let debit=debits[unit-1];
+  if debit.symbols_after<before {return blot_error::Error.invalid_artifact;}
+  if changed[unit-1] {
+   let continued,error=self_.checkOrdered(unit);
+   if error!=blot_error::Error.none {return error;}
+   if !continued || self_.diagnostics.items.len!=0 {return blot_error::Error.invalid_artifact;}
+   if self_.source.symbols.entries.len!=debit.symbols_after {return blot_error::Error.invalid_artifact;}
+   for index in before..debit.symbols_after {
+    let symbol=(index+1) as u32;
+    if self_.source.symbols.get(symbol)!=symbols.get(symbol) {return blot_error::Error.invalid_artifact;}
+   }
+  } else {
+   if debit.resolution>self_.resolution_remaining || debit.associated>self_.associated_remaining {return blot_error::Error.invalid_artifact;}
+   self_.resolution_remaining-=debit.resolution;
+   self_.associated_remaining-=debit.associated;
+   let error=replaySymbols(self_.source.symbols,symbols,debit.symbols_after);
+   if error!=blot_error::Error.none {return error;}
+  }
+ }
+ return blot_error::Error.none;
+}
+
+fn replaySymbols(pool:blot_parse_symbols::Pool&,original:const blot_parse_symbols::Pool&,end:i64)->Error {
+ for index in pool.entries.len..end {
+  let symbol=(index+1) as u32;
+  let actual,error=pool.intern(original.get(symbol));
+  if error!=blot_error::Error.none {return error;}
+  if actual!=symbol {return blot_error::Error.invalid_artifact;}
+ }
+ return blot_error::Error.none;
 }
