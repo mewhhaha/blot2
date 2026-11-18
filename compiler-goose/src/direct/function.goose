@@ -30,6 +30,7 @@ import .function_control;
 import .function_storage;
 import .function_effects;
 import .function_entry;
+import .function_staging;
 
 type Ty = u32;
 type Error = blot_direct_types::Error;
@@ -292,7 +293,8 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     match n.tag {
-        constant => { return constant(g, f, id); },
+        constant => { return constant(g, f, id, n.a); },
+        staging => { return stagedConstant(g, f, id); },
         reference => { return reference(g, f, id); },
         scalar => { return scalar(g, f, id); },
         logical => { return logical(g, f, id); },
@@ -390,15 +392,14 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return unitVal(), blot_direct_types::Error.none;
 }
 
-fn constant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+fn constant(g: Generator&, f: Fn&, id: u32, bits: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
-    let n = m.node(id);
     let ty, error = typeOf(g, f, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     match tagOf(g, ty) {
         unit => { return unitVal(), blot_direct_types::Error.none; },
-        f32_ => { f32Const(g, n.a); },
-        u32_, boolean => { i32Const(g, n.a); },
+        f32_ => { f32Const(g, bits); },
+        u32_, boolean => { i32Const(g, bits); },
         _ => { return neverVal(), g.fail(m, id, "constant of a composite type"); },
     }
     return pop(g, f, ty, id);

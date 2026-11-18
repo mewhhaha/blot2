@@ -7,6 +7,7 @@ import reuse.project_check_owners;
 import parse.symbols;
 import inference_limits;
 import reuse.persistent_unit;
+import check.typed_staging_names;
 
 type Tree=blot_parse_ast::Tree;
 type Unit=blot_reuse_project::Unit;
@@ -194,6 +195,18 @@ fn sameInitializerShape(old:const Unit&,new_:const Unit&)->bool {
  return old_end!=0 && old.source[old_end..]==new_.source[new_end..];
 }
 
+fn needsLiveValues(tree:const Tree&,symbols:const blot_parse_symbols::Pool&)->bool {
+ if tree.has_numeric_proofs {return true;}
+ if !tree.has_typed_staging {return false;}
+ for node in tree.nodes.items {
+  if node.tag==blot_parse_ast::tag_type_code || node.tag==blot_parse_ast::tag_type_descriptor {return true;}
+  if node.tag!=blot_parse_ast::tag_intrinsic {continue;}
+  let operation,staged=blot_check_typed_staging::lookup(symbols.get(node.a));
+  if staged && operation!=blot_check_typed_staging::Op.evaluate {return true;}
+ }
+ return false;
+}
+
 fn planModules(source:const Project&,previous:const Project&,changed:bool[:])->bool,bool {
  var any_changed=false;
  var value_observer=false;
@@ -202,7 +215,7 @@ fn planModules(source:const Project&,previous:const Project&,changed:bool[:])->b
  propagates.resize(changed.len,false);
  for unit,index in source.units.items {
   let old:const Unit& =previous.units.items[index];
-  value_observer=value_observer || unit.tree.has_numeric_proofs || unit.tree.has_typed_staging;
+  value_observer=value_observer || needsLiveValues(unit.tree,source.symbols);
   if unit.source==old.source {continue;}
   if blot_check_check::hasNumericFailure(unit.tree) {return false,false;}
   if index+1==source.prelude_unit || !sameInitializerShape(old,unit) {

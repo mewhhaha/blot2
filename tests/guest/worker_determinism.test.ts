@@ -204,3 +204,61 @@ Deno.test("project workers preserve the exact associated type budget across impo
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("staged imports use parallel workers and observe current Core after a retained edit", async () => {
+  const directory = await Deno.makeTempDir({ prefix: "blot-staged-workers-" });
+  const entry = directory + "/main.blot";
+  const provider = directory + "/math.blot";
+  try {
+    const imports = ['import { plus, base, spin } from "./math"'];
+    for (let index = 0; index < 15; index++) {
+      imports.push(`import * as side${index} from "./side${index}"`);
+      await Deno.writeTextFile(`${directory}/side${index}.blot`, `const v = ${index}\n`);
+    }
+    const main = (expr: string) => imports.join("\n") + "\nentry func answer (arg: U32): U32 => return " + expr + "\n";
+    const source = (base: number) => `const base: Bool = ${base === 40}\nfunc plus (a: U32) -> (b: U32): U32 => return @u32.add a b\nfunc spin (n: U32): U32 => return spin n\n`;
+    const staged = main("(#run (plus (if base then 40 else 41) 2))");
+    await Deno.writeTextFile(entry, staged);
+    await Deno.writeTextFile(provider, source(40));
+    const lanes: { bytes: Uint8Array[]; diagnoses: unknown[] }[] = [];
+    for (const frontendWorkers of [1, 4]) {
+      const compiler = await createZigProjectCompiler({ executable, entry, prelude: null, frontendWorkers, profileBackend: true });
+      const bytes: Uint8Array[] = [];
+      const diagnoses = [];
+      try {
+        for (const base of [40, 41]) {
+          const result = await compiler.build({ sources: { [entry]: staged, [provider]: source(base) } });
+          if (!result.success) throw new Error(JSON.stringify(result.diagnostics));
+          if (frontendWorkers > 1 && Deno.build.os === "linux") {
+            if (base === 40) {
+              const profile = result.stats.phaseProfile as { checking: Record<string, number> };
+              assert.equal(profile.checking.parallel_worker_jobs, 17);
+              assert.equal(profile.checking.parallel_retries, 0);
+            } else { assert.equal(result.stats.freshModules, 1); }
+          }
+          const guest = await instantiateGuest(result.bytes);
+          try { assert.equal(guest.call("answer", 0), base + 2); } finally { guest.dispose(); }
+          bytes.push(result.bytes);
+        }
+        const literal = await compiler.build({ sources: { [entry]: main("43"), [provider]: source(41) } });
+        assert(literal.success);
+        assert.deepEqual(literal.bytes, bytes[1]);
+        for (const [operand, cause] of [
+          ["plus arg 2", "runtime binding"],
+          ["@u32.div 1 0", "division by zero"],
+          ["spin 0", "evaluation budget"],
+        ]) {
+          const result = await compiler.build({ sources: { [entry]: main(`(#run (${operand}))`), [provider]: source(41) } });
+          assert(!result.success);
+          assert(result.diagnostics.some(d => d.message.includes(cause)), JSON.stringify(result.diagnostics));
+          diagnoses.push(result.diagnostics);
+        }
+        const recovery = await compiler.build({ sources: { [entry]: staged, [provider]: source(40) } });
+        assert(recovery.success);
+        assert.deepEqual(recovery.bytes, bytes[0]);
+      } finally { await compiler.dispose(); }
+      lanes.push({ bytes, diagnoses });
+    }
+    assert.deepEqual(lanes[0], lanes[1]);
+  } finally { await Deno.remove(directory, { recursive: true }); }
+});

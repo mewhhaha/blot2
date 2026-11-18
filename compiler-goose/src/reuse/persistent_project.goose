@@ -10,9 +10,10 @@ import work_counters;
 import phase_profile;
 
 fn preparePersistent(source:Project&,retained:Retained?)->Preparation,Error {
- // Staged values and numeric proof diagnostics require the live source checker.
+ // Plain #run reads checked Core at emission. Quoted code and numeric
+ // validation still use the live source checker.
  for unit in source.units.items {
-  if unit.tree.has_typed_staging || unit.tree.has_numeric_proofs || blot_check_check::hasNumericFailure(unit.tree) {return Preparation.inactive,blot_error::Error.none;}
+  if needsLiveValues(unit.tree,source.symbols) || blot_check_check::hasNumericFailure(unit.tree) {return Preparation.inactive,blot_error::Error.none;}
  }
  let parsed=source.symbols.entries.len;
  var symbols,error=blot_parse_symbols::initPooled();

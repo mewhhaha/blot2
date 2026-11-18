@@ -1716,12 +1716,12 @@ receive `unsupported_attribute`.
 
 ## Modules, constants, current limits
 
-`#run expression` requires compile-time evaluation of a pure expression using
-the same numeric semantics as the Wasm target. It can call functions and read
-compile-time values in the current scope; runtime-dependent inputs are rejected.
-Parentheses delimit it when it is part of a larger expression. Evaluation
-failures and exhausted evaluator budgets fail compilation without publishing a
-Wasm module.
+`#run expression` evaluates a pure expression during compilation. Parentheses
+delimit it inside a larger expression. The direct backend folds reached scalar
+expressions to Wasm constants. It supports Unit, Bool, U32 and F32 literals,
+scalar arithmetic and comparisons, conditionals, short-circuit logic, global
+constants and fully applied named functions, including imports. Integer
+arithmetic wraps as in Wasm. Integer division by zero fails compilation.
 
 `#do:` is shorthand for `#run do:`. Its local statements execute at compile
 time, and `break` supplies the resulting value:
@@ -1732,14 +1732,11 @@ entry func answer () => return #do:
   break base + 2
 ```
 
-Both forms use the existing evaluator. They do not allow runtime host effects.
-
-Constant evaluation uses a separate representation. Append/prepend can extend
-the latest collection version into unused buffer slots, with geometric growth;
-all previously published elements remain immutable. Branches from older versions
-and indexed replacements copy. Consequently, sequential staged builders are
-linear, while large staged indexed-update loops can still be quadratic. Unused
-reserved slots count against the evaluator's storage limit.
+Both forms can use bindings created inside the staged expression. A runtime
+parameter, host effect, unsupported operation or exhausted evaluation budget
+fails the build. Each evaluation has a budget of 65,536 Core node visits and a
+depth limit of 256. Collection construction and quoted code still need backend
+support.
 
 `#if` is still pending. The initial scoped storage profile uses the same array
 literal for all length modes:

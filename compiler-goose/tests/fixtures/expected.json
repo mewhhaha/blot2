@@ -2487,6 +2487,46 @@
    "wasm_bytes": 3491,
    "wasm_sha256": "3ed3528f7032182450450ef6827d944414f6a38892a2e10e03dd091cb1ef5d2d"
   },
+  "direct/staged_scalar.blot": {
+   "exit": 0,
+   "records": [
+    {
+     "body_elaborations": 162,
+     "body_lowerings": 162,
+     "check_occurs_steps": 1649,
+     "checker": {
+      "associated_steps": 0,
+      "inference_steps": 2987,
+      "instantiations": 219,
+      "memo_declined": 0,
+      "memo_hits": 5,
+      "memo_misses": 9,
+      "obligations_appended": 59,
+      "pending_peak": 57,
+      "projection_memo_hits": 0,
+      "shared_uses": 20,
+      "use_expansions": 17
+     },
+     "core_nodes": 923,
+     "effect_rows": 2669,
+     "emitted_functions": 24,
+     "filename": "direct/staged_scalar.blot",
+     "files": 2,
+     "imported_schemes": 23,
+     "kind": "compilation",
+     "row_versions": 464,
+     "source_bytes": 14988,
+     "stage": "build-project",
+     "success": true,
+     "syntax_nodes": 2097,
+     "type_nodes": 5191,
+     "type_versions": 788,
+     "wasm_bytes": 1865
+    }
+   ],
+   "wasm_bytes": 1865,
+   "wasm_sha256": "6a04e3fc65d6c6cbe07753b3701cbdd5e94cca7fb7ea0336151a6df724912683"
+  },
   "direct/storage.blot": {
    "exit": 0,
    "records": [

@@ -1,3 +1,4 @@
+import { deepStrictEqual } from "node:assert";
 import { compileAndRun, equal } from "./compile_helpers.ts";
 
 Deno.test("staged member lookup finishes a constant before draining its dependents", async () => {
@@ -292,4 +293,23 @@ entry const partial = func () => return do:
       equal(guest.call("partial", null), 25);
     }
   }, { prelude: "std/prelude.blot" });
+});
+
+Deno.test("#run folds scalar calls and #do blocks to literal Wasm", async () => {
+  const prefix = `func sum (x: U32) -> (y: U32): U32 => return @u32.add x y
+func twice (n: U32): U32 => return sum n n
+`;
+  async function answer(expression: string, expected: number) {
+    let emitted: Uint8Array | undefined;
+    await compileAndRun(prefix + "entry func answer () => return " + expression + "\n", (guest, bytes) => {
+      equal(guest.call("answer", null), expected);
+      emitted = bytes;
+    }, { prelude: "none" });
+    return emitted;
+  }
+  const staged = await answer("#do:\n  let subtotal = twice 20\n  break sum subtotal 2", 42);
+  deepStrictEqual(staged, await answer("42", 42));
+  await answer("#run (@u32.add 4294967295 2)", 1);
+  await answer("#run (if false then @u32.div 1 0 else 42)", 42);
+  await answer("#run (@f32.add 1.5 2.25)", 3.75);
 });
