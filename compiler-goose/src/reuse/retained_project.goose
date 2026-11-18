@@ -95,12 +95,29 @@ fn sameWords(left:const u32[:],right:const u32[:])->bool {
  return true;
 }
 
-fn sameGraph(source:const Project&,previous:const Retained&)->bool {
+// Only the root sees names following the dependency prefix. A committed
+// packet from a dependency was checked and lowered within that prefix.
+fn entryOnlyEdit(source:const Project&,previous:const Retained&)->bool {
+ let old .= previous.source;
+ if previous.packets.len==0 || old.lease==0 || source.entry==0 || source.entry!=old.entry ||
+    source.units.len!=old.units.len || blot_reuse_project::entryPacket(source).len==0 ||
+    blot_reuse_project::entryPacket(old).len==0 {return false;}
+ if source.unit(source.entry).source==old.unit(old.entry).source ||
+    source.unit(source.entry).parse_start!=old.unit(old.entry).parse_start {return false;}
+ for unit,i in source.units.items {
+  if i+1!=source.entry && unit.source!=old.units.items[i].source {return false;}
+ }
+ return true;
+}
+fn sameGraph(source:const Project&,previous:const Retained&,entry_only:bool)->bool {
  let old:const Project& =previous.source;
  if old.lease==0 || source.diagnostics.len!=0 || source.compiled_modules.len!=0 || previous.inference_limit!=blot_inference_limits::configured() {return false;}
  if source.input_mode!=old.input_mode || source.entry!=old.entry || source.prelude_unit!=old.prelude_unit || source.units.len!=old.units.len || source.checking.workers!=old.checking.workers {return false;}
- if !sameWords(source.order.items,old.order.items) || source.symbols.entries.len!=previous.parsed_symbols {return false;}
- for index in 0..previous.parsed_symbols {
+ if !sameWords(source.order.items,old.order.items) {return false;}
+ var prefix=previous.parsed_symbols;
+ if entry_only {prefix=source.unit(source.entry).parse_start;}
+ else if source.symbols.entries.len!=prefix {return false;}
+ for index in 0..prefix {
   let symbol=(index+1) as u32;
   if source.symbols.get(symbol)!=old.symbols.get(symbol) {return false;}
  }
@@ -247,7 +264,8 @@ fn includeDependents(source:const Project&,changed:bool[:]) {
 }
 
 fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core:const Prepared&,candidate:Retained&)->Preparation,Error {
- if !sameGraph(source,previous) {return Preparation.inactive,blot_error::Error.none;}
+ let entry_only=entryOnlyEdit(source,previous);
+ if !sameGraph(source,previous,entry_only) {return Preparation.inactive,blot_error::Error.none;}
  var changed:bool[>..]=[];
  changed.resize(source.units.len,false);
  let edited,admitted=planModules(source,previous.source,changed[..]);
@@ -261,7 +279,7 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
  for dirty in changed {any_reused=any_reused || !dirty;}
  if !any_reused {return Preparation.inactive,blot_error::Error.none;}
  if previous.packets.len!=0 {
-  return prepareRetainedPersistent(source,previous,previous_core,changed[..],candidate);
+  return prepareRetainedPersistent(source,previous,previous_core,changed[..],entry_only,candidate);
  }
 
  // A fallback starts with the loaded parser symbols exactly as they were.
@@ -367,12 +385,12 @@ fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&)->Error 
  return blot_error::Error.none;
 }
 
-fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],candidate:Retained&)->Preparation,Error {
+fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],entry_only:bool,candidate:Retained&)->Preparation,Error {
  var symbols,error=blot_parse_symbols::initPooled();
  if error!=blot_error::Error.none {return declineRetained(error);}
  let packets=allocateRetainedPackets(changed.len);
  let debits=blot_reuse_project_check::allocateModuleDebits(changed.len);
- let value,error=checkRetainedPersistent(source,previous,previous_core,changed,symbols,packets,debits,candidate);
+ let value,error=checkRetainedPersistent(source,previous,previous_core,changed,symbols,packets,debits,entry_only,candidate);
  symbols.deinit();
  if candidate.source.lease==0 {
   releaseRetainedPackets(packets);
@@ -381,16 +399,19 @@ fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_c
  return value,error;
 }
 
-fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],candidate:Retained&)->Preparation,Error {
- let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,previous.parsed_symbols);
+fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],entry_only:bool,candidate:Retained&)->Preparation,Error {
+ let parsed=source.symbols.entries.len;
+ let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,parsed);
  if error!=blot_error::Error.none {return declineRetained(error);}
  var input=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
  input.symbols=blot_parse_symbols::canonical(symbols);
  let prepared,error=blot_reuse_project_check::preparePersistentNames(input);
  if error!=blot_error::Error.none {return declineRetained(error);}
  let end=symbols.entries.len;
- if !prepared || end!=previous.source.symbols.entries.len {return Preparation.inactive,blot_error::Error.none;}
- for index in previous.parsed_symbols..end {
+ if !prepared || (!entry_only && end!=previous.source.symbols.entries.len) {return Preparation.inactive,blot_error::Error.none;}
+ var verified=parsed;
+ if entry_only {verified=end;}
+ for index in verified..end {
   let id=(index+1) as u32;
   if symbols.get(id)!=previous.source.symbols.get(id) {return Preparation.inactive,blot_error::Error.none;}
  }
@@ -407,7 +428,7 @@ fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_cor
  if failure==blot_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,debits,packets,ready);}
  engine.deinit();
  if failure!=blot_error::Error.none {ready.deinit();return declineRetained(failure);}
- candidate.adoptPersistent(source,symbols,previous.parsed_symbols,debits,packets);
+ candidate.adoptPersistent(source,symbols,parsed,debits,packets);
  return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
 }
 
@@ -433,6 +454,7 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   let associated=engine.associated_remaining;
   let symbol_count=engine.source.symbols.entries.len;
   cache.current=unit;
+  engine.selectUnitNames(unit);
   let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
   let continued,error=engine.checkOrdered(unit);
   check.exit();
@@ -451,7 +473,7 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
   owned[index]=blot_reuse_project_check::copyOwned(packet[..]);
   let lowered=lowerRetainedUnit(engine.source,module.checked,unit,ready);
   if lowered!=blot_error::Error.none {return lowered;}
-  if engine.source.symbols.missing_name || engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
+  if engine.source.symbols.outsideView() || engine.source.symbols.missing_name || engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
   ready.stats.body_elaborations+=module.checked.body_elaborations;
   ready.stats.imported_schemes+=module.checked.imported_schemes;
   ready.stats.normalization.merge(module.checked.types.normalization);

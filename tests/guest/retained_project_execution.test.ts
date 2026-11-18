@@ -318,3 +318,87 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("entry names can change while dependency fields and imported bindings keep their meanings", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  // The persistent checker starts at sixteen modules. Every hop contributes
+  // to the executed answer, including the dependency that owns the host field.
+  await Deno.writeTextFile(
+    dir + "/m0.blot",
+    "type Pair is data = $Pair { pad: U32, host: U32 }\n" +
+      "func read () => return ($Pair { host: 7, pad: 99 }).host\n",
+  );
+  for (let i = 1; i <= 14; i++) {
+    await Deno.writeTextFile(
+      dir + "/m" + i + ".blot",
+      'import * as prev from "./m' + (i - 1) +
+        '"\nfunc read () => return prev.read ()\n',
+    );
+  }
+  const body = (arg: string, expr: string) =>
+    'import { read } from "./m14"\n' +
+    "entry func answer (" + arg + ": U32): U32 => return " + expr + "\n";
+  await Deno.writeTextFile(entry, body("host", "@u32.add host (read ())"));
+  const options = {
+    entry,
+    executable: Deno.args[0],
+    frontendWorkers: 8,
+    prelude: null,
+  };
+  const session = await createZigProjectCompiler(options);
+  let revision = 0;
+  async function check(
+    source: string,
+    result: number | null,
+    freshModules?: number,
+  ) {
+    const request = { sources: { [entry]: source } };
+    const oracle = await createZigProjectCompiler({
+      ...options,
+      frontendWorkers: 1,
+    });
+    try {
+      const actual = await session.build(request),
+        expected = await oracle.build(request);
+      assert.equal(actual.success, expected.success);
+      if (result === null) {
+        assert(!actual.success && !expected.success);
+        assert.deepEqual(actual.diagnostics, expected.diagnostics);
+        assert.equal(actual.revision, revision);
+        return;
+      }
+      assert(actual.success && expected.success, JSON.stringify(actual));
+      assert.equal(actual.revision, ++revision);
+      assert.deepEqual(actual.bytes, expected.bytes);
+      if (freshModules !== undefined) {
+        assert.equal(actual.stats.freshModules, freshModules);
+      }
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", 5), result);
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await oracle.dispose();
+    }
+  }
+  try {
+    await check(body("host", "@u32.add host (read ())"), 12, 16);
+    await check(body("fresh_param", "@u32.add fresh_param (read ())"), 12, 1);
+    await check(body("pad", "@u32.sub (read ()) pad"), 2, 1);
+    await check(body("read", "read"), 5, 1);
+    const extra = body("value", "@u32.add (extra ()) value") +
+      "func extra () => return read ()\n";
+    await check(extra, 12, 1);
+    await check(extra.replace("func extra ()", "func extra ("), null);
+    await check(body("unbound", "fresh_param"), null);
+    await check(body("host", "@u32.add host (read ())"), 12, 1);
+    await Deno.writeTextFile(dir + "/m0.blot", "func read () => return 17\n");
+    await check(body("other", "@u32.add other (read ())"), 22);
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});

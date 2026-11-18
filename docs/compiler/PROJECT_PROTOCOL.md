@@ -216,7 +216,14 @@ reads the current inputs again. It can reuse checked
 modules and Core when the module graph and symbol slots still match. A changed
 module is checked and lowered again. Its importers are checked when the edit
 can change the facts they observe. A failed build preserves the checkpoint.
-Every successful build emits the complete Wasm.
+Every successful build returns the complete Wasm.
+
+The entry parses in a separate symbol table. Its import paths enter the project
+table first. Once the dependencies have supplied their source and checker
+names, the loader links the entry syntax into that table. Parallel dependency
+workers see only the dependency names. An entry-only edit can therefore add,
+remove or shadow names and reuse those workers’ results. The session checks
+the current entry against the dependencies before committing it.
 
 `@mewhhaha/blot`'s `createCompiler` passes its own `std/` as `stdRoot` and
 `std/prelude.blot` as `prelude`, unless the caller passes `null`.

@@ -35,31 +35,38 @@ fn resize(self_: Buckets&,length: i64) { blot_support_pooled_buffer::resize(self
 fn resize(self_: Buckets&,length: i64,value: Symbol) { if length<=self_.len { resize(self_,length); return; } let error=ensure(self_,length); if error!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: Buckets&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: Buckets&) { blot_support_pooled_buffer::deinit(self_,pool_Buckets); self_.len=0; self_.failure=blot_error::Error.none; }
-struct State { bytes: Bytes=Bytes {},entries: Entries=Entries {},buckets: Buckets=Buckets {},generation: u64=0,owner_id: u64=0,live: bool=false }
+struct State { outside_view:bool=false,bytes: Bytes=Bytes {},entries: Entries=Entries {},buckets: Buckets=Buckets {},generation: u64=0,owner_id: u64=0,live: bool=false }
 reusable var states: State[>..]=[];
 var inactive: State=State {};
 var next_generation: u64=1;
-struct Pool { read_only: bool=false,missing_name: bool=false,owner_id: u64=0,bytes: Bytes& =inactive.bytes,entries: Entries& =inactive.entries,buckets: Buckets& =inactive.buckets,lease: u32=0,generation: u64=0 }
+struct Pool { visible:i64=0x7fffffffffffffff,read_only: bool=false,missing_name: bool=false,owner_id: u64=0,bytes: Bytes& =inactive.bytes,entries: Entries& =inactive.entries,buckets: Buckets& =inactive.buckets,lease: u32=0,generation: u64=0 }
 fn initPooled() -> Pool,Error { if next_generation==0xffffffffffffffff||states.len>=0xffffffff { return Pool {},blot_error::Error.out_of_memory; } let generation=next_generation; next_generation++; let owner=blot_native::fresh_owner_id(); let at=states.alloc_index(State {generation:generation,owner_id:owner,live:true}); let state: State& =states[at]; return Pool {owner_id:owner,bytes:state.bytes,entries:state.entries,buckets:state.buckets,lease:(at+1) as u32,generation:generation},blot_error::Error.none; }
 fn valid(pool: const Pool&) -> bool { return pool.lease!=0&&pool.lease-1<states.len&&states[pool.lease-1].live&&states[pool.lease-1].generation==pool.generation&&states[pool.lease-1].owner_id==pool.owner_id; }
 // Resolve an existing live header without retaining or copying its storage.
 fn canonical(pool:const Pool&)->Pool {
  assert(valid(pool));let state:State& =states[pool.lease-1];
  assert(pool.bytes .== state.bytes && pool.entries .== state.entries && pool.buckets .== state.buckets);
- return Pool{read_only:pool.read_only,missing_name:pool.missing_name,owner_id:pool.owner_id,bytes:state.bytes,entries:state.entries,buckets:state.buckets,lease:pool.lease,generation:pool.generation};
+ return Pool{visible:pool.visible,read_only:pool.read_only,missing_name:pool.missing_name,owner_id:pool.owner_id,bytes:state.bytes,entries:state.entries,buckets:state.buckets,lease:pool.lease,generation:pool.generation};
 }
 fn deinit(pool: Pool&) { if pool.lease==0 { return; } assert(!pool.read_only&&valid(pool)); pool.bytes.deinit(); pool.entries.deinit(); pool.buckets.deinit(); let at=pool.lease-1; states[at].live=false; states.free(at); pool=Pool {}; }
 fn get(pool: const Pool&, symbol: Symbol) -> const u8[:] {
  if symbol == absent { return pool.bytes.items[..0]; }
+ if symbol>pool.visible {states[pool.lease-1].outside_view=true;}
  let e = pool.entries.items[symbol-1]; return pool.bytes.items[e.offset..e.offset+e.len];
 }
+fn restrictView(pool:Pool&,end:i64) {
+ assert(pool.read_only);
+ pool.visible=end;
+ states[pool.lease-1].outside_view=false;
+}
+fn outsideView(pool:const Pool&)->bool {return states[pool.lease-1].outside_view;}
 fn wyhash(text: const u8[:]) -> u64 { return blot_support_wyhash::hash(0,text); }
 fn find(pool: const Pool&, text: const u8[:], hash: u64) -> Symbol,bool {
  if pool.buckets.len==0 { return absent,false; }
  var slot=(hash & ((pool.buckets.len-1) as u64)) as i64;
  while pool.buckets.items[slot] != absent {
   let symbol=pool.buckets.items[slot]; let entry=pool.entries.items[symbol-1];
-  if entry.hash==hash && get(pool,symbol)==text { return symbol,true; }
+  if symbol<=pool.visible && entry.hash==hash && get(pool,symbol)==text { return symbol,true; }
   slot=(slot+1)&(pool.buckets.len-1);
  }
  return absent,false;

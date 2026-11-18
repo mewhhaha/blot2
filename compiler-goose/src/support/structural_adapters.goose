@@ -2460,6 +2460,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_zig_project_server
 fn blot_reuse_zig_project_server::blotStructuralHash<StructuralSink>(value:blot_reuse_zig_project_server::RejectionReply,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_zig_project_server::Request)->bool {return equalFields(left,right);}
 fn blot_reuse_zig_project_server::blotStructuralHash<StructuralSink>(value:blot_reuse_zig_project_server::Request,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_zig_project_server::SourceLoad)->bool {return equalFields(left,right);}
+fn blot_reuse_zig_project_server::blotStructuralHash<StructuralSink>(value:blot_reuse_zig_project_server::SourceLoad,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_zig_project_server::SourceRange)->bool {return equalFields(left,right);}
 fn blot_reuse_zig_project_server::blotStructuralHash<StructuralSink>(value:blot_reuse_zig_project_server::SourceRange,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_zig_project_server::StorageBudgets)->bool {return equalFields(left,right);}

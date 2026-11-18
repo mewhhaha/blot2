@@ -153,7 +153,16 @@ fn cpuMicros(start:u64)->u64 {
     return (end-start)/1000;
 }
 
+fn selectUnitNames(self_:Engine&,unit:u32) {
+    let source .= self_.source;
+    var end:i64=0x7fffffffffffffff;
+    if unit!=source.entry && blot_reuse_project::entryPacket(source).len!=0 {
+        end=source.unit(source.entry).parse_start;
+    }
+    source.symbols.restrictView(end);
+}
 fn persistentUnit(self_:Engine&,unit:u32,shared:u64)->Error {
+    self_.selectUnitNames(unit);
     let cache:PersistentCache& =self_.persistentCache();
     if unit==0 || unit>cache.producers.len || self_.diagnostics.items.len!=0 {
         return blot_error::Error.invalid_artifact;
@@ -186,6 +195,7 @@ fn persistentUnit(self_:Engine&,unit:u32,shared:u64)->Error {
     let error=publishPersistentUnit(self_.source,slots[unit-1].value,unit,shared,work,resolution_used,associated_used,check_elapsed);
     slots[unit-1].value.deinit();
     slots[unit-1]=blot_support::none<Module>();
+    if self_.source.symbols.outsideView() {return blot_error::Error.invalid_artifact;}
     return error;
 }
 

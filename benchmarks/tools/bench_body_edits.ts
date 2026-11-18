@@ -28,14 +28,28 @@ const stagedWorld = edit(
   "let lighting_look = #[if (#run lighting_look.probe_flag) then lighting_look.proposed else lighting_look.original]",
 );
 const flag = "\nconst probe_flag: Bool = ";
+const renamed = edit(
+  edit(entrySource, "(host:", "(session_probe_host:"),
+  "played host",
+  "played session_probe_host",
+);
 const sources: Record<string, Record<string, string>> = {
   base: {},
-  entryRename: {
-    [entry]: edit(
-      edit(entrySource, "(host:", "(session_probe_host:"),
-      "played host",
-      "played session_probe_host",
+  entryRename: { [entry]: renamed },
+  dependencyRename: {
+    [world]: edit(
+      edit(
+        worldSource,
+        "func run initial -> stages -> host =>",
+        "func run initial -> stages -> renamed_host =>",
+      ),
+      "(application stages) (owners initial) host",
+      "(application stages) (owners initial) renamed_host",
     ),
+  },
+  renamedDark: { [entry]: renamed, [leaf]: dark },
+  rejectedEntry: {
+    [entry]: edit(renamed, "played session_probe_host", "played missing_host"),
   },
   dark: { [leaf]: dark },
   both: {
@@ -97,7 +111,7 @@ for (const label of Object.keys(sources)) {
 }
 function verify(label: string, row: Awaited<ReturnType<typeof build>>) {
   const reference = oracle.get(label)!;
-  if (label === "rejected") {
+  if (reference.diagnostics) {
     assert(reference.diagnostics?.length);
     assert.deepEqual(row.diagnostics, reference.diagnostics);
   } else {
@@ -124,12 +138,19 @@ try {
       "stageOff",
       "stageOn",
       "base",
+      "entryRename",
+      "rejectedEntry",
+      "renamedDark",
+      "entryRename",
+      "base",
+      "dependencyRename",
+      "base",
       "dark",
     ]
   ) {
     const row = await build(candidate, label);
     verify(label, row);
-    if (label !== "rejected") revision++;
+    if (!row.diagnostics) revision++;
     assert.equal(row.revision, revision);
     if (label === "dark" || label === "both") {
       assert.equal(row.relocatedOperands, 1);
@@ -177,17 +198,32 @@ for (let pair = 0; pair < 10; pair++) {
     }
   }
 }
-// An entry parameter rename changes symbol IDs early in the import walk.
-for (let pair = 0; pair < 4; pair++) {
+// Time the rename directly from the original scene in a separate session.
+for (let pair = 0; pair < 10; pair++) {
   const order = ["previous", "candidate"];
   if (pair % 2) order.reverse();
   for (const treatment of order) {
-    const c = await open(treatment === "previous" ? oldPath : newPath);
+    const c = await open(
+      treatment === "previous" ? oldPath : newPath,
+      pair >= 8,
+    );
     try {
       verify("base", await build(c, "base"));
       const rename = await build(c, "entryRename");
       verify("entryRename", rename);
-      entryRenames.push({ pair: pair + 1, treatment, rename });
+      if (treatment === "candidate") {
+        assert.equal(rename.fresh, 1);
+        assert.equal(
+          rename.sourceLoad?.reusedSyntaxModules,
+          rename.modules! - 1,
+        );
+      }
+      entryRenames.push({
+        pair: pair + 1,
+        profiled: pair >= 8,
+        treatment,
+        rename,
+      });
     } finally {
       await c.dispose();
     }

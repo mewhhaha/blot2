@@ -21,7 +21,7 @@ fn seedContractName(source: Project&, contract: ContractName, namespace_: u32, a
     return blot_error::Error.none;
 }
 
-fn preparePersistentNames(source: Project&) -> bool, Error {
+fn preparePersistentNames(source: Project&, skip:u32=0) -> bool, Error {
     // Mixed projects currently use their checked producer catalogs.
     if source.input_mode != blot_reuse_project::InputMode.project || source.compiledCount() != 0 {
         return false, blot_error::Error.none;
@@ -30,6 +30,7 @@ fn preparePersistentNames(source: Project&) -> bool, Error {
     ranges.resize(source.units.len, blot_reuse_project::Range{..});
     var contracts: ContractName[>..] = [];
     for unit in source.order.items {
+        if unit==skip {continue;}
         let tree: const blot_parse_ast::Tree& = source.unit(unit).tree;
         let locals = blot_check_check::prepareGeneratedNames(source.symbols, tree, default<const blot_check_check::ImportedCatalog[:]>());
         if locals != blot_error::Error.none {return false, locals;}
