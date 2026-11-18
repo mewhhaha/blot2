@@ -1,0 +1,308 @@
+{
+  "date": "2026-11-18",
+  "decision": "Archive signature sharing. The first fresh medians were equal and the candidate won more individual pairs in both windows. The second window ran under heavy CPU contention. Profiled worker CPU and serial checking showed no repeatable reduction.",
+  "baselineSource": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "baselineGit": "5279817383d4f424910f435dbc00aa80d6adebe3",
+  "candidateSource": "signature-sharing.patch against 5279817383d4f424910f435dbc00aa80d6adebe3",
+  "baselineBinary": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+  "candidateBinary": "a6b3bc3c0f2e3bf1db006b05e8d0a948ef9d2ea51c2c8ff5a248fe9eff758d52",
+  "candidateSourceDigest": "6acef9c483ae535af5933606d5a1ecb9a19ea88188d9fc33bdce60abe7afc0b6",
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "method": "Alternating two optimized compilers in both orders. Whole fresh Gdev Main project, warm disk pages, eight frontend workers. Each retained runner opens a fresh process then applies one valid edit, three invalid edits and recovery. Successful outputs and diagnostic sequences are checked for equality after timing. The six independent one-worker controls ran while the compiler gate was rebuilding the release.",
+  "conditions": {
+    "fresh": {
+      "cpuPressure": "some avg10=15.37 avg60=10.01 avg300=5.51 total=1300996494",
+      "loadAverage": "14.57 8.10 4.68 8/1507 1302052"
+    },
+    "edits": {
+      "cpuPressure": "some avg10=1.07 avg60=5.81 avg300=5.04 total=1302172906",
+      "loadAverage": "10.12 7.86 4.76 5/1504 1303491"
+    },
+    "profile": {
+      "cpuPressure": "some avg10=1.88 avg60=4.26 avg300=4.74 total=1303362035",
+      "loadAverage": "10.40 8.31 5.05 4/1501 1304552"
+    }
+  },
+  "fresh": {
+    "pairs": 24,
+    "previousMs": 892.827,
+    "candidateMs": 893.092,
+    "pairedMedianSavedMs": 18.798,
+    "wins": 15
+  },
+  "edits": {
+    "fresh": {
+      "pairs": 8,
+      "previousMs": 1000.117,
+      "candidateMs": 1000.692,
+      "pairedMedianSavedMs": -2.112,
+      "wins": 4
+    },
+    "edit": {
+      "pairs": 8,
+      "previousMs": 281.218,
+      "candidateMs": 283.263,
+      "pairedMedianSavedMs": 6.869,
+      "wins": 5
+    },
+    "reject": {
+      "pairs": 8,
+      "previousMs": 443.096,
+      "candidateMs": 443.102,
+      "pairedMedianSavedMs": 16.685,
+      "wins": 5
+    },
+    "syntax": {
+      "pairs": 8,
+      "previousMs": 135.278,
+      "candidateMs": 138.713,
+      "pairedMedianSavedMs": -0.807,
+      "wins": 3
+    },
+    "lex": {
+      "pairs": 8,
+      "previousMs": 138.824,
+      "candidateMs": 139.08,
+      "pairedMedianSavedMs": 2.775,
+      "wins": 5
+    },
+    "recover": {
+      "pairs": 8,
+      "previousMs": 287.355,
+      "candidateMs": 289.422,
+      "pairedMedianSavedMs": 0.854,
+      "wins": 4
+    }
+  },
+  "phase": {
+    "check": {
+      "pairs": 6,
+      "previousMs": 570.293,
+      "candidateMs": 578.58,
+      "pairedMedianSavedMs": -3.617,
+      "wins": 3
+    },
+    "workerCpu": {
+      "pairs": 6,
+      "previousMs": 2351.117,
+      "candidateMs": 2370.318,
+      "pairedMedianSavedMs": -1.327,
+      "wins": 3
+    },
+    "serialCheck": {
+      "pairs": 6,
+      "previousMs": 1117.981,
+      "candidateMs": 1132.284,
+      "pairedMedianSavedMs": -10.687,
+      "wins": 2
+    },
+    "serialComplete": {
+      "pairs": 6,
+      "previousMs": 1716.429,
+      "candidateMs": 1727.554,
+      "pairedMedianSavedMs": -14.707,
+      "wins": 2
+    }
+  },
+  "work": {
+    "before": {
+      "resolve_nodes_added": 405857,
+      "resolve_depth_entries": 3695637,
+      "type_nodes": 1334708,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_reply_bytes": 72858303
+    },
+    "after": {
+      "resolve_nodes_added": 329686,
+      "resolve_depth_entries": 3694339,
+      "type_nodes": 1258537,
+      "parallel_worker_jobs": 269,
+      "parallel_worker_reply_bytes": 72303878
+    }
+  },
+  "qualification": {
+    "fullGateSeconds": 322.093396569,
+    "guestHostPassed": 1088,
+    "ignored": 100,
+    "referenceFixtures": 190,
+    "changedFixtureFields": [
+      "effect_rows",
+      "type_nodes"
+    ],
+    "otherFixtureFieldsIdentical": true,
+    "uniquenessFixtures": 212,
+    "directFixtures": 2,
+    "GdevPen": [
+      1220,
+      108
+    ],
+    "GdevModules": 210,
+    "InkPen": [
+      280,
+      0
+    ],
+    "InkModules": 73,
+    "InkNative": [
+      111,
+      2
+    ],
+    "namedResultsIdentical": true,
+    "replayFrames": 120,
+    "matchingReplayFiles": 242,
+    "framePngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTraceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+  },
+  "trials": "2026-11-18-gdev-finished-functions.raw.json.gz",
+  "confirmation": {
+    "pairs": 24,
+    "previousMs": 3121.089,
+    "candidateMs": 2895.001,
+    "pairedMedianSavedMs": 52.783,
+    "wins": 14
+  },
+  "confirmationMethod": "Another 24 fresh alternating pairs with the first compiler reversed from the first window. The compiler gate, Pen qualification and demand probe had finished. The shared host may run unrelated jobs.",
+  "confirmationCpuPressureSamples": [
+    "some avg10=40.45 avg60=37.66 avg300=23.01 total=1392872992",
+    "some avg10=38.56 avg60=37.41 avg300=23.06 total=1393529210",
+    "some avg10=38.09 avg60=37.36 avg300=23.15 total=1394097149",
+    "some avg10=35.54 avg60=36.93 avg300=23.15 total=1394610276",
+    "some avg10=34.17 avg60=36.63 avg300=23.19 total=1395223275",
+    "some avg10=33.96 avg60=36.52 avg300=23.25 total=1396048236",
+    "some avg10=34.51 avg60=36.53 avg300=23.35 total=1396639439",
+    "some avg10=33.33 avg60=36.25 avg300=23.38 total=1397224101",
+    "some avg10=32.18 avg60=35.95 avg300=23.41 total=1397821782",
+    "some avg10=31.79 avg60=35.75 avg300=23.45 total=1398546030",
+    "some avg10=33.82 avg60=35.99 avg300=23.58 total=1399465856",
+    "some avg10=35.30 avg60=36.19 avg300=23.71 total=1400293969",
+    "some avg10=34.70 avg60=36.05 avg300=23.77 total=1400641734",
+    "some avg10=30.95 avg60=35.33 avg300=23.70 total=1400832090",
+    "some avg10=26.79 avg60=34.43 avg300=23.59 total=1401018987",
+    "some avg10=23.57 avg60=33.60 avg300=23.49 total=1401192812",
+    "some avg10=21.11 avg60=32.83 avg300=23.40 total=1401660486",
+    "some avg10=22.36 avg60=32.67 avg300=23.43 total=1402207909",
+    "some avg10=23.02 avg60=32.45 avg300=23.45 total=1402745656",
+    "some avg10=24.10 avg60=32.34 avg300=23.49 total=1403365994",
+    "some avg10=25.35 avg60=32.30 avg300=23.54 total=1404021339",
+    "some avg10=26.19 avg60=32.22 avg300=23.58 total=1404579716",
+    "some avg10=26.70 avg60=32.11 avg300=23.62 total=1405187497",
+    "some avg10=26.93 avg60=31.98 avg300=23.65 total=1405767757",
+    "some avg10=27.31 avg60=31.88 avg300=23.69 total=1406326563",
+    "some avg10=25.98 avg60=31.49 avg300=23.66 total=1406447037",
+    "some avg10=22.36 avg60=30.66 avg300=23.54 total=1406608926",
+    "some avg10=19.58 avg60=29.88 avg300=23.43 total=1406750225",
+    "some avg10=17.30 avg60=29.13 avg300=23.32 total=1406855713",
+    "some avg10=15.07 avg60=28.34 avg300=23.19 total=1406963427",
+    "some avg10=13.24 avg60=27.58 avg300=23.07 total=1407061911",
+    "some avg10=11.57 avg60=26.81 avg300=22.93 total=1407183911",
+    "some avg10=10.74 avg60=26.16 avg300=22.83 total=1407337494",
+    "some avg10=10.24 avg60=25.56 avg300=22.72 total=1407485952",
+    "some avg10=9.11 avg60=24.86 avg300=22.60 total=1407593581",
+    "some avg10=8.36 avg60=24.21 avg300=22.47 total=1407683017",
+    "some avg10=7.75 avg60=23.58 avg300=22.36 total=1407794801",
+    "some avg10=7.07 avg60=22.94 avg300=22.23 total=1407895822",
+    "some avg10=6.70 avg60=22.35 avg300=22.11 total=1408008680",
+    "some avg10=6.39 avg60=21.78 avg300=21.99 total=1408120342",
+    "some avg10=6.14 avg60=21.23 avg300=21.88 total=1408273808",
+    "some avg10=6.65 avg60=20.83 avg300=21.79 total=1408442094",
+    "some avg10=6.90 avg60=20.41 avg300=21.69 total=1408661028",
+    "some avg10=7.28 avg60=20.04 avg300=21.61 total=1408801698",
+    "some avg10=7.23 avg60=19.61 avg300=21.51 total=1408947729",
+    "some avg10=7.18 avg60=19.20 avg300=21.41 total=1409097630",
+    "some avg10=7.15 avg60=18.80 avg300=21.31 total=1409232759",
+    "some avg10=7.12 avg60=18.41 avg300=21.21 total=1409421201",
+    "some avg10=7.10 avg60=18.04 avg300=21.11 total=1409550443",
+    "some avg10=7.08 avg60=17.68 avg300=21.02 total=1409673074",
+    "some avg10=6.52 avg60=17.23 avg300=20.90 total=1409816818",
+    "some avg10=6.61 avg60=16.90 avg300=20.81 total=1409927786",
+    "some avg10=6.31 avg60=16.51 avg300=20.70 total=1410053276",
+    "some avg10=6.62 avg60=16.23 avg300=20.61 total=1410206692",
+    "some avg10=6.87 avg60=15.96 avg300=20.52 total=1410373528",
+    "some avg10=6.71 avg60=15.63 avg300=20.42 total=1410459876",
+    "some avg10=6.04 avg60=15.22 avg300=20.30 total=1410548018",
+    "some avg10=5.67 avg60=14.85 avg300=20.19 total=1410648725",
+    "some avg10=5.36 avg60=14.50 avg300=20.08 total=1410730294",
+    "some avg10=5.12 avg60=14.15 avg300=19.97 total=1410814629",
+    "some avg10=5.27 avg60=13.88 avg300=19.88 total=1410955262",
+    "some avg10=5.41 avg60=13.63 avg300=19.78 total=1411103164",
+    "some avg10=5.33 avg60=13.34 avg300=19.68 total=1411198564",
+    "some avg10=5.09 avg60=13.04 avg300=19.57 total=1411296757",
+    "some avg10=5.25 avg60=12.81 avg300=19.48 total=1411437852",
+    "some avg10=5.57 avg60=12.62 avg300=19.39 total=1411588875",
+    "some avg10=5.83 avg60=12.43 avg300=19.31 total=1411705445",
+    "some avg10=5.86 avg60=12.22 avg300=19.22 total=1411846735",
+    "some avg10=5.88 avg60=12.02 avg300=19.13 total=1412021435",
+    "some avg10=6.27 avg60=11.89 avg300=19.05 total=1412172714",
+    "some avg10=6.58 avg60=11.76 avg300=18.97 total=1412349317",
+    "some avg10=6.47 avg60=11.57 avg300=18.89 total=1412510318",
+    "some avg10=7.11 avg60=11.52 avg300=18.82 total=1412686082",
+    "some avg10=7.27 avg60=11.40 avg300=18.75 total=1412891748",
+    "some avg10=7.04 avg60=11.22 avg300=18.66 total=1412963986"
+  ],
+  "demandProbe": {
+    "purpose": "Experimental removal of the two final loops that normalize expression types and dispatch signatures. Built from the baseline checker.",
+    "releaseCandidate": false,
+    "success": true,
+    "wasmBytes": 2639228,
+    "diagnostics": [],
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "resolverNodes": 256867,
+    "fixtureChanges": {
+      "programs": 190,
+      "fields": [
+        "effect_rows",
+        "type_nodes"
+      ]
+    },
+    "cursorWitness": "For a parent bound between two writes to its child, full resolution returns bool while restarting the nested lookup at zero returns u32."
+  },
+  "prototypes": "2026-11-18-gdev-finished-functions-prototypes.tar.gz",
+  "confirmationCpuPressureDuring": {
+    "source": "/proc/pressure/cpu some avg10, percent",
+    "samples": [
+      [
+        "2026-11-18T15:35:57+01:00",
+        82.2
+      ],
+      [
+        "2026-11-18T15:36:24+01:00",
+        83.73
+      ],
+      [
+        "2026-11-18T15:37:25+01:00",
+        82.08
+      ]
+    ]
+  }
+}

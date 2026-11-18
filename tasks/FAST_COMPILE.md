@@ -5,6 +5,39 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+The signature-sharing experiment reduced resolver allocations **19%**, from
+405,857 to 329,686. Both executables compiled the same 46,109 lines into
+2,639,228 Wasm bytes. The prototype remains in the measurement archive.
+
+| Gdev Main | Baseline | Candidate | Candidate wins |
+| --- | ---: | ---: | ---: |
+| First 24 fresh pairs | 893 ms | 893 ms | 15/24 |
+| Second 24, starting order reversed | 3121 ms | 2895 ms | 14/24 |
+| Retained lighting edit | 281 ms | 283 ms | 5/8 |
+
+![Type nodes and fresh compile medians](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.svg)
+
+The second window ran under heavy contention. The host CPU pressure reached
+82% over ten seconds during the comparison. The median savings within pairs were 18.798 ms in the first window
+and 52.783 ms in the second. Positive values favor the candidate.
+The single-worker control took 1118 and 1132 ms for checking. The full
+compiler gate and 120-frame Pen replay passed. All named Gdev and Ink
+outcomes matched the release, including its existing failures.
+
+Expression type finalization allocated 112,112 nodes and dispatch signatures
+another 37,855. Removing both loops cut the resolver count to 256,867 and
+preserved Main's Wasm. All 190 fixtures retained the same output and diagnostics.
+A store-level witness exposes the constraint on this shortcut. If a parent is
+bound between two writes to a child's variable, the resolver selects the later
+`bool` replacement. Restarting the child's lookup at cursor zero selects the
+earlier `u32`. The next experiment is to carry the effective substitution
+position through Core projection and memoize by source type and position.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.json)
+· [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.raw.json.gz)
+· [Patches and cursor witness](../benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions-prototypes.tar.gz)
+
+### Direct variable views
+
 Blot `6b223a73` compiled Main in **868 ms**, down from **890 ms** for
 `0c4bc0eb` on the same 18 alternating fresh pairs. The median paired gain
 was 22 ms, with 14 wins. In an earlier, busier three-way window the same

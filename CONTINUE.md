@@ -7,14 +7,15 @@ Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
 The qualified compiler is Blot `6b223a73`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. On 18 alternating fresh pairs, Main fell from
-**890 to 868 ms**. The retained lighting edit took **255 and 257 ms**.
-The new resolver reached its full node traversal 2.15 million times, down
-from 3.65 million. All Main builds emitted the same 2,639,228 Wasm bytes.
-An extra cache improved serial checking and lost the eight-worker comparison.
-Next, identify which type shapes and callers account for the 405,857 nodes
-still allocated during resolution.
-[Measurements and probes](benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.json) · [Compiler work](tasks/FAST_COMPILE.md)
+`3f2e603` and Pen `ad9766c`. An experiment reusing final function signatures
+reduced resolver allocations from **405,857 to 329,686**.
+Across two windows of 24 alternating fresh pairs, the baseline and candidate
+medians were **893 and 893 ms**, then **3,121 and 2,895 ms** under heavy CPU
+contention. The prototype remains in the measurement archive.
+The retained lighting edit took 281 and 283 ms. Both compilers emitted the
+same 2,639,228-byte module. Next, project expression and dispatch types
+directly into Core while carrying the substitution cursor into every child.
+[Measurements and prototypes](benchmarks/evidence/measurements/2026-11-18-gdev-finished-functions.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -30,7 +31,7 @@ Another 267 newly executable checks pass and 30 fail. The remaining 108
 failures comprise 70 assertions, 18 stack traps, 11 heap traps and 9 failed
 `require` calls. Six independent hauling scenarios now run in Pen.
 
-The current candidate matches every named Gdev and Ink outcome from the
+The qualified release matches every named Gdev and Ink outcome from the
 ownership release. Pen checked Main, Devtools and 545 assets. All 242 files
 of the 120-frame replay matched, including the final snapshot. The inspected
 640×480 hardware frame and trace also matched. The earlier ownership release

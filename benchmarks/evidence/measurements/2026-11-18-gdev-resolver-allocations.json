@@ -664,5 +664,63 @@
       }
     }
   },
-  "archive": "2026-11-18-gdev-resolver-allocations-probes.tar.gz"
+  "archive": "2026-11-18-gdev-resolver-allocations-probes.tar.gz",
+  "finishingCallSites": [
+    {
+      "loop": "for &id in self_.expr_types",
+      "input": "id",
+      "allocations": 112112,
+      "functions": 98532,
+      "modules": 212
+    },
+    {
+      "loop": "for &id in self_.dispatch_signatures",
+      "input": "id",
+      "allocations": 37855,
+      "functions": 37673,
+      "modules": 198
+    },
+    {
+      "loop": "for &binding in self_.bindings[1..]",
+      "input": "binding.ty",
+      "allocations": 8384,
+      "functions": 8248,
+      "modules": 188
+    },
+    {
+      "loop": "for &binding in self_.bindings[1..]",
+      "input": "binding.scheme.root",
+      "allocations": 15,
+      "functions": 8,
+      "modules": 8
+    },
+    {
+      "loop": "for &constructor in self_.constructors[1..]",
+      "input": "constructor.scheme.root",
+      "allocations": 10,
+      "functions": 2,
+      "modules": 1
+    },
+    {
+      "loop": "for &constructor in self_.constructors[1..]",
+      "input": "constructor.payload",
+      "allocations": 8,
+      "functions": 0,
+      "modules": 1
+    },
+    {
+      "loop": "for &predicate in self_.obligations",
+      "input": "predicate.ty",
+      "allocations": 8,
+      "functions": 0,
+      "modules": 2
+    },
+    {
+      "loop": "for &requirement in self_.covered_requirements",
+      "input": "requirement.value.ty",
+      "allocations": 6,
+      "functions": 0,
+      "modules": 3
+    }
+  ]
 }
