@@ -295,6 +295,7 @@ the reference client rejects an empty or invalid module.
   "stats": {
     "frontend": {},
     "sourceBytes": 0,
+    "sourceLoad": { "sourceReads": 0, "reusedSyntaxModules": 0 },
     "freshModules": 0,
     "cachedModules": 0,
     "emittedFunctions": 0,
@@ -315,7 +316,7 @@ ownership rules are in [NATIVE_ASSETS.md](NATIVE_ASSETS.md#successful-snapshot).
 The revision and the native asset snapshot commit only after the whole reply has
 been encoded and bounded; a rejection leaves both as they were.
 
-`stats` holds exactly these fields:
+Successful builds report the following work in `stats`.
 
 - `frontend`: an object of `syntax_nodes`, `body_elaborations`, `body_lowerings`
   and `imported_schemes` for the modules this build checked and lowered, and
@@ -323,6 +324,10 @@ been encoded and bounded; a rejection leaves both as they were.
 - integers: `sourceBytes`, `freshModules` (modules this build checked),
   `cachedModules` (modules reused from the session or its dependency bundle)
   and `emittedFunctions`;
+- `sourceLoad.sourceReads` counts distinct source acquisitions in the revision,
+  including overlays. `sourceLoad.reusedSyntaxModules` counts unchanged parsed
+  trees copied from the previous committed revision. Older protocol-2 compilers
+  omit `sourceLoad`.
 - `phaseProfile`: an object, empty unless the session opened with
   `profileBackend`.
 

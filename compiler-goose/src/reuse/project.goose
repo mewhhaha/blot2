@@ -60,7 +60,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
     }
 }
 struct Import { declaration: DeclarationId, target: UnitId=0, path: Symbol, namespace_: Symbol, bindings: blot_parse_ast::List, span: Span }
-struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false }
+struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0 }
 reusable[] var owned_source: u8[>..]=[];
 reusable[] var owned_lexical: blot_parse_lexer::Diagnostic[>..]=[];
 fn copySource(bytes: const u8[:]) -> const u8[:] { let result=owned_source.alloc_slice(bytes.len); for byte,index in bytes {result[index]=byte;} return result; }
@@ -82,7 +82,7 @@ fn canonicalOwnedDiagnostic(value:Diagnostic)->Diagnostic {
  return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:cause,lex_code:value.lex_code,parse_code:value.parse_code,publication:publication,parse_detail:value.parse_detail,lexical_details:lexical};
 }
 fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
-fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude};}
+fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end};}
 fn deinit(self_: Unit&) {self_.tree.deinit();releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
@@ -132,7 +132,7 @@ struct Lowering { io: bool=false, workers:u8=1 }
 struct Project {
     owner_id:u64=0,lease:u32=0,input_mode:InputMode=InputMode.project,compiled_modules:const blot_reuse_frozen_dependency::Module[:]=default<const blot_reuse_frozen_dependency::Module[:]>(),compiled_reuse:const bool[:]=default<const bool[:]>(),
     symbols:blot_parse_symbols::Pool=blot_parse_symbols::Pool {..},units:UnitBuffer& =inactive_UnitBuffer,order:WordBuffer& =inactive_WordBuffer,imports:ImportBuffer& =inactive_ImportBuffer,diagnostics:DiagnosticBuffer& =inactive_DiagnosticBuffer,
-    entry:UnitId=0,prelude_unit:UnitId=0,source_bytes:i64=0,lowering:Lowering=Lowering {..},checking:Lowering=Lowering {..},
+    entry:UnitId=0,prelude_unit:UnitId=0,source_bytes:i64=0,reused_syntax:i64=0,lowering:Lowering=Lowering {..},checking:Lowering=Lowering {..},
 }
 fn init()->Project,Error {
     if projects.len>=0xffffffff {return Project {..},blot_error::Error.out_of_memory;}
@@ -146,7 +146,7 @@ fn canonicalLoaded(self_:const Project&,modules:const blot_reuse_frozen_dependen
  assert(self_.lease!=0 && self_.lease-1<projects.len);let state:ProjectState& =projects[self_.lease-1];assert(state.owner==self_.owner_id);
  assert(self_.units .== state.units && self_.order .== state.order && self_.imports .== state.imports && self_.diagnostics .== state.diagnostics);
  assert(blot_support::same_slice_identity(self_.compiled_modules,modules) && blot_support::same_slice_identity(self_.compiled_reuse,reuse));
- return Project{owner_id:self_.owner_id,lease:self_.lease,input_mode:self_.input_mode,compiled_modules:modules,compiled_reuse:reuse,symbols:blot_parse_symbols::canonical(self_.symbols),units:state.units,order:state.order,imports:state.imports,diagnostics:state.diagnostics,entry:self_.entry,prelude_unit:self_.prelude_unit,source_bytes:self_.source_bytes,lowering:self_.lowering,checking:self_.checking};
+ return Project{owner_id:self_.owner_id,lease:self_.lease,input_mode:self_.input_mode,compiled_modules:modules,compiled_reuse:reuse,symbols:blot_parse_symbols::canonical(self_.symbols),units:state.units,order:state.order,imports:state.imports,diagnostics:state.diagnostics,entry:self_.entry,prelude_unit:self_.prelude_unit,source_bytes:self_.source_bytes,reused_syntax:self_.reused_syntax,lowering:self_.lowering,checking:self_.checking};
 }
 // These diagnostics own their payloads; recover the registered run behind the Project view.
 fn diagnosticAt(self_:Project,index:i64)->Diagnostic {
@@ -183,6 +183,7 @@ reusable[] var loader_visit_runs:Visit[>..]=[];
 reusable[] var loader_frame_runs:Frame[>..]=[];
 reusable[] var loader_fixity_runs:blot_parse_parser::InheritedFixity[>..]=[];
 struct Loader<P> {
+    previous:const Project?=null, verified_symbols:i64=0,
     parse_batch:ParseBatch=ParseBatch{},options:Options,project:Project,inputs:P&,files:LoaderFiles,visits:LoaderVisits,stack:LoaderStack,inherited_fixities:LoaderFixities,prelude_ready:bool=false,
 }
 fn starts(text: const u8[:], prefix: const u8[:]) -> bool {return prefix.len<=text.len&&text[..prefix.len]==prefix;}
@@ -276,6 +277,38 @@ fn validateAliases<P>(self_:Loader<P>&)->bool,Error {
     if self_.options.std_root.present {let root=self_.options.std_root.value;if root.len==0||contains(root,0) {let error=self_.report(Origin {..},Code.invalid_alias,"std/",blot_support::none<const u8[:]>());return false,error;}}
     return true,blot_error::Error.none;
 }
+// Parsed trees store project-wide symbol IDs. Verify any names produced by
+// intervening fresh parses before adopting a tree, then replay its new IDs.
+fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot_parse_ast::Tree&)->bool,Error {
+    let previous .= loader.previous;
+    let index=loader.project.units.len;
+    if !previous || index>=previous.units.len {return false,blot_error::Error.none;}
+    let old=previous.units.items[index];
+    let symbols .= loader.project.symbols;
+    if old.filename!=filename || old.parse_start!=symbols.entries.len ||
+       old.implicit_prelude!=loader.prelude_ready || old.source!=source {
+        return false,blot_error::Error.none;
+    }
+    for i in loader.verified_symbols..old.parse_start {
+        let id=(i+1) as Symbol;
+        if previous.symbols.get(id)!=symbols.get(id) {
+            loader.previous .= null;
+            return false,blot_error::Error.none;
+        }
+    }
+    for i in old.parse_start..old.parse_end {
+        let id=(i+1) as Symbol;
+        let actual,error=symbols.intern_hashed(previous.symbols.get(id),previous.symbols.entries.items[i].hash);
+        if error!=blot_error::Error.none {return false,error;}
+        assert(actual==id);
+    }
+    loader.verified_symbols=old.parse_end;
+    let error=tree.copyParsed(old.tree);
+    if error!=blot_error::Error.none {return false,error;}
+    loader.project.reused_syntax++;
+    return true,blot_error::Error.none;
+}
+
 fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Option<UnitId>,Error {
     let no=blot_support::none<UnitId>();var canonical:u8[>..<]=[];
     let canonical_error=self_.inputs.canonical(path,canonical);
@@ -304,7 +337,10 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
     if source.len>allowed {let reported=self_.report(origin,Code.source_limit,canonical,blot_support::none<const u8[:]>());return no,reported;}
     let initialized,tree_error=blot_parse_ast::initPooled();if tree_error!=blot_error::Error.none {return no,tree_error;}var tree=initialized;
     var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];
-    if !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree) {
+    let parse_start=self_.project.symbols.entries.len;
+    let cached,reuse_error=self_.reuseSyntax(filename,source,tree);
+    if reuse_error!=blot_error::Error.none {tree.deinit();return no,reuse_error;}
+    if !cached && !self_.parse_batch.adopt(canonical,source,self_.project.symbols,tree) {
         var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);
         let lex_scope=blot_phase_profile::enter(blot_phase_profile::Phase.lex);let lex_error=blot_parse_lexer::lex(source,lexed);lex_scope.exit();
         if lex_error!=blot_error::Error.none {
@@ -319,7 +355,7 @@ fn read<P>(self_:Loader<P>&,path:const u8[:],origin:Origin)->blot_support::Optio
         }
     }
     var id=(self_.project.units.len+1) as UnitId;if reserved.present {id=reserved.value;}
-    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready, ..};
+    var loaded=Unit {filename:filename,source:copySource(source),tree:tree,implicit_prelude:self_.prelude_ready,parse_start:parse_start,parse_end:self_.project.symbols.entries.len, ..};
     if reserved.present {self_.project.units.items[id-1]=canonicalUnit(loaded);}
     else {let appended=self_.project.units.push(loaded);if appended!=blot_error::Error.none {loaded.deinit();return no,appended;}}
     let finished,failure=self_.finishRead(id,diagnostics,tokens);
@@ -373,7 +409,7 @@ fn walk<P>(self_:Loader<P>&,root:UnitId)->Error {
     return blot_error::Error.none;
 }
 struct LoadContext {
-    parse_workers:u8=1,entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
+    previous:const Project?=null,parse_workers:u8=1,entrypath:const u8[:],result:blot_support::Option<Project>,dependency:const blot_reuse_frozen_dependency::FrozenDependency?=null,mutable:blot_reuse_frozen_dependency::FrozenDependency?=null,mutable_owner:blot_reuse_dependency_payload::Owner?=null,reuse:blot_support::Option<const bool[:]>,library:bool=false,provided:bool=false,
 }
 fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_reuse_frozen_dependency::Module[:]) {
  if context.reuse.present {context.result=blot_support::some<Project>(canonicalLoaded(project,modules,context.reuse.value));}
@@ -382,7 +418,7 @@ fn publishLoaded(context:LoadContext&,project:const Project&,modules:const blot_
 fn withLoader<P,F>(options:Options,inputs:P&,context:LoadContext&)->Error {
     let scope=blot_phase_profile::enter(blot_phase_profile::Phase.load);
     let initialized,error=init();if error!=blot_error::Error.none {scope.exit();return error;}
-    var loader=Loader<P> {options:options,project:initialized,inputs:inputs,files:LoaderFiles{},visits:LoaderVisits{},stack:LoaderStack{},inherited_fixities:LoaderFixities{}, ..};loader.project.input_mode=options.input_mode;
+    var loader=Loader<P> {previous:context.previous,options:options,project:initialized,inputs:inputs,files:LoaderFiles{},visits:LoaderVisits{},stack:LoaderStack{},inherited_fixities:LoaderFixities{}, ..};loader.project.input_mode=options.input_mode;
     let failure=F(context,loader);scope.exit();
     loader.deinitScratch();
     if failure!=blot_error::Error.none {loader.project.deinit();return failure;}
@@ -399,8 +435,8 @@ fn loadWithInputs<P>(entrypath:const u8[:],options:Options,inputs:P&)->Project,E
     let error=withLoader(options,inputs,context,loadSource);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
-fn loadWithParseWorkers<P>(entrypath:const u8[:],options:Options,inputs:P&,workers:u8)->Project,Error {
-    var context=LoadContext {parse_workers:workers,entrypath:entrypath,provided:true, ..};
+fn loadWithParseWorkers<P>(entrypath:const u8[:],options:Options,inputs:P&,workers:u8,previous:const Project?)->Project,Error {
+    var context=LoadContext {previous:previous,parse_workers:workers,entrypath:entrypath,provided:true, ..};
     let error=withLoader(options,inputs,context,loadSourceParallel);
     if error!=blot_error::Error.none {return Project {..},error;}return canonicalLoaded(context.result.value,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>()),blot_error::Error.none;
 }
@@ -418,9 +454,14 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
             if tree.node(root).tag!=blot_parse_ast::tag_fixity_decl {continue;}let fixity=tree.fixity(root);
             let error=blot_support_pooled_buffer::push(loader.inherited_fixities,blot_parse_parser::InheritedFixity {fixity.operator,fixity.precedence,fixity.association,fixity.named, ..},loader_fixity_runs);if error!=blot_error::Error.none {return error;}
         }
+        // The prelude root supplies every inherited fixity to the next parses.
+        let previous .= loader.previous;
+        if previous && (previous.prelude_unit!=prelude.value ||
+            previous.unit(prelude.value).source!=loader.project.unit(prelude.value).source ||
+            previous.filename(prelude.value)!=loader.project.filename(prelude.value)) {loader.previous .= null;}
         loader.prelude_ready=true;
     }
-    if context.parse_workers!=1 && loader.options.input_mode==InputMode.project {F(loader,context.entrypath,context.parse_workers);}
+    if !loader.previous && context.parse_workers!=1 && loader.options.input_mode==InputMode.project {F(loader,context.entrypath,context.parse_workers);}
     let entry,failure=loader.read(context.entrypath,Origin {..});if failure!=blot_error::Error.none {return failure;}if !entry.present {return blot_error::Error.none;}
     loader.project.entry=entry.value;
     if loader.options.input_mode==InputMode.source {

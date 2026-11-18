@@ -10,6 +10,8 @@ const root = resolve("../gdev");
 const project = await gdevProject(root, resolve("std"), "src/main.blot");
 const leaf = resolve(root, "src/effects/lighting_look.blot");
 const world = resolve(root, "src/world_storage.blot");
+const entry = resolve(root, "src/main.blot");
+const entrySource = await Deno.readTextFile(entry);
 const original = await Deno.readTextFile(leaf);
 const worldSource = await Deno.readTextFile(world);
 function edit(source: string, before: string, after: string) {
@@ -28,6 +30,13 @@ const stagedWorld = edit(
 const flag = "\nconst probe_flag: Bool = ";
 const sources: Record<string, Record<string, string>> = {
   base: {},
+  entryRename: {
+    [entry]: edit(
+      edit(entrySource, "(host:", "(session_probe_host:"),
+      "played host",
+      "played session_probe_host",
+    ),
+  },
   dark: { [leaf]: dark },
   both: {
     [leaf]: edit(
@@ -71,6 +80,8 @@ async function build(c: Client, label: string, since = performance.now()) {
     sha256: await sha(r.bytes),
     bytes: r.bytes.length,
     fresh: r.stats.freshModules,
+    modules: r.stats.freshModules + r.stats.cachedModules,
+    sourceLoad: r.stats.sourceLoad,
     relocatedOperands: r.stats.relocatedOperands,
     phases: r.stats.phaseProfile.phases,
   };
@@ -132,6 +143,7 @@ try {
   await candidate.dispose();
 }
 const pairs = [];
+const entryRenames = [];
 for (let pair = 0; pair < 10; pair++) {
   const order = ["previous", "candidate"];
   if (pair % 2) order.reverse();
@@ -146,7 +158,13 @@ for (let pair = 0; pair < 10; pair++) {
       verify("base", fresh);
       const changed = await build(c, "dark");
       verify("dark", changed);
-      if (treatment === "candidate") assert.equal(changed.relocatedOperands, 1);
+      if (treatment === "candidate") {
+        assert.equal(changed.relocatedOperands, 1);
+        assert.deepEqual(changed.sourceLoad, {
+          sourceReads: changed.modules,
+          reusedSyntaxModules: changed.modules! - 1,
+        });
+      }
       pairs.push({
         pair: pair + 1,
         profiled: pair >= 8,
@@ -159,6 +177,22 @@ for (let pair = 0; pair < 10; pair++) {
     }
   }
 }
+// An entry parameter rename changes symbol IDs early in the import walk.
+for (let pair = 0; pair < 4; pair++) {
+  const order = ["previous", "candidate"];
+  if (pair % 2) order.reverse();
+  for (const treatment of order) {
+    const c = await open(treatment === "previous" ? oldPath : newPath);
+    try {
+      verify("base", await build(c, "base"));
+      const rename = await build(c, "entryRename");
+      verify("entryRename", rename);
+      entryRenames.push({ pair: pair + 1, treatment, rename });
+    } finally {
+      await c.dispose();
+    }
+  }
+}
 console.log(JSON.stringify(
   {
     compiler: {
@@ -166,11 +200,13 @@ console.log(JSON.stringify(
       candidate: await sha(await Deno.readFile(newPath)),
     },
     sources: {
+      entry: await sha(await Deno.readFile(entry)),
       lighting: await sha(await Deno.readFile(leaf)),
       world: await sha(await Deno.readFile(world)),
     },
     transitions,
     pairs,
+    entryRenames,
   },
   null,
   2,

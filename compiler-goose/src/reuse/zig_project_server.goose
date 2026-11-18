@@ -134,9 +134,12 @@ fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
 // Loads, checks and lowers this revision's sources. With a dependency bundle,
 // the bundle's unchanged modules are taken as checked; a rejection there is
 // reported by the fresh check of every module.
-fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&,candidate:Retained&,allow_reuse:bool,reused:bool&)->Preparation,Error {
+fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&,candidate:Retained&,allow_reuse:bool,reused:bool&,reused_syntax:i64&)->Preparation,Error {
     if self_.seed.present {let seeded,error=prepareSeeded(self_,snapshot);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}match seeded {ready payload=>{return seeded,blot_error::Error.none;},_=>{var unused=seeded;unused.deinit();}}}
-    var provider=snapshot.provider();let loaded,error=blot_reuse_project::loadWithParseWorkers(self_.entry,snapshot.options(),provider,self_.policy.frontend_workers);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}var source=loaded;self_.configure(source);
+    var previous:const blot_reuse_project::Project?=null;
+    if allow_reuse && !self_.seed.present && self_.checked.source.lease!=0 {previous .= self_.checked.source;}
+    var provider=snapshot.provider();let loaded,error=blot_reuse_project::loadWithParseWorkers(self_.entry,snapshot.options(),provider,self_.policy.frontend_workers,previous);if error!=blot_error::Error.none {return blot_reuse_partial_dependency::Preparation.inactive,error;}var source=loaded;self_.configure(source);
+    reused_syntax=source.reused_syntax;
     if self_.seed.present {
         let empty=Frozen{..};let value,failure=blot_reuse_partial_dependency::prepareProject(source,self_.entry,blot_support::none<const u8[:]>(),empty);source.deinit();return value,failure;
     }

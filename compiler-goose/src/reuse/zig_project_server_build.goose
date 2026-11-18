@@ -4,11 +4,13 @@ import .zig_project_server;
 struct AssetRange {id:u32,path:const u8[:],mediaType:const u8[:],sha256:const u8[:],start:u32,length:u32}
 struct AssetDependency {path:const u8[:],sha256:Text}
 struct DefinitionRead {filename:const u8[:],start:u32,end:u32}
-struct BuildStats {relocatedOperands:i64=-1,reusedStagedWasm:bool=false,stagedDefinitions:const DefinitionRead[:]=default<const DefinitionRead[:]>(),frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,phaseProfile:blot_phase_profile::Record}
+struct SourceLoad {sourceReads:i64=0,reusedSyntaxModules:i64=0}
+struct BuildStats {sourceLoad:SourceLoad=SourceLoad{},relocatedOperands:i64=-1,reusedStagedWasm:bool=false,stagedDefinitions:const DefinitionRead[:]=default<const DefinitionRead[:]>(),frontend:blot_reuse_dependency_consumer::Stats,sourceBytes:i64,freshModules:i64,cachedModules:i64,emittedFunctions:i64,phaseProfile:blot_phase_profile::Record}
 struct BuildReply {id:u32,revision:u64,stats:BuildStats,wasm_bytes:i64,ranges:const AssetRange[:]=default<const AssetRange[:]>(),dependencies:const AssetDependency[:]=default<const AssetDependency[:]>(),assets:blot_backend_native_assets::Candidate?=null}
 fn jsonStringify(self_:BuildReply,writer:Writer&)->Error {writer.beginObject();writer.field("kind","build");writer.field("id",self_.id);writer.field("epoch",epoch);writer.field("revision",self_.revision);writer.field("success",true);writer.key("stats");writer.beginObject();
     writer.field("frontend",self_.stats.frontend);writer.field("sourceBytes",self_.stats.sourceBytes);
     writer.field("freshModules",self_.stats.freshModules);writer.field("cachedModules",self_.stats.cachedModules);
+    writer.field("sourceLoad",self_.stats.sourceLoad);
     if self_.stats.relocatedOperands>=0 {writer.field("relocatedOperands",self_.stats.relocatedOperands);}
     writer.field("emittedFunctions",self_.stats.emittedFunctions);writer.field("phaseProfile",self_.stats.phaseProfile);
     let inputs .= self_.assets;
@@ -39,11 +41,12 @@ fn buildSources(writer:blot_io::Writer,opened:OpenProject&,id:u32,sources:const 
 fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,snapshot:blot_reuse_revision_inputs::Snapshot&)->bool,Error {
     var allow_reuse=true;
     loop {
-        var candidate=Retained{..};var reused=false;
-        var preparation,error=opened.prepare(snapshot,candidate,allow_reuse,reused);
+        var candidate=Retained{..};var reused=false;var load=SourceLoad{};
+        var preparation,error=opened.prepare(snapshot,candidate,allow_reuse,reused,load.reusedSyntaxModules);
+        load.sourceReads=snapshot.counts().source_reads;
         if error!=blot_error::Error.none {candidate.deinit();if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
         var retry=false;
-        let committed,failure=buildPrepared(writer,opened,id,assets,profile,preparation,reused,candidate.source.lease!=0,retry);
+        let committed,failure=buildPrepared(writer,opened,id,assets,profile,preparation,reused,candidate.source.lease!=0,load,retry);
         if committed && candidate.source.lease!=0 {
             if reused {candidate.completeFrom(opened.checked);}
             match preparation {ready payload=>{
@@ -57,7 +60,7 @@ fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         allow_reuse=false;
     }
 }
-fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&,reused:bool,retainable:bool,retry:bool&)->bool,Error {
+fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,preparation:Preparation&,reused:bool,retainable:bool,load:SourceLoad,retry:bool&)->bool,Error {
     match preparation {
         inactive=>{return false,blot_error::Error.missing_rejection_diagnostic;},
         rejected payload=>{let diagnostic,error=issue(payload.value,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);},
@@ -70,7 +73,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
                 if previous && reused && payload.value.cachedCount()==payload.value.units.len && assets.reuseStagedWasm(previous) {
                     timing.exit();
                     let result=Emission{result:blot_reuse_dependency_consumer::Result{compiled:blot_reuse_dependency_consumer::Compiled{bytes:blot_reuse_dependency_consumer::ownBytes(previous.cached_wasm),emitted_functions:previous.cached_functions,..},stats:payload.value.stats,..},source_bytes:payload.value.source_bytes,cached_modules:payload.value.units.len,..};
-                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value);var owned=result;owned.deinit();return committed,error;
+                    let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load);var owned=result;owned.deinit();return committed,error;
                 }
             }
             // The asset evaluator owns its file read set. Projects declaring
@@ -96,7 +99,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
             }
             timing.exit();
             if reused && result.result.compiled.failed { pending.deinit();result.deinit();retry=true;return false,blot_error::Error.none; }
-            let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,operands);
+            let committed,error=buildEmitted(writer,opened,id,assets,profile,result,payload.value,load,operands);
             if committed {
                 if operands<0 {
                     opened.image.deinit();
@@ -114,7 +117,7 @@ fn buildPrepared(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         }
     }
 }
-fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&,prepared:const blot_reuse_partial_dependency::Prepared&,operands:i64=-1)->bool,Error {
+fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_backend_native_assets::Candidate?,profile:blot_phase_profile::Profile&,result:const Emission&,prepared:const blot_reuse_partial_dependency::Prepared&,load:SourceLoad,operands:i64=-1)->bool,Error {
     if result.result.compiled.failed {let diagnostic,error=issue(result,opened.entry);if error!=blot_error::Error.none {return false,error;}return false,reject(writer,id,opened.revisions,diagnostic);}
     let wasm:const u8[:]=result.result.compiled.bytes;var phases=blot_phase_profile::Record{..};if profile.key.slot!=0 {phases=profile.record();}
     var reads:DefinitionRead[>..]=[];var reused_wasm=false;
@@ -126,7 +129,7 @@ fn buildEmitted(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_ba
         }
         let saved=assets.keepStagedWasm(wasm,result.result.compiled.emitted_functions);if saved!=blot_error::Error.none {return false,saved;}
     }
-    let stats=BuildStats{relocatedOperands:operands,reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,phaseProfile:phases};
+    let stats=BuildStats{sourceLoad:load,relocatedOperands:operands,reusedStagedWasm:reused_wasm,stagedDefinitions:reads[..],frontend:result.result.stats,sourceBytes:result.source_bytes,freshModules:result.fresh_modules,cachedModules:result.cached_modules,emittedFunctions:result.result.compiled.emitted_functions,phaseProfile:phases};
     var ranges:AssetRange[>..]=[];var dependencies:AssetDependency[>..]=[];var payload_size=wasm.len;
     if assets {
         if payload_size>blot_reuse_zig_project_frames::max_frame_bytes-8 {return false,operationFailure(writer,opened,id,"response_limit","Build reply exceeds protocol limits");}

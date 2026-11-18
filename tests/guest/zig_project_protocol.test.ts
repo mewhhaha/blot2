@@ -246,6 +246,7 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
     equal((wasm.instance.exports.answer as WebAssembly.Global).value, 42);
     fields(built.metadata.stats, [
       "sourceBytes",
+      "sourceLoad",
       "freshModules",
       "cachedModules",
       "emittedFunctions",
@@ -260,6 +261,10 @@ Deno.test("wire contract: build, rejection details, revisions and close", async 
       ]
     ) natural(built.metadata.stats[key]);
     for (const key of statObjects) object(built.metadata.stats[key]);
+    equal(built.metadata.stats.sourceLoad, {
+      sourceReads: 1,
+      reusedSyntaxModules: 0,
+    });
     let id = 3;
     for (
       const source of [

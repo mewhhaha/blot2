@@ -240,3 +240,81 @@ Deno.test("scalar relocations follow committed edits and decline staged and widt
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixity", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const prelude = dir + "/prelude.blot";
+  const first = dir + "/first.blot";
+  const last = dir + "/last.blot";
+  const operator =
+    "infixl 60 (-) = sub\nfunc sub a -> b => return @u32.sub a b\n";
+  const original =
+    "func left () => return do:\n  let first = 10\n  return first\n";
+  const stamp = new Date("2024-01-02T03:04:05Z");
+  await Deno.writeTextFile(prelude, operator);
+  await Deno.writeTextFile(
+    entry,
+    'import { left } from "./first"\nimport { right } from "./last"\n' +
+      "entry func answer (): U32 => return left () - right () - 1\n",
+  );
+  await Deno.writeTextFile(first, original);
+  await Deno.writeTextFile(last, "func right () => return 3\n");
+  await Deno.utime(first, stamp, stamp);
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude,
+    frontendWorkers: 1,
+  };
+  const client = await createZigProjectCompiler(options);
+  async function expect(value: number, reused: number) {
+    const oracle = await createZigProjectCompiler(options);
+    try {
+      const actual = await client.build();
+      const fresh = await oracle.build();
+      assert(actual.success, JSON.stringify(actual));
+      assert(fresh.success);
+      assert.deepEqual(actual.bytes, fresh.bytes);
+      assert.deepEqual(actual.stats.sourceLoad, {
+        sourceReads: 4,
+        reusedSyntaxModules: reused,
+      });
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", null), value);
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await oracle.dispose();
+    }
+  }
+  try {
+    await expect(6, 0);
+    await expect(6, 4);
+    await Deno.writeTextFile(first, original.replace("10", "20"));
+    await Deno.utime(first, stamp, stamp);
+    await expect(16, 3);
+    // The edited local preserves the symbol count but changes a spelling.
+    await Deno.writeTextFile(first, original.replaceAll("first", "other"));
+    await expect(6, 2);
+    await Deno.writeTextFile(prelude, operator.replace("infixl", "infixr"));
+    await expect(8, 0);
+    if (Deno.build.os !== "windows") {
+      await Deno.rename(last, dir + "/three.blot");
+      await Deno.symlink(dir + "/three.blot", last);
+      await expect(8, 3);
+      await Deno.writeTextFile(
+        dir + "/five.blot",
+        "func right () => return 5\n",
+      );
+      await Deno.remove(last);
+      await Deno.symlink(dir + "/five.blot", last);
+      await expect(6, 3);
+    }
+  } finally {
+    await client.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});

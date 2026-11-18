@@ -98,12 +98,11 @@ over the child's stderr. The client keeps a bounded tail of them in
 `profileProgress`, which remains readable after disposal or cancellation.
 
 Concurrent builds queue in order. A successful build returns
-`{ success: true, revision, bytes, stats }`. `stats` is
-`{ frontend, sourceBytes, freshModules, cachedModules, emittedFunctions, phaseProfile }`:
-the frontend's work counts for the modules this build checked, source bytes
-read, the modules checked for this build and those reused from the session or
-its dependency bundle,
-the number of emitted functions, and the optional phase profile. A
+`{ success: true, revision, bytes, stats }`. The stats include source bytes,
+checked and cached module counts, frontend work, emitted functions and the
+optional phase profile. With a current compiler, `stats.sourceLoad.sourceReads`
+counts source acquisitions including overlays, and
+`stats.sourceLoad.reusedSyntaxModules` counts reused parse trees. A
 `nativeAssets` session also returns `assets`, `assetStats` and
 `assetDependencies`. A failure returns
 `{ success: false, revision, diagnostics }` and keeps the last successful

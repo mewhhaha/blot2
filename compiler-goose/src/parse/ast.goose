@@ -339,6 +339,25 @@ fn initPooled() -> Tree,TreeError {
     return tree,blot_error::Error.none;
 }
 fn init() -> Tree,TreeError { return initPooled(); }
+// Copy the tables of a successful parse into the candidate's own tree.
+fn copyParsed(self_:Tree&,previous:const Tree&)->TreeError {
+    assert(previous.diagnostics.len==0);
+    self_.nodes.clear();
+    self_.spans.clear();
+    self_.nodes.append(previous.nodes.items);
+    self_.spans.append(previous.spans.items);
+    self_.extra.append(previous.extra.items);
+    self_.roots.append(previous.roots.items);
+    self_.runtime_names.append(previous.runtime_names.items);
+    self_.constant_names.append(previous.constant_names.items);
+    self_.declaration_traits.append(previous.declaration_traits.items);
+    self_.declaration_nodes.append(previous.declaration_nodes.items);
+    self_.operator_origins.append(previous.operator_origins.items);
+    self_.type_conversion_origins.append(previous.type_conversion_origins.items);
+    self_.has_typed_staging=previous.has_typed_staging;
+    self_.has_numeric_proofs=previous.has_numeric_proofs;
+    return self_.failure();
+}
 fn failure(self_: const Tree&) -> TreeError {
     assert(self_.valid());
     if self_.nodes.failure!=blot_error::Error.none { return self_.nodes.failure; }

@@ -41,16 +41,18 @@ export const maxFrameBytes = 64 * 1024 * 1024;
 const maxMetadataBytes = 16 * 1024 * 1024;
 type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 export type ZigProjectStats = { [key: string]: Json };
-export interface ZigProjectBuildStats extends ZigProjectStats {
+export type ZigProjectBuildStats = ZigProjectStats & {
   frontend: ZigProjectStats;
   sourceBytes: number;
   /** Modules checked for this build and modules reused from a session or bundle. */
   freshModules: number;
   cachedModules: number;
+  /** Distinct source acquisitions (including overlays) and prior syntax trees copied this build. */
+  sourceLoad?: { sourceReads: number; reusedSyntaxModules: number };
   emittedFunctions: number;
   /** Phase clocks; empty unless `profileBackend` was set. */
   phaseProfile: ZigProjectStats;
-}
+};
 export interface ZigProjectSourceLocation {
   filename: string;
   start: number;
@@ -317,6 +319,11 @@ function buildStats(value: unknown): ZigProjectBuildStats {
   }
   for (const field of ["frontend", "phaseProfile"]) {
     stats(object[field], `stats ${field}`);
+  }
+  if (object.sourceLoad !== undefined) {
+    const load = stats(object.sourceLoad, "stats sourceLoad");
+    natural(load.sourceReads, "sourceLoad sourceReads");
+    natural(load.reusedSyntaxModules, "sourceLoad reusedSyntaxModules");
   }
   return object as ZigProjectBuildStats;
 }
