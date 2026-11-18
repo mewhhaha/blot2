@@ -11,6 +11,8 @@ const project = await gdevProject(root, resolve("std"), "src/main.blot");
 const leaf = resolve(root, "src/effects/lighting_look.blot");
 const world = resolve(root, "src/world_storage.blot");
 const entry = resolve(root, "src/main.blot");
+const session = resolve(root, "src/session.blot");
+const sessionSource = await Deno.readTextFile(session);
 const entrySource = await Deno.readTextFile(entry);
 const original = await Deno.readTextFile(leaf);
 const worldSource = await Deno.readTextFile(world);
@@ -37,14 +39,10 @@ const sources: Record<string, Record<string, string>> = {
   base: {},
   entryRename: { [entry]: renamed },
   dependencyRename: {
-    [world]: edit(
-      edit(
-        worldSource,
-        "func run initial -> stages -> host =>",
-        "func run initial -> stages -> renamed_host =>",
-      ),
-      "(application stages) (owners initial) host",
-      "(application stages) (owners initial) renamed_host",
+    [session]: edit(
+      edit(sessionSource, "-> host =>", "-> renamed_host =>"),
+      "}) host",
+      "}) renamed_host",
     ),
   },
   renamedDark: { [entry]: renamed, [leaf]: dark },
@@ -215,10 +213,7 @@ async function measureRename(label: "entryRename" | "dependencyRename") {
         if (treatment === "candidate") {
           if (label === "entryRename") assert.equal(rename.fresh, 1);
           if (label === "dependencyRename") {
-            assert(
-              rename.fresh !== undefined && rename.fresh > 0 &&
-                rename.fresh <= 6,
-            );
+            assert.equal(rename.fresh, 2);
           }
           assert.equal(
             rename.sourceLoad?.reusedSyntaxModules,
@@ -245,6 +240,7 @@ console.log(JSON.stringify(
       entry: await sha(await Deno.readFile(entry)),
       lighting: await sha(await Deno.readFile(leaf)),
       world: await sha(await Deno.readFile(world)),
+      session: await sha(await Deno.readFile(session)),
     },
     transitions,
     pairs,

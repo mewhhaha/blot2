@@ -472,6 +472,14 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
   }
   try {
     await compare({}, 24, 18);
+    // Changing executable code with the same interface only checks its owner.
+    const bodyEdit = initialLeaf.replace("next: 7", "next: 9");
+    await compare({ [leaf]: bodyEdit }, 26, 1);
+    // Its callers must still see a changed result type and reject the build.
+    await compare({
+      [leaf]: bodyEdit.replace("func v0 () => return ", "func v0 () => return @u32.eq 7 "),
+    }, null);
+    await compare({}, 24, 1);
     const renamed = initialBridge.replaceAll("value", "new_binding");
     await compare({ [bridge]: renamed }, 24, 2);
     await compare(

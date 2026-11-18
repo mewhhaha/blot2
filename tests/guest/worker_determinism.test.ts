@@ -100,8 +100,9 @@ Deno.test("frontend and lowering workers emit identical Wasm and diagnostics for
               assert(checking.parallel_worker_processes < checking.parallel_worker_jobs);
               assert(checking.parallel_worker_reply_bytes > 0);
             } else {
-              assert.equal(result.stats.freshModules, 3);
-              assert.equal(result.stats.cachedModules, modules - 2);
+              // Both implementations changed. Their caller sees identical interfaces.
+              assert.equal(result.stats.freshModules, 2);
+              assert.equal(result.stats.cachedModules, modules - 1);
             }
           }
           bytes.push(result.bytes);
