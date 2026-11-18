@@ -1,0 +1,741 @@
+{
+  "date": "2026-11-18",
+  "host": {
+    "cpu": "AMD Ryzen 7 3800X, eight cores and 16 logical CPUs",
+    "kernel": "7.3.4-1-cachyos x86_64",
+    "deno": "2.9.8",
+    "clang": "23.1.5",
+    "sharedHost": true
+  },
+  "source": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "compiler": {
+    "baseGit": "9409487492fb517e8180a261e546fbbdd3b7e834",
+    "previousCodeGit": "d92d35acfb70b7cf476ba9cddb7ef9431e5e4c81",
+    "productionCodeGit": "0c4bc0eb798aaff0f330aab51b43c28cec794146",
+    "previousSha256": "50f5c93671e37c19e75bc168224e7a0c2732a7c41f01029d210f3e5bd70201e6",
+    "pilotSha256": "42d2d007acf1ad2769951b40a7e344b24c54391645f701b25751996c51e8bb4a",
+    "productionSha256": "b60f158e6b3d7e6cd35d89c0627eae662ae20329822a5c20212bf82ef38ac495",
+    "productionSourceManifest": "c87b48af971e4ebb73bb1f13f6bd7f97d1639f521b40784c9c102b4ac71f187c",
+    "gooseSha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clangSha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "method": "Real gdev Main with normal storage, prelude, native assets, aliases and frontend worker defaults. Fresh sessions start a new compiler process with warmed OS file cache. Wall time starts before opening the session and ends when the complete Wasm is available. SHA-256, validation and diagnostic comparisons are outside the timer. Alternating order within pairs, same host and inputs. Timed builds have profiling disabled.",
+  "release": {
+    "fresh": {
+      "before": [
+        933.473,
+        915.129,
+        924.832,
+        951.088,
+        944.043,
+        885.596,
+        899.0,
+        883.937,
+        873.424,
+        890.092,
+        923.811,
+        960.074
+      ],
+      "after": [
+        828.704,
+        783.364,
+        817.145,
+        839.965,
+        832.786,
+        853.909,
+        809.327,
+        815.155,
+        835.791,
+        815.865,
+        793.675,
+        859.752
+      ],
+      "controlMedianMs": 919.47,
+      "candidateMedianMs": 822.92,
+      "pairedMedianSavedMs": 102.55,
+      "fasterPairs": 12
+    },
+    "edits": {
+      "fresh": {
+        "before": [
+          895.55,
+          940.589,
+          945.041,
+          896.838,
+          903.63
+        ],
+        "after": [
+          877.575,
+          818.9,
+          817.44,
+          820.552,
+          824.902
+        ],
+        "controlMedianMs": 903.63,
+        "candidateMedianMs": 820.55,
+        "pairedMedianSavedMs": 78.73,
+        "fasterPairs": 5
+      },
+      "edit": {
+        "before": [
+          279.371,
+          281.243,
+          281.122,
+          280.222,
+          278.314
+        ],
+        "after": [
+          239.689,
+          233.812,
+          229.966,
+          235.731,
+          228.272
+        ],
+        "controlMedianMs": 280.22,
+        "candidateMedianMs": 233.81,
+        "pairedMedianSavedMs": 47.43,
+        "fasterPairs": 5
+      },
+      "reject": {
+        "before": [
+          422.445,
+          417.343,
+          415.494,
+          424.728,
+          418.016
+        ],
+        "after": [
+          376.761,
+          366.147,
+          369.429,
+          363.63,
+          369.578
+        ],
+        "controlMedianMs": 418.02,
+        "candidateMedianMs": 369.43,
+        "pairedMedianSavedMs": 48.44,
+        "fasterPairs": 5
+      },
+      "syntax": {
+        "before": [
+          160.714,
+          159.764,
+          159.026,
+          160.455,
+          161.97
+        ],
+        "after": [
+          111.42,
+          110.55,
+          108.528,
+          106.934,
+          111.211
+        ],
+        "controlMedianMs": 160.46,
+        "candidateMedianMs": 110.55,
+        "pairedMedianSavedMs": 50.5,
+        "fasterPairs": 5
+      },
+      "lex": {
+        "before": [
+          156.588,
+          155.376,
+          154.495,
+          159.238,
+          158.222
+        ],
+        "after": [
+          111.65,
+          107.902,
+          106.039,
+          110.905,
+          108.119
+        ],
+        "controlMedianMs": 156.59,
+        "candidateMedianMs": 108.12,
+        "pairedMedianSavedMs": 48.33,
+        "fasterPairs": 5
+      },
+      "recover": {
+        "before": [
+          285.22,
+          279.57,
+          274.381,
+          279.298,
+          285.924
+        ],
+        "after": [
+          236.893,
+          237.514,
+          242.86,
+          240.69,
+          237.033
+        ],
+        "controlMedianMs": 279.57,
+        "candidateMedianMs": 237.51,
+        "pairedMedianSavedMs": 42.06,
+        "fasterPairs": 5
+      }
+    },
+    "linesPerSecond": 56031,
+    "minimumPairedGainMs": 50,
+    "profiledPhaseMediansMs": {
+      "before": {
+        "other": 15.801,
+        "assets": 74.5,
+        "load": 11.006,
+        "lex": 22.623,
+        "parse": 124.556,
+        "check": 485.377,
+        "lower": 39.309,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 113.603,
+        "loadLexParse": 157.993
+      },
+      "after": {
+        "other": 18.212,
+        "assets": 71.363,
+        "load": 68.395,
+        "lex": 0.162,
+        "parse": 0.775,
+        "check": 495.205,
+        "lower": 35.579,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 115.841,
+        "loadLexParse": 69.331
+      }
+    }
+  },
+  "pilot": {
+    "method": "Same instrumented executable with 1 or 8 parser workers and 8 checker workers. The compiler checks the prelude first. The breadth-first pilot discovered and adopted the other 268 valid trees. A syntax or lexical rejection adopted 267 and reproduced its source diagnostic serially. This earlier timing window had substantial host contention.",
+    "fresh": {
+      "p1": [
+        990.582,
+        1058.959,
+        1007.405,
+        1090.374,
+        1395.308,
+        1789.42,
+        1702.109,
+        1833.982,
+        1771.943,
+        1523.561,
+        1544.962,
+        1475.926
+      ],
+      "p8": [
+        970.039,
+        922.684,
+        933.058,
+        976.563,
+        1730.155,
+        1610.111,
+        1645.616,
+        1604.193,
+        1558.767,
+        1498.887,
+        1572.947,
+        1572.843
+      ],
+      "controlMedianMs": 1499.74,
+      "candidateMedianMs": 1565.81,
+      "pairedMedianSavedMs": 65.42,
+      "fasterPairs": 9
+    },
+    "edits": {
+      "fresh": {
+        "p1": [
+          1592.712,
+          1440.624,
+          1688.661,
+          1849.105,
+          1996.605
+        ],
+        "p8": [
+          1452.368,
+          1538.779,
+          1562.567,
+          1423.453,
+          1465.87
+        ],
+        "controlMedianMs": 1688.66,
+        "candidateMedianMs": 1465.87,
+        "pairedMedianSavedMs": 140.34,
+        "fasterPairs": 4
+      },
+      "edit": {
+        "p1": [
+          370.789,
+          383.106,
+          429.852,
+          718.673,
+          407.571
+        ],
+        "p8": [
+          372.322,
+          393.987,
+          397.099,
+          373.636,
+          422.158
+        ],
+        "controlMedianMs": 407.57,
+        "candidateMedianMs": 393.99,
+        "pairedMedianSavedMs": -1.53,
+        "fasterPairs": 2
+      },
+      "reject": {
+        "p1": [
+          597.044,
+          593.887,
+          687.265,
+          1364.587,
+          626.238
+        ],
+        "p8": [
+          556.276,
+          598.381,
+          627.041,
+          617.837,
+          597.031
+        ],
+        "controlMedianMs": 626.24,
+        "candidateMedianMs": 598.38,
+        "pairedMedianSavedMs": 40.77,
+        "fasterPairs": 4
+      },
+      "syntax": {
+        "p1": [
+          224.414,
+          214.975,
+          231.515,
+          682.826,
+          249.704
+        ],
+        "p8": [
+          181.349,
+          199.004,
+          247.705,
+          197.389,
+          187.291
+        ],
+        "controlMedianMs": 231.51,
+        "candidateMedianMs": 197.39,
+        "pairedMedianSavedMs": 43.06,
+        "fasterPairs": 4
+      },
+      "lex": {
+        "p1": [
+          195.895,
+          195.376,
+          232.909,
+          397.05,
+          233.441
+        ],
+        "p8": [
+          176.741,
+          193.121,
+          171.19,
+          216.042,
+          185.676
+        ],
+        "controlMedianMs": 232.91,
+        "candidateMedianMs": 185.68,
+        "pairedMedianSavedMs": 47.77,
+        "fasterPairs": 5
+      },
+      "recover": {
+        "p1": [
+          404.025,
+          398.832,
+          457.956,
+          845.844,
+          477.205
+        ],
+        "p8": [
+          395.835,
+          395.129,
+          382.458,
+          520.784,
+          360.903
+        ],
+        "controlMedianMs": 457.96,
+        "candidateMedianMs": 395.13,
+        "pairedMedianSavedMs": 75.5,
+        "fasterPairs": 5
+      }
+    },
+    "tracedMedians": {
+      "p1trace": {
+        "workerLanes": {
+          "other": {
+            "wallMs": 75.0,
+            "cpuMs": 27.54
+          },
+          "typeCheck": {
+            "wallMs": 3507.96,
+            "cpuMs": 2153.2
+          },
+          "coreLower": {
+            "wallMs": 650.9,
+            "cpuMs": 416.11
+          },
+          "freezeEncodeInterface": {
+            "wallMs": 354.86,
+            "cpuMs": 235.58
+          },
+          "encodeCore": {
+            "wallMs": 90.86,
+            "cpuMs": 61.0
+          },
+          "decodeInterface": {
+            "wallMs": 203.23,
+            "cpuMs": 135.58
+          },
+          "queueClaim": {
+            "wallMs": 2439.85,
+            "cpuMs": 7.89
+          },
+          "publishCopy": {
+            "wallMs": 106.52,
+            "cpuMs": 62.14
+          },
+          "readCopy": {
+            "wallMs": 31.58,
+            "cpuMs": 16.86
+          },
+          "coordinatorDecode": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          }
+        },
+        "coordinator": {
+          "other": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "typeCheck": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "coreLower": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "freezeEncodeInterface": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "encodeCore": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "decodeInterface": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "queueClaim": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "publishCopy": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "readCopy": {
+            "wallMs": 11.18,
+            "cpuMs": 10.66
+          },
+          "coordinatorDecode": {
+            "wallMs": 40.52,
+            "cpuMs": 38.45
+          }
+        },
+        "loadLexParseMs": 208.3,
+        "phasesMs": {
+          "other": 20.7,
+          "assets": 97.49,
+          "load": 17.59,
+          "lex": 30.5,
+          "parse": 160.31,
+          "check": 1014.17,
+          "lower": 51.55,
+          "freeze": 0.0,
+          "validation": 0.0,
+          "backend": 177.69
+        }
+      },
+      "p8trace": {
+        "workerLanes": {
+          "other": {
+            "wallMs": 69.12,
+            "cpuMs": 26.89
+          },
+          "typeCheck": {
+            "wallMs": 3768.14,
+            "cpuMs": 2165.44
+          },
+          "coreLower": {
+            "wallMs": 700.77,
+            "cpuMs": 410.85
+          },
+          "freezeEncodeInterface": {
+            "wallMs": 388.46,
+            "cpuMs": 234.9
+          },
+          "encodeCore": {
+            "wallMs": 94.3,
+            "cpuMs": 60.77
+          },
+          "decodeInterface": {
+            "wallMs": 231.45,
+            "cpuMs": 134.65
+          },
+          "queueClaim": {
+            "wallMs": 2520.94,
+            "cpuMs": 7.42
+          },
+          "publishCopy": {
+            "wallMs": 124.15,
+            "cpuMs": 61.89
+          },
+          "readCopy": {
+            "wallMs": 31.15,
+            "cpuMs": 17.24
+          },
+          "coordinatorDecode": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          }
+        },
+        "coordinator": {
+          "other": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "typeCheck": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "coreLower": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "freezeEncodeInterface": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "encodeCore": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "decodeInterface": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "queueClaim": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "publishCopy": {
+            "wallMs": 0.0,
+            "cpuMs": 0.0
+          },
+          "readCopy": {
+            "wallMs": 11.04,
+            "cpuMs": 10.17
+          },
+          "coordinatorDecode": {
+            "wallMs": 39.8,
+            "cpuMs": 37.51
+          }
+        },
+        "loadLexParseMs": 141.35,
+        "phasesMs": {
+          "other": 23.96,
+          "assets": 89.95,
+          "load": 140.24,
+          "lex": 0.19,
+          "parse": 0.92,
+          "check": 1010.5,
+          "lower": 50.78,
+          "freeze": 0.0,
+          "validation": 0.0,
+          "backend": 177.0
+        }
+      }
+    }
+  },
+  "checker": {
+    "method": "Four separate builds of the instrumented pilot with eight parser and checker workers, phase profile off. Exclusive monotonic and thread CPU clocks on each worker, and separately on the coordinator. Lane wall and CPU are summed across workers per run and then summarized by median. Queue claim includes dependency waiting, scheduling searches and queue locking. Publication and read include copies, locking and record checks. Coordinator decode excludes reads. The metered runs carry no sampling timer.",
+    "ordinaryMeterMedians": {
+      "workerLanes": {
+        "other": {
+          "wallMs": 18.57,
+          "cpuMs": 17.53
+        },
+        "typeCheck": {
+          "wallMs": 1440.28,
+          "cpuMs": 1413.14
+        },
+        "coreLower": {
+          "wallMs": 269.3,
+          "cpuMs": 263.91
+        },
+        "freezeEncodeInterface": {
+          "wallMs": 167.69,
+          "cpuMs": 165.39
+        },
+        "encodeCore": {
+          "wallMs": 48.93,
+          "cpuMs": 48.26
+        },
+        "decodeInterface": {
+          "wallMs": 100.36,
+          "cpuMs": 99.19
+        },
+        "queueClaim": {
+          "wallMs": 1521.8,
+          "cpuMs": 5.0
+        },
+        "publishCopy": {
+          "wallMs": 45.5,
+          "cpuMs": 44.52
+        },
+        "readCopy": {
+          "wallMs": 12.57,
+          "cpuMs": 12.29
+        },
+        "coordinatorDecode": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        }
+      },
+      "coordinator": {
+        "other": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "typeCheck": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "coreLower": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "freezeEncodeInterface": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "encodeCore": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "decodeInterface": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "queueClaim": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "publishCopy": {
+          "wallMs": 0.0,
+          "cpuMs": 0.0
+        },
+        "readCopy": {
+          "wallMs": 7.7,
+          "cpuMs": 7.55
+        },
+        "coordinatorDecode": {
+          "wallMs": 31.83,
+          "cpuMs": 31.44
+        }
+      },
+      "typeCheckCpuPercent": 68.4,
+      "waitLaneWallPercent": 42.06
+    },
+    "workerReplyBytes": 72858303,
+    "workerJobs": 269,
+    "countsFromSeparatePhaseTrace": {
+      "candidate_scans": 2414174,
+      "type_nodes": 1334708,
+      "scheme_calls": 9926,
+      "import_requests": 192057
+    },
+    "normalizationVisits": 3909874,
+    "ordinarySampling": {
+      "method": "Six additional fresh builds with phase profile off. Linux SIGPROF at a 1 ms CPU interval, rearmed after fork, recording the exclusive instruction pointer during checking outside nested import decoding and transport. Clock and sample shares do not predict wall-time savings.",
+      "total": 8406,
+      "outsideExecutable": 832,
+      "threeResolverFunctions": {
+        "blot_check_types_resolveRoot": 426,
+        "blot_check_types_resolveDepth": 391,
+        "blot_check_types_resolveNode": 377
+      },
+      "threeResolverPercent": 14.2
+    }
+  },
+  "qualification": {
+    "pass": true,
+    "compilerGateSeconds": 301.364563723,
+    "toolingPassed": 25,
+    "guestHostPassed": 1088,
+    "guestHostIgnored": 100,
+    "wasmFixtures": 190,
+    "uniquenessReferences": 212,
+    "directReferences": 2,
+    "standaloneTreeEquivalence": {
+      "gdev": 451,
+      "ink": 325,
+      "std": 13,
+      "compilerFixtures": 402,
+      "extraValid": 2,
+      "extraFallback": 4,
+      "assertions": "All syntax tables, flags, and symbol spellings and order with an overlapping parent pool. Invalid inputs take the serial path."
+    },
+    "projectCheck": "Main, Devtools, save adapter, 545 assets and pen codegen --check passed",
+    "pen": {
+      "gdev": {
+        "passed": 1220,
+        "knownFailed": 108,
+        "modules": 210
+      },
+      "ink": {
+        "passed": 280,
+        "failed": 0,
+        "modules": 73
+      },
+      "inkNative": {
+        "passed": 111,
+        "knownFailed": 2
+      },
+      "namedOutcomes": "Compared Gdev and Ink test mappings to staged-core-nov18. Both Ink native failures match the prior memory limits."
+    },
+    "replayFrames": 120,
+    "identicalReplayFiles": 242,
+    "framePngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTraceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "mainWasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+  },
+  "reproduce": {
+    "release": "deno run -A scripts/integration/time_gdev_parse.ts --before <previous> --after <new> --rounds 12; add --edits --rounds 5 or --profile --rounds 3 for those comparisons.",
+    "probe": "2026-11-18-gdev-parallel-parse-probe.tar.gz",
+    "probeSha256": "2f38be452bfa89029e60c8018f8bfb4d6d820c9f311a3a79a0da2891df6ea9c1",
+    "raw": "2026-11-18-gdev-parallel-parse.raw.json.gz"
+  }
+}

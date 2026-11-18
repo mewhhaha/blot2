@@ -6,14 +6,13 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `d92d35ac`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. Fresh Main took **938 ms** median over twelve
-ordinary builds. A lighting preset edit rechecked one module in **291 ms**.
-Putting `#run true` in the actual lighting preset now uses all 269 module
-jobs and emits the original 2,639,228 Wasm bytes. That build took **1.015 s**
-median over six fresh processes. The three proposed early interfaces gained
-6 ms in the median paired build and remain experimental.
-[Measurements and pilot patches](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json) · [Compiler work](tasks/FAST_COMPILE.md)
+The qualified compiler is Blot `0c4bc0eb`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. Parallel parsing reduced fresh Main from
+**919 to 823 ms** and a retained lighting preset edit from **280 to 234 ms**.
+The new compiler won all twelve fresh pairs and all five edit pairs. Main
+still emits the same 2,639,228 Wasm bytes. Type checking consumed 68% of
+checker worker CPU. The next experiment is to reduce repeated type resolution.
+[Measurements and profile](benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -22,7 +21,7 @@ median over six fresh processes. The three proposed early interfaces gained
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 190 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,087 guest and host tests passed, 100 ignored |
+| Compiler | | 190 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,088 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

@@ -5,6 +5,51 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+Blot `0c4bc0eb` compiled 46,109 lines to complete Wasm in **823 ms**
+median on eight cores, about **56,000 lines/s**. The previous release took
+**919 ms** on the same alternating twelve pairs. Each fresh build checked
+269 modules. All 24 emitted the same 2,639,228 bytes.
+
+![Fresh Gdev and retained edit latency, and CPU spent in checker workers](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.svg)
+
+| Gdev workload | Previous release | Parallel parser |
+| --- | ---: | ---: |
+| Fresh process | 919 ms | 823 ms |
+| Edit the lighting preset in an open session | 280 ms | 234 ms |
+| Reject an unresolved name | 418 ms | 369 ms |
+| Reject a syntax error | 160 ms | 111 ms |
+| Reject a lexical error | 157 ms | 108 ms |
+| Restore the original source after rejection | 280 ms | 238 ms |
+
+The fresh improvement was 103 ms median within pairs. Valid edits and
+recoveries rechecked one module and reused 268. Across three separate profiled
+pairs, loading, lexing and parsing together fell from 158 to 69 ms. On Linux,
+large projects discover leading literal imports and parse independent files
+after the prelude. The loader reads the actual revision, adopts only exact
+source matches and replays symbols in the original order. Unrecognized import
+layouts and rejected speculative parses use the ordinary parser.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.json)
+· [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse.raw.json.gz)
+· [Benchmark runner](../scripts/integration/time_gdev_parse.ts)
+
+**Next experiment.** Reduce repeated work in `resolveRoot`, `resolveDepth`
+and `resolveNode`. The checker made 3.91 million recursive resolution visits,
+and these three functions accounted for 1,194 of 8,406 exclusive CPU samples
+during type checking. Count visits by type node and inference cursor before
+changing cache invalidation. Preserve inferred types, budget rejections and
+the order of diagnostics when testing reuse of a resolved type.
+
+Four separately metered builds spent **1,413 ms of aggregate worker CPU**
+in type checking (68%), 264 ms lowering to Core, 165 ms freezing and encoding
+interfaces, and 99 ms decoding imported interfaces. Workers spent 57 ms in
+queue publication and reads combined. Coordinator reads and gathering added
+39 ms of CPU. Waiting for available jobs occupied 42% of aggregate lane
+wall time and consumed 5 ms of CPU. These worker durations overlap. A
+million lines per second still gives this workload a **46 ms wall budget**.
+[Reproducible profiling probe](../benchmarks/evidence/measurements/2026-11-18-gdev-parallel-parse-probe.tar.gz)
+
+### Scalar compile-time execution
+
 Blot `d92d35ac` compiled the 46,109-line project in **938 ms** median over
 twelve fresh processes, about **49,100 lines/s**. A lighting edit took
 **291 ms** median. On the same sources, an unused `#run` fell from **1,938 to
@@ -99,10 +144,10 @@ and 1.50 s with sixteen on eight physical cores.
 3. **Reduce work per line and parallelize the rest of the pipeline.** The
    checker alone used 1,101 ms of single-core CPU. At the throughput target,
    eight cores have 369 ms of CPU for the entire compile. Measure repeated
-   type resolution and the 72.9 MB of worker replies. A trace of the new
-   compiler spent 163 ms parsing and 142 ms in the Wasm backend. Parse files independently
-   and reserve stable Wasm indices so workers can emit function bodies in
-   parallel. [Go's per-function backend queue](https://go.dev/src/cmd/compile/internal/gc/compile.go)
+   type resolution and the 72.9 MB of worker replies. The parallel parser shipped in `0c4bc0eb`. Its release trace spent
+   69 ms loading and parsing and 116 ms in the Wasm backend. After the type
+   resolution experiment, test assigning stable Wasm indices before workers
+   emit independent function bodies. [Go's per-function backend queue](https://go.dev/src/cmd/compile/internal/gc/compile.go)
 
 ## Goose release measurements, 17 November 2026
 
