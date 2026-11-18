@@ -2,6 +2,7 @@
 // are encoded straight to bytes by the emitter; this owner only lays out
 // sections around them.
 namespace blot_direct_writer;
+import direct.relocations;
 import std;
 import support.error;
 
@@ -356,9 +357,12 @@ fn assemble(module: const Module&, out: u8[>..<]&) {
     uleb(payload, module.functions.len as! u64);
     for function in module.functions {
         uleb(payload, function.body.len as! u64);
+        blot_direct_relocations::linkBody(function.body.start,payload.len);
         raw(payload, text(module, function.body));
     }
+    let code_size=payload.len;
     section(out, 10, payload);
+    blot_direct_relocations::finishCode(out.len-code_size);
     // 11: data
     if module.data.len != 0 {
         uleb(payload, 1);

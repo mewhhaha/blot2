@@ -322,3 +322,6 @@ for t in elements:
 ''')
 with (GOOSE/'reuse/dependency_format_owners.goose').open('a') as file:file.write(''.join(release_owner))
 (GOOSE/'reuse/dependency_format_owners.goose').write_text(owner_syntax((GOOSE/'reuse/dependency_format_owners.goose').read_text()))
+
+from write_body_shape import write_body_shape
+write_body_shape(GOOSE.parent)

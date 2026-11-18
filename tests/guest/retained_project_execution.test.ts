@@ -46,6 +46,7 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
     assert.equal(initial.stats.freshModules, 3);
     const change = await compare({ sources: { [leaf]: edited } });
     assert(change.success, JSON.stringify(change));
+    assert.equal(change.stats.relocatedOperands, 1);
     assert.equal(change.stats.freshModules, 1);
     assert.equal(change.stats.cachedModules, 2);
     const guest = await instantiateGuest(change.bytes);
@@ -162,6 +163,80 @@ Deno.test("a function edit only invalidates its own callers when an independent 
     }
   } finally {
     await Promise.all([compiler.dispose(), fresh.dispose()]);
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("scalar relocations follow committed edits and decline staged and width changes", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const values = dir + "/values.blot";
+  const base = "const flag: Bool = true\nconst a: U32 = 7\nconst b: U32 = 13\n";
+  const main = 'import * as v from "./values"\n' +
+    "entry func answer (n: U32): U32 => return do:\n" +
+    "  let rows: List U32 = []\n" +
+    "  for i in 0..n:\n" +
+    "    rows := @list.append self (v.a + 3)\n" +
+    "  return rows.length + (if (#run v.flag) then v.a else v.b)\n" +
+    "entry func selected (): U32 => return (#run (if v.flag then v.a else v.b))\n" +
+    "entry func scale (): F32 => return 0.25\n";
+  const options = {
+    executable: Deno.args[0],
+    entry,
+    prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+    stdRoot: new URL("../../std/", import.meta.url).pathname,
+  };
+  await Deno.writeTextFile(entry, main);
+  await Deno.writeTextFile(values, base);
+  const client = await createZigProjectCompiler(options);
+  try {
+    const first = await client.build();
+    assert(first.success);
+    const withA = base.replace("= 7", "= 19");
+    const withB = withA.replace("= 13", "= 24");
+    const off = withB.replace("= true", "= false");
+    const wide = off.replace("= 24", "= 4096");
+    const final = wide.replace("= 19", "= 16000").replace("4096", "4097");
+    const loopEdit = main.replace("(v.a + 3)", "(v.a + 4)");
+    const floatEdit = loopEdit.replace("0.25", "0.125");
+    const cases: [string, number, boolean, string?][] = [
+      [withA, 23, false],
+      [withB, 23, true],
+      [off, 28, false],
+      [wide, 4100, false],
+      [wide.replace("4096", "4097"), 4101, false],
+      [wide.replace("= 19", "= 20").replace("4096", "4097"), 4101, true],
+      [final, 4101, false],
+      [final, 4101, true, loopEdit],
+      [final, 4101, true, floatEdit],
+    ];
+    for (const [source, result, relocated, entrySource = main] of cases) {
+      const request = { sources: { [values]: source, [entry]: entrySource } };
+      const actual = await client.build(request);
+      assert(actual.success, JSON.stringify(actual));
+      if (relocated) assert(Number(actual.stats.relocatedOperands) > 0);
+      else assert.equal(actual.stats.relocatedOperands, undefined);
+      const fresh = await createZigProjectCompiler(options);
+      try {
+        const oracle = await fresh.build(request);
+        assert(oracle.success);
+        assert.deepEqual(actual.bytes, oracle.bytes);
+      } finally {
+        await fresh.dispose();
+      }
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", 4), result);
+        assert.equal(guest.call("selected", null), result - 4);
+        let scale = 0.25;
+        if (entrySource === floatEdit) scale = 0.125;
+        assert.equal(guest.call("scale", null), scale);
+      } finally {
+        guest.dispose();
+      }
+    }
+  } finally {
+    await client.dispose();
     await Deno.remove(dir, { recursive: true });
   }
 });

@@ -326,6 +326,11 @@ been encoded and bounded; a rejection leaves both as they were.
 - `phaseProfile`: an object, empty unless the session opened with
   `profileBackend`.
 
+A build served from the session's committed Wasm image also reports
+`relocatedOperands`. It counts scalar instruction operands rewritten in that
+image. Zero means the image was reused verbatim. The reply still contains the
+complete module and advances the revision on success.
+
 A profiled build's `phaseProfile` reports `total_us`, the process's
 `peak_rss_kib`, exclusive `phases` (`other`, `assets`, `inputs`, `load`, `lex`,
 `parse`, `check`, `lower`, `freeze`, `validation`, `backend`), which partition

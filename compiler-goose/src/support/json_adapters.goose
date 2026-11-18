@@ -84,6 +84,7 @@ import direct.function;
 import direct.function_entry;
 import direct.function_staging;
 import direct.map;
+import direct.relocations;
 import direct.runtime;
 import direct.types;
 import direct.writer;
@@ -117,6 +118,7 @@ import parse.symbols;
 import parse.syntax_diagnostics;
 import parse.token;
 import phase_profile;
+import reuse.body_image;
 import reuse.completion_fit;
 import reuse.completion_names;
 import reuse.completion_probe;
@@ -868,6 +870,10 @@ fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::S
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::StagePart,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_function::blotJsonWrite<JsonWriter>(value:blot_direct_function::StageValue,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_map::blotJsonWrite<JsonWriter>(value:blot_direct_map::U64Map,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_direct_relocations::blotJsonWrite<JsonWriter>(value:blot_direct_relocations::BodySite,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_direct_relocations::blotJsonWrite<JsonWriter>(value:blot_direct_relocations::BodyStart,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_direct_relocations::blotJsonWrite<JsonWriter>(value:blot_direct_relocations::Site,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_direct_relocations::blotJsonWrite<JsonWriter>(value:blot_direct_relocations::Snapshot,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_runtime::blotJsonWrite<JsonWriter>(value:blot_direct_runtime::Budgets,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_runtime::blotJsonWrite<JsonWriter>(value:blot_direct_runtime::H,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_direct_runtime::blotJsonWrite<JsonWriter>(value:blot_direct_runtime::Layout,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -1104,6 +1110,7 @@ fn blot_project_packet::blotJsonWrite<JsonWriter>(value:blot_project_packet::Lin
 fn blot_project_packet::blotJsonWrite<JsonWriter>(value:blot_project_packet::Owner,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_project_packet::blotJsonWrite<JsonWriter>(value:blot_project_packet::Reader,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_project_packet::blotJsonWrite<JsonWriter>(value:blot_project_packet::Writer,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
+fn blot_reuse_body_image::blotJsonWrite<JsonWriter>(value:blot_reuse_body_image::Image,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_completion_fit::blotJsonWrite<JsonWriter>(value:blot_reuse_completion_fit::Budget,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_completion_fit::blotJsonWrite<JsonWriter>(value:blot_reuse_completion_fit::Measure,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
 fn blot_reuse_completion_names::blotJsonWrite<JsonWriter>(value:blot_reuse_completion_names::Builder,writer:JsonWriter&)->blot_error::Error {if writer.failure!=blot_error::Error.none {return writer.failure;}let error=blot_json::jsonStringify(value,writer);if error!=blot_error::Error.none {return blot_json::fail(writer,error);}return writer.failure;}
@@ -1696,6 +1703,8 @@ fn blot_direct_function::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->b
 
 fn blot_direct_map::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
+fn blot_direct_relocations::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
+
 fn blot_direct_runtime::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_direct_types::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
@@ -1757,6 +1766,8 @@ fn blot_parse_token::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_
 fn blot_phase_profile::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_project_packet::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
+
+fn blot_reuse_body_image::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 
 fn blot_reuse_completion_fit::blotJsonWrite<T>(value:T?,writer:blot_json::Writer&)->blot_error::Error {if value==null {return blot_json::nullValue(writer);}return blot_json::write(writer,value);}
 

@@ -78,6 +78,7 @@ import direct.emit;
 import direct.function;
 import direct.function_staging;
 import direct.map;
+import direct.relocations;
 import direct.runtime;
 import direct.types;
 import direct.writer;
@@ -110,6 +111,7 @@ import parse.symbols;
 import parse.syntax_diagnostics;
 import parse.token;
 import phase_profile;
+import reuse.body_image;
 import reuse.completion_fit;
 import reuse.completion_names;
 import reuse.completion_probe;
@@ -1548,6 +1550,14 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageVa
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageValue,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_map::U64Map)->bool {return equalFields(left,right);}
 fn blot_direct_map::blotStructuralHash<StructuralSink>(value:blot_direct_map::U64Map,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::BodySite)->bool {return equalFields(left,right);}
+fn blot_direct_relocations::blotStructuralHash<StructuralSink>(value:blot_direct_relocations::BodySite,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::BodyStart)->bool {return equalFields(left,right);}
+fn blot_direct_relocations::blotStructuralHash<StructuralSink>(value:blot_direct_relocations::BodyStart,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::Site)->bool {return equalFields(left,right);}
+fn blot_direct_relocations::blotStructuralHash<StructuralSink>(value:blot_direct_relocations::Site,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_relocations::Snapshot)->bool {return equalFields(left,right);}
+fn blot_direct_relocations::blotStructuralHash<StructuralSink>(value:blot_direct_relocations::Snapshot,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_runtime::Budgets)->bool {return equalFields(left,right);}
 fn blot_direct_runtime::blotStructuralHash<StructuralSink>(value:blot_direct_runtime::Budgets,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_runtime::H)->bool {return equalFields(left,right);}
@@ -2026,6 +2036,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_project_packet::Reader)-
 fn blot_project_packet::blotStructuralHash<StructuralSink>(value:blot_project_packet::Reader,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_project_packet::Writer)->bool {return equalFields(left,right);}
 fn blot_project_packet::blotStructuralHash<StructuralSink>(value:blot_project_packet::Writer,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_body_image::Image)->bool {return equalFields(left,right);}
+fn blot_reuse_body_image::blotStructuralHash<StructuralSink>(value:blot_reuse_body_image::Image,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_completion_fit::Budget)->bool {return equalFields(left,right);}
 fn blot_reuse_completion_fit::blotStructuralHash<StructuralSink>(value:blot_reuse_completion_fit::Budget,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_completion_fit::Measure)->bool {return equalFields(left,right);}

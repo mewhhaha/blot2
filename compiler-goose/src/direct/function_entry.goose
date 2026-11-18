@@ -6,7 +6,7 @@ import .function;
 // A body that begins at the top of the generator's stacks.
 fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
     g.s.serial += 1;
-    return Fn { unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
+    return Fn { sites_base:blot_direct_relocations::mark(), unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
 }
 
 // ----- host boundary -----------------------------------------------------
@@ -135,10 +135,12 @@ fn hostBody(g: Generator&, f: Fn&, instance_id: u32, captures: Vals, argument: V
 recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     let s .= g.s;
     let code_mark = s.code.len;
+    let sites_mark = blot_direct_relocations::mark();
     let locals_mark = s.locals.len;
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
     let error = emitInstanceBody(g, id);
+    blot_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);
     s.locals.resize(locals_mark);
     s.labels.resize(labels_mark);
@@ -289,6 +291,7 @@ fn finishWith(g: Generator&, function: u32, f: const Fn&, release: bool, owner_m
         at = end;
     }
     if release { markInto(g, out, owner_mark, stack_mark); }
+    blot_direct_relocations::finishBody(f.sites_base,out.len-f.code_base,(function-g.module.imports.len) as u32,g.module.text.len);
     blot_direct_writer::raw(out, g.s.code[f.code_base..g.s.code.len]);
     blot_direct_writer::setBody(g.module, function, out[..]);
 }

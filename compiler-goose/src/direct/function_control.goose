@@ -878,6 +878,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         blot_direct_writer::sleb(prefix, boolWord(f.memory_stores == stores));
         prefix.push(OP_local_set);
         blot_direct_writer::uleb(prefix, allow);
+        blot_direct_relocations::insert(f.sites_base,mark_at,prefix.len);
         let old_len = s.code.len;
         for byte in prefix { s.code.push(byte); }
         var at = old_len;
@@ -978,9 +979,10 @@ recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
 recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    let children = m.breakValues(id);
-    let values = g.reserveVals(children.len);
-    for child, at in children {
+    let count = m.breakValues(id).len;
+    let values = g.reserveVals(count);
+    for at in 0..count {
+        let child = m.breakValues(id)[at];
         let value, error = expr(g, f, child);
         if error != blot_direct_types::Error.none { return value, error; }
         g.s.vals[values.start + at] = value;

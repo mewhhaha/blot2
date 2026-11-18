@@ -170,6 +170,7 @@ recursive fn evaluateStage(g: Generator&, s: Stage&, m: const Module&, id: u32, 
             return evaluateStage(g, s, m, n.a, s.bindings.items.len, depth + 1);
         },
         constant => {
+            blot_direct_relocations::stagedRead(m.unit,id);
             let ty = m.types.node(n.ty).tag;
             if ty == blot_check_types::Tag.unit { return StageValue {}; }
             if ty == blot_check_types::Tag.unsigned32 { return StageValue {n.a, blot_check_types::u32_type, 0}; }

@@ -7,6 +7,7 @@ import std;
 import json;
 import reuse.zig_project_frames;
 import reuse.project;
+import reuse.body_image;
 import reuse.project_check;
 import reuse.revision_inputs;
 import reuse.source_overlays;
@@ -98,9 +99,9 @@ struct OpenProject {
     seed:blot_support::Option<OwnedFrozen> =blot_support::none<OwnedFrozen>(),seed_settings:Digest=[0;32],
     assets:blot_support::Option<blot_backend_native_assets::Session> =blot_support::none<blot_backend_native_assets::Session>(),
     policy:Policy=Policy{..},revisions:u64=0,owner:Owner=Owner{..},
-    checked:Retained=Retained{..},core:Prepared=Prepared{..},
+    checked:Retained=Retained{..},core:Prepared=Prepared{..},image:blot_reuse_body_image::Image=blot_reuse_body_image::Image{},
 }
-fn deinit(self_:OpenProject&) {self_.core.deinit();self_.checked.deinit();if self_.seed.present {self_.seed.value.deinit();}if self_.assets.present {self_.assets.value.deinit();}self_.options_owner.deinit();self_.owner.deinit();self_=OpenProject{..};}
+fn deinit(self_:OpenProject&) {self_.image.deinit();self_.core.deinit();self_.checked.deinit();if self_.seed.present {self_.seed.value.deinit();}if self_.assets.present {self_.assets.value.deinit();}self_.options_owner.deinit();self_.owner.deinit();self_=OpenProject{..};}
 fn initOpen(request:Request,compiler:Digest,policy:Policy)->OpenProject,Error {
     let raw,error=validateOpen(request);if error!=blot_error::Error.none {return OpenProject{..},error;}var result=OpenProject{profile_trace:request.profileTrace,profile_backend:request.profileBackend,policy:policy,..};
     if request.nativeAssets.present {let assets,error=blot_backend_native_assets::init(request.nativeAssets.value);if error!=blot_error::Error.none {result.deinit();return OpenProject{..},error;}result.assets=blot_support::some(assets);}

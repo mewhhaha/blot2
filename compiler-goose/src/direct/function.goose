@@ -50,6 +50,7 @@ type Chars = const u8[:];
 
 struct ScratchCut { target: u32 = 0, owner: u32 = 0, stack: u32 = 0 }
 struct Fn {
+    sites_base:i64=0,
     scratch_body: u32 = 0,
     scratch_cut: ScratchCut = ScratchCut {},
     // The module of this body, as `g.units[unit - 1]`.
@@ -293,7 +294,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
     match n.tag {
-        constant => { return constant(g, f, id, n.a); },
+        constant => { return constant(g, f, id, n.a, true); },
         staging => { return stagedConstant(g, f, id); },
         reference => { return reference(g, f, id); },
         scalar => { return scalar(g, f, id); },
@@ -392,10 +393,11 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     return unitVal(), blot_direct_types::Error.none;
 }
 
-fn constant(g: Generator&, f: Fn&, id: u32, bits: u32) -> Val, Error {
+fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let ty, error = typeOf(g, f, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if literal && ty!=blot_direct_types::unit { blot_direct_relocations::operand(m.unit,id,g.s.code.len); }
     match tagOf(g, ty) {
         unit => { return unitVal(), blot_direct_types::Error.none; },
         f32_ => { f32Const(g, bits); },
