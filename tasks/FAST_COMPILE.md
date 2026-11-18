@@ -86,14 +86,50 @@ A failed edit preserves the previous image, its table and its revision.
 The candidate won all eight edit pairs and one of eight fresh pairs.
 In two separately profiled sessions per compiler, backend time on the edit fell
 from 108.36 to 0.76 ms. Loading the project took 92.89 ms on the candidate.
-The next experiment is to retain parsed files across edit requests while
-checking for changed imports, overlays and on-disk edits.
 
 ![Gdev session build times](../benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.png)
 
 The named compiler, Gdev and Ink checks preserved their reference outcomes.
 The Main image, 120-frame replay and inspected hardware frame also matched.
 [Paired timings and qualification](../benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json) · [Runnable edit comparison](../benchmarks/tools/bench_body_edits.ts)
+
+### Reusing parsed modules across edits
+
+The loader now checks every canonical import and current source as it walks
+the project. When a module's source, parser symbols and inherited fixities
+agree, the candidate copies its parsed tree. Each revision owns its copy, so
+a rejected revision can be discarded without affecting the previous one.
+An early symbol divergence makes later modules parse again. If the entry
+introduces different symbols, the loader sends its remaining imports to parse
+workers. In the first trial, reparsing those imports serially took
+768.7 ms against 689.3 ms in its paired control. The table shows the final
+release and its independently measured control.
+Changing the prelude root disables reuse for modules that inherit its operators.
+
+| Gdev Main, eight frontend workers | Previous | Current | Alternating pairs |
+| --- | ---: | ---: | ---: |
+| Edit the lighting preset | 119.6 ms | 36.5 ms | 8 |
+| Start a fresh session | 762.9 ms | 737.3 ms | 8 |
+| Rename the entry parameter | 714.6 ms | 712.1 ms | 4 |
+
+The lighting edit acquired all 270 sources and reused 269 syntax trees.
+An independent file-open trace counted 213 speculative opens of
+`.blot` files on the previous compiler and 0 on the current one.
+Both opened 214 disk sources during the authoritative walk. Other
+sources came from in-memory inputs. In two separately profiled pairs,
+load time fell from 92.9 to 14.5 ms.
+The client timer includes delivery of the complete Wasm image. All eight
+lighting pairs improved. A fresh build spent 426.6 ms in checking across two
+profiles. Renaming an entry parameter rechecked all 270 modules. A candidate
+for the next experiment is to give modules stable local symbol IDs and resolve
+them when importing an interface.
+
+Tests cover on-disk edits with the same size and timestamp, retargeted symlinks,
+changed identifier spellings, inherited operator associativity, overlay removal
+and recovery after a rejection. The benchmark compared every revision with an
+independent fresh build and compared the replay, hardware frame and named
+Gdev and Ink outcomes with their references.
+[Raw pairs, profiles and qualification](../benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.json) · [Runnable edit comparison](../benchmarks/tools/bench_body_edits.ts)
 
 ### Verified arrays in worker packets
 

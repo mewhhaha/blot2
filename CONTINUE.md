@@ -6,10 +6,10 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `cb1e9e15`, with Gdev `0e0d772`,
-Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **764.0 ms**
+The qualified compiler is Blot `3a74b90b`, with Gdev `0e0d772`,
+Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **737.3 ms**
 median with eight frontend workers and emitted **2,639,648 bytes** across
-270 modules. [Paired fresh and edit measurements](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json)
+270 modules. [Paired fresh and edit measurements](benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.json)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev
@@ -39,17 +39,15 @@ checker replies fell from 72,858,303 to 71,856,423 bytes. The full compiler
 gate, named Gdev and Ink outcomes, 120-frame replay and inspected frame
 qualified the release.
 
-The project server now reuses the last committed Wasm image for fixed-width
-scalar edits. Changing Gdev’s lighting preset updated one operand. Time from
-the edit request to receipt of the complete **2,639,648-byte** image fell
-from **229.7 to 121.9 ms** median in eight alternating pairs.
-Fresh session builds took **750.5 and 764.0 ms** respectively. All
-14 transitions matched an independent fresh build or its rejection. Structural
-edits, changed staged reads and changes in encoded width use full emission.
-The compiler keeps the relocation table for the current layout and advances
-the image only after a successful revision. Two separate profiles measured
-**0.76 ms** in the backend and **92.9 ms** loading the edited project. Next,
-measure which source reads and parses can be reused while detecting on-disk edits. [Paired edit results](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json) · [Compiler work](tasks/FAST_COMPILE.md)
+The project server rereads every reachable source and reuses syntax when
+its bytes, inherited operators and parser symbol IDs agree. A lighting edit
+reparsed one module and relocated one Wasm operand. Delivery of the complete
+image fell from **119.6 to 36.5 ms** in eight paired sessions. The load
+phase fell from **92.9 to 14.5 ms** in two separate profiles.
+Renaming the entry parameter still rechecked all 270 modules and took
+**712.1 ms**, against **714.6 ms** on the previous compiler. Next, test
+module-local symbol IDs so a private rename can preserve dependency checks.
+All edited images and diagnostics matched fresh builds. [Measurements](benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -58,7 +56,7 @@ measure which source reads and parses can be reused while detecting on-disk edit
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,096 guest and host tests passed, 100 ignored |
+| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,097 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

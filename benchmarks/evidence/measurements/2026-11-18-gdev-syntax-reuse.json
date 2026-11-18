@@ -1,0 +1,1648 @@
+{
+  "date": "2026-11-18",
+  "candidateBlot": "3a74b90bdcf47b8ef545e92a6e74ad604479dfc6",
+  "baselineBlot": "e71a54bdf8332211d825dc99c9a4450595324ce0",
+  "projects": {
+    "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "workload": "Gdev Main with eight frontend workers and warm filesystem. Each unprofiled AB/BA pair starts an independent session per compiler. Fresh includes client startup, edit starts at request. Both end at receipt of the complete Wasm. Two extra pairs measure phases. Four additional pairs rename the entry parameter in separate sessions. Compared every result against an independent fresh build of the same input.",
+  "medianMs": {
+    "previous": {
+      "fresh": 762.91,
+      "changed": 119.64,
+      "entryRename": 714.62
+    },
+    "candidate": {
+      "fresh": 737.29,
+      "changed": 36.46,
+      "entryRename": 712.08
+    }
+  },
+  "paired": {
+    "fresh": {
+      "fasterPairs": 5,
+      "pairs": 8,
+      "medianPairedSavingMs": 18.37
+    },
+    "changed": {
+      "fasterPairs": 8,
+      "pairs": 8,
+      "medianPairedSavingMs": 83.01
+    },
+    "entryRename": {
+      "fasterPairs": 3,
+      "pairs": 4,
+      "medianPairedSavingMs": 9.04
+    }
+  },
+  "medianEditPhasesMs": {
+    "previous": {
+      "other": 7.38,
+      "assets": 6.87,
+      "load": 92.94,
+      "lex": 0.14,
+      "parse": 0.68,
+      "check": 1.93,
+      "lower": 0.47,
+      "freeze": 0.27,
+      "validation": 0.0,
+      "backend": 0.81
+    },
+    "candidate": {
+      "other": 5.66,
+      "assets": 6.68,
+      "load": 14.52,
+      "lex": 0.07,
+      "parse": 0.1,
+      "check": 1.54,
+      "lower": 0.36,
+      "freeze": 0.2,
+      "validation": 0.0,
+      "backend": 0.74
+    }
+  },
+  "diskOpens": {
+    "method": "Separate untimed runs intercepted successful Linux open calls for .blot files. O_NONBLOCK identifies speculative regular-file probes. Source acquisitions in compiler stats also include in-memory overlays.",
+    "previous": [
+      {
+        "action": "fresh",
+        "probes": 214,
+        "reads": 215,
+        "distinct": 215,
+        "modules": 270
+      },
+      {
+        "action": "edit",
+        "probes": 213,
+        "reads": 214,
+        "distinct": 214,
+        "modules": 270
+      }
+    ],
+    "candidate": [
+      {
+        "action": "fresh",
+        "probes": 214,
+        "reads": 215,
+        "distinct": 215,
+        "modules": 270,
+        "load": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      {
+        "action": "edit",
+        "probes": 0,
+        "reads": 214,
+        "distinct": 214,
+        "modules": 270,
+        "load": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        }
+      }
+    ]
+  },
+  "qualification": {
+    "compilerSha256": "8556db16a2e1c5070ebbbacf17dc911bf4a42d823f004fcb03a4c554377fe871",
+    "mainBytes": 2639648,
+    "mainSha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (108.8 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (9.7 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameMatchesPrevious": true
+  },
+  "compilerGate": {
+    "exit": 0,
+    "recordedWasmFixtures": 192,
+    "loweringFixtures": 212,
+    "directReferences": 2,
+    "passedGuestAndHost": 1097,
+    "ignoredGuestAndHost": 100
+  },
+  "compiler": {
+    "previous": "e6b251b889601bc5c89e57ee30274c2522c8a50c332592bba1c48375d4f56439",
+    "candidate": "8556db16a2e1c5070ebbbacf17dc911bf4a42d823f004fcb03a4c554377fe871"
+  },
+  "sources": {
+    "entry": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+    "lighting": "a112162fde2fc19484fbe7f562c57127908b2b8fcb76f8c183ef46eb3ee48ce1",
+    "world": "f766be72c7e801c72b80ad3d2e4fb8528a388b364248367627e240a05d660bd8"
+  },
+  "transitions": [
+    {
+      "label": "base",
+      "ms": 733.716144,
+      "revision": 1,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 0
+      }
+    },
+    {
+      "label": "dark",
+      "ms": 38.094506999999794,
+      "revision": 2,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "both",
+      "ms": 36.21874099999968,
+      "revision": 3,
+      "sha256": "14c742bbeeb671f6e6e90ffbab28149587b52a88558eb0ad496a7d447175fd6c",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "rejected",
+      "ms": 374.4491390000003,
+      "revision": 3,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: no_such_flag",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "label": "dark",
+      "ms": 35.577933000000485,
+      "revision": 4,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "base",
+      "ms": 34.6705179999999,
+      "revision": 5,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    },
+    {
+      "label": "scalar",
+      "ms": 926.1460609999995,
+      "revision": 6,
+      "sha256": "e153a494652c4c73b96ea80c8fdbd9973daf8796d741bc3855a0004c1448a500",
+      "bytes": 2639659,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "wide",
+      "ms": 904.0836839999993,
+      "revision": 7,
+      "sha256": "b147fa05371025ed1b857d2e4b332edc3a1bcf77b74f93b3ed217e6d4d10c2ad",
+      "bytes": 2639660,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "scalar",
+      "ms": 908.944947,
+      "revision": 8,
+      "sha256": "e153a494652c4c73b96ea80c8fdbd9973daf8796d741bc3855a0004c1448a500",
+      "bytes": 2639659,
+      "fresh": 72,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "stageOn",
+      "ms": 770.1615560000009,
+      "revision": 9,
+      "sha256": "7e93db5375d1a55397445a5dcbc123d6aa164f4d3f46bb64cffd7022629665b7",
+      "bytes": 2639829,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "stageOff",
+      "ms": 148.07646899999963,
+      "revision": 10,
+      "sha256": "01afdaa15f4ad5eac1a392eba056a2e2b90b56d3e24e3d87b40835d32005789a",
+      "bytes": 2639829,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "stageOn",
+      "ms": 142.6566160000002,
+      "revision": 11,
+      "sha256": "7e93db5375d1a55397445a5dcbc123d6aa164f4d3f46bb64cffd7022629665b7",
+      "bytes": 2639829,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      }
+    },
+    {
+      "label": "base",
+      "ms": 783.1840040000006,
+      "revision": 12,
+      "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+      "bytes": 2639648,
+      "fresh": 270,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 2
+      }
+    },
+    {
+      "label": "dark",
+      "ms": 37.70702000000165,
+      "revision": 13,
+      "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+      "bytes": 2639648,
+      "fresh": 1,
+      "modules": 270,
+      "sourceLoad": {
+        "sourceReads": 270,
+        "reusedSyntaxModules": 269
+      },
+      "relocatedOperands": 1
+    }
+  ],
+  "pairs": [
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 771.3811939999996,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 119.97878899999887,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 1,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 772.8963540000004,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.417169000000285,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 849.7735360000006,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.22123500000089,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 2,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 756.5016130000004,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 118.27624199999991,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 778.2059869999994,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 119.00734100000045,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 3,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 732.2389529999964,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.180969999997615,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 715.750974999999,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.130763000001025,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 4,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 757.9083360000004,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 123.4316230000004,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 727.0094300000019,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 116.08250100000078,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 5,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 732.5653930000008,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 36.703882999998314,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 742.0161909999988,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 35.448475999997754,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 6,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 776.3495760000005,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 124.01150600000256,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 767.913026000002,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 119.30585900000005,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 7,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 765.4969220000021,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 35.333488000000216,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 715.1569029999991,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        }
+      },
+      "changed": {
+        "ms": 37.888183999999455,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 8,
+      "profiled": false,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 754.0690850000028,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      },
+      "changed": {
+        "ms": 121.35086800000136,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 750.2090160000007,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "phases": {
+          "other": {
+            "us": 16740,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 69468,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5320
+          },
+          "load": {
+            "us": 70098,
+            "requested_bytes": 34435211,
+            "allocations": 59885,
+            "rss_growth_kib": 42608
+          },
+          "lex": {
+            "us": 154,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 762,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 428510,
+            "requested_bytes": 80288128,
+            "allocations": 283121,
+            "rss_growth_kib": 38440
+          },
+          "lower": {
+            "us": 30366,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 124528
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 112837,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 116.41294900000139,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 7376,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6889,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 91992,
+            "requested_bytes": 30109205,
+            "allocations": 39198,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 144,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 658,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1969,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 484,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 283,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 753,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 9,
+      "profiled": true,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 730.170055999999,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 16113,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 71004,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5436
+          },
+          "load": {
+            "us": 67186,
+            "requested_bytes": 35417437,
+            "allocations": 62586,
+            "rss_growth_kib": 43552
+          },
+          "lex": {
+            "us": 149,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 737,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 417731,
+            "requested_bytes": 101048466,
+            "allocations": 383369,
+            "rss_growth_kib": 61044
+          },
+          "lower": {
+            "us": 25908,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 117012
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 112265,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 38.77689399999872,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5905,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6487,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14961,
+            "requested_bytes": 25879079,
+            "allocations": 31020,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 68,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 97,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1568,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 355,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 199,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 737,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "candidate",
+      "fresh": {
+        "ms": 762.3710379999975,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 0
+        },
+        "phases": {
+          "other": {
+            "us": 20993,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 68937,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5240
+          },
+          "load": {
+            "us": 63973,
+            "requested_bytes": 35743953,
+            "allocations": 64282,
+            "rss_growth_kib": 43432
+          },
+          "lex": {
+            "us": 152,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 721,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 435557,
+            "requested_bytes": 81053646,
+            "allocations": 304370,
+            "rss_growth_kib": 41236
+          },
+          "lower": {
+            "us": 43125,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 124904
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 112675,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 35.60115600000063,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 269
+        },
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 5408,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6872,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 14075,
+            "requested_bytes": 25879079,
+            "allocations": 31020,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 65,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 105,
+            "requested_bytes": 30646,
+            "allocations": 188,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1518,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 372,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 197,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 739,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    },
+    {
+      "pair": 10,
+      "profiled": true,
+      "treatment": "previous",
+      "fresh": {
+        "ms": 719.0733180000025,
+        "revision": 1,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "phases": {
+          "other": {
+            "us": 16469,
+            "requested_bytes": 3086728,
+            "allocations": 18920,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 70158,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5320
+          },
+          "load": {
+            "us": 64292,
+            "requested_bytes": 34915236,
+            "allocations": 59808,
+            "rss_growth_kib": 42860
+          },
+          "lex": {
+            "us": 157,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 747,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 414072,
+            "requested_bytes": 87364780,
+            "allocations": 336730,
+            "rss_growth_kib": 44500
+          },
+          "lower": {
+            "us": 26679,
+            "requested_bytes": 72742659,
+            "allocations": 17218,
+            "rss_growth_kib": 121412
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 111938,
+            "requested_bytes": 3290656,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "changed": {
+        "ms": 118.72227999999814,
+        "revision": 2,
+        "sha256": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90",
+        "bytes": 2639648,
+        "fresh": 1,
+        "modules": 270,
+        "relocatedOperands": 1,
+        "phases": {
+          "other": {
+            "us": 7376,
+            "requested_bytes": 4141680,
+            "allocations": 19474,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6850,
+            "requested_bytes": 1066751,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 93891,
+            "requested_bytes": 29210688,
+            "allocations": 34714,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 145,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 711,
+            "requested_bytes": 283914,
+            "allocations": 1258,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 1881,
+            "requested_bytes": 951903,
+            "allocations": 2278,
+            "rss_growth_kib": 0
+          },
+          "lower": {
+            "us": 462,
+            "requested_bytes": 150343,
+            "allocations": 580,
+            "rss_growth_kib": 0
+          },
+          "freeze": {
+            "us": 266,
+            "requested_bytes": 188788,
+            "allocations": 609,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 876,
+            "requested_bytes": 2639648,
+            "allocations": 1,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    }
+  ],
+  "entryRenames": [
+    {
+      "pair": 1,
+      "treatment": "previous",
+      "rename": {
+        "ms": 708.4541989999998,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      }
+    },
+    {
+      "pair": 1,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 699.8102240000007,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 716.5875000000015,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 2,
+      "treatment": "previous",
+      "rename": {
+        "ms": 708.9141709999967,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      }
+    },
+    {
+      "pair": 3,
+      "treatment": "previous",
+      "rename": {
+        "ms": 720.3219200000021,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      }
+    },
+    {
+      "pair": 3,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 710.8939950000058,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "treatment": "candidate",
+      "rename": {
+        "ms": 713.2701620000007,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270,
+        "sourceLoad": {
+          "sourceReads": 270,
+          "reusedSyntaxModules": 1
+        }
+      }
+    },
+    {
+      "pair": 4,
+      "treatment": "previous",
+      "rename": {
+        "ms": 734.0942429999996,
+        "revision": 2,
+        "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "bytes": 2639648,
+        "fresh": 270,
+        "modules": 270
+      }
+    }
+  ],
+  "serialFallbackTrial": {
+    "commit": "1ff61f854b23b4263bf2757e2024d9721ad8904e",
+    "compiler": {
+      "previous": "e6b251b889601bc5c89e57ee30274c2522c8a50c332592bba1c48375d4f56439",
+      "candidate": "ee1ee0b48e494d3e3bde6210e281c85e73e8b538df28a9defb46816383b597e3"
+    },
+    "medianMs": {
+      "previous": {
+        "fresh": 740.45,
+        "changed": 116.76,
+        "entryRename": 689.29
+      },
+      "candidate": {
+        "fresh": 728.86,
+        "changed": 36.17,
+        "entryRename": 768.69
+      }
+    },
+    "entryRenames": [
+      {
+        "pair": 1,
+        "treatment": "previous",
+        "rename": {
+          "ms": 695.4496209999998,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270
+        }
+      },
+      {
+        "pair": 1,
+        "treatment": "candidate",
+        "rename": {
+          "ms": 784.0163749999992,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270,
+          "sourceLoad": {
+            "sourceReads": 270,
+            "reusedSyntaxModules": 1
+          }
+        }
+      },
+      {
+        "pair": 2,
+        "treatment": "candidate",
+        "rename": {
+          "ms": 740.4493379999985,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270,
+          "sourceLoad": {
+            "sourceReads": 270,
+            "reusedSyntaxModules": 1
+          }
+        }
+      },
+      {
+        "pair": 2,
+        "treatment": "previous",
+        "rename": {
+          "ms": 683.139559999996,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270
+        }
+      },
+      {
+        "pair": 3,
+        "treatment": "previous",
+        "rename": {
+          "ms": 672.7126910000006,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270
+        }
+      },
+      {
+        "pair": 3,
+        "treatment": "candidate",
+        "rename": {
+          "ms": 799.0820779999995,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270,
+          "sourceLoad": {
+            "sourceReads": 270,
+            "reusedSyntaxModules": 1
+          }
+        }
+      },
+      {
+        "pair": 4,
+        "treatment": "candidate",
+        "rename": {
+          "ms": 753.3647820000042,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270,
+          "sourceLoad": {
+            "sourceReads": 270,
+            "reusedSyntaxModules": 1
+          }
+        }
+      },
+      {
+        "pair": 4,
+        "treatment": "previous",
+        "rename": {
+          "ms": 728.4484119999979,
+          "revision": 2,
+          "sha256": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+          "bytes": 2639648,
+          "fresh": 270,
+          "modules": 270
+        }
+      }
+    ],
+    "observation": "Serial parsing of the suffix after an entry symbol changed regressed all four pairs. The shipping candidate starts worker parsing at the entry imports when its parser symbol prefix diverges."
+  }
+}

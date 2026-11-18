@@ -17,12 +17,12 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Editing Gdev’s lighting preset now returns the complete Wasm in **121.9 ms**,
-down from **229.7 ms** across eight paired sessions. Fresh builds took
-**764.0 ms** median and emitted the same 2,639,648 bytes.
-[Session benchmarks and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json)
+Editing Gdev’s lighting preset returns the complete **2,639,648-byte** Wasm
+in **36.5 ms**, down from **119.6 ms** across eight paired sessions.
+The loader rereads the project and reparses one of 270 modules. Fresh builds
+took **737.3 ms** median. [Measurements and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.json)
 
-![Fresh and edited Gdev Main builds](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.png)
+![Fresh Gdev builds and two types of source edit](benchmarks/evidence/measurements/2026-11-18-gdev-syntax-reuse.png)
 
 The Gdev intent benchmark that appends inside two case arms builds its list in
 **21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms)
