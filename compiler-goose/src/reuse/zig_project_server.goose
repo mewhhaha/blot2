@@ -117,7 +117,19 @@ fn initOpen(request:Request,compiler:Digest,policy:Policy)->OpenProject,Error {
     return result,blot_error::Error.none;
 }
 // Lowering is serial here whatever the policy asks.
-fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {source.lowering=blot_reuse_project::Lowering{io:true,workers:1};source.checking=blot_reuse_project::Lowering{io:true,workers:self_.policy.frontend_workers};}
+fn configure(self_:const OpenProject&,source:blot_reuse_project::Project&) {
+    var width=self_.policy.frontend_workers;
+    if width==0 {
+        width=1;
+        if source.units.len>=16 && source.source_bytes>=65536 {
+            var cap:u8=4;
+            if source.source_bytes>=524288 {cap=8;}
+            width=min(cap,blot_native::available_workers());
+        }
+    }
+    source.lowering=blot_reuse_project::Lowering{io:true,workers:1};
+    source.checking=blot_reuse_project::Lowering{io:true,workers:width};
+}
 // Loads, checks and lowers this revision's sources. With a dependency bundle,
 // the bundle's unchanged modules are taken as checked; a rejection there is
 // reported by the fresh check of every module.

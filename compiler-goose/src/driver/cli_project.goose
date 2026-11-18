@@ -62,7 +62,7 @@ fn processProject(writer:blot_io::Writer,command:Command,filename:const u8[:],op
  if installation.present {installation.value.restore();}if profile.present {profile.value.deinit();}return accepted&&written==blot_error::Error.none,written;
 }
 fn projectLoad(writer:blot_io::Writer,command:Command,filename:const u8[:],options:Options,output:Text,policy:Policy,started:u64,stats:ProjectStats&)->bool,Error {
- var loaded,error=blot_reuse_project::load(filename,options);if error!=blot_error::Error.none {return false,error;}loaded.checking=blot_reuse_project::Lowering{io:true,workers:policy.frontend_workers};
+ var loaded,error=blot_reuse_project::load(filename,options);if error!=blot_error::Error.none {return false,error;}loaded.checking=blot_reuse_project::Lowering{io:true,workers:max(1 as u8,policy.frontend_workers)};
  let accepted,error=projectLoaded(writer,command,filename,output,policy,started,stats,loaded);let release_start=now();loaded.deinit();stats.teardown_us+=elapsed(release_start);return accepted,error;
 }
 fn projectLoaded(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,policy:Policy,started:u64,stats:ProjectStats&,loaded:Project&)->bool,Error {

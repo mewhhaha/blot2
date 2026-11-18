@@ -1,16 +1,15 @@
 # The `serve-project` protocol
 
 `blotc serve-project` keeps one Blot project open in a child process and builds
-it on request. Each build loads, checks, lowers and compiles its revision from
-the sources it names with the direct backend; no checked or compiled module is
-carried from one build to the next. A host talks to it over the child's stdin
+it on request. A build reads its current sources, reuses eligible checked
+modules and Core, and emits the complete Wasm. A host talks to it over the child's stdin
 and stdout in length-prefixed frames. This document is enough to write a host
 without `@mewhhaha/blot`. It describes protocol version 1 as implemented by this
 repository:
 
 - the server:
-  [zig_project_server.zig](../../compiler/src/reuse/zig_project_server.zig) and
-  [zig_project_frames.zig](../../compiler/src/reuse/zig_project_frames.zig);
+  [zig_project_server.goose](../../compiler-goose/src/reuse/zig_project_server.goose) and
+  [zig_project_frames.goose](../../compiler-goose/src/reuse/zig_project_frames.goose);
 - the reference client:
   [host/zig_project_client.ts](../../host/zig_project_client.ts), behind
   `createCompiler` and `createZigProjectCompiler`
@@ -29,13 +28,19 @@ session revision rules below.
 
 ```
 blotc serve-project
-blotc serve-project --frontend-workers N    (N in 1..16, default 4)
+blotc serve-project --frontend-workers N    (N in 1..16, default automatic)
 blotc serve-project --semantic-workers N    (N in 1..16, default serial)
 blotc serve-project --inference-budget STEPS
 ```
 
 The options may be combined, and each takes exactly one value.
-`--frontend-workers` checks independent modules on N workers.
+`--frontend-workers` sets the number of workers available to check independent
+modules, including the parent. On Linux the default is one worker for small
+projects. With at least 16 modules it uses up to four workers at 64 KiB of
+source and up to eight at 512 KiB, within the process's CPU affinity. Other
+platforms default to one. On eligible source projects the workers publish
+each finished interface to its importers and lower that module to Core.
+The server uses the source checker when a worker cannot complete the build.
 `--semantic-workers` lowers the modules a build checked to Core on N workers.
 `--inference-budget` sets the process-local inference limit (default 1,000,000);
 a value other than the default changes `compilerIdentity`. Worker counts never
@@ -204,9 +209,10 @@ bundle cannot be used for a build, or loading, checking or lowering with it
 rejects, the build loads and checks every module from source, and that result is
 the reply.
 
-A session opened without a bundle retains the checked modules and Core from
-its latest successful build.
-Each build resolves and reads the current inputs again. It can reuse checked
+A session opened without a bundle retains the checked interfaces, inference
+budget used per module, and Core from its latest successful build. This also
+applies when the first build used multiple workers. Each build resolves and
+reads the current inputs again. It can reuse checked
 modules and Core when the module graph and symbol slots still match. A changed
 module is checked and lowered again. Its importers are checked when the edit
 can change the facts they observe. A failed build preserves the checkpoint.

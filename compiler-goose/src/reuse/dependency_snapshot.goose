@@ -164,8 +164,48 @@ fn freezeCheckedRootsInner<C>(tree: const Tree&,checked: const Checked&,roots: u
  { private=projector.private_ctx; } { projector.deinit(); } }
 fn deinitGraph(graph: OwnedGraph&) { blot_reuse_dependency_payload::deinit(graph); }
 fn deinit(owner: OwnedInterface&) { blot_reuse_dependency_payload::deinit(owner); }
-fn freeze(tree: const Tree&,checked: const Checked&) -> OwnedInterface,Error { return freezeMode(tree,checked,false); }
-fn freezePrincipal(tree: const Tree&,checked: const Checked&) -> OwnedInterface,Error { return freezeMode(tree,checked,true); }
+type SchemeSummary=blot_check_check::SchemeSummary;
+struct ProjectedSchemeSummary { binding:u32, summary:SchemeSummary }
+fn freeze(tree: const Tree&,checked: const Checked&) -> OwnedInterface,Error {
+ var summaries:ProjectedSchemeSummary[>..]=[];
+ return freezeMode(tree,checked,false,false,summaries);
+}
+fn freezePrincipal(tree: const Tree&,checked: const Checked&) -> OwnedInterface,Error {
+ var summaries:ProjectedSchemeSummary[>..]=[];
+ return freezeMode(tree,checked,true,false,summaries);
+}
+fn freezePersistent(tree:const Tree&,checked:const Checked&,summaries:ProjectedSchemeSummary[>..]&) -> OwnedInterface,Error {
+ return freezeMode(tree,checked,true,true,summaries);
+}
+fn projectSchemeSummary<C>(projector:Projector<C>&,source:SchemeSummary)->SchemeSummary,Error {
+ var value=source;
+ let variables,error=projector.projectedList(source.public_variables);
+ if error!=blot_error::Error.none {return value,error;}
+ value.public_variables=variables;
+ var rows:u32[>..]=[];
+ for row in projector.checked.types.list(source.public_rows) {
+  let projected,error=projector.projectRowVariable(row);
+  if error!=blot_error::Error.none {return value,error;}
+  rows.push(projected);
+ }
+ let public_rows,error=projector.saveTypes(rows[..]);
+ if error!=blot_error::Error.none {return value,error;}
+ value.public_rows=public_rows;
+ // These arrays hold positional flags and must not be remapped as type IDs.
+ let inputs,error=projector.saveTypes(projector.checked.types.list(source.public_inputs));
+ if error!=blot_error::Error.none {return value,error;}
+ value.public_inputs=inputs;
+ let outputs,error=projector.saveTypes(projector.checked.types.list(source.public_outputs));
+ if error!=blot_error::Error.none {return value,error;}
+ value.public_outputs=outputs;
+ let requirements,error=projector.saveTypes(projector.checked.types.list(source.requirement_variables));
+ if error!=blot_error::Error.none {return value,error;}
+ value.requirement_variables=requirements;
+ let row_requirements,error=projector.saveTypes(projector.checked.types.list(source.requirement_rows));
+ if error!=blot_error::Error.none {return value,error;}
+ value.requirement_rows=row_requirements;
+ return value,blot_error::Error.none;
+}
 reusable[] var private_flags: bool[>..]=[];
 fn selectCapabilities(owner: Owner&,checked: const Checked&,keep: const bool[:],principal_only: bool) -> blot_check_capability_contracts::Collection,Error {
  var store,error=blot_check_capability_contracts::initPooled(); if error!=blot_error::Error.none { return blot_check_capability_contracts::Collection {},error; }  var roots: blot_check_capability_contracts::Binding[>..]=[];
@@ -176,7 +216,7 @@ fn copyProofHeader(owner: Owner&,source: blot_check_numeric_proof_headers::Owned
  let values,error=owner.copy(source.value_slots); if error!=blot_error::Error.none { return default<blot_check_numeric_proof_headers::Owned>(),error; } let proofs,e=owner.copy(source.proof_slots); if e!=blot_error::Error.none { return default<blot_check_numeric_proof_headers::Owned>(),e; } let kinds,e2=owner.copy(source.values); if e2!=blot_error::Error.none { return default<blot_check_numeric_proof_headers::Owned>(),e2; } let operands,e3=owner.copy(source.operands); if e3!=blot_error::Error.none { return default<blot_check_numeric_proof_headers::Owned>(),e3; } let requirements,e4=owner.copy(source.requirements); if e4!=blot_error::Error.none { return default<blot_check_numeric_proof_headers::Owned>(),e4; } return blot_check_numeric_proof_headers::Owned {source.arity,values,proofs,kinds,operands,requirements,source.result},blot_error::Error.none;
 }
 fn projectPredicate<C>(projector: Projector<C>&,source: blot_check_types::Obligation) -> blot_check_types::Obligation,Error { var value=source; let ty,error=projector.projectType(source.ty,0); if error!=blot_error::Error.none { return default<blot_check_types::Obligation>(),error; } value.ty=ty; let other,e=projector.projectType(source.other,0); if e!=blot_error::Error.none { return default<blot_check_types::Obligation>(),e; } value.other=other; let result,e2=projector.projectType(source.result,0); if e2!=blot_error::Error.none { return default<blot_check_types::Obligation>(),e2; } value.result=result; let signature,e3=projector.projectType(source.signature,0); if e3!=blot_error::Error.none { return default<blot_check_types::Obligation>(),e3; } value.signature=signature; value.source=0; return value,blot_error::Error.none; }
-fn freezeMode(tree: const Tree&,checked: const Checked&,principal_only: bool) -> OwnedInterface,Error {
+fn freezeMode(tree: const Tree&,checked: const Checked&,principal_only: bool,publish_summaries:bool,summaries:ProjectedSchemeSummary[>..]&) -> OwnedInterface,Error {
  var projector=Projector<NoPrivate> {private_ctx:NoPrivate {},allow_rank:principal_only,checked:checked,tree:tree};  let initialized=projector.initialize(); if initialized!=blot_error::Error.none { let __cleanup_result_81_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_81_1: Error = initialized; { projector.deinit(); } return __cleanup_result_81_0, __cleanup_result_81_1; } var owner,error=blot_reuse_dependency_payload::init(); if error!=blot_error::Error.none { let __cleanup_result_82_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_82_1: Error = error; { projector.deinit(); } return __cleanup_result_82_0, __cleanup_result_82_1; } var alive=true;  var result=default<Interface>(); result.unit=checked.unit;
  let bindings,binding_error=blot_reuse_dependency_payload::alloc<blot_reuse_principal_interface::Binding>(owner,checked.bindings.len); if binding_error!=blot_error::Error.none { let __cleanup_result_83_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_83_1: Error = binding_error; { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_83_0, __cleanup_result_83_1; } result.bindings=bindings; var retained: bool[:]=default<bool[:]>(); if principal_only { retained=private_flags.alloc_slice(checked.bindings.len); for old,index in checked.bindings { retained[index]=(old.kind==blot_reuse_principal_interface::Kind.global&&!old.private)||old.kind==blot_reuse_principal_interface::Kind.external; } for method in checked.associated { if !checked.bindings[method.binding].private { retained[method.binding]=true; } } }
  let capabilities,capability_error=selectCapabilities(owner,checked,retained,principal_only); if capability_error!=blot_error::Error.none { if capability_error==blot_error::Error.out_of_memory { let __cleanup_result_84_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_84_1: Error = capability_error; { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_84_0, __cleanup_result_84_1; } let __cleanup_result_85_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_85_1: Error = blot_error::Error.dependency_limit; { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_85_0, __cleanup_result_85_1; } result.capability_contracts=capabilities;
@@ -213,5 +253,19 @@ fn freezeMode(tree: const Tree&,checked: const Checked&,principal_only: bool) ->
  var member_templates: blot_reuse_principal_interface::MemberTemplate[>..]=[]; for old in checked.member_templates { if principal_only&&checked.bindings[old.binding].private { continue; } var value=old; let arguments,error=projector.projectedList(old.arguments); if error!=blot_error::Error.none { let __cleanup_result_144_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_144_1: Error = error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_144_0, __cleanup_result_144_1; } value.arguments=arguments; member_templates.push(value); } let members,templates_error=owner.copy(member_templates); if templates_error!=blot_error::Error.none { let __cleanup_result_145_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_145_1: Error = templates_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_145_0, __cleanup_result_145_1; } result.member_templates=members;
  if !principal_only { let proofs,error=owner.copy(checked.selected_proofs); if error!=blot_error::Error.none { let __cleanup_result_146_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_146_1: Error = error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_146_0, __cleanup_result_146_1; } result.selected_proofs=proofs; for old,index in checked.selected_proofs { let arguments,e=projector.projectedList(old.arguments); if e!=blot_error::Error.none { let __cleanup_result_147_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_147_1: Error = e; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_147_0, __cleanup_result_147_1; } proofs[index].arguments=arguments; let predicate,e2=projectPredicate(projector,old.predicate); if e2!=blot_error::Error.none { let __cleanup_result_148_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_148_1: Error = e2; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_148_0, __cleanup_result_148_1; } proofs[index].predicate=predicate; } let selected_members,e=owner.copy(checked.selected_members); if e!=blot_error::Error.none { let __cleanup_result_149_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_149_1: Error = e; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_149_0, __cleanup_result_149_1; } result.selected_members=selected_members; for old,index in checked.selected_members { let root,e2=projector.projectType(old.root,0); if e2!=blot_error::Error.none { let __cleanup_result_150_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_150_1: Error = e2; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_150_0, __cleanup_result_150_1; } selected_members[index].root=root; } let edges,e2=owner.copy(checked.selected_edges); if e2!=blot_error::Error.none { let __cleanup_result_151_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_151_1: Error = e2; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_151_0, __cleanup_result_151_1; } result.selected_edges=edges; }
  let pattern_nodes,patterns_error=owner.copy(projector.pattern_nodes.items); if patterns_error!=blot_error::Error.none { let __cleanup_result_152_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_152_1: Error = patterns_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_152_0, __cleanup_result_152_1; } let pattern_extra,pattern_extra_error=owner.copy(projector.pattern_extra.items); if pattern_extra_error!=blot_error::Error.none { let __cleanup_result_153_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_153_1: Error = pattern_extra_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_153_0, __cleanup_result_153_1; } result.patterns=blot_check_frozen_types::PatternGraph {pattern_nodes,pattern_extra}; let obligations,obligations_error=owner.copy(projector.obligations.items); if obligations_error!=blot_error::Error.none { let __cleanup_result_154_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_154_1: Error = obligations_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_154_0, __cleanup_result_154_1; } result.obligations=obligations; let spans,spans_error=owner.copy(projector.obligation_spans.items); if spans_error!=blot_error::Error.none { let __cleanup_result_155_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_155_1: Error = spans_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_155_0, __cleanup_result_155_1; } result.obligation_spans=spans;
+ if publish_summaries {
+  for old,index in checked.bindings {
+   if !retained[index] || !old.summary.shareable {continue;}
+   let summary,error=projectSchemeSummary(projector,old.summary);
+   if error!=blot_error::Error.none {
+    private_flags.free_slice(public_predicates);
+    private_flags.free_slice(retained);
+    owner.deinit();
+    projector.deinit();
+    return default<OwnedInterface>(),error;
+   }
+   summaries.push(ProjectedSchemeSummary{binding:index as u32,summary:summary});
+  }
+ }
  let graph,graph_error=projector.publishGraph(owner); if graph_error!=blot_error::Error.none { let __cleanup_result_156_0: OwnedInterface = default<OwnedInterface>(); let __cleanup_result_156_1: Error = graph_error; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_156_0, __cleanup_result_156_1; } result.graph=graph; for node in graph.nodes { if node.tag==blot_check_types::Tag.forall||node.tag==blot_check_types::Tag.existential { result.has_rank_contracts=true; break; } } for node in graph.nodes { if node.tag==blot_check_types::Tag.usage { result.has_usage_contracts=true; break; } } for node in graph.nodes { if node.tag==blot_check_types::Tag.erased_proof { result.has_numeric_proofs=true; break; } } alive=false; let __cleanup_result_157_0: OwnedInterface = OwnedInterface {result,owner}; let __cleanup_result_157_1: Error = blot_error::Error.none; { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } return __cleanup_result_157_0, __cleanup_result_157_1;
  { private_flags.free_slice(public_predicates); } { private_flags.free_slice(retained); } { if alive { owner.deinit(); } } { projector.deinit(); } }

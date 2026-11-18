@@ -21,7 +21,9 @@ import parse.syntax_diagnostics;
 import phase_profile;
 import support.error;
 import support.option;
+import support.project_packet;
 import .retained_project;
+import .persistent_project;
 type Error=blot_error::Error;
 type Core=blot_check_core::Module;
 type Frozen=blot_reuse_frozen_dependency::FrozenDependency;
@@ -43,16 +45,17 @@ fn deinit(self_:Result&) {self_.result.deinit();if self_.diagnostic_filename.pre
 // the unit vector, the paths and the flags; unit_owners owns each Core. A
 // cached Core is a copy of the admitted seed's (raw frozen input carries no
 // lifetime authority in this port); `borrowed` marks those positions.
-struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:Owner[:]=default<Owner[:]>()}
+struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:Owner[:]=default<Owner[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
 // Re-publish the owned runs without retaining the temporary header.
 fn publishPrepared(value:Prepared)->Prepared {
  assert(value.catalog_owner.unique());
  let units=value.catalog_owner.mutable(value.units);let paths=value.catalog_owner.mutable(value.paths);let borrowed=value.catalog_owner.mutable(value.borrowed);
  let unit_owners=core_owners.realloc_slice(value.unit_owners,value.unit_owners.len);assert(blot_support::same_slice_identity(unit_owners,value.unit_owners));
- return Prepared{units:units,paths:paths,borrowed:borrowed,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners};
+ return Prepared{units:units,paths:paths,borrowed:borrowed,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
 }
 fn deinit(self_:Prepared&) {
  for &owner in self_.unit_owners {owner.release();}if self_.unit_owners.len!=0 {core_owners.free_slice(self_.unit_owners);}
+ if self_.wire_owner.slot!=0 {self_.wire_owner.deinit();}
  self_.catalog_owner.release();self_=Prepared{};
 }
 fn cachedCount(self_:const Prepared&)->i64 {var count:i64=0;for borrowed in self_.borrowed {if borrowed {count++;}}return count;}
@@ -107,14 +110,21 @@ fn prepareProjectMode(source:Project&,entry_path:const u8[:],output_identity:blo
   let diagnostic,error=blot_reuse_dependency_consumer::init(issue.unit,"load",issue.codeName(),issue.span,issue.message());if error!=blot_error::Error.none {return Preparation.inactive,error;}return reject(source,entry_path,diagnostic);
  }
  if output_identity.present {for unit in source.units.items {if output_identity.value==source.symbols.get(unit.filename) {return Preparation.inactive,blot_error::Error.output_is_source;}}}
+ if source.checking.workers>1 && source.checking.io && source.units.len>=16 && source.compiled_modules.len==0 && source.input_mode==blot_reuse_project::InputMode.project {
+  let prepared,error=preparePersistent(source,retained);
+  if error==blot_error::Error.out_of_memory {return Preparation.inactive,error;}
+  match prepared {ready=>{return prepared,blot_error::Error.none;},_=>{}}
+ }
  // Checking stops at the first module that reports a diagnostic.
  let parsed_symbols=source.symbols.entries.len;
  var debits=default<ModuleDebit[:]>();
  var checked=CheckedProject{..};
  var error=blot_error::Error.none;
- if retained!=null && source.checking.workers<=1 {
+ if retained!=null {
   debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
-  checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticTracked(source,debits);
+  var serial=source;
+  serial.checking.workers=1;
+  checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticTracked(serial,debits);
  } else {
   checked,error=blot_reuse_project_check::checkProjectToFirstDiagnosticWithWorkers(source);
  }

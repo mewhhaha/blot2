@@ -6,10 +6,12 @@ import reuse.project_check_engine;
 import reuse.project_check_owners;
 import parse.symbols;
 import inference_limits;
+import reuse.persistent_unit;
 
 type Tree=blot_parse_ast::Tree;
 type Unit=blot_reuse_project::Unit;
 type ModuleDebit=blot_reuse_project_check::ModuleDebit;
+reusable[] var retained_packet_tables:(const u8[:])[>..]=[];
 
 struct Retained {
  source:Project=Project{..},
@@ -17,30 +19,68 @@ struct Retained {
  parsed_symbols:i64=0,
  inference_limit:u64=0,
  debits:ModuleDebit[:]=default<ModuleDebit[:]>(),
+ packets:const u8[:][:]=default<const u8[:][:]>(),
 }
 
 fn deinit(self_:Retained&) {
  self_.checked.deinit();
  self_.source.deinit();
  blot_reuse_project_check::releaseModuleDebits(self_.debits);
+ releaseRetainedPackets(self_.packets);
  self_=Retained{};
 }
 
 fn adopt(self_:Retained&,source:Project&,checked:CheckedProject&,parsed_symbols:i64,debits:const ModuleDebit[:]) {
+ self_.adoptSource(source,parsed_symbols,debits);
+ self_.checked=blot_reuse_project_check::canonicalOwnedResult(checked);
+ checked=CheckedProject{..};
+}
+
+fn adoptSource(self_:Retained&,source:Project&,parsed_symbols:i64,debits:const ModuleDebit[:]) {
  assert(self_.source.lease==0 && self_.checked.owner.slot==0);
  // This checkpoint owns every loaded unit. Portable dependency catalogs
  // have a separate lifetime in the project session.
  self_.source=blot_reuse_project::canonicalLoaded(source,default<const blot_reuse_frozen_dependency::Module[:]>(),default<const bool[:]>());
- self_.checked=blot_reuse_project_check::canonicalOwnedResult(checked);
  self_.parsed_symbols=parsed_symbols;
  self_.inference_limit=blot_inference_limits::configured();
  self_.debits=blot_reuse_project_check::canonicalModuleDebits(debits);
  source=Project{..};
- checked=CheckedProject{..};
 }
 
 fn completeFrom(self_:Retained&,previous:Retained&) {
+ if self_.packets.len!=0 {
+  let next=retained_packet_tables.realloc_slice(self_.packets,self_.packets.len);
+  let old=retained_packet_tables.realloc_slice(previous.packets,previous.packets.len);
+  for packet,index in old {
+   if next[index].len!=0 {continue;}
+   next[index]=packet;
+   old[index]=default<const u8[:]>();
+  }
+  return;
+ }
  blot_reuse_project_check::moveSkippedModules(self_.checked,previous.checked);
+}
+
+fn allocateRetainedPackets(length:i64)->const u8[:][:] {
+ let packets=retained_packet_tables.alloc_slice(length);
+ for &entry in packets {entry=default<const u8[:]>();}
+ return packets;
+}
+
+fn releaseRetainedPackets(packets:const u8[:][:]) {
+ if packets.len==0 {return;}
+ for packet in packets {blot_reuse_project_check::releaseOwned(packet);}
+ retained_packet_tables.free_slice(packets);
+}
+
+fn adoptPersistent(self_:Retained&,source:Project&,symbols:blot_parse_symbols::Pool&,parsed:i64,debits:const ModuleDebit[:],packets:const u8[:][:]) {
+ source.symbols.deinit();
+ source.symbols=blot_parse_symbols::canonical(symbols);
+ symbols=blot_parse_symbols::Pool{..};
+ self_.adoptSource(source,parsed,debits);
+ let owned=retained_packet_tables.realloc_slice(packets,packets.len);
+ assert(blot_support::same_slice_identity(owned,packets));
+ self_.packets=owned;
 }
 
 fn prepareRetainableProject(source:Project&,entry_path:const u8[:],candidate:Retained&)->Preparation,Error {
@@ -207,6 +247,9 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
  var any_reused=false;
  for dirty in changed {any_reused=any_reused || !dirty;}
  if !any_reused {return Preparation.inactive,blot_error::Error.none;}
+ if previous.packets.len!=0 {
+  return prepareRetainedPersistent(source,previous,previous_core,changed[..],candidate);
+ }
 
  // A fallback starts with the loaded parser symbols exactly as they were.
  // Only this private pool receives names while the checker replays the prefix.
@@ -264,29 +307,145 @@ fn lowerWithRetainedCore(source:const Project&,checked:const CheckedProject&,pre
   let path,error=ready.catalog_owner.copy(source.filename(id));
   if error!=blot_error::Error.none {return false,error;}
   ready.paths[index]=path;
-  if edited {
-   let unit .= source.unit(id);
-   let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
-   var core,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(source));
-   timing.exit();
-   if error!=blot_error::Error.none {return false,error;}
-   if core.value.diagnostics.len!=0 {core.owner.release();return false,blot_error::Error.none;}
-   core.value.unit=id;
-   ready.stats.body_lowerings+=core.value.body_lowerings;
-   ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
-   ready.units[index]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
-   ready.unit_owners[index]=core.owner;
-  } else {
-   // Reattach the table runs to their pool before sharing the lease. The
-   // candidate may outlive the previous catalog header, which owns no tables.
-   if !previous.unit_owners[index].unique() {return false,blot_error::Error.none;}
-   let core=blot_reuse_dependency_owned_headers::canonical(previous.unit_owners[index],previous.units[index]);
-   let pin,error=previous.unit_owners[index].retain();
-   if error!=blot_error::Error.none {return false,error;}
-   ready.unit_owners[index]=pin;
-   ready.units[index]=core;
-   ready.borrowed[index]=true;
-  }
+  var issue=blot_error::Error.none;
+  if edited {issue=lowerRetainedUnit(source,checked.module(id).checked,id,ready);}
+  else {issue=reuseRetainedCore(previous,index,ready);}
+  if issue!=blot_error::Error.none {return false,issue;}
  }
  return true,blot_error::Error.none;
+}
+
+fn lowerRetainedUnit(source:const Project&,checked:const blot_check_check::Checked&,id:u32,ready:Prepared&)->Error {
+ let unit .= source.unit(id);
+ let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
+ var core,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked,blot_reuse_project_check::moduleOrigins(source));
+ timing.exit();
+ if error!=blot_error::Error.none {return error;}
+ if core.value.diagnostics.len!=0 {core.owner.release();return blot_error::Error.invalid_artifact;}
+ core.value.unit=id;
+ ready.stats.body_lowerings+=core.value.body_lowerings;
+ ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
+ ready.units[id-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
+ ready.unit_owners[id-1]=core.owner;
+ return blot_error::Error.none;
+}
+
+fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&)->Error {
+ if previous.unit_owners[index].lease==0 {
+  // All clean cold entries share one immutable typed decode. Keep it only
+  // while a surviving unit still refers to that initial build's tables.
+  if ready.wire_owner.slot==0 {
+   let owner,error=previous.wire_owner.retain();
+   if error!=blot_error::Error.none {return error;}
+   ready.wire_owner=owner;
+  }
+  let units=previous.catalog_owner.mutable(previous.units);
+  ready.units[index]=units[index];
+ } else {
+  // Recover the mutable header before retaining the immutable published Core.
+  if !previous.unit_owners[index].unique() {return blot_error::Error.invalid_artifact;}
+  let core=blot_reuse_dependency_owned_headers::canonical(previous.unit_owners[index],previous.units[index]);
+  let owner,error=previous.unit_owners[index].retain();
+  if error!=blot_error::Error.none {return error;}
+  ready.unit_owners[index]=owner;
+  ready.units[index]=core;
+ }
+ ready.borrowed[index]=true;
+ return blot_error::Error.none;
+}
+
+fn prepareRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],candidate:Retained&)->Preparation,Error {
+ var symbols,error=blot_parse_symbols::initPooled();
+ if error!=blot_error::Error.none {return declineRetained(error);}
+ let packets=allocateRetainedPackets(changed.len);
+ let debits=blot_reuse_project_check::allocateModuleDebits(changed.len);
+ let value,error=checkRetainedPersistent(source,previous,previous_core,changed,symbols,packets,debits,candidate);
+ symbols.deinit();
+ if candidate.source.lease==0 {
+  releaseRetainedPackets(packets);
+  blot_reuse_project_check::releaseModuleDebits(debits);
+ }
+ return value,error;
+}
+
+fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&,packets:const u8[:][:],debits:ModuleDebit[:],candidate:Retained&)->Preparation,Error {
+ let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,previous.parsed_symbols);
+ if error!=blot_error::Error.none {return declineRetained(error);}
+ var input=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
+ input.symbols=blot_parse_symbols::canonical(symbols);
+ let prepared,error=blot_reuse_project_check::preparePersistentNames(input);
+ if error!=blot_error::Error.none {return declineRetained(error);}
+ let end=symbols.entries.len;
+ if !prepared || end!=previous.source.symbols.entries.len {return Preparation.inactive,blot_error::Error.none;}
+ for index in previous.parsed_symbols..end {
+  let id=(index+1) as u32;
+  if symbols.get(id)!=previous.source.symbols.get(id) {return Preparation.inactive,blot_error::Error.none;}
+ }
+ var engine,error=blot_reuse_project_check::initPersistentWorker(input);
+ if error!=blot_error::Error.none {return declineRetained(error);}
+ engine.persistent_previous=previous.packets;
+ engine.persistent_candidate=packets;
+ engine.persistent_changed=changed;
+ let owner,error=blot_reuse_dependency_payload::init();
+ if error!=blot_error::Error.none {engine.deinit();return declineRetained(error);}
+ var ready=Prepared{entry:source.entry,source_bytes:source.source_bytes,catalog_owner:owner,..};
+ let allocated=allocateCatalog(ready,changed.len);
+ var failure=allocated;
+ if failure==blot_error::Error.none {failure=rebuildRetainedPersistent(engine,previous,previous_core,changed,debits,packets,ready);}
+ engine.deinit();
+ if failure!=blot_error::Error.none {ready.deinit();return declineRetained(failure);}
+ candidate.adoptPersistent(source,symbols,previous.parsed_symbols,debits,packets);
+ return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
+}
+
+fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
+ let owned=retained_packet_tables.realloc_slice(packets,packets.len);
+ let cache .= engine.persistentCache();
+ for unit in engine.source.order.items {
+  let index=unit-1;
+  let path,error=ready.catalog_owner.copy(engine.source.filename(unit));
+  if error!=blot_error::Error.none {return error;}
+  ready.paths[index]=path;
+  if !changed[index] {
+   let debit=previous.debits[index];
+   if debit.resolution>engine.resolution_remaining || debit.associated>engine.associated_remaining {return blot_error::Error.invalid_artifact;}
+   engine.resolution_remaining-=debit.resolution;
+   engine.associated_remaining-=debit.associated;
+   debits[index]=debit;
+   let error=reuseRetainedCore(previous_core,index,ready);
+   if error!=blot_error::Error.none {return error;}
+   continue;
+  }
+  let resolution=engine.resolution_remaining;
+  let associated=engine.associated_remaining;
+  let symbol_count=engine.source.symbols.entries.len;
+  cache.current=unit;
+  let check=blot_phase_profile::enter(blot_phase_profile::Phase.check);
+  let continued,error=engine.checkOrdered(unit);
+  check.exit();
+  if error!=blot_error::Error.none {return error;}
+  if !continued || cache.error!=blot_error::Error.none || engine.source.symbols.missing_name || engine.diagnostics.items.len!=0 {
+   if cache.error!=blot_error::Error.none {return cache.error;}
+   return blot_error::Error.invalid_artifact;
+  }
+  let slots=blot_reuse_project_check::moduleSlots(engine.result);
+  let module:const blot_reuse_project_check::Module& =slots[index].value;
+  var packet:u8[>..<]=[];
+  let freeze=blot_phase_profile::enter(blot_phase_profile::Phase.freeze);
+  let encoded=blot_reuse_project_check::encodePersistentInterface(engine.source.prelude_unit,engine.source.unit(unit).tree,module,unit,packet);
+  freeze.exit();
+  if encoded!=blot_error::Error.none {return encoded;}
+  owned[index]=blot_reuse_project_check::copyOwned(packet[..]);
+  let lowered=lowerRetainedUnit(engine.source,module.checked,unit,ready);
+  if lowered!=blot_error::Error.none {return lowered;}
+  if engine.source.symbols.missing_name || engine.source.symbols.entries.len!=symbol_count {return blot_error::Error.invalid_artifact;}
+  ready.stats.body_elaborations+=module.checked.body_elaborations;
+  ready.stats.imported_schemes+=module.checked.imported_schemes;
+  ready.stats.normalization.merge(module.checked.types.normalization);
+  debits[index]=ModuleDebit{resolution-engine.resolution_remaining,associated-engine.associated_remaining,symbol_count};
+  slots[index].value.deinit();
+  slots[index]=blot_support::none<blot_reuse_project_check::Module>();
+  cache.current=0;
+ }
+ return blot_error::Error.none;
 }

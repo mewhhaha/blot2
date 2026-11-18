@@ -13,8 +13,8 @@ speed.
   and the command line (`src/driver/`). The module map follows the Zig
   source it came from; `source-correspondence.json` names the Zig file of
   each module.
-- `native/` is the C host: the entry point, file and process calls, and
-  the observer that counts pool requests for the `memory` record.
+- `native/` contains the entry point, file and process calls, the shared
+  Linux checker queue in `check_queue.c`, and the pool allocation observer.
 - `tools/` has the generators for the generated modules in `src/support/`
   and `src/reuse/`, the two models they read, the build of the patched
   Goose, and the test runners.

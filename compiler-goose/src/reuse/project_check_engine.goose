@@ -6,14 +6,14 @@ import phase_profile;
 struct SourceModule {validation:blot_check_check::SourceValidation,exports:Export[:],valid:bool}
 struct CompiledCatalog {exports:Export[:]=default<Export[:]>(),declarations:blot_check_check::SourceDeclaration[:]=default<blot_check_check::SourceDeclaration[:]>()}
 enum CatalogOwner {inactive,typed{value:const Checked&},source{value:const blot_check_check::SourceValidation&},frozen{value:const blot_reuse_principal_interface::Interface&}}
-struct CatalogModule {owner:CatalogOwner=CatalogOwner.inactive,exports:const Export[:]=default<const Export[:]>(),valid:bool=false}
+struct CatalogModule {owner:CatalogOwner=CatalogOwner.inactive,exports:const Export[:]=default<const Export[:]>(),valid:bool=false,summaries:const blot_check_check::SchemeSummary[:]=default<const blot_check_check::SchemeSummary[:]>()}
 fn catalog(self_:CatalogModule)->blot_check_check::DeclarationCatalog {match self_.owner {
  typed payload=>{return blot_check_check::declarationCatalog(payload.value);},source payload=>{return blot_check_check::declarationCatalog(payload.value);},
- frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.catalog();},inactive=>{abort("inactive project declaration catalog");},
+ frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value,self_.summaries)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.catalog();},inactive=>{abort("inactive project declaration catalog");},
 }}
 fn declaration(self_:CatalogModule,binding:u32)->blot_check_check::SourceDeclaration {match self_.owner {
  typed payload=>{return blot_check_check::sourceDeclaration(payload.value.bindings[binding]);},source payload=>{return payload.value.declarations[binding];},
- frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.declaration(binding);},inactive=>{abort("inactive project declaration catalog");},
+ frozen payload=>{return blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(payload.value,self_.summaries)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:0, ..}.declaration(binding);},inactive=>{abort("inactive project declaration catalog");},
 }}
 fn resolved(self_:CatalogModule,node:u32)->u32 {match self_.owner {typed payload=>{return payload.value.resolved[node];},source payload=>{return payload.value.resolved[node];},_=>{abort("source resolution requires a live source catalog");}}}
 enum Editor {none,query{value:EditorQuery}}
@@ -22,6 +22,10 @@ struct DiagnosticBuffer {storage:Diagnostic[:]=default<Diagnostic[:]>(),items:Di
 struct Engine {
  source:Project=Project{..},result:CheckedProject=CheckedProject{..},diagnostics:DiagnosticBuffer=DiagnosticBuffer{..},
  retained:const CheckedProject?=null,
+ persistent_cache:u32=0,
+ persistent_previous:const u8[:][:]=default<const u8[:][:]>(),
+ persistent_candidate:const u8[:][:]=default<const u8[:][:]>(),
+ persistent_changed:const bool[:]=default<const bool[:]>(),
  source_validation:bool=false,prepare_names:bool=false,execution:blot_check_check::PrivateExecution=blot_check_check::PrivateExecution{..},resolution_remaining:i64=1000000,associated_remaining:i64=1000000,editor:Editor=Editor.none,
  source_modules:blot_support::Option<SourceModule>[:]=default<blot_support::Option<SourceModule>[:]>(),compiled_catalogs:CompiledCatalog[:]=default<CompiledCatalog[:]>(),
 }
@@ -44,7 +48,7 @@ fn deinitSourceModules(self_:Engine&) {
  if self_.compiled_catalogs.len!=0 {compiled_catalog_runs.free_slice(self_.compiled_catalogs);}self_.compiled_catalogs=default<CompiledCatalog[:]>();
 }
 fn deinitDiagnostics(self_:Engine&) {for &item in self_.diagnostics.items {item.deinit();}blot_support_pooled_buffer::deinit(self_.diagnostics,owned_Diagnostic);}
-fn deinit(self_:Engine&) {self_.deinitDiagnostics();self_.deinitSourceModules();self_.result.deinit();self_=Engine{..};}
+fn deinit(self_:Engine&) {self_.deinitPersistentProducers();self_.deinitDiagnostics();self_.deinitSourceModules();self_.result.deinit();self_=Engine{..};}
 fn checkedModule(self_:const Engine&,unit:u32)->const Module? {
  if unit<=self_.result.modules.len && self_.result.modules[unit-1].present {return self_.result.modules[unit-1].value;}
  let retained .= self_.retained;
@@ -53,13 +57,26 @@ fn checkedModule(self_:const Engine&,unit:u32)->const Module? {
 }
 fn catalogModule(self_:const Engine&,unit:u32)->blot_support::Option<CatalogModule> {
  if unit==0 || unit>self_.source.units.len {return blot_support::none<CatalogModule>();}let compiled .= self_.source.compiledModule(unit);if compiled {return blot_support::some(CatalogModule{CatalogOwner.frozen{compiled.interface},self_.compiled_catalogs[unit-1].exports,true, ..});}
+ let producer .= self_.persistentProducer(unit);
+ if producer {return blot_support::some(CatalogModule{CatalogOwner.frozen{producer.interface},producer.exports,true,producer.summaries, ..});}
  if self_.source_validation {if unit<=self_.source_modules.len && self_.source_modules[unit-1].present {let source:const SourceModule& =self_.source_modules[unit-1].value;return blot_support::some(CatalogModule{CatalogOwner.source{source.validation},source.exports,source.valid, ..});}}
  else {let module .= self_.checkedModule(unit);if module {return blot_support::some(CatalogModule{CatalogOwner.typed{module.checked},module.exports,module.valid, ..});}}
  return blot_support::none<CatalogModule>();
 }
-fn valueImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::ImportedBinding {
+fn valueImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::ImportedBinding,Error {
  assert(!self_.source_validation);let compiled .= self_.source.compiledModule(target.unit);var interface=default<blot_check_check::SchemeInterface>();
- if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(compiled.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {let module .= self_.checkedModule(target.unit);assert(module);interface=checkedInterface(module.checked,target);}return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. };
+ if compiled {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(compiled.interface)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}else {
+  let producer .= self_.persistentProducer(target.unit);
+  if producer {interface=blot_check_check::ImportedCatalog{frozen:blot_support::Option<blot_check_check::FrozenProducer>{true,blot_check_check::frozenProducer(producer.interface,producer.summaries)},kind:blot_check_check::ImportedCatalog_kind.catalog,index:0,origin:origin, ..}.interface(target.binding);}
+  else {
+   if self_.persistent_cache!=0 {
+    let failure=self_.persistentCache().error;
+    if failure!=blot_error::Error.none {return default<blot_check_check::ImportedBinding>(),failure;}
+    return default<blot_check_check::ImportedBinding>(),blot_error::Error.invalid_artifact;
+   }
+   let module .= self_.checkedModule(target.unit);assert(module);interface=checkedInterface(module.checked,target);
+  }
+ }return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. },blot_error::Error.none;
 }
 fn headerImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::SourceHeader {
  assert(self_.source_validation);let module=self_.catalogModule(target.unit);assert(module.present);let declaration=module.value.declaration(target.binding);return blot_check_check::SourceHeader{ capability_flow:declaration.capability_flow, capability_parameters:declaration.capability_parameters, target:target, named_function:declaration.named_function, origin:origin, .. };
@@ -144,4 +161,13 @@ fn replaySymbols(pool:blot_parse_symbols::Pool&,original:const blot_parse_symbol
   if actual!=symbol {return blot_error::Error.invalid_artifact;}
  }
  return blot_error::Error.none;
+}
+
+
+// Candidate dependencies are published in source order. A changed module never
+// receives the previous body or interface at its old ordinal.
+fn retainedPersistentPacket(self_:const Engine&,unit:u32)->const u8[:] {
+ if unit==0 || unit>self_.persistent_changed.len {return default<const u8[:]>();}
+ if self_.persistent_changed[unit-1] {return self_.persistent_candidate[unit-1];}
+ return self_.persistent_previous[unit-1];
 }

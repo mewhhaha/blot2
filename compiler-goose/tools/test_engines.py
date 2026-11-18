@@ -101,13 +101,14 @@ def main() -> int:
     try:
         runtime = output / "goose_runtime.c"
         call("emit runtime", [str(goose), "--emit-runtime", str(runtime)], args.timeout)
-        objects = [build.cached_object("compile " + name, source, output, [str(cc)],
+        native_sources = [runtime, ROOT / "native/platform.c", ROOT / "native/check_queue.c"]
+        objects = [build.cached_object("compile " + source.stem, source, output, [str(cc)],
                     flags, evidence["cc"]["sha256"], args.timeout)
-                   for name, source in [("runtime", runtime), ("platform", ROOT / "native/platform.c")]]
+                   for source in native_sources]
         evidence["native_objects"] = [{"path": str(path), "sha256": build.digest_file(path),
             "source": str(source), "source_sha256": build.digest_file(source),
             "compile_command": [str(cc)] + flags + ["-c", str(source), "-o", str(path)]}
-            for path, source in zip(objects, [runtime, ROOT / "native/platform.c"])]
+            for path, source in zip(objects, native_sources)]
         evidence["runtime_sha256"] = build.digest_file(runtime)
         # The explicit preparation/invocation probes hit their 30s emission caps; they remain
         # opt-in and unqualified, outside the default component-law inventory.

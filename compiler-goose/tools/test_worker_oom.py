@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import time
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -24,7 +25,8 @@ def main():
     sources = [ROOT/'native'/p for p in ('main.c', 'platform.c', 'request_supervisor.c',
         'request_supervisor.h', 'request_cache.c', 'request_cache.h',
         'allocation_observer.c', 'allocation_observer.h', 'tests/worker_oom_test.c',
-        'tests/request_supervisor_test.c', 'tests/request_transport_test.c')]
+        'tests/request_supervisor_test.c', 'tests/request_transport_test.c',
+        'check_queue.c', 'tests/persistent_queue_test.c')]
     sources += [ROOT/'native/request_transport.c', ROOT/'native/request_transport.h', Path(__file__).resolve()]
     identities = {str(p.relative_to(ROOT)): digest(p) for p in sources}
     wrapper = work/'worker-oom.c'
@@ -64,6 +66,16 @@ def main():
             (work/(test+'-'+name+'.stderr')).write_text(result.stderr)
             rows.append({'test': test, 'variant': name, 'seconds': round(time.monotonic()-t, 3),
                          'binary_sha256': digest(command[0]), 'stdout': result.stdout})
+        if sys.platform.startswith('linux'):
+            queue = work / ('persistent-queue-' + name)
+            run([args.cc, *flags, '-Wall', '-Wextra', '-Werror', '-DPERSIST_WHITEBOX',
+                 ROOT/'native/tests/persistent_queue_test.c', ROOT/'native/platform.c',
+                 ROOT/'native/request_supervisor.c', '-lm', '-o', queue])
+            started_queue = time.monotonic()
+            run([queue], env)
+            rows.append({'test': 'persistent-queue', 'variant': name,
+                         'seconds': round(time.monotonic() - started_queue, 3),
+                         'binary_sha256': digest(queue)})
     if identities != {str(p.relative_to(ROOT)): digest(p) for p in sources}:
         raise RuntimeError('native sources changed during qualification')
     receipt = {'runtime_sha256': digest(args.runtime), 'source_sha256': identities, 'checks': rows,
