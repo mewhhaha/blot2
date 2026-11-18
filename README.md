@@ -17,6 +17,13 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
+Gdev Main compiles from a fresh project session in **0.889 s** median
+and rebuilds a lighting preset edit in **268 ms**. Each fresh build
+checks all 269 modules and emits 2,639,228 bytes of Wasm.
+[Same-source measurements](benchmarks/evidence/measurements/2026-11-18-gdev-compiler-workers.json)
+
+![Fresh Gdev Main compile time before and after persistent workers](benchmarks/evidence/measurements/2026-11-18-gdev-compiler-workers.svg)
+
 Blot versus Goose's direct Wasm backend, measured on 2026-11-04. Seven adapted
 pairs now pass: six original-numeric workloads and a Mandelbrot F32 control.
 Merge sort and quicksort retain their original recursive algorithms.
@@ -30,10 +37,8 @@ and Sieve **1.16x**. Hash and merge now roughly match Goose. Both charts use
 fresh five-sample measurements. Blot uses U32 byte/flag buffers where Goose uses
 U8; both sorts use four-byte elements. Original F64 remains unsupported.
 
-Main shrinks **10.04 → 9.20MB (8.3%)** through local-index ordering. Compilation
-has a **5.52s median**, with no reliable speed gain. Wide-record backing
-regressed Main and was removed. See the
-[measurements and pending qualification](benchmarks/goose/results/2026-11-04-array-engines.md).
+On the November 4 snapshot, local-index ordering reduced Main from 10.04 MB
+to 9.20 MB. [Historical measurements](benchmarks/goose/results/2026-11-04-array-engines.md)
 
 ## Development
 

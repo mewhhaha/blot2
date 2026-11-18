@@ -6,16 +6,13 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The current qualified compiler is Blot `ea110ae6`, with Gdev `45748aba`,
-Ink `3f2e603` and Pen `ad9766c`. On the same Gdev source the median lighting
-edit fell from **1.625 s to 0.260 s**. Fresh Main fell from **1.708 s to
-1.578 s** with the default single worker. All 269 modules check and produce
-2,639,228 bytes of Wasm. The current performance target is a fresh build
-under one second. A separate eight-worker compiler reached **961 ms** in a
-fresh session. Its import budget and retained edit behavior are still being
-qualified. [Release measurements](benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
-· [Worker experiment](benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
-· [Compiler work](tasks/FAST_COMPILE.md)
+The qualified compiler is Blot `20fed713`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. Fresh Main fell from **1.691 s to 0.889 s**
+on the same sources. All six fresh processes finished in 870–910 ms,
+checking all 269 modules and emitting the same 2,639,228 bytes. A lighting
+preset edit in an open session took **268 ms** and rechecked one
+module. A public function-body edit rechecked 72 modules.
+[Measurements](benchmarks/evidence/measurements/2026-11-18-gdev-compiler-workers.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -24,7 +21,7 @@ qualified. [Release measurements](benchmarks/evidence/measurements/2026-11-18-gd
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,084 guest and host tests passed, 100 ignored |
+| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,085 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

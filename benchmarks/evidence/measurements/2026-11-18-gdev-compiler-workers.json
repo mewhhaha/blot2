@@ -1,0 +1,530 @@
+{
+  "date": "2026-11-18",
+  "source": {
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "compilerSha256": "ad7f75009948a575fd608d850328ec5199b51de1fdfbfb46e734a39de6d6ad1b",
+    "penSha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "blot2": "20fed71392c3ae278ffe57b6e37c6f10f5912b67",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "protocolIdentity": "51a5651a98da07aadc3ae2daf0738f93fc9db88ab6d8427d9e81b75547614082",
+    "gooseSha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "runtimeSha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "clangSha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "cFlags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "clang": "clang version 23.1.5",
+    "deno": "deno 2.9.8 (stable, release, x86_64-unknown-linux-gnu)",
+    "host": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads",
+    "kernel": "7.3.4-1-cachyos"
+  },
+  "previous": {
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+    "penSha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "blot2": "ea110ae6c2a0946fb14dd4c05bfae8ef7c43bbe3",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "workload": {
+    "entry": "src/main.blot",
+    "sourceBytes": 2527266,
+    "syntaxNodes": 354194,
+    "modules": 269,
+    "bodyElaborations": 5994,
+    "bodyLowerings": 6010,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "lightingEditWasmSha256": "4e4fba58869dbd87e760919247d52afebc1c4fae443512747b9c06f61c27e757"
+  },
+  "entryFiles": {
+    "entrySha256": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+    "preludeSha256": "72051ce29e0057bb116809e7bdd6428ebab2cad537763e1cd9b21298dc04f057",
+    "penJsonSha256": "fb1023f9cf0d7f1192061d97a34ce0faf7bf3d67efd5f8d36eddaaae59e1042c"
+  },
+  "fresh": {
+    "method": "Six interleaved runs per configuration on a shared Linux host with warm filesystem pages. Each uses a new compiler process and project, runs native asset generation, checks every source module and receives full Wasm. No frontend worker flag for default builds. Excludes hashing and evidence writes. Profiled runs are separate.",
+    "comparison": {
+      "previous-default": {
+        "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+        "trialsMs": [
+          1763.51,
+          1664.82,
+          1698.42,
+          1688.67,
+          1694.05,
+          1679.14
+        ],
+        "medianMs": 1691.36,
+        "underOneSecond": 0
+      },
+      "previous-workers": {
+        "compilerSha256": "aa9886994ea6dfdbedefa7e10c5677b9adb28914fd37e22725ed4b12f96fa908",
+        "trialsMs": [
+          932.24,
+          911.48,
+          918.88,
+          915.1,
+          912.3,
+          898.61
+        ],
+        "medianMs": 913.7,
+        "underOneSecond": 6
+      },
+      "default": {
+        "compilerSha256": "ad7f75009948a575fd608d850328ec5199b51de1fdfbfb46e734a39de6d6ad1b",
+        "trialsMs": [
+          886.25,
+          887.59,
+          899.39,
+          910.47,
+          869.76,
+          889.6
+        ],
+        "medianMs": 888.59,
+        "underOneSecond": 6
+      }
+    },
+    "profiledStages": {
+      "0": {
+        "label": "automatic",
+        "phaseMs": {
+          "other": 16.54,
+          "assets": 72.8,
+          "load": 12.45,
+          "lex": 22.36,
+          "parse": 121.17,
+          "check": 446.7,
+          "lower": 53.84,
+          "freeze": 0.0,
+          "validation": 0.0,
+          "backend": 112.55
+        },
+        "checking": {
+          "modules": 269,
+          "import_requests": 192057,
+          "imported_summary_reuses": 4756,
+          "parallel_batches": 1,
+          "parallel_worker_processes": 7,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 269,
+          "parallel_worker_reply_bytes": 72858303
+        }
+      },
+      "1": {
+        "label": "one worker",
+        "phaseMs": {
+          "other": 4.8,
+          "assets": 72.68,
+          "load": 14.52,
+          "lex": 23.96,
+          "parse": 124.0,
+          "check": 1119.2,
+          "lower": 207.46,
+          "freeze": 0.0,
+          "validation": 0.0,
+          "backend": 111.64
+        },
+        "checking": {
+          "modules": 269,
+          "import_requests": 192057,
+          "imported_summary_reuses": 4756,
+          "parallel_batches": 0,
+          "parallel_worker_processes": 0,
+          "parallel_retries": 0,
+          "parallel_worker_jobs": 0,
+          "parallel_worker_reply_bytes": 0
+        }
+      }
+    },
+    "coreTableTransfer": {
+      "beforeCompiler": "aa9886994ea6dfdbedefa7e10c5677b9adb28914fd37e22725ed4b12f96fa908",
+      "previousPacketBytes": 75020577,
+      "currentPacketBytes": 72858303,
+      "types": [
+        "Core Node",
+        "Span",
+        "Binding",
+        "BindingRef",
+        "CallInfo",
+        "Body",
+        "Parameter",
+        "DeclarationDependencies"
+      ]
+    }
+  },
+  "retained": {
+    "method": "Three alternating pairs of previous and candidate binaries with the same in-memory lighting overlay. Fresh sessions check baseline, edited bytes and the complete diagnostic. Invalid edits preserve the last successful revision. RSS was read from the compiler process after each response.",
+    "results": {
+      "previous": {
+        "open": {
+          "trialsMs": [
+            1665.55,
+            1663.7,
+            1672.03
+          ],
+          "medianMs": 1665.55,
+          "medianReportedRssMiB": 305.95,
+          "freshModules": 269,
+          "cachedModules": 0,
+          "bodyLowerings": 6010
+        },
+        "edit": {
+          "trialsMs": [
+            270.0,
+            275.78,
+            267.77
+          ],
+          "medianMs": 270.0,
+          "medianReportedRssMiB": 324.03,
+          "freshModules": 1,
+          "cachedModules": 268,
+          "bodyLowerings": 6
+        },
+        "reject": {
+          "trialsMs": [
+            298.78,
+            302.71,
+            305.37
+          ],
+          "medianMs": 302.71,
+          "medianReportedRssMiB": 353.53
+        },
+        "recover": {
+          "trialsMs": [
+            262.72,
+            262.29,
+            263.46
+          ],
+          "medianMs": 262.72,
+          "medianReportedRssMiB": 353.53,
+          "freshModules": 0,
+          "cachedModules": 269,
+          "bodyLowerings": 0
+        },
+        "revert": {
+          "trialsMs": [
+            264.26,
+            265.59,
+            269.07
+          ],
+          "medianMs": 265.59,
+          "medianReportedRssMiB": 353.53,
+          "freshModules": 1,
+          "cachedModules": 268,
+          "bodyLowerings": 6
+        }
+      },
+      "candidate": {
+        "open": {
+          "trialsMs": [
+            891.77,
+            919.3,
+            892.6
+          ],
+          "medianMs": 892.6,
+          "medianReportedRssMiB": 170.77,
+          "freshModules": 269,
+          "cachedModules": 0,
+          "bodyLowerings": 6010
+        },
+        "edit": {
+          "trialsMs": [
+            268.23,
+            262.18,
+            280.13
+          ],
+          "medianMs": 268.23,
+          "medianReportedRssMiB": 186.97,
+          "freshModules": 1,
+          "cachedModules": 268,
+          "bodyLowerings": 6
+        },
+        "reject": {
+          "trialsMs": [
+            394.01,
+            402.64,
+            407.85
+          ],
+          "medianMs": 402.64,
+          "medianReportedRssMiB": 212.46
+        },
+        "recover": {
+          "trialsMs": [
+            269.88,
+            276.11,
+            273.35
+          ],
+          "medianMs": 273.35,
+          "medianReportedRssMiB": 212.46,
+          "freshModules": 0,
+          "cachedModules": 269,
+          "bodyLowerings": 0
+        },
+        "revert": {
+          "trialsMs": [
+            261.68,
+            269.03,
+            272.77
+          ],
+          "medianMs": 269.03,
+          "medianReportedRssMiB": 212.48,
+          "freshModules": 1,
+          "cachedModules": 268,
+          "bodyLowerings": 6
+        }
+      }
+    },
+    "ordinaryFunctionEdit": [
+      {
+        "label": "baseline",
+        "revision": 1,
+        "buildMs": 880.9866599999996,
+        "fresh": 269,
+        "cached": 0,
+        "hash": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "label": "ordinary",
+        "revision": 2,
+        "buildMs": 1123.1517860000004,
+        "fresh": 72,
+        "cached": 197,
+        "hash": "eb546b5ebd644117826bcbad1a071c0c78106a4655ceff46c1abda242753a129"
+      },
+      {
+        "label": "reject",
+        "revision": 2,
+        "buildMs": 417.6665440000006,
+        "diagnostics": [
+          {
+            "filename": "/home/jacobt/src/gdev/src/effects/lighting_look.blot",
+            "stage": "check-project",
+            "code": "type_mismatch",
+            "start": 1594,
+            "end": 1627,
+            "message": "Types do not match; one side: Bool; other side: F32",
+            "offset_encoding": "utf8_bytes",
+            "utf16": null,
+            "details": null
+          }
+        ]
+      },
+      {
+        "label": "recover",
+        "revision": 3,
+        "buildMs": 273.24392200000057,
+        "fresh": 0,
+        "cached": 269,
+        "hash": "eb546b5ebd644117826bcbad1a071c0c78106a4655ceff46c1abda242753a129"
+      },
+      {
+        "label": "ordinary-revert",
+        "revision": 4,
+        "buildMs": 1102.8234120000006,
+        "fresh": 72,
+        "cached": 197,
+        "hash": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "label": "bool",
+        "revision": 5,
+        "buildMs": 272.4855289999996,
+        "fresh": 1,
+        "cached": 268,
+        "hash": "4e4fba58869dbd87e760919247d52afebc1c4fae443512747b9c06f61c27e757"
+      },
+      {
+        "label": "bool-revert",
+        "revision": 6,
+        "buildMs": 270.0170049999997,
+        "fresh": 1,
+        "cached": 268,
+        "hash": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa"
+      },
+      {
+        "label": "ordinary-again",
+        "revision": 7,
+        "buildMs": 1108.1263209999997,
+        "fresh": 72,
+        "cached": 197,
+        "hash": "eb546b5ebd644117826bcbad1a071c0c78106a4655ceff46c1abda242753a129"
+      }
+    ]
+  },
+  "workerPolicy": {
+    "platform": "Linux",
+    "minimumModules": 16,
+    "fourWorkersFromSourceBytes": 65536,
+    "eightWorkersFromSourceBytes": 524288,
+    "bound": "process CPU affinity",
+    "initialQualificationWidthsMs": {
+      "6": {
+        "trialsMs": [
+          1007.08,
+          983.97,
+          965.8,
+          1005.03
+        ],
+        "medianMs": 994.5
+      },
+      "8": {
+        "trialsMs": [
+          972.91,
+          968.74,
+          980.63,
+          1003.19
+        ],
+        "medianMs": 976.77
+      },
+      "10": {
+        "trialsMs": [
+          1009.8,
+          965.22,
+          1009.31,
+          989.56
+        ],
+        "medianMs": 999.44
+      },
+      "12": {
+        "trialsMs": [
+          1022.09,
+          980.91,
+          1036.1,
+          1027.84
+        ],
+        "medianMs": 1024.97
+      },
+      "16": {
+        "trialsMs": [
+          1046.75,
+          1052.05,
+          1053.29,
+          1092.78
+        ],
+        "medianMs": 1052.67
+      }
+    },
+    "workerReleaseCommit": "2092c48fd2d1242862225443580bc200c8d158fe",
+    "initialFreshQualification": {
+      "previous-default": {
+        "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+        "trialsMs": [
+          2068.78,
+          1926.08,
+          1922.56,
+          1889.16,
+          2010.62,
+          1937.75
+        ],
+        "medianMs": 1931.91,
+        "underOneSecond": 0
+      },
+      "default": {
+        "compilerSha256": "aa9886994ea6dfdbedefa7e10c5677b9adb28914fd37e22725ed4b12f96fa908",
+        "trialsMs": [
+          1026.64,
+          1108.71,
+          1002.0,
+          1001.79,
+          1026.02,
+          1032.6
+        ],
+        "medianMs": 1026.33,
+        "underOneSecond": 0
+      },
+      "single": {
+        "compilerSha256": "aa9886994ea6dfdbedefa7e10c5677b9adb28914fd37e22725ed4b12f96fa908",
+        "trialsMs": [
+          2013.72,
+          2235.26,
+          1901.93,
+          1868.41,
+          2002.57,
+          1991.17
+        ],
+        "medianMs": 1996.87,
+        "underOneSecond": 0
+      },
+      "four": {
+        "compilerSha256": "aa9886994ea6dfdbedefa7e10c5677b9adb28914fd37e22725ed4b12f96fa908",
+        "trialsMs": [
+          1186.21,
+          1173.9,
+          1035.73,
+          1062.47,
+          1060.63,
+          1100.38
+        ],
+        "medianMs": 1081.42,
+        "underOneSecond": 0
+      }
+    }
+  },
+  "checking": {
+    "allNonSchedulerProfileCountersMatchOneWorker": true,
+    "reusedImportSummaries": 4756,
+    "sharedContractFixture": {
+      "moduleCount": 20,
+      "acceptedBudget": 16862,
+      "firstRejectedBudget": 16861,
+      "diagnostic": "associated_limit"
+    },
+    "portableDependencyFormatChanged": false
+  },
+  "qualification": {
+    "compiler": {
+      "guestsAndHostsPassed": 1085,
+      "ignored": 100,
+      "recordedWasmFixtures": 189,
+      "loweringDiagnostics": 212,
+      "directBackendReferences": 2
+    },
+    "nativeWorkerChecks": 8,
+    "projects": {
+      "gdev": {
+        "modules": 210,
+        "passed": 1220,
+        "failed": 108,
+        "unbuilt": 0
+      },
+      "ink": {
+        "modules": 73,
+        "passed": 280,
+        "failed": 0,
+        "unbuilt": 0
+      }
+    },
+    "inkNative": {
+      "passed": 111,
+      "knownFailures": [
+        "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+        "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+      ]
+    },
+    "pen": {
+      "main": true,
+      "devtools": true,
+      "assetsLinted": 545,
+      "codegenCheck": true,
+      "matchingReplayFiles": 242,
+      "frames": 120,
+      "inspectedHardwareFrame": {
+        "frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+        "frames.trace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f"
+      }
+    }
+  },
+  "raw": "2026-11-18-gdev-compiler-workers.raw.json.gz",
+  "reproduce": {
+    "fresh": "deno run -A scripts/integration/build_gdev.ts --gdev-root ../gdev --compiler compiler-goose/build/blotc-goose --timeout-ms 20000",
+    "warm": "deno run -A scripts/integration/time_gdev_edits.ts --gdev-root ../gdev --compiler compiler-goose/build/blotc-goose --repetitions 3",
+    "chart": "2026-11-18-gdev-compiler-workers.svg"
+  }
+}

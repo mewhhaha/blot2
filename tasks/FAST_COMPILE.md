@@ -1,75 +1,60 @@
-# Fast compilation: a modular direct backend
+# Fast compilation
 
-The long-term goal is 1M lines/s. The next milestone is a fresh Gdev Main
-build under one second, from opening the compiler session through receiving
-the complete Wasm with every module checked.
+The long-term goal is one million source lines per second. The Gdev milestone
+measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
-Blot `ea110ae6` builds a real lighting edit in **260 ms** and a fresh Main
-in **1.578 s**. Both compilers below used Gdev `45748aba`, Ink `3f2e603` and
-Pen `ad9766c`. Fresh builds include session startup, asset generation, checking
-all 269 modules and receiving the complete 2,639,228-byte Wasm.
-[Pinned measurements and raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
+Blot `20fed713` took **0.889 s** median on fresh Main and **268 ms**
+on a lighting preset edit in an open session. Each of six fresh builds checked
+all 269 modules, emitted the same 2,639,228 bytes and finished in 870–910 ms. Both defaults used Gdev `45748aba`, Ink `3f2e603`
+and Pen `ad9766c` on the same shared eight-core Linux host.
+[Measurements and raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-compiler-workers.json)
 
-| Operation, median | Previous compiler | Current compiler |
+| Operation | Previous default | Current default |
 | --- | ---: | ---: |
-| Fresh Main, 1 worker | 1,708 ms | 1,578 ms |
-| Fresh Main, 4 workers | 4,475 ms | 1,808 ms |
-| Edit the lighting preset in an open session | 1,625 ms | 260 ms |
-| Reject an invalid lighting edit | 303 ms | 289 ms |
-| Restore the last valid edit | 1,631 ms | 250 ms |
-| Revert to the original source | 1,628 ms | 256 ms |
+| Fresh Main | 1,691 ms | 889 ms |
+| Lighting preset edit | 270 ms | 268 ms |
+| Reject an invalid lighting edit | 303 ms | 403 ms |
+| Recover the last valid edit | 263 ms | 273 ms |
+| Revert the lighting preset | 266 ms | 269 ms |
 
-### Live edits
+Fresh trials opened a new native process, regenerated assets and checked every
+module with warm filesystem pages. The edit trials alternated previous and current
+compilers and compared successful bytes and rejection diagnostics with fresh sessions.
 
-The session retains checked modules and Core from its most recent successful
-build. A Boolean literal change inside a closed data initializer can stop at
-the producer. The Gdev edit rechecked one module and lowered six bodies.
-Ordinary function edits recheck the changed module and its transitive
-importers. A change the session cannot prove safe takes the full path.
-Failed edits preserve the last successful revision. The
-[edit benchmark](../scripts/integration/time_gdev_edits.ts) compares all
-successful outputs and rejection diagnostics against fresh sessions. Retaining
-the results raised median process RSS after one cycle from 319 to 354 MiB.
+### Where fresh time goes
 
-### Fresh builds
+Seven forked workers and the parent check dependency-ready modules. Each
+publishes its interface as soon as it is ready, then lowers the checked body to
+Core. Importers decode each producer once per worker. The coordinator restores
+the budget debits in source order and assembles the complete Wasm.
 
-Gdev now exposes station state and layout, robot data and picking, and salt
-appearance through small ordinary modules. The number of transitive dependents,
-including each producer, fell from 12 to 3 for station, 31 to 20 for robots
-and 53 to 35 for salt. The compiler shares ownership traversal scratch across
-queries and groups ready modules across checker processes. At four workers
-the parent does one group's work. Forks fell from 269 to 60 and reply traffic
-from 139.1 to 76.7 MB. One worker remains fastest on the measured host.
+In a separate traced build, checking and worker-side lowering took
+447 ms, gathering Core took 54 ms, loading and parsing took
+156 ms, assets took 73 ms and the Wasm backend took 113 ms.
+The serial trace spent 1,119 ms checking and 207 ms lowering.
+Sending the largest Core tables as verified Goose arrays reduced worker replies
+from 75.0 MB to 72.9 MB. With the same scheduler it reduced fresh time from
+0.914 s to 0.889 s on these six pairs.
 
-A fresh serial profile spent 1,057 ms checking, 192 ms lowering, 142 ms
-loading, lexing and parsing, 102 ms emitting Wasm, and 69 ms on assets.
-An isolated two-level grouping experiment reduced four-worker debug time from
-6.544 to 6.299 s and raised reply traffic to 81.7 MB. Allocating type-list
-scratch lazily cut pooled allocations by 9.2% without a repeatable wall-time gain. Both remain
-outside the release.
+### Edits and remaining costs
 
-### Persistent workers
+A successful build retains the interfaces, inference-budget debits and Core it
+needs for the next edit. A closed-record Boolean edit checks one module and
+reuses 268. Restoring the last successful revision after rejection reuses all
+269. Rejection falls back to the source checker for the ordered diagnostic.
+In the measured cycle, the compiler process ended at
+212 MiB RSS, compared with 354 MiB previously.
 
-An isolated compiler built fresh Main in **961 ms** median with eight workers.
-All four trials were below one second (942–975 ms). The release compiler
-measured 1,781 ms on the same inputs interleaved with those trials. Four
-workers took 1,031 ms. Every build checked 269 modules and emitted the same
-complete Wasm. [Measurements, prototype patches and test receipts](../benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
-
-Each worker publishes its finished module interface immediately and lowers
-the same module to Core. Other workers read each imported interface on first
-use. The parent assembles the received Core. Source declarations and actual
-imports determine the generated names before any worker starts. Three or
-seven child processes serve the whole build, with the parent checking too.
-The prior scheduling model predicted 770 ms with four workers.
-
-The measured prototype rechecks all modules after an edit. On a valid
-20-module project it also charged 17,420 associated-resolution steps against
-16,862 on the live checker. Publishing reusable scheme summaries and retaining
-interfaces across session revisions are the remaining conditions for making
-this the default.
+Changing the body of a public lighting function produced different Wasm and
+rechecked 72 modules in **1.11 s** median across the edit, revert
+and repeat. Comparing the changed module's exported interface before checking
+its importers could reduce that work. The source splits already reduced the
+inclusive dependent count for station from 12 to 3, robots from 31 to 20 and
+salt from 53 to 35.
+[Source split and serial edit measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
+· [Worker prototype and rejected experiments](../benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
 
 ## Goose release measurements, 17 November 2026
 
