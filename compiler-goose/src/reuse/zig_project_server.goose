@@ -128,7 +128,7 @@ fn prepare(self_:OpenProject&,snapshot:blot_reuse_revision_inputs::Snapshot&,can
         let empty=Frozen{..};let value,failure=blot_reuse_partial_dependency::prepareProject(source,self_.entry,blot_support::none<const u8[:]>(),empty);source.deinit();return value,failure;
     }
     if allow_reuse && self_.core.units.len!=0 {
-        let retained,failure=blot_reuse_partial_dependency::prepareRetainedProject(source,self_.checked,self_.core);
+        let retained,failure=blot_reuse_partial_dependency::prepareRetainedProject(source,self_.checked,self_.core,candidate);
         if failure!=blot_error::Error.none {source.deinit();return blot_reuse_partial_dependency::Preparation.inactive,failure;}
         match retained {ready=>{reused=true;source.deinit();return retained,blot_error::Error.none;},_=>{var unused=retained;unused.deinit();}}
     }

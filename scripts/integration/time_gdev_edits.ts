@@ -13,6 +13,7 @@ const { values } = parseArgs({
     "gdev-root": { type: "string", default: "../gdev" },
     "frontend-workers": { type: "string" },
     repetitions: { type: "string", default: "3" },
+    cycles: { type: "string", default: "1" },
   },
 });
 const root = resolve(values["gdev-root"]);
@@ -24,6 +25,8 @@ const options = await gdevProject(
 );
 const repetitions = Number(values.repetitions);
 assert(Number.isSafeInteger(repetitions) && repetitions > 0);
+const cycles = Number(values.cycles);
+assert(Number.isSafeInteger(cycles) && cycles > 0);
 if (values["frontend-workers"]) {
   options.frontendWorkers = Number(values["frontend-workers"]);
 }
@@ -123,6 +126,10 @@ async function session(steps: Step[], fresh: boolean) {
     await compiler.dispose();
   }
 }
+const retainedSteps: Step[] = ["open"];
+for (let cycle = 0; cycle < cycles; ++cycle) {
+  retainedSteps.push("edit", "reject", "recover", "revert");
+}
 for (let run = 0; run < repetitions; ++run) {
   // Alternate order to share CPU and filesystem warmup between the two paths.
   const controls = async () => {
@@ -131,7 +138,7 @@ for (let run = 0; run < repetitions; ++run) {
     }
   };
   if (run % 2 === 0) await controls();
-  await session(["open", "edit", "reject", "recover", "revert"], false);
+  await session(retainedSteps, false);
   if (run % 2 !== 0) await controls();
 }
 assert.notEqual(

@@ -1,5 +1,5 @@
-// A session retains one successful full check and its Core. Each candidate
-// reloads the actual project before deciding that its interfaces still hold.
+// A session retains the latest successful checked project and its Core.
+// Each candidate reloads the project before deciding which interfaces still hold.
 namespace blot_reuse_partial_dependency;
 import .partial_dependency;
 import reuse.project_check_engine;
@@ -37,6 +37,10 @@ fn adopt(self_:Retained&,source:Project&,checked:CheckedProject&,parsed_symbols:
  self_.debits=blot_reuse_project_check::canonicalModuleDebits(debits);
  source=Project{..};
  checked=CheckedProject{..};
+}
+
+fn completeFrom(self_:Retained&,previous:Retained&) {
+ blot_reuse_project_check::moveSkippedModules(self_.checked,previous.checked);
 }
 
 fn prepareRetainableProject(source:Project&,entry_path:const u8[:],candidate:Retained&)->Preparation,Error {
@@ -153,18 +157,26 @@ fn sameInitializerShape(old:const Unit&,new_:const Unit&)->bool {
 fn planModules(source:const Project&,previous:const Project&,changed:bool[:])->bool,bool {
  var any_changed=false;
  var value_observer=false;
- var propagates=false;
+ var any_propagation=false;
+ var propagates:bool[>..]=[];
+ propagates.resize(changed.len,false);
  for unit,index in source.units.items {
   let old:const Unit& =previous.units.items[index];
   value_observer=value_observer || unit.tree.has_numeric_proofs || unit.tree.has_typed_staging;
   if unit.source==old.source {continue;}
   if blot_check_check::hasNumericFailure(unit.tree) {return false,false;}
-  if index+1==source.prelude_unit || !sameInitializerShape(old,unit) {propagates=true;}
+  if index+1==source.prelude_unit || !sameInitializerShape(old,unit) {
+   propagates[index]=true;
+   any_propagation=true;
+  }
   changed[index]=true;
   any_changed=true;
  }
  if any_changed && value_observer {return false,false;}
- if propagates {includeDependents(source,changed);}
+ if any_propagation {
+  includeDependents(source,propagates[..]);
+  for dirty,index in propagates {if dirty {changed[index]=true;}}
+ }
  return any_changed,true;
 }
 
@@ -181,7 +193,7 @@ fn includeDependents(source:const Project&,changed:bool[:]) {
  }
 }
 
-fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core:const Prepared&)->Preparation,Error {
+fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core:const Prepared&,candidate:Retained&)->Preparation,Error {
  if !sameGraph(source,previous) {return Preparation.inactive,blot_error::Error.none;}
  var changed:bool[>..]=[];
  changed.resize(source.units.len,false);
@@ -200,20 +212,31 @@ fn prepareRetainedProject(source:Project&,previous:const Retained&,previous_core
  // Only this private pool receives names while the checker replays the prefix.
  var symbols,error=blot_parse_symbols::initPooled();
  if error!=blot_error::Error.none {return declineRetained(error);}
- let value,error=prepareRetainedWithSymbols(source,previous,previous_core,changed[..],symbols);
+ let debits=blot_reuse_project_check::allocateModuleDebits(source.units.len);
+ let value,error=prepareRetainedWithSymbols(source,previous,previous_core,changed[..],symbols,debits,candidate);
  symbols.deinit();
+ if candidate.source.lease==0 {blot_reuse_project_check::releaseModuleDebits(debits);}
  return value,error;
 }
 
-fn prepareRetainedWithSymbols(source:const Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&)->Preparation,Error {
+fn prepareRetainedWithSymbols(source:Project&,previous:const Retained&,previous_core:const Prepared&,changed:const bool[:],symbols:blot_parse_symbols::Pool&,debits:ModuleDebit[:],candidate:Retained&)->Preparation,Error {
  let error=blot_reuse_project_check::replaySymbols(symbols,source.symbols,previous.parsed_symbols);
  if error!=blot_error::Error.none {return declineRetained(error);}
  var checking=blot_reuse_project::canonicalLoaded(source,source.compiled_modules,source.compiled_reuse);
  checking.symbols=blot_parse_symbols::canonical(symbols);
- var checked,error=blot_reuse_project_check::checkRetainedModules(checking,previous.checked,changed,previous.debits,previous.source.symbols);
+ var checked,error=blot_reuse_project_check::checkRetainedModules(checking,previous.checked,changed,previous.debits,debits,previous.source.symbols);
  if error!=blot_error::Error.none {return declineRetained(error);}
  if checked.diagnostics.len!=0 {checked.deinit();return Preparation.inactive,blot_error::Error.none;}
  let result,error=prepareWithRetainedCore(checking,checked,previous_core,changed);
+ match result {
+  ready=>{
+   source.symbols.deinit();
+   source.symbols=blot_parse_symbols::canonical(symbols);
+   symbols=blot_parse_symbols::Pool{..};
+   candidate.adopt(source,checked,previous.parsed_symbols,debits);
+  },
+  _=>{},
+ }
  checked.deinit();
  return result,error;
 }

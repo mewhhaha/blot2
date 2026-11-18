@@ -82,6 +82,16 @@ fn containsNominalMemoWork(store: const blot_check_types::Store&, nominals, root
     let context = NominalStore { store, nominals, work , ..}; if epoch == 0xffffffffffffffff || store.effects.mutation_epoch == 0xffffffffffffffff { return inspectWithMemo(context, root, Mode.any, work, null); } return inspectWithMemo(context, root, Mode.any, work, memo);
 }
 struct Pending { ids: Id[4096], slots: u16[8192] = [0; 8192], count: i64 = 0 }
+// Remove entries in reverse insertion order so earlier probe chains stay intact.
+fn reset(self_: Pending&) {
+    while self_.count != 0 {
+        self_.count -= 1;
+        let id = self_.ids[self_.count];
+        var slot = ((id as u64 * 0x9e3779b1) & (self_.slots.len as u64 - 1)) as i64;
+        while self_.slots[slot] != self_.count + 1 { slot = (slot + 1) & (self_.slots.len - 1); }
+        self_.slots[slot] = 0;
+    }
+}
 fn add(self_: Pending&, source, raw: Id, budget: Work&, known: Memo?) -> Error {
     if !source.valid(raw) { return blot_error::Error.type_limit; } let id = source.head(raw, 0); if !source.valid(id) { return blot_error::Error.type_limit; }
     { let optional_binding_72 .= known; if optional_binding_72 { let cache .= optional_binding_72; let error = budget.charge(1); if error != blot_error::Error.none { return error; } if ::contains(cache.safe,id) { return blot_error::Error.none; }  } }
@@ -90,7 +100,11 @@ fn add(self_: Pending&, source, raw: Id, budget: Work&, known: Memo?) -> Error {
     if self_.count == self_.ids.len { return blot_error::Error.type_limit; } self_.ids[self_.count] = id; self_.count += 1; self_.slots[slot] = self_.count as u16; return blot_error::Error.none;
 }
 fn inspectWithMemo(store, root: Id, mode: Mode, work: Work&, memo: Memo?) -> bool, Error {
-    var pending = Pending {..}; let error = pending.add(store, root, work, memo); if error != blot_error::Error.none { return false, error; } var next: i64 = 0;
+    var pending = Pending {..};
+    return inspectPending(store, root, mode, work, memo, pending);
+}
+fn inspectPending(store, root: Id, mode: Mode, work: Work&, memo: Memo?, pending: Pending&) -> bool, Error {
+    let error = pending.add(store, root, work, memo); if error != blot_error::Error.none { return false, error; } var next: i64 = 0;
     while next != pending.count { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } let id = pending.ids[next]; next += 1; let node = store.node(id);
         let error = store.shape(node); if error != blot_error::Error.none { return false, error; }
         if mode != Mode.borrow && node.tag == blot_check_types::Tag.nominal { let property, error = store.nominalProperty(node, mode); if error != blot_error::Error.none { return false, error; } if property { return true, blot_error::Error.none; } }
@@ -113,19 +127,36 @@ fn inspectWithMemo(store, root: Id, mode: Mode, work: Work&, memo: Memo?) -> boo
     { let optional_binding_71 .= memo; if optional_binding_71 { let cache .= optional_binding_71; for index in 0..pending.count { let error = work.charge(1); if error != blot_error::Error.none { return false, error; } cache.safe.insert(pending.ids[index], true); }  } } return false, blot_error::Error.none;
 }
 struct Walker<E> {
-    engine: E, task_views: bool = false, states: State[>..<]&, remaining: i64 = 65536, regions: Id[128], region_count: i64 = 0, returns: ExitFrame? = null, breaks: ExitFrame? = null,
+    engine: E, task_views: bool = false, states: State[>..<]&, pending: Pending&, remaining: i64 = 65536, regions: Id[128], region_count: i64 = 0, returns: ExitFrame? = null, breaks: ExitFrame? = null,
 }
 fn record<E>(self_: Walker<E>&, frame: ExitFrame&) { frame.seen = true; for &entry, index in frame.joined { if entry.first == 0 { entry.first = self_.states[index].first; } } }
 fn charge<E>(self_: Walker<E>&, depth: i64) -> Error { if depth >= 128 || self_.remaining == 0 { return blot_error::Error.type_limit; } self_.remaining -= 1; return blot_error::Error.none; }
 fn snapshot<E>(self_: Walker<E>&, destination: StateBuffer&) -> Error { if self_.states.len > self_.remaining { return blot_error::Error.type_limit; } self_.remaining -= self_.states.len; return blot_support_pooled_buffer::append(destination,self_.states[..],state_scratch); }
 fn restore<E>(self_: Walker<E>&, states: const State[:]) { self_.states.resize(states.len); for entry, index in states { self_.states[index] = entry; } }
 fn state<E>(self_: Walker<E>&, binding: u32) -> State? { for &entry in self_.states { if entry.binding == binding { return entry; } } return null; }
+// Validation runs after inference. Its type queries are sequential, including in
+// nested scopes, so they can share one queue and clear just its occupied slots.
+fn affineType<E>(self_: Walker<E>&, root: Id) -> bool, Error {
+    var work = Work {..};
+    let context = NominalStore { self_.engine.types, self_.engine.nominals, work, .. };
+    let value, error = inspectPending(context, root, Mode.affine, work, null, self_.pending);
+    self_.pending.reset();
+    return value, error;
+}
+fn borrowedType<E>(self_: Walker<E>&, root: Id) -> bool, Error {
+    var work = Work {..};
+    let empty: const blot_check_core::Nominal[:] = default<const blot_check_core::Nominal[:]>();
+    let context = NominalStore { self_.engine.types, empty, work, .. };
+    let value, error = inspectPending(context, root, Mode.borrow, work, null, self_.pending);
+    self_.pending.reset();
+    return value, error;
+}
 fn introduce<E>(self_: Walker<E>&, binding: u32) -> Error {
-    if binding == 0 || self_.state(binding) != null { return blot_error::Error.none; } let affine, error = affineNominal(self_.engine.types, self_.engine.nominals, self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
+    if binding == 0 || self_.state(binding) != null { return blot_error::Error.none; } let affine, error = self_.affineType(self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
     if self_.states.len == 4096 { return blot_error::Error.type_limit; } self_.states.push(State { binding , ..}); return blot_error::Error.none;
 }
 fn use<E>(self_: Walker<E>&, binding: u32, source: AstId) -> Error {
-    if binding == 0 { return blot_error::Error.none; } let affine, error = affineNominal(self_.engine.types, self_.engine.nominals, self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
+    if binding == 0 { return blot_error::Error.none; } let affine, error = self_.affineType(self_.engine.bindings[binding].ty); if error != blot_error::Error.none { return error; } if !affine { return blot_error::Error.none; }
     { let optional_binding_70 .= self_.state(binding); if optional_binding_70 { let entry .= optional_binding_70;
         if entry.loan != 0 { return self_.engine.usageConflict(blot_check_check::Code.borrow_conflict, source, entry.loan, self_.engine.bindings[binding].declaration); }
         if entry.first != 0 { var code = blot_check_check::Code.use_after_move; let ty = self_.engine.types.node(self_.engine.types.head(self_.engine.bindings[binding].ty, 0)); if ty.tag == blot_check_types::Tag.usage && ty.b == blot_parse_ast::usagekind_once { code = blot_check_check::Code.once_reused; }
@@ -245,7 +276,7 @@ fn admitsAffine<E>(self_: Walker<E>&, callee_source: AstId) -> bool, Error {
         } let arrow = self_.engine.tree.node(annotation); if arrow.tag != blot_parse_ast::tag_type_function { return false, blot_error::Error.none; } var input = arrow.a; while self_.engine.tree.node(input).tag == blot_parse_ast::tag_group { input = self_.engine.tree.node(input).a; } return self_.engine.tree.node(input).tag == blot_parse_ast::tag_type_usage, blot_error::Error.none;
     }
     var header = self_.engine.types.node(self_.engine.types.head(declaration.ty, 0)); while header.tag == blot_check_types::Tag.usage || header.tag == blot_check_types::Tag.forall { header = self_.engine.types.node(self_.engine.types.head(header.a, 0)); }
-    if header.tag != blot_check_types::Tag.function { return false, blot_error::Error.none; } if self_.engine.types.node(header.a).tag == blot_check_types::Tag.usage { return true, blot_error::Error.none; } return affineNominal(self_.engine.types, self_.engine.nominals, header.a);
+    if header.tag != blot_check_types::Tag.function { return false, blot_error::Error.none; } if self_.engine.types.node(header.a).tag == blot_check_types::Tag.usage { return true, blot_error::Error.none; } return self_.affineType(header.a);
 }
 recursive fn inspectRead<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Outcome, Error {
     var operand = source; while self_.engine.tree.node(operand).tag == blot_parse_ast::tag_group { operand = self_.engine.tree.node(operand).a; }
@@ -342,8 +373,8 @@ recursive fn application<E>(self_: Walker<E>&, source: AstId, depth: i64) -> Out
     } }
     let flow, error = expression(self_, node.a, depth + 1); if error != blot_error::Error.none || flow == Outcome.exit { return flow, error; } let flow, error = expression(self_, node.b, depth + 1); if error != blot_error::Error.none || flow == Outcome.exit { return flow, error; }
     if node.tag == blot_parse_ast::tag_apply {
-        let affine, error = affineNominal(self_.engine.types, self_.engine.nominals, self_.engine.expr_types[node.b]); if error != blot_error::Error.none { return Outcome.live, error; } var borrowed_value = false;
-        if !affine { let value, error = borrowed(self_.engine.types, self_.engine.expr_types[node.b]); if error != blot_error::Error.none { return Outcome.live, error; } borrowed_value = value; }
+        let affine, error = self_.affineType(self_.engine.expr_types[node.b]); if error != blot_error::Error.none { return Outcome.live, error; } var borrowed_value = false;
+        if !affine { let value, error = self_.borrowedType(self_.engine.expr_types[node.b]); if error != blot_error::Error.none { return Outcome.live, error; } borrowed_value = value; }
         if affine || borrowed_value { var callee = self_.engine.types.node(self_.engine.types.head(self_.engine.expr_types[node.a], 0)); if callee.tag == blot_check_types::Tag.usage { callee = self_.engine.types.node(self_.engine.types.head(callee.a, 0)); }
             var admits = false; if callee.tag == blot_check_types::Tag.function { let value, error = admitsAffine(self_, node.a); if error != blot_error::Error.none { return Outcome.live, error; } admits = value; }
             if !admits { let error = self_.engine.usageDiagnostic(blot_check_check::Code.multiplicity_unknown, source); if error != blot_error::Error.none { return Outcome.live, error; } }
@@ -369,7 +400,7 @@ recursive fn loopBody<E>(self_: Walker<E>&, source: AstId, node: blot_parse_ast:
     if flow == Outcome.live && single { record(self_, frame); } return flow, blot_error::Error.none;
 }
 fn validate<E>(engine: E) -> Error {
-    var states: State[>..<] = []; let read_symbol,read_present=engine.pool.lookup("@task.read");var task_views=read_present;if !task_views {let write_symbol,write_present=engine.pool.lookup("@task.write");task_views=write_present;}var walker = Walker<E> { engine: engine, states: states, task_views: task_views , ..};
+    var states: State[>..<] = []; var pending = Pending {..}; let read_symbol,read_present=engine.pool.lookup("@task.read");var task_views=read_present;if !task_views {let write_symbol,write_present=engine.pool.lookup("@task.write");task_views=write_present;}var walker = Walker<E> { engine: engine, states: states, pending: pending, task_views: task_views , ..};
     let ast_walk_11_count=engine.tree.roots.items.len;for ast_walk_11_index in 0..ast_walk_11_count {let root=engine.tree.roots.items[ast_walk_11_index]; if engine.tree.node(root).tag != blot_parse_ast::tag_value_decl { continue; } walker.states.clear(); walker.remaining = 65536; let binding = engine.resolved[root]; let body = engine.tree.value_decl(root).body;
         if binding != 0 && blot_check_cleanup_contracts::pureNominal(engine.types, engine.nominals, engine.bindings[binding].ty) && !blot_check_cleanup_contracts::source(engine, body) { let error = engine.usageDiagnostic(blot_check_check::Code.cleanup_not_safe, body); if error != blot_error::Error.none { return error; } }
         let flow, error = expression(walker, body, 0); if error == blot_error::Error.type_limit { let error = engine.usageDiagnostic(blot_check_check::Code.usage_analysis_limit, root); if error != blot_error::Error.none { return error; } continue; } if error != blot_error::Error.none { return error; }
@@ -458,7 +489,7 @@ fn inspectWithPooledMemo(store, root: Id, mode: Mode, work: Work&, memo: PooledM
 }
 
 fn exitFrame(joined:State[:])->ExitFrame {return ExitFrame{joined:joined,..};}
-fn scopedWalker<E>(parent:const Walker<E>&,returns:ExitFrame?,breaks:ExitFrame?)->Walker<E> {return Walker<E>{engine:parent.engine,task_views:parent.task_views,states:parent.states,remaining:parent.remaining,regions:parent.regions,region_count:parent.region_count,returns:returns,breaks:breaks,..};}
+fn scopedWalker<E>(parent:const Walker<E>&,returns:ExitFrame?,breaks:ExitFrame?)->Walker<E> {return Walker<E>{engine:parent.engine,task_views:parent.task_views,states:parent.states,pending:parent.pending,remaining:parent.remaining,regions:parent.regions,region_count:parent.region_count,returns:returns,breaks:breaks,..};}
 fn publishWalker<E>(target:Walker<E>&,source:const Walker<E>&) {target.task_views=source.task_views;target.remaining=source.remaining;target.regions=source.regions;target.region_count=source.region_count;}
 
 recursive fn requestCase<E>(self_:Walker<E>&,node:blot_parse_ast::Node,depth:i64)->Outcome, Error {var prior=StateBuffer{..};let flow,error=requestCaseValue(self_,node,depth,prior);blot_support_pooled_buffer::deinit(prior,state_scratch);return flow,error;}

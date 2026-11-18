@@ -29,8 +29,12 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
       const actual = await compiler.build(request);
       const expected = await fresh.build(request);
       assert.equal(actual.success, expected.success);
-      if (actual.success && expected.success) assert.deepEqual(actual.bytes, expected.bytes);
-      if (!actual.success && !expected.success) assert.deepEqual(actual.diagnostics, expected.diagnostics);
+      if (actual.success && expected.success) {
+        assert.deepEqual(actual.bytes, expected.bytes);
+      }
+      if (!actual.success && !expected.success) {
+        assert.deepEqual(actual.diagnostics, expected.diagnostics);
+      }
       return actual;
     } finally {
       await fresh.dispose();
@@ -50,37 +54,114 @@ Deno.test("project revisions recheck edited data, keep callers and recover from 
     } finally {
       guest.dispose();
     }
-    const fail = await compare({ sources: { [leaf]: edited.replace("false", "unknown") } });
+    const fail = await compare({
+      sources: { [leaf]: edited.replace("false", "unknown") },
+    });
     assert(!fail.success);
     assert.equal(fail.revision, change.revision);
     const recovered = await compare({ sources: { [leaf]: edited } });
     assert(recovered.success);
     assert.equal(recovered.revision, change.revision + 1);
+    assert.equal(recovered.stats.freshModules, 0);
     const revert = await compare({});
     assert(revert.success);
-    assert.equal(revert.stats.freshModules, 0);
+    assert.equal(revert.stats.freshModules, 1);
     assert.deepEqual(revert.bytes, initial.bytes);
     const branch = "func lit () => return if true then s.look.sun else false";
     const middle = dir + "/middle.blot";
-    await Deno.writeTextFile(middle, 'import * as s from "./settings"\n' + branch + "\n");
+    await Deno.writeTextFile(
+      middle,
+      'import * as s from "./settings"\n' + branch + "\n",
+    );
     const withBranch = await compare({});
     assert(withBranch.success);
-    const body = await compare({ sources: { [middle]: 'import * as s from "./settings"\n' +
-      branch.replace("if true", "if false") + "\n" } });
+    const reapply = await compare({ sources: { [leaf]: edited } });
+    assert(reapply.success);
+    assert.equal(reapply.stats.freshModules, 1);
+    const body = await compare({
+      sources: {
+        [leaf]: edited,
+        [middle]: 'import * as s from "./settings"\n' +
+          branch.replace("if true", "if false") + "\n",
+      },
+    });
     assert(body.success);
     assert.equal(body.stats.freshModules, 2);
     assert.equal(body.stats.cachedModules, 1);
+    const repeatedRoute = await compare({
+      sources: {
+        [leaf]: edited,
+        [middle]: 'import * as s from "./settings"\n' +
+          branch.replace("if true", "if false") + "\n",
+      },
+    });
+    assert(repeatedRoute.success);
+    assert.equal(repeatedRoute.stats.freshModules, 0);
     // Move declaration slots and change the type observed by a caller.
-    await Deno.writeTextFile(leaf, "const first = 9\n" + base.replace("sun: Bool", "sun: U32").replace("sun: true", "sun: 9"));
+    await Deno.writeTextFile(
+      leaf,
+      "const first = 9\n" +
+        base.replace("sun: Bool", "sun: U32").replace("sun: true", "sun: 9"),
+    );
     const diskFailure = await compare({});
     assert(!diskFailure.success);
-    assert.equal(diskFailure.revision, body.revision);
+    assert.equal(diskFailure.revision, repeatedRoute.revision);
     await Deno.writeTextFile(leaf, "const first = 9\n" + edited);
     const moved = await compare({});
     assert(moved.success);
-    assert.equal(moved.revision, body.revision + 1);
+    assert.equal(moved.revision, repeatedRoute.revision + 1);
   } finally {
     await compiler.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("a function edit only invalidates its own callers when an independent initializer also changes", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const settings = dir + "/settings.blot";
+  const tuning = dir + "/tuning.blot";
+  const options = { executable: Deno.args[0], entry, prelude: null };
+  await Deno.writeTextFile(settings, "const flag = true\n");
+  await Deno.writeTextFile(tuning, "func tune () => return 9\n");
+  await Deno.writeTextFile(
+    dir + "/reader.blot",
+    'import { flag } from "./settings"\nfunc enabled () => return flag\n',
+  );
+  await Deno.writeTextFile(
+    entry,
+    'import { enabled } from "./reader"\nimport { tune } from "./tuning"\n' +
+      "entry func answer () => return if enabled () then 0 else tune ()\n",
+  );
+  const compiler = await createZigProjectCompiler(options);
+  const fresh = await createZigProjectCompiler(options);
+  try {
+    const initial = await compiler.build({});
+    assert(initial.success, JSON.stringify(initial));
+    assert.equal(initial.stats.freshModules, 4);
+    const request = {
+      sources: {
+        [settings]: "const flag = false\n",
+        [tuning]: "func tune () => return 29\n",
+      },
+    };
+    const [actual, expected] = await Promise.all([
+      compiler.build(request),
+      fresh.build(request),
+    ]);
+    assert(actual.success, JSON.stringify(actual));
+    assert(expected.success, JSON.stringify(expected));
+    assert.deepEqual(actual.bytes, expected.bytes);
+    assert.equal(actual.stats.freshModules, 3);
+    assert.equal(actual.stats.cachedModules, 1);
+    const guest = await instantiateGuest(actual.bytes);
+    try {
+      assert.equal(guest.call("answer", null), 29);
+    } finally {
+      guest.dispose();
+    }
+  } finally {
+    await Promise.all([compiler.dispose(), fresh.dispose()]);
     await Deno.remove(dir, { recursive: true });
   }
 });

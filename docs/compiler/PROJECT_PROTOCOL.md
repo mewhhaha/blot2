@@ -204,7 +204,8 @@ bundle cannot be used for a build, or loading, checking or lowering with it
 rejects, the build loads and checks every module from source, and that result is
 the reply.
 
-A session opened without a bundle retains its last fully checked project.
+A session opened without a bundle retains the checked modules and Core from
+its latest successful build.
 Each build resolves and reads the current inputs again. It can reuse checked
 modules and Core when the module graph and symbol slots still match. A changed
 module is checked and lowered again. Its importers are checked when the edit

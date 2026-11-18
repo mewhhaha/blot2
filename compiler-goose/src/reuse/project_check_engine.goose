@@ -93,19 +93,19 @@ fn releaseModuleDebits(debits:const ModuleDebit[:]) {if debits.len!=0 {module_de
 // The caller has verified that every skipped module's checker inputs are
 // equivalent to the checkpoint. Replay its global budget and symbol changes
 // at exactly its original position, including for independent modules.
-fn checkRetainedModules(source:Project,retained:const CheckedProject&,changed:const bool[:],debits:const ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->CheckedProject,Error {
+fn checkRetainedModules(source:Project,retained:const CheckedProject&,changed:const bool[:],debits:const ModuleDebit[:],candidate_debits:ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->CheckedProject,Error {
  let timing=blot_phase_profile::enter(blot_phase_profile::Phase.check);
  var engine,error=initEngine(source,blot_check_check::PrivateExecution{..},Editor.none);
  if error!=blot_error::Error.none {timing.exit();return CheckedProject{..},error;}
  engine.retained .= retained;
- let error=checkChangedModules(engine,changed,debits,symbols);
+ let error=checkChangedModules(engine,changed,debits,candidate_debits,symbols);
  if error!=blot_error::Error.none {engine.deinit();timing.exit();return CheckedProject{..},error;}
  let result=finishProject(engine);
  engine.deinit();timing.exit();
  return result,blot_error::Error.none;
 }
 
-fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->Error {
+fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDebit[:],candidate_debits:ModuleDebit[:],symbols:const blot_parse_symbols::Pool&)->Error {
  let error=self_.result.allocateModules(changed.len);
  if error!=blot_error::Error.none {return error;}
  for unit in self_.source.order.items {
@@ -113,6 +113,8 @@ fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDe
   let debit=debits[unit-1];
   if debit.symbols_after<before {return blot_error::Error.invalid_artifact;}
   if changed[unit-1] {
+   let resolution=self_.resolution_remaining;
+   let associated=self_.associated_remaining;
    let continued,error=self_.checkOrdered(unit);
    if error!=blot_error::Error.none {return error;}
    if !continued || self_.diagnostics.items.len!=0 {return blot_error::Error.invalid_artifact;}
@@ -121,12 +123,14 @@ fn checkChangedModules(self_:Engine&,changed:const bool[:],debits:const ModuleDe
     let symbol=(index+1) as u32;
     if self_.source.symbols.get(symbol)!=symbols.get(symbol) {return blot_error::Error.invalid_artifact;}
    }
+   candidate_debits[unit-1]=ModuleDebit{resolution-self_.resolution_remaining,associated-self_.associated_remaining,debit.symbols_after};
   } else {
    if debit.resolution>self_.resolution_remaining || debit.associated>self_.associated_remaining {return blot_error::Error.invalid_artifact;}
    self_.resolution_remaining-=debit.resolution;
    self_.associated_remaining-=debit.associated;
    let error=replaySymbols(self_.source.symbols,symbols,debit.symbols_after);
    if error!=blot_error::Error.none {return error;}
+   candidate_debits[unit-1]=debit;
   }
  }
  return blot_error::Error.none;

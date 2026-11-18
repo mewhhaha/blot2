@@ -41,6 +41,19 @@ fn moduleSlots(self_:CheckedProject)->blot_support::Option<Module>[:] {
 }
 fn canonicalModule(value:Module)->Module {let checked=blot_check_check::canonicalOwnedChecked(value.checked);let length=value.exports.len;if length==0 {return Module{checked:checked,exports:default<Export[:]>(),valid:value.valid};}let owned=owned_Export.realloc_slice(value.exports,length);assert(blot_support::same_slice_identity(owned,value.exports));let start=owned_Export.index_of(owned[0]);return Module{checked:checked,exports:owned_Export[start..start+length],valid:value.valid};}
 fn publishModule(self_:CheckedProject,unit:u32,value:Module) {let modules=moduleSlots(self_);modules[unit-1]=blot_support::Option<Module>{true,canonicalModule(value)};}
+
+// Commit is the first point where the previous result's owned slots may move.
+fn moveSkippedModules(candidate:CheckedProject&,previous:CheckedProject&) {
+ assert(candidate.modules.len==previous.modules.len);
+ let old=moduleSlots(previous);
+ let next=moduleSlots(candidate);
+ for index in 0..next.len {
+  if next[index].present {continue;}
+  assert(old[index].present);
+  next[index]=blot_support::Option<Module>{true,canonicalModule(old[index].value)};
+  old[index]=blot_support::none<Module>();
+ }
+}
 fn releaseOwned(values:const blot_support::Option<Module>[:]) {if values.len==0 {return;}owned_blot_support__Option_Module_.free_slice(values);}
 fn valid(self_:ResultOwner)->bool {return self_.slot!=0 && self_.slot-1<result_states.len && result_states[self_.slot-1].live && result_states[self_.slot-1].generation==self_.generation;}
 fn initResult()->CheckedProject,Error {if result_states.len>=0xffffffff {return CheckedProject{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let at=result_states.alloc_index(ResultState{generation:generation,live:true, ..});return CheckedProject{owner:ResultOwner{(at+1) as u32,generation, ..}, ..},blot_error::Error.none;}

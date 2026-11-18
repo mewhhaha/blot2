@@ -36,9 +36,8 @@ fn buildSnapshot(writer:blot_io::Writer,opened:OpenProject&,id:u32,assets:blot_b
         if error!=blot_error::Error.none {candidate.deinit();if error==blot_error::Error.out_of_memory {return false,error;}return false,operationFailure(writer,opened,id,blot_error::error_name(error),"Compiler operation failed");}
         var retry=false;
         let committed,failure=buildPrepared(writer,opened,id,assets,profile,preparation,reused,retry);
-        if committed && !opened.seed.present && !reused {
-            // Keep a single fully checked checkpoint. A later revision may
-            // reuse any combination of its modules without a chain of owners.
+        if committed && candidate.source.lease!=0 {
+            if reused {candidate.completeFrom(opened.checked);}
             match preparation {ready payload=>{
                 opened.core.deinit();opened.checked.deinit();
                 opened.checked=candidate;candidate=Retained{..};
