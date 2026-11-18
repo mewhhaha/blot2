@@ -53,7 +53,7 @@ struct Obligation {
     qualification_unit: u32 = 0,
 }
 struct Version { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none }
-struct Variable { first: u32 = none, last: u32 = none, region: bool = false, row_effect: blot_check_effects::Id = none }
+struct Variable { first: u32 = none, last: u32 = none, region: bool = false, row_effect: blot_check_effects::Id = none, principal: Id = absent }
 struct Mark { nodes: i64, extra: i64, variables: i64, versions: i64, operations: i64, quantifier_goals: i64 = 0, quantifier_obligations: i64 = 0, effects: blot_check_effects::Mark }
 struct ProjectionResolution { root: Id, at: Cursor, depth: u32 }
 struct OperationKey { identity: NominalIdentity, instance: NominalIdentity, arity: u32, shape: u64 }
@@ -358,21 +358,32 @@ fn containsRigidRow(self_: Store&, root: blot_check_effects::Id, scope: u32) -> 
 fn containsRigid(self_: Store&, root: Id, scope: u32) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::contains(self_, root, scope, false); }
 fn freeBound(self_: Store&, root: Id) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::contains(self_, root, 0, true); }
 fn increment(value: u64&) { if value != 0xffffffffffffffff { value += 1; } }
-fn fresh(self_: Store&) -> Id, Error {
-    if self_.variables.len >= none { return 0, blot_error::Error.type_limit; } let index = self_.variables.len as u32;
-    self_.variables.push(Variable {..});if self_.variables.failure!=blot_error::Error.none {return 0,self_.variables.failure;} increment(self_.normalization.type_binders_created);
-    let id, error = variableView(self_, index, 0); if error != blot_error::Error.none { self_.variables.pop(); } return id, error;
+// The principal view exists for the whole lifetime of its binder. Only
+// historical views need the (variable, cursor) dictionary.
+fn newVariable(self_: Store&, variable: Variable) -> Id, Error {
+    if self_.variables.len >= none { return 0, blot_error::Error.type_limit; }
+    let index = self_.variables.len as u32;
+    self_.variables.push(variable);
+    if self_.variables.failure != blot_error::Error.none { return 0, self_.variables.failure; }
+    increment(self_.normalization.type_binders_created);
+    let id, error = add(self_, Node { tag: Tag.variable, a: index, ..});
+    if error != blot_error::Error.none { self_.variables.pop(); return 0, error; }
+    self_.variables.items[index].principal = id;
+    increment(self_.normalization.variable_views_created);
+    return id, blot_error::Error.none;
 }
+fn fresh(self_: Store&) -> Id, Error { return newVariable(self_, Variable {..}); }
 fn freshRegion(self_: Store&) -> Id, Error {
-    if self_.variables.len >= none { return 0, blot_error::Error.type_limit; } let index = self_.variables.len as u32;
-    self_.variables.push(Variable { region: true , ..});if self_.variables.failure!=blot_error::Error.none {return 0,self_.variables.failure;} increment(self_.normalization.type_binders_created); self_.has_rank_types = true;
-    let id, error = variableView(self_, index, 0); if error != blot_error::Error.none { self_.variables.pop(); } return id, error;
+    self_.has_rank_types = true;
+    return newVariable(self_, Variable { region: true, ..});
 }
 fn freshRowType(self_: Store&) -> Id, Error {
-    let point = mark(self_); let row_, re = freshEffects(self_); if re != blot_error::Error.none { rollback(self_, point); return 0, re; }
-    if self_.variables.len >= none { rollback(self_, point); return 0, blot_error::Error.type_limit; }
-    let index = self_.variables.len as u32; self_.variables.push(Variable { row_effect: row_ , ..});if self_.variables.failure!=blot_error::Error.none {return 0,self_.variables.failure;} increment(self_.normalization.type_binders_created); self_.has_rank_types = true;
-    let id, error = variableView(self_, index, 0); if error != blot_error::Error.none { rollback(self_, point); } return id, error;
+    let point = mark(self_); let row_, re = freshEffects(self_);
+    if re != blot_error::Error.none { rollback(self_, point); return 0, re; }
+    self_.has_rank_types = true;
+    let id, error = newVariable(self_, Variable { row_effect: row_, ..});
+    if error != blot_error::Error.none { rollback(self_, point); }
+    return id, error;
 }
 recursive fn rowType(self_: Store&, root: Id) -> blot_check_effects::Id, Error {
     let resolved, error = resolve(self_, root, 0); if error != blot_error::Error.none { return 0, error; } let leaf = node(self_, resolved);
@@ -404,7 +415,9 @@ fn dataKind(self_: const Store&, root: Id) -> Error {
     return blot_error::Error.none;
 }
 fn variableView(self_: Store&, index: u32, at: Cursor) -> Id, Error {
-    var position = at; if self_.variables.items[index].first == none && at <= cursor(self_) { position = 0; }
+    let variable = self_.variables.items[index];
+    if at == 0 || (variable.first == none && at <= cursor(self_)) { return variable.principal, blot_error::Error.none; }
+    let position = at;
     let key = ((index as u64) << 32) | position;
     block { let saved = self_.variable_views.get(key); if saved { return saved, blot_error::Error.none; } }
     let id, error = add(self_, Node { tag: Tag.variable, a: index, b: position , ..}); if error != blot_error::Error.none { return 0, error; }
@@ -503,7 +516,7 @@ fn rollback(self_: Store&, point: Mark) {
         let write = self_.versions.pop(); self_.variables.items[write.variable].last = write.previous;
         if write.previous == none { self_.variables.items[write.variable].first = none; } else { self_.versions.items[write.previous].next = none; }
     }
-    for value in self_.nodes.items[point.nodes..] { if value.tag == Tag.variable { self_.variable_views.remove(((value.a as u64) << 32) | value.b); } }
+    for value in self_.nodes.items[point.nodes..] { if value.tag == Tag.variable && value.b != 0 { self_.variable_views.remove(((value.a as u64) << 32) | value.b); } }
     self_.nodes.pop_n(self_.nodes.len - point.nodes); self_.extra.pop_n(self_.extra.len - point.extra); self_.variables.pop_n(self_.variables.len - point.variables);
     unlinkOperations(self_, point.operations); self_.operations.pop_n(self_.operations.len - point.operations);
     self_.quantifier_goals.pop_n(self_.quantifier_goals.len - point.quantifier_goals); self_.quantifier_obligations.pop_n(self_.quantifier_obligations.len - point.quantifier_obligations);
@@ -541,7 +554,10 @@ fn head(self_: const Store&, root: Id, at: Cursor) -> Id {
     }
     block { let equation = self_.associated_equations.get(id); if equation { id = equation; } }
     let value = node(self_, id);
-    if value.tag == Tag.variable { let saved = self_.variable_views.get(((value.a as u64) << 32) | position); if saved { return saved; } }
+    if value.tag == Tag.variable {
+        if position == 0 { return self_.variables.items[value.a].principal; }
+        let saved = self_.variable_views.get(((value.a as u64) << 32) | position); if saved { return saved; }
+    }
     return id;
 }
 
@@ -808,6 +824,8 @@ recursive fn resolveRoot(self_: Store&, root: Id, at: Cursor) -> Id, Error {
     if self_.use_closed_graphs {
         synchronizeClosedGraphs(self_); if closedHeight(self_, root) != 0 { return root, blot_error::Error.none; }
         let raw = node(self_, root);
+        if at == 0 && raw.tag == Tag.variable && raw.b == 0 && self_.variables.items[raw.a].first == none &&
+            !self_.has_projections && self_.resolution_depth_limit > 0 { return root, blot_error::Error.none; }
         if self_.use_resolution_cache && at == 0 && raw.tag == Tag.variable && raw.b == 0 && raw.c != 0 && raw.closed_generation == self_.closed_generation && self_.closed_generation != 0xffff && self_.effects.physical_epoch != 0xffffffffffffffff {
             let remaining = node(self_, raw.c); if closedHeight(self_, raw.c) != 0 { return raw.c, blot_error::Error.none; }
             if remaining.tag == Tag.variable {
@@ -840,8 +858,15 @@ recursive fn resolveRoot(self_: Store&, root: Id, at: Cursor) -> Id, Error {
 }
 recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id, Error {
     increment(self_.normalization.resolve_depth_entries);
+    // A proven closed subtree has no substitutions. Projected stores still
+    // pass through the charged path to preserve their exact inference budget.
+    let height = closedHeight(self_, root);
+    if height != 0 && !self_.has_projections {
+        if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+        return root, blot_error::Error.none;
+    }
     if (self_.has_projections || self_.use_closed_graphs) && self_.use_resolution_cache && depth != 0 && root > never {
-        if closedHeight(self_, root) != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth); }
+        if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth); }
         if self_.projection_resolution_types != self_.mutation_epoch || self_.projection_resolution_rows != self_.effects.mutation_epoch || self_.projection_resolution_limit != self_.resolution_depth_limit {
             self_.projection_resolutions.clear(); self_.projection_resolution_types = self_.mutation_epoch; self_.projection_resolution_rows = self_.effects.mutation_epoch; self_.projection_resolution_limit = self_.resolution_depth_limit;
         }
@@ -900,7 +925,7 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
             return functionWithEffects(self_, parameter, result, effect_row);
         },
         product => {
-            let fields=resolution_arguments.alloc_slice(value.b);let result,error=resolveProductFields(self_,id,value,position,depth,fields);resolution_arguments.free_slice(fields);return result,error;
+            return resolveProductFields(self_,id,value,position,depth);
         },
         array, list, cursor, resolver => {
             let child, error = resolveDepth(self_, value.a, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
@@ -918,44 +943,69 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
             if read == value.a && write == value.b && state_type == value.c { return id, blot_error::Error.none; } return stateProvider(self_, read, write, state_type);
         },
         record => {
-            let fields=resolution_fields.alloc_slice(value.b);let result,error=resolveRecordFields(self_,id,value,position,depth,fields);resolution_fields.free_slice(fields);return result,error;
+            return resolveRecordFields(self_,id,value,position,depth);
         },
         nominal, projection, instance_selection => {
-            let count=self_.extra.items[value.c];let args=resolution_arguments.alloc_slice(count);let result,error=resolveNominalArguments(self_,id,value,position,depth,count,args);resolution_arguments.free_slice(args);return result,error;
+            return resolveNominalArguments(self_,id,value,position,depth);
         },
         _ => { return id, blot_error::Error.none; },
     }
 }
 reusable[] var resolution_fields:Field[>..];
-// Copy prefixes only after the first changed child, as in the original traversal.
-recursive fn resolveProductFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,fields:Id[:])->Id,Error {
-            var changed=false;
-            for i in value.b {
-                let old = self_.extra.items[value.a + i]; let child, error = resolveDepth(self_, old, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != old { for previous,offset in self_.extra.items[value.a..value.a+i] {fields[offset]=previous;} changed=true; }
-                if changed { fields[i]=child; }
-            }
-            if changed { return product(self_, fields); } return id, blot_error::Error.none;
+// All three shapes can return their original node without allocating scratch.
+recursive fn resolveProductFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64)->Id,Error {
+    var fields:Id[:] = default<Id[:]>();
+    for i in value.b {
+        let old=self_.extra.items[value.a+i];
+        let child,error=resolveDepth(self_,old,position,depth+1);
+        if error!=blot_error::Error.none { if fields.len!=0 {resolution_arguments.free_slice(fields);} return 0,error; }
+        if fields.len==0 {
+            if child==old {continue;}
+            fields=resolution_arguments.alloc_slice(value.b);
+            fields[..i].move_from(self_.extra.items[value.a..value.a+i]);
+        }
+        fields[i]=child;
+    }
+    if fields.len==0 {return id,blot_error::Error.none;}
+    let result,error=product(self_,fields);resolution_arguments.free_slice(fields);return result,error;
 }
-recursive fn resolveRecordFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,fields:Field[:])->Id,Error {
-            var changed=false;
-            for i in value.b {
-                let field = recordField(self_, value, i); let child, error = resolveDepth(self_, field.ty, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != field.ty { for prefix in i {fields[prefix]=recordField(self_,value,prefix);} changed=true; }
-                if changed { fields[i]=Field{field.name,child,..}; }
-            }
-            if changed { return record(self_, fields); } return id, blot_error::Error.none;
+recursive fn resolveRecordFields(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64)->Id,Error {
+    var fields:Field[:] = default<Field[:]>();
+    for i in value.b {
+        let field=recordField(self_,value,i);
+        let child,error=resolveDepth(self_,field.ty,position,depth+1);
+        if error!=blot_error::Error.none { if fields.len!=0 {resolution_fields.free_slice(fields);} return 0,error; }
+        if fields.len==0 {
+            if child==field.ty {continue;}
+            fields=resolution_fields.alloc_slice(value.b);
+            for prefix in i {fields[prefix]=recordField(self_,value,prefix);}
+        }
+        fields[i]=Field{field.name,child,..};
+    }
+    if fields.len==0 {return id,blot_error::Error.none;}
+    let result,error=record(self_,fields);resolution_fields.free_slice(fields);return result,error;
 }
-recursive fn resolveNominalArguments(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,count:u32,args:Id[:])->Id,Error {
-            var changed=false;
-            for i in count {
-                let child = self_.extra.items[value.c + 1 + i]; let next, error = resolveDepth(self_, child, position, depth + 1); if error != blot_error::Error.none { return 0, error; }
-                if !changed && child != next { for previous,offset in self_.extra.items[value.c+1..value.c+1+i] {args[offset]=previous;} changed=true; } if changed { args[i]=next; }
-            }
-            if !changed { return id, blot_error::Error.none; }
-            if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b , ..}, projectionMember(self_, value), args); }
-            if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b , ..}, args); }
-            return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
+recursive fn resolveNominalArguments(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64)->Id,Error {
+    let count=self_.extra.items[value.c];
+    var args:Id[:] = default<Id[:]>();
+    for i in count {
+        let old=self_.extra.items[value.c+1+i];
+        let child,error=resolveDepth(self_,old,position,depth+1);
+        if error!=blot_error::Error.none { if args.len!=0 {resolution_arguments.free_slice(args);} return 0,error; }
+        if args.len==0 {
+            if child==old {continue;}
+            args=resolution_arguments.alloc_slice(count);
+            args[..i].move_from(self_.extra.items[value.c+1..value.c+1+i]);
+        }
+        args[i]=child;
+    }
+    if args.len==0 {return id,blot_error::Error.none;}
+    let identity=NominalIdentity{value.a,value.b,..};
+    var result:Id=0;var error=blot_error::Error.none;
+    if value.tag==Tag.projection {result,error=projection(self_,identity,projectionMember(self_,value),args);}
+    else if value.tag==Tag.instance_selection {result,error=instanceSelection(self_,identity,args);}
+    else {result,error=nominal(self_,identity,args);}
+    resolution_arguments.free_slice(args);return result,error;
 }
 fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
     let resolved_root, error = resolve(self_, root, 0); if error != blot_error::Error.none { return false, error; }

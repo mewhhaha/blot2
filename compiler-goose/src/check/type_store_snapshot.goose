@@ -894,8 +894,8 @@ fn snapshotOwnedBytes(snapshot: const Snapshot&) -> i64 {
     total += snapshot.store_nodes.len * 16;
     if snapshot.store_extra.len > (9223372036854775807 - total) / 4 { return 9223372036854775807; }
     total += snapshot.store_extra.len * 4;
-    if snapshot.store_variables.len > (9223372036854775807 - total) / 13 { return 9223372036854775807; }
-    total += snapshot.store_variables.len * 13;
+    if snapshot.store_variables.len > (9223372036854775807 - total) / 17 { return 9223372036854775807; }
+    total += snapshot.store_variables.len * 17;
     if snapshot.store_versions.len > (9223372036854775807 - total) / 20 { return 9223372036854775807; }
     total += snapshot.store_versions.len * 20;
     if snapshot.store_operations.len > (9223372036854775807 - total) / 24 { return 9223372036854775807; }
