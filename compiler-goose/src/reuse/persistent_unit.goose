@@ -119,7 +119,7 @@ fn readPersistentSummaries(reader:blot_project_packet::Reader&,bindings:i64)->co
     }
     if reader.failure==blot_error::Error.none {return summaries;}
     persistent_summaries.free_slice(summaries);
-    return default<const PersistentSummary[:]>();    
+    return default<const PersistentSummary[:]>();
 }
 fn decodePersistentProducer(destination:PersistentProducer&,unit:u32,packet:const u8[:])->Error {
     var owner,error=blot_project_packet::initOwner();
