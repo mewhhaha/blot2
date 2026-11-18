@@ -277,6 +277,14 @@ fn validateAliases<P>(self_:Loader<P>&)->bool,Error {
     if self_.options.std_root.present {let root=self_.options.std_root.value;if root.len==0||contains(root,0) {let error=self_.report(Origin {..},Code.invalid_alias,"std/",blot_support::none<const u8[:]>());return false,error;}}
     return true,blot_error::Error.none;
 }
+fn sameParserPrefix<P>(loader:const Loader<P>&,previous:const Project&,end:i64)->bool {
+    for i in loader.verified_symbols..end {
+        let id=(i+1) as Symbol;
+        if previous.symbols.get(id)!=loader.project.symbols.get(id) {return false;}
+    }
+    return true;
+}
+
 // Parsed trees store project-wide symbol IDs. Verify any names produced by
 // intervening fresh parses before adopting a tree, then replay its new IDs.
 fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot_parse_ast::Tree&)->bool,Error {
@@ -289,12 +297,9 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
        old.implicit_prelude!=loader.prelude_ready || old.source!=source {
         return false,blot_error::Error.none;
     }
-    for i in loader.verified_symbols..old.parse_start {
-        let id=(i+1) as Symbol;
-        if previous.symbols.get(id)!=symbols.get(id) {
-            loader.previous .= null;
-            return false,blot_error::Error.none;
-        }
+    if !sameParserPrefix(loader,previous,old.parse_start) {
+        loader.previous .= null;
+        return false,blot_error::Error.none;
     }
     for i in old.parse_start..old.parse_end {
         let id=(i+1) as Symbol;
@@ -461,9 +466,21 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
             previous.filename(prelude.value)!=loader.project.filename(prelude.value)) {loader.previous .= null;}
         loader.prelude_ready=true;
     }
-    if !loader.previous && context.parse_workers!=1 && loader.options.input_mode==InputMode.project {F(loader,context.entrypath,context.parse_workers);}
+    let parallel=context.parse_workers!=1 && loader.options.input_mode==InputMode.project;
+    let previous .= loader.previous;
+    if parallel && !previous {F(loader,context.entrypath,context.parse_workers);}
     let entry,failure=loader.read(context.entrypath,Origin {..});if failure!=blot_error::Error.none {return failure;}if !entry.present {return blot_error::Error.none;}
     loader.project.entry=entry.value;
+    // A new symbol at the root invalidates the IDs of the remaining syntax.
+    // Start the ordinary worker batch at its imports before walking them.
+    if parallel && previous && loader.visits.items[entry.value-1]!=Visit.finished && loader.project.diagnostics.len==0 {
+        let end=loader.project.unit(entry.value).parse_end;
+        if !loader.previous || previous.entry!=entry.value || previous.unit(entry.value).parse_end!=end ||
+           !sameParserPrefix(loader,previous,end) {
+            loader.previous .= null;
+            F(loader,context.entrypath,context.parse_workers);
+        }
+    }
     if loader.options.input_mode==InputMode.source {
         if loader.visits.items[entry.value-1]!=Visit.finished {let appended=loader.project.order.push(entry.value);if appended!=blot_error::Error.none {return appended;}loader.visits.items[entry.value-1]=Visit.finished;}
     } else {return loader.walk(entry.value);}

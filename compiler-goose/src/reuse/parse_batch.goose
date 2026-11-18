@@ -93,7 +93,17 @@ fn prepareParseBatch<P>(loader:Loader<P>&,entry:const u8[:],workers:u8) {
     if width==0 {width=min(8,blot_native::available_workers());}
     if width<=1 || blot_native::platform_is_linux()==0 {return;}
     let batch .= loader.parse_batch;
-    addParseInput(loader,entry);
+    if loader.project.entry==0 {
+        addParseInput(loader,entry);
+    } else {
+        let root=loader.project.entry;
+        for edge in loader.project.unitImports(root) {
+            var path:u8[>..<]=[];
+            if resolveImportPath(loader.project.filename(root),loader.project.symbols.get(edge.path),loader.options,path)==blot_error::Error.none {
+                addParseInput(loader,path[..]);
+            }
+        }
+    }
     var i:i64=0;
     while i<batch.inputs.items.len {let item=batch.inputs.items[i];discoverParseInputs(loader,item);i++;}
     if batch.inputs.items.len<16 || batch.total<65536 {return;}
