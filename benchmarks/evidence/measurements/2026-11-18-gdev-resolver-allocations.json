@@ -1,0 +1,668 @@
+{
+  "measured": "2026-11-18",
+  "baselineGit": "5279817383d4f424910f435dbc00aa80d6adebe3",
+  "releaseSourceGit": "6b223a73f4dd2e38e2f9be72fe8bf0165035087c",
+  "releaseBinarySha256": "1379011488fa68e05d7695d17c9b718c6bb9c47a41819f9da1b8e2551d75f9b7",
+  "probes": {
+    "allocationsSha256": "0c7d22f577f2e76ebcd850676f57bae607ef9b6c13db6c5402e29c2155f80f36",
+    "functionChangesSha256": "9d843bd45d28394f3e201e09ee2d1c012609c480f0e15462066bc257a795a89a"
+  },
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "method": "Two observational Goose builds, compiled with the same upstream toolchain using -O0 and frame pointers. The first recorded every successful types.add during module checking. Both recorded the outer types.resolve caller; no allocation occurred in a nested public resolve. Both compiled all modules and matched the release Wasm hash. Probe wall times are excluded.",
+  "seenShapeMethod": "Within a module and type store, reset prior shapes when closed generation changes or node IDs rewind. Direct matches compare scalar fields and list payloads by value. In structural matches children can point to a previously observed equivalent shape. Function effect row IDs must match exactly. These counts describe existing shapes observed by the probe; they do not establish that sharing is valid for every caller.",
+  "checkedModules": 269,
+  "insideResolver": 405857,
+  "byTag": {
+    "function": {
+      "count": 341886,
+      "sameDirect": 74568,
+      "sameShape": 131504,
+      "closed": 85130
+    },
+    "product": {
+      "count": 34402,
+      "sameDirect": 5013,
+      "sameShape": 10453,
+      "closed": 6148
+    },
+    "nominal": {
+      "count": 14225,
+      "sameDirect": 8128,
+      "sameShape": 12193,
+      "closed": 9701
+    },
+    "array": {
+      "count": 8091,
+      "sameDirect": 7110,
+      "sameShape": 7478,
+      "closed": 7092
+    },
+    "record": {
+      "count": 3088,
+      "sameDirect": 714,
+      "sameShape": 2165,
+      "closed": 1927
+    },
+    "usage": {
+      "count": 2715,
+      "sameDirect": 2158,
+      "sameShape": 2510,
+      "closed": 1587
+    },
+    "list": {
+      "count": 1319,
+      "sameDirect": 1152,
+      "sameShape": 1229,
+      "closed": 1091
+    },
+    "cursor": {
+      "count": 131,
+      "sameDirect": 67,
+      "sameShape": 100,
+      "closed": 128
+    }
+  },
+  "byCaller": {
+    "blot_check_check_finishNormalized": {
+      "count": 158398,
+      "sameDirect": 54639,
+      "sameShape": 100403,
+      "closed": 73482
+    },
+    "blot_check_check_resolveUse": {
+      "count": 53575,
+      "sameDirect": 15708,
+      "sameShape": 19058,
+      "closed": 16597
+    },
+    "blot_check_check_applicationFlow": {
+      "count": 48547,
+      "sameDirect": 6064,
+      "sameShape": 8807,
+      "closed": 4045
+    },
+    "blot_check_types_resolveUnification": {
+      "count": 39083,
+      "sameDirect": 3160,
+      "sameShape": 4461,
+      "closed": 3959
+    },
+    "blot_check_check_ordinaryApplication": {
+      "count": 37518,
+      "sameDirect": 28,
+      "sameShape": 28,
+      "closed": 22
+    },
+    "blot_check_check_certifiedLambdaType": {
+      "count": 21561,
+      "sameDirect": 5502,
+      "sameShape": 11865,
+      "closed": 803
+    },
+    "blot_check_check_attemptPendingBody": {
+      "count": 14202,
+      "sameDirect": 3153,
+      "sameShape": 6190,
+      "closed": 5749
+    },
+    "blot_check_check_schemeInto": {
+      "count": 8220,
+      "sameDirect": 73,
+      "sameShape": 87,
+      "closed": 91
+    },
+    "blot_check_types_freeVariablesMode": {
+      "count": 7603,
+      "sameDirect": 3785,
+      "sameShape": 5047,
+      "closed": 1251
+    },
+    "blot_check_check_projectConstructorFields": {
+      "count": 5843,
+      "sameDirect": 730,
+      "sameShape": 2981,
+      "closed": 2888
+    },
+    "blot_check_check_expandInformedUses": {
+      "count": 3030,
+      "sameDirect": 2140,
+      "sameShape": 3027,
+      "closed": 480
+    },
+    "blot_check_check_schemeRequirements": {
+      "count": 2403,
+      "sameDirect": 1894,
+      "sameShape": 2328,
+      "closed": 188
+    },
+    "blot_check_check_pendingMemberSelection": {
+      "count": 2085,
+      "sameDirect": 1035,
+      "sameShape": 2085,
+      "closed": 1561
+    },
+    "blot_check_check_normalizeList": {
+      "count": 1572,
+      "sameDirect": 24,
+      "sameShape": 26,
+      "closed": 742
+    },
+    "blot_check_check_ordinaryApplicationFinish": {
+      "count": 347,
+      "sameDirect": 142,
+      "sameShape": 196,
+      "closed": 226
+    },
+    "blot_check_check_letStatementBody": {
+      "count": 320,
+      "sameDirect": 116,
+      "sameShape": 170,
+      "closed": 167
+    },
+    "blot_eval_given_equations_normalize": {
+      "count": 282,
+      "sameDirect": 39,
+      "sameShape": 44,
+      "closed": 12
+    },
+    "blot_check_check_instantiate": {
+      "count": 256,
+      "sameDirect": 59,
+      "sameShape": 97,
+      "closed": 26
+    },
+    "blot_check_check_lambdaExpressionBody": {
+      "count": 238,
+      "sameDirect": 113,
+      "sameShape": 133,
+      "closed": 98
+    },
+    "blot_check_check_recordConstructorFields": {
+      "count": 154,
+      "sameDirect": 144,
+      "sameShape": 150,
+      "closed": 147
+    },
+    "blot_check_check_constrainIndexed": {
+      "count": 147,
+      "sameDirect": 59,
+      "sameShape": 79,
+      "closed": 14
+    },
+    "blot_check_check_nominalAnnotationArguments": {
+      "count": 85,
+      "sameDirect": 82,
+      "sameShape": 82,
+      "closed": 24
+    },
+    "blot_check_check_local": {
+      "count": 76,
+      "sameDirect": 45,
+      "sameShape": 52,
+      "closed": 28
+    },
+    "blot_check_check_rebindStatement": {
+      "count": 48,
+      "sameDirect": 22,
+      "sameShape": 31,
+      "closed": 35
+    },
+    "blot_check_check_updatedNominalFields": {
+      "count": 41,
+      "sameDirect": 18,
+      "sameShape": 41,
+      "closed": 29
+    },
+    "blot_check_check_contextualLambda": {
+      "count": 39,
+      "sameDirect": 17,
+      "sameShape": 26,
+      "closed": 7
+    },
+    "blot_check_check_loopStatementDispatch": {
+      "count": 34,
+      "sameDirect": 29,
+      "sameShape": 30,
+      "closed": 32
+    },
+    "blot_check_check_projectField": {
+      "count": 31,
+      "sameDirect": 22,
+      "sameShape": 31,
+      "closed": 29
+    },
+    "blot_check_check_updatedFieldType": {
+      "count": 28,
+      "sameDirect": 28,
+      "sameShape": 28,
+      "closed": 27
+    },
+    "blot_check_check_scopedOperation": {
+      "count": 20,
+      "sameDirect": 8,
+      "sameShape": 9,
+      "closed": 14
+    },
+    "blot_check_check_expandUsePrincipal": {
+      "count": 20,
+      "sameDirect": 8,
+      "sameShape": 11,
+      "closed": 12
+    },
+    "blot_check_check_rebindFieldsBody": {
+      "count": 11,
+      "sameDirect": 6,
+      "sameShape": 6,
+      "closed": 1
+    },
+    "blot_check_check_arrayExpression": {
+      "count": 7,
+      "sameDirect": 7,
+      "sameShape": 7,
+      "closed": 1
+    },
+    "blot_check_check_storageApplication": {
+      "count": 7,
+      "sameDirect": 2,
+      "sameShape": 3,
+      "closed": 0
+    },
+    "blot_check_check_storeStatementBody": {
+      "count": 7,
+      "sameDirect": 4,
+      "sameShape": 5,
+      "closed": 3
+    },
+    "blot_check_check_recordLiteral": {
+      "count": 4,
+      "sameDirect": 1,
+      "sameShape": 3,
+      "closed": 4
+    },
+    "blot_check_check_statement": {
+      "count": 3,
+      "sameDirect": 0,
+      "sameShape": 0,
+      "closed": 0
+    },
+    "blot_check_check_constructorPattern": {
+      "count": 3,
+      "sameDirect": 0,
+      "sameShape": 0,
+      "closed": 3
+    },
+    "blot_check_check_productExpressionWork": {
+      "count": 3,
+      "sameDirect": 2,
+      "sameShape": 2,
+      "closed": 1
+    },
+    "blot_check_check_caseInputs": {
+      "count": 3,
+      "sameDirect": 2,
+      "sameShape": 3,
+      "closed": 3
+    },
+    "blot_check_check_coveredVariants": {
+      "count": 2,
+      "sameDirect": 0,
+      "sameShape": 0,
+      "closed": 2
+    },
+    "blot_check_check_productPattern": {
+      "count": 1,
+      "sameDirect": 0,
+      "sameShape": 0,
+      "closed": 1
+    }
+  },
+  "functionRebuilds": {
+    "changed": {
+      "parameter": 17032,
+      "effect": 141195,
+      "parameter+effect": 10038,
+      "result+effect": 69751,
+      "parameter+result+effect": 45521,
+      "result": 23903,
+      "parameter+result": 34446
+    },
+    "effects": {
+      "bothLabelListsEmpty": 266292,
+      "sameEmptyTailDifferentCursor": 80809
+    }
+  },
+  "byCallerFunctionChanges": {
+    "blot_check_check_finishNormalized": {
+      "changed": {
+        "parameter": 1430,
+        "result": 12460,
+        "parameter+result": 14769,
+        "effect": 34928,
+        "parameter+effect": 3590,
+        "result+effect": 37805,
+        "parameter+result+effect": 39481
+      },
+      "effects": {
+        "bothLabelListsEmpty": 115715,
+        "sameEmptyTailDifferentCursor": 9968
+      }
+    },
+    "blot_check_check_resolveUse": {
+      "changed": {
+        "effect": 25367,
+        "result+effect": 399,
+        "result": 6,
+        "parameter+result": 2,
+        "parameter+result+effect": 18
+      },
+      "effects": {
+        "bothLabelListsEmpty": 25772,
+        "sameEmptyTailDifferentCursor": 732
+      }
+    },
+    "blot_check_check_applicationFlow": {
+      "changed": {
+        "parameter": 207,
+        "effect": 30571,
+        "parameter+effect": 5155,
+        "result+effect": 1079,
+        "parameter+result+effect": 3999,
+        "result": 1391,
+        "parameter+result": 1844
+      },
+      "effects": {
+        "bothLabelListsEmpty": 40787,
+        "sameEmptyTailDifferentCursor": 1488
+      }
+    },
+    "blot_check_types_resolveUnification": {
+      "changed": {
+        "parameter": 9188,
+        "effect": 19147,
+        "parameter+effect": 271,
+        "result": 3249,
+        "parameter+result": 1855,
+        "result+effect": 272,
+        "parameter+result+effect": 27
+      },
+      "effects": {
+        "bothLabelListsEmpty": 19680,
+        "sameEmptyTailDifferentCursor": 18190
+      }
+    },
+    "blot_check_check_ordinaryApplication": {
+      "changed": {
+        "effect": 20134,
+        "parameter+effect": 130,
+        "result": 58,
+        "result+effect": 17014,
+        "parameter+result+effect": 124
+      },
+      "effects": {
+        "bothLabelListsEmpty": 37391,
+        "sameEmptyTailDifferentCursor": 37360
+      }
+    },
+    "blot_check_check_certifiedLambdaType": {
+      "changed": {
+        "parameter+result": 15002,
+        "parameter+effect": 43,
+        "parameter+result+effect": 183,
+        "effect": 281,
+        "result+effect": 447,
+        "parameter": 1618,
+        "result": 2548
+      },
+      "effects": {
+        "bothLabelListsEmpty": 939,
+        "sameEmptyTailDifferentCursor": 513
+      }
+    },
+    "blot_check_check_attemptPendingBody": {
+      "changed": {
+        "parameter": 3709,
+        "parameter+result": 700,
+        "effect": 2064,
+        "result+effect": 2226,
+        "parameter+effect": 419,
+        "parameter+result+effect": 874,
+        "result": 2637
+      },
+      "effects": {
+        "bothLabelListsEmpty": 5568,
+        "sameEmptyTailDifferentCursor": 217
+      }
+    },
+    "blot_check_check_schemeInto": {
+      "changed": {
+        "effect": 3148,
+        "parameter": 3,
+        "result": 9,
+        "parameter+result": 1,
+        "parameter+effect": 43,
+        "result+effect": 4813,
+        "parameter+result+effect": 57
+      },
+      "effects": {
+        "bothLabelListsEmpty": 8058,
+        "sameEmptyTailDifferentCursor": 8007
+      }
+    },
+    "blot_check_types_freeVariablesMode": {
+      "changed": {
+        "parameter": 181,
+        "effect": 1480,
+        "parameter+effect": 292,
+        "result+effect": 2372,
+        "parameter+result+effect": 245,
+        "result": 737,
+        "parameter+result": 100
+      },
+      "effects": {
+        "bothLabelListsEmpty": 4389,
+        "sameEmptyTailDifferentCursor": 1331
+      }
+    },
+    "blot_check_check_projectConstructorFields": {
+      "changed": {
+        "parameter": 528,
+        "result": 505,
+        "parameter+result": 17,
+        "effect": 1056,
+        "result+effect": 1216
+      },
+      "effects": {
+        "bothLabelListsEmpty": 2272,
+        "sameEmptyTailDifferentCursor": 2272
+      }
+    },
+    "blot_check_check_expandInformedUses": {
+      "changed": {
+        "effect": 883
+      },
+      "effects": {
+        "bothLabelListsEmpty": 883
+      }
+    },
+    "blot_check_check_schemeRequirements": {
+      "changed": {
+        "effect": 530,
+        "parameter+effect": 27,
+        "result+effect": 1244,
+        "parameter+result+effect": 26,
+        "parameter": 20,
+        "result": 259,
+        "parameter+result": 45
+      },
+      "effects": {
+        "bothLabelListsEmpty": 1827,
+        "sameEmptyTailDifferentCursor": 53
+      }
+    },
+    "blot_check_check_pendingMemberSelection": {
+      "changed": {
+        "effect": 735,
+        "result+effect": 323,
+        "parameter": 8,
+        "result": 25,
+        "parameter+result": 6,
+        "parameter+effect": 33,
+        "parameter+result+effect": 448
+      },
+      "effects": {
+        "bothLabelListsEmpty": 1525
+      }
+    },
+    "blot_check_check_normalizeList": {
+      "changed": {
+        "parameter": 3,
+        "effect": 525,
+        "parameter+effect": 20,
+        "result+effect": 295,
+        "parameter+result+effect": 34,
+        "result": 5
+      },
+      "effects": {
+        "bothLabelListsEmpty": 874,
+        "sameEmptyTailDifferentCursor": 180
+      }
+    },
+    "blot_check_check_ordinaryApplicationFinish": {
+      "changed": {
+        "effect": 62,
+        "result+effect": 30
+      },
+      "effects": {
+        "bothLabelListsEmpty": 92,
+        "sameEmptyTailDifferentCursor": 92
+      }
+    },
+    "blot_check_check_letStatementBody": {
+      "changed": {
+        "parameter+effect": 2,
+        "parameter": 15,
+        "result": 4,
+        "parameter+result": 60,
+        "effect": 19,
+        "result+effect": 15
+      },
+      "effects": {
+        "bothLabelListsEmpty": 36,
+        "sameEmptyTailDifferentCursor": 34
+      }
+    },
+    "blot_eval_given_equations_normalize": {
+      "changed": {
+        "parameter": 111,
+        "parameter+result": 1,
+        "effect": 128
+      },
+      "effects": {
+        "bothLabelListsEmpty": 128,
+        "sameEmptyTailDifferentCursor": 128
+      }
+    },
+    "blot_check_check_instantiate": {
+      "changed": {
+        "effect": 34,
+        "result+effect": 98,
+        "parameter": 1,
+        "result": 7,
+        "parameter+effect": 1,
+        "parameter+result+effect": 3
+      },
+      "effects": {
+        "bothLabelListsEmpty": 136,
+        "sameEmptyTailDifferentCursor": 100
+      }
+    },
+    "blot_check_check_lambdaExpressionBody": {
+      "changed": {
+        "parameter+result": 15,
+        "effect": 29,
+        "result+effect": 48
+      },
+      "effects": {
+        "bothLabelListsEmpty": 77,
+        "sameEmptyTailDifferentCursor": 77
+      }
+    },
+    "blot_check_check_recordConstructorFields": {
+      "changed": {
+        "result": 1,
+        "effect": 2,
+        "result+effect": 1
+      },
+      "effects": {
+        "bothLabelListsEmpty": 3,
+        "sameEmptyTailDifferentCursor": 3
+      }
+    },
+    "blot_check_check_constrainIndexed": {
+      "changed": {
+        "effect": 54,
+        "parameter+effect": 10,
+        "result+effect": 53,
+        "parameter": 4,
+        "parameter+result+effect": 2
+      },
+      "effects": {
+        "bothLabelListsEmpty": 119,
+        "sameEmptyTailDifferentCursor": 56
+      }
+    },
+    "blot_check_check_nominalAnnotationArguments": {
+      "changed": {
+        "effect": 2
+      },
+      "effects": {
+        "bothLabelListsEmpty": 2,
+        "sameEmptyTailDifferentCursor": 2
+      }
+    },
+    "blot_check_check_local": {
+      "changed": {
+        "parameter+effect": 2,
+        "parameter": 6,
+        "result": 2,
+        "parameter+result": 29,
+        "result+effect": 1,
+        "effect": 3
+      },
+      "effects": {
+        "bothLabelListsEmpty": 6,
+        "sameEmptyTailDifferentCursor": 3
+      }
+    },
+    "blot_check_check_expandUsePrincipal": {
+      "changed": {
+        "effect": 10
+      },
+      "effects": {
+        "bothLabelListsEmpty": 10
+      }
+    },
+    "blot_check_check_statement": {
+      "changed": {
+        "effect": 3
+      },
+      "effects": {
+        "bothLabelListsEmpty": 3,
+        "sameEmptyTailDifferentCursor": 3
+      }
+    }
+  },
+  "archive": "2026-11-18-gdev-resolver-allocations-probes.tar.gz"
+}

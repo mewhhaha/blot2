@@ -35,10 +35,17 @@ With eight workers, the initial comparison split 9–9. In 18 further direct
 pairs it won eight, took 864 ms versus 856 ms for the shipped resolver, and
 lost 1.5 ms in the median pair. The prototype is archived.
 
-**Next experiment.** Attribute the 405,857 type nodes created during resolution
-to their callers and shapes. That count was identical across all three
-compilers. Check how often a rebuilt record, function or nominal type duplicates
-an already constructed shape before choosing which construction to eliminate.
+Two observational builds attributed all **405,857** resolver allocations.
+Functions account for 341,886 (84%). Finishing inferred types allocated
+158,398 nodes, including 144,463 functions. Among those functions, 43,852
+had the same parameter, result and effect row IDs as a previously seen
+signature. Across all callers, a change to the effect row alone triggered
+141,195 function rebuilds. Checking ordinary calls produced 37,460 functions,
+but just 28 matched an earlier signature by its three IDs.
+[Allocation profile and probe source](../benchmarks/evidence/measurements/2026-11-18-gdev-resolver-allocations.json)
+
+![Type allocations grouped by caller and shape](../benchmarks/evidence/measurements/2026-11-18-gdev-resolver-allocations.svg)
+
 [Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.json)
 · [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution.raw.json.gz)
 · [Counter and cache source](../benchmarks/evidence/measurements/2026-11-18-gdev-type-resolution-probes.tar.gz)
