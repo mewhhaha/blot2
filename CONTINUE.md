@@ -11,8 +11,11 @@ Ink `3f2e603` and Pen `ad9766c`. On the same Gdev source the median lighting
 edit fell from **1.625 s to 0.260 s**. Fresh Main fell from **1.708 s to
 1.578 s** with the default single worker. All 269 modules check and produce
 2,639,228 bytes of Wasm. The current performance target is a fresh build
-under one second. [Measurements](benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
-· [Compiler work and next experiment](tasks/FAST_COMPILE.md)
+under one second. A separate eight-worker compiler reached **961 ms** in a
+fresh session. Its import budget and retained edit behavior are still being
+qualified. [Release measurements](benchmarks/evidence/measurements/2026-11-18-gdev-incremental.json)
+· [Worker experiment](benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
+· [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 

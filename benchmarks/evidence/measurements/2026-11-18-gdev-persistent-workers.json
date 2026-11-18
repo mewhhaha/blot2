@@ -1,0 +1,232 @@
+{
+  "date": "2026-11-18",
+  "releaseCompiler": "ea110ae6c2a0946fb14dd4c05bfae8ef7c43bbe3",
+  "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+  "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+  "workload": {
+    "entry": "src/main.blot",
+    "sourceBytes": 2527266,
+    "syntaxNodes": 354194,
+    "modules": 269,
+    "bodyElaborations": 5994,
+    "bodyLowerings": 6010,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "lightingEditWasmSha256": "4e4fba58869dbd87e760919247d52afebc1c4fae443512747b9c06f61c27e757"
+  },
+  "host": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads",
+  "method": "Fresh native compiler and project session per trial on the same shared Linux host with warm filesystem pages. Includes generating assets, checking all 269 modules, and receiving complete Wasm. Each trial checked 5,994 bodies and lowered 6,010 bodies. The two experiments have contemporaneous one-worker release controls. Profiled runs are separate.",
+  "firstComparison": {
+    "qualified1": {
+      "workers": 1,
+      "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+      "trialsMs": [
+        1951.57,
+        2115.95,
+        1987.75,
+        1949.8
+      ],
+      "medianMs": 1969.66
+    },
+    "eager4": {
+      "workers": 4,
+      "compilerSha256": "9dd72eed41e4fa1ac6f66ad4de6e2ad74044ce59e4e2f88db9a7018bfc21f8c3",
+      "trialsMs": [
+        1073.35,
+        1127.61,
+        1121.98,
+        1150.94
+      ],
+      "medianMs": 1124.8
+    },
+    "eager8": {
+      "workers": 8,
+      "compilerSha256": "9dd72eed41e4fa1ac6f66ad4de6e2ad74044ce59e4e2f88db9a7018bfc21f8c3",
+      "trialsMs": [
+        991.62,
+        982.68,
+        1015.38,
+        1027.92
+      ],
+      "medianMs": 1003.5
+    }
+  },
+  "optimizedComparison": {
+    "qualified1": {
+      "workers": 1,
+      "compilerSha256": "f80dcc68ef543d0e1e61a6ccee6efa433049110d62bd1d393a9dc80aa23551f6",
+      "trialsMs": [
+        1800.06,
+        1785.89,
+        1768.07,
+        1776.21
+      ],
+      "medianMs": 1781.05
+    },
+    "eager4": {
+      "workers": 4,
+      "compilerSha256": "9dd72eed41e4fa1ac6f66ad4de6e2ad74044ce59e4e2f88db9a7018bfc21f8c3",
+      "trialsMs": [
+        1045.26,
+        1063.66,
+        1076.08,
+        1044.48
+      ],
+      "medianMs": 1054.46
+    },
+    "eager8": {
+      "workers": 8,
+      "compilerSha256": "9dd72eed41e4fa1ac6f66ad4de6e2ad74044ce59e4e2f88db9a7018bfc21f8c3",
+      "trialsMs": [
+        1007.26,
+        995.34,
+        975.92,
+        1001.1
+      ],
+      "medianMs": 998.22
+    },
+    "lazy4": {
+      "workers": 4,
+      "compilerSha256": "f59769536ccb1f03639e07843a144bea99b8eb6247abf0a73d337e7e1e078f17",
+      "trialsMs": [
+        1020.98,
+        1024.96,
+        1036.72,
+        1052.01
+      ],
+      "medianMs": 1030.84
+    },
+    "lazy8": {
+      "workers": 8,
+      "compilerSha256": "f59769536ccb1f03639e07843a144bea99b8eb6247abf0a73d337e7e1e078f17",
+      "trialsMs": [
+        971.52,
+        975.33,
+        942.2,
+        949.85
+      ],
+      "medianMs": 960.69
+    }
+  },
+  "processProfiles": [
+    {
+      "width": 4,
+      "wallMs": 1809.43,
+      "processedModules": 269,
+      "processes": 3,
+      "batches": 1,
+      "retries": 0,
+      "replyBytes": 74472580,
+      "reportedWorkerCpuUs": 2532034,
+      "importedSummaryReuses": 0,
+      "phaseMs": {
+        "other": 25.26,
+        "assets": 132.84,
+        "load": 58.05,
+        "lex": 42.93,
+        "parse": 224.97,
+        "check": 994.3,
+        "lower": 87.6,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 205.15
+      }
+    },
+    {
+      "width": 8,
+      "wallMs": 1464.59,
+      "processedModules": 269,
+      "processes": 7,
+      "batches": 1,
+      "retries": 0,
+      "replyBytes": 74472580,
+      "reportedWorkerCpuUs": 2608881,
+      "importedSummaryReuses": 0,
+      "phaseMs": {
+        "other": 23.88,
+        "assets": 86.86,
+        "load": 22.14,
+        "lex": 36.34,
+        "parse": 179.83,
+        "check": 812.46,
+        "lower": 80.37,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 193.84
+      }
+    },
+    {
+      "width": 4,
+      "wallMs": 1037.88,
+      "processedModules": 269,
+      "processes": 3,
+      "batches": 1,
+      "retries": 0,
+      "replyBytes": 74472580,
+      "reportedWorkerCpuUs": 1817470,
+      "importedSummaryReuses": 0,
+      "phaseMs": {
+        "other": 16.39,
+        "assets": 81.25,
+        "load": 13.69,
+        "lex": 23.58,
+        "parse": 127.22,
+        "check": 592.93,
+        "lower": 40.36,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 114.33
+      }
+    },
+    {
+      "width": 8,
+      "wallMs": 964.88,
+      "processedModules": 269,
+      "processes": 7,
+      "batches": 1,
+      "retries": 0,
+      "replyBytes": 74472580,
+      "reportedWorkerCpuUs": 2062055,
+      "importedSummaryReuses": 0,
+      "phaseMs": {
+        "other": 15.64,
+        "assets": 75.02,
+        "load": 12.92,
+        "lex": 22.44,
+        "parse": 123.74,
+        "check": 522.75,
+        "lower": 51.43,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 119.44
+      }
+    }
+  ],
+  "semantics": {
+    "frozenImports": "All 269 modules consumed decoded interfaces, exports and prelude fixities. The serial test produced the live Main hash. Ten focused guest tests passed, one existing test was ignored.",
+    "sourceHeaders": "The names required by the read-only pool were collected from actual source imports, contract declarations and re-exports. A contract projection through two named re-exports matched serial bytes and diagnostics.",
+    "workerLaw": "19 modules, fresh/edit/reject/revert and executed Wasm compared at several worker counts. Checked actual worker participation.",
+    "nativeLaw": "1, 4 and 8 concurrent lanes, early release of consumers, exact packet payloads, duplicate edges, cycles, hard cap, abort, dead worker, robust mutex owner death, and timeout. Native ASan and UBSan passed.",
+    "qualifiedReleaseComparison": "The release compiler and these variants emit identical complete Gdev Main bytes. These pilots do not share the released retained checker.",
+    "budgetWitness": {
+      "modules": 20,
+      "inferenceBudget": 40000,
+      "liveAssociatedDebits": 16862,
+      "experimentalAssociatedDebits": 17420,
+      "liveSummaryReuses": 18,
+      "experimentalSummaryReuses": 0,
+      "editedSession": {
+        "success": true,
+        "fresh": 20,
+        "cached": 0,
+        "jobs": 20,
+        "batches": 1,
+        "retries": 0,
+        "summaries": 0
+      }
+    }
+  },
+  "reproducePatch": "The raw file contains a unified diff per measured prototype against releaseCompiler, plus its Deno worker and native queue witnesses. Apply the chosen diff to that source and use the regular optimized compiler build. Pass --frontend-workers 4 or 8 to scripts/integration/build_gdev.ts.",
+  "raw": "2026-11-18-gdev-persistent-workers.raw.json.gz"
+}

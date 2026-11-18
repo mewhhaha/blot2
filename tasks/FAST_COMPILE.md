@@ -50,15 +50,26 @@ An isolated two-level grouping experiment reduced four-worker debug time from
 scratch lazily cut pooled allocations by 9.2% without a repeatable wall-time gain. Both remain
 outside the release.
 
-The next cold-build experiment gives each long-lived worker its own checker.
-It can publish a module's interface as soon as the checker finishes, then
-lower that module while another worker checks its callers. An optimized
-probe created, encoded and decoded all 269 interfaces and all 269 Core units.
-Applying those measured costs to the import graph gives **0.770 s** with four
-workers under ideal scheduling. That leaves **230 ms** for process coordination,
-symbol handling, extra cross-module lookups and differences between live and
-frozen imports. Time a fresh process through complete Wasm before adopting
-the design.
+### Persistent workers
+
+An isolated compiler built fresh Main in **961 ms** median with eight workers.
+All four trials were below one second (942–975 ms). The release compiler
+measured 1,781 ms on the same inputs interleaved with those trials. Four
+workers took 1,031 ms. Every build checked 269 modules and emitted the same
+complete Wasm. [Measurements, prototype patches and test receipts](../benchmarks/evidence/measurements/2026-11-18-gdev-persistent-workers.json)
+
+Each worker publishes its finished module interface immediately and lowers
+the same module to Core. Other workers read each imported interface on first
+use. The parent assembles the received Core. Source declarations and actual
+imports determine the generated names before any worker starts. Three or
+seven child processes serve the whole build, with the parent checking too.
+The prior scheduling model predicted 770 ms with four workers.
+
+The measured prototype rechecks all modules after an edit. On a valid
+20-module project it also charged 17,420 associated-resolution steps against
+16,862 on the live checker. Publishing reusable scheme summaries and retaining
+interfaces across session revisions are the remaining conditions for making
+this the default.
 
 ## Goose release measurements, 17 November 2026
 
