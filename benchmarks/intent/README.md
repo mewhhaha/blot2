@@ -1,5 +1,7 @@
 # Packed lists of Gdev intents
 
+## Isolated Wasm layouts
+
 Gdev's pile-handle benchmark produced 144 Idle and 144 Collect intents across
 the six workers' incoming and outgoing plans. The sequence comes from executing
 the Blot fixture for pile counts 2, 8 and 64. The main game does not use this
@@ -27,5 +29,66 @@ reverse order and checks the resulting sequence with an order-sensitive hash.
 
 These measurements support a split representation for sequential lists of
 varying-width cases. Blot still emits its existing fixed-stride list layout.
-The experiment does not measure building persistent lists by repeated append,
-shared tails or growth of a tag and payload pair. [Raw measurements](../evidence/measurements/2026-11-18-intent-layout.json)
+The following Blot benchmark exercises repeated append and shared tails. [Raw measurements](../evidence/measurements/2026-11-18-intent-layout.json)
+
+
+## Building and sharing lists in Blot
+
+The released compiler builds the actual Gdev `plan.Intent` type, including its
+opaque four-word pile handle. The fixture supplies 288 captured intents and a
+second control covers all four alternatives. Run
+`deno run -A benchmarks/intent/persistent.ts` with the Ink and Gdev siblings.
+A source overlay adds a constructor and a scalar projection in the module
+that defines the handle. Timing starts after creating the input array.
+
+| Joining 128 alternating 31- and 33-intent chunks | Bulk bytes copied during join | Build, join and scan |
+| --- | ---: | ---: |
+| Repeated flat `@list.concat` | 5,282,560 | 169.7 µs |
+| Append each intent to one flat builder | 130,920 | 37.8 µs |
+| Append fixed-width chunk references | 1,008 | 14.7 µs |
+| Append packed chunk references, payloads grouped by width | 4,004 | 15.8 µs |
+
+Repeated flat concatenation copied each successive prefix and kept 129
+owners live at the join boundary. A list of two-word chunk references kept
+one additional owner. Its 1,008 copied bytes came from growing the descriptor
+list. The two immutable input chunks were read again after traversal.
+
+| Build a 4,096-intent tail and two prefixes, join both branches, then scan | Reserved capacity after build | Bulk bytes copied by both joins | Build, join and scan |
+| --- | ---: | ---: | ---: |
+| Fixed-width lists, flat joins | 160 KiB | 184,340 | 103.1 µs |
+| Fixed-width lists, shared tail | 160 KiB | 0 | 97.8 µs |
+| Packed tag bytes and scalar payload words, shared tail | 45.5 KiB | 0 | 118.2 µs |
+| Packed tag bytes and payloads grouped by width, shared tail | 45.5 KiB | 0 | 82.6 µs |
+
+Grouping writes a four-word Collect target with one append. Deliver and Rest
+share a separate one-word stream. Both branches keep the same tail and retain
+the original operands. Their descriptor lists reserved 32 bytes for fixed
+elements, 80 for packed words and 112 for grouped payloads. These capacity
+measurements cover owner backing storage at callback boundaries and exclude
+headers, allocator free lists and the runtime's fixed Wasm memory reservation.
+On the all-variants control the grouped shared-tail case reserved 55.5 KiB
+and took 99.6 µs, down from 116.9 µs for fixed-width shared chunks.
+
+Fresh 19-module builds of the shared-tail probe emitted 30,529 bytes for
+fixed rows, 33,508 for packed words and 34,051 for grouped payloads. Their
+medians were 162, 158 and 158 ms across 18 fresh builds per layout. All
+three still use Blot's regular List operations. The shipping list layout is
+fixed stride. The main game uses a different planner.
+
+### Two append sites can copy every prefix
+
+On 4,096 mixed inputs, two mutually exclusive `case` arms appended the same
+1,171 home IDs as a single append after the match. The first spelling copied
+**2,740,140 bytes** and retained 1,172 owners. The second copied **8,176 bytes**
+and retained one. The larger count equals four bytes times the sum of all
+prior list lengths. Blot’s in-place append optimization uses a syntactic
+reference count. The next compiler experiment should test that two exclusive
+arms may grow the same private owner while preserving the copy path for
+observably shared inputs.
+
+Each checksum includes every active payload word in order. Small controls
+cover empty inputs, all tag alignments, partial tag words and saved operands.
+Three processes timed unmodified release Wasm with rotated variant order.
+A separate instrumented guest verified the same checksum and counted
+`memory.copy` bytes. Sub-microsecond join timings include the callback
+boundary. [Measurements](../evidence/measurements/2026-11-18-blot-list-builders.json) · [Per-process samples](../evidence/measurements/2026-11-18-blot-list-builders.raw.json.gz)

@@ -1,11 +1,13 @@
 /** Diagnostic memory-traffic instrumentation; never use its output for timing. */
 import { strict as assert } from "node:assert";
+// deno-lint-ignore no-import-prefix -- keep this benchmark-only decoder outside the published package imports.
 import wabt from "npm:wabt@1.0.39";
 
 const factory = await wabt();
 const names = ["copy", "fill", "read", "write"] as const;
 export function instrumentMemoryTraffic(
   bytes: Uint8Array<ArrayBuffer>,
+  options: { ownerTable?: boolean } = {},
 ): Uint8Array<ArrayBuffer> {
   const module = factory.readWasm(bytes, { readDebugNames: false });
   let text: string;
@@ -38,7 +40,7 @@ export function instrumentMemoryTraffic(
     );
   }
   for (const line of lines) {
-    if (/^  \(func\b/.test(line)) {
+    if (/^ {2}\(func\b/.test(line)) {
       result.push(line);
       functionStart = result.length;
       declarations = true;
@@ -46,7 +48,7 @@ export function instrumentMemoryTraffic(
       continue;
     }
     if (functionStart >= 0 && declarations) {
-      if (/^    \(local\b/.test(line)) {
+      if (/^ {4}\(local\b/.test(line)) {
         result.push(line);
         functionStart = result.length;
         continue;
@@ -78,6 +80,13 @@ export function instrumentMemoryTraffic(
     result.push(
       `  (global $__qual_${name} (export "qual:${name}") (mut i64) (i64.const 0))`,
     );
+  }
+  if (options.ownerTable) {
+    // ABI 8 direct.runtime emits these two mutable globals first.
+    assert(/\(global \(;0;\) \(mut i32\) \(i32.const 1\)\)/.test(text));
+    result.push('  (export "qual:memory" (memory 0))');
+    result.push('  (export "qual:owner_top" (global 0))');
+    result.push('  (export "qual:persistent_bottom" (global 1))');
   }
   result.push(")");
   const parsed = factory.parseWat("memory-traffic", result.join("\n"));

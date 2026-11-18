@@ -23,11 +23,16 @@ rechecked four modules, down from six. A terrain update reused the allocation
 for all 169 tiles and preserved a copied snapshot.
 [Scene interface](benchmarks/evidence/measurements/2026-11-18-gdev-scene-interface.json)
 
-Separate tag and payload buffers used 9 bytes per intent in a Wasm layout
-experiment, down from 20. Copying two spans fell from 29.4 to 13.6 µs.
-Blot lists still use their existing layout. The next layout test should
-measure constructing and concatenating Blot lists with shared tails.
-[Intent layout and reproduction](benchmarks/intent/README.md)
+The released compiler now has a Blot benchmark for building and sharing
+lists of Gdev intents. Joining 128 chunks and traversing them fell from
+**169.7 to 14.7 µs** using chunk references. Bulk copies fell from 5,282,560
+to 1,008 bytes. Grouping the packed payloads by width reserved **45.5 KiB**
+for a 4,096-intent tail and two prefixes, down from 160 KiB. Packing still
+costs Wasm bytes and the shipping layout remains fixed stride. Next, qualify
+the compiler’s private append optimization across mutually exclusive case arms.
+On a scalar control two append sites copied 2,740,140 bytes against 8,176
+for one append after the match.
+[Blot builder experiments](benchmarks/intent/README.md#building-and-sharing-lists-in-blot)
 
 Workers transfer 13 more Core and interface tables as verified Goose arrays.
 Across all 269 modules, writing the captured Core records fell from

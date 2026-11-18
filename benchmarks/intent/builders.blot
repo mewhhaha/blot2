@@ -1,0 +1,175 @@
+import * as plan from "game/actors/actor_plan"
+import * as handles from "ink/handles"
+
+type Packed = { count: U32, tags: List U32, words: List U32 }
+
+func parts (value: plan.Intent): (U32, U32, U32, U32, U32, U32) => return case value of
+  $plan.Idle => (0, 0, 0, 0, 0, 0)
+  $plan.Collect h => do:
+    let (a, b, c, d) = handles.benchmark_words h
+    break (1, 4, a, b, c, d)
+  $plan.Deliver h => (2, 1, plan.home_word h, 0, 0, 0)
+  $plan.Rest h => (3, 1, plan.home_word h, 0, 0, 0)
+
+func fixed (source: Array plan.Intent) -> start -> count: List plan.Intent => return do:
+  let rows: List plan.Intent = []
+  for i in 0..count:
+    rows := @list.append self source[(start + i) % source.length]
+  return rows
+
+func packed (source: Array plan.Intent) -> start -> count: Packed => return do:
+  let tags: List U32 = []
+  let words: List U32 = []
+  let group = 0
+  for i in 0..count:
+    let (tag, width, a, b, c, d) = parts source[(start + i) % source.length]
+    group := self | (tag << ((i & 3) * 8))
+    if (i & 3) == 3 or i + 1 == count:
+      tags := @list.append self group
+      group := 0
+    if width > 0:
+      words := @list.append self a
+    if width == 4:
+      words := @list.append self b
+      words := @list.append self c
+      words := @list.append self d
+  return {count, tags, words}
+
+func mix hash -> word => return hash * 16777619 + word
+func scan_fixed (seed: U32) -> (items: List plan.Intent): U32 => return do:
+  let hash = seed
+  for item in items:
+    case item of
+      $plan.Idle => do:
+        hash := mix self 0
+      $plan.Collect h => do:
+        let (a, b, c, d) = handles.benchmark_words h
+        hash := mix (mix (mix (mix (mix self 1) a) b) c) d
+      $plan.Deliver h => do:
+        hash := mix (mix self 2) (plan.home_word h)
+      $plan.Rest h => do:
+        hash := mix (mix self 3) (plan.home_word h)
+  return hash
+
+func scan_packed (seed: U32) -> (items: Packed): U32 => return do:
+  let hash = seed
+  let remaining = items.count
+  let cursor = @list.cursor items.words
+  for group in items.tags:
+    let used = min remaining 4
+    for i in 0..used:
+      let tag = (group >> (i * 8)) & 255
+      hash := mix self tag
+      if tag != 0:
+        hash := mix self (@cursor.value cursor)
+        cursor := @cursor.advance self
+      if tag == 1:
+        hash := mix self (@cursor.value cursor)
+        cursor := @cursor.advance self
+        hash := mix self (@cursor.value cursor)
+        cursor := @cursor.advance self
+        hash := mix self (@cursor.value cursor)
+        cursor := @cursor.advance self
+    remaining := self - used
+  return hash
+
+func share left -> right => return [left, right]
+func join_fixed (left: List plan.Intent) -> (right: List plan.Intent) => return @list.concat left right
+
+// A partial last tag word must join the first tags of the right input.
+func join_tags left -> right: List U32 => return do:
+  let count = left.count + right.count
+  let fill = left.count & 3
+  if fill == 0 or right.count == 0:
+    return @list.concat left.tags right.tags
+  let tags: List U32 = []
+  let carry = 0
+  let index = 0
+  for group in left.tags:
+    if index + 1 == left.tags.length:
+      carry := group
+    else:
+      tags := @list.append self group
+    index := self + 1
+  let remaining = right.count
+  for group in right.tags:
+    let used = min remaining 4
+    carry := self | (group << (fill * 8))
+    if fill + used >= 4:
+      tags := @list.append self carry
+      carry := group >> ((4 - fill) * 8)
+    remaining := self - used
+  if (count & 3) != 0:
+    tags := @list.append self carry
+  return tags
+
+func join_packed (left: Packed) -> (right: Packed): Packed => return {
+  count: left.count + right.count, tags: join_tags left right, words: @list.concat left.words right.words
+}
+
+// Give each active payload width one typed stream. An entire target uses one append and one cursor pull.
+type Grouped = {count: U32, tags: List U32, targets: List (U32, U32, U32, U32), homes: List U32}
+func grouped (source: Array plan.Intent) -> start -> count: Grouped => return do:
+  let tags: List U32 = []
+  let targets: List (U32, U32, U32, U32) = []
+  let homes: List U32 = []
+  let group = 0
+  for i in 0..count:
+    let (tag, width, a, b, c, d) = parts source[(start + i) % source.length]
+    if width == 4:
+      targets := @list.append self (a, b, c, d)
+    if width == 1:
+      homes := @list.append self a
+    group := self | (tag << ((i & 3) * 8))
+    if (i & 3) == 3 or i + 1 == count:
+      tags := @list.append self group
+      group := 0
+  return {count, tags, targets, homes}
+
+func scan_grouped (seed: U32) -> (items: Grouped): U32 => return do:
+  let hash = seed
+  let remaining = items.count
+  let targets = @list.cursor items.targets
+  let homes = @list.cursor items.homes
+  for group in items.tags:
+    let used = min remaining 4
+    for i in 0..used:
+      let tag = (group >> (i * 8)) & 255
+      hash := mix self tag
+      if tag == 1:
+        let (a, b, c, d) = @cursor.value targets
+        hash := mix (mix (mix (mix self a) b) c) d
+        targets := @cursor.advance self
+      if tag > 1:
+        hash := mix self (@cursor.value homes)
+        homes := @cursor.advance self
+    remaining := self - used
+  return hash
+
+func join_grouped (left: Grouped) -> (right: Grouped): Grouped => return {
+  count: left.count + right.count, tags: join_tags left right,
+  targets: @list.concat left.targets right.targets, homes: @list.concat left.homes right.homes
+}
+
+// The same private list grows down two mutually exclusive case arms.
+func homes_in_arms (source: Array plan.Intent) -> count: List U32 => return do:
+  let homes: List U32 = []
+  for i in 0..count:
+    case source[i % source.length] of
+      $plan.Deliver h => do:
+        homes := @list.append self (plan.home_word h)
+      $plan.Rest h => do:
+        homes := @list.append self (plan.home_word h)
+      _ => ()
+  return homes
+
+func homes_after_match (source: Array plan.Intent) -> count: List U32 => return do:
+  let homes: List U32 = []
+  for i in 0..count:
+    let value = case source[i % source.length] of
+      $plan.Deliver h => $Some (plan.home_word h)
+      $plan.Rest h => $Some (plan.home_word h)
+      _ => $Nothing
+    if let $Some word = value:
+      homes := @list.append self word
+  return homes

@@ -99,3 +99,15 @@ reserves 900,000 bytes. The current tag-word/max-payload layout models 1,200,000
 bytes for this element schema, excluding sequence metadata. The 78.3% reduction
 describes encoded element bytes; it is not a measured Blot runtime, Wasm-size or
 compile-time improvement.
+
+
+## Blot builder and shared-tail measurements
+
+A source implementation now exercises the released List builder, the real
+Gdev Intent type, tag-word alignment, independently hashed branches sharing a
+tail, repeated concatenation and the allocation cost of each representation.
+A one-level list of chunk references avoids copying either input payload.
+The measured grouped layout uses three private streams and reserves 45.5 KiB
+for the Gdev tail and two prefixes. Flat rows reserve 160 KiB. Arbitrary
+nested concatenation, balancing and general escaping lifetimes remain open.
+[Workloads and results](../../benchmarks/intent/README.md#building-and-sharing-lists-in-blot)

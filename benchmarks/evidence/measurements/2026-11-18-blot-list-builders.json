@@ -1,0 +1,1624 @@
+{
+  "compilerSha256": "4596feef82837fd6d696b70917a6159a62a60f7be0b12e02e6bccbc35f1d1299",
+  "gdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+  "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "wasmSha256": "16ecf12cc4fa7a5361508b6f9c011ccce4c9d000e117f6e93db7a6396b63c9ea",
+  "wasmBytes": 45261,
+  "tools": {
+    "deno": "2.9.8",
+    "v8": "15.0.245.2-rusty",
+    "typescript": "6.0.3"
+  },
+  "sourceTraceSha256": "1daa0988ec7753bce631f26c7ad0b9e714ccb963d5854cd891043a705ebb0a17",
+  "counts": [
+    [
+      144,
+      144,
+      0,
+      0
+    ],
+    [
+      3,
+      2,
+      1,
+      1
+    ]
+  ],
+  "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+  "raw": "2026-11-18-blot-list-builders.raw.json.gz",
+  "method": "Three fresh Deno processes on a shared host. Times are medians of process medians: four warm rounds followed by two complete order rotations, nine executions per variant per round. Timing uses unmodified Blot Wasm and host markers. A separate instrumented Wasm run checks the same order-sensitive result and samples bulk memory.copy lengths, active owner capacities and counts. Capacity excludes 16-byte owner headers, allocator alignment, inactive free-list blocks and the fixed linear memory budget. Programs compile and instantiate through the released project client; fresh per-layout compilations include session open through receipt of Wasm. Times cover these benchmark guests.",
+  "layoutModules": {
+    "fixed": {
+      "bytes": 30529,
+      "sha256": "db2fe79524cf4a74bc9fa22d565c9b8921dc662f848c696d7f0d83b89e40f0b4",
+      "fresh": 19,
+      "medianFreshMs": 161.81
+    },
+    "packed": {
+      "bytes": 33508,
+      "sha256": "6c2df46ef595cc9c41c67c6aec76a86bde0387cb9519371dd164f7e01a81f49f",
+      "fresh": 19,
+      "medianFreshMs": 157.72
+    },
+    "grouped": {
+      "bytes": 34051,
+      "sha256": "a635deded96774d90d3a82525d913a760cb5e6597933dc5fe97243d3927c2a60",
+      "fresh": 19,
+      "medianFreshMs": 158.27
+    }
+  },
+  "results": [
+    {
+      "scenario": "shared_tail",
+      "dataset": "gdev",
+      "n": 256,
+      "hash": 2300940169,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 4.03,
+            "joinUs": 0.54,
+            "scanUs": 2.84,
+            "totalUs": 7.4
+          },
+          "totalUsByProcess": [
+            7.4,
+            7.48,
+            7.25
+          ],
+          "memory": {
+            "buildCopy": 9960,
+            "joinCopy": 11540,
+            "buildReserved": 10240,
+            "joinReserved": 11540,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 4.04,
+            "joinUs": 0.21,
+            "scanUs": 2.87,
+            "totalUs": 7.11
+          },
+          "totalUsByProcess": [
+            7.11,
+            7.19,
+            7.0
+          ],
+          "memory": {
+            "buildCopy": 9960,
+            "joinCopy": 0,
+            "buildReserved": 10240,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 6.54,
+            "joinUs": 3.68,
+            "scanUs": 3.03,
+            "totalUs": 13.21
+          },
+          "totalUsByProcess": [
+            13.21,
+            13.42,
+            11.52
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 5392,
+            "buildReserved": 2912,
+            "joinReserved": 5408,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 4.92,
+            "joinUs": 0.22,
+            "scanUs": 3.1,
+            "totalUs": 8.24
+          },
+          "totalUsByProcess": [
+            8.24,
+            10.02,
+            8.17
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 0,
+            "buildReserved": 2912,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 3.2,
+            "joinUs": 3.73,
+            "scanUs": 2.96,
+            "totalUs": 9.88
+          },
+          "totalUsByProcess": [
+            9.88,
+            10.1,
+            9.71
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 5392,
+            "buildReserved": 2912,
+            "joinReserved": 5408,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 3.18,
+            "joinUs": 0.22,
+            "scanUs": 3.03,
+            "totalUs": 6.42
+          },
+          "totalUsByProcess": [
+            6.42,
+            6.6,
+            6.33
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 0,
+            "buildReserved": 2912,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "shared_tail",
+      "dataset": "gdev",
+      "n": 1024,
+      "hash": 3094439435,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 14.74,
+            "joinUs": 1.5,
+            "scanUs": 10.93,
+            "totalUs": 27.2
+          },
+          "totalUsByProcess": [
+            27.73,
+            26.8,
+            27.2
+          ],
+          "memory": {
+            "buildCopy": 40640,
+            "joinCopy": 46100,
+            "buildReserved": 40960,
+            "joinReserved": 46100,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 14.76,
+            "joinUs": 0.21,
+            "scanUs": 11.0,
+            "totalUs": 25.96
+          },
+          "totalUsByProcess": [
+            26.51,
+            25.59,
+            25.96
+          ],
+          "memory": {
+            "buildCopy": 40640,
+            "joinCopy": 0,
+            "buildReserved": 40960,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 23.2,
+            "joinUs": 3.37,
+            "scanUs": 11.68,
+            "totalUs": 38.11
+          },
+          "totalUsByProcess": [
+            40.35,
+            38.11,
+            33.55
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 21616,
+            "buildReserved": 11648,
+            "joinReserved": 21632,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 18.34,
+            "joinUs": 0.22,
+            "scanUs": 11.75,
+            "totalUs": 30.3
+          },
+          "totalUsByProcess": [
+            30.3,
+            35.11,
+            30.23
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 0,
+            "buildReserved": 11648,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 10.57,
+            "joinUs": 3.45,
+            "scanUs": 11.39,
+            "totalUs": 25.44
+          },
+          "totalUsByProcess": [
+            25.78,
+            25.09,
+            25.44
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 21616,
+            "buildReserved": 11648,
+            "joinReserved": 21632,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 10.52,
+            "joinUs": 0.23,
+            "scanUs": 11.46,
+            "totalUs": 22.22
+          },
+          "totalUsByProcess": [
+            22.62,
+            21.93,
+            22.22
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 0,
+            "buildReserved": 11648,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "shared_tail",
+      "dataset": "gdev",
+      "n": 4096,
+      "hash": 4257437339,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 55.72,
+            "joinUs": 5.6,
+            "scanUs": 41.82,
+            "totalUs": 103.11
+          },
+          "totalUsByProcess": [
+            108.51,
+            102.82,
+            103.11
+          ],
+          "memory": {
+            "buildCopy": 163440,
+            "joinCopy": 184340,
+            "buildReserved": 163840,
+            "joinReserved": 184340,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 55.66,
+            "joinUs": 0.21,
+            "scanUs": 41.9,
+            "totalUs": 97.8
+          },
+          "totalUsByProcess": [
+            102.12,
+            97.27,
+            97.8
+          ],
+          "memory": {
+            "buildCopy": 163440,
+            "joinCopy": 0,
+            "buildReserved": 163840,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 92.48,
+            "joinUs": 11.51,
+            "scanUs": 44.58,
+            "totalUs": 147.99
+          },
+          "totalUsByProcess": [
+            155.28,
+            147.99,
+            125.02
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 86512,
+            "buildReserved": 46592,
+            "joinReserved": 86528,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 70.2,
+            "joinUs": 0.22,
+            "scanUs": 44.85,
+            "totalUs": 118.23
+          },
+          "totalUsByProcess": [
+            118.23,
+            137.64,
+            114.3
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 0,
+            "buildReserved": 46592,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 38.44,
+            "joinUs": 11.65,
+            "scanUs": 43.89,
+            "totalUs": 94.03
+          },
+          "totalUsByProcess": [
+            98.22,
+            93.36,
+            94.03
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 86512,
+            "buildReserved": 46592,
+            "joinReserved": 86528,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 38.35,
+            "joinUs": 0.22,
+            "scanUs": 44.0,
+            "totalUs": 82.57
+          },
+          "totalUsByProcess": [
+            86.73,
+            81.73,
+            82.57
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 0,
+            "buildReserved": 46592,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "gdev",
+      "n": 8,
+      "hash": 1865014568,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 1.06,
+            "joinUs": 1.2,
+            "scanUs": 1.1,
+            "totalUs": 3.36
+          },
+          "totalUsByProcess": [
+            3.35,
+            3.36,
+            3.37
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 22960,
+            "buildReserved": 2048,
+            "joinReserved": 22960,
+            "buildOwners": 2,
+            "joinOwners": 9
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 1.07,
+            "joinUs": 3.68,
+            "scanUs": 1.09,
+            "totalUs": 5.84
+          },
+          "totalUsByProcess": [
+            5.84,
+            5.78,
+            5.87
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 8080,
+            "buildReserved": 2048,
+            "joinReserved": 8192,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 1.06,
+            "joinUs": 0.26,
+            "scanUs": 1.16,
+            "totalUs": 2.48
+          },
+          "totalUsByProcess": [
+            2.48,
+            2.48,
+            2.52
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 48,
+            "buildReserved": 2048,
+            "joinReserved": 64,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 1.02,
+            "joinUs": 0.29,
+            "scanUs": 1.25,
+            "totalUs": 2.57
+          },
+          "totalUsByProcess": [
+            2.57,
+            2.55,
+            2.6
+          ],
+          "memory": {
+            "buildCopy": 544,
+            "joinCopy": 196,
+            "buildReserved": 608,
+            "joinReserved": 256,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "gdev",
+      "n": 32,
+      "hash": 1274232780,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 1.08,
+            "joinUs": 9.81,
+            "scanUs": 3.29,
+            "totalUs": 14.21
+          },
+          "totalUsByProcess": [
+            14.72,
+            14.16,
+            14.21
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 337600,
+            "buildReserved": 2048,
+            "joinReserved": 337600,
+            "buildOwners": 2,
+            "joinOwners": 33
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 1.04,
+            "joinUs": 6.48,
+            "scanUs": 3.28,
+            "totalUs": 10.81
+          },
+          "totalUsByProcess": [
+            11.28,
+            10.74,
+            10.81
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 32640,
+            "buildReserved": 2048,
+            "joinReserved": 32768,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 1.06,
+            "joinUs": 0.45,
+            "scanUs": 3.48,
+            "totalUs": 5.01
+          },
+          "totalUsByProcess": [
+            5.13,
+            4.89,
+            5.01
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 240,
+            "buildReserved": 2048,
+            "joinReserved": 256,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 1.0,
+            "joinUs": 0.55,
+            "scanUs": 3.76,
+            "totalUs": 5.33
+          },
+          "totalUsByProcess": [
+            5.49,
+            5.25,
+            5.33
+          ],
+          "memory": {
+            "buildCopy": 544,
+            "joinCopy": 952,
+            "buildReserved": 608,
+            "joinReserved": 1024,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "gdev",
+      "n": 128,
+      "hash": 3146493020,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 1.05,
+            "joinUs": 156.73,
+            "scanUs": 11.93,
+            "totalUs": 169.7
+          },
+          "totalUsByProcess": [
+            172.33,
+            168.77,
+            169.7
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 5282560,
+            "buildReserved": 2048,
+            "joinReserved": 5282560,
+            "buildOwners": 2,
+            "joinOwners": 129
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 1.03,
+            "joinUs": 24.77,
+            "scanUs": 11.89,
+            "totalUs": 37.76
+          },
+          "totalUsByProcess": [
+            38.7,
+            37.72,
+            37.76
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 130920,
+            "buildReserved": 2048,
+            "joinReserved": 131072,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 1.03,
+            "joinUs": 1.08,
+            "scanUs": 12.64,
+            "totalUs": 14.74
+          },
+          "totalUsByProcess": [
+            14.89,
+            14.59,
+            14.74
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 1008,
+            "buildReserved": 2048,
+            "joinReserved": 1024,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 1.33,
+            "scanUs": 13.45,
+            "totalUs": 15.77
+          },
+          "totalUsByProcess": [
+            16.36,
+            15.54,
+            15.77
+          ],
+          "memory": {
+            "buildCopy": 544,
+            "joinCopy": 4004,
+            "buildReserved": 608,
+            "joinReserved": 4096,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "shared_tail",
+      "dataset": "mixed",
+      "n": 256,
+      "hash": 3338064022,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 3.93,
+            "joinUs": 0.48,
+            "scanUs": 4.12,
+            "totalUs": 8.52
+          },
+          "totalUsByProcess": [
+            8.55,
+            8.52,
+            8.39
+          ],
+          "memory": {
+            "buildCopy": 9960,
+            "joinCopy": 11540,
+            "buildReserved": 10240,
+            "joinReserved": 11540,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 3.94,
+            "joinUs": 0.16,
+            "scanUs": 4.17,
+            "totalUs": 8.27
+          },
+          "totalUsByProcess": [
+            8.27,
+            8.28,
+            8.1
+          ],
+          "memory": {
+            "buildCopy": 9960,
+            "joinCopy": 0,
+            "buildReserved": 10240,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 5.06,
+            "joinUs": 1.18,
+            "scanUs": 2.57,
+            "totalUs": 8.84
+          },
+          "totalUsByProcess": [
+            8.84,
+            8.86,
+            8.71
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 4084,
+            "buildReserved": 2912,
+            "joinReserved": 4100,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 5.07,
+            "joinUs": 0.18,
+            "scanUs": 2.64,
+            "totalUs": 7.91
+          },
+          "totalUsByProcess": [
+            7.91,
+            7.94,
+            7.78
+          ],
+          "memory": {
+            "buildCopy": 2816,
+            "joinCopy": 0,
+            "buildReserved": 2912,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 3.47,
+            "joinUs": 1.35,
+            "scanUs": 3.73,
+            "totalUs": 8.54
+          },
+          "totalUsByProcess": [
+            8.55,
+            8.54,
+            8.4
+          ],
+          "memory": {
+            "buildCopy": 3408,
+            "joinCopy": 4084,
+            "buildReserved": 3552,
+            "joinReserved": 4100,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 3.49,
+            "joinUs": 0.19,
+            "scanUs": 3.8,
+            "totalUs": 7.47
+          },
+          "totalUsByProcess": [
+            7.47,
+            7.47,
+            7.34
+          ],
+          "memory": {
+            "buildCopy": 3408,
+            "joinCopy": 0,
+            "buildReserved": 3552,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "shared_tail",
+      "dataset": "mixed",
+      "n": 1024,
+      "hash": 2655937213,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 14.43,
+            "joinUs": 1.35,
+            "scanUs": 15.1,
+            "totalUs": 30.88
+          },
+          "totalUsByProcess": [
+            31.39,
+            30.88,
+            30.87
+          ],
+          "memory": {
+            "buildCopy": 40640,
+            "joinCopy": 46100,
+            "buildReserved": 40960,
+            "joinReserved": 46100,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 14.45,
+            "joinUs": 0.16,
+            "scanUs": 15.15,
+            "totalUs": 29.77
+          },
+          "totalUsByProcess": [
+            30.39,
+            29.75,
+            29.77
+          ],
+          "memory": {
+            "buildCopy": 40640,
+            "joinCopy": 0,
+            "buildReserved": 40960,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 15.18,
+            "joinUs": 3.06,
+            "scanUs": 9.73,
+            "totalUs": 29.36
+          },
+          "totalUsByProcess": [
+            32.06,
+            29.36,
+            28.13
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 16360,
+            "buildReserved": 11648,
+            "joinReserved": 16376,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 18.68,
+            "joinUs": 0.17,
+            "scanUs": 9.79,
+            "totalUs": 28.56
+          },
+          "totalUsByProcess": [
+            29.17,
+            28.56,
+            28.54
+          ],
+          "memory": {
+            "buildCopy": 11552,
+            "joinCopy": 0,
+            "buildReserved": 11648,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 11.63,
+            "joinUs": 3.22,
+            "scanUs": 14.01,
+            "totalUs": 28.85
+          },
+          "totalUsByProcess": [
+            29.41,
+            28.85,
+            28.84
+          ],
+          "memory": {
+            "buildCopy": 14064,
+            "joinCopy": 16360,
+            "buildReserved": 14208,
+            "joinReserved": 16376,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 11.64,
+            "joinUs": 0.18,
+            "scanUs": 14.04,
+            "totalUs": 25.87
+          },
+          "totalUsByProcess": [
+            26.35,
+            25.85,
+            25.87
+          ],
+          "memory": {
+            "buildCopy": 14064,
+            "joinCopy": 0,
+            "buildReserved": 14208,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "shared_tail",
+      "dataset": "mixed",
+      "n": 4096,
+      "hash": 4102688835,
+      "variants": [
+        {
+          "name": "fixed_flat",
+          "median": {
+            "buildUs": 56.86,
+            "joinUs": 5.33,
+            "scanUs": 59.95,
+            "totalUs": 122.14
+          },
+          "totalUsByProcess": [
+            122.91,
+            120.19,
+            122.14
+          ],
+          "memory": {
+            "buildCopy": 163440,
+            "joinCopy": 184340,
+            "buildReserved": 163840,
+            "joinReserved": 184340,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "fixed_chunks",
+          "median": {
+            "buildUs": 56.72,
+            "joinUs": 0.16,
+            "scanUs": 60.03,
+            "totalUs": 116.93
+          },
+          "totalUsByProcess": [
+            118.74,
+            113.64,
+            116.93
+          ],
+          "memory": {
+            "buildCopy": 163440,
+            "joinCopy": 0,
+            "buildReserved": 163840,
+            "joinReserved": 32,
+            "buildOwners": 3,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "packed_flat",
+          "median": {
+            "buildUs": 72.96,
+            "joinUs": 10.95,
+            "scanUs": 38.44,
+            "totalUs": 122.49
+          },
+          "totalUsByProcess": [
+            122.59,
+            118.68,
+            122.49
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 65444,
+            "buildReserved": 46592,
+            "joinReserved": 65460,
+            "buildOwners": 6,
+            "joinOwners": 4
+          }
+        },
+        {
+          "name": "packed_chunks",
+          "median": {
+            "buildUs": 72.48,
+            "joinUs": 0.17,
+            "scanUs": 38.34,
+            "totalUs": 111.01
+          },
+          "totalUsByProcess": [
+            112.47,
+            109.11,
+            111.01
+          ],
+          "memory": {
+            "buildCopy": 46496,
+            "joinCopy": 0,
+            "buildReserved": 46592,
+            "joinReserved": 80,
+            "buildOwners": 6,
+            "joinOwners": 2
+          }
+        },
+        {
+          "name": "grouped_flat",
+          "median": {
+            "buildUs": 43.95,
+            "joinUs": 10.92,
+            "scanUs": 55.1,
+            "totalUs": 110.05
+          },
+          "totalUsByProcess": [
+            111.52,
+            108.33,
+            110.05
+          ],
+          "memory": {
+            "buildCopy": 56688,
+            "joinCopy": 65444,
+            "buildReserved": 56832,
+            "joinReserved": 65460,
+            "buildOwners": 9,
+            "joinOwners": 6
+          }
+        },
+        {
+          "name": "grouped_chunks",
+          "median": {
+            "buildUs": 44.03,
+            "joinUs": 0.18,
+            "scanUs": 55.35,
+            "totalUs": 99.58
+          },
+          "totalUsByProcess": [
+            100.53,
+            98.15,
+            99.58
+          ],
+          "memory": {
+            "buildCopy": 56688,
+            "joinCopy": 0,
+            "buildReserved": 56832,
+            "joinReserved": 112,
+            "buildOwners": 9,
+            "joinOwners": 2
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "mixed",
+      "n": 8,
+      "hash": 461283564,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 0.71,
+            "scanUs": 1.53,
+            "totalUs": 3.25
+          },
+          "totalUsByProcess": [
+            3.33,
+            3.21,
+            3.25
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 22960,
+            "buildReserved": 2048,
+            "joinReserved": 22960,
+            "buildOwners": 2,
+            "joinOwners": 9
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 1.79,
+            "scanUs": 1.52,
+            "totalUs": 4.31
+          },
+          "totalUsByProcess": [
+            4.41,
+            4.28,
+            4.31
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 8080,
+            "buildReserved": 2048,
+            "joinReserved": 8192,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 0.23,
+            "scanUs": 1.62,
+            "totalUs": 2.85
+          },
+          "totalUsByProcess": [
+            2.9,
+            2.83,
+            2.85
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 48,
+            "buildReserved": 2048,
+            "joinReserved": 64,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 1.06,
+            "joinUs": 0.24,
+            "scanUs": 1.49,
+            "totalUs": 2.79
+          },
+          "totalUsByProcess": [
+            2.88,
+            2.79,
+            2.77
+          ],
+          "memory": {
+            "buildCopy": 640,
+            "joinCopy": 196,
+            "buildReserved": 736,
+            "joinReserved": 256,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "mixed",
+      "n": 32,
+      "hash": 2649966576,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 1.0,
+            "joinUs": 7.77,
+            "scanUs": 4.86,
+            "totalUs": 13.65
+          },
+          "totalUsByProcess": [
+            14.09,
+            13.47,
+            13.65
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 337600,
+            "buildReserved": 2048,
+            "joinReserved": 337600,
+            "buildOwners": 2,
+            "joinOwners": 33
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 0.98,
+            "joinUs": 6.57,
+            "scanUs": 4.85,
+            "totalUs": 12.4
+          },
+          "totalUsByProcess": [
+            12.74,
+            12.22,
+            12.4
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 32640,
+            "buildReserved": 2048,
+            "joinReserved": 32768,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 0.41,
+            "scanUs": 5.05,
+            "totalUs": 6.45
+          },
+          "totalUsByProcess": [
+            6.64,
+            6.38,
+            6.45
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 240,
+            "buildReserved": 2048,
+            "joinReserved": 256,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 1.03,
+            "joinUs": 0.44,
+            "scanUs": 4.69,
+            "totalUs": 6.16
+          },
+          "totalUsByProcess": [
+            6.42,
+            6.0,
+            6.16
+          ],
+          "memory": {
+            "buildCopy": 640,
+            "joinCopy": 952,
+            "buildReserved": 736,
+            "joinReserved": 1024,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "repeated_concat",
+      "dataset": "mixed",
+      "n": 128,
+      "hash": 2326417152,
+      "variants": [
+        {
+          "name": "chain_flat",
+          "median": {
+            "buildUs": 0.99,
+            "joinUs": 157.76,
+            "scanUs": 17.9,
+            "totalUs": 176.73
+          },
+          "totalUsByProcess": [
+            181.45,
+            172.23,
+            176.73
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 5282560,
+            "buildReserved": 2048,
+            "joinReserved": 5282560,
+            "buildOwners": 2,
+            "joinOwners": 129
+          }
+        },
+        {
+          "name": "chain_builder",
+          "median": {
+            "buildUs": 0.96,
+            "joinUs": 25.32,
+            "scanUs": 17.87,
+            "totalUs": 44.29
+          },
+          "totalUsByProcess": [
+            44.41,
+            43.04,
+            44.29
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 130920,
+            "buildReserved": 2048,
+            "joinReserved": 131072,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_chunks",
+          "median": {
+            "buildUs": 0.98,
+            "joinUs": 0.61,
+            "scanUs": 34.82,
+            "totalUs": 36.43
+          },
+          "totalUsByProcess": [
+            36.48,
+            35.22,
+            36.43
+          ],
+          "memory": {
+            "buildCopy": 1880,
+            "joinCopy": 1008,
+            "buildReserved": 2048,
+            "joinReserved": 1024,
+            "buildOwners": 2,
+            "joinOwners": 1
+          }
+        },
+        {
+          "name": "chain_grouped",
+          "median": {
+            "buildUs": 1.01,
+            "joinUs": 1.18,
+            "scanUs": 17.13,
+            "totalUs": 19.34
+          },
+          "totalUsByProcess": [
+            19.43,
+            18.64,
+            19.34
+          ],
+          "memory": {
+            "buildCopy": 640,
+            "joinCopy": 4004,
+            "buildReserved": 736,
+            "joinReserved": 4096,
+            "buildOwners": 6,
+            "joinOwners": 1
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "exclusive_appends",
+      "dataset": "mixed",
+      "n": 256,
+      "hash": 2671498479,
+      "variants": [
+        {
+          "name": "test_homes_in_arms",
+          "median": {
+            "buildUs": 8.63,
+            "joinUs": 0.1,
+            "scanUs": 0.58,
+            "totalUs": 9.31
+          },
+          "totalUsByProcess": [
+            10.82,
+            9.1,
+            9.31
+          ],
+          "memory": {
+            "buildCopy": 10804,
+            "joinCopy": 0,
+            "buildReserved": 11100,
+            "joinReserved": 0,
+            "buildOwners": 75,
+            "joinOwners": 0
+          }
+        },
+        {
+          "name": "test_homes_after_match",
+          "median": {
+            "buildUs": 4.83,
+            "joinUs": 0.1,
+            "scanUs": 0.58,
+            "totalUs": 5.52
+          },
+          "totalUsByProcess": [
+            9.66,
+            5.39,
+            5.52
+          ],
+          "memory": {
+            "buildCopy": 496,
+            "joinCopy": 0,
+            "buildReserved": 512,
+            "joinReserved": 0,
+            "buildOwners": 1,
+            "joinOwners": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "exclusive_appends",
+      "dataset": "mixed",
+      "n": 1024,
+      "hash": 2571797382,
+      "variants": [
+        {
+          "name": "test_homes_in_arms",
+          "median": {
+            "buildUs": 14.53,
+            "joinUs": 0.1,
+            "scanUs": 1.87,
+            "totalUs": 16.51
+          },
+          "totalUsByProcess": [
+            28.19,
+            16.26,
+            16.51
+          ],
+          "memory": {
+            "buildCopy": 171112,
+            "joinCopy": 0,
+            "buildReserved": 172284,
+            "joinReserved": 0,
+            "buildOwners": 294,
+            "joinOwners": 0
+          }
+        },
+        {
+          "name": "test_homes_after_match",
+          "median": {
+            "buildUs": 4.83,
+            "joinUs": 0.1,
+            "scanUs": 1.9,
+            "totalUs": 6.83
+          },
+          "totalUsByProcess": [
+            11.37,
+            6.75,
+            6.83
+          ],
+          "memory": {
+            "buildCopy": 2032,
+            "joinCopy": 0,
+            "buildReserved": 2048,
+            "joinReserved": 0,
+            "buildOwners": 1,
+            "joinOwners": 0
+          }
+        }
+      ]
+    },
+    {
+      "scenario": "exclusive_appends",
+      "dataset": "mixed",
+      "n": 4096,
+      "hash": 3530685604,
+      "variants": [
+        {
+          "name": "test_homes_in_arms",
+          "median": {
+            "buildUs": 107.5,
+            "joinUs": 0.11,
+            "scanUs": 1.44,
+            "totalUs": 112.31
+          },
+          "totalUsByProcess": [
+            174.31,
+            112.31,
+            102.94
+          ],
+          "memory": {
+            "buildCopy": 2740140,
+            "joinCopy": 0,
+            "buildReserved": 2744824,
+            "joinReserved": 0,
+            "buildOwners": 1172,
+            "joinOwners": 0
+          }
+        },
+        {
+          "name": "test_homes_after_match",
+          "median": {
+            "buildUs": 20.28,
+            "joinUs": 0.1,
+            "scanUs": 4.46,
+            "totalUs": 24.85
+          },
+          "totalUsByProcess": [
+            39.47,
+            24.85,
+            23.21
+          ],
+          "memory": {
+            "buildCopy": 8176,
+            "joinCopy": 0,
+            "buildReserved": 8192,
+            "joinReserved": 0,
+            "buildOwners": 1,
+            "joinOwners": 0
+          }
+        }
+      ]
+    }
+  ]
+}
