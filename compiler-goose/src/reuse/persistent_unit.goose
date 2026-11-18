@@ -157,7 +157,8 @@ fn selectUnitNames(self_:Engine&,unit:u32) {
     let source .= self_.source;
     var end:i64=0x7fffffffffffffff;
     if unit!=source.entry && blot_reuse_project::entryPacket(source).len!=0 {
-        end=source.unit(source.entry).parse_start;
+        end=source.unit(unit).visible_names;
+        if end==0 {end=source.unit(source.entry).parse_start;}
     }
     source.symbols.restrictView(end);
 }

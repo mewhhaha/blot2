@@ -214,6 +214,12 @@ async function measureRename(label: "entryRename" | "dependencyRename") {
         verify(label, rename);
         if (treatment === "candidate") {
           if (label === "entryRename") assert.equal(rename.fresh, 1);
+          if (label === "dependencyRename") {
+            assert(
+              rename.fresh !== undefined && rename.fresh > 0 &&
+                rename.fresh <= 6,
+            );
+          }
           assert.equal(
             rename.sourceLoad?.reusedSyntaxModules,
             rename.modules! - 1,

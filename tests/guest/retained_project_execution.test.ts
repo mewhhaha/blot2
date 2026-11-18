@@ -259,7 +259,10 @@ Deno.test("retained syntax follows disk bytes, parser symbols and inherited fixi
       "entry func answer (): U32 => return left () - right () - 1\n",
   );
   await Deno.writeTextFile(first, original);
-  await Deno.writeTextFile(last, "func right () => return do:\n  let first = 3\n  return { other: 99, first: first }.first\n");
+  await Deno.writeTextFile(
+    last,
+    "func right () => return do:\n  let first = 3\n  return { other: 99, first: first }.first\n",
+  );
   await Deno.utime(first, stamp, stamp);
   const options = {
     executable: Deno.args[0],
@@ -397,6 +400,107 @@ Deno.test("entry names can change while dependency fields and imported bindings 
     await check(body("host", "@u32.add host (read ())"), 12, 1);
     await Deno.writeTextFile(dir + "/m0.blot", "func read () => return 17\n");
     await check(body("other", "@u32.add other (read ())"), 22);
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("an imported name change preserves earlier checks and rechecks callers", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const bridge = dir + "/bridge.blot";
+  const leaf = dir + "/v0.blot";
+  const initialLeaf = "type Pair is data = $Pair { first: U32, next: U32 }\n" +
+    "func v0 () => return ($Pair { next: 7, first: 99 }).next\n";
+  const initialBridge =
+    'import { v0 } from "./v0"\nfunc bridge value => return @u32.add value (v0 ())\n';
+  await Deno.writeTextFile(bridge, initialBridge);
+  await Deno.writeTextFile(leaf, initialLeaf);
+  const imports = ['import { bridge } from "./bridge"'];
+  for (let i = 1; i < 16; i++) {
+    await Deno.writeTextFile(
+      dir + "/v" + i + ".blot",
+      "func v" + i + " () => return " + i + "\n",
+    );
+    imports.push("import { v" + i + ' } from "./v' + i + '"');
+  }
+  await Deno.writeTextFile(
+    entry,
+    imports.join("\n") +
+      "\nentry func answer (n: U32): U32 => return @u32.add (bridge n) (v15 ())\n",
+  );
+  const options = {
+    entry,
+    prelude: null,
+    executable: Deno.args[0],
+    frontendWorkers: 8,
+  };
+  const session = await createZigProjectCompiler(options);
+  let revision = 0;
+  async function compare(
+    sources: Record<string, string>,
+    want: number | null,
+    fresh?: number,
+  ) {
+    const oracle = await createZigProjectCompiler({
+      ...options,
+      frontendWorkers: 1,
+    });
+    try {
+      const actual = await session.build({ sources });
+      const reference = await oracle.build({ sources });
+      if (want === null) {
+        assert(!actual.success && !reference.success);
+        assert.deepEqual(actual.diagnostics, reference.diagnostics);
+        assert.equal(actual.revision, revision);
+        return;
+      }
+      assert(actual.success && reference.success, JSON.stringify(actual));
+      assert.deepEqual(actual.bytes, reference.bytes);
+      assert.equal(actual.revision, ++revision);
+      if (fresh !== undefined) assert.equal(actual.stats.freshModules, fresh);
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", 2), want);
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await oracle.dispose();
+    }
+  }
+  try {
+    await compare({}, 24, 18);
+    const renamed = initialBridge.replaceAll("value", "new_binding");
+    await compare({ [bridge]: renamed }, 24, 2);
+    await compare(
+      { [bridge]: renamed.replace("(v0 ())", "(missing ())") },
+      null,
+    );
+    await compare(
+      {
+        [bridge]: initialBridge.replace(
+          "value => return @u32.add value (v0 ())",
+          "v0 => return v0",
+        ),
+      },
+      17,
+      2,
+    );
+    await compare({
+      [bridge]: renamed,
+      [leaf]: initialLeaf.replace("next: 7", "next: 11"),
+    }, 28);
+    await Deno.writeTextFile(
+      dir + "/other.blot",
+      initialLeaf.replace("next: 7", "next: 8"),
+    );
+    await compare({ [bridge]: initialBridge.replace("./v0", "./other") }, 25);
+    const small =
+      'import { bridge } from "./bridge"\nentry func answer (n: U32): U32 => return bridge n\n';
+    await compare({ [entry]: small }, 9, 3);
+    await compare({}, 24);
   } finally {
     await session.dispose();
     await Deno.remove(dir, { recursive: true });

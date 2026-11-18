@@ -63,7 +63,7 @@ fn message(self_: Diagnostic) -> const u8[:] {
     }
 }
 struct Import { declaration: DeclarationId, target: UnitId=0, path: Symbol, namespace_: Symbol, bindings: blot_parse_ast::List, span: Span }
-struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0, parse_names:const u32[:]=default<const u32[:]>() }
+struct Unit { filename: Symbol, source: const u8[:], tree: blot_parse_ast::Tree, imports: Range=Range {..}, implicit_prelude: bool=false, parse_start:i64=0, parse_end:i64=0, parse_names:const u32[:]=default<const u32[:]>(), parser_tree:blot_parse_ast::Tree=blot_parse_ast::Tree{..}, visible_names:i64=0 }
 reusable[] var owned_source: u8[>..]=[];
 reusable[] var owned_lexical: blot_parse_lexer::Diagnostic[>..]=[];
 fn copySource(bytes: const u8[:]) -> const u8[:] { let result=owned_source.alloc_slice(bytes.len); for byte,index in bytes {result[index]=byte;} return result; }
@@ -85,8 +85,8 @@ fn canonicalOwnedDiagnostic(value:Diagnostic)->Diagnostic {
  return Diagnostic{unit:value.unit,span:value.span,code:value.code,target:value.target,cause:cause,lex_code:value.lex_code,parse_code:value.parse_code,publication:publication,parse_detail:value.parse_detail,lexical_details:lexical};
 }
 fn deinit(self_:Diagnostic&) {if self_.cause.present {releaseSource(self_.cause.value);}if self_.publication.present {releaseSource(self_.publication.value.code);releaseSource(self_.publication.value.message);}releaseLexical(self_.lexical_details);self_=default<Diagnostic>();}
-fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end,parse_names:value.parse_names};}
-fn deinit(self_: Unit&) {self_.tree.deinit();blot_reuse_project_check::releaseOwned(self_.parse_names);releaseSource(self_.source);self_.source=default<const u8[:]>();}
+fn canonicalUnit(value:Unit)->Unit {return Unit{filename:value.filename,source:owned_source.realloc_slice(value.source,value.source.len),tree:blot_parse_ast::canonical(value.tree),imports:value.imports,implicit_prelude:value.implicit_prelude,parse_start:value.parse_start,parse_end:value.parse_end,parse_names:value.parse_names,parser_tree:blot_parse_ast::canonical(value.parser_tree),visible_names:value.visible_names};}
+fn deinit(self_: Unit&) {self_.tree.deinit();self_.parser_tree.deinit();blot_reuse_project_check::releaseOwned(self_.parse_names);releaseSource(self_.source);self_.source=default<const u8[:]>();}
 struct UnitBuffer {storage:Unit[:]=default<Unit[:]>(),items:Unit[:]=default<Unit[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var project_UnitBuffer_runs:Unit[>..]=[];
 var inactive_UnitBuffer:UnitBuffer=UnitBuffer {..};
@@ -129,7 +129,7 @@ fn append(self_:DiagnosticBuffer&,values:const Diagnostic[:])->Error {let length
 fn resize(self_:DiagnosticBuffer&,length:i64) {assert(length>=0 && length<=self_.items.len);for &item in self_.items[length..] {item.deinit();}blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
 fn clear(self_:DiagnosticBuffer&) {for &item in self_.items {item.deinit();}blot_support_pooled_buffer::clear(self_);self_.len=0;self_.failure=blot_error::Error.none;}
 fn deinit(self_:DiagnosticBuffer&) {self_.clear();blot_support_pooled_buffer::deinit(self_,project_DiagnosticBuffer_runs);}
-struct ProjectState {parser_seed:i64=0,entry_packet:const u8[:]=default<const u8[:]>(),owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {..},order:WordBuffer=WordBuffer {..},imports:ImportBuffer=ImportBuffer {..},diagnostics:DiagnosticBuffer=DiagnosticBuffer {..}}
+struct ProjectState {checking_ids:const u32[:]=default<const u32[:]>(),parser_symbols:blot_parse_symbols::Pool=blot_parse_symbols::Pool{..},parser_seed:i64=0,entry_packet:const u8[:]=default<const u8[:]>(),owner:u64=0,origin_lease:u32=0,units:UnitBuffer=UnitBuffer {..},order:WordBuffer=WordBuffer {..},imports:ImportBuffer=ImportBuffer {..},diagnostics:DiagnosticBuffer=DiagnosticBuffer {..}}
 reusable var projects:ProjectState[>..]=[];
 struct Lowering { io: bool=false, workers:u8=1 }
 struct Project {
@@ -163,7 +163,7 @@ fn deinit(self_:Project&) {
     if self_.lease==0 {return;}assert(projects[self_.lease-1].owner==self_.owner_id);
     for &unit in self_.units.items {unit.deinit();}self_.units.deinit();self_.order.deinit();self_.imports.deinit();
     self_.diagnostics.deinit();self_.symbols.deinit();
-    let index=self_.lease-1;releaseSource(projects[index].entry_packet);blot_reuse_project_check::releaseModuleOrigins(projects[index].origin_lease);projects[index].owner=0;projects.free(index);self_=Project {..};
+    let index=self_.lease-1;blot_reuse_project_check::releaseOwned(projects[index].checking_ids);projects[index].parser_symbols.deinit();releaseSource(projects[index].entry_packet);blot_reuse_project_check::releaseModuleOrigins(projects[index].origin_lease);projects[index].owner=0;projects.free(index);self_=Project {..};
 }
 fn compiledModule(self_:const Project&,id:i64)->const blot_reuse_frozen_dependency::Module? {if id==0||id>self_.compiled_modules.len {return null;}if self_.compiled_reuse.len!=0&&!self_.compiled_reuse[id-1] {return null;}return self_.compiled_modules[id-1];}
 fn compiledCount(self_:const Project&)->i64 {if self_.compiled_reuse.len==0 {return self_.compiled_modules.len;}var count:i64=0;for reused in self_.compiled_reuse {if reused {count++;}}return count;}
@@ -280,11 +280,20 @@ fn validateAliases<P>(self_:Loader<P>&)->bool,Error {
     if self_.options.std_root.present {let root=self_.options.std_root.value;if root.len==0||contains(root,0) {let error=self_.report(Origin {..},Code.invalid_alias,"std/",blot_support::none<const u8[:]>());return false,error;}}
     return true,blot_error::Error.none;
 }
+fn parserSymbols(project:const Project&)->const blot_parse_symbols::Pool& {
+    let saved .= projects[project.lease-1].parser_symbols;
+    if saved.lease!=0 {return saved;}
+    return project.symbols;
+}
+fn parserTree(unit:const Unit&)->const blot_parse_ast::Tree& {
+    if unit.visible_names!=0 {return unit.parser_tree;}
+    return unit.tree;
+}
 fn sameParserPrefix<P>(loader:const Loader<P>&,previous:const Project&,end:i64)->bool {
-    if end>previous.symbols.entries.len {return false;}
+    if end>parserSymbols(previous).entries.len {return false;}
     for i in loader.verified_symbols..end {
         let id=(i+1) as Symbol;
-        if previous.symbols.get(id)!=loader.project.symbols.get(id) {return false;}
+        if parserSymbols(previous).get(id)!=loader.project.symbols.get(id) {return false;}
     }
     return true;
 }
@@ -299,7 +308,7 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
     let old=previous.units.items[index];
     let symbols .= loader.project.symbols;
     if old.implicit_prelude!=loader.prelude_ready || old.source!=source ||
-       previous.symbols.get(old.filename)!=symbols.get(filename) {return false,blot_error::Error.none;}
+       previous.filename((index+1) as u32)!=symbols.get(filename) {return false,blot_error::Error.none;}
     if !loader.stable_prefix || old.parse_start!=symbols.entries.len ||
        !sameParserPrefix(loader,previous,old.parse_start) {
         loader.stable_prefix=false;
@@ -309,19 +318,19 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
         if loader.options.prelude_path.present && !loader.prelude_ready {return false,blot_error::Error.none;}
         let map .= loader.remap;
         if map.len==0 {
-            let failure=map.ensure(previous.symbols.entries.len);
+            let failure=map.ensure(parserSymbols(previous).entries.len);
             if failure!=blot_error::Error.none {return false,failure;}
-            map.items=map.storage[..previous.symbols.entries.len];
+            map.items=map.storage[..parserSymbols(previous).entries.len];
             map.len=map.items.len;
             for &word in map.items {word=0;}
         }
         for old_id in old.parse_names {
-            let actual,error=symbols.intern_hashed(previous.symbols.get(old_id),previous.symbols.entries.items[old_id-1].hash);
+            let actual,error=symbols.intern_hashed(parserSymbols(previous).get(old_id),parserSymbols(previous).entries.items[old_id-1].hash);
             if error!=blot_error::Error.none {return false,error;}
             map.items[old_id-1]=actual;
             recorded.push(actual);
         }
-        let copied=tree.copyParsed(old.tree);
+        let copied=tree.copyParsed(parserTree(old));
         if copied!=blot_error::Error.none {return false,copied;}
         if !blot_reuse_parse_packet::relocate_tree(tree,seed as u32,map.items[seed..]) {return false,blot_error::Error.invalid_artifact;}
         loader.project.reused_syntax++;
@@ -329,14 +338,21 @@ fn reuseSyntax<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot
     }
     for i in old.parse_start..old.parse_end {
         let id=(i+1) as Symbol;
-        let actual,error=symbols.intern_hashed(previous.symbols.get(id),previous.symbols.entries.items[i].hash);
+        let actual,error=symbols.intern_hashed(parserSymbols(previous).get(id),parserSymbols(previous).entries.items[i].hash);
         if error!=blot_error::Error.none {return false,error;}
         assert(actual==id);
     }
     recorded.append(old.parse_names);
     loader.verified_symbols=old.parse_end;
-    let error=tree.copyParsed(old.tree);
-    if error!=blot_error::Error.none {return false,error;}
+    if old.parser_tree.lease!=0 {
+        let shared,error=old.parser_tree.retainParsed();
+        if error!=blot_error::Error.none {return false,error;}
+        tree.deinit();
+        tree=blot_parse_ast::canonical(shared);
+    } else {
+        let error=tree.copyParsed(old.tree);
+        if error!=blot_error::Error.none {return false,error;}
+    }
     loader.project.reused_syntax++;
     return true,blot_error::Error.none;
 }
@@ -348,7 +364,7 @@ fn entryPacket(project:const Project&)->const u8[:] {return projects[project.lea
 fn readEntryPacket<P>(loader:Loader<P>&,filename:Symbol,source:const u8[:],tree:blot_parse_ast::Tree&)->bool {
     let symbols .= loader.project.symbols;
     let previous .= loader.previous;
-    if previous && previous.entry!=0 && previous.unit(previous.entry).filename==filename &&
+    if previous && previous.entry!=0 && previous.filename(previous.entry)==symbols.get(filename) &&
        previous.unit(previous.entry).source==source {
         let packet=entryPacket(previous);
         if packet.len>=9 && blot_bytes::get_u32(packet,0)==symbols.entries.len &&
@@ -532,7 +548,7 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
     loader.reading_entry=loader.options.input_mode==InputMode.project;
     let entry,failure=loader.read(context.entrypath,Origin {..});loader.reading_entry=false;if failure!=blot_error::Error.none {return failure;}if !entry.present {return blot_error::Error.none;}
     loader.project.entry=entry.value;
-    if entryPacket(loader.project).len!=0 {return loadEntryDependencies(loader,entry.value);}
+    if entryPacket(loader.project).len!=0 {return loadEntryDependencies(loader,entry.value,parallel);}
     // A new symbol at the root invalidates the IDs of the remaining syntax.
     // Start the ordinary worker batch at its imports before walking them.
     if parallel && previous && loader.visits.items[entry.value-1]!=Visit.finished && loader.project.diagnostics.len==0 {
@@ -548,7 +564,102 @@ fn loadSourceUsing<P,F>(context:LoadContext&,loader:Loader<P>&)->Error {
     } else {return loader.walk(entry.value);}
     return blot_error::Error.none;
 }
-fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId)->Error {
+
+fn linkSymbol(original:const blot_parse_symbols::Pool&,next:blot_parse_symbols::Pool&,map:u32[:],id:u32)->Error {
+    if id==0 || map[id]!=0 {return blot_error::Error.none;}
+    let assigned,error=next.intern_hashed(original.get(id),original.entries.items[id-1].hash);
+    if error==blot_error::Error.none {map[id]=assigned;}
+    return error;
+}
+
+// Bucket the existing topological order by maximum import depth. Ties keep
+// their source order, and a long import chain takes one pass over its edges.
+fn checkingOrder(project:const Project&,order:u32[>..]&) {
+    var depth:u32[>..]=[];depth.resize(project.units.len,0);
+    var maximum:u32=0;
+    for id in project.order.items {
+        var level:u32=0;
+        for edge in project.unitImports(id) {level=max(level,depth[edge.target-1]+1);}
+        if project.unit(id).implicit_prelude {level=max(level,depth[project.prelude_unit-1]+1);}
+        depth[id-1]=level;maximum=max(maximum,level);
+    }
+    var next:u32[>..]=[];next.resize(maximum+1,0);
+    for level in depth {next[level]++;}
+    var offset:u32=0;
+    for &at in next {let count=at;at=offset;offset+=count;}
+    order.resize(project.units.len,0);
+    for id in project.order.items {
+        let level=depth[id-1];
+        order[next[level]]=id;
+        next[level]++;
+    }
+}
+
+// A producer sees its entire dependency chain, including generated names.
+// Keep parser coordinates separately so unchanged syntax can serve both views.
+fn linkCheckingNames(project:Project&,entry:u32,seed:i64,previous:const Project?)->Error {
+    let pool,error=blot_parse_symbols::initPooled();
+    if error!=blot_error::Error.none {return error;}
+    let original .= projects[project.lease-1].parser_symbols;
+    original=blot_parse_symbols::canonical(project.symbols);
+    project.symbols=blot_parse_symbols::canonical(pool);
+    var names:u32[>..]=[];names.resize(original.entries.len+1,0);
+    for i in 1..seed+1 {
+        let error=linkSymbol(original,project.symbols,names[..],i as u32);
+        if error!=blot_error::Error.none {return error;}
+    }
+    for &unit in project.units.items {
+        let error=linkSymbol(original,project.symbols,names[..],unit.filename);
+        if error!=blot_error::Error.none {return error;}
+        unit.filename=names[unit.filename];
+    }
+    for &edge in project.imports.items {
+        let error=linkSymbol(original,project.symbols,names[..],edge.path);
+        if error!=blot_error::Error.none {return error;}
+        edge.path=names[edge.path];
+    }
+    var ranges:Range[>..]=[];ranges.resize(project.units.len,Range{..});
+    var contracts:blot_reuse_project_check::ContractName[>..]=[];
+    var order:u32[>..]=[];checkingOrder(project,order);
+    for id in order {
+        if id==entry {continue;}
+        let unit .= project.units.items[id-1];
+        var same_tree=false;
+        var old_map=default<const u32[:]>();
+        if previous && id<=previous.units.len && previous.unit(id).parser_tree.lease==unit.tree.lease {
+            old_map=projects[previous.lease-1].checking_ids;
+            same_tree=old_map.len!=0;
+        }
+        for old in unit.parse_names {
+            let error=linkSymbol(original,project.symbols,names[..],old);
+            if error!=blot_error::Error.none {return error;}
+            if same_tree && names[old]!=old_map[old] {same_tree=false;}
+        }
+        var linked=blot_parse_ast::Tree{..};
+        var error=blot_error::Error.none;
+        if previous && same_tree {
+            linked,error=previous.unit(id).tree.retainParsed();
+        } else {
+            linked,error=blot_parse_ast::initPooled();
+            if error==blot_error::Error.none {error=linked.copyParsed(unit.tree);}
+            if error==blot_error::Error.none && !blot_reuse_parse_packet::relocate_tree(linked,0,names[1..]) {error=blot_error::Error.invalid_artifact;}
+        }
+        if error!=blot_error::Error.none {linked.deinit();return error;}
+        unit.parser_tree=blot_parse_ast::canonical(unit.tree);
+        unit.tree=blot_parse_ast::canonical(linked);
+        let range=unit.imports;
+        for &edge in project.imports.items[range.start..range.start+range.len] {
+            edge.namespace_=unit.tree.import_decl(edge.declaration.node).namespace_;
+        }
+        let prepared=blot_reuse_project_check::prepareUnitNames(project,id,ranges[..],contracts);
+        if prepared!=blot_error::Error.none {return prepared;}
+        unit.visible_names=project.symbols.entries.len;
+    }
+    projects[project.lease-1].checking_ids=blot_reuse_project_check::copyOwned(names[..]);
+    return blot_error::Error.none;
+}
+
+fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId,parallel:bool)->Error {
     let project .= loader.project;
     // Keep only the prelude and entry filename. DFS needs the paths spelled
     // by the entry's edges, but never inspects its body.
@@ -568,9 +679,14 @@ fn loadEntryDependencies<P>(loader:Loader<P>&,entry:UnitId)->Error {
     let walked=loader.walk(entry);
     if walked!=blot_error::Error.none {return walked;}
     if project.diagnostics.len==0 {
-        let prepared,failure=blot_reuse_project_check::preparePersistentNames(project,entry);
-        if failure!=blot_error::Error.none {return failure;}
-        assert(prepared);
+        if parallel && project.units.len>=16 {
+            let failure=linkCheckingNames(project,entry,prefix,loader.previous);
+            if failure!=blot_error::Error.none {return failure;}
+        } else {
+            let prepared,failure=blot_reuse_project_check::preparePersistentNames(project,entry);
+            if failure!=blot_error::Error.none {return failure;}
+            assert(prepared);
+        }
     }
     let root .= project.units.items[entry-1];
     root.parse_start=project.symbols.entries.len;

@@ -280,7 +280,8 @@ fn resize(self_: ConversionBuffer&, length: i64) { blot_support_pooled_buffer::r
 fn resize(self_: ConversionBuffer&, length: i64, value: TypeConversionOrigin) { if length<=self_.len { self_.resize(length); return; } if self_.ensure(length)!=blot_error::Error.none { return; } for index in self_.len..length { self_.storage[index]=value; } self_.items=self_.storage[..length]; self_.len=length; }
 fn clear(self_: ConversionBuffer&) { blot_support_pooled_buffer::clear(self_); self_.len=0; self_.failure=blot_error::Error.none; }
 fn deinit(self_: ConversionBuffer&) { blot_support_pooled_buffer::deinit(self_,tree_ConversionBuffer_runs); self_.len=0; self_.failure=blot_error::Error.none; }
-struct TreeState { owner_id: u64=0, generation: u64=0,
+struct TreeState {
+    references:u32=1, owner_id: u64=0, generation: u64=0,
     nodes: NodeBuffer=NodeBuffer {..},
     spans: SpanBuffer=SpanBuffer {..},
     extra: WordBuffer=WordBuffer {..},
@@ -373,8 +374,21 @@ fn failure(self_: const Tree&) -> TreeError {
     if self_.type_conversion_origins.failure!=blot_error::Error.none { return self_.type_conversion_origins.failure; }
     return blot_error::Error.none;
 }
+// Retained project syntax is immutable. The loader makes a private copy
+// before relocating any node and holds each shared tree until its revision ends.
+fn retainParsed(self_:const Tree&)->Tree,TreeError {
+    assert(self_.valid() && self_.diagnostics.len==0);
+    let state .= tree_states[self_.lease-1];
+    if state.references==0xffffffff {return Tree{..},blot_error::Error.out_of_memory;}
+    state.references++;
+    return canonical(self_),blot_error::Error.none;
+}
 fn deinit(self_: Tree&) {
     if self_.lease==0 { return; } assert(self_.valid());
+    let state .= tree_states[self_.lease-1];
+    assert(state.references!=0);
+    state.references--;
+    if state.references!=0 {self_=Tree{..};return;}
     self_.nodes.deinit();
     self_.spans.deinit();
     self_.extra.deinit();
