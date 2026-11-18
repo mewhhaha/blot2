@@ -17,12 +17,13 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Renaming Gdev Main’s entry parameter now checks **one module** and returns
-the complete Wasm in **45.2 ms**, down from **710.8 ms**.
-Fresh builds took **763.8 ms** and lighting edits **37.3 ms**.
-[Measurements and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-entry-symbols.json)
+Renaming a parameter in Gdev’s imported `world_storage` module checks **6 of
+270 modules** and returns the complete **2,639,648-byte** Wasm in **257.6 ms**,
+down from **949.7 ms**. Renaming the entry parameter took **54.4 ms**,
+editing lighting took **47.0 ms**, and a fresh build took **971.5 ms**.
+[Paired measurements and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.json)
 
-![Gdev Main entry rename, lighting edit and fresh build times](benchmarks/evidence/measurements/2026-11-18-gdev-entry-symbols.png)
+![Gdev imported rename time, source loading and checking](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.png)
 
 The Gdev intent benchmark that appends inside two case arms builds its list in
 **21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms)

@@ -151,7 +151,7 @@ returned the same Wasm SHA-256 as a fresh build on the previous release.
 Across two separately profiled pairs, checking fell from **435.5 to 6.2 ms**
 and backend work fell from **109.0 to 0.7 ms**.
 The same private rename in the imported world-storage module rechecked
-270 modules. Extending name isolation to imported modules is the next experiment.
+270 modules on this release.
 
 A 16-module executed fixture covers moving between fresh and existing names,
 shadowing an imported function, adding a local declaration, changing a
@@ -159,6 +159,47 @@ dependency, and recovery from syntax and name errors. All 21 Gdev session
 transitions matched independent release builds or their diagnostics. The
 hardware frame, 120-frame replay and named Gdev and Ink outcomes also matched.
 [Paired trials and profiles](../benchmarks/evidence/measurements/2026-11-18-gdev-entry-symbols.json) · [Runnable comparison](../benchmarks/tools/bench_body_edits.ts)
+
+### Rechecking a changed import
+
+The parser records the order in which each file uses names. After an imported
+file introduces a new name, unchanged files replay those spellings and relocate
+their parsed trees. For parallel source projects with at least 16 modules, the
+checker assigns names by maximum import depth. Each module gets the same view
+of source and generated names on fresh and retained checks. A change to that
+view rebuilds the module and its dependents. The parser and checker share
+immutable trees across revisions when their symbol IDs still agree.
+
+| Gdev Main, eight alternating pairs | Previous | Current | Faster pairs |
+| --- | ---: | ---: | ---: |
+| Rename an imported parameter | 949.7 ms | 257.6 ms | 8/8 |
+| Rename the entry parameter | 53.0 ms | 54.4 ms | 4/8 |
+| Edit the lighting preset | 47.1 ms | 47.0 ms | 4/8 |
+| Start a fresh session | 1,031.9 ms | 971.5 ms | 5/8 |
+
+For the private rename in `world_storage`, checking fell from
+**951.0 to 230.7 ms** and loading, lexing and parsing together fell from
+**314.6 to 52.9 ms** across two separately profiled pairs.
+The compiler reused 269 parsed trees, up from two, and rechecked six modules,
+down from 270. In a separate trace, checking `game.blot` took 101.7 ms and
+checking `world_storage.blot` took 100.4 ms.
+
+Relinking names raised the load phase alone from **23.4 to 47.4 ms**.
+The next target is reuse of `game.blot` when an edit preserves the exports it consumes.
+
+Across four separate pairs, median resident memory after the rename was
+**282.9 MiB** previously and **269.8 MiB** on this release. The measurement sums
+proportional set size for the live compiler processes after the reply. Fresh
+builds used 180.8 and 191.0 MiB respectively. In one further session, memory
+held steady from the fourth through the sixteenth alternating rename or revert.
+
+All 21 edit, rejection and recovery transitions matched independent fresh
+compilations. An 18-module executed test covers parameter renames,
+shadowing, an unbound name, edits to two files, a retargeted import and
+crossing the parallel checker’s project-size threshold. The release passed
+the full compiler gate and reproduced Gdev Main, its inspected hardware frame
+and every file of the 120-frame replay. All named Gdev and Ink outcomes matched.
+[Trials, phase profiles, memory and qualification](../benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.json) · [Runnable edit comparison](../benchmarks/tools/bench_body_edits.ts)
 
 ### Verified arrays in worker packets
 
