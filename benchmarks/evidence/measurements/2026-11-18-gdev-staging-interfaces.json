@@ -1,0 +1,705 @@
+{
+  "date": "2026-11-18",
+  "compilerGit": "d92d35acfb70b7cf476ba9cddb7ef9431e5e4c81",
+  "compilerSha256": "50f5c93671e37c19e75bc168224e7a0c2732a7c41f01029d210f3e5bd70201e6",
+  "previousCompilerGit": "20fed71392c3ae278ffe57b6e37c6f10f5912b67",
+  "previousCompilerSha256": "ad7f75009948a575fd608d850328ec5199b51de1fdfbfb46e734a39de6d6ad1b",
+  "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+  "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "staging": {
+    "method": "Six fresh compiler processes per configuration, interleaved in forward and reverse order. Eight frontend workers, warm filesystem, native assets, timer starts before opening the compiler and stops on receiving complete Wasm. Each mode sends the lighting source including the ordinary control. Profiles and single-worker controls are additional runs with timing instrumentation. Before/after use the same original project. Cut uses the optional nine-file patch. Every successful byte hash matches.",
+    "runner": "scripts/integration/time_gdev_staging.ts",
+    "trials": {
+      "before": {
+        "ms": [
+          919.287,
+          1003.673,
+          999.579,
+          948.698,
+          904.677,
+          960.703
+        ],
+        "medianMs": 954.7,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 948.968522,
+            "fresh": 269,
+            "jobs": 269,
+            "retries": 0
+          }
+        ]
+      },
+      "after": {
+        "ms": [
+          965.062,
+          1046.048,
+          1025.82,
+          990.603,
+          944.352,
+          951.109
+        ],
+        "medianMs": 977.83,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 991.932319,
+            "fresh": 269,
+            "jobs": 269,
+            "retries": 0
+          }
+        ]
+      },
+      "cut": {
+        "ms": [
+          998.822,
+          940.379,
+          888.182,
+          997.979,
+          1016.765,
+          957.296
+        ],
+        "medianMs": 977.64,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 936.337063,
+            "fresh": 272,
+            "jobs": 272,
+            "retries": 0
+          }
+        ]
+      },
+      "before-unused": {
+        "ms": [
+          1879.288,
+          1965.017,
+          2016.797,
+          1841.88,
+          1910.414,
+          1981.784
+        ],
+        "medianMs": 1937.72,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 1900.5219430000002,
+            "fresh": 269,
+            "jobs": 0,
+            "retries": 0
+          }
+        ]
+      },
+      "after-unused": {
+        "ms": [
+          1052.84,
+          1087.971,
+          947.771,
+          926.356,
+          1009.992,
+          1131.911
+        ],
+        "medianMs": 1031.42,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 971.3527839999999,
+            "fresh": 269,
+            "jobs": 269,
+            "retries": 0
+          }
+        ]
+      },
+      "after-reachable": {
+        "ms": [
+          1116.522,
+          1073.276,
+          979.09,
+          949.107,
+          1050.18,
+          954.12
+        ],
+        "medianMs": 1014.63,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 952.017073,
+            "fresh": 269,
+            "jobs": 269,
+            "retries": 0
+          },
+          {
+            "workers": 1,
+            "success": true,
+            "ms": 1918.333949,
+            "fresh": 269,
+            "jobs": 0,
+            "retries": 0
+          }
+        ]
+      },
+      "cut-reachable": {
+        "ms": [
+          1123.272,
+          1187.296,
+          996.403,
+          987.935,
+          998.726,
+          956.93
+        ],
+        "medianMs": 997.56,
+        "profiles": [
+          {
+            "workers": 8,
+            "success": true,
+            "ms": 929.578725,
+            "fresh": 272,
+            "jobs": 272,
+            "retries": 0
+          },
+          {
+            "workers": 1,
+            "success": true,
+            "ms": 1843.398532,
+            "fresh": 272,
+            "jobs": 0,
+            "retries": 0
+          }
+        ]
+      },
+      "before-reachable": {
+        "profiles": [
+          {
+            "workers": 8,
+            "success": false,
+            "ms": 1798.571487,
+            "diagnostics": [
+              {
+                "filename": "effects/lighting_look.blot",
+                "stage": "emit",
+                "code": "storage_unsupported",
+                "start": 536,
+                "end": 545,
+                "message": "Direct backend: 1 unsupported form(s): staging expressions are not supported yet (1x at 52:536)",
+                "offset_encoding": "utf8_bytes",
+                "utf16": null,
+                "details": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "sourceInterfacePilot": {
+    "patch": "2026-11-18-gdev-staging-interfaces-source-cut.patch.gz",
+    "scope": "Ordinary checked Blot modules. Move closed subsets and re-export their public names. Consumers read the three small checked modules while the provider remainder can be checked independently. This still infers bodies in the small modules.",
+    "locations": {
+      "world/salt → actors/hauling_plan": "world/salt_search",
+      "actors/robots → actors/minors": "actors/robot_behavior",
+      "world_storage → progression/scenes": "scene_storage"
+    },
+    "sourceDigests": {
+      "actors/hauling_plan.blot": "c2cff6c6658ba7a0eaca580bc60d6319d26d71edad0cbfdeb43f5ac61dca5e7b",
+      "actors/minors.blot": "d8c7ba586533ac7f0eff1450061b5b7d8db88c2b1de62a1226a794c4d09a4304",
+      "actors/robot_behavior.blot": "02ee24c39fad5fd67d6260fe8834ffac5e7b8a3acfeb05a84e28c02e185aea01",
+      "actors/robots.blot": "9004406cf6d696f2fb9b4ea48b5f0200beb3d08623a5839c44717383236dc7e3",
+      "progression/scenes.blot": "c0a7783b79fb8387ba9f4baccad979dc5a23777c77000a5217dc9b49c79084a0",
+      "scene_storage.blot": "51a0b1cfb430957a227a8e6a8e25aed51832ff149e5a48211ee6d33480f715b6",
+      "world/salt.blot": "8101ee8c6881850155c48c05f61eef628124db3ea7d89e6cdaff3188a1da7903",
+      "world/salt_search.blot": "a9f2f439e2e9a9cdbf9d8b25e33a4f1b9d820a2795d3a258b11bffc6bfd6baf1",
+      "world_storage.blot": "e1f5be6c36bde570d76faf7df44828d733f98dc29e8153dccb7ae6186ec3527a"
+    },
+    "freshJobs": 272,
+    "originalMs": [
+      917.582,
+      911.651,
+      956.419,
+      962.214,
+      941.359,
+      887.744,
+      876.888,
+      935.277,
+      906.332,
+      971.171,
+      1000.438,
+      971.172
+    ],
+    "cutMs": [
+      895.918,
+      885.646,
+      949.785,
+      921.63,
+      853.102,
+      937.642,
+      871.371,
+      887.771,
+      935.316,
+      988.891,
+      1024.034,
+      991.867
+    ],
+    "medianOriginalMs": 938.32,
+    "medianCutMs": 928.47,
+    "medianPairedDeltaMs": -6.08,
+    "wins": 7,
+    "method": "Twelve within-pair alternating order fresh processes. Normal project build on complete on-disk source with the same release compiler and its default worker count. No overrides, profiling or stored modules. Every complete Wasm matched.",
+    "decision": "Keep as a reproducible experiment. The 12-pair effect was small and the separate six-run overlay medians were effectively equal.",
+    "exploratorySourceCuts": {
+      "all": {
+        "differencesMs": [
+          37.58859800000016,
+          -24.1421220000002,
+          -37.90101199999981,
+          -0.42249200000003384,
+          18.767106999999896,
+          10.26140200000009
+        ],
+        "medianPairedDifferenceMs": 4.919455000000028,
+        "fasterPairs": 3
+      },
+      "all_hauling": {
+        "differencesMs": [
+          -63.348319999999944,
+          -4.718567000000007,
+          -59.17844500000001,
+          -26.26582700000006,
+          44.793335999999954,
+          -42.27595400000007
+        ],
+        "medianPairedDifferenceMs": -34.270890500000064,
+        "fasterPairs": 5
+      },
+      "all_wide": {
+        "differencesMs": [
+          2.263321000000019,
+          -71.97203699999977,
+          -246.87818300000004,
+          20.541157,
+          -89.09872599999994,
+          -61.51663700000017
+        ],
+        "medianPairedDifferenceMs": -66.74433699999997,
+        "fasterPairs": 4
+      },
+      "all_wide_exact": {
+        "differencesMs": [
+          -35.46977800000002,
+          244.01727700000015,
+          8.964967000000001,
+          -98.10011000000009,
+          -44.60947800000008,
+          -6.067188999999985
+        ],
+        "medianPairedDifferenceMs": -20.768483500000002,
+        "fasterPairs": 4
+      }
+    },
+    "dependencyControls": [
+      {
+        "mode": "all_hauling",
+        "entry": "actors/hauling_plan",
+        "poison": "world/salt_pilot_body",
+        "success": true,
+        "freshModules": 104
+      },
+      {
+        "mode": "all_hauling",
+        "entry": "actors/minors",
+        "poison": "actors/robots_pilot_body",
+        "success": true,
+        "freshModules": 138
+      },
+      {
+        "mode": "all_hauling",
+        "entry": "progression/scenes",
+        "poison": "world_storage_pilot_body",
+        "success": true,
+        "freshModules": 241
+      },
+      {
+        "mode": "all_wide_exact",
+        "entry": "actors/hauling_plan",
+        "poison": "world/salt_pilot_body",
+        "success": true,
+        "freshModules": 104
+      },
+      {
+        "mode": "all_wide_exact",
+        "entry": "actors/minors",
+        "poison": "actors/robots_pilot_body",
+        "success": true,
+        "freshModules": 139
+      },
+      {
+        "mode": "all_wide_exact",
+        "entry": "progression/scenes",
+        "poison": "world_storage_pilot_body",
+        "success": true,
+        "freshModules": 241
+      },
+      {
+        "mode": "all_wide_exact",
+        "entry": "game",
+        "poison": "world_storage_pilot_body",
+        "success": true,
+        "freshModules": 265
+      },
+      {
+        "mode": "all_wide",
+        "entry": "world/pile_batch",
+        "poison": "world/salt_pilot_body",
+        "success": true,
+        "freshModules": 80
+      },
+      {
+        "mode": "all_wide",
+        "entry": "actors/minors",
+        "poison": "actors/robots_pilot_body",
+        "success": true,
+        "freshModules": 139
+      },
+      {
+        "mode": "all_wide",
+        "entry": "progression/scenes",
+        "poison": "world_storage_pilot_body",
+        "success": true,
+        "freshModules": 241
+      }
+    ],
+    "exploratoryCompilerSha256": "ad7f75009948a575fd608d850328ec5199b51de1fdfbfb46e734a39de6d6ad1b",
+    "alternateSaltEdge": {
+      "consumer": "actors/hauling_plan",
+      "earlyDeclarations": 4,
+      "sameOriginalWasm": true,
+      "wasmSha": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+      "bytes": 2639228,
+      "poisonRemainderSucceeded": true
+    },
+    "initialCriticalEdges": {
+      "salt": {
+        "surface": "world/salt",
+        "consumer": "world/pile_batch",
+        "roots": [
+          "ensure_piles_into",
+          "put_stack_into",
+          "compact_stacks_into",
+          "Access",
+          "read_state",
+          "brick_height"
+        ],
+        "earlyLocalDeclarations": 43,
+        "remainingLocalDeclarations": 148,
+        "brokenRemainderProbeFreshModules": 80,
+        "originalPoisonDiagnostic": {
+          "filename": "/home/jacobt/src/gdev/src/world/salt.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 15,
+          "end": 15,
+          "message": "unknown value: missing_pilot_binding",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        },
+        "individuallyOriginalWasm": false,
+        "surfaceBytes": 11345,
+        "originalBytes": 76558
+      },
+      "robots": {
+        "surface": "actors/robots",
+        "consumer": "actors/minors",
+        "roots": [
+          "Haul",
+          "Hauling",
+          "Resident",
+          "Robot",
+          "arriving",
+          "center_y",
+          "displaced",
+          "housing",
+          "mesh",
+          "role_is_housed",
+          "steer",
+          "walk_material",
+          "yaw_rotation"
+        ],
+        "earlyLocalDeclarations": 11,
+        "remainingLocalDeclarations": 201,
+        "brokenRemainderProbeFreshModules": 138,
+        "originalPoisonDiagnostic": {
+          "filename": "/home/jacobt/src/gdev/src/actors/robots.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 15,
+          "end": 15,
+          "message": "unknown value: missing_pilot_binding",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        },
+        "individuallyOriginalWasm": true,
+        "surfaceBytes": 3226,
+        "originalBytes": 123383
+      },
+      "storage": {
+        "surface": "world_storage",
+        "consumer": "progression/scenes",
+        "roots": [
+          "hooks"
+        ],
+        "earlyLocalDeclarations": 17,
+        "remainingLocalDeclarations": 31,
+        "brokenRemainderProbeFreshModules": 241,
+        "originalPoisonDiagnostic": {
+          "filename": "/home/jacobt/src/gdev/src/world_storage.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 15,
+          "end": 15,
+          "message": "unknown value: missing_pilot_binding",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        },
+        "individuallyOriginalWasm": true,
+        "surfaceBytes": 19028,
+        "originalBytes": 70111
+      }
+    },
+    "earlyRootsOnFinalEdges": {
+      "world/salt": {
+        "consumer": "actors/hauling_plan",
+        "requested": [
+          "Stack",
+          "Stash",
+          "nearest_stack",
+          "nearest_stash",
+          "pile_index",
+          "stash_center"
+        ],
+        "localDeclarations": 4,
+        "remainingDeclarations": 187
+      },
+      "actors/robots": {
+        "consumer": "actors/minors",
+        "requested": [
+          "Haul",
+          "Hauling",
+          "Resident",
+          "Robot",
+          "arriving",
+          "center_y",
+          "displaced",
+          "housing",
+          "mesh",
+          "role_is_housed",
+          "steer",
+          "walk_material",
+          "yaw_rotation"
+        ],
+        "localDeclarations": 11,
+        "remainingDeclarations": 201
+      },
+      "world_storage": {
+        "consumer": "progression/scenes",
+        "requested": [
+          "hooks"
+        ],
+        "localDeclarations": 17,
+        "remainingDeclarations": 31
+      }
+    },
+    "patchSha256": "7ec83192447e273ebf79ecc6287512a38ed46336bf3693e072a7b774ffaf9b2c"
+  },
+  "declaredInputPilot": {
+    "patch": "2026-11-18-gdev-staging-interfaces-declared-input.patch.gz",
+    "producer": "world/salt",
+    "consumer": "actors/hauling_decisions",
+    "declaration": "stash_index: U32, target_for: Unit -> Maybe U32",
+    "result": "The planner builds with deliberately invalid salt. The original planner reports unknown_value in salt. The existing public choose, choose_target and nearest_stack entry points are preserved in a composing module.",
+    "consumerUnits": 103,
+    "mainUnits": 269,
+    "wasmBytes": 2639224,
+    "wasmSha256": "f085470d5bb7df34e191541497a078b81c6f0de669fe0bd812540a68ba4d94a7",
+    "shipping": false,
+    "patchSha256": "cff412f89722e8e2ec18cc41607c7ec3b89cd059c496550bc63c029e4ca38cf2",
+    "affectedPenResults": "The original and the declared-input pilot built both hauling_plan and scaling modules and produced identical outcomes on all 11 named tests, including one existing failure.",
+    "affectedPenTests": {
+      "passed": 10,
+      "existingFailures": 1
+    }
+  },
+  "worldHooksDeclaration": {
+    "result": "TypeLimit while building the declared record of callbacks over FrameAccess in the reference compiler. Reduced to one imported field. The real FrameAccess alone and a Hooks record over U32 compile. A synthetic 512-field U32 record with the same callback compiles.",
+    "minimalModule": "import * as buildings from \"game/buildings/buildings\"\ntype FrameAccess is data = $FrameAccess { building_pictures: buildings.PictureAccess }\ntype Hooks = { despawn: own FrameAccess -> U32 -> FrameAccess, reset_salt: own FrameAccess -> FrameAccess, stash_scene: own FrameAccess -> FrameAccess, restore_scene: own FrameAccess -> FrameAccess }\n",
+    "comparison": "Independent imported type declarations currently need bounded handling of real nested nominal types. These tests identify a reproducer, not which checker traversal exhausts its budget."
+  },
+  "qualification": {
+    "compilerGateSeconds": 285.946277817,
+    "compilerTests": {
+      "passed": 1087,
+      "failed": 0,
+      "ignored": 100
+    },
+    "wasmFixtures": 190,
+    "unchangedExistingWasmFixtures": 189,
+    "loweringFixtures": 212,
+    "direct": [
+      "writer",
+      "runtime"
+    ],
+    "gdevPen": {
+      "passed": 1220,
+      "failed": 108,
+      "modulesRun": 210
+    },
+    "inkPen": {
+      "passed": 280,
+      "failed": 0,
+      "modulesRun": 73
+    },
+    "replayFrames": 120,
+    "identicalReplayFiles": 242,
+    "identicalPngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "identicalFrameTraceSha256": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "perTestComparison": "All named Gdev and Ink outcomes matched the previous release, both on the shipping sources and on the nine-file interface pilot. pen check and pen codegen --check passed on both.",
+    "inspectedFrame": "640 × 480 Pen hardware frame from the shipping compiler with #run in the lighting field, matching the previous PNG and frame trace by SHA-256.",
+    "shippingSourceManifestDigest": "d36a2fbbd23c3c8f2bc04aa3b1526f39222fa5370671a92bc45d78c05b79586f",
+    "protocolCompilerIdentity": "fb7c23a202695e83623fac49381965ff5ad1a76cf305bb46eb3aaa0905288313",
+    "comparisonExecutable": "Fresh Gdev probes and the source-interface qualification used the same current release executable. The declared-input proof was also built with the previous release."
+  },
+  "reproduce": [
+    "Run deno run -A scripts/integration/time_gdev_staging.ts --compiler <binary> --gdev-root <pinned-gdev> --mode ordinary (or unused or reachable). Add --profile to see actual jobs.",
+    "For either experiment, decompress its patch and apply it to an archive of the specified Gdev revision, retaining the normal Ink and std import roots. For the ordinary source cut run scripts/integration/build_gdev.ts on that tree and the untouched tree in alternating order."
+  ],
+  "profiledShippingBuild": {
+    "method": "One separate fresh original Gdev build with trace and phase profiling enabled. Check includes worker-side lowering; phase timings do not measure parallel speedups. End-to-end throughput is reported from unprofiled runs.",
+    "totalMs": 1147.46,
+    "phasesMs": {
+      "other": 21.761,
+      "assets": 84.778,
+      "load": 19.302,
+      "lex": 29.775,
+      "parse": 163.107,
+      "check": 609.697,
+      "lower": 48.913,
+      "freeze": 0.0,
+      "validation": 0.0,
+      "backend": 142.274
+    },
+    "workerReplyBytes": 72858303,
+    "jobs": 269
+  },
+  "retainedLighting": {
+    "open": {
+      "buildMs": [
+        945.717,
+        920.969,
+        945.932
+      ],
+      "freshModules": [
+        269,
+        269,
+        269
+      ],
+      "cachedModules": [
+        0,
+        0,
+        0
+      ],
+      "medianMs": 945.72
+    },
+    "edit": {
+      "buildMs": [
+        291.209,
+        290.77,
+        297.558
+      ],
+      "freshModules": [
+        1,
+        1,
+        1
+      ],
+      "cachedModules": [
+        268,
+        268,
+        268
+      ],
+      "medianMs": 291.21
+    },
+    "reject": {
+      "buildMs": [
+        448.511,
+        421.816,
+        446.888
+      ],
+      "freshModules": [
+        null,
+        null,
+        null
+      ],
+      "cachedModules": [
+        null,
+        null,
+        null
+      ],
+      "medianMs": 446.89
+    },
+    "recover": {
+      "buildMs": [
+        314.233,
+        293.034,
+        303.579
+      ],
+      "freshModules": [
+        0,
+        0,
+        0
+      ],
+      "cachedModules": [
+        269,
+        269,
+        269
+      ],
+      "medianMs": 303.58
+    },
+    "revert": {
+      "buildMs": [
+        292.283,
+        283.145,
+        355.205
+      ],
+      "freshModules": [
+        1,
+        1,
+        1
+      ],
+      "cachedModules": [
+        268,
+        268,
+        268
+      ],
+      "medianMs": 292.28
+    }
+  },
+  "charts": [
+    "2026-11-18-gdev-staging-interfaces.png",
+    "2026-11-18-gdev-staging-interfaces.svg"
+  ]
+}

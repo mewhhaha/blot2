@@ -5,6 +5,17 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+Blot `d92d35ac` compiled the 46,109-line project in **938 ms** median over
+twelve fresh processes, about **49,100 lines/s**. A lighting edit took
+**291 ms** median. On the same sources, an unused `#run` fell from **1,938 to
+1,031 ms**. Using it for the actual lighting field took **1,015 ms** and
+emitted byte-identical Wasm. All 269 modules used the worker queue.
+[Measurements, compiler identities and probe inputs](../benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json)
+
+![Fresh Gdev compile times with ordinary and staged lighting](../benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.svg)
+
+### Earlier worker release
+
 Blot `20fed713` took **0.889 s** median on fresh Main and **268 ms**
 on a lighting preset edit in an open session. Each of six fresh builds checked
 all 269 modules, emitted the same 2,639,228 bytes and finished in 870–910 ms. Both defaults used Gdev `45748aba`, Ink `3f2e603`
@@ -67,25 +78,29 @@ and 1.50 s with sixteen on eight physical cores.
 [Worker scaling graph](../benchmarks/evidence/measurements/2026-11-18-gdev-multicore.svg)
 · [Source counts and raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-multicore.json)
 
-1. **Publish interfaces before checking bodies.** Start with `world_storage`,
-   `world/salt` and `actors/robots`. Make the types, effects, ownership and
-   constraints that callers observe available from the declaration. Keep local
-   inference. A model using measured per-module CPU takes 307 ms on eight
-   workers with today's imports, 225 ms with those three interfaces ready at
-   startup, and 138 ms with all interfaces ready. These are checker-only
-   estimates with free headers. Of 3,281 visible named functions, 2,923 omit
-   the result type. Measure a pilot before requiring annotations throughout.
-   [Rust's type collection and body checking](https://rustc-dev-guide.rust-lang.org/hir-typeck/summary.html)
-2. **Keep compile-time execution local to its dependencies.** Adding an unused
-   private `#run true` to one Gdev file reduced parallel checker jobs from 269
-   to zero and still emitted identical Wasm. Using it for the actual lighting
-   field instead reached a `storage_unsupported` diagnostic at Wasm emission.
-   Evaluate the required body and make its value available to consumers. The
-   other modules can continue independently.
+1. **Early interfaces.** The estimate of 307 → 225 ms for the eight-worker
+   checker assumed free headers for `world_storage`, `world/salt` and
+   `actors/robots`. In the source pilot, scenes, hauling plans and minors each
+   compiled with the corresponding producer remainder deliberately broken.
+   Complete builds checked all 272 modules. They took 938 → 928 ms across
+   twelve paired runs, winning seven with a 6 ms median within-pair gain.
+   The application retains its current layout. A second pilot passed the
+   hauling planner a declared U32 stash index and a lazy lookup. It compiled
+   with the entire salt producer broken. A declared callbacks record over
+   `FrameAccess` hit `TypeLimit` even after reducing it to one imported field.
+   This reproducer is a smaller target than adding result annotations to all
+   2,923 functions that currently omit them.
+   [Pilot inputs and results](../benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json)
+2. **Compile-time execution.** The direct backend folds supported pure scalar
+   `#run` and `#do` expressions from current Core. Imported scalar functions
+   and constants can run during compilation. A retained Boolean edit to an
+   imported constant rechecks one module and updates the staged result.
+   Quoted code and numeric proof validation still use the live checker.
 3. **Reduce work per line and parallelize the rest of the pipeline.** The
    checker alone used 1,101 ms of single-core CPU. At the throughput target,
    eight cores have 369 ms of CPU for the entire compile. Measure repeated
-   type resolution and the 72.9 MB of worker replies. Parse files independently
+   type resolution and the 72.9 MB of worker replies. A trace of the new
+   compiler spent 163 ms parsing and 142 ms in the Wasm backend. Parse files independently
    and reserve stable Wasm indices so workers can emit function bodies in
    parallel. [Go's per-function backend queue](https://go.dev/src/cmd/compile/internal/gc/compile.go)
 

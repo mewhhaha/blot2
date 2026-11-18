@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
+  "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns:xlink="http://www.w3.org/1999/xlink" width="612pt" height="277.2pt" viewBox="0 0 612 277.2" xmlns="http://www.w3.org/2000/svg" version="1.1">
+ <metadata>
+  <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+   <cc:Work>
+    <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+    <dc:format>image/svg+xml</dc:format>
+    <dc:creator>
+     <cc:Agent>
+      <dc:title>Matplotlib v3.11.2, https://matplotlib.org/</dc:title>
+     </cc:Agent>
+    </dc:creator>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <defs>
+  <style type="text/css">*{stroke-linejoin: round; stroke-linecap: butt}</style>
+ </defs>
+ <g id="figure_1">
+  <g id="patch_1">
+   <path d="M 0 277.2
+L 612 277.2
+L 612 0
+L 0 0
+z
+" style="fill: #fafaf8"/>
+  </g>
+  <g id="axes_1">
+   <g id="patch_2">
+    <path d="M 115.336959 234.199057
+L 608.99976 234.199057
+L 608.99976 27.917584
+L 115.336959 27.917584
+z
+" style="fill: #fafaf8"/>
+   </g>
+   <g id="matplotlib.axis_1">
+    <g id="xtick_1">
+     <g id="line2d_1">
+      <path d="M 115.336959 234.199057
+L 115.336959 27.917584
+" clip-path="url(#pb0dab4d94f)" style="fill: none; stroke: #b0b0b0; stroke-opacity: 0.13; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_2"/>
+     <g id="text_1">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="115.336959" y="250.556479" transform="rotate(-0 115.336959 250.556479)">0 s</text>
+     </g>
+    </g>
+    <g id="xtick_2">
+     <g id="line2d_3">
+      <path d="M 225.039803 234.199057
+L 225.039803 27.917584
+" clip-path="url(#pb0dab4d94f)" style="fill: none; stroke: #b0b0b0; stroke-opacity: 0.13; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_4"/>
+     <g id="text_2">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="225.039803" y="250.556479" transform="rotate(-0 225.039803 250.556479)">0.5 s</text>
+     </g>
+    </g>
+    <g id="xtick_3">
+     <g id="line2d_5">
+      <path d="M 334.742648 234.199057
+L 334.742648 27.917584
+" clip-path="url(#pb0dab4d94f)" style="fill: none; stroke: #b0b0b0; stroke-opacity: 0.13; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_6"/>
+     <g id="text_3">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="334.742648" y="250.556479" transform="rotate(-0 334.742648 250.556479)">1 s</text>
+     </g>
+    </g>
+    <g id="xtick_4">
+     <g id="line2d_7">
+      <path d="M 444.445493 234.199057
+L 444.445493 27.917584
+" clip-path="url(#pb0dab4d94f)" style="fill: none; stroke: #b0b0b0; stroke-opacity: 0.13; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_8"/>
+     <g id="text_4">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="444.445493" y="250.556479" transform="rotate(-0 444.445493 250.556479)">1.5 s</text>
+     </g>
+    </g>
+    <g id="xtick_5">
+     <g id="line2d_9">
+      <path d="M 554.148338 234.199057
+L 554.148338 27.917584
+" clip-path="url(#pb0dab4d94f)" style="fill: none; stroke: #b0b0b0; stroke-opacity: 0.13; stroke-width: 0.8; stroke-linecap: square"/>
+     </g>
+     <g id="line2d_10"/>
+     <g id="text_5">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: middle" x="554.148338" y="250.556479" transform="rotate(-0 554.148338 250.556479)">2 s</text>
+     </g>
+    </g>
+    <g id="text_6">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: middle; fill: #344a50" x="362.168359" y="272.037651" transform="rotate(-0 362.168359 272.037651)">Median of six fresh processes per successful build  ·  269 modules  ·  identical 2,639,228-byte Wasm</text>
+    </g>
+   </g>
+   <g id="matplotlib.axis_2">
+    <g id="ytick_1">
+     <g id="line2d_11"/>
+     <g id="text_7">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="107.336959" y="74.93473" transform="rotate(-0 107.336959 74.93473)">Ordinary Main</text>
+     </g>
+    </g>
+    <g id="ytick_2">
+     <g id="line2d_12"/>
+     <g id="text_8">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="107.336959" y="140.839354" transform="rotate(-0 107.336959 140.839354)">Unused #run</text>
+     </g>
+    </g>
+    <g id="ytick_3">
+     <g id="line2d_13"/>
+     <g id="text_9">
+      <text style="font-size: 11px; font-family: 'DejaVu Sans'; text-anchor: end" x="107.336959" y="206.743978" transform="rotate(-0 107.336959 206.743978)">Lighting uses #run</text>
+     </g>
+    </g>
+   </g>
+   <g id="patch_3">
+    <path d="M 115.336959 67.62512
+L 324.80357 67.62512
+L 324.80357 52.796579
+L 115.336959 52.796579
+z
+" clip-path="url(#pb0dab4d94f)" style="fill: #697786"/>
+   </g>
+   <g id="patch_4">
+    <path d="M 115.336959 88.714599
+L 329.878424 88.714599
+L 329.878424 73.886059
+L 115.336959 73.886059
+z
+" clip-path="url(#pb0dab4d94f)" style="fill: #127565"/>
+   </g>
+   <g id="patch_5">
+    <path d="M 115.336959 133.529744
+L 540.483751 133.529744
+L 540.483751 118.701203
+L 115.336959 118.701203
+z
+" clip-path="url(#pb0dab4d94f)" style="fill: #697786"/>
+   </g>
+   <g id="patch_6">
+    <path d="M 115.336959 154.619223
+L 341.636375 154.619223
+L 341.636375 139.790683
+L 115.336959 139.790683
+z
+" clip-path="url(#pb0dab4d94f)" style="fill: #127565"/>
+   </g>
+   <g id="patch_7">
+    <path d="M 115.336959 220.523847
+L 337.952553 220.523847
+L 337.952553 205.695307
+L 115.336959 205.695307
+z
+" clip-path="url(#pb0dab4d94f)" style="fill: #127565"/>
+   </g>
+   <g id="text_10">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #1a2c32" x="331.385741" y="62.808506" transform="rotate(-0 331.385741 62.808506)">0.955 s</text>
+   </g>
+   <g id="text_11">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #1a2c32" x="336.460595" y="83.897985" transform="rotate(-0 336.460595 83.897985)">0.978 s</text>
+   </g>
+   <g id="text_12">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #1a2c32" x="547.065922" y="128.71313" transform="rotate(-0 547.065922 128.71313)">1.938 s</text>
+   </g>
+   <g id="text_13">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #1a2c32" x="348.218546" y="149.802609" transform="rotate(-0 348.218546 149.802609)">1.031 s</text>
+   </g>
+   <g id="text_14">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #697786" x="121.260912" y="194.618144" transform="rotate(-0 121.260912 194.618144)">Wasm emission failed</text>
+   </g>
+   <g id="text_15">
+    <text style="font-size: 10px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #1a2c32" x="344.534724" y="215.707233" transform="rotate(-0 344.534724 215.707233)">1.015 s</text>
+   </g>
+   <g id="text_16">
+    <text style="font-weight: 700; font-size: 17px; font-family: 'DejaVu Sans'; text-anchor: start; fill: #172c32" x="115.336959" y="15.917584" transform="rotate(-0 115.336959 15.917584)">Fresh Gdev compile with eight workers</text>
+   </g>
+   <g id="legend_1">
+    <g id="patch_8">
+     <path d="M 396.394448 42.856177
+L 408.094448 42.856177
+L 408.094448 36.556177
+L 396.394448 36.556177
+z
+" style="fill: #697786"/>
+    </g>
+    <g id="text_17">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="415.294448" y="42.856177" transform="rotate(-0 415.294448 42.856177)">Previous compiler</text>
+    </g>
+    <g id="patch_9">
+     <path d="M 506.16351 42.856177
+L 517.86351 42.856177
+L 517.86351 36.556177
+L 506.16351 36.556177
+z
+" style="fill: #127565"/>
+    </g>
+    <g id="text_18">
+     <text style="font-size: 9px; font-family: 'DejaVu Sans'; text-anchor: start" x="525.06351" y="42.856177" transform="rotate(-0 525.06351 42.856177)">Current compiler</text>
+    </g>
+   </g>
+  </g>
+ </g>
+ <defs>
+  <clipPath id="pb0dab4d94f">
+   <rect x="115.336959" y="27.917584" width="493.662801" height="206.281473"/>
+  </clipPath>
+ </defs>
+</svg>

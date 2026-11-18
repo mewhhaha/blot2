@@ -6,13 +6,14 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `20fed713`, with Gdev `45748aba`, Ink
-`3f2e603` and Pen `ad9766c`. Fresh Main fell from **1.691 s to 0.889 s**
-on the same sources. All six fresh processes finished in 870–910 ms,
-checking all 269 modules and emitting the same 2,639,228 bytes. A lighting
-preset edit in an open session took **268 ms** and rechecked one
-module. A public function-body edit rechecked 72 modules.
-[Measurements](benchmarks/evidence/measurements/2026-11-18-gdev-compiler-workers.json) · [Compiler work](tasks/FAST_COMPILE.md)
+The qualified compiler is Blot `d92d35ac`, with Gdev `45748aba`, Ink
+`3f2e603` and Pen `ad9766c`. Fresh Main took **938 ms** median over twelve
+ordinary builds. A lighting preset edit rechecked one module in **291 ms**.
+Putting `#run true` in the actual lighting preset now uses all 269 module
+jobs and emits the original 2,639,228 Wasm bytes. That build took **1.015 s**
+median over six fresh processes. The three proposed early interfaces gained
+6 ms in the median paired build and remain experimental.
+[Measurements and pilot patches](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -21,7 +22,7 @@ module. A public function-body edit rechecked 72 modules.
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 189 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,085 guest and host tests passed, 100 ignored |
+| Compiler | | 190 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,087 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108
