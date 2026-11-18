@@ -1367,6 +1367,46 @@
    "wasm_bytes": 3764,
    "wasm_sha256": "699c40f58e3fb24b1ea1737cd0bdf09955f565efcf17d678ff1b329883f58cda"
   },
+  "direct/branch_appends.blot": {
+   "exit": 0,
+   "records": [
+    {
+     "body_elaborations": 160,
+     "body_lowerings": 160,
+     "check_occurs_steps": 1709,
+     "checker": {
+      "associated_steps": 0,
+      "inference_steps": 3077,
+      "instantiations": 239,
+      "memo_declined": 0,
+      "memo_hits": 7,
+      "memo_misses": 13,
+      "obligations_appended": 69,
+      "pending_peak": 57,
+      "projection_memo_hits": 0,
+      "shared_uses": 26,
+      "use_expansions": 23
+     },
+     "core_nodes": 970,
+     "effect_rows": 2762,
+     "emitted_functions": 22,
+     "filename": "direct/branch_appends.blot",
+     "files": 2,
+     "imported_schemes": 29,
+     "kind": "compilation",
+     "row_versions": 488,
+     "source_bytes": 15226,
+     "stage": "build-project",
+     "success": true,
+     "syntax_nodes": 2149,
+     "type_nodes": 5391,
+     "type_versions": 834,
+     "wasm_bytes": 2452
+    }
+   ],
+   "wasm_bytes": 2452,
+   "wasm_sha256": "b19a27c05b137602f768df50e88162602d3b8711dd0a6a077fb0033c7c58b3d2"
+  },
   "direct/calls.blot": {
    "exit": 0,
    "records": [

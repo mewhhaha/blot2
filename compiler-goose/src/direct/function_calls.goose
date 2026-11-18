@@ -514,6 +514,41 @@ recursive fn aliasType(g: Generator&, f: Fn&, use: u32, id: u32, depth: u32) -> 
     }
     return 0, false, blot_direct_types::Error.none;
 }
+// Follow the version a loop gives to its next iteration. Only a terminal
+// rebinding in an actual arm may count as a use of the old list. Conditions,
+// guards, item expressions and earlier statements still count as ordinary
+// references. A statement case lowers to nested two-arm matches.
+recursive fn terminalAppends(m: const Module&, suite: u32, incoming: u32, outgoing: u32, depth: i64) -> u32 {
+    if incoming == 0 || incoming == outgoing || suite == 0 || depth >= 64 { return 0; }
+    if m.node(suite).tag != blot_check_core::Tag.suite { return 0; }
+    let statements = m.children(suite);
+    if statements.len == 0 { return 0; }
+    let id = statements[statements.len - 1];
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.bind {
+        if n.a != outgoing || n.c != 1 { return 0; }
+        if m.node(n.b).tag != blot_check_core::Tag.array_op || m.arrayOperation(n.b) != blot_backend_collection_ops::Op.append { return 0; }
+        let args = m.children(n.b);
+        if args.len == 2 && localRef(m, args[0]) == incoming { return 1; }
+        return 0;
+    }
+    var yes: u32 = 0;
+    var no: u32 = 0;
+    if n.tag == blot_check_core::Tag.if_stmt { yes = n.b; no = n.c; }
+    else if n.tag == blot_check_core::Tag.match_ && m.matchInfo(id).statement {
+        let arms = m.matchArms(id);
+        if arms.len != 2 { return 0; }
+        yes = arms[0].body;
+        no = arms[1].body;
+    } else { return 0; }
+    for merge in m.branchMerges(id) {
+        if merge.result == outgoing {
+            return terminalAppends(m, yes, incoming, merge.then_binding, depth + 1)
+                 + terminalAppends(m, no, incoming, merge.else_binding, depth + 1);
+        }
+    }
+    return 0;
+}
 // References to local `binding` in this unit, counted once. A loop exit
 // (`break_`) carrying a version is on a path exclusive with any later
 // rebinding of it, so it does not count.
@@ -534,6 +569,18 @@ fn uses(g: Generator&, f: const Fn&, binding: u32) -> u32 {
             let key = blot_direct_emit::key64(m.unit, target.binding);
             let count, counted = g.s.use_counts.get(key);
             g.s.use_counts.put(key, count + 1);
+        }
+        // Each arm hands its successor to the same carry, so only one of
+        // these receivers can run before the old version is replaced.
+        for loop_ in m.loops {
+            for carry in m.loop_carries[loop_.carries.start..loop_.carries.start + loop_.carries.len] {
+                let key = blot_direct_emit::key64(m.unit, carry.iteration);
+                let count, found = g.s.use_counts.get(key);
+                if !found || count < 2 || m.types.node(m.binding(carry.iteration).ty).tag != blot_check_types::Tag.list { continue; }
+                if terminalAppends(m, loop_.body, carry.iteration, carry.backedge, 0) == count {
+                    g.s.use_counts.put(key, 1);
+                }
+            }
         }
     }
     let count, counted = g.s.use_counts.get(blot_direct_emit::key64(m.unit, binding));
