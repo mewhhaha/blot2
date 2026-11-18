@@ -7,6 +7,8 @@ import support.error;
 
 fn main() {
     functionUnification();
+    assert(selectionUnification(false)==blot_error::Error.type_limit);
+    assert(selectionUnification(true)==blot_error::Error.type_limit);
     let ok=blot_error::Error.none;
     var store,init_error=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true,..});
     assert(init_error==ok);
@@ -101,4 +103,30 @@ fn functionUnification() {
     assert(store.effects.versions.len==mark.effects.versions && store.cursor()==mark.effects.next_position);
     let retained,e3=store.resolveEffects(tail,0);assert(e3==ok && retained==tail);
     store.deinit();
+}
+
+// Selection interning matches scope identities. A shallow type may resolve to an
+// older representative with a deep descriptor, and selection has its own node cap.
+fn selectionUnification(fill_store:bool)->blot_error::Error {
+    let ok=blot_error::Error.none;let unit=blot_check_types::unit;let never=blot_check_types::never;
+    var s,init=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true,..});assert(init==ok);
+    let a=blot_check_types::NominalIdentity{1,1};let b=blot_check_types::NominalIdentity{1,2};
+    let sel=blot_check_types::NominalIdentity{2,1};
+    var descriptor=unit;
+    if !fill_store {for i in 0..1025 {let next,ne=s.sequence(blot_check_types::Tag.array,descriptor);assert(ne==ok);descriptor=next;}}
+    let known,ke=s.scoped(descriptor,a);let other,oe=s.scoped(unit,b);assert(ke==ok && oe==ok);
+    let first,fe=s.instanceSelection(sel,[known,other]);assert(fe==ok);
+    let cap,ce=s.fresh();assert(ce==ok);
+    let dynamic,de=s.scoped(unit,blot_check_types::NominalIdentity{0,cap});assert(de==ok);
+    let proposal,pe=s.instanceSelection(sel,[dynamic,other]);assert(pe==ok && proposal!=first);
+    let fixed,xe=s.scoped(unit,a);assert(xe==ok && s.appendVersion(cap,fixed)==ok);
+    var left_arg=proposal;var right_arg=never;
+    if fill_store {
+        let x,te=s.fresh();assert(te==ok && s.appendVersion(x,never)==ok);
+        left_arg=x;right_arg=proposal;
+    }
+    let left,le=s.function(left_arg,unit);let right,re=s.function(right_arg,unit);assert(le==ok && re==ok);
+    if fill_store {while s.nodes.len<65535 {let unused,ue=s.function(unit,unit);assert(ue==ok);}}
+    let result=s.unify(left,right);
+    s.deinit();return result;
 }
