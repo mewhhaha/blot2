@@ -27,7 +27,7 @@ deno run -A benchmarks/language/staged_catalog.ts
 
 ### Reusing emitted function bodies after a scalar edit
 
-The shipping compiler compiled Gdev Main in **879 ms** and rebuilt the lighting
+The earlier full-emission compiler compiled Gdev Main in **879 ms** and rebuilt the lighting
 preset in **270 ms** median over six unprofiled sessions. Six separate profiles
 put loading at 109 ms and the backend at 126 ms on the edit. The following
 experiment starts with the previous emitter state and the two decoded Core
@@ -66,11 +66,34 @@ median and **15.7 ms** p95. The parent’s RSS rose 2.5 MiB while receiving the
 images. Both Core catalogs were already resident in this experiment. Both soak
 tests checked every image against the matching release build.
 
-The running project server still uses full emission. Integrate snapshot
-ownership at its successful revision commit and compare cumulative edits
-against the baseline so successive changes in a staged branch use current
-values. Measure source loading, Core transfer and delivery through the normal
-client before making an end-to-end speed claim.
+The project server now reuses the last committed Wasm image for fixed-width
+scalar edits. Changing Gdev’s lighting preset updated one operand. Time from
+the edit request to receipt of the complete **2,639,648-byte** image fell
+from **229.7 to 121.9 ms** median in eight alternating pairs.
+Fresh session builds took **750.5 and 764.0 ms** respectively. All
+14 transitions matched an independent fresh build or its rejection. Structural
+edits, changed staged reads and changes in encoded width use full emission.
+
+The writer records ordinary scalar operands as it emits them. It accounts for
+insertions at loop entry and keeps only the final version of a body emitted
+during type inference. The session compares newly checked Core against the last
+committed revision and passes through previously checked units. A changed
+literal that was read by `#run`, an unaccounted literal, or a different code
+shape causes a full build and a replacement table. Projects with declared
+compile-time file inputs continue to use their existing asset read-set logic.
+A failed edit preserves the previous image, its table and its revision.
+
+The candidate won all eight edit pairs and one of eight fresh pairs.
+In two separately profiled sessions per compiler, backend time on the edit fell
+from 108.36 to 0.76 ms. Loading the project took 92.89 ms on the candidate.
+The next experiment is to retain parsed files across edit requests while
+checking for changed imports, overlays and on-disk edits.
+
+![Gdev session build times](../benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.png)
+
+The named compiler, Gdev and Ink checks preserved their reference outcomes.
+The Main image, 120-frame replay and inspected hardware frame also matched.
+[Paired timings and qualification](../benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json) · [Runnable edit comparison](../benchmarks/tools/bench_body_edits.ts)
 
 ### Verified arrays in worker packets
 

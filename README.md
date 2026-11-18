@@ -17,11 +17,15 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Fresh Gdev Main builds took **793.4 ms** median across eight pairs with
-eight frontend slots. The previous compiler took 794.7 ms on the same
-270 modules. Both produced identical Wasm (2,639,648 bytes). A Gdev intent
-benchmark that appends inside two case arms now builds its list in
-**21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms) · [Fresh-build samples](benchmarks/evidence/measurements/2026-11-18-exclusive-appends.json)
+Editing Gdev’s lighting preset now returns the complete Wasm in **121.9 ms**,
+down from **229.7 ms** across eight paired sessions. Fresh builds took
+**764.0 ms** median and emitted the same 2,639,648 bytes.
+[Session benchmarks and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.json)
+
+![Fresh and edited Gdev Main builds](benchmarks/evidence/measurements/2026-11-18-gdev-session-relocations.png)
+
+The Gdev intent benchmark that appends inside two case arms builds its list in
+**21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms)
 
 An earlier 269-module snapshot compiled 46,109 lines in 886.0 ms median
 across 40 fresh builds on a lightly loaded host, down from 916.8 ms.
@@ -34,7 +38,7 @@ those two windows and showed no consistent speedup.
 
 A retained-backend experiment reduced Wasm emission for a lighting edit from
 **111.2 ms to 2.1 ms**. It re-emitted one of 6,859 function bodies and
-reassembled Main. The shipping compiler took **270 ms end to end** on that edit.
+reassembled Main. The full-emission compiler in that experiment took **270 ms end to end** on that edit.
 [Retained backend measurements](benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.json)
 
 ![Gdev backend time after four edits](benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.svg)
