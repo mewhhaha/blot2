@@ -1,0 +1,218 @@
+{
+  "date": "2026-11-18",
+  "baselineGit": "f1e755a48e1722e649fbaafe4767d81864ce1989",
+  "compilerGit": "3476218dac0cfd17d259923fc750e80aeeb4a5f7",
+  "sources": {
+    "gdev": "45748aba053befae1e62e59ed0b4ea0f0e0113cc",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "workload": {
+    "physicalLines": 46109,
+    "modules": 269,
+    "wasmBytes": 2639228,
+    "wasmSha256": "c151554930880a097ff95cd2a487853d11cc84fcbdca9e89209e2fbb1d48ffaa",
+    "host": "cachyos-x8664",
+    "hardware": "AMD Ryzen 7 3800X, 8 cores, 16 hardware threads"
+  },
+  "binarySha256": {
+    "release": "6070336a083d8188d91bcb339ee410c78846a93b98a382c59027709097b2acef",
+    "probe": "5587f8b2fd951e4098eccc4c72d8f9fe4266b20433ebacadc538ee2179cea0e6",
+    "stockControl": "733d726993e1398a92fd5d3c7a28e7620d4e287b968a91429b807ce065e00144",
+    "capture": "5b5e7c622c1cf1d23e33237cf349c9adabb84a8268f729ac14f5f829b9581fbf",
+    "unitOnly": "b11cce4a37ede98f4de30fe36d95414954c47426fd86ef580eb0dd5433e47b56"
+  },
+  "releaseMs": {
+    "fresh": {
+      "wallMs": 878.994,
+      "backendMs": 130.73,
+      "loadMs": 83.066,
+      "wallRuns": 6,
+      "profileRuns": 6
+    },
+    "edit": {
+      "wallMs": 269.573,
+      "backendMs": 125.626,
+      "loadMs": 109.266,
+      "wallRuns": 6,
+      "profileRuns": 6
+    }
+  },
+  "backendMs": {
+    "boolean": {
+      "rounds": 12,
+      "fullMs": 111.152,
+      "retainedMs": 2.091,
+      "medianPairedSavingMs": 109.117,
+      "wins": 12,
+      "initialStockMs": 109.926,
+      "initialTrackingMs": 116.286
+    },
+    "shape": {
+      "rounds": 12,
+      "fullMs": 110.046,
+      "retainedMs": 114.396,
+      "medianPairedSavingMs": -2.673,
+      "wins": 5,
+      "initialStockMs": 111.188,
+      "initialTrackingMs": 115.116
+    },
+    "staged-provider": {
+      "rounds": 12,
+      "fullMs": 110.277,
+      "retainedMs": 2.726,
+      "medianPairedSavingMs": 107.552,
+      "wins": 12,
+      "initialStockMs": 113.141,
+      "initialTrackingMs": 116.021
+    },
+    "reachable-integer-width": {
+      "rounds": 12,
+      "fullMs": 107.894,
+      "retainedMs": 2.1,
+      "medianPairedSavingMs": 105.853,
+      "wins": 12,
+      "initialStockMs": 111.678,
+      "initialTrackingMs": 116.126
+    }
+  },
+  "cases": {
+    "boolean": {
+      "bodies": 1,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "integer": {
+      "bodies": 0,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": false
+    },
+    "width": {
+      "bodies": 0,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": false
+    },
+    "float": {
+      "bodies": 0,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": false
+    },
+    "call": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 1,
+      "wasmChanged": false
+    },
+    "shape": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "phase": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "helper": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 192,
+      "wasmChanged": true
+    },
+    "entry": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "staged-provider": {
+      "bodies": 1,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "reverse": {
+      "bodies": 0,
+      "accepted": false,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "reachable-integer-width": {
+      "bodies": 1,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "reachable-float": {
+      "bodies": 1,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    },
+    "undo": {
+      "bodies": 1,
+      "accepted": true,
+      "dirtyUnits": 1,
+      "wasmChanged": true
+    }
+  },
+  "qualification": {
+    "transitions": 14,
+    "admitted": 8,
+    "fallback": 6,
+    "allMatch": true,
+    "releaseSourceModified": false,
+    "verifiedFreshOverlays": 14,
+    "distinctFreshWasmHashes": 10
+  },
+  "soak": {
+    "revisions": 512,
+    "moduleBytesAdded": 30208,
+    "temporaryValuesAdded": 4096,
+    "temporaryWordsAdded": 7680,
+    "residentBytesAdded": 4349952
+  },
+  "immutableSnapshot": {
+    "revisions": 512,
+    "medianMs": 12.935,
+    "p95Ms": 15.746,
+    "moduleBytesAdded": 0,
+    "temporaryValuesAdded": 0,
+    "temporaryWordsAdded": 0,
+    "residentBytesAdded": 2646016,
+    "responseBytes": 2639228
+  },
+  "index": {
+    "lightingReads": 41436,
+    "reservedBytes": 786432
+  },
+  "method": "Release times include project open for fresh builds and complete bytes after one successful build for edits. Standalone backend times start from decoded resident Core with dirty-unit flags and warmed prior emitter state. They include validating changed modules, finding recorded readers, re-emission and complete Wasm assembly or full fallback. Workload capture, initial state construction and output verification are outside the retained timer. Independent control and probe processes alternate order. Snapshot round trips also include fork, a complete pipe reply and waiting for child exit; both Core catalogs are resident at fork. The standalone probe omits project-server ownership, updates to the retained frontend, and Deno delivery. All measurements use warm filesystem pages.",
+  "reproducer": "2026-11-18-gdev-body-reuse-probes.tar.gz",
+  "raw": "2026-11-18-gdev-body-reuse.raw.json.gz"
+}

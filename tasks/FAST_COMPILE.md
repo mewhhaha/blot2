@@ -5,6 +5,53 @@ measures a fresh process from project session open to receipt of complete Wasm.
 
 ## Gdev Main, 18 November 2026
 
+### Reusing emitted function bodies after a scalar edit
+
+The shipping compiler compiled Gdev Main in **879 ms** and rebuilt the lighting
+preset in **270 ms** median over six unprofiled sessions. Six separate profiles
+put loading at 109 ms and the backend at 126 ms on the edit. The following
+experiment starts with the previous emitter state and the two decoded Core
+catalogs. Each run returns a complete Wasm image.
+
+| Source edit | Stock backend | Prototype | Functions re-emitted on the reuse path |
+| --- | ---: | ---: | ---: |
+| Lighting preset | 111.2 ms | 2.1 ms | 1 |
+| Imported `#run` constant | 110.3 ms | 2.7 ms | 1 |
+| Integer literal crosses a signed LEB128 width boundary | 107.9 ms | 2.1 ms | 1 |
+| Replacing a literal with an expression | 110.0 ms | 114.4 ms | Full fallback |
+
+![Time to emit Gdev Wasm after four edits](../benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.svg)
+
+The compiler records the Core literals consumed by each emitted function,
+including reads made while evaluating `#run` in another module. The prototype
+compares the changed modules’ portable fields and accepts changes to scalar
+values and source positions. It recompiles the affected instances in their
+original type-inference mode and assembles the module with the existing Wasm
+writer. Other structural changes use the whole backend. At the lighting
+baseline, 41,436 recorded reads reserved 768 KiB. Initial backend construction
+in that window took 116.3 ms with tracking and 109.9 ms in the stock control.
+
+All 14 transitions matched independently compiled release Wasm. Eight used the
+reuse path, including three edits to unreachable code that required zero bodies.
+The six structural fallbacks also matched. Selecting bodies solely by their
+source module missed a staged caller in another module. The edit comparisons,
+raw records, exact inputs and runnable probe are in the evidence bundle.
+[Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.json) · [Raw trials](../benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.raw.json.gz) · [Reproducer](../benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse-probes.tar.gz)
+
+Over 512 alternating lighting edits, mutating the same generator appended
+30,208 bytes of body storage, 4,096 temporary values and 7,680 words. Forking
+from an immutable baseline kept those three counts fixed. Fork, re-emission,
+assembly, transfer of the 2,639,228-byte image and child exit took **12.9 ms**
+median and **15.7 ms** p95. The parent’s RSS rose 2.5 MiB while receiving the
+images. Both Core catalogs were already resident in this experiment. Both soak
+tests checked every image against the matching release build.
+
+The running project server still uses full emission. Integrate snapshot
+ownership at its successful revision commit and compare cumulative edits
+against the baseline so successive changes in a staged branch use current
+values. Measure source loading, Core transfer and delivery through the normal
+client before making an end-to-end speed claim.
+
 ### Verified arrays in worker packets
 
 Tracing the previous compiler on Gdev located slow field-by-field serialization
@@ -58,8 +105,7 @@ In six separately profiled lighting edits under contention, project loading
 took 164 ms and the backend took 216 ms. Checking took just 3.5 ms and never
 dispatched a worker. The edit changed only the code section, and only the
 59-byte body at defined-function ordinal 98. All other 6,858 bodies matched
-byte for byte at the same ordinal. Next, test reusing unaffected function
-bodies across edits and compare the emitted Wasm with a fresh compile.
+byte for byte at the same ordinal. The [body reuse experiment](#reusing-emitted-function-bodies-after-a-scalar-edit) tests this observation against fresh compilation.
 [Measurements](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.json)
 · [Raw trials and record hashes](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.raw.json.gz)
 · [Packet capture and replay tools](../benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables-probes.tar.gz)

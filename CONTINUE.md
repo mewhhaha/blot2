@@ -21,11 +21,19 @@ checker replies fell from 72,858,303 to 71,856,423 bytes. The full compiler
 gate, named Gdev and Ink outcomes, 120-frame replay and inspected frame
 qualified the release.
 
-A lighting edit changed **one of 6,859 Wasm function bodies**. The compiler
-rechecked one module and dispatched zero checker jobs. Under contention the
-backend took 216 ms and project loading took 164 ms. Next, test reusing
-unchanged function bodies and compare the whole result with a fresh build.
-[Measurements and reproducers](benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.json) · [Compiler work](tasks/FAST_COMPILE.md)
+Gdev’s lighting edit changes one of 6,859 Wasm bodies. A standalone backend
+prototype re-emitted that body and assembled Main in **2.1 ms**, down from
+**111.2 ms** for full emission. It reproduced fresh release bytes for all 14
+edit transitions, including an imported `#run` change and six full fallbacks.
+On the shipping compiler the same edit took **269.6 ms end to end**, including
+a separately profiled 125.6 ms in the backend and 109.3 ms loading the project.
+
+An immutable emitter snapshot returned all 2,639,228 bytes through a pipe in
+**12.9 ms** median across 512 alternating edits. Next, give the project server
+ownership of a snapshot for its last structural revision, compare cumulative
+edits with that revision, and time complete session builds. Qualify rejected
+edits, changed compile-time branches and snapshot replacement before enabling it.
+[Body reuse experiment](benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 

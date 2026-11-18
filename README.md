@@ -27,6 +27,13 @@ A fresh build checks 269 modules with eight worker slots and produces 2,639,228 
 
 ![Worker packet transfers and Gdev compile times](benchmarks/evidence/measurements/2026-11-18-gdev-worker-tables.svg)
 
+A retained-backend experiment reduced Wasm emission for a lighting edit from
+**111.2 ms to 2.1 ms**. It re-emitted one of 6,859 function bodies and
+reassembled Main. The shipping compiler took **270 ms end to end** on that edit.
+[Retained backend measurements](benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.json)
+
+![Gdev backend time after four edits](benchmarks/evidence/measurements/2026-11-18-gdev-body-reuse.svg)
+
 An earlier compiler took **938 ms** for ordinary lighting and **1,015 ms** for
 `#run true` in the same field. Both produced identical Wasm.
 [Compile-time execution benchmark](benchmarks/evidence/measurements/2026-11-18-gdev-staging-interfaces.json)
