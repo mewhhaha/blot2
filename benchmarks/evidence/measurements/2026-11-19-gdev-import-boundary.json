@@ -1,0 +1,1371 @@
+{
+  "date": "2026-11-19",
+  "baselineBlot": "15b7c447c106587a7f92acb182ec74b835e2a876",
+  "candidateBlot": "c3001b52e6df7b826ec3462f556d5a510bbdd962",
+  "projects": {
+    "gdev": "73b4b2c79928f4c1fe84e1f835f5c8420e838510",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "toolchain": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "method": "Eight counterbalanced rounds of four compiler/source combinations. Fresh includes opening the session. Each edit starts from the same base source. Odd rounds rename before the storage edit and even rounds change lighting first, with a revert between edits. Timing stops at receipt of the complete Wasm before hashing. Every image matches an independent fresh build of its own source. For the original layout only entry and storage are overlaid from the pinned Gdev revision.",
+  "edits": {
+    "rename": "Rename host to renamed_host on the imported session runner, changing neither Wasm nor behavior.",
+    "storage": "Increase the scene history capacity from 64 to 65 inside world_storage. The resulting image must change.",
+    "lighting": "Set proposed.sun to false. The resulting image must change."
+  },
+  "medians": {
+    "original": {
+      "previous": {
+        "rename": {
+          "medianMs": 215.4,
+          "checked": 6
+        },
+        "storage": {
+          "medianMs": 182.4,
+          "checked": 4
+        },
+        "lighting": {
+          "medianMs": 40.0,
+          "checked": 1
+        },
+        "fresh": {
+          "medianMs": 868.6,
+          "checked": 270
+        }
+      },
+      "candidate": {
+        "rename": {
+          "medianMs": 222.7,
+          "checked": 6
+        },
+        "storage": {
+          "medianMs": 137.1,
+          "checked": [
+            1,
+            4
+          ]
+        },
+        "lighting": {
+          "medianMs": 38.7,
+          "checked": 1
+        },
+        "fresh": {
+          "medianMs": 870.9,
+          "checked": 270
+        }
+      }
+    },
+    "session": {
+      "previous": {
+        "rename": {
+          "medianMs": 66.6,
+          "checked": 2
+        },
+        "storage": {
+          "medianMs": 189.4,
+          "checked": 5
+        },
+        "lighting": {
+          "medianMs": 40.2,
+          "checked": 1
+        },
+        "fresh": {
+          "medianMs": 877.7,
+          "checked": 271
+        }
+      },
+      "candidate": {
+        "rename": {
+          "medianMs": 69.1,
+          "checked": 2
+        },
+        "storage": {
+          "medianMs": 92.2,
+          "checked": 1
+        },
+        "lighting": {
+          "medianMs": 39.4,
+          "checked": 1
+        },
+        "fresh": {
+          "medianMs": 872.9,
+          "checked": 271
+        }
+      }
+    }
+  },
+  "measurements": {
+    "previousGdev": "0e0d7726ffb90ecfce16e31a2321ee2f9815f7fa",
+    "sourceFiles": [
+      {
+        "layout": "original",
+        "sha256": {
+          "src/main.blot": "4465e5e9b27a685a0a26d8361875db04b8aca2f89849d963a5c3387c0efe66d2",
+          "src/world_storage.blot": "f766be72c7e801c72b80ad3d2e4fb8528a388b364248367627e240a05d660bd8"
+        }
+      },
+      {
+        "layout": "session",
+        "sha256": {
+          "src/main.blot": "e1ec214ec0f698e0ada6aff4d0a0ef76bbfa2abffb3497a282227b0a97884b8f",
+          "src/world_storage.blot": "d8cdd7d73911bde472d94ef910018092586eb57cf4fa0188b4a31edea74833c0",
+          "src/session.blot": "9f09fa069cae06c2aed88d179a354379407b0391551fc2d418cb3d0ab241c647"
+        }
+      }
+    ],
+    "candidateGdev": "73b4b2c79928f4c1fe84e1f835f5c8420e838510",
+    "compilerSha256": [
+      "828754352bb89879b362655bfc29cb805b187e076a1f5b54c808694a374f31a6",
+      "b4f7c3a6897d39894061c88ce7bb8d0a7bf9f836d426475c17d3fae0c89fe280"
+    ],
+    "frontendWorkers": 8,
+    "oracles": [
+      {
+        "base": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "rename": "91cc73ab2edccf78a1ef91bfc68284bcf2eca60ad6ed4ea9a5212a4d5129d8ae",
+        "storage": "3c1817940fa822f46b5cb4dfbce650324321620e7af90f028b5fb3c13c733407",
+        "lighting": "25d0a679942757d17ccbfa9ad3f257e146dcc516be8f8cac577b6c600e404c90"
+      },
+      {
+        "base": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "rename": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "storage": "380d7464d1f147c27111111bd2c33fd33441c042ca521befd90c24ae03eab90a",
+        "lighting": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60"
+      }
+    ]
+  },
+  "trials": [
+    {
+      "round": 1,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 899.85,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 226.19,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 185.27,
+        "checked": 4
+      },
+      "lighting": {
+        "ms": 39.01,
+        "checked": 1
+      }
+    },
+    {
+      "round": 1,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 868.86,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 220.74,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 86.99,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 35.37,
+        "checked": 1
+      }
+    },
+    {
+      "round": 1,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 865.21,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 68.77,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 87.42,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 38.1,
+        "checked": 1
+      }
+    },
+    {
+      "round": 1,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 864.22,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 69.39,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 191.94,
+        "checked": 5
+      },
+      "lighting": {
+        "ms": 39.52,
+        "checked": 1
+      }
+    },
+    {
+      "round": 2,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 902.63,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 40.84,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 195.96,
+        "checked": 5
+      },
+      "rename": {
+        "ms": 66.68,
+        "checked": 2
+      }
+    },
+    {
+      "round": 2,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 887.14,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 40.35,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 91.56,
+        "checked": 1
+      },
+      "rename": {
+        "ms": 72.96,
+        "checked": 2
+      }
+    },
+    {
+      "round": 2,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 872.29,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 42.15,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 189.09,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 215.61,
+        "checked": 6
+      }
+    },
+    {
+      "round": 2,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 860.37,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 40.18,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 179.54,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 207.74,
+        "checked": 6
+      }
+    },
+    {
+      "round": 3,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 848.39,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 231.63,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 95.86,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 37.28,
+        "checked": 1
+      }
+    },
+    {
+      "round": 3,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 874.46,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 68.17,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 96.05,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 41.48,
+        "checked": 1
+      }
+    },
+    {
+      "round": 3,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 900.34,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 66.49,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 187.91,
+        "checked": 5
+      },
+      "lighting": {
+        "ms": 36.26,
+        "checked": 1
+      }
+    },
+    {
+      "round": 3,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 857.14,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 232.79,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 174.06,
+        "checked": 4
+      },
+      "lighting": {
+        "ms": 36.18,
+        "checked": 1
+      }
+    },
+    {
+      "round": 4,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 895.01,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 47.7,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 96.32,
+        "checked": 1
+      },
+      "rename": {
+        "ms": 69.48,
+        "checked": 2
+      }
+    },
+    {
+      "round": 4,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 875.84,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 41.8,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 182.13,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 312.29,
+        "checked": 6
+      }
+    },
+    {
+      "round": 4,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 1300.31,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 62.75,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 227.09,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 206.62,
+        "checked": 6
+      }
+    },
+    {
+      "round": 4,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 877.38,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 41.45,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 185.96,
+        "checked": 5
+      },
+      "rename": {
+        "ms": 62.21,
+        "checked": 2
+      }
+    },
+    {
+      "round": 5,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 861.95,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 75.98,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 92.81,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 35.9,
+        "checked": 1
+      }
+    },
+    {
+      "round": 5,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 875.61,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 68.99,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 192.15,
+        "checked": 5
+      },
+      "lighting": {
+        "ms": 42.16,
+        "checked": 1
+      }
+    },
+    {
+      "round": 5,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 915.68,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 229.63,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 171.9,
+        "checked": 4
+      },
+      "lighting": {
+        "ms": 40.61,
+        "checked": 1
+      }
+    },
+    {
+      "round": 5,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 871.86,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 226.03,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 87.45,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 36.33,
+        "checked": 1
+      }
+    },
+    {
+      "round": 6,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 873.53,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 38.88,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 178.33,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 204.52,
+        "checked": 6
+      }
+    },
+    {
+      "round": 6,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 825.6,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 45.39,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 186.24,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 204.76,
+        "checked": 6
+      }
+    },
+    {
+      "round": 6,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 878.1,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 39.37,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 187.58,
+        "checked": 5
+      },
+      "rename": {
+        "ms": 65.82,
+        "checked": 2
+      }
+    },
+    {
+      "round": 6,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 852.54,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 38.46,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 91.59,
+        "checked": 1
+      },
+      "rename": {
+        "ms": 63.2,
+        "checked": 2
+      }
+    },
+    {
+      "round": 7,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 875.46,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 68.83,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 190.8,
+        "checked": 5
+      },
+      "lighting": {
+        "ms": 37.96,
+        "checked": 1
+      }
+    },
+    {
+      "round": 7,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 867.59,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 217.63,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 174.58,
+        "checked": 4
+      },
+      "lighting": {
+        "ms": 35.92,
+        "checked": 1
+      }
+    },
+    {
+      "round": 7,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 869.9,
+        "checked": 270
+      },
+      "rename": {
+        "ms": 224.75,
+        "checked": 6
+      },
+      "storage": {
+        "ms": 91.95,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 40.0,
+        "checked": 1
+      }
+    },
+    {
+      "round": 7,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 871.4,
+        "checked": 271
+      },
+      "rename": {
+        "ms": 69.43,
+        "checked": 2
+      },
+      "storage": {
+        "ms": 95.13,
+        "checked": 1
+      },
+      "lighting": {
+        "ms": 37.11,
+        "checked": 1
+      }
+    },
+    {
+      "round": 8,
+      "layout": "original",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 869.71,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 39.73,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 189.14,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 213.18,
+        "checked": 6
+      }
+    },
+    {
+      "round": 8,
+      "layout": "session",
+      "compiler": "previous",
+      "fresh": {
+        "ms": 892.4,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 42.08,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 186.7,
+        "checked": 5
+      },
+      "rename": {
+        "ms": 65.19,
+        "checked": 2
+      }
+    },
+    {
+      "round": 8,
+      "layout": "session",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 895.16,
+        "checked": 271
+      },
+      "lighting": {
+        "ms": 44.32,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 87.77,
+        "checked": 1
+      },
+      "rename": {
+        "ms": 61.99,
+        "checked": 2
+      }
+    },
+    {
+      "round": 8,
+      "layout": "original",
+      "compiler": "candidate",
+      "fresh": {
+        "ms": 866.37,
+        "checked": 270
+      },
+      "lighting": {
+        "ms": 38.48,
+        "checked": 1
+      },
+      "storage": {
+        "ms": 180.19,
+        "checked": 4
+      },
+      "rename": {
+        "ms": 201.87,
+        "checked": 6
+      }
+    }
+  ],
+  "directStorageAfterFresh": [
+    {
+      "round": 1,
+      "layout": "original",
+      "checked": 4,
+      "ms": 181.89559799999995
+    },
+    {
+      "round": 1,
+      "layout": "session",
+      "checked": 1,
+      "ms": 93.27500700000019
+    },
+    {
+      "round": 2,
+      "layout": "session",
+      "checked": 1,
+      "ms": 93.13257700000031
+    },
+    {
+      "round": 2,
+      "layout": "original",
+      "checked": 4,
+      "ms": 178.65735300000006
+    },
+    {
+      "round": 3,
+      "layout": "original",
+      "checked": 4,
+      "ms": 189.14058699999987
+    },
+    {
+      "round": 3,
+      "layout": "session",
+      "checked": 1,
+      "ms": 98.69146099999944
+    },
+    {
+      "round": 4,
+      "layout": "session",
+      "checked": 1,
+      "ms": 101.94329099999959
+    },
+    {
+      "round": 4,
+      "layout": "original",
+      "checked": 4,
+      "ms": 180.6200920000001
+    }
+  ],
+  "profiledEdits": [
+    {
+      "kind": "rename",
+      "binary": "build/import-boundary/baseline",
+      "phases": {
+        "other": {
+          "us": 6561,
+          "requested_bytes": 4872423,
+          "allocations": 19483,
+          "rss_growth_kib": 3668
+        },
+        "assets": {
+          "us": 7339,
+          "requested_bytes": 1066737,
+          "allocations": 691,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 29020,
+          "requested_bytes": 46196608,
+          "allocations": 54832,
+          "rss_growth_kib": 0
+        },
+        "lex": {
+          "us": 8,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "parse": {
+          "us": 47,
+          "requested_bytes": 4374,
+          "allocations": 77,
+          "rss_growth_kib": 0
+        },
+        "check": {
+          "us": 11054,
+          "requested_bytes": 8070315,
+          "allocations": 19025,
+          "rss_growth_kib": 0
+        },
+        "lower": {
+          "us": 3525,
+          "requested_bytes": 1391667,
+          "allocations": 8444,
+          "rss_growth_kib": 0
+        },
+        "freeze": {
+          "us": 3250,
+          "requested_bytes": 3188375,
+          "allocations": 11187,
+          "rss_growth_kib": 0
+        },
+        "validation": {
+          "us": 0,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "backend": {
+          "us": 862,
+          "requested_bytes": 2639638,
+          "allocations": 1,
+          "rss_growth_kib": 0
+        }
+      },
+      "checked": 2,
+      "modules": [
+        {
+          "path": "src/session.blot",
+          "cpuUs": 5234
+        },
+        {
+          "path": "src/main.blot",
+          "cpuUs": 5616
+        }
+      ]
+    },
+    {
+      "kind": "rename",
+      "binary": "compiler-goose/build/blotc-goose",
+      "phases": {
+        "other": {
+          "us": 6879,
+          "requested_bytes": 4872423,
+          "allocations": 19483,
+          "rss_growth_kib": 3244
+        },
+        "assets": {
+          "us": 7868,
+          "requested_bytes": 1066737,
+          "allocations": 691,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 28305,
+          "requested_bytes": 46196608,
+          "allocations": 54832,
+          "rss_growth_kib": 0
+        },
+        "lex": {
+          "us": 8,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "parse": {
+          "us": 49,
+          "requested_bytes": 4374,
+          "allocations": 77,
+          "rss_growth_kib": 0
+        },
+        "check": {
+          "us": 11193,
+          "requested_bytes": 8070315,
+          "allocations": 19025,
+          "rss_growth_kib": 0
+        },
+        "lower": {
+          "us": 3207,
+          "requested_bytes": 1391667,
+          "allocations": 8444,
+          "rss_growth_kib": 0
+        },
+        "freeze": {
+          "us": 3238,
+          "requested_bytes": 3188375,
+          "allocations": 11187,
+          "rss_growth_kib": 0
+        },
+        "validation": {
+          "us": 0,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "backend": {
+          "us": 738,
+          "requested_bytes": 2639638,
+          "allocations": 1,
+          "rss_growth_kib": 0
+        }
+      },
+      "checked": 2,
+      "modules": [
+        {
+          "path": "src/session.blot",
+          "cpuUs": 5383
+        },
+        {
+          "path": "src/main.blot",
+          "cpuUs": 5611
+        }
+      ]
+    },
+    {
+      "kind": "storage",
+      "binary": "build/import-boundary/baseline",
+      "phases": {
+        "other": {
+          "us": 7800,
+          "requested_bytes": 7278057,
+          "allocations": 19485,
+          "rss_growth_kib": 0
+        },
+        "assets": {
+          "us": 7354,
+          "requested_bytes": 1066743,
+          "allocations": 691,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 15938,
+          "requested_bytes": 13524368,
+          "allocations": 47473,
+          "rss_growth_kib": 0
+        },
+        "lex": {
+          "us": 534,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "parse": {
+          "us": 2655,
+          "requested_bytes": 1301839,
+          "allocations": 6713,
+          "rss_growth_kib": 0
+        },
+        "check": {
+          "us": 124115,
+          "requested_bytes": 59884945,
+          "allocations": 259815,
+          "rss_growth_kib": 0
+        },
+        "lower": {
+          "us": 17837,
+          "requested_bytes": 6548339,
+          "allocations": 34879,
+          "rss_growth_kib": 0
+        },
+        "freeze": {
+          "us": 13494,
+          "requested_bytes": 13214764,
+          "allocations": 40995,
+          "rss_growth_kib": 0
+        },
+        "validation": {
+          "us": 0,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "backend": {
+          "us": 1374,
+          "requested_bytes": 2639638,
+          "allocations": 1,
+          "rss_growth_kib": 0
+        }
+      },
+      "checked": 5,
+      "modules": [
+        {
+          "path": "src/world_storage.blot",
+          "cpuUs": 47887
+        },
+        {
+          "path": "src/buildings/construction.blot",
+          "cpuUs": 11288
+        },
+        {
+          "path": "src/game.blot",
+          "cpuUs": 52906
+        },
+        {
+          "path": "src/session.blot",
+          "cpuUs": 4645
+        },
+        {
+          "path": "src/main.blot",
+          "cpuUs": 5549
+        }
+      ]
+    },
+    {
+      "kind": "storage",
+      "binary": "compiler-goose/build/blotc-goose",
+      "phases": {
+        "other": {
+          "us": 6461,
+          "requested_bytes": 4654884,
+          "allocations": 19481,
+          "rss_growth_kib": 0
+        },
+        "assets": {
+          "us": 7532,
+          "requested_bytes": 1066743,
+          "allocations": 691,
+          "rss_growth_kib": 0
+        },
+        "load": {
+          "us": 15959,
+          "requested_bytes": 13524368,
+          "allocations": 47473,
+          "rss_growth_kib": 0
+        },
+        "lex": {
+          "us": 516,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "parse": {
+          "us": 2621,
+          "requested_bytes": 1301839,
+          "allocations": 6713,
+          "rss_growth_kib": 0
+        },
+        "check": {
+          "us": 49213,
+          "requested_bytes": 26029986,
+          "allocations": 87073,
+          "rss_growth_kib": 0
+        },
+        "lower": {
+          "us": 4578,
+          "requested_bytes": 1691749,
+          "allocations": 6637,
+          "rss_growth_kib": 0
+        },
+        "freeze": {
+          "us": 1977,
+          "requested_bytes": 2060334,
+          "allocations": 5770,
+          "rss_growth_kib": 0
+        },
+        "validation": {
+          "us": 0,
+          "requested_bytes": 0,
+          "allocations": 0,
+          "rss_growth_kib": 0
+        },
+        "backend": {
+          "us": 997,
+          "requested_bytes": 2639638,
+          "allocations": 1,
+          "rss_growth_kib": 0
+        }
+      },
+      "checked": 1,
+      "modules": [
+        {
+          "path": "src/world_storage.blot",
+          "cpuUs": 48200
+        }
+      ]
+    }
+  ],
+  "qualification": {
+    "compilerSha256": "b4f7c3a6897d39894061c88ce7bb8d0a7bf9f836d426475c17d3fae0c89fe280",
+    "mainBytes": 2639638,
+    "mainSha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (163.7 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (11.5 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameMatchesPrevious": true
+  },
+  "additionalEntries": {
+    "performance/traced_main.blot": {
+      "bytes": 2639804,
+      "sha256": "0f136bc80d6a0e41b3e663f082a907de647252d0457d03cacf3d168ba1472a60"
+    },
+    "performance/reference_main.blot": {
+      "bytes": 2643639,
+      "sha256": "e29e49be8f596e8ff93bdc3672ab876a505d3696216f75945f0aa5205d649415"
+    },
+    "performance/transport_reference_main.blot": {
+      "bytes": 2642164,
+      "sha256": "1609addb969b78915c5792f98740c13f14337451a838a387ea7b15716666e649"
+    },
+    "test_support/actor_host.blot": {
+      "bytes": 1227615,
+      "sha256": "b21974104b7f7b93597553f828cd5ace25ef70f77810be6ff7f961b0445edcda"
+    }
+  },
+  "compilerGate": {
+    "passed": 1099,
+    "ignored": 100,
+    "wasmFixtures": 192,
+    "uniquenessFixtures": 212,
+    "directReferences": 2
+  },
+  "transitions": [
+    {
+      "label": "base",
+      "revision": 1,
+      "fresh": 271
+    },
+    {
+      "label": "dark",
+      "revision": 2,
+      "fresh": 1
+    },
+    {
+      "label": "both",
+      "revision": 3,
+      "fresh": 1
+    },
+    {
+      "label": "rejected",
+      "revision": 3
+    },
+    {
+      "label": "dark",
+      "revision": 4,
+      "fresh": 1
+    },
+    {
+      "label": "base",
+      "revision": 5,
+      "fresh": 1
+    },
+    {
+      "label": "scalar",
+      "revision": 6,
+      "fresh": 73
+    },
+    {
+      "label": "wide",
+      "revision": 7,
+      "fresh": 73
+    },
+    {
+      "label": "scalar",
+      "revision": 8,
+      "fresh": 73
+    },
+    {
+      "label": "stageOn",
+      "revision": 9,
+      "fresh": 117
+    },
+    {
+      "label": "stageOff",
+      "revision": 10,
+      "fresh": 1
+    },
+    {
+      "label": "stageOn",
+      "revision": 11,
+      "fresh": 1
+    },
+    {
+      "label": "base",
+      "revision": 12,
+      "fresh": 117
+    },
+    {
+      "label": "entryRename",
+      "revision": 13,
+      "fresh": 1
+    },
+    {
+      "label": "rejectedEntry",
+      "revision": 13
+    },
+    {
+      "label": "renamedDark",
+      "revision": 14,
+      "fresh": 1
+    },
+    {
+      "label": "entryRename",
+      "revision": 15,
+      "fresh": 1
+    },
+    {
+      "label": "base",
+      "revision": 16,
+      "fresh": 1
+    },
+    {
+      "label": "dependencyRename",
+      "revision": 17,
+      "fresh": 2
+    },
+    {
+      "label": "base",
+      "revision": 18,
+      "fresh": 2
+    },
+    {
+      "label": "dark",
+      "revision": 19,
+      "fresh": 1
+    }
+  ]
+}

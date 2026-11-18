@@ -17,13 +17,13 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Renaming a parameter in Gdev’s imported `world_storage` module checks **6 of
-270 modules** and returns the complete **2,639,648-byte** Wasm in **257.6 ms**,
-down from **949.7 ms**. Renaming the entry parameter took **54.4 ms**,
-editing lighting took **47.0 ms**, and a fresh build took **971.5 ms**.
-[Paired measurements and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.json)
+Changing scene history capacity in Gdev now checks **one module** and takes
+**92.2 ms**, down from **189.4 ms** on the same game source.
+Moving the shared session setup out of storage reduced a parameter rename from
+**222.7 to 69.1 ms** on the new compiler. A fresh build of Gdev Main
+returned the **2,639,638-byte** Wasm in **872.9 ms** median. [Eight rounds across both compilers and source layouts](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json)
 
-![Gdev imported rename time, source loading and checking](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.png)
+![Time to rebuild Gdev after a parameter rename or a storage edit](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.png)
 
 The Gdev intent benchmark that appends inside two case arms builds its list in
 **21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms)

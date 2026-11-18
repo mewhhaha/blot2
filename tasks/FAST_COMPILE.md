@@ -3,6 +3,40 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Gdev import edits, 19 November 2026
+
+The retained checker compares the producer’s exported interface packet after
+checking a changed implementation. With identical bytes and a stable symbol
+view it can reuse its callers. A changed packet or renumbered symbols still
+invalidate transitive consumers, including through re-exports. Gdev also moved
+startup above storage and game. Main, the performance entries and an actor
+fixture now share the same camera, orbit and stash initialization.
+
+| Median time to full Wasm | Original Gdev, previous compiler | Original Gdev, new compiler | Shared session, previous compiler | Shared session, new compiler |
+| --- | ---: | ---: | ---: | ---: |
+| Increase scene history capacity | 182.4 ms | 137.1 ms | 189.4 ms | 92.2 ms |
+| Rename the imported host parameter | 215.4 ms | 222.7 ms | 66.6 ms | 69.1 ms |
+| Change lighting | 40.0 ms | 38.7 ms | 40.2 ms | 39.4 ms |
+| Open and compile Main | 868.6 ms | 870.9 ms | 877.7 ms | 872.9 ms |
+
+Eight counterbalanced rounds used eight frontend workers on a shared machine.
+Every edit and revert returned the same bytes as a fresh compile of that source.
+The capacity edit changes the Wasm, while the rename preserves it. With the original
+Gdev source the new compiler checked one module after a rename and revert,
+and four after a lighting edit and revert. Each order ran four times.
+Directly after a fresh build the old source also needed four checks in four
+trials, while the current source needed one in all four.
+The original runner rename still checks 6 modules. On the new source
+it checks only the session and Main with either compiler. A storage edit there
+now checks 1 of 271 modules, down from 5. Its separately profiled checker phase
+took 49.2 ms. Checking individual declarations inside storage is the next target.
+
+The compiler suite passed. The named Gdev, Ink and native outcomes, the hardware
+frame and all 242 files from the 120-frame replay matched the reference. All
+three performance entry modules and the actor host compiled.
+[Trials, profiles and qualification](../benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json) ·
+[Rerun the four configurations](../benchmarks/tools/bench_import_boundary.ts)
+
 ## Gdev Main, 18 November 2026
 
 ### Scene callbacks and compile-time inputs

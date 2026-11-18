@@ -6,10 +6,10 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `978ca3c7`, with Gdev `0e0d772`,
-Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **971.5 ms**
-median with eight frontend workers and emitted **2,639,648 bytes** across
-270 modules. [Paired fresh and edit measurements](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.json)
+The qualified compiler is Blot `c3001b52`, with Gdev `73b4b2c`,
+Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **872.9 ms**
+median with eight frontend workers and emitted **2,639,638 bytes** across
+271 modules. [Fresh, edit and integration measurements](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev
@@ -39,12 +39,12 @@ checker replies fell from 72,858,303 to 71,856,423 bytes. The full compiler
 gate, named Gdev and Ink outcomes, 120-frame replay and inspected frame
 qualified the release.
 
-Renaming a parameter in the imported `world_storage` module reuses **269
-syntax trees** and checks **6 of 270 modules**. Returning the full Wasm fell
-from **949.7 to 257.6 ms** in eight paired runs. The checker assigns names
-in dependency order and records which names each module can see. The entry
-rename took **54.4 ms** and the lighting edit **47.0 ms**.
-[Measurements and qualification](benchmarks/evidence/measurements/2026-11-18-gdev-import-rename.json) · [Compiler work](tasks/FAST_COMPILE.md)
+A storage capacity edit now checks only `world_storage.blot`. On the current
+Gdev source this fell from **189.4 to 92.2 ms**. The shared session
+module owns startup for Main, the three performance entries and the actor fixture.
+Renaming its host parameter checks the session and Main in **69.1 ms**.
+The next storage target is rechecking the changed declaration inside its module.
+[Measurements and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
