@@ -1,0 +1,1065 @@
+{
+  "blot": "4a5a7b7445677814d99aeefc7bc6aec3d8b66332",
+  "gdev": "73b4b2c79928f4c1fe84e1f835f5c8420e838510",
+  "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+  "compilerSha256": "06a61218b0d0d939a69d037ffce47813a75317436ad37020b0bfe53b2fb12b9a",
+  "workers": "project default",
+  "method": "Fresh process/session open through complete Main Wasm, then one overlay edit adding an unused public function. A fresh build of the edited source is timed before or after each pair in alternating rounds. Warm filesystem. Profiled runs recorded separately. Hashes checked against fresh builds of each source.",
+  "oracles": {
+    "base": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+    "gameLibrary": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+    "inkMath": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+    "prelude": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350"
+  },
+  "samples": [
+    {
+      "round": 1,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 691.997856,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 951.8627480000005,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 729.2646540000001,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 1,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 675.5455339999999,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1334.3883320000004,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 692.6608580000002,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 1,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 704.4106150000007,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 679.606686000001,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 747.3698879999993,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 2,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 733.9277359999996,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 699.161994,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 698.1097160000008,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 2,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 724.821989,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1326.7081909999997,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 690.1397019999986,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 2,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 707.8233009999985,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 952.7079369999992,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 693.327481999997,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 3,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 701.4661940000005,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 958.6826269999983,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 700.363734999999,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 3,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 698.6966560000001,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1326.8747040000017,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 709.6475279999977,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 3,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 718.6975019999991,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 702.5576079999992,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 707.2000280000029,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 4,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 736.5036199999995,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 660.5256359999985,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 709.4228440000006,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 4,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 661.1769060000006,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1349.850688999999,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 679.128679999998,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 4,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 715.2478130000018,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 968.8214049999988,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 732.2961220000034,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 5,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 686.2202909999978,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 950.7427360000001,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 722.7601339999965,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 5,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 718.1120499999961,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1323.5468009999968,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 697.7952890000015,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 5,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 697.0850629999986,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 680.1839269999982,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 687.3430780000053,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 6,
+      "profiled": false,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 670.4321800000034,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 683.0114959999992,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      },
+      "freshEdit": {
+        "ms": 733.3787809999994,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 6,
+      "profiled": false,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 684.1540400000013,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 1349.7597959999985,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864
+      },
+      "freshEdit": {
+        "ms": 726.9208660000004,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 6,
+      "profiled": false,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 708.3378589999993,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993
+      },
+      "edit": {
+        "ms": 940.2564189999975,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451
+      },
+      "freshEdit": {
+        "ms": 721.1204089999956,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994
+      }
+    },
+    {
+      "round": 7,
+      "profiled": true,
+      "editModule": "gameLibrary",
+      "fresh": {
+        "ms": 697.0150090000025,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993,
+        "phases": {
+          "other": {
+            "us": 20999,
+            "requested_bytes": 3085374,
+            "allocations": 18925,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 63402,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5432
+          },
+          "load": {
+            "us": 72228,
+            "requested_bytes": 55684702,
+            "allocations": 86283,
+            "rss_growth_kib": 63124
+          },
+          "lex": {
+            "us": 145,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 822,
+            "requested_bytes": 308326,
+            "allocations": 1272,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 375308,
+            "requested_bytes": 53476746,
+            "allocations": 201533,
+            "rss_growth_kib": 29248
+          },
+          "lower": {
+            "us": 42257,
+            "requested_bytes": 73373482,
+            "allocations": 17277,
+            "rss_growth_kib": 133404
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 103636,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "edit": {
+        "ms": 962.0310080000054,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 92,
+        "cachedModules": 179,
+        "bodies": 2451,
+        "phases": {
+          "other": {
+            "us": 12909,
+            "requested_bytes": 22624700,
+            "allocations": 19573,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6221,
+            "requested_bytes": 1066737,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 21689,
+            "requested_bytes": 37720111,
+            "allocations": 53497,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 57,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 219,
+            "requested_bytes": 179676,
+            "allocations": 324,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 635437,
+            "requested_bytes": 278223799,
+            "allocations": 1457726,
+            "rss_growth_kib": 52220
+          },
+          "lower": {
+            "us": 118125,
+            "requested_bytes": 52524063,
+            "allocations": 233770,
+            "rss_growth_kib": 29436
+          },
+          "freeze": {
+            "us": 59434,
+            "requested_bytes": 69248693,
+            "allocations": 236092,
+            "rss_growth_kib": 3844
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 96184,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 5244
+          }
+        }
+      }
+    },
+    {
+      "round": 7,
+      "profiled": true,
+      "editModule": "inkMath",
+      "fresh": {
+        "ms": 707.9624970000004,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993,
+        "phases": {
+          "other": {
+            "us": 21058,
+            "requested_bytes": 3085374,
+            "allocations": 18925,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 63831,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5692
+          },
+          "load": {
+            "us": 73229,
+            "requested_bytes": 53421216,
+            "allocations": 76468,
+            "rss_growth_kib": 62968
+          },
+          "lex": {
+            "us": 151,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 757,
+            "requested_bytes": 308326,
+            "allocations": 1272,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 383943,
+            "requested_bytes": 62318838,
+            "allocations": 231876,
+            "rss_growth_kib": 32628
+          },
+          "lower": {
+            "us": 43971,
+            "requested_bytes": 73373482,
+            "allocations": 17277,
+            "rss_growth_kib": 131032
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 106107,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "edit": {
+        "ms": 1362.6558619999996,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 194,
+        "cachedModules": 77,
+        "bodies": 4864,
+        "phases": {
+          "other": {
+            "us": 17445,
+            "requested_bytes": 28781017,
+            "allocations": 19675,
+            "rss_growth_kib": 88
+          },
+          "assets": {
+            "us": 6445,
+            "requested_bytes": 1066733,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 24588,
+            "requested_bytes": 45757715,
+            "allocations": 54450,
+            "rss_growth_kib": 0
+          },
+          "lex": {
+            "us": 257,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 1372,
+            "requested_bytes": 768321,
+            "allocations": 3151,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 949269,
+            "requested_bytes": 415994666,
+            "allocations": 2190889,
+            "rss_growth_kib": 73892
+          },
+          "lower": {
+            "us": 179625,
+            "requested_bytes": 76810070,
+            "allocations": 316105,
+            "rss_growth_kib": 36048
+          },
+          "freeze": {
+            "us": 76534,
+            "requested_bytes": 87422001,
+            "allocations": 289880,
+            "rss_growth_kib": 3948
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 96175,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 5248
+          }
+        }
+      }
+    },
+    {
+      "round": 7,
+      "profiled": true,
+      "editModule": "prelude",
+      "fresh": {
+        "ms": 688.0568510000012,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5993,
+        "phases": {
+          "other": {
+            "us": 15264,
+            "requested_bytes": 3085374,
+            "allocations": 18925,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 63140,
+            "requested_bytes": 23046237,
+            "allocations": 236483,
+            "rss_growth_kib": 5520
+          },
+          "load": {
+            "us": 71984,
+            "requested_bytes": 54376719,
+            "allocations": 80374,
+            "rss_growth_kib": 62820
+          },
+          "lex": {
+            "us": 144,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 745,
+            "requested_bytes": 308326,
+            "allocations": 1272,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 391556,
+            "requested_bytes": 69227140,
+            "allocations": 231179,
+            "rss_growth_kib": 44696
+          },
+          "lower": {
+            "us": 25777,
+            "requested_bytes": 73373482,
+            "allocations": 17277,
+            "rss_growth_kib": 125320
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 101961,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      },
+      "edit": {
+        "ms": 665.4207179999939,
+        "sha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+        "bytes": 2639638,
+        "freshModules": 271,
+        "cachedModules": 0,
+        "bodies": 5994,
+        "phases": {
+          "other": {
+            "us": 15370,
+            "requested_bytes": 3105635,
+            "allocations": 18928,
+            "rss_growth_kib": 0
+          },
+          "assets": {
+            "us": 6401,
+            "requested_bytes": 1066738,
+            "allocations": 691,
+            "rss_growth_kib": 0
+          },
+          "load": {
+            "us": 105973,
+            "requested_bytes": 51139373,
+            "allocations": 65762,
+            "rss_growth_kib": 6832
+          },
+          "lex": {
+            "us": 129,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "parse": {
+            "us": 671,
+            "requested_bytes": 382360,
+            "allocations": 1278,
+            "rss_growth_kib": 0
+          },
+          "check": {
+            "us": 409039,
+            "requested_bytes": 132541585,
+            "allocations": 484709,
+            "rss_growth_kib": 51704
+          },
+          "lower": {
+            "us": 21322,
+            "requested_bytes": 73374408,
+            "allocations": 17277,
+            "rss_growth_kib": 109216
+          },
+          "freeze": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "validation": {
+            "us": 0,
+            "requested_bytes": 0,
+            "allocations": 0,
+            "rss_growth_kib": 0
+          },
+          "backend": {
+            "us": 97945,
+            "requested_bytes": 3290646,
+            "allocations": 2,
+            "rss_growth_kib": 0
+          }
+        }
+      }
+    }
+  ],
+  "summary": {
+    "freshMain": {
+      "count": 18,
+      "medianMs": 702.9384045000006,
+      "minMs": 661.1769060000006,
+      "maxMs": 736.5036199999995,
+      "freshModules": [
+        271
+      ],
+      "checkedBodies": [
+        5993
+      ]
+    },
+    "gameLibrary": {
+      "edit": {
+        "count": 6,
+        "medianMs": 952.2853424999998,
+        "minMs": 940.2564189999975,
+        "maxMs": 968.8214049999988,
+        "freshModules": [
+          92
+        ],
+        "checkedBodies": [
+          2451
+        ]
+      },
+      "freshEdit": {
+        "count": 6,
+        "medianMs": 721.940271499996,
+        "minMs": 693.327481999997,
+        "maxMs": 732.2961220000034,
+        "freshModules": [
+          271
+        ],
+        "checkedBodies": [
+          5994
+        ]
+      }
+    },
+    "inkMath": {
+      "edit": {
+        "count": 6,
+        "medianMs": 1330.631518000001,
+        "minMs": 1323.5468009999968,
+        "maxMs": 1349.850688999999,
+        "freshModules": [
+          194
+        ],
+        "checkedBodies": [
+          4864
+        ]
+      },
+      "freshEdit": {
+        "count": 6,
+        "medianMs": 695.2280735000008,
+        "minMs": 679.128679999998,
+        "maxMs": 726.9208660000004,
+        "freshModules": [
+          271
+        ],
+        "checkedBodies": [
+          5994
+        ]
+      }
+    },
+    "prelude": {
+      "edit": {
+        "count": 6,
+        "medianMs": 681.5977114999987,
+        "minMs": 660.5256359999985,
+        "maxMs": 702.5576079999992,
+        "freshModules": [
+          271
+        ],
+        "checkedBodies": [
+          5994
+        ]
+      },
+      "freshEdit": {
+        "count": 6,
+        "medianMs": 708.3114360000018,
+        "minMs": 687.3430780000053,
+        "maxMs": 747.3698879999993,
+        "freshModules": [
+          271
+        ],
+        "checkedBodies": [
+          5994
+        ]
+      }
+    }
+  }
+}

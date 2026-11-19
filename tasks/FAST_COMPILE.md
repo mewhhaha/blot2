@@ -3,6 +3,35 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Broad edits to shared modules, 19 November 2026
+
+Adding an unused public function to Ink math produced the same Gdev Main Wasm
+as the unmodified project. Rebuilding in the open session nevertheless
+took **1,331 ms** median. A fresh process compiling the exact edited source
+took **695 ms**. These runs used the production worker default.
+
+| Unused function added to | Edit in open session | Fresh process, same edit | Modules rechecked in open session |
+| --- | ---: | ---: | ---: |
+| Gdev library | 952 ms | 722 ms | 92 / 271 |
+| Ink math | 1,331 ms | 695 ms | 194 / 271 |
+| Standard prelude | 682 ms | 708 ms | 271 / 271 |
+
+Baseline fresh Main took 703 ms median across 18 runs from an empty compiler
+session with a warm filesystem. Every build returned identical 2,639,638-byte Wasm.
+Each edit was measured six times. The fresh compile of the edited source ran
+before or after the retained trial in alternating rounds. Phase traces were taken separately.
+
+The retained checker walks affected modules serially. When every module is
+affected it already uses the parallel fresh checker. For edits that affect
+many modules, try selecting that parallel path early using the amount of
+previously checked work in the affected modules. Compare both broad edits
+and the 35 ms history-capacity edit before setting a crossover. Tracking the
+public declarations each consumer actually uses could also eliminate work
+when an ordinary, unreferenced helper is added.
+
+[Raw trials and phase traces](../benchmarks/evidence/measurements/2026-11-19-gdev-invalidation.json) ·
+[Runnable benchmark](../benchmarks/tools/bench_gdev_invalidation.ts)
+
 ## Reusing a checked call after an integer edit, 19 November 2026
 
 The project session can revise a single equal-width decimal U32 token in

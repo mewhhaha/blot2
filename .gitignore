@@ -1,6 +1,9 @@
 node_modules/
 __pycache__/
 /build/
+.zig-cache/
+/compiler/.zig-analyzer/
+/compiler/zig-out*/
 /generated/compiler/
 /editor/tree-sitter-blot2/src/
 /editor/tree-sitter-blot2/.cache/
