@@ -12,6 +12,9 @@ import check.typed_staging;
 import support.native;
 
 struct StageValue { bits: u32 = 0, ty: u32 = blot_check_types::unit, returning_to: u32 = 0 }
+struct StageFunction { unit: u32, target: u32, captures: u32, count: u32, named: bool }
+reusable[] var stage_function_runs:StageFunction[>..]=[];
+let stage_function: u32 = 0xfffffffe;
 struct StageBinding { binding: u32, value: StageValue }
 // Scalar values keep their original bits. Aggregates refer to immutable member
 // ranges so that bindings and calls can share values during evaluation.
@@ -23,6 +26,7 @@ struct Stage {
     parts: blot_support_pooled_buffer::Buffer<StagePart> = blot_support_pooled_buffer::Buffer<StagePart>{..},
     aggregates: blot_support_pooled_buffer::Buffer<StageAggregate> = blot_support_pooled_buffer::Buffer<StageAggregate>{..},
     bindings: blot_support_pooled_buffer::Buffer<StageBinding> = blot_support_pooled_buffer::Buffer<StageBinding>{..},
+    functions: blot_support_pooled_buffer::Buffer<StageFunction> = blot_support_pooled_buffer::Buffer<StageFunction>{..},
     remaining: i64 = 65536,
     failure: Chars = "",
 }
@@ -40,7 +44,7 @@ fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var result = neverVal();
     var error = blot_direct_types::Error.none;
     if s.failure.len != 0 { error = g.fail(m, id, s.failure); }
-    else if value.ty != stage_aggregate { result, error = constant(g, f, id, value.bits); }
+    else if value.ty != stage_aggregate && value.ty != stage_function { result, error = constant(g, f, id, value.bits); }
     else {
         let ty, lowered = typeOf(g, f, id);
         error = lowered;
@@ -49,6 +53,7 @@ fn stagedConstant(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             result, error = emitStageValue(g, f, s, value, ty, id, remaining, 0);
         }
     }
+    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
     blot_support_pooled_buffer::deinit(s.parts, part_runs);
     blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
     blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
@@ -113,12 +118,60 @@ fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Stag
     return stopStage(s, "#run does not support this scalar operation");
 }
 
+fn stageFunction(s: Stage&, value: StageFunction) -> StageValue {
+    let index = s.functions.items.len as u32;
+    blot_support_pooled_buffer::push(s.functions, value, stage_function_runs);
+    return StageValue {index, stage_function, 0};
+}
+
+// A staged function keeps its lexical captures even after its creator returns.
+recursive fn applyStage(g: Generator&, s: Stage&, fn_value: StageValue, argument: StageValue, depth: i64) -> StageValue {
+    if fn_value.ty != stage_function { return stopStage(s, "#run expected a function"); }
+    let fun = s.functions.items[fn_value.bits];
+    let owner .= g.units[fun.unit - 1];
+    var root: u32 = 0;
+    var parameter: u32 = 0;
+    if fun.named {
+        let body .= owner.body(fun.target);
+        if !body || !body.is_function || body.runtime || body.parameters.len != 1 { return stopStage(s, "#run needs a unary compile-time callback"); }
+        root = body.root;
+        parameter = owner.bodyParameters(body)[0].binding;
+    } else {
+        let closure = owner.closure(fun.target);
+        root = closure.body;
+        parameter = closure.parameter.binding;
+    }
+    if fun.count > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+    s.remaining -= fun.count;
+    let base = s.bindings.items.len;
+    for at in 0..(fun.count as i64) {
+        let part = s.parts.items[fun.captures + at];
+        blot_support_pooled_buffer::push(s.bindings, StageBinding {part.name, part.value}, binding_runs);
+    }
+    blot_support_pooled_buffer::push(s.bindings, StageBinding {parameter, argument}, binding_runs);
+    let result = evaluateStage(g, s, owner, root, base, depth + 1);
+    blot_support_pooled_buffer::resize(s.bindings, base);
+    return result;
+}
+
 recursive fn evaluateStageCall(g: Generator&, s: Stage&, m: const Module&, id: u32, frame: i64, depth: i64) -> StageValue {
     let call = m.call(id);
     let target = g.resolve(m, call.target);
     if !g.hasUnit(target.unit) { return stopStage(s, "#run has no body for this call"); }
-    blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
     let owner .= g.units[target.unit - 1];
+    let binding = owner.binding(target.binding);
+    if target.unit == m.unit && (binding.kind == blot_reuse_principal_interface::Kind.local || binding.kind == blot_reuse_principal_interface::Kind.parameter) {
+        var callback, found = stageBinding(s, frame, target.binding);
+        if !found { return stopStage(s, "#run depends on a runtime callback"); }
+        for child in call.arguments {
+            let arg = evaluateStage(g, s, m, child, frame, depth + 1);
+            if s.failure.len != 0 || arg.returning_to != 0 { return arg; }
+            callback = applyStage(g, s, callback, arg, depth + 1);
+            if s.failure.len != 0 || callback.returning_to != 0 { return callback; }
+        }
+        return callback;
+    }
+    blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
     let alias, primitive = primitiveAlias(owner, target.binding);
     if primitive {
         let info = owner.primitive(alias);
@@ -194,7 +247,8 @@ recursive fn evaluateStage(g: Generator&, s: Stage&, m: const Module&, id: u32, 
             let body .= owner.body(target.binding);
             var root = binding.initializer;
             if body {
-                if body.runtime || body.is_function { return stopStage(s, "#run requires a compile-time scalar value"); }
+                if body.runtime { return stopStage(s, "#run requires a compile-time value"); }
+                if body.is_function { return stageFunction(s, StageFunction {target.unit, target.binding, 0, 0, true}); }
                 root = body.root;
             }
             if root == 0 { return stopStage(s, "#run has no compile-time initializer"); }
@@ -202,6 +256,25 @@ recursive fn evaluateStage(g: Generator&, s: Stage&, m: const Module&, id: u32, 
             let value = evaluateStage(g, s, owner, root, base, depth + 1);
             blot_support_pooled_buffer::resize(s.bindings, base);
             return value;
+        },
+        closure => {
+            let start = s.parts.items.len as u32;
+            let captures = m.closureCaptures(id);
+            if captures.len > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+            s.remaining -= captures.len;
+            for binding in captures {
+                let value, found = stageBinding(s, frame, binding);
+                if !found { return stopStage(s, "#run closure captures a runtime binding"); }
+                blot_support_pooled_buffer::push(s.parts, StagePart {binding, value}, part_runs);
+            }
+            return stageFunction(s, StageFunction {m.unit, id, start, captures.len as u32, false});
+        },
+        apply => {
+            let callee = evaluateStage(g, s, m, n.a, frame, depth + 1);
+            if s.failure.len != 0 || callee.returning_to != 0 { return callee; }
+            let arg = evaluateStage(g, s, m, n.b, frame, depth + 1);
+            if s.failure.len != 0 || arg.returning_to != 0 { return arg; }
+            return applyStage(g, s, callee, arg, depth + 1);
         },
         product, record, array, construct => {
             let children = m.children(id);
@@ -262,6 +335,25 @@ recursive fn evaluateStage(g: Generator&, s: Stage&, m: const Module&, id: u32, 
             let children = m.children(id);
             let value = evaluateStage(g, s, m, children[0], frame, depth + 1);
             if s.failure.len != 0 || value.returning_to != 0 { return value; }
+            if operation == blot_backend_collection_ops::Op.generate || operation == blot_backend_collection_ops::Op.fill {
+                let source = evaluateStage(g, s, m, children[1], frame, depth + 1);
+                if s.failure.len != 0 || source.returning_to != 0 { return source; }
+                if value.ty != blot_check_types::u32_type || value.bits > s.remaining { return stopStage(s, "#run exceeded its evaluation budget"); }
+                s.remaining -= value.bits;
+                let start = s.parts.items.len as u32;
+                for at in 0..(value.bits as i64) { blot_support_pooled_buffer::push(s.parts, StagePart {}, part_runs); }
+                for at in 0..(value.bits as i64) {
+                    var item = source;
+                    if operation == blot_backend_collection_ops::Op.generate {
+                        item = applyStage(g, s, source, StageValue {at as u32, blot_check_types::u32_type, 0}, depth + 1);
+                        if s.failure.len != 0 || item.returning_to != 0 { return item; }
+                    }
+                    s.parts.items[start + at].value = item;
+                }
+                let index = s.aggregates.items.len as u32;
+                blot_support_pooled_buffer::push(s.aggregates, StageAggregate {blot_check_core::Tag.array, start, value.bits, 0}, aggregate_runs);
+                return StageValue {index, stage_aggregate, 0};
+            }
             if value.ty != stage_aggregate || s.aggregates.items[value.bits].kind != blot_check_core::Tag.array { return stopStage(s, "#run requires an array"); }
             let a = s.aggregates.items[value.bits];
             if operation == blot_backend_collection_ops::Op.length { return StageValue {a.len, blot_check_types::u32_type, 0}; }
@@ -335,6 +427,41 @@ recursive fn emitStageValue(g: Generator&, f: Fn&, s: const Stage&, v: StageValu
     let m .= g.units[f.unit - 1];
     if remaining == 0 || depth >= 256 { return neverVal(), g.fail(m, id, "#run result exceeded its materialization budget"); }
     remaining--;
+    if v.ty == stage_function {
+        let fun = s.functions.items[v.bits];
+        if tagOf(g, ty) != blot_direct_types::Tag.function { return neverVal(), g.fail(m, id, "#run function result shape mismatch"); }
+        if fun.named { return bindingValue(g, f, BindingRef {fun.unit, fun.target}, ty, false, id); }
+        let owner .= g.units[fun.unit - 1];
+        var env = Env {};
+        g.types.match_(owner, owner.typeOf(fun.target), ty, env);
+        let values = g.reserveVals(fun.count);
+        for at in 0..(fun.count as i64) {
+            let part = s.parts.items[fun.captures + at];
+            let capture_ty, error = g.types.lower(owner, owner.binding(part.name).ty, env);
+            if error != blot_direct_types::Error.none { return neverVal(), g.fail(m, id, "#run needs a concrete captured type"); }
+            let capture, error = emitStageValue(g, f, s, part.value, capture_ty, id, remaining, depth + 1);
+            if error != blot_direct_types::Error.none { return capture, error; }
+            g.s.vals[values.start + at] = capture;
+        }
+        let key = InstanceKey {blot_direct_emit::InstanceKind.lambda, fun.unit, fun.target, ty, f.instance_id, f.evidence_context};
+        var instance, present = g.find(key);
+        if !present {
+            let capture_types = Tys {g.s.tys.len as u32, fun.count};
+            for at in 0..(fun.count as i64) { g.s.tys.push(g.s.vals[values.start + at].ty); }
+            let arrow = g.types.node(ty);
+            let parameters = g.saveTys([arrow.a]);
+            let created, error = g.addInstanceWith(key, env, parameters, arrow.b, true, capture_types, owner, fun.target);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            instance = created;
+        } else {
+            let layout = g.s.instances[instance].captures;
+            if layout.len != fun.count { return neverVal(), g.fail(m, id, "#run closure capture count mismatch"); }
+            for at in 0..(fun.count as i64) {
+                if g.s.tys[layout.start + at] != g.s.vals[values.start + at].ty { return neverVal(), g.fail(m, id, "#run closure capture layout mismatch"); }
+            }
+        }
+        return makeClosure(g, f, instance, ty, values, id);
+    }
     if v.ty != stage_aggregate {
         match tagOf(g, ty) {
             unit => { return unitVal(), blot_direct_types::Error.none; },

@@ -332,3 +332,25 @@ entry func field () => return #do:
     deepStrictEqual(Array.from(guest.call("rows", null) as Uint32Array), [41,42]);
   }, {prelude:"none"});
 });
+
+Deno.test("#run generates lookup tables with lexical callbacks and returns a callable value", async () => {
+  await compileAndRun(`
+func square (i: U32): U32 => return @u32.mul i i
+func table (bias: U32): Array U32 => return @array.generate 4 (func (i: U32): U32 => return @u32.add (square i) bias)
+func add_table (bias: U32): (U32 -> U32) => return do:
+  let rows: Array U32 = table bias
+  return func (index: U32): U32 => return @array.get rows index
+func choose (flag: Bool): (U32 -> U32) => return if flag then square else (func (n: U32): U32 => return n)
+entry func rows (): Array U32 => return #run (table 2)
+entry func generated (i: U32): U32 => return (#run (add_table 2)) i
+entry func selected (i: U32): U32 => return (#run (choose true)) i
+entry func empty (): U32 => return #run (@array.length (@array.generate 0 (func (i: U32): U32 => return @u32.div i 0)))
+entry func filled (): Array U32 => return #run (@array.fill 3 7)
+`, guest => {
+    deepStrictEqual(Array.from(guest.call("rows", null) as Uint32Array), [2, 3, 6, 11]);
+    equal(guest.call("generated", 3), 11);
+    equal(guest.call("selected", 5), 25);
+    equal(guest.call("empty", null), 0);
+    deepStrictEqual(Array.from(guest.call("filled", null) as Uint32Array), [7, 7, 7]);
+  }, {prelude: "none"});
+});

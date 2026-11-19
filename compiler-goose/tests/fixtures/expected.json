@@ -1733,7 +1733,7 @@
     {
      "body_elaborations": 183,
      "body_lowerings": 183,
-     "check_occurs_steps": 2184,
+     "check_occurs_steps": 2186,
      "checker": {
       "associated_steps": 0,
       "inference_steps": 3559,
@@ -1755,11 +1755,11 @@
      "imported_schemes": 64,
      "kind": "compilation",
      "row_versions": 638,
-     "source_bytes": 17589,
+     "source_bytes": 17669,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 2540,
-     "type_nodes": 7053,
+     "syntax_nodes": 2552,
+     "type_nodes": 7061,
      "type_versions": 1137,
      "wasm_bytes": 2760
     }
@@ -2453,15 +2453,15 @@
     {
      "body_elaborations": 233,
      "body_lowerings": 233,
-     "check_occurs_steps": 2529,
+     "check_occurs_steps": 2528,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4251,
+      "inference_steps": 4254,
       "instantiations": 308,
       "memo_declined": 0,
       "memo_hits": 21,
       "memo_misses": 15,
-      "obligations_appended": 87,
+      "obligations_appended": 88,
       "pending_peak": 57,
       "projection_memo_hits": 0,
       "shared_uses": 42,
@@ -2479,7 +2479,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2985,
-     "type_nodes": 8261,
+     "type_nodes": 8262,
      "type_versions": 1290,
      "wasm_bytes": 2390
     }
@@ -2493,15 +2493,15 @@
     {
      "body_elaborations": 235,
      "body_lowerings": 235,
-     "check_occurs_steps": 2632,
+     "check_occurs_steps": 2631,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 4360,
+      "inference_steps": 4363,
       "instantiations": 329,
       "memo_declined": 0,
       "memo_hits": 31,
       "memo_misses": 16,
-      "obligations_appended": 99,
+      "obligations_appended": 100,
       "pending_peak": 57,
       "projection_memo_hits": 0,
       "shared_uses": 53,
@@ -2519,7 +2519,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 3060,
-     "type_nodes": 8554,
+     "type_nodes": 8555,
      "type_versions": 1365,
      "wasm_bytes": 3491
     }
@@ -4765,44 +4765,89 @@
    ]
   },
   "nominal/ordered-right-fallback.blot": {
-   "exit": 0,
+   "exit": 1,
    "records": [
     {
+     "actual_token": null,
+     "cause": "native_detail",
+     "code": "missing_associated",
+     "details": {
+      "contexts": [
+       {
+        "kind": "left_operand",
+        "span": {
+         "end": 419,
+         "start": 412
+        }
+       },
+       {
+        "kind": "right_operand",
+        "span": {
+         "end": 430,
+         "start": 422
+        }
+       }
+      ],
+      "explanation": {
+       "candidates": [
+        {
+         "operand": "Left",
+         "outcome": "incompatible",
+         "side": "left"
+        }
+       ],
+       "member": "add",
+       "operation": "+",
+       "truncated": false
+      }
+     },
+     "end": 430,
+     "expected_token": null,
+     "filename": "nominal/ordered-right-fallback.blot",
+     "kind": "diagnostic",
+     "message": "No compatible associated implementation exists",
+     "offset_encoding": "utf8_bytes",
+     "stage": "check-project",
+     "start": 412,
+     "utf16": {
+      "end": 430,
+      "start": 412
+     }
+    },
+    {
      "body_elaborations": 164,
-     "body_lowerings": 164,
-     "check_occurs_steps": 1655,
+     "body_lowerings": 0,
+     "check_occurs_steps": 1654,
      "checker": {
       "associated_steps": 0,
-      "inference_steps": 2993,
-      "instantiations": 217,
-      "memo_declined": 0,
+      "inference_steps": 2992,
+      "instantiations": 216,
+      "memo_declined": 1,
       "memo_hits": 5,
-      "memo_misses": 9,
+      "memo_misses": 8,
       "obligations_appended": 60,
       "pending_peak": 57,
       "projection_memo_hits": 0,
       "shared_uses": 20,
       "use_expansions": 17
      },
-     "core_nodes": 915,
-     "effect_rows": 2657,
-     "emitted_functions": 23,
+     "core_nodes": 0,
+     "effect_rows": 2651,
+     "emitted_functions": 0,
      "filename": "nominal/ordered-right-fallback.blot",
      "files": 2,
      "imported_schemes": 21,
      "kind": "compilation",
-     "row_versions": 459,
+     "row_versions": 457,
      "source_bytes": 15181,
      "stage": "build-project",
-     "success": true,
+     "success": false,
      "syntax_nodes": 2102,
-     "type_nodes": 5206,
-     "type_versions": 789,
-     "wasm_bytes": 1771
+     "type_nodes": 5202,
+     "type_versions": 788,
+     "wasm_bytes": 0
     }
-   ],
-   "wasm_bytes": 1771,
-   "wasm_sha256": "84f0a53ece23c84c9f3e2a411327e199a58d3ee3777f99c85def261b5abde5ac"
+   ]
   },
   "package/mixed-composition.blot": {
    "exit": 1,
@@ -8171,7 +8216,7 @@
     {
      "body_elaborations": 212,
      "body_lowerings": 212,
-     "check_occurs_steps": 3061,
+     "check_occurs_steps": 3063,
      "checker": {
       "associated_steps": 0,
       "inference_steps": 5214,
@@ -8193,11 +8238,11 @@
      "imported_schemes": 107,
      "kind": "compilation",
      "row_versions": 923,
-     "source_bytes": 27340,
+     "source_bytes": 27420,
      "stage": "build-project",
      "success": true,
-     "syntax_nodes": 3867,
-     "type_nodes": 10088,
+     "syntax_nodes": 3879,
+     "type_nodes": 10096,
      "type_versions": 1601,
      "wasm_bytes": 7559
     }

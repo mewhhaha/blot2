@@ -1502,6 +1502,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::MigrationSummary)->
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::MigrationSummary,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::ProjectStats)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::ProjectStats,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SignatureSummary)->bool {return equalFields(left,right);}
+fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SignatureSummary,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::SimpleRecord)->bool {return equalFields(left,right);}
 fn blot_cli::blotStructuralHash<StructuralSink>(value:blot_cli::SimpleRecord,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_cli::Stats)->bool {return equalFields(left,right);}
@@ -1552,6 +1554,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageAg
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageAggregate,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageBinding)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageBinding,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageFunction)->bool {return equalFields(left,right);}
+fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StageFunction,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StagePart)->bool {return equalFields(left,right);}
 fn blot_direct_function::blotStructuralHash<StructuralSink>(value:blot_direct_function::StagePart,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_direct_function::StageValue)->bool {return equalFields(left,right);}

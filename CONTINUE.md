@@ -6,14 +6,24 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `be489b79`, with Gdev `73b4b2c`,
-Ink `3f2e603` and Pen `ad9766c`. Six layers of `(x, 0, x)` now produce
-runnable Wasm in **3.4 ms**, down from a three-second timeout.
-Gdev Main took **1,088.3 → 1,070.7 ms** over 16 alternating
-fresh-process pairs with warm file data (seven faster). All 271 modules produced the same
-2,639,638-byte Wasm. The remaining structural type growth occurs during
-inference when constructing nested signatures.
-[Qualification and paired trials](benchmarks/evidence/measurements/2026-11-19-shared-ownership.json) ·
+The Goose compiler now resolves a binary operation on its left operand and
+can evaluate an ordinary callback or return a closure from `#run`. The full
+compiler gate passed 1,108 guest and host tests. The same 120-frame Gdev
+input produced identical packets and final state with the previous compiler.
+At Gdev `aaad3f5` and Ink `00d5b3a`, all 210 Gdev test modules execute,
+with 1,224 checks passing and 108 failing. Ink passes 281 guest checks.
+[Qualification and exact inputs](benchmarks/evidence/measurements/2026-11-19-language-design.json)
+
+Gdev's hauling planner now imports the salt read model independently. Its
+Wasm returns the expected height even when the salt writer has a type error.
+Writing out public signatures in Ink's motion module gave **791 ms** to
+compile Gdev Main and **51 ms** after an edit on eight workers. Leaving
+those signatures inferred gave **789 ms** and **50 ms**. Private helpers
+remain inferred. [Signature experiment](tasks/FAST_COMPILE.md#export-signatures-and-module-boundaries-19-november-2026)
+
+The previous type-system checkpoint at Blot `be489b79` reduced six layers
+of `(x, 0, x)` from a three-second timeout to 3.4 ms. Nested inferred
+signatures still grow during construction.
 [Type-system assessment](tasks/FAST_COMPILE.md#shared-types-in-ownership-analysis-19-november-2026)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
@@ -51,7 +61,7 @@ position. The session copies the changed module’s Core nodes and updates
 one Wasm operand. Other body edits still use module-level checking.
 [Measurements and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
-## Current results
+## Earlier runtime qualification at Blot `be489b79`
 
 | Suite | Starting checkpoint | Qualified release |
 | --- | --- | --- |
@@ -82,12 +92,14 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
 ## Remaining work
 
 1. Migrate the remaining shared writers and borrowed returns. The
-   [source scan](scripts/integration/count_stores.py) finds **1,190 candidate
-   store lines and 15 `lent` declarations**, down from 1,558 and 55. The
-   [world-writer scan](scripts/integration/world_writers.py) finds 20 writers
-   each in `player/hand` and `world/salt`. Follow their callers as a group and
-   preserve snapshot independence when replacing live terrain views. Retire
-   the mutation form of `=`, `lent` and their migration tools once callers move.
+   [source scan](scripts/integration/count_stores.py) finds **1,008 candidate
+   store lines and six `lent` declarations**, down from 1,190 and 15.
+   Terrain snapshots, the devtools clock, station title animation and prepared
+   path tables now have explicit owners. The residual Gdev salt and hand
+   callbacks borrow overlapping parts of the world. Compute a salt update
+   from the read views, let those views end and apply the result to the owned
+   world. Retire the mutation form of `=`, `lent` and their migration tools
+   after the remaining applications move.
 2. Reduce committed linear memory while preserving the contiguous scratch
    allocation fast path. The two remaining Ink native failures enforce memory
    limits for dense bodies, snapshots, UI and text. Default modules start at

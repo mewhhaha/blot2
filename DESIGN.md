@@ -33,9 +33,12 @@ Prefer shared semantic shapes and bounded analysis over repeatedly expanding
 physical values. Any optimization must preserve checked authority, effect order,
 trap behavior, numerical bits and real application budgets.
 
-Ordinary compile-time functions through `#run` are the direction for future
-build work. Controlled build effects and broader reflection remain open;
-existing forced evaluation is not a claim of unrestricted compile-time effects.
+Ordinary `#run` functions can read declared build inputs, build lookup tables
+and return a function that closes over the resulting data. The public
+declaration supplies the name. Reflection and quotation-based code generation
+remain open. Binary operators select an implementation on the left operand.
+The export-signature experiment checks written public contracts while letting
+private helpers infer.
 Language tasks are retired from the target model; isolated host workers remain.
 
 The earlier proposal catalogue is available in the

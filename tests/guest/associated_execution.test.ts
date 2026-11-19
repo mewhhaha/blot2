@@ -111,3 +111,19 @@ entry const primitive = func (value: U32) : U32 => return @u32.add value 2
     equal(guest.call("primitive", 40), 42);
   });
 });
+
+Deno.test("an annotated result cannot make an incompatible left-hand operator use the right implementation", async () => {
+  const source = `
+type Left is data = $Left U32
+type Right is data = $Right U32
+func Left.add (a: Left) -> (b: Left): U32 => return 1
+func Right.add (a: Left) -> (b: Right): U32 => return 42
+func combine a -> b => return @type.call "add" a b
+`;
+  for (const expr of ['@type.call "add" ($Left n) ($Right n)', 'combine ($Left n) ($Right n)']) {
+    await compileExpectedFailure(source + `entry func answer (n: U32): U32 => return ${expr}\n`,
+      "missing_associated", undefined, {prelude: "none"});
+  }
+  await compileAndRun(source + "entry func answer (n: U32): U32 => return Right.add ($Left n) ($Right n)\n",
+    guest => equal(guest.call("answer", 0), 42), {prelude: "none"});
+});

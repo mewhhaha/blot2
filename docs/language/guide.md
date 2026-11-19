@@ -474,8 +474,8 @@ other declarations: `infixl 60 (++) = combine`, `infixr 50 (**) = power`, or
 `infix 30 (~=) = close`. A backtick function can also have a fixity declaration.
 
 Arithmetic/comparison operators call generic prelude functions. `add` uses
-`@type.call "add" left right`. At compile time, try the left type's `add`, then
-the right type's if the first cannot accept both operands. Never swap arguments.
+`@type.call "add" left right`. The left operand's type supplies `add`; its signature determines which right
+operand it accepts. Use an explicit qualified call for other operand orders.
 A compatible left implementation wins even if its result conflicts with an
 annotation. Associated functions belong to the nominal type's defining module;
 `@type.call` accepts other literal member names too.
@@ -490,12 +490,11 @@ such as `Array.get` and `geometry.Point.add` still work.
 When dispatch fails, the diagnostic explains it. The client returns
 `diagnostic.explanation` (CLI JSON: `details.explanation`): the operator, the
 member looked up, and each candidate in the order dispatch considered it. A
-candidate has a `side` (`left`, `builtin`, `right`, `destination` for
+candidate has a `side` (`left`, `builtin`, `destination` for
 `@type.result`, or `receiver`), the type's spelling and an `outcome`:
 `unknown_operand`, `no_member`, `incompatible` (the member rejects these
 operands), `unsupported_scalar`, or `result_mismatch` (selected, but its result
-conflicts with the expected type, so no later candidate was tried). A right type
-equal to the left is not listed twice. Explanations hold at most four candidates
+conflicts with the expected type, so no later candidate was tried). Explanations hold at most four candidates
 and 256 bytes per spelling; `truncated` marks cut detail. For an operator
 failure, `explanation.contexts` gives up to two source operand locations, even
 when dispatch is checked inside an imported generic function. For a direct type
@@ -505,7 +504,7 @@ diagnostic.
 
 ```text
 entry func answer () => return 1 + 2.5
-// missing_associated; `+` (add): left U32 incompatible, right F32 incompatible
+// missing_associated; `+` (add): left U32 incompatible
 ```
 
 Named constructor fields support `point.x`. A field must exist on every
@@ -1305,17 +1304,16 @@ lane operands come last, so `lanes |> simd.u32_shl 13` pipelines.
   the host chooses, so its results can differ between machines and from
   compile-time evaluation, which fuses. It uses the relaxed-SIMD instruction set
   and is never chosen implicitly.
-- `load index values` and `store index lanes values` read or replace four
-  consecutive U32, F32 or Bool elements after one range check, which precedes
-  the index arithmetic. In the owned profile a store mutates the named Array
-  through its aliases. A load reads the existing lanes without copying the
-  owner. Copy explicitly before retaining an independent version.
+- `load index values` reads four consecutive U32, F32 or Bool elements from
+  an Array, GrowArray, ResizeArray or read-only slice. Indices start at the
+  beginning of the supplied collection. All four lanes must fit inside that
+  collection, including when a slice ends before its underlying array.
+- `store index lanes values` replaces four elements of a fixed Array. The
+  range check precedes index arithmetic for both operations.
 
-Explicit compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*` with their
-full argument lists, like the scalar compiler operations;
-`@simd.load values
-index` and `@simd.store values index lanes` take the Array
-first.
+Explicit compiler operations use `@simd.u32x4.*` and `@simd.f32x4.*`
+with their full argument lists. `@simd.load values index` and
+`@simd.store values index lanes` take the collection first.
 
 The owned backend lowers supported closed four-lane values and operations
 without changing lane order, bit reinterpretation or rounding contracts. Exact
@@ -1716,10 +1714,35 @@ receive `unsupported_attribute`.
 
 ## Modules, constants, current limits
 
+Use `blotc check-exports FILE...` to check that a module writes the types of
+its public values. Named functions may annotate their parameters and result;
+`const` and `let` may annotate the whole declaration. A unit parameter spells
+its own type. Local functions keep ordinary inference. The command parses the
+file and reports missing signatures even when an implementation contains an
+unresolved name. `--include-private` also checks private module-level values.
+An ordinary build still checks bodies and infers omitted signatures.
+
 `#run expression` evaluates a pure expression during compilation. Parentheses
 delimit it inside a larger expression. Scalar results become Wasm constants. A staged function can build
 arrays, named records, tuples and data constructors, select a field and read
 an array element. Its returned data uses the same layout as a literal.
+A table generator can use a captured value, and a staged function can produce
+the implementation of a function with a declared type. For example, the
+following function calculates the four entries during compilation. The runtime
+argument selects an entry.
+
+```blot
+func lookup (base: U32): (U32 -> U32) => return do:
+  let rows: Array U32 = @array.generate 4 (func i => return @u32.add base i)
+  return func (i: U32): U32 => return @array.get rows i
+entry func answer (i: U32): U32 => return (#run (lookup 40)) i
+```
+
+`@array.fill` and `@array.generate` charge their size against the evaluation
+budget. Generators run in index order. A zero-length table invokes the
+generator zero times. Staging produces a value inside a declaration; module
+names and type definitions are known once parsing finishes.
+
 The evaluator supports Unit, Bool, U32 and F32 literals,
 scalar arithmetic and comparisons, conditionals, short-circuit logic, global
 constants and fully applied named functions, including imports. Integer
@@ -1736,7 +1759,7 @@ entry func answer () => return #do:
 
 Both forms can use bindings created inside the staged expression. A runtime
 parameter, host effect, unsupported operation or exhausted evaluation budget
-fails the build. Each evaluation has a budget of 65,536 Core node visits and a
+fails the build. Each evaluation has a 65,536-step budget for Core visits, generated elements and captured bindings, and a
 depth limit of 256. Embedding the result has a separate 65,536-value budget.
 Quoted code still needs backend support.
 

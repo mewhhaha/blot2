@@ -1,0 +1,354 @@
+{
+  "date": "2026-11-19",
+  "compiler": {
+    "parent": "d0ab8e6b1e493b4f1416c5086271a634a43cb721",
+    "sourceIdentity": "23f0f2c0cdb3c6b6138d79f79da747a109417ab1d9084c2b9d2825e37df25fd7",
+    "binarySha256": "e6344e087a4fb32a095fbe91f11121baca0f9c803d340215570ad564eb8b8391",
+    "baselineBinarySha256": "c2429570c26f5b3103c6c75a48b2c3e98d0992595bf183b19e8d85e2b13a57ee",
+    "configuration": {
+      "artifact_replay": false,
+      "c_flags": [
+        "-std=gnu11",
+        "-D_GNU_SOURCE",
+        "-O2",
+        "-pthread"
+      ],
+      "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+      "entry": "src/main.goose",
+      "goose_inline": "-O2",
+      "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+      "host": "linux",
+      "host_entry": "blot_goose_main",
+      "inference_budget": 1000000,
+      "machine": "x86_64",
+      "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+      "schema": 1,
+      "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+    }
+  },
+  "benchInputs": {
+    "gdev": "dfba0307f3920f80ddd65c2f384d3a61fb417a15",
+    "gdevReadModelOverlay": {
+      "commit": "c54a54083fa5cd108945df248329a3a399a46cb9",
+      "files": [
+        "src/world/salt.blot",
+        "src/world/salt_state.blot",
+        "src/actors/hauling_plan.blot"
+      ]
+    },
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "publicMotionFrom": "3c7f8686db55692911220edad5e771fd379ac44c",
+    "std": "This compiler revision",
+    "deno": "2.9.8",
+    "policy": "Six fresh project sessions per cell in six rotating orders. Warm file data; no disk eviction. A retained second request changes the reachable comparison x >= 88.0 to x >= 87.0. Fresh clock includes process/session opening. Shared host. Measurements between worker counts are in separate series."
+  },
+  "trials": [
+    {
+      "workers": 1,
+      "signatures": "inferred",
+      "sourceSha256": "3ffba16e9f94112b1f4edbd1b9977bcd995d4abbc7d6b68f1b1d868974890abf",
+      "fresh": {
+        "ms": [
+          1627.789,
+          1754.858,
+          1766.677,
+          1689.397,
+          1742.205,
+          1675.776
+        ],
+        "medianMs": 1715.8,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          752.615,
+          747.34,
+          759.612,
+          754.565,
+          726.491,
+          724.084
+        ],
+        "medianMs": 749.98,
+        "freshModules": 61
+      }
+    },
+    {
+      "workers": 1,
+      "signatures": "exports",
+      "sourceSha256": "ddc0b2d9447e4d51d398107e0aea7c40ff55283a19b0c4e016129486e65bbc33",
+      "fresh": {
+        "ms": [
+          1630.472,
+          1674.221,
+          1699.777,
+          1726.612,
+          1622.841,
+          1715.1
+        ],
+        "medianMs": 1687.0,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          720.388,
+          768.626,
+          766.116,
+          769.75,
+          747.678,
+          744.718
+        ],
+        "medianMs": 756.9,
+        "freshModules": 61
+      }
+    },
+    {
+      "workers": 1,
+      "signatures": "all",
+      "sourceSha256": "8edf84930865ba26e3050c566caade19e3b7517899d6a16874ac3a2b6bad0feb",
+      "fresh": {
+        "ms": [
+          1669.605,
+          1677.484,
+          1772.67,
+          1682.097,
+          1738.885,
+          1731.954
+        ],
+        "medianMs": 1707.03,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          756.244,
+          748.058,
+          765.491,
+          756.358,
+          844.695,
+          755.992
+        ],
+        "medianMs": 756.3,
+        "freshModules": 61
+      }
+    },
+    {
+      "workers": 8,
+      "signatures": "inferred",
+      "sourceSha256": "3ffba16e9f94112b1f4edbd1b9977bcd995d4abbc7d6b68f1b1d868974890abf",
+      "fresh": {
+        "ms": [
+          778.61,
+          788.388,
+          816.362,
+          789.403,
+          786.227,
+          832.511
+        ],
+        "medianMs": 788.9,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          49.705,
+          52.977,
+          53.369,
+          49.537,
+          49.751,
+          49.109
+        ],
+        "medianMs": 49.73,
+        "freshModules": 1
+      }
+    },
+    {
+      "workers": 8,
+      "signatures": "exports",
+      "sourceSha256": "ddc0b2d9447e4d51d398107e0aea7c40ff55283a19b0c4e016129486e65bbc33",
+      "fresh": {
+        "ms": [
+          777.195,
+          783.602,
+          751.953,
+          799.237,
+          827.971,
+          829.64
+        ],
+        "medianMs": 791.42,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          49.477,
+          49.177,
+          48.865,
+          53.004,
+          54.626,
+          51.749
+        ],
+        "medianMs": 50.61,
+        "freshModules": 1
+      }
+    },
+    {
+      "workers": 8,
+      "signatures": "all",
+      "sourceSha256": "8edf84930865ba26e3050c566caade19e3b7517899d6a16874ac3a2b6bad0feb",
+      "fresh": {
+        "ms": [
+          763.988,
+          812.552,
+          804.628,
+          813.033,
+          798.937,
+          811.263
+        ],
+        "medianMs": 807.95,
+        "freshModules": 271
+      },
+      "edit": {
+        "ms": [
+          48.158,
+          48.319,
+          51.975,
+          58.103,
+          51.512,
+          54.048
+        ],
+        "medianMs": 51.74,
+        "freshModules": 1
+      }
+    }
+  ],
+  "wasm": {
+    "fresh": {
+      "bytes": 2639905,
+      "sha256": "50fd10f611d68892ea32dcdc62721e9aae3f1c599d1a2037a97685c23610204f"
+    },
+    "edit": {
+      "bytes": 2639905,
+      "sha256": "d6149c3522475e85e1a5ef9ce305821f68562eb6e22c928700ca2968feb68837"
+    }
+  },
+  "surveyBeforeAnnotations": {
+    "gdev": {
+      "public": {
+        "files": 151,
+        "checked": 4017,
+        "missing": 3837
+      },
+      "includingPrivate": {
+        "files": 151,
+        "checked": 4018,
+        "missing": 3838
+      }
+    },
+    "ink": {
+      "public": {
+        "files": 134,
+        "checked": 2184,
+        "missing": 1912
+      },
+      "includingPrivate": {
+        "files": 134,
+        "checked": 2220,
+        "missing": 1941
+      }
+    },
+    "blot2": {
+      "public": {
+        "files": 14,
+        "checked": 386,
+        "missing": 336
+      },
+      "includingPrivate": {
+        "files": 14,
+        "checked": 401,
+        "missing": 341
+      }
+    }
+  },
+  "plannerBoundary": {
+    "storageError": "unknown_value",
+    "before": false,
+    "after": true,
+    "modules": 103,
+    "wasmBytes": 6051,
+    "wasmSha256": "51b039f5ce7a15e8dfb095a56181f5878c231f0b6214488ac476c17fa332f607",
+    "executedWaitingSpotHeight": 3,
+    "haulingTestsPassed": 4
+  },
+  "gdevDevtools": {
+    "testsPassed": 29,
+    "modules": 5,
+    "frameCountInClockTest": 20,
+    "wasmBytes": 1086631
+  },
+  "ownership": {
+    "method": "Candidate lines counted by scripts/integration/count_stores.py in Gdev src/ tests/ pen/ test_support/ devtools/ performance/ and Ink lib/ tests/. Counts approximate.",
+    "before": {
+      "gdev": "73b4b2c79928f4c1fe84e1f835f5c8420e838510",
+      "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+      "stores": 1190,
+      "lent": 15
+    },
+    "after": {
+      "gdev": "aaad3f58e9d1e6abf2d72bf347e47e06147feb64",
+      "ink": "00d5b3a5c7ed7b1cb3706b13ed31ef31f77e2bd5",
+      "gdevStores": 812,
+      "inkStores": 196,
+      "stores": 1008,
+      "lent": 6
+    }
+  },
+  "qualification": {
+    "compilerGate": "deno task test:compiler",
+    "guestTests": 1108,
+    "ignored": 100,
+    "wasmFixtures": 192,
+    "loweringFixtures": 212,
+    "directReferences": 2,
+    "gdev": {
+      "sourceInput": "Gdev 616f31e plus the fixture-only changes at aaad3f5, with Ink 4c37d97 plus its fixture update batch.",
+      "pass": 1224,
+      "fail": 108,
+      "modules": 210,
+      "unbuilt": 0,
+      "additionalNamedFailures": 0
+    },
+    "ink": {
+      "commit": "00d5b3a5c7ed7b1cb3706b13ed31ef31f77e2bd5",
+      "guestPass": 281,
+      "guestModules": 73,
+      "nativePass": 111,
+      "nativeFail": [
+        "dense_bodies_and_snapshots_keep_committed_memory_bounded",
+        "ui_and_text_adversarial_workloads_reuse_bounded_memory"
+      ]
+    },
+    "replay": {
+      "before": 242,
+      "after": 242,
+      "changed": [],
+      "manifestSha256": "f69927af57047fbfd111289aa547aed7ab55e91e8851681d6352491f1f808238"
+    },
+    "replayCompilerComparison": "before/after binaries on identical benchInputs and public motion.blot. Full 120-frame packet/input/snapshot sets compared by path and content.",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "liveFrame": {
+      "note": "Separate live working-tree build. Figures do not share the pinned signature benchmark inputs.",
+      "penSha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+      "wasmSha256": "0529ada60c0a44c8eee8f5c9c1a18ae1ad0122e317174f6deb551e74e7f08c98",
+      "bytes": 2655834,
+      "freshModules": 271,
+      "totalCompileMs": 767.351817,
+      "frameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "traceSha256": "b9df8add551a580caf952c0f7d953ed3863af23199d6e1fe9cf989ce53c272ac",
+      "checks": {
+        "exit_zero": true,
+        "one_completed_guest_trace": true,
+        "one_headless_step": true,
+        "first_guest_frame": true,
+        "complete_render": true,
+        "screenshot_640x480": true
+      }
+    }
+  }
+}

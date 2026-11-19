@@ -1,4 +1,4 @@
-import { compileAndRun, equal } from "./compile_helpers.ts";
+import { compileAndRun, compileExpectedFailure, equal } from "./compile_helpers.ts";
 
 const declarations = `type Identity = forall [a] => a -> a
 const identity: Identity = func value => return value
@@ -33,8 +33,8 @@ entry const fraction = func (value: F32) => return represented (field {x: value}
   );
 });
 
-Deno.test("ordinary associated helpers retry a compatible right owner beside forall", async () => {
-  await compileAndRun(
+Deno.test("ordinary associated helpers reject a right-only match beside forall", async () => {
+  await compileExpectedFailure(
     `const identity: forall [a] => a -> a = func value => return value
 type Left is data = $Left {value: U32}
 type Right is data = $Right {value: U32}
@@ -43,7 +43,8 @@ const Right.add = func (left: Left) => return func (right: Right) => return @u32
 const combine = func left => return func right => return @type.call "add" left right
 entry const answer = func (value: U32) => return identity (combine ($Left {value: value}) ($Right {value: 22}))
 `,
-    (guest) => equal(guest.call("answer", 20), 42),
+    "missing_associated",
+    undefined,
     { prelude: "none" },
   );
 });

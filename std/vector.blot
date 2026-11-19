@@ -13,10 +13,10 @@ func Vec2.div (value: Vec2) -> (scale: F32): Vec2 => return
 func Vec2.lerp (a: Vec2) -> (b: Vec2) -> (weight: F32): Vec2 => return
   $Vec2 { x: F32.lerp a.x b.x weight, y: F32.lerp a.y b.y weight }
 func Vec2.dot (a: Vec2) -> (b: Vec2): F32 => return a.x * b.x + a.y * b.y
-func Vec2.length_squared value => return Vec2.dot value value
-func Vec2.length value => return sqrt (Vec2.length_squared value)
+func Vec2.length_squared (value: Vec2): F32 => return Vec2.dot value value
+func Vec2.length (value: Vec2): F32 => return sqrt (Vec2.length_squared value)
 // Zero normalizes to zero. Other inputs follow F32 arithmetic.
-func Vec2.normalized value => return do:
+func Vec2.normalized (value: Vec2): Vec2 => return do:
   let length = Vec2.length value
   break if length == 0.0 then value else value / length
 
@@ -36,8 +36,8 @@ func Vec3.cross (a: Vec3) -> (b: Vec3): Vec3 => return $Vec3 {
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 }
-func Vec3.length_squared value => return Vec3.dot value value
-func Vec3.length value => return sqrt (Vec3.length_squared value)
-func Vec3.normalized value => return do:
+func Vec3.length_squared (value: Vec3): F32 => return Vec3.dot value value
+func Vec3.length (value: Vec3): F32 => return sqrt (Vec3.length_squared value)
+func Vec3.normalized (value: Vec3): Vec3 => return do:
   let length = Vec3.length value
   break if length == 0.0 then value else value / length

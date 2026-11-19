@@ -3,6 +3,46 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Export signatures and module boundaries, 19 November 2026
+
+Declaring all 20 public functions and constants in Ink's motion module left
+Gdev's produced Wasm unchanged. Giving its five private helpers explicit
+results also left the Wasm unchanged. The table shows medians in milliseconds
+across six fresh project sessions per cell. Each retained edit changes a
+reachable numeric threshold and produces different, validated Wasm.
+
+| Motion declarations | Fresh, 8 workers | Edited, 8 workers | Fresh, 1 worker | Edited, 1 worker |
+| --- | ---: | ---: | ---: | ---: |
+| Original, inferred | 788.9 | 49.7 | 1,715.8 | 750.0 |
+| Public types declared | 791.4 | 50.6 | 1,687.0 | 756.9 |
+| Public and private declared | 807.9 | 51.7 | 1,707.0 | 756.3 |
+
+Each fresh session checked 271 modules. The edit rechecked **one** module
+on eight workers and **61** on one worker for every spelling. These are
+fresh processes with warm files on a shared host. Annotations alone left the
+same work for the compiler. Keep private inference. The separate Gdev
+change that moved pure stack and stash lookups into the salt read model
+enabled a consumer to compile against 103 modules and run while the salt
+writer contained an unknown name. The same probe before the import change
+failed at that name. All four hauling behavior tests passed through Pen.
+
+`blotc check-exports` checks written public signatures without resolving
+imports or checking function bodies. `--include-private` also checks private
+values. Before adding signatures, the survey found 3,837 of 4,017 Gdev values
+and 1,912 of 2,184 Ink values missing written public types. This opt-in check
+lets a library adopt the policy one module at a time.
+
+To reproduce the trials, export the Gdev and Ink commits listed in the
+evidence into sibling directories and take the three salt/hauling files
+from the Gdev overlay commit. Use this revision's std. From the Ink repo,
+save `git show 3f2e603:lib/motion.blot` and
+`git show 3c7f868:lib/motion.blot` as two files. From Blot, run
+`deno run -A benchmarks/tools/bench_export_signatures.ts COMPILER GDEV ORIGINAL PUBLIC 6`.
+The runner derives the private annotations and checks Wasm bytes against
+both worker counts and all three source variants.
+
+[Raw trials, inputs and qualification](../benchmarks/evidence/measurements/2026-11-19-language-design.json)
+
 ## Shared types in ownership analysis, 19 November 2026
 
 The old ownership checker followed both paths to a shared type each time it

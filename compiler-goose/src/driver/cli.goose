@@ -29,8 +29,8 @@ type Error=blot_error::Error;
 type Text=blot_support::Option<const u8[:]>;
 type Policy=blot_execution_policy::Policy;
 type Options=blot_reuse_project::Options;
-enum Command {lex,parse,check,build,dependencies,parse_project,check_project,build_project}
-let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc migrate-stores ENTRY... [--project PEN_JSON] [--write-root DIR] [--include-std] [--dry-run] [project options]\n       migrate-stores rewrites each := that gets aliased_update into the store =.\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
+enum Command {lex,parse,check_exports,check,build,dependencies,parse_project,check_project,build_project}
+let usage:const u8[:]="Usage: blotc lex|parse|check SOURCE [SOURCE...]\n       blotc check-exports [--include-private] SOURCE [SOURCE...]\n       blotc build ENTRY OUTPUT.wasm [--dependencies FILE] [--profile] [project options]\n       blotc dependencies ENTRY OUTPUT.blotdep [project options]\n       blotc parse-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc check-project ENTRY [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none]\n       blotc build-project ENTRY OUTPUT.wasm [--std-root DIR] [--alias PREFIX=DIR] [--prelude PATH|none] [--profile]\n       blotc serve-project (owned project-build byte protocol)\n       blotc migrate-stores ENTRY... [--project PEN_JSON] [--write-root DIR] [--include-std] [--dry-run] [project options]\n       migrate-stores rewrites each := that gets aliased_update into the store =.\n       blotc check|build also accepts explicit --prelude PATH|none (default: none).\n       Project options accept --input-mode project|source (default: project).\n       --profile (build, build-project) adds phase clocks to the stats record.\n       --inference-budget STEPS sets a process-local inference limit (default: 1000000).\n       --frontend-workers 1..16 (build, build-project, serve-project) opts into independent module checks.\n       --semantic-workers 1..16 (build, build-project, serve-project) lowers modules on workers.\n\nBlot compiler written in Goose. JSON-lines diagnostics and stage metrics\nare written to stdout. Parse coverage and executable coverage are distinct.\n\n";
 type Argument=const u8[:];
 struct Arguments {items:Argument[:]=default<Argument[:]>(),bytes:u8[:]=default<u8[:]>()}
 reusable[] var argument_bytes:u8[>..]=[];
@@ -49,7 +49,7 @@ fn unsigned(text:const u8[:],maximum:u64)->u64,Error {
 fn workerCount(value:const u8[:])->u8,bool {let workers,error=unsigned(value,255);if error!=blot_error::Error.none||workers==0||workers>16 {return 0,false;}return workers as u8,true;}
 fn configure(value:const u8[:])->Error {let limit,error=unsigned(value,0xffffffffffffffff);if error!=blot_error::Error.none {return error;}return blot_main::configureInferenceBudget(limit);}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len&&text[..prefix.len]==prefix;}
-fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",lex=>"lex",parse=>"parse",check=>"check",build=>"build",dependencies=>"dependencies"}}
+fn commandName(command:Command)->const u8[:] {match command {parse_project=>"parse-project",check_project=>"check-project",build_project=>"build-project",lex=>"lex",parse=>"parse",check_exports=>"check-exports",check=>"check",build=>"build",dependencies=>"dependencies"}}
 fn parseCommand(text:const u8[:])->Command,bool {for command in [Command.lex,Command.parse,Command.check,Command.build,Command.dependencies,Command.parse_project,Command.check_project,Command.build_project] {if text==commandName(command) {return command,true;}}return Command.lex,false;}
 fn isBuild(command:Command)->bool {return command==Command.build||command==Command.build_project;}
 struct Stats {
@@ -74,11 +74,49 @@ struct Stats {
  emit_us:i64=0,
  checker:blot_check_check::Counters=blot_check_check::Counters{..},
 }
+// Compare public-only and whole-module signature policies without executing
+// initializers, resolving imports or inferring types from function bodies.
+fn checkExportSignatures(writer:blot_io::Writer,filename:const u8[:],tree:const blot_parse_ast::Tree&,names:const blot_parse_symbols::Pool&,include_private:bool)->bool,Error {
+ var checked:u32=0;
+ var missing:u32=0;
+ for id in tree.roots.items {
+  if tree.node(id).tag!=blot_parse_ast::tag_value_decl {continue;}
+  if !include_private && blot_parse_ast::declaration_traits(tree,id).private {continue;}
+  checked++;
+  let declaration=tree.value_decl(id);
+  if declaration.annotation!=0 {continue;}
+  var expr=declaration.body;
+  var complete=false;
+  var problem=id;
+  while tree.node(expr).tag==blot_parse_ast::tag_group {expr=tree.node(expr).a;}
+  while tree.node(expr).tag==blot_parse_ast::tag_lambda {
+   let lambda=tree.node(expr);
+   let parameter=tree.parameter(lambda.a);
+   if !parameter.is_unit && parameter.annotation==0 {problem=lambda.a;break;}
+   if lambda.c!=0 {complete=true;break;}
+   expr=lambda.b;
+  }
+  if complete {continue;}
+  missing++;
+  let span=tree.span(problem);
+  var start=span.start;
+  var end=span.end;
+  if problem==id {
+   let point,found=tree.value_name_point(id);
+   if found {start=point;end=start+(names.get(declaration.name).len as u32);}
+  }
+  let error=diagnostic(writer,filename,"check-exports","missing_signature",start,end,"Write the parameter and result types or give the declaration a type");
+  if error!=blot_error::Error.none {return false,error;}
+ }
+ let error=emit(writer,SignatureSummary{filename:filename,checked:checked,missing:missing,..});
+ return missing==0,error;
+}
+struct SignatureSummary {kind:const u8[:]="signatures",filename:const u8[:],checked:u32,missing:u32}
 fn now()->u64 {return blot_native::clock_ns();}
 fn elapsed(start:u64)->i64 {let ended=now();if ended<start {return 0;}return ((ended-start)/1000) as i64;}
 struct SimpleRecord {kind:const u8[:]="compilation",filename:const u8[:],stage:const u8[:],success:bool,total_us:i64,stats:Stats,memory:blot_runtime_memory::Counts=blot_runtime_memory::Counts{..},memory_scope:const u8[:]="Requested bytes of the compiler's pooled owners; excludes arrays owned by a scope, pool capacity and process RSS. All owners released before this record."}
 fn process(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text)->bool,Error {let meter=blot_runtime_memory::start();var stats=Stats{..};let started=now();let accepted,error=processSingle(writer,command,filename,output,stats);if error!=blot_error::Error.none {return false,error;}let written=emit(writer,SimpleRecord{filename:filename,stage:commandName(command),success:accepted,total_us:elapsed(started),stats:stats,memory:meter.counts(),..});return accepted,written;}
-fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&)->bool,Error {
+fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],output:Text,stats:Stats&,include_private:bool=false)->bool,Error {
  var input=blot_reuse_project::FileInputs{..};var source:u8[>..<]=[];let read=input.read(filename,33554432,source);if read!=blot_error::Error.none {return false,read;}stats.source_bytes=source.len;
  var names,error=blot_parse_symbols::initPooled();if error!=blot_error::Error.none {return false,error;}
  var tokens:blot_parse_token::Token[>..<]=[];var comments:blot_parse_token::Token[>..<]=[];var diagnostics:blot_parse_lexer::Diagnostic[>..<]=[];var lexed=blot_parse_lexer::init(tokens,comments,diagnostics);let lex_start=now();let error=blot_parse_lexer::lex(source[..],lexed);if error!=blot_error::Error.none {names.deinit();return false,error;}stats.lex_us=elapsed(lex_start);stats.tokens=tokens.len;
@@ -89,6 +127,10 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
  if tree.diagnostics.len!=0 {let publication,error=blot_parse_syntax_diagnostics::parse(tokens[..],tree.diagnostics.items[0]);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}let error=frontendDiagnostic(writer,filename,"parse",source[..],publication,tree.diagnostics.items);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}}
  stats.parse_us=elapsed(parse_start);stats.syntax_nodes=tree.nodes.len-1;stats.syntax_extra_words=tree.extra.len;stats.symbols=names.entries.len;stats.symbol_bytes=names.bytes.len;
  if tree.diagnostics.len!=0 {tree.deinit();names.deinit();return false,blot_error::Error.none;}
+ if command==Command.check_exports {
+  let accepted,error=checkExportSignatures(writer,filename,tree,names,include_private);
+  tree.deinit();names.deinit();return accepted,error;
+ }
  if command==Command.parse {tree.deinit();names.deinit();return true,blot_error::Error.none;}
  let check_start=now();var checked,error=blot_check_check::check(tree,names);if error!=blot_error::Error.none {tree.deinit();names.deinit();return false,error;}
  stats.check_us=elapsed(check_start);stats.type_nodes=checked.types.nodes.len;stats.type_versions=checked.types.versions.len;stats.bindings=checked.bindings.len-1;stats.body_elaborations=checked.body_elaborations;stats.checker=checked.counters;
@@ -107,6 +149,21 @@ fn processSingle(writer:blot_io::Writer,command:Command,filename:const u8[:],out
 fn stageName(command:Command)->const u8[:] {if command==Command.parse_project {return "parse-project";}if command==Command.check_project {return "check-project";}return "build-project";}
 fn run(args:const Argument[:])->bool,Error {
  let stdout=blot_io::Writer{1};let stderr=blot_io::Writer{2};if args.len<=1||args[1]=="--help" {return true,blot_io::write_all(stdout,usage);}
+ if args[1]=="check-exports" {
+  var start:i64=2;
+  let include_private=args.len>2 && args[2]=="--include-private";
+  if include_private {start++;}
+  if args.len<=start {return false,blot_io::write_all(stderr,usage);}
+  var accepted=true;
+  for filename in args[start..] {
+   if starts(filename,"--") {return false,blot_io::write_all(stderr,usage);}
+   var stats=Stats{..};
+   let ok,error=processSingle(stdout,Command.check_exports,filename,blot_support::none<const u8[:]>(),stats,include_private);
+   if error!=blot_error::Error.none {return false,error;}
+   if !ok {accepted=false;}
+  }
+  return accepted,blot_error::Error.none;
+ }
  if args[1]=="serve-project" {
   var policy=Policy{..};var at:i64=2;
   while at<args.len {

@@ -40,11 +40,21 @@ fn validate(types: const blot_check_core::Types&, operation: blot_check_core::Ar
         convert => { if !((first.tag == blot_check_types::Tag.array && result.tag == blot_check_types::Tag.list) || (first.tag == blot_check_types::Tag.list && result.tag == blot_check_types::Tag.array)) { return blot_error::Error.invalid_artifact; } return proof.same(first.a, result.a); },
         cursor => { if (first.tag != blot_check_types::Tag.array && first.tag != blot_check_types::Tag.list) || result.tag != blot_check_types::Tag.cursor { return blot_error::Error.invalid_artifact; } return proof.same(inputs[0], result.a); },
         simd_load, simd_store => {
-            if first.tag != blot_check_types::Tag.array { return blot_error::Error.invalid_artifact; } let index = proof.same(blot_check_types::u32_type, inputs[1]); if index != blot_error::Error.none { return index; }
-            var lane_type = output_; if operation == blot_backend_collection_ops::Op.simd_store { lane_type = inputs[2]; } let lanes = types.node(lane_type);
+            let writing = operation == blot_backend_collection_ops::Op.simd_store;
+            if writing && first.tag != blot_check_types::Tag.array { return blot_error::Error.invalid_artifact; }
+            let index = proof.same(blot_check_types::u32_type, inputs[1]); if index != blot_error::Error.none { return index; }
+            var lane_type = output_; if writing { lane_type = inputs[2]; }
+            let lanes = types.node(lane_type);
             if lanes.tag != blot_check_types::Tag.product || lanes.b != 4 { return blot_error::Error.invalid_artifact; }
-            for lane in types.list(blot_check_types::List { lanes.a, lanes.b , ..}) { let error = proof.same(first.a, lane); if error != blot_error::Error.none { return error; } }
-            if operation == blot_backend_collection_ops::Op.simd_store { return proof.same(inputs[0], output_); }
+            let items = types.list(blot_check_types::List {lanes.a, lanes.b, ..});
+            let readable = blot_check_storage_types::readableElement(types, inputs[0]);
+            if readable.present {
+                let error = proof.same(readable.value, items[0]); if error != blot_error::Error.none { return error; }
+            } else {
+                let error = proof.collection(inputs[0], items[0], true); if error != blot_error::Error.none { return error; }
+            }
+            for lane in items[1..] { let error = proof.same(items[0], lane); if error != blot_error::Error.none { return error; } }
+            if writing { return proof.same(inputs[0], output_); }
         },
         cursor_has, cursor_value, cursor_advance => {
             if first.tag != blot_check_types::Tag.cursor { return blot_error::Error.invalid_artifact; }

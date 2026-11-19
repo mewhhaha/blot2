@@ -34,7 +34,6 @@ Deno.test.ignore("operator failures explain prelude dispatch through the CLI", a
     const cases: [string, unknown][] = [
       ["entry const answer = func () : U32 => return 1 + 2.5\n", [
         { side: "left", operand: "U32", outcome: "incompatible" },
-        { side: "right", operand: "F32", outcome: "incompatible" },
       ]],
       ["entry const answer = func () : Bool => return true + false\n", [
         { side: "left", operand: "Bool", outcome: "no_member" },
@@ -109,7 +108,6 @@ entry const broken = func (value: F32) : F32 => return do:
           member: "sub",
           candidates: [
             { side: "left", operand: "(F32 -> F32)", outcome: "no_member" },
-            { side: "right", operand: "F32", outcome: "incompatible" },
           ],
           truncated: false,
         });

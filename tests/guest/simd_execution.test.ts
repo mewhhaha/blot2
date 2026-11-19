@@ -626,3 +626,16 @@ entry const run = func (lane: U32) => return ${body}
 `, "simd_lane_literal", undefined, { stdRoot });
   }
 });
+
+Deno.test("SIMD loads obey the offset and end of a borrowed slice", async () => {
+  await compileAndRun(`
+import * as simd from "std/simd"
+func lanes (rows: &[U32]) -> (i: U32): U32 => return simd.u32_sum (simd.load i rows)
+entry func answer (i: U32): U32 => return do:
+  let rows = #[100, 1, 2, 4, 8, 200]
+  return lanes (&rows[1..5]) i
+`, guest => {
+    equal(guest.call("answer", 0), 15);
+    for (const index of [1, 4, 0xfffffffe, 0xffffffff]) throws(() => guest.call("answer", index));
+  }, {stdRoot});
+});

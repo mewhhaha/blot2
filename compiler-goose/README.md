@@ -102,6 +102,14 @@ Two of them read a model that is edited by hand:
   `tests/global_empty_facts` test the patches to the Goose compiler, not
   this compiler.
 
+## Checking published types
+
+`build/blotc-goose check-exports FILE...` checks public value signatures from
+source declarations. Add `--include-private` before the file paths to check
+every module-level value. Each file produces a JSON summary with the number of
+checked declarations and missing signatures. A missing signature exits with
+status 1. Run the normal project build to check bodies and imported types.
+
 ## Finding a pooled owner that is not released
 
 The `memory` field of a compilation record counts the compiler's pooled

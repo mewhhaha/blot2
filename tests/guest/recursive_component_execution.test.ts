@@ -41,17 +41,19 @@ entry const floating: U32 -> F32 = func depth => return repeat 1.5 depth
   }
 });
 
-Deno.test("queued associated methods preserve left dispatch priority", async () => {
+Deno.test("queued associated methods select each left operand independently", async () => {
   await compileAndRun(
     `type L is data = $L U32
 type R is data = $R U32
-type X is data = $X U32
-const prime = @type.call "merge" ($X 1) ($R 2)
+entry const prime: F32 = @type.call "merge" ($R 1) ($R 2)
 entry const answer: U32 = @type.call "merge" ($L 1) ($R 2)
 const L.merge: L -> R -> U32 = func left => return func right => return 1
 const R.merge: a -> R -> F32 = func left => return func right => return 1.0
 `,
-    (guest) => equal(guest.read("answer"), 1),
+    (guest) => {
+      equal(guest.read("prime"), 1.0);
+      equal(guest.read("answer"), 1);
+    },
     { prelude: "none" },
   );
 });
