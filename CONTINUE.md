@@ -6,10 +6,10 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `c3001b52`, with Gdev `73b4b2c`,
-Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **872.9 ms**
+The qualified compiler is Blot `f7013484`, with Gdev `73b4b2c`,
+Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **759.1 ms**
 median with eight frontend workers and emitted **2,639,638 bytes** across
-271 modules. [Fresh, edit and integration measurements](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json)
+271 modules. [Fresh, edit and integration measurements](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev
@@ -39,12 +39,12 @@ checker replies fell from 72,858,303 to 71,856,423 bytes. The full compiler
 gate, named Gdev and Ink outcomes, 120-frame replay and inspected frame
 qualified the release.
 
-A storage capacity edit now checks only `world_storage.blot`. On the current
-Gdev source this fell from **189.4 to 92.2 ms**. The shared session
-module owns startup for Main, the three performance entries and the actor fixture.
-Renaming its host parameter checks the session and Main in **69.1 ms**.
-The next storage target is rechecking the changed declaration inside its module.
-[Measurements and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json) · [Compiler work](tasks/FAST_COMPILE.md)
+Changing the history capacity from 64 to 65 in `world_storage.blot`
+returns finished Wasm in **35.0 ms**, down from **82.2 ms**.
+The retained checker reuses the checked type, callee and scalar argument
+position. The session copies the changed module’s Core nodes and updates
+one Wasm operand. Other body edits still use module-level checking.
+[Measurements and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json) · [Compiler work](tasks/FAST_COMPILE.md)
 
 ## Current results
 
@@ -53,7 +53,7 @@ The next storage target is rechecking the changed declaration inside its module.
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,099 guest and host tests passed, 100 ignored |
+| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,100 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

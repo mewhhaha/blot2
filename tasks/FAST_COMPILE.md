@@ -3,6 +3,38 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Reusing a checked call after an integer edit, 19 November 2026
+
+The project session can revise a single equal-width decimal U32 token in
+a local binding initialized by an imported function called with integer
+literals. It verifies the source span, checked call, external target and
+operand before copying the module’s nodes. The other Core tables and the
+producer interface keep their existing owners. If symbols, dependent
+interfaces or the call shape change, normal checking takes over.
+
+| Gdev Main, eight paired rounds | Previous | Current |
+| --- | ---: | ---: |
+| Change history capacity | 82.2 ms | 35.0 ms |
+| Rename the session parameter | 60.5 ms | 60.6 ms |
+| Change lighting | 35.6 ms | 37.3 ms |
+| Open and compile Main | 755.8 ms | 759.1 ms |
+
+Checking the edited storage module took 41.5 ms in a separate previous
+profile and zero on this path. Loading the project took 14.2 ms on the new path and is the largest remaining phase.
+The capacity edit changed one emitted operand
+in all eight measured builds and also directly after each of four fresh builds.
+Staged reads and changes in signed LEB width still go through emission when
+the previous layout cannot represent the edit. The execution test compares
+successful Wasm and diagnostics to a separate fresh compiler and exercises
+rejection, reversion, an indexed store and a staged use. A further 64
+alternating storage and lighting edits matched all four fresh Wasm images.
+The debug compiler still rebuilds three modules on a separate record-literal
+revert where the test expects one. That count reproduced on the parent debug
+binary and the candidate. Both optimized builds pass the test.
+
+[Trials, profiles and qualification](../benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json) ·
+[Runnable comparison](../benchmarks/tools/bench_import_boundary.ts)
+
 ## Gdev import edits, 19 November 2026
 
 The retained checker compares the producer’s exported interface packet after

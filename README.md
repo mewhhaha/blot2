@@ -17,13 +17,13 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
-Changing scene history capacity in Gdev now checks **one module** and takes
-**92.2 ms**, down from **189.4 ms** on the same game source.
-Moving the shared session setup out of storage reduced a parameter rename from
-**222.7 to 69.1 ms** on the new compiler. A fresh build of Gdev Main
-returned the **2,639,638-byte** Wasm in **872.9 ms** median. [Eight rounds across both compilers and source layouts](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.json)
+Changing scene history capacity in Gdev returns the complete Wasm in
+**35.0 ms**, down from **82.2 ms** on the same source.
+The compiler reuses all checked bodies and updates one operand. A fresh build
+of Main took **759.1 ms** median and emitted **2,639,638 bytes**.
+[Paired timings and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
 
-![Time to rebuild Gdev after a parameter rename or a storage edit](benchmarks/evidence/measurements/2026-11-19-gdev-import-boundary.png)
+![Gdev capacity edit time and type checking](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.png)
 
 The Gdev intent benchmark that appends inside two case arms builds its list in
 **21.2 µs**, down from **110.8 µs**. [List benchmark and chart](benchmarks/intent/README.md#growing-one-list-across-case-arms)

@@ -97,7 +97,7 @@ async function build(
   );
   return {
     ms,
-    checked: result.stats.freshModules,
+    freshModules: result.stats.freshModules,
     elaboratedBodies: result.stats.frontend.body_elaborations,
     loweredBodies: result.stats.frontend.body_lowerings,
     relocatedOperands: result.stats.relocatedOperands,
@@ -150,8 +150,8 @@ for (let round = 0; round < repeats; round++) {
         results[kind] = await build(client, versions[kind]);
         assert.equal(results[kind].sha256, oracles[layout][kind]);
         if (layout === 1 && compiler === 1) {
-          if (kind === "storage") assert.equal(results[kind].checked, 1);
-          if (kind === "rename") assert.equal(results[kind].checked, 2);
+          if (kind === "storage") assert.equal(results[kind].freshModules, 1);
+          if (kind === "rename") assert.equal(results[kind].freshModules, 2);
         }
       }
       rows.push({
@@ -184,7 +184,7 @@ for (let round = 0; round < Math.min(repeats, 4); round++) {
       directStorageAfterFresh.push({
         round: round + 1,
         layout: sources[layout].layout,
-        checked: storage.checked,
+        freshModules: storage.freshModules,
         ms: storage.ms,
         elaboratedBodies: storage.elaboratedBodies,
         relocatedOperands: storage.relocatedOperands,
