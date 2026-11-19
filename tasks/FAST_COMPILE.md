@@ -3,6 +3,70 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Plan for publishing checked declarations early
+
+Give a caller access to the verified declarations it uses while the producer
+continues checking unrelated bodies. The pilot is a Blot2 compiler change.
+Use the existing Gdev sources, syntax and type inference. The baseline on
+Gdev `e3dd428` is **823 ms fresh**, including a **449 ms module-checking
+stage** in separate profiles. Three of four completion traces passed through
+robots → kites, and one through robots → cannon. Test both edges together so
+one cannot hide a gain on the other. [Baseline and control layouts](../benchmarks/evidence/measurements/2026-11-19-robot-interfaces.json)
+
+1. **Measure how soon each caller could start.** Trace the producer facts
+   actually read when checking cannon and kites, including lookups that search
+   an entire namespace. Cannon names `Picked`, `Wake` and `wake_draw`. Kites
+   also reads builders and presentation functions. Follow their private
+   dependencies, reexports, constructors and implicit lookups. Record when
+   each required fact becomes final and when the caller's other imports are
+   ready. Replay both edges against the observed worker queue, first in today's
+   order and then with the required bodies checked first. Charge the measured
+   work for those bodies. The second run estimates the optimistic saving
+   before paying for a new packet or changing scheduling.
+   If the ceiling is small, investigate the measured type-resolution cost in
+   `finishFacts` before committing to a scheduler rewrite.
+2. **Prove one partial interface with the existing checker.** Start with
+   cannon's three names. In the producer's worker, use the normal module
+   headers and check the required bodies and their dependencies once. Keep
+   mutually recursive declarations together. Freeze the facts a caller can
+   observe, including binding identities, inferred types, effects, ownership
+   and callback contracts. Compare those facts with the corresponding entries
+   in the finished module before letting a caller use them. If a later
+   constraint, associated implementation, compile-time value or whole-module
+   check could change an answer, that import waits for the full interface.
+   A missing entry in a partial interface must never mean “unknown export.”
+3. **Let one producer release selected callers.** Extend the existing module
+   queue with one additional immutable publication for an eligible producer.
+   Register which callers accept it and which need the full interface. Wake
+   each caller once all its required publications have arrived. The producer
+   keeps its checker and finishes the remaining bodies and Core. Keep the early
+   packet local to the build; commit retained state only after full success.
+   Derive a conservative list of required facts from the current source and
+   its import environment. Use the traces to test that list. The same code
+   should handle cannon, kites and a small independent fixture. Measure
+   extra worker CPU, packet bytes, ready-to-start delay and
+   peak memory alongside elapsed time.
+4. **Decide whether to ship.** Alternate the current and candidate release
+   compilers on identical sources at eight workers. Use a short pilot first,
+   then 24 paired fresh builds for a promising candidate. Use the pre-split
+   Gdev revision as a second workload and one worker as the overhead control.
+   A proposed adoption target is **at least 20 ms median paired end-to-end
+   saving** on current Gdev, with a paired interval above zero and no
+   reproducible one-worker or retained-edit regression beyond timing noise.
+   Verify identical Wasm, deterministic diagnostics and inference-budget
+   outcomes. Exercise a bad unrelated producer body after early publication,
+   a changed callback contract, a reexport, recursion, and edit → rejection →
+   recovery against fresh builds. Run the compiler gate and Gdev integration
+   once on the final candidate. Use the measured result to decide whether
+   to extend early publication to more producers.
+
+The implementation starts in [the module graph](../compiler-goose/src/reuse/persistent_project.goose),
+[the producer packet writer and reader](../compiler-goose/src/reuse/persistent_unit.goose)
+and [the native worker queue](../compiler-goose/native/check_queue.c).
+The [semantic checker](../compiler-goose/src/check/check_factory.goose) currently
+collects headers, validates module bodies and then publishes the checked result.
+The first task is to identify the earliest sound point inside that sequence.
+
 ## Earlier robot interfaces, 19 November 2026
 
 Gdev now gives robot motion, housing and staffing their own modules. The

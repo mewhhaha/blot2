@@ -10,7 +10,9 @@ Splitting Gdev's robot motion, housing and staffing let four consumers start
 checking 33–73 ms before the full robot interface was ready. Fresh eight-worker
 builds went from **854 to 823 ms** with byte-identical Wasm across 24 pairs.
 The remaining path to world storage ran through kites in three traces and
-cannon in one. Examine which robot declarations those two modules need.
+cannon in one. The next Blot2 experiment measures how early the checker can
+release both callers on the existing Gdev source.
+[Compiler implementation plan and adoption target](tasks/FAST_COMPILE.md#plan-for-publishing-checked-declarations-early)
 [Timings and queue traces](tasks/FAST_COMPILE.md#earlier-robot-interfaces-19-november-2026)
 
 An earlier Gdev revision took **870 ms** with eight workers and **1,434 ms**
