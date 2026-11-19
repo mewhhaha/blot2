@@ -28,7 +28,31 @@ fn effectHistory() {
     store.deinit();
 }
 
+fn sharedSignatures() {
+    let ok=blot_error::Error.none;
+    var store,init_error=blot_check_types::init();assert(init_error==ok);
+    let a,ae=store.fresh();let b,be=store.fresh();assert(ae==ok && be==ok);
+    let future,fe=store.variableView(store.node(a).a,store.cursor()+1);assert(fe==ok && a!=future);
+    let one,e1=store.product([a,b]);let two,e2=store.product([a,b]);assert(e1==ok && e2==ok);
+    let swapped,e3=store.product([b,a]);let later,e4=store.product([future,b]);assert(e3==ok && e4==ok);
+    let left,e5=store.record([blot_check_types::Field{1,one}]);let right,e6=store.record([blot_check_types::Field{1,two}]);
+    let renamed,e7=store.record([blot_check_types::Field{2,one}]);assert(e5==ok && e6==ok && e7==ok);
+    let output,oe=store.product([one,two,swapped,later,left,right,renamed]);assert(oe==ok);
+    let inner,ie=store.function(b,output);let arrow,re=store.function(a,inner);assert(ie==ok && re==ok);
+    let result,error=store.compactSignature(arrow);assert(error==ok && result!=arrow);
+    let outer=store.node(result);assert(outer.a==a && outer.c==0);
+    let nested=store.node(outer.b);assert(nested.a==b && nested.c==0);
+    let shape=store.node(nested.b);let children=store.list(blot_check_types::List{shape.a,shape.b});
+    assert(children==[one,one,swapped,later,left,left,renamed]);
+    let original=store.node(output);
+    assert(store.list(blot_check_types::List{original.a,original.b})==[one,two,swapped,later,left,right,renamed]);
+    store.has_projections=true;
+    let unchanged,pe=store.compactSignature(arrow);assert(pe==ok && unchanged==arrow);
+    store.deinit();
+}
+
 fn main() {
+    sharedSignatures();
     effectHistory();
     functionUnification();
     assert(selectionUnification(false)==blot_error::Error.type_limit);

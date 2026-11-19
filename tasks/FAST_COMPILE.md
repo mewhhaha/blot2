@@ -38,13 +38,59 @@ programs ran and returned the expected values, the invalid program kept its
 diagnostic, and Gdev's Wasm, hardware frame and 120-frame replay matched.
 [Samples, work counts and identities](../benchmarks/evidence/measurements/2026-11-19-general-type-checker.json) · [Paired source benchmark](../benchmarks/tools/bench_type_checker.py)
 
-**Next experiment.** Share identical, immutable children when constructing
-inferred generic signatures. A function returning a pair of calls to the
-preceding function took 21,808 type-resolution visits at six layers and
-53,960 at nine, while unification rose by only 21 pairs. Widening one record
-from eight to 256 fields added 248 unification pairs and zero resolution
-visits. Check the shared-pair family against independently inferred type
-variables, different solver views, and real imports before extending sharing.
+### Sharing inferred tuple and record signatures
+
+When two calls infer the same shape, the checker can store that part of the
+result once. For example, `(previous x, previous x)` still calls `previous`
+twice at runtime. When publishing the generic function's result type, the
+checker can give both tuple positions the same type node. The next caller
+then substitutes its own type variable into that shared node once.
+
+The checker compares ordered child IDs and record field names before sharing.
+Two different type variables, or two views of a variable at different points
+in inference, remain distinct. The lookup tables last for one signature.
+Inside an aggregate, function types, nominal types and other leaves retain
+their original identity, including their effects. Modules checking associated projections keep their inference-budget
+behavior, and schemes with active generative bindings retain their existing
+representation. The search has a bounded work budget and can leave an
+already valid subtree as it is.
+
+| Thirteen declarations, no prelude | Earlier checker | Shared signatures | Earlier full build | New full build |
+| --- | ---: | ---: | ---: | ---: |
+| Repeated pair | 33.90 ms | 4.29 ms | 45.80 ms | 5.94 ms |
+| Record with repeated field types | 32.14 ms | 4.55 ms | 46.84 ms | 6.53 ms |
+| Repeated pair separated by a boolean | 35.05 ms | 4.05 ms | 48.14 ms | 5.85 ms |
+| One child and a boolean at each layer | 1.59 ms | 1.50 ms | 3.04 ms | 3.01 ms |
+
+These are medians from 12 alternating release pairs. All three repeated
+shapes fell from 32,934 type nodes to 880. In the pair case, type-resolution
+visits fell from 280,656 to 5,622 and requested allocation across the build
+fell from 10.46 MB to 0.36 MB. The one-child control kept 491 type nodes.
+Each declaration was checked, and every build emitted the same Wasm for the
+constant entry. A separate executed guest calls a generic from another module
+at two distinct types and reads both positions of its result.
+
+![Type nodes created while inferring nested generic pairs](../benchmarks/evidence/measurements/2026-11-19-inferred-signatures.png)
+
+With 22 declarations, the new checker took 7.2 ms in a separate check-only
+run. The previous process exceeded the one-second deadline. At 16 declarations
+both completed, with 262,266 → 1,293 nodes. The measurements apply to the
+inferred type of a repeating shape. Materializing its entire value still
+requires work proportional to the number of elements.
+
+Across the 19-program corpus, all Wasm bytes and rejection diagnostics matched.
+Most programs used exactly the same number of type nodes. The invalid generic
+checked more slowly in the first window (6.86 → 10.04 ms). A separate
+32-pair run on one logical CPU measured 11.10 → 12.07 ms, with the 95%
+interval for the paired saving crossing zero. The nine-layer-source benchmark
+in the same repeat went from 18.16 to 14.85 ms with the standard prelude.
+
+Fresh Gdev Main measured **1,172 → 1,186 ms** across 18 alternating eight-worker
+pairs. The 95% interval for paired savings was −72 to +137 ms. Both compilers
+created 1,377,766 type nodes. The full compiler gate and all 283 configured Ink
+guest checks passed. Gdev's Wasm, hardware frame, trace and all 242 replay files
+matched. An edit and three rejected revisions matched fresh compiler sessions.
+[Samples, source and compiler identities](../benchmarks/evidence/measurements/2026-11-19-inferred-signatures.json) · [Reproducible scaling families](../benchmarks/tools/bench_type_scaling.ts)
 
 ### Measurement plan
 
@@ -238,8 +284,8 @@ and assets while its working tree contained unrelated edits. The complete
 2,639,638-byte Wasm, the inspected frame, all 242 replay files and
 the named Gdev and Ink outcomes matched. The separate inference benchmark
 still allocates 32,934 nodes for 13 layers of structural pairs and 1,043 for
-the named type. Sharing immutable nodes while building those signatures
-remains a separate experiment.
+the named type. The later signature-sharing experiment addresses that growth.
+[Current measurements](#sharing-inferred-tuple-and-record-signatures)
 
 [Measurements and qualification](../benchmarks/evidence/measurements/2026-11-19-shared-ownership.json) ·
 [Reproducible scaling cases](../benchmarks/tools/bench_type_scaling.ts)
@@ -310,11 +356,10 @@ distinct ways to make very short programs expensive.
   type nodes for six layers. The full build crossed the three-second limit
   at this checkpoint. The shared-type change above fixes that case.
 
-Field inference and named types at public boundaries remain available. Next, share completed, immutable
-subtypes when publishing a function signature. Inference variables can
-change during solving, so reusing their answers requires tracking the solver version.
-Measure both the tuple family and Gdev before extending sharing across the
-type store. Count graph visits against a work limit in the passes after
+Field inference and named types at public boundaries remain available. The
+later compiler shares immutable tuple and record subtypes when publishing a
+generic result. Inference variables can change during solving, so reusing
+their answers across solver versions still requires separate evidence. Count graph visits against a work limit in the passes after
 inference as well. Today the
 eleven-function composition reaches the checker's `nesting_limit`, while a
 much smaller program could previously stall downstream.

@@ -175,6 +175,75 @@ for (
   });
 }
 
+Deno.test("inference shares repeated aggregate shapes across generic calls", async () => {
+  await Deno.mkdir(scratchRoot, { recursive: true });
+  const directory = await Deno.makeTempDir({
+    dir: scratchRoot,
+    prefix: "signatures-",
+  });
+  const entry = directory + "/main.blot";
+  const library = directory + "/library.blot";
+  const layers = ["func layer0 x => return x"];
+  for (let i = 1; i <= 12; i++) {
+    const call = `layer${i - 1} x`;
+    if (i % 2 === 0) {
+      layers.push(
+        `func layer${i} x => return { left: ${call}, right: ${call} }`,
+      );
+    } else layers.push(`func layer${i} x => return (${call}, true, ${call})`);
+  }
+  layers.push("func both x -> y => return {left: (x, y), right: (x, y)}");
+  const main = `import { both, layer2 } from "./library"
+entry func answer (n: U32): U32 => return do:
+  let a = both n true
+  let b = both false n
+  let (number, flag) = a.right
+  let (_, other) = b.left
+  let nested = layer2 other
+  let (_, _, last) = nested.right
+  return if flag then @u32.add number last else 0
+`;
+  const client = await createZigProjectCompiler({
+    executable: compiler,
+    entry,
+    prelude: null,
+    profileBackend: true,
+  });
+  try {
+    await Deno.writeTextFile(library, layers.join("\n") + "\n");
+    await Deno.writeTextFile(entry, main);
+    const result = await client.build();
+    if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
+    const checking = result.stats.phaseProfile.checking as {
+      type_nodes: number;
+    };
+    assert(
+      checking.type_nodes < 2500,
+      `inferred ${checking.type_nodes} nodes for 13 layers`,
+    );
+    const guest = await instantiateGuest(result.bytes);
+    try {
+      assert.equal(guest.call("answer", 21), 42);
+      assert.equal(guest.call("answer", 9), 18);
+    } finally {
+      guest.dispose();
+    }
+    const invalid = await client.build({
+      sources: {
+        [entry]: main.replace("@u32.add number last", "@u32.add number flag"),
+      },
+    });
+    assert(!invalid.success);
+    assert(
+      invalid.diagnostics.some((d) => d.code === "type_mismatch"),
+      JSON.stringify(invalid.diagnostics),
+    );
+  } finally {
+    await client.dispose();
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 // Every retained edit and revert of the edit suite matches a fresh build.
 Deno.test("budget: retained edit suite matches fresh builds", async () => {
   await Deno.mkdir(scratchRoot, { recursive: true });

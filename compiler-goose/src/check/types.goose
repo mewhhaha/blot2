@@ -1746,6 +1746,87 @@ recursive fn substituteArguments<L,R>(self_:Store&,value:Node,old:const Id[:],fr
             return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
 }
 
+// Each generic call instantiates its own variables. Once its result has been
+// resolved, two tuples or records may have the very same children. Share that
+// structure in the published scheme before the next caller instantiates it.
+fn compactSignature(self_:Store&,root:Id)->Id,Error {
+    if self_.has_projections {return root,blot_error::Error.none;}
+    var result=node(self_,root);
+    while result.tag==Tag.function {result=node(self_,result.b);}
+    if result.tag!=Tag.product && result.tag!=Tag.record {return root,blot_error::Error.none;}
+    var nested=false;
+    for i in result.b {
+        var child=self_.extra.items[result.a+i];
+        if result.tag==Tag.record {child=recordField(self_,result,i).ty;}
+        let tag=node(self_,child).tag;
+        if tag==Tag.product || tag==Tag.record {nested=true;break;}
+    }
+    if !nested {return root,blot_error::Error.none;}
+    var visited=dictionary<Id,Id>{};
+    var shapes=dictionary<u64,Id>{};
+    var remaining:i64=65536;
+    var arrows:Node[>..]=[];
+    var result_id=root;
+    while node(self_,result_id).tag==Tag.function {
+        let arrow=node(self_,result_id);
+        arrows.push(arrow);
+        result_id=arrow.b;
+    }
+    let shared,error=compactAggregate(self_,result_id,visited,shapes,remaining,0);
+    if error!=blot_error::Error.none || shared==result_id {return root,error;}
+    var child=shared;
+    while arrows.len!=0 {
+        let arrow=arrows.pop();
+        let rebuilt,failure=functionWithEffects(self_,arrow.a,child,arrow.c);
+        if failure!=blot_error::Error.none {return 0,failure;}
+        child=rebuilt;
+    }
+    return child,blot_error::Error.none;
+}
+recursive fn compactAggregate(self_:Store&,root:Id,visited:dictionary<Id,Id>&,shapes:dictionary<u64,Id>&,remaining:i64&,depth:i64)->Id,Error {
+    let value=node(self_,root);
+    if depth>=1024 || remaining==0 {return root,blot_error::Error.none;}
+    if value.tag!=Tag.product && value.tag!=Tag.record {return root,blot_error::Error.none;}
+    let prior=::get(visited,root);if prior {return prior,blot_error::Error.none;}
+    var stride:u32=1;if value.tag==Tag.record {stride=2;}
+    let count=value.b*stride;
+    if count>=remaining {remaining=0;return root,blot_error::Error.none;}
+    remaining-=count+1;
+    let words=substitution_ids.alloc_slice(count);
+    let result,error=compactFields(self_,root,value,stride,words,visited,shapes,remaining,depth);
+    substitution_ids.free_slice(words);
+    if error==blot_error::Error.none {::insert(visited,root,result);}
+    return result,error;
+}
+recursive fn compactFields(self_:Store&,root:Id,value:Node,stride:u32,words:Id[:],visited:dictionary<Id,Id>&,shapes:dictionary<u64,Id>&,remaining:i64&,depth:i64)->Id,Error {
+    var key=::hash(stride);var changed=false;
+    for i in value.b {
+        let offset=i*stride;
+        if stride==2 {
+            let label=self_.extra.items[value.a+offset];
+            words[offset]=label;key=::hash_combine(key,::hash(label));
+        }
+        let index=offset+stride-1;
+        let old=self_.extra.items[value.a+index];
+        let child,error=compactAggregate(self_,old,visited,shapes,remaining,depth+1);
+        if error!=blot_error::Error.none {return 0,error;}
+        words[index]=child;key=::hash_combine(key,::hash(child));changed=changed || old!=child;
+    }
+    let prior=::get(shapes,key);
+    if prior {
+        let found=node(self_,prior);
+        if found.tag==value.tag && found.b==value.b && self_.extra.items[found.a..found.a+words.len]==words {return prior,blot_error::Error.none;}
+    }
+    var result=root;
+    if changed {
+        let span,error=saveList(self_,words);if error!=blot_error::Error.none {return 0,error;}
+        let id,failure=add(self_,Node{tag:value.tag,a:span.start,b:value.b,..});if failure!=blot_error::Error.none {return 0,failure;}
+        result=id;
+    }
+    ::insert(shapes,key,result);
+    return result,blot_error::Error.none;
+}
+
 struct CovariantInput { root: Id, depth: i64 }
 fn hash(value: CovariantInput) -> u64 { return ::hash_combine(::hash(value.root), ::hash(value.depth)); }
 struct CovariantEntry { root: Id, depth: i64, protected: List, result: Id }

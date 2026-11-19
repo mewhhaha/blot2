@@ -1,11 +1,17 @@
 # Working on Blot and Gdev
 
-General type-checker work now avoids an eager scan of quantified variables
+The type checker now shares repeated tuple and record shapes in inferred
+generic results. On 13 nested pair declarations, checking went from
+**33.9 to 4.3 ms** and type nodes fell from **32,934 to 880**. The new
+checker also checked 22 declarations in 7.2 ms. The previous process
+exceeded the one-second deadline on that input. Gdev showed no measurable
+whole-build gain in the paired run. [Scaling curves and qualification](tasks/FAST_COMPILE.md#sharing-inferred-tuple-and-record-signatures)
+
+The previous checker change avoids an eager scan of quantified variables
 and scales ownership-contract instantiation to the input. Three-term contracts
 took **938 → 591 ns**. Across 19 source workloads checker timings were mixed.
-Fresh Gdev Main took **975 → 972 ms** in 24 pairs with identical Wasm.
-The next experiment is sharing repeated subtypes in inferred generic
-signatures. [Checker results, scaling cases and plan](tasks/FAST_COMPILE.md#general-type-checker-performance)
+Fresh Gdev Main took **975 → 972 ms** in that window with identical Wasm.
+[Ownership results and general checker plan](tasks/FAST_COMPILE.md#general-type-checker-performance)
 
 The checker sizes temporary storage to each capability contract. On pinned
 Gdev Main, validator calls to clear memory fell from 1.78 GB to 0.30 MB.

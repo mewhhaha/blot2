@@ -19,19 +19,23 @@ function source(kind: string, size: number) {
     for (let i = 1; i < size; i++) {
       lines.push(`func layer${i} x => return layer${i - 1} (layer${i - 1} x)`);
     }
-  } else if (kind === "pair" || kind === "namedPair") {
-    let constructor = "";
+  } else if (
+    ["pair", "namedPair", "recordPair", "mixedPair", "distinctPair"].includes(
+      kind,
+    )
+  ) {
     if (kind === "namedPair") {
       lines.push("type Pair a is data = $Pair (a, a)");
-      constructor = "$Pair ";
     }
     lines.push("func layer0 x => return x");
     for (let i = 1; i < size; i++) {
-      lines.push(
-        `func layer${i} x => return ${constructor}(layer${i - 1} x, layer${
-          i - 1
-        } x)`,
-      );
+      const child = `layer${i - 1} x`;
+      let body = `(${child}, ${child})`;
+      if (kind === "namedPair") body = "$Pair " + body;
+      if (kind === "recordPair") body = `{left: ${child}, right: ${child}}`;
+      if (kind === "mixedPair") body = `(${child}, true, ${child})`;
+      if (kind === "distinctPair") body = `(${child}, true)`;
+      lines.push(`func layer${i} x => return ${body}`);
     }
   } else {
     for (let i = 0; i < size; i++) {
@@ -46,7 +50,16 @@ function source(kind: string, size: number) {
 }
 try {
   // Isolate type inference so later passes cannot hide its scaling curve.
-  for (const kind of ["pair", "namedPair", ...compositionSeeds.keys()]) {
+  for (
+    const kind of [
+      "pair",
+      "namedPair",
+      "recordPair",
+      "mixedPair",
+      "distinctPair",
+      ...compositionSeeds.keys(),
+    ]
+  ) {
     let limit = 13;
     if (compositionSeeds.has(kind)) limit = 11;
     for (let size = 1; size <= limit; size++) {
