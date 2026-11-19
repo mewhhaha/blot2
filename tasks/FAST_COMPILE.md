@@ -3,6 +3,53 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Earlier robot interfaces, 19 November 2026
+
+Gdev now gives robot motion, housing and staffing their own modules. The
+`minors` module can check its steering call as soon as motion and its other
+imports are ready. The station imports hiring and pointing directly. All
+three new modules use the production compiler's existing ownership and type
+checks. No language annotation or compiler change was required.
+
+| Fresh Gdev Main, eight workers | Original | Split |
+| --- | ---: | ---: |
+| Session open through complete Wasm, median of 24 | 854 ms | 823 ms |
+| Module checking stage, median of four separate profiles | 473 ms | 449 ms |
+| Longest import chain, weighted by measured check and publication CPU | 424 ms | 399 ms |
+| Checked modules | 276 | 279 |
+| Main Wasm size | 2,732,918 B | 2,732,918 B |
+
+The split won 21 of 24 alternating fresh pairs, with a median paired saving of
+22 ms (95% bootstrap interval 13–35 ms). Every run produced the same Wasm
+bytes. Each compiler started in a new process with the source files warm in
+the OS cache. Checker work stayed close: imported schemes rose from 18,446
+to 18,696, while total checker-worker CPU including publication and lowering
+went from 2,004 to 1,983 ms. The gain came from overlapping more work.
+
+![When dependent modules start checking relative to robot interface publication](../benchmarks/evidence/measurements/2026-11-19-robot-interfaces.png)
+
+Moving functions into two files and reexporting them through the original
+module left `minors` and `village` waiting for robots in all three control
+traces. Direct imports freed both. Extracting staffing also freed purchases,
+and moving hiring freed the station. The original two-way trial ran under
+heavy system load and its wall times were inconclusive. The final comparison
+used the same later Gdev revision on both sides.
+
+Changing the exported hauler turning rate in an open compiler session took
+503 → 480 ms across seven pairs. The original rechecked 23 modules and the
+split rechecked 24. Both edits produced the same changed Wasm as a fresh build,
+and both reverts recovered the original bytes.
+
+Gdev `e3dd428` matched the baseline's 1,254 passing and 107 failing named
+checks. Pen's project and codegen checks passed. The first hardware frame,
+its trace, and all 242 files from a 120-frame replay matched byte for byte.
+
+Three of four final completion traces followed robots → kites → world storage,
+and one followed robots → cannon → world storage. Cannon uses the picked
+state constructor and the wake drawing helper. Kites still uses robot
+presentation and builder state. These dependencies are the next candidates
+for earlier publication. [Pinned sources, samples and queue traces](../benchmarks/evidence/measurements/2026-11-19-robot-interfaces.json)
+
 ## Fresh Gdev compilation under CPU contention, 19 November 2026
 
 With compiler `0f47c8e0`, the previous Gdev checkpoint and the current source
@@ -35,7 +82,7 @@ appeared on the sequence of imports that determined completion in all six
 queue traces. Gdev's game module spent its own 52 ms checking 33 bodies
 and importing 1,265 schemes.
 
-The next compiler experiment is to let consumers of the robot module start
+The proposed experiment was to let consumers of the robot module start
 once the declarations they use have verified interfaces, while independent
 bodies continue checking. In the measured graph, halving the robot module's
 time to publish shortens the longest chain by **45 ms**. This is a model

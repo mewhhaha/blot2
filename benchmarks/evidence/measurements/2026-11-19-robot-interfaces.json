@@ -1,0 +1,1822 @@
+{
+  "inputs": {
+    "blot": "0f47c8e037826f7f56a51e9761704f1ecba2e859",
+    "compilerSha256": "cd0d873675d675f7d870b2f4332b10ccc8bb7033d134785a6823b3c613682a3b",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "hardware": "Ryzen 7 3800X, 8 physical cores, 16 logical CPUs",
+    "gdevDiscovery": "9b56ec1becefeb33de1111b20d6a731aac89a880",
+    "gdevControl": "ffb7548ee7b48acf9f40a89e94f5d90c89142a0a",
+    "gdevSourceTree": "f7c55eda2dc41c4f2118cd46a292207db4f791b0",
+    "gdevSplit": "e3dd4286e10c11b5dd4118adf215fcf8036a74ab"
+  },
+  "methods": {
+    "timing": "Local fresh compiler process and project session through complete Wasm, warm filesystem, production compiler, eight workers, 9.5 s session cap. Unprofiled measurements are ordered by round in each array. First wave cycles through all six permutations; later pairs alternate which layout runs first. Workloads elsewhere on the host varied between waves; compare only inside a wave.",
+    "uncertainty": "Paired saving is original minus candidate in the same round. The interval resamples paired differences 10000 times with seed 65361, giving a descriptive 95% percentile interval for their median.",
+    "queue": "Additional builds with release-native queue probes, separate from fresh timings. Check and interface-publication thread CPU are the two components of each node weight. All dependency edges checked against loader traversal, packet-tail sums against aggregate worker CPU. Longest chain is a model using median weights. Separately timestamped claim, first interface publication and finish for every node, and checked consumer claim follows publication of each import. A negative consumer offset means that body started before robots published. Each observed completion chain follows the last-publishing prerequisite of the last-finishing job.",
+    "variants": {
+      "base": "Unmodified Gdev.",
+      "facade": "Housing and motion in separate modules; clients still import through robots.",
+      "test": "Same two modules, clients import directly where possible.",
+      "staff": "Direct housing, movement and employment, with hire and fling in robots.",
+      "latestbase": "Unmodified later Gdev, including the resident-bar update.",
+      "lateststaff": "Three-way split on the later Gdev.",
+      "latestrecruit": "Final three-way split; both hire entry points moved into staffing, and station imports pointing directly."
+    }
+  },
+  "discovery": {
+    "base": {
+      "wasmSha256": "67f5b4f95caf3aac95ac62a18dbf62757f7488b843c591a237959006d9e0a397",
+      "wasmBytes": 2732777,
+      "modules": 276,
+      "freshMs": [
+        2887.21,
+        3290.98,
+        3539.65,
+        2816.43,
+        2434.12,
+        3049.92
+      ],
+      "freshMedianMs": 2968.57,
+      "queue": {
+        "edges": 2390,
+        "publishCpuMs": {
+          "game": 117.79,
+          "world_storage": 89.08,
+          "cannon": 34.18,
+          "robots": 165.88,
+          "village": 25.51,
+          "minors": 32.24,
+          "kites": 33.96,
+          "station": 92.87,
+          "purchases": 11.03
+        },
+        "weightOfLongestChainMs": 749.6,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/pile_batch.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "trace-0-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 3.16,
+              "village": 118.39,
+              "minors": 1.2,
+              "kites": 4.79,
+              "station": 64.01,
+              "purchases": 6.75
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/ui/tree.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1567.86
+          },
+          {
+            "seq": "trace-1-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.15,
+              "village": 85.75,
+              "minors": 0.04,
+              "kites": 1.27,
+              "station": 51.81,
+              "purchases": 2.95
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/transform.blot",
+              "ink/lib/render.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1575.54
+          },
+          {
+            "seq": "trace-2-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.35,
+              "village": 54.51,
+              "minors": 0.32,
+              "kites": 0.86,
+              "station": 24.58,
+              "purchases": 3.73
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1331.52
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 315.27,
+            "check": 1786.01,
+            "backend": 840.42
+          },
+          "workerCpuMs": 3298.82,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 645.38,
+            "check": 1735.31,
+            "backend": 388.29
+          },
+          "workerCpuMs": 3408.73,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 305.67,
+            "check": 1382.23,
+            "backend": 370.55
+          },
+          "workerCpuMs": 3264.63,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        }
+      ]
+    },
+    "facade": {
+      "wasmSha256": "67f5b4f95caf3aac95ac62a18dbf62757f7488b843c591a237959006d9e0a397",
+      "wasmBytes": 2732777,
+      "modules": 278,
+      "freshMs": [
+        2633.33,
+        3116.3,
+        2644.18,
+        3052.23,
+        2746.01,
+        2485.49
+      ],
+      "freshMedianMs": 2695.1,
+      "queue": {
+        "edges": 2412,
+        "publishCpuMs": {
+          "game": 120.83,
+          "world_storage": 93.15,
+          "cannon": 34.28,
+          "robots": 149.64,
+          "robot_housing": 8.58,
+          "robot_motion": 13.29,
+          "village": 24.91,
+          "minors": 31.76,
+          "kites": 34.92,
+          "station": 96.52,
+          "purchases": 10.72
+        },
+        "weightOfLongestChainMs": 743.77,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/pile_batch.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "trace-0-facade",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.79,
+              "village": 130.75,
+              "minors": 0.76,
+              "kites": 2.44,
+              "station": 52.94,
+              "purchases": 4.06
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/view.blot",
+              "ink/lib/orbit.blot",
+              "gdev/src/library.blot",
+              "gdev/src/world/trails.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1600.13
+          },
+          {
+            "seq": "trace-1-facade",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 1.75,
+              "village": 118.8,
+              "minors": 0.12,
+              "kites": 2.6,
+              "station": 63.44,
+              "purchases": 4.12
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1942.35
+          },
+          {
+            "seq": "trace-2-facade",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.69,
+              "village": 93.06,
+              "minors": 0.04,
+              "kites": 0.72,
+              "station": 47.75,
+              "purchases": 0.74
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1488.46
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 472.09,
+            "check": 1811.76,
+            "backend": 712.62
+          },
+          "workerCpuMs": 3352.81,
+          "importedSchemes": 18604,
+          "typeNodes": 1377882
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 296.84,
+            "check": 1740.01,
+            "backend": 369.03
+          },
+          "workerCpuMs": 3340.96,
+          "importedSchemes": 18604,
+          "typeNodes": 1377882
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 464.62,
+            "check": 1637.8,
+            "backend": 387.51
+          },
+          "workerCpuMs": 3312.06,
+          "importedSchemes": 18604,
+          "typeNodes": 1377882
+        }
+      ],
+      "pairedSavingsVsOriginalMs": {
+        "median": 214.28,
+        "bootstrap95": [
+          -273.85,
+          729.95
+        ],
+        "fasterPairs": 4,
+        "pairs": 6
+      }
+    },
+    "test": {
+      "wasmSha256": "67f5b4f95caf3aac95ac62a18dbf62757f7488b843c591a237959006d9e0a397",
+      "wasmBytes": 2732777,
+      "modules": 278,
+      "freshMs": [
+        3405.9,
+        2723.36,
+        3547.03,
+        2704.18,
+        2559.41,
+        2834.56
+      ],
+      "freshMedianMs": 2778.96,
+      "queue": {
+        "edges": 2426,
+        "publishCpuMs": {
+          "game": 116.23,
+          "world_storage": 90.39,
+          "cannon": 32.91,
+          "robots": 144.9,
+          "robot_housing": 8.53,
+          "robot_motion": 13.79,
+          "village": 25.82,
+          "minors": 29.03,
+          "kites": 32.77,
+          "station": 93.1,
+          "purchases": 10.31
+        },
+        "weightOfLongestChainMs": 709.97,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/pile_batch.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/progression/purchases.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "trace-0-test",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.56,
+              "village": -211.12,
+              "minors": -270.01,
+              "kites": 2.18,
+              "station": 53.41,
+              "purchases": 3.81
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/view.blot",
+              "ink/lib/orbit.blot",
+              "gdev/src/library.blot",
+              "gdev/src/world/trails.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1700.57
+          },
+          {
+            "seq": "trace-1-test",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.05,
+              "village": -198.92,
+              "minors": -230.96,
+              "kites": 0.14,
+              "station": 32.17,
+              "purchases": 0.6
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/buildings/cannon.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1519.24
+          },
+          {
+            "seq": "trace-2-test",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.05,
+              "village": -155.65,
+              "minors": -193.05,
+              "kites": 0.08,
+              "station": 20.96,
+              "purchases": 0.43
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/ui/tree.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 1185.28
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 306.43,
+            "check": 1988.33,
+            "backend": 339.22
+          },
+          "workerCpuMs": 3291.32,
+          "importedSchemes": 18604,
+          "typeNodes": 1375907
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 253.8,
+            "check": 1641.84,
+            "backend": 389.71
+          },
+          "workerCpuMs": 3308.85,
+          "importedSchemes": 18604,
+          "typeNodes": 1375907
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 262.66,
+            "check": 1722.69,
+            "backend": 385.94
+          },
+          "workerCpuMs": 3244.39,
+          "importedSchemes": 18604,
+          "typeNodes": 1375907
+        }
+      ],
+      "pairedSavingsVsOriginalMs": {
+        "median": 52.43,
+        "bootstrap95": [
+          -321.99,
+          391.49
+        ],
+        "fasterPairs": 3,
+        "pairs": 6
+      }
+    }
+  },
+  "staffingExperiment": {
+    "base": {
+      "wasmSha256": "67f5b4f95caf3aac95ac62a18dbf62757f7488b843c591a237959006d9e0a397",
+      "wasmBytes": 2732777,
+      "modules": 276,
+      "freshMs": [
+        1372.22,
+        1736.19,
+        1753.0,
+        939.04,
+        929.78,
+        890.7,
+        918.18,
+        917.42,
+        903.64,
+        929.55,
+        933.01,
+        901.61
+      ],
+      "freshMedianMs": 929.67,
+      "queue": {
+        "edges": 2390,
+        "publishCpuMs": {
+          "game": 62.19,
+          "world_storage": 45.71,
+          "cannon": 24.66,
+          "robots": 87.27,
+          "village": 13.25,
+          "minors": 19.55,
+          "kites": 26.84,
+          "station": 51.38,
+          "purchases": 7.91
+        },
+        "weightOfLongestChainMs": 423.5,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/pile_batch.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "extended-trace-0-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.04,
+              "village": 16.16,
+              "minors": 0.03,
+              "kites": 0.06,
+              "station": 7.58,
+              "purchases": 0.08
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 411.59
+          },
+          {
+            "seq": "extended-trace-1-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.03,
+              "village": 27.0,
+              "minors": 0.02,
+              "kites": 0.05,
+              "station": 10.03,
+              "purchases": 0.07
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 432.94
+          },
+          {
+            "seq": "extended-trace-2-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.04,
+              "village": 17.19,
+              "minors": 0.02,
+              "kites": 0.05,
+              "station": 10.81,
+              "purchases": 0.06
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 427.63
+          },
+          {
+            "seq": "extended-trace-3-base",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.04,
+              "village": 19.99,
+              "minors": 0.02,
+              "kites": 0.05,
+              "station": 14.1,
+              "purchases": 0.07
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/ui/tree.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 456.36
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 105.97,
+            "check": 497.29,
+            "backend": 141.43
+          },
+          "workerCpuMs": 2233.84,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 112.46,
+            "check": 485.41,
+            "backend": 131.27
+          },
+          "workerCpuMs": 2072.57,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 117.75,
+            "check": 466.98,
+            "backend": 129.52
+          },
+          "workerCpuMs": 1941.75,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        },
+        {
+          "round": 3,
+          "phaseWallMs": {
+            "load": 99.24,
+            "check": 452.35,
+            "backend": 120.87
+          },
+          "workerCpuMs": 2004.79,
+          "importedSchemes": 18447,
+          "typeNodes": 1372237
+        }
+      ]
+    },
+    "staff": {
+      "wasmSha256": "67f5b4f95caf3aac95ac62a18dbf62757f7488b843c591a237959006d9e0a397",
+      "wasmBytes": 2732777,
+      "modules": 279,
+      "freshMs": [
+        1304.27,
+        1221.72,
+        1343.85,
+        937.65,
+        894.64,
+        901.94,
+        901.95,
+        895.53,
+        863.27,
+        875.0,
+        844.09,
+        896.93
+      ],
+      "freshMedianMs": 899.44,
+      "queue": {
+        "edges": 2449,
+        "publishCpuMs": {
+          "game": 59.17,
+          "world_storage": 45.21,
+          "cannon": 17.51,
+          "robots": 78.23,
+          "robot_housing": 6.88,
+          "robot_motion": 10.57,
+          "robot_staffing": 11.12,
+          "village": 15.77,
+          "minors": 18.59,
+          "kites": 23.27,
+          "station": 52.22,
+          "purchases": 6.53
+        },
+        "weightOfLongestChainMs": 403.12,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/kites.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "extended-trace-0-staff",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -53.06,
+              "minors": -77.24,
+              "kites": 0.03,
+              "station": 0.04,
+              "purchases": -77.14
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/ui/tree.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 410.92
+          },
+          {
+            "seq": "extended-trace-1-staff",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -51.79,
+              "minors": -71.62,
+              "kites": 0.04,
+              "station": 0.06,
+              "purchases": -67.97
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/kites.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 419.25
+          },
+          {
+            "seq": "extended-trace-2-staff",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -66.68,
+              "minors": -82.32,
+              "kites": 0.03,
+              "station": 0.05,
+              "purchases": -76.48
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/transform.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 434.95
+          },
+          {
+            "seq": "extended-trace-3-staff",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -60.23,
+              "minors": -77.32,
+              "kites": 0.05,
+              "station": 0.06,
+              "purchases": -74.49
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/ui/tree.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 418.07
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 107.73,
+            "check": 455.0,
+            "backend": 139.44
+          },
+          "workerCpuMs": 2022.79,
+          "importedSchemes": 18694,
+          "typeNodes": 1378009
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 108.66,
+            "check": 460.62,
+            "backend": 130.09
+          },
+          "workerCpuMs": 2091.0,
+          "importedSchemes": 18694,
+          "typeNodes": 1378009
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 100.01,
+            "check": 425.36,
+            "backend": 125.16
+          },
+          "workerCpuMs": 1975.16,
+          "importedSchemes": 18694,
+          "typeNodes": 1378009
+        },
+        {
+          "round": 3,
+          "phaseWallMs": {
+            "load": 99.7,
+            "check": 445.76,
+            "backend": 125.8
+          },
+          "workerCpuMs": 2013.75,
+          "importedSchemes": 18694,
+          "typeNodes": 1378009
+        }
+      ],
+      "pairedSavingsVsOriginalMs": {
+        "median": 37.75,
+        "bootstrap95": [
+          10.45,
+          78.44
+        ],
+        "fasterPairs": 11,
+        "pairs": 12
+      }
+    }
+  },
+  "laterSourceControl": {
+    "latestbase": {
+      "wasmSha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+      "wasmBytes": 2732918,
+      "modules": 276,
+      "freshMs": [
+        839.57,
+        825.96,
+        864.82,
+        878.41,
+        974.03,
+        971.3,
+        959.3,
+        996.76,
+        974.24,
+        1019.17,
+        958.1,
+        951.56,
+        1070.9,
+        924.31,
+        922.05,
+        978.48,
+        917.02,
+        933.02,
+        959.39,
+        861.82
+      ],
+      "freshMedianMs": 954.83
+    },
+    "lateststaff": {
+      "wasmSha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+      "wasmBytes": 2732918,
+      "modules": 279,
+      "freshMs": [
+        899.7,
+        865.43,
+        833.81,
+        833.78,
+        974.69,
+        958.86,
+        916.13,
+        942.51,
+        953.61,
+        1019.55,
+        957.72,
+        949.64,
+        948.05,
+        962.84,
+        910.54,
+        902.59,
+        913.73,
+        906.74,
+        824.61,
+        829.06
+      ],
+      "freshMedianMs": 914.93,
+      "pairedSavingsVsOriginalMs": {
+        "median": 16.53,
+        "bootstrap95": [
+          1.15,
+          37.97
+        ],
+        "fasterPairs": 15,
+        "pairs": 20
+      }
+    }
+  },
+  "final": {
+    "latestbase": {
+      "wasmSha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+      "wasmBytes": 2732918,
+      "modules": 276,
+      "freshMs": [
+        914.06,
+        855.99,
+        857.76,
+        825.49,
+        832.45,
+        856.15,
+        827.97,
+        838.51,
+        830.28,
+        838.26,
+        831.8,
+        868.19,
+        877.09,
+        844.54,
+        855.67,
+        877.11,
+        863.11,
+        809.21,
+        838.89,
+        852.65,
+        872.11,
+        862.58,
+        837.11,
+        878.05
+      ],
+      "freshMedianMs": 854.16,
+      "queue": {
+        "edges": 2390,
+        "publishCpuMs": {
+          "game": 56.28,
+          "world_storage": 46.02,
+          "cannon": 24.38,
+          "robots": 81.85,
+          "village": 17.25,
+          "minors": 22.89,
+          "kites": 24.55,
+          "station": 53.01,
+          "purchases": 8.75
+        },
+        "weightOfLongestChainMs": 423.99,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/pile_batch.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "ship-trace-0-latestbase",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.05,
+              "village": 24.63,
+              "minors": 0.02,
+              "kites": 0.06,
+              "station": 14.05,
+              "purchases": 0.07
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/progression/purchases.blot",
+              "gdev/src/ui/station.blot",
+              "gdev/src/debug/review_scenes.blot",
+              "gdev/src/progression/scenes.blot",
+              "gdev/src/ui/title.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 435.69
+          },
+          {
+            "seq": "ship-trace-1-latestbase",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.05,
+              "village": 28.33,
+              "minors": 0.03,
+              "kites": 0.09,
+              "station": 11.4,
+              "purchases": 0.1
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 489.93
+          },
+          {
+            "seq": "ship-trace-2-latestbase",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.03,
+              "village": 19.02,
+              "minors": 0.02,
+              "kites": 0.05,
+              "station": 7.61,
+              "purchases": 0.06
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 458.68
+          },
+          {
+            "seq": "ship-trace-3-latestbase",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.05,
+              "village": 21.98,
+              "minors": 0.03,
+              "kites": 0.07,
+              "station": 8.22,
+              "purchases": 0.09
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/transform.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/world/pile_batch.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/minors.blot",
+              "gdev/src/actors/village.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 455.11
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 119.44,
+            "check": 478.24,
+            "backend": 140.46
+          },
+          "workerCpuMs": 2023.25,
+          "importedSchemes": 18446,
+          "typeNodes": 1372374
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 103.42,
+            "check": 452.23,
+            "backend": 137.5
+          },
+          "workerCpuMs": 1876.8,
+          "importedSchemes": 18446,
+          "typeNodes": 1372374
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 103.53,
+            "check": 474.58,
+            "backend": 123.77
+          },
+          "workerCpuMs": 1983.82,
+          "importedSchemes": 18446,
+          "typeNodes": 1372374
+        },
+        {
+          "round": 3,
+          "phaseWallMs": {
+            "load": 108.83,
+            "check": 472.16,
+            "backend": 122.88
+          },
+          "workerCpuMs": 2046.6,
+          "importedSchemes": 18446,
+          "typeNodes": 1372374
+        }
+      ]
+    },
+    "latestrecruit": {
+      "wasmSha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+      "wasmBytes": 2732918,
+      "modules": 279,
+      "freshMs": [
+        839.56,
+        893.44,
+        823.08,
+        809.87,
+        809.62,
+        841.22,
+        800.79,
+        771.7,
+        823.14,
+        814.53,
+        828.56,
+        820.61,
+        854.98,
+        835.56,
+        817.79,
+        807.66,
+        792.52,
+        787.14,
+        826.23,
+        857.95,
+        819.58,
+        849.69,
+        861.51,
+        864.72
+      ],
+      "freshMedianMs": 823.11,
+      "queue": {
+        "edges": 2450,
+        "publishCpuMs": {
+          "game": 59.1,
+          "world_storage": 44.37,
+          "cannon": 18.97,
+          "robots": 69.97,
+          "robot_housing": 4.58,
+          "robot_motion": 9.35,
+          "robot_staffing": 9.54,
+          "village": 15.14,
+          "minors": 18.09,
+          "kites": 22.54,
+          "station": 49.1,
+          "purchases": 5.18
+        },
+        "weightOfLongestChainMs": 399.34,
+        "longestChain": [
+          "std/prelude.blot",
+          "std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/kites.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        "observed": [
+          {
+            "seq": "ship-trace-0-latestrecruit",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -55.9,
+              "minors": -70.3,
+              "kites": 0.03,
+              "station": -40.31,
+              "purchases": -68.65
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/buildings/cannon.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 431.57
+          },
+          {
+            "seq": "ship-trace-1-latestrecruit",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -52.08,
+              "minors": -69.36,
+              "kites": 0.04,
+              "station": -30.45,
+              "purchases": -67.78
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/clock.blot",
+              "ink/lib/app.blot",
+              "ink/lib/render.blot",
+              "ink/lib/ui.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/kites.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 448.05
+          },
+          {
+            "seq": "ship-trace-2-latestrecruit",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -59.4,
+              "minors": -75.31,
+              "kites": 0.04,
+              "station": -34.13,
+              "purchases": -70.15
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/transform.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/kites.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 448.6
+          },
+          {
+            "seq": "ship-trace-3-latestrecruit",
+            "consumerStartMinusRobotsPublishMs": {
+              "cannon": 0.02,
+              "village": -60.34,
+              "minors": -80.73,
+              "kites": 0.05,
+              "station": -32.09,
+              "purchases": -77.32
+            },
+            "completionChain": [
+              "std/prelude.blot",
+              "std/vector.blot",
+              "ink/lib/math.blot",
+              "ink/lib/lanes.blot",
+              "ink/lib/transform.blot",
+              "ink/lib/render.blot",
+              "ink/lib/brush.blot",
+              "ink/lib/editor.blot",
+              "gdev/src/effects/celebrations.blot",
+              "gdev/src/world/salt_simulation.blot",
+              "gdev/src/world/salt.blot",
+              "gdev/src/actors/robot_staffing.blot",
+              "gdev/src/actors/robots.blot",
+              "gdev/src/actors/kites.blot",
+              "gdev/src/world_storage.blot",
+              "gdev/src/buildings/construction.blot",
+              "gdev/src/game.blot",
+              "gdev/src/session.blot",
+              "gdev/src/main.blot"
+            ],
+            "queueWallMs": 434.5
+          }
+        ]
+      },
+      "profiled": [
+        {
+          "round": 0,
+          "phaseWallMs": {
+            "load": 112.43,
+            "check": 452.4,
+            "backend": 145.36
+          },
+          "workerCpuMs": 1998.25,
+          "importedSchemes": 18696,
+          "typeNodes": 1377766
+        },
+        {
+          "round": 1,
+          "phaseWallMs": {
+            "load": 109.62,
+            "check": 464.32,
+            "backend": 131.05
+          },
+          "workerCpuMs": 2067.32,
+          "importedSchemes": 18696,
+          "typeNodes": 1377766
+        },
+        {
+          "round": 2,
+          "phaseWallMs": {
+            "load": 104.75,
+            "check": 417.26,
+            "backend": 122.99
+          },
+          "workerCpuMs": 1911.5,
+          "importedSchemes": 18696,
+          "typeNodes": 1377766
+        },
+        {
+          "round": 3,
+          "phaseWallMs": {
+            "load": 105.6,
+            "check": 445.31,
+            "backend": 139.82
+          },
+          "workerCpuMs": 1967.43,
+          "importedSchemes": 18696,
+          "typeNodes": 1377766
+        }
+      ],
+      "pairedSavingsVsOriginalMs": {
+        "median": 22.09,
+        "bootstrap95": [
+          12.89,
+          34.68
+        ],
+        "fasterPairs": 21,
+        "pairs": 24
+      }
+    }
+  },
+  "qualification": {
+    "penSha256": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "pluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "wasmSha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+    "frameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "58aae684b0bd9dd5863ee799aa4782fd0d968e493451a058624a7c5292c0f88a",
+    "replayFiles": 242,
+    "replayTreeSha256": "fa159a34466583b7112fb697dfa338df3cb596b6005a1f86c804968aa317b973",
+    "guestSuite": {
+      "modules": 217,
+      "passes": 1254,
+      "existingFailures": 107,
+      "empty": [
+        "tests/kites_render.blot",
+        "tests/restoration_conversions.blot"
+      ],
+      "existingCompileFailures": [],
+      "namedOutcomeSha256": "594c39a0722c6f3a702ff54c8a3f3afb7296ad13d759f7987f6ab639e7888549",
+      "coverage": "Compared all named guest outcomes by module and test. Corrected one named import in the frozen drawing reference, then replaced that single module result with its three passing rerun outcomes. The two benchmark entries that use this fixture were also checked."
+    },
+    "penCheck": "passed, including Main, devtools, saved-state adapter and 552 assets",
+    "penCodegenCheck": "passed",
+    "benchEntries": {
+      "performance/modernize/presentation.blot": {
+        "hash": "dbc7f6a39c70a99dc1fa44c4adb83da00fc4ea4c960502f73e64f0cb8e64ef2a",
+        "wasmBytes": 357590
+      },
+      "performance/modernize/actor_dataflow.blot": {
+        "hash": "3748a0b853b9e9198bbfb4d962e3db4a6e8ac6f0b6e243bfeb57ca873a854ca8",
+        "wasmBytes": 356772
+      },
+      "performance/modernize/actor_behaviors.blot": {
+        "hash": "33d4be04778edc174645d86ff276e3e996342c022a647ef4c6154c7eacd4bbe9",
+        "wasmBytes": 52244
+      },
+      "performance/sparse-stream.blot": {
+        "diagnostics": [
+          [
+            "unknown_value",
+            "unknown value: tutorial.sandbox"
+          ]
+        ]
+      },
+      "performance/maxed_day.blot": {
+        "hash": "0333fec7a79a21a6911524d6d107a3a690ea106a5992b9e6a0be03a004488a36",
+        "wasmBytes": 2627705
+      },
+      "performance/economy.blot": {
+        "hash": "ffd2678b1ee750f00819a9401a6c4a9f46e43149b80f1e570a3520459cd0dd01",
+        "wasmBytes": 2403271
+      }
+    }
+  },
+  "retained": {
+    "method": "Change the reachable exported hauler_turn constant from 8.0 to 7.25 in robots or robot_motion respectively. Alternate seven independent paired sessions, each doing open, edit, revert. Check Wasm validity and both layouts against a separate fresh edited build. Values in milliseconds.",
+    "latestbase": {
+      "edit": [
+        500.04,
+        480.6,
+        503.91,
+        509.7,
+        493.85,
+        563.98,
+        502.81
+      ],
+      "revert": [
+        477.63,
+        491.8,
+        523.04,
+        489.57,
+        485.19,
+        721.1,
+        475.65
+      ],
+      "checkedPerEdit": [
+        23
+      ],
+      "editedSha256": "8e44f033a5f66db3e87440169c4388f7ac24be22e2ae9c927116ad11f517ccea"
+    },
+    "latestrecruit": {
+      "edit": [
+        751.43,
+        449.81,
+        483.17,
+        490.05,
+        479.79,
+        463.6,
+        480.48
+      ],
+      "revert": [
+        472.75,
+        471.64,
+        453.28,
+        483.08,
+        461.25,
+        458.03,
+        450.59
+      ],
+      "checkedPerEdit": [
+        24
+      ],
+      "editedSha256": "8e44f033a5f66db3e87440169c4388f7ac24be22e2ae9c927116ad11f517ccea"
+    }
+  }
+}

@@ -6,11 +6,15 @@ Fresh compile medians were **890 → 864 ms** across 30 eight-worker pairs.
 The median paired saving was 23 ms (95% bootstrap interval −1 to +34 ms).
 [Measurements and output checks](benchmarks/evidence/measurements/2026-11-19-gdev-checker.json)
 
-The current Gdev source took **870 ms** with eight workers and **1,434 ms**
-when the same workers shared two physical cores. An import chain through salt,
-pile search and robots accounts for about 436 ms of checking and publication
-CPU. The robot module was on the completion path in all six queue traces.
-Target earlier publication of the declarations its consumers need.
+Splitting Gdev's robot motion, housing and staffing let four consumers start
+checking 33–73 ms before the full robot interface was ready. Fresh eight-worker
+builds went from **854 to 823 ms** with byte-identical Wasm across 24 pairs.
+The remaining path to world storage ran through kites in three traces and
+cannon in one. Examine which robot declarations those two modules need.
+[Timings and queue traces](tasks/FAST_COMPILE.md#earlier-robot-interfaces-19-november-2026)
+
+An earlier Gdev revision took **870 ms** with eight workers and **1,434 ms**
+when the same workers shared two physical cores.
 [Phase timings, CPU contention and the dependency chain](tasks/FAST_COMPILE.md#fresh-gdev-compilation-under-cpu-contention-19-november-2026)
 
 `@spark` now maps bounded scalar expressions over one array in order.
