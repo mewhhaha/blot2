@@ -144,6 +144,12 @@ let code_table_limit: Code = 14;
 let code_private_marker: Code = 15;
 let code_GPU_FRONTEND_SYNTAX_ERROR: Code = 16;
 let code_function_return_required: Code = 17;
+let code_spark_generator: Code = 18;
+let code_spark_kernel: Code = 19;
+let code_spawn_program: Code = 20;
+// Extra constraints on the generated application (ordinary applications use 0).
+let apply_process_start: u32 = 1;
+let apply_spark_identity: u32 = 2;
 
 struct Node { tag: Tag = 0, a: u32 = 0, b: u32 = 0, c: u32 = 0 }
 struct NumericFault { node: Id, code: NumericCode, span: Span, actual_token: blot_parse_token::Tag }
@@ -157,6 +163,9 @@ struct Diagnostic {
 fn message(value: Diagnostic) -> const u8[:] {
  if value.code == code_GPU_FRONTEND_SYNTAX_ERROR { return "This syntax is not allowed in this position"; }
  if value.code == code_expected_token { return "Expected a syntax token"; }
+ if value.code == code_spark_generator { return "A spark requires one unguarded array generator: @spark #[result | item <- array]"; }
+ if value.code == code_spark_kernel { return "The spark kernel must use its input, numeric literals and bounded numeric primitives"; }
+ if value.code == code_spawn_program { return "Spawn requires a start operation and a local entry func with a matching _step entry"; }
  if value.code == code_expected_expression { return "Expected an expression"; }
  if value.code == code_function_return_required { return "A function body requires return or a do block with explicit returns"; }
  if value.code == code_expected_type { return "Expected a type"; }
@@ -477,6 +486,9 @@ fn fixity(tree: const Tree&, id: Id) -> Fixity {
 
 fn code_name(code: Code) -> const u8[:] {
  if code==code_expected_token { return "expected_token"; }
+ if code==code_spark_generator { return "spark_generator"; }
+ if code==code_spark_kernel { return "spark_kernel"; }
+ if code==code_spawn_program { return "spawn_program"; }
  if code==code_expected_expression { return "expected_expression"; }
  if code==code_expected_type { return "expected_type"; }
  if code==code_expected_pattern { return "expected_pattern"; }

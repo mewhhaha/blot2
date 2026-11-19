@@ -753,7 +753,10 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  }
  if t.tag==t_string { let __cleanup_result_45_0: Id = add(p,source,tokens,a_string,string_symbol(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_45_0; }
  if t.tag==t_intrinsic {
-  advance(p,source,tokens); let staging,has_staging=blot_check_typed_staging::lookup(text(p,source,t)); if has_staging { p.tree.has_typed_staging=true; }
+  advance(p,source,tokens);
+  if text(p,source,t)=="@spark" { let result=spark_expression(p,source,tokens,start); p.depth--; return result; }
+  if text(p,source,t)=="@spawn" { let result=spawn_expression(p,source,tokens,start); p.depth--; return result; }
+  let staging,has_staging=blot_check_typed_staging::lookup(text(p,source,t)); if has_staging { p.tree.has_typed_staging=true; }
   let proof,has_proof=blot_check_numeric_proof_terms::constructor(text(p,source,t)); if has_proof { p.tree.has_numeric_proofs=true; }
   let __cleanup_result_46_0: Id = add(p,source,tokens,a_intrinsic,intern(p,source,tokens,text(p,source,t)),0,0,start); { p.depth--; } return __cleanup_result_46_0;
  }
@@ -829,6 +832,109 @@ recursive fn collection(p: Parser&,source: const u8[:],tokens: const Token[:],is
  for value in refs.items[spread+1..] { result=collection_intrinsic(p,source,tokens,append,[result,value],start); }
  if values.len==1 { result=collection_intrinsic(p,source,tokens,identity,[result],start); } statements.push(add(p,source,tokens,a_return_stmt,result,0,0,start)); let __cleanup_result_61_0: Id = list_node(p,source,tokens,a_block,statements.items,start); refs.deinit(); statements.deinit(); values.deinit(); return __cleanup_result_61_0;
  refs.deinit(); statements.deinit(); values.deinit(); }
+// A spark admits one fixed-work numeric result per array index. Only total
+// primitives are eligible here; source operators can have user implementations.
+recursive fn spark_scalar(p: Parser&,id: Id,item: Symbol,depth: u32) -> bool {
+ if depth>=64 { return false; }
+ let n=p.tree.node(id);
+ if n.tag==a_group { return spark_scalar(p,n.a,item,depth+1); }
+ if n.tag==a_name { return n.a==item; }
+ if n.tag==a_integer||n.tag==a_float { return true; }
+ if n.tag!=a_apply { return false; }
+ var head=id; var count=0;
+ while p.tree.node(head).tag==a_apply {
+  let call=p.tree.node(head);
+  if count==2||!spark_scalar(p,call.b,item,depth+1) { return false; }
+  head=call.a; count++;
+ }
+ let op=p.tree.node(head);
+ if op.tag!=a_intrinsic { return false; }
+ let spelling=p.pool.get(op.a);
+ if count==1 { return spelling=="@u32.to_f32"||spelling=="@f32.abs"||spelling=="@f32.neg"; }
+ if count!=2 { return false; }
+ for name in ["@u32.add","@u32.sub","@u32.mul","@u32.bit_and","@u32.bit_or","@u32.bit_xor","@f32.add","@f32.sub","@f32.mul","@f32.div"] {
+  if spelling==name { return true; }
+ }
+ return false;
+}
+recursive fn spark_expression(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
+ if !eat(p,source,tokens,t_hash)||!eat(p,source,tokens,t_l_bracket) { return fail(p,source,tokens,blot_parse_ast::code_spark_generator); }
+ let body=collection_element(p,source,tokens);
+ if !eat(p,source,tokens,t_pipe)||!at(p,source,tokens,t_identifier)||peek(p,tokens,1)!=t_left_arrow { return fail(p,source,tokens,blot_parse_ast::code_spark_generator); }
+ let item=lower_identifier(p,source,tokens); advance(p,source,tokens);
+ let input=expression(p,source,tokens);
+ if p.failure!=blot_error::Error.none { return 0; }
+ if !at(p,source,tokens,t_r_bracket) { return fail(p,source,tokens,blot_parse_ast::code_spark_generator); }
+ if !spark_scalar(p,body,item,0) { return fail(p,source,tokens,blot_parse_ast::code_spark_kernel); }
+ advance(p,source,tokens);
+ // An effectful generator runs once before the map. An unshadowed source
+ // name can be read directly without introducing another owner binding.
+ var seq=p.tree.node(input).a; var saved: Id=0;
+ if p.tree.node(input).tag!=a_name||seq==item {
+  seq=collection_name(p,source,tokens,start);
+  saved=add(p,source,tokens,a_use_stmt,seq,input,0,start);
+ }
+ let values=add(p,source,tokens,a_name,seq,0,0,start);
+ let size=collection_intrinsic(p,source,tokens,"@array.length",[values],start);
+ let index=collection_name(p,source,tokens,start);
+ let parameter=add(p,source,tokens,a_parameter,index,0,extra(p,source,tokens,[0 as u32,0,0,0]),start);
+ let position=add(p,source,tokens,a_name,index,0,0,start);
+ let element=collection_intrinsic(p,source,tokens,"@array.get",[values,position],start);
+ let binding=collection_binding(p,source,tokens,item,element,start);
+ // A bare identity also has a scalar result in this first numeric profile.
+ var leaf=body; while p.tree.node(leaf).tag==a_group { leaf=p.tree.node(leaf).a; }
+ if p.tree.node(leaf).tag==a_name {
+  p.tree.nodes.items[element].c=blot_parse_ast::apply_spark_identity;
+ }
+ let result=add(p,source,tokens,a_return_stmt,body,0,0,start);
+ let kernel=add(p,source,tokens,a_lambda,parameter,list_node(p,source,tokens,a_block,[binding,result],start),0,start);
+ let array=collection_intrinsic(p,source,tokens,"@array.generate",[size,kernel],start);
+ if saved==0 { return array; }
+ let returned=add(p,source,tokens,a_return_stmt,array,0,0,start);
+ return list_node(p,source,tokens,a_block,[saved,returned],start);
+}
+fn has_process_entry(p: Parser&,source: const u8[:],tokens: const Token[:],name: const u8[:]) -> bool {
+ for token,i in tokens {
+  if token.tag==t_kw_func&&i>0&&i+1<tokens.len&&tokens[i-1].tag==t_identifier&&text(p,source,tokens[i-1])=="entry"&&text(p,source,tokens[i+1])==name { return true; }
+ }
+ return false;
+}
+fn process_signature(p: Parser&,source: const u8[:],tokens: const Token[:],name: Symbol,input: Id,output: Id,start: u32) -> Id {
+ let reference=add(p,source,tokens,a_name,name,0,0,start);
+ let binding=collection_binding(p,source,tokens,collection_name(p,source,tokens,start),reference,start);
+ let signature=add(p,source,tokens,a_type_function,input,output,0,start);
+ p.tree.extra.items[p.tree.node(binding).c]=signature;
+ return binding;
+}
+recursive fn spawn_expression(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
+ let operation=postfix(p,source,tokens);
+ if p.failure!=blot_error::Error.none { return 0; }
+ if p.tree.node(operation).tag!=a_name||!at(p,source,tokens,t_identifier) { return fail(p,source,tokens,blot_parse_ast::code_spawn_program); }
+ let spelling=text(p,source,current(p,source,tokens)); var step_symbol: Symbol=0;
+ { let step_name=str(spelling,"_step");
+ if spelling.len>64||!has_process_entry(p,source,tokens,spelling)||!has_process_entry(p,source,tokens,step_name) { return fail(p,source,tokens,blot_parse_ast::code_spawn_program); }
+ step_symbol=intern(p,source,tokens,step_name); }
+ let program=lower_identifier(p,source,tokens);
+ let config=postfix(p,source,tokens);
+ if p.failure!=blot_error::Error.none { return 0; }
+ let word_type=add(p,source,tokens,a_type_name,intern(p,source,tokens,"U32"),0,0,start);
+ let array_type=add(p,source,tokens,a_type_name,intern(p,source,tokens,"Array"),0,0,start);
+ let words=add(p,source,tokens,a_type_apply,array_type,word_type,0,start);
+ let init=process_signature(p,source,tokens,program,word_type,word_type,start);
+ let step=process_signature(p,source,tokens,step_symbol,words,word_type,start);
+ let config_name=collection_name(p,source,tokens,start);
+ let evaluated=add(p,source,tokens,a_use_stmt,config_name,config,word_type,start);
+ var packet=ScratchIdBuffer {}; packet.push(add(p,source,tokens,a_name,config_name,0,0,start));
+ for byte in spelling { packet.push(add(p,source,tokens,a_integer,byte as u32,0,0,start)); }
+ let request=collection_literal(p,source,tokens,false,packet.items,start); packet.deinit();
+ let packet_name=collection_name(p,source,tokens,start);
+ let bound=collection_binding(p,source,tokens,packet_name,request,start);
+ p.tree.extra.items[p.tree.node(bound).c]=words;
+ let payload=add(p,source,tokens,a_name,packet_name,0,0,start);
+ let call=add(p,source,tokens,a_apply,operation,payload,blot_parse_ast::apply_process_start,start);
+ let returned=add(p,source,tokens,a_return_stmt,call,0,0,start);
+ return list_node(p,source,tokens,a_block,[init,step,evaluated,bound,returned],start);
+}
 recursive fn comprehension(p: Parser&,source: const u8[:],tokens: const Token[:],is_list: bool,result: Id,start: u32) -> Id {
  var qualifiers=ScratchQualifierBuffer {};
  while p.failure==blot_error::Error.none {

@@ -265,8 +265,13 @@ suspension does not introduce a collector or implicit rollback.
 ## Retired runtime extensions
 
 ABI 8 rejects counted ownership/resource hooks, task imports and task metadata.
-Language-level scope/spawn/join/cancellation and concurrent guest task callbacks
-are retired. Host workers and copied-packet queues remain separate features.
+The retired task protocol used scope, spawn, join and cancellation imports.
+The current `@spawn Start program config` calls an ordinary scoped effect.
+A host provider copies the configuration and returns an admission endpoint
+before running either child entry. The Deno process scheduler drives each
+child through the existing guest ABI. The Deno spark pool exchanges numeric
+arrays with separate instances through its own worker channel.
+[Language forms and registration contracts](../language/guide.md#sparks-processes-and-host-workers)
 
 The still-existing earlier backend and its removal are tracked by task 120. Its
 former collector and task protocol details are preserved in

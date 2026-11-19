@@ -17,6 +17,13 @@ candidate, evidence and requirements.
 
 ## Benchmarks
 
+Eight prepared Deno workers ran 128 Ink route forecasts for Gdev in **2.32 ms**
+versus **5.34 ms** for one direct Wasm call. The existing four-route gameplay
+result stayed faster directly, **0.30 ms** versus **0.42 ms**. Preparing the
+pool took 123–138 ms across the two runs. [Benchmark and raw samples](benchmarks/evidence/measurements/2026-11-19-spark-spawn.json)
+
+![Direct and worker times for Gdev route batches](benchmarks/evidence/measurements/2026-11-19-spark-spawn.png)
+
 Changing scene history capacity in Gdev returns the complete Wasm in
 **35.0 ms**, down from **82.2 ms** on the same source.
 The compiler reuses all checked bodies and updates one operand.

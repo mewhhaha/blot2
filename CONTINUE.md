@@ -1,5 +1,20 @@
 # Working on Blot and Gdev
 
+`@spark` now maps bounded scalar expressions over one array in order.
+`@spawn` asks a scoped provider to admit a child with private Wasm state
+and a bounded mailbox. The Deno host can explicitly register independent
+fixed-width batch entries for copied worker execution. Ink's route planner
+is registered by the benchmark. Transparent worker placement for named
+guest functions and hard copy budgets remain open.
+
+Across two Deno runs (42 measured samples per cell), eight prepared workers
+finished 128 Gdev route forecasts in **2.32 ms** versus **5.34 ms** directly.
+For the existing four-route result including selection, direct took **0.30 ms**
+and the pool took **0.42 ms**. Keep four-route gameplay direct. A single-threaded
+spawned planner took 0.170 ms per turn versus 0.167 ms for the same direct call.
+The pinned Main Wasm, hardware frame, trace and all 242 replay files matched
+the preceding checkpoint. [Code and samples](benchmarks/evidence/measurements/2026-11-19-spark-spawn.json)
+
 Whole-pile replacement now takes and returns the salt owner. Authoring 66
 piles, replacing them with zero and then one, and restoring the original save
 recovers all original IDs, the active slots and the last pile's grid lookup.

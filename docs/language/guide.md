@@ -2060,13 +2060,70 @@ alternatives, and removes parentheses that do not affect expression grouping.
 `--check` checks without writing. The formatter verifies that the parsed
 structure is unchanged before writing.
 
-## Host workers
+## Sparks, processes and host workers
 
-Language tasks, sparks and receives are retired. Parallel work runs in host
-workers, which exchange copied numeric packets. A worker cannot receive a guest
-closure, storage owner, borrowed view or provider capability. Copy inputs before
-posting them and copy results into the destination owner after validating the
-reply. The guest ABI and session protocol remain unchanged.
+Use a spark when the caller needs an ordered array in this invocation. Use
+a process when private state needs to survive the caller.
+
+```blot
+entry func double (xs: Array U32): Array U32 => return @spark #[@u32.mul x 2 | x <- xs]
+```
+
+The compiler evaluates the generator input once, allocates the result array at its final
+length and writes one result at each input index. Empty inputs produce an
+empty array. The direct Wasm path works on single-threaded hosts. This first
+profile accepts one unguarded array generator, numeric literals, the bound
+item, and nested calls to these bounded scalar operations:
+
+| Input | Operations |
+| --- | --- |
+| U32 | `@u32.add`, `sub`, `mul`, `bit_and`, `bit_or`, `bit_xor`, `to_f32` |
+| F32 | `@f32.add`, `sub`, `mul`, `div`, `abs`, `neg` |
+
+A bare identity preserves U32 or F32 elements. User functions, overloaded operators, captures,
+guards and additional generators are outside this profile. Unmarked
+comprehensions keep their existing semantics.
+
+A Deno host can opt into parallel execution for an independently verified
+batch entry with `SparkPool.open(module, { entry, width, workers })` from
+`@mewhhaha/blot/sparks`. `pool.run(queries)` gives prepared workers disjoint
+contiguous rows. The input is a private U32 array. Each query must return
+exactly `width` lanes of the declared U32 or F32 result type, in input order.
+An optional copied U32 prefix supplies the same configuration to each batch.
+The host registering a kernel is responsible for its purity, termination
+and row independence. On worker failure the pool retires its workers and
+recomputes the complete saved input directly. `pool.direct(queries)` runs
+the same entry in one guest call. `pool.close()` releases the workers.
+Worker selection is explicit. There is currently no hard copy-budget form.
+
+```blot
+effect Start: Array U32 -> U32
+entry func planner (seed: U32): U32 => return seed
+entry func planner_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
+func request (config: U32): U32 ! {Start} => return @spawn Start planner config
+```
+
+A scoped provider for `Start` decides admission synchronously. The packet
+contains the U32 configuration followed by the ASCII bytes of the local
+program name. The compiler checks the start operation and the two entry
+signatures. A live provider forwards the packet to `ProcessHost.admit`
+from `@mewhhaha/blot/processes`. Zero means refused. An admitted child starts
+in a later `advance(budget)` in its own Wasm instance. The host registers
+an initialization and step work charge for each trusted bounded program.
+A step consumes `#[previous_state, command]` and its U32 result becomes
+both the next state and the reply.
+
+`send` accepts a command when the child is ready and its mailbox has room.
+Accepted tickets reserve space for a final reply. `poll` consumes one
+completed, cancelled or failed ticket. `close` cancels queued tickets,
+`release` reclaims a drained terminal child, and `restore` invalidates all
+endpoints and returns their remaining terminal events to the previous owner. Turn budgets bound registered work units. Each Wasm call runs to
+completion on the host thread. The caller should check world revisions before
+applying a result produced across frames.
+
+Host workers exchange copied numeric packets under ABI 8 and session
+protocol 2. Guest closures, owners, borrowed views and provider capabilities
+stay in their originating instance.
 
 Host callbacks suspend the current invocation through the guest adapter. Keep
 borrowed views within that invocation; retain later state by copying it into a

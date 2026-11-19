@@ -1,0 +1,27 @@
+// Loaded in the Gdev project beside its existing path plan benchmark.
+import * as fixture from "../../test_support/path_plans"
+import * as array from "std/array"
+entry func serial_shared (seed: U32) => return fixture.direct_shared seed
+// One seed per packet. Each query has four summary lanes and at most 129 XYZ points.
+entry func routes (input: Array U32): Array F32 => return fixture.with_solids input[0] (func solids => return do:
+  let count = input.length - 1
+  let output = array.fill (count * 392) 0.0
+  for i in 0 .. count:
+    let query = input[i + 1]
+    if query < 4:
+      let row = fixture.packed_on solids query
+      let start = i * 392
+      output[start] := U32.to_f32 row.length
+      for j in 0 .. row.length:
+        output[start + j + 1] := row[j]
+  return output)
+
+effect StartRoute: Array U32 -> U32
+entry func route_planner (seed: U32): U32 => return seed
+entry func route_planner_step (pair: Array U32): U32 => return do:
+  let plans = fixture.direct_shared (@u32.add pair[0] pair[1])
+  return F32.to_u32 plans[0]
+func request_planner (): U32 ! { StartRoute } => return @spawn StartRoute route_planner 11
+entry func start_route (host: Array U32 -> U32 ! { Foreign }) => return do @effect.provider StartRoute host:
+  use endpoint <- request_planner ()
+  return endpoint
