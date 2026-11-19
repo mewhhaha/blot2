@@ -1,5 +1,19 @@
 # Working on Blot and Gdev
 
+Player and worker drops now pass one salt owner through pile insertion, the
+active index and the cleanup journal. Of 400 seeded piles, the first cleanup
+previously queued 33 for another sweep. Checking the final positions left one
+genuine retry. After it clears, inserting at slot 400 selects only that slot.
+An explicit snapshot survives a later drop, and all three backing arrays keep
+their address and capacity when shortened from eight to six and grown to seven.
+
+The pinned Gdev comparison gained one repaired check and three new passes,
+with 107 existing failures. All 242 replay files and the hardware frame matched.
+Across seven fresh eight-worker build pairs on a shared host, median Main
+compile time went from 2,326 to 2,339 ms and Wasm grew by 1,234 bytes to
+2,658,171. The subsecond figures below belong to an earlier comparison.
+[Salt ownership qualification](benchmarks/evidence/measurements/2026-11-19-owned-salt-insertion.json)
+
 All 44 previously unbuilt Gdev test modules now execute. This includes the 34
 blocked on result selection for `from`. The starting-salt, scene, terrain
 restore and editor hooks now pass their successor world to their callers.
@@ -109,10 +123,11 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
    A borrowed `@storage.push` changed a saved alias's length from one to two.
    A borrowed `@storage.truncate` changed it to zero. An `own` helper
    rejects the live alias, and an explicit copy preserves its length.
-   Start with Gdev's salt insertion and active-index update. They grow two
-   arrays in the same transaction. Compute the update from read views, end
-   those views, then apply both changes to one owned salt state and return it.
-   The [source scan](scripts/integration/count_stores.py) finds **1,004
+   Next migrate Gdev's `salt_simulation.write_stack`. Changing an existing
+   pile can move its active index and append to both update journals through
+   a borrowed salt record. Use insertion's owning boundary and compare active
+   ordering, journal contents and sparse cleanup against a full sweep.
+   The [source scan](scripts/integration/count_stores.py) finds **997
    candidate store lines** plus one deliberately rejected regression.
    Gdev and Ink have **zero `lent` declarations**, down from 15. The compiler
    still accepts `lent` and shared stores to arrays while callers migrate.

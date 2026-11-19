@@ -3,6 +3,16 @@
 The active migration count, next caller family and executed Gdev comparison
 are in [CONTINUE.md](../CONTINUE.md). Counts below belong to their source checkpoints.
 
+Gdev now passes one salt owner through both player and worker pile insertion.
+Reading a saved alias after insertion or after truncating the cleanup journal
+produces `own_argument`. An explicit copy keeps its original pile, including
+the count and credit. The Wasm probe observes the pile rows, active index and
+cleanup journal at lengths 8, 6 and 7. All three keep their original payload
+address, capacity and generation. Run
+`deno run -A benchmarks/language/salt_ownership.ts ../gdev` from the Blot root.
+Existing-pile edits still resize shared columns in `salt_simulation.write_stack`.
+[Source revisions, probes and comparison](../benchmarks/evidence/measurements/2026-11-19-owned-salt-insertion.json)
+
 On 19 November 2026 the last four Ink `lent` declarations became read-only
 scene and prepared-physics ranges. Gdev had already removed its last two
 frame alias declarations. The checker rejects indexed writes through a slice,

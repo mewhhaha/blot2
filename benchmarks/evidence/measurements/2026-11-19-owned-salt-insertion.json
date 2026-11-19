@@ -1,0 +1,308 @@
+{
+  "date": "2026-11-19",
+  "scope": "Salt insertion, index and journal ownership in Gdev, and post-move cleanup selection.",
+  "inputs": {
+    "blot": "8559f49749c709683c5d7aacb5f781dcdb3d28a8",
+    "compilerSha256": "d0eb64e6cd73cad33d30233d105a3c439189dd7fc8ebb2fe0057f853c4d90109",
+    "gdevProjectSessionIdentity": "63a7b221c923fa03a325038a2ba0e4e2eea3c5c78c5f7cc8db9918e1c4d3f4ff",
+    "guestAbi": 8,
+    "projectSessionProtocol": 2,
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "penBinarySha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "penBlotPluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "gdevBase": "fbea05c03389b7a4122e806fccdb2d4220c5ef21",
+    "gdevCandidate": {
+      "base": "fbea05c03389b7a4122e806fccdb2d4220c5ef21",
+      "filesFromCommit": "379adab2326f2ebbb06872b843fb122b9bb50da8",
+      "files": [
+        "src/actors/robots.blot",
+        "src/buildings/construction.blot",
+        "src/player/hand.blot",
+        "src/progression/tutorial.blot",
+        "src/world/salt.blot",
+        "src/world/salt_simulation.blot",
+        "src/world/world_ground.blot",
+        "tests/construction_delivery.blot",
+        "tests/hauling_plan.blot",
+        "tests/minors.blot",
+        "tests/minors_game.blot",
+        "tests/performance_semantics.blot",
+        "tests/rejected/aliased_cleanup_truncate.blot",
+        "tests/rejected/aliased_salt_insert.blot",
+        "tests/salt_flight.blot",
+        "tests/simulation_features.blot"
+      ]
+    },
+    "inkBefore": "c6f63a369856dec7ab5d71f3ba43f523025ecbe1",
+    "inkAfter": "a2d53352c32ed7f1dcbf44a3d514a531a7a92b3e",
+    "std": "Blot revision above; no compiler rebuild."
+  },
+  "cleanup": {
+    "fixture": "tests/performance_semantics.blot",
+    "seedPiles": 400,
+    "before": {
+      "queuedAfterFirstSweep": 33,
+      "stillObstructed": [
+        171
+      ],
+      "stillInStash": 0,
+      "queuedAfterImmediateAppend": 34
+    },
+    "after": {
+      "queuedAfterFirstSweep": 1,
+      "stillObstructed": [
+        171
+      ],
+      "stillInStash": 0,
+      "queuedAfterImmediateAppend": 2,
+      "selectedAfterSecondSweepAndAppend": [
+        400
+      ]
+    },
+    "laws": [
+      "Compare all final pile positions with the retry list.",
+      "Sparse cleanup and forced full cleanup encode the same state.",
+      "A geometry revision selects all 401 piles."
+    ]
+  },
+  "ownership": {
+    "insertion": "salt_simulation.append_stack takes and returns one salt_state.Access. Player drops, worker cargo and brick landings use it.",
+    "arrayUpdates": "An owned pages.push grows the columns. An owned pages.truncate clears the cleanup journal while retaining capacity.",
+    "rejectedWithLiveAlias": [
+      "tests/rejected/aliased_salt_insert.blot",
+      "tests/rejected/aliased_cleanup_truncate.blot"
+    ],
+    "expectedDiagnostic": "own_argument",
+    "explicitSnapshot": "test_hand_and_worker_insert_into_one_salt_owner preserves the copied stack count, ID, height and credit across the second insertion.",
+    "guestProbe": "deno run -A benchmarks/language/salt_ownership.ts ../gdev",
+    "observed": {
+      "nextPileId": 9,
+      "retained": [
+        {
+          "slot": 4,
+          "address": 13633184,
+          "capacityBytes": 512,
+          "generation": 0,
+          "lengths": [
+            8,
+            6,
+            7
+          ]
+        },
+        {
+          "slot": 6,
+          "address": 13633152,
+          "capacityBytes": 32,
+          "generation": 0,
+          "lengths": [
+            8,
+            6,
+            7
+          ]
+        },
+        {
+          "slot": 9,
+          "address": 13633120,
+          "capacityBytes": 32,
+          "generation": 0,
+          "lengths": [
+            8,
+            6,
+            7
+          ]
+        }
+      ]
+    },
+    "scopeLimit": "Borrowed storage intrinsics remain available on other, unmigrated paths.",
+    "capacityProbeMethod": "Seed eight moving piles, shorten the three columns and their logical counts to six, then call the real cargo-drop entry. The probe reads array descriptors at each step.",
+    "storeLineScan": {
+      "method": "scripts/integration/count_stores.py on tracked Gdev src, pen, test_support, tests, devtools, performance and Ink lib, tests. Includes the deliberately rejected store in Ink tests/rejected/scene_query_storage.blot.",
+      "before": {
+        "gdev": {
+          "storeLines": 812,
+          "lent": 0
+        },
+        "ink": {
+          "storeLines": 193,
+          "lent": 0
+        }
+      },
+      "after": {
+        "gdev": {
+          "storeLines": 805,
+          "lent": 0
+        },
+        "ink": {
+          "storeLines": 193,
+          "lent": 0
+        }
+      }
+    }
+  },
+  "gdevTests": {
+    "control": {
+      "pass": 1225,
+      "fail": 108,
+      "modules": 210
+    },
+    "candidateFullRun": {
+      "pass": 1228,
+      "fail": 107,
+      "modules": 211
+    },
+    "extraRejection": {
+      "pass": 1,
+      "fail": 0,
+      "modules": 1
+    },
+    "distinctCandidateOutcomes": 1336,
+    "changedExistingChecks": {
+      "tests/performance_semantics.blot test_cleanup_journal_ignores_untouched_piles_and_survives_render_acknowledgement": [
+        "FAILED",
+        "ok"
+      ]
+    },
+    "addedPassingChecks": [
+      "tests/performance_semantics.blot test_hand_and_worker_insert_into_one_salt_owner",
+      "tests/rejected/aliased_salt_insert.blot rejected: own_argument",
+      "tests/rejected/aliased_cleanup_truncate.blot rejected: own_argument"
+    ],
+    "newFailures": 0,
+    "unbuiltModules": 0,
+    "liveFocused": {
+      "pass": 20,
+      "fail": 0,
+      "modules": 4
+    },
+    "penCheck": {
+      "main": true,
+      "devtools": true,
+      "assets": 550,
+      "codegenCheck": true
+    }
+  },
+  "inkTests": {
+    "guestPassed": 283,
+    "guestModules": 74,
+    "guestFailed": 0,
+    "nativePassed": 111,
+    "nativeStillFailing": [
+      "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+      "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+    ],
+    "formatAndGeneratedSourcesChecked": true
+  },
+  "output": {
+    "penReplay": {
+      "frames": 120,
+      "matchingFiles": 242,
+      "orderedFileHashMapSha256": "f1ab3f3332a31b3a81d7fcb823e773d8fc3ba5aa0a0b4418bec6319f654117a8",
+      "finalSnapshotSha256": "eaa7be919a72149cc86a81e8678ca16239e715b0ef5cd0d839e9ec72fd5e5781"
+    },
+    "hardwareFrame": {
+      "pixels": [
+        640,
+        480
+      ],
+      "matchingHashes": {
+        "frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+        "frames.trace": "4b2069040ce1e9f8d87b16577ebd1fba3ecd0b7c4956f6f954cace18d82d37c2"
+      },
+      "penRunAndImageInspected": true
+    },
+    "economySamples": [
+      {
+        "input": [
+          0,
+          3,
+          1,
+          4
+        ],
+        "result": [
+          0,
+          3,
+          8,
+          0.06666667014360428,
+          0,
+          0,
+          100000,
+          0,
+          0,
+          0,
+          100000,
+          0
+        ],
+        "runsPerVariant": 4
+      },
+      {
+        "input": [
+          1,
+          3,
+          2,
+          8
+        ],
+        "result": [
+          1,
+          3,
+          27,
+          0.13333334028720856,
+          0,
+          0,
+          100000,
+          0,
+          0,
+          0,
+          100000,
+          0
+        ],
+        "runsPerVariant": 4
+      }
+    ]
+  },
+  "freshBuilds": {
+    "entry": "src/main.blot",
+    "compilerWorkers": 8,
+    "method": "Fresh compiler process per build, warm files, same machine. Time starts after reading project options, before opening the compiler session, and ends when Wasm bytes are returned. Initial variant alternates across seven pairs. Both outputs match the hardware frame builds.",
+    "before": {
+      "freshModules": 272,
+      "wasmBytes": 2656937,
+      "wasmSha256": "f827c775acd35ee8b069cab7b8ce23fd231d12bb3c4d15f3ee0161b429ab2a83",
+      "milliseconds": [
+        2852.395,
+        1791.435,
+        2326.04,
+        2842.64,
+        3076.924,
+        2057.287,
+        2196.998
+      ],
+      "medianMs": 2326.04
+    },
+    "after": {
+      "freshModules": 273,
+      "wasmBytes": 2658171,
+      "wasmSha256": "a7ebf65534f7319bfa9612bb9e1bec419dd97eefa519bfdc9b7c716148ac17d8",
+      "milliseconds": [
+        2610.406,
+        2018.07,
+        2400.82,
+        2339.462,
+        2593.203,
+        2204.761,
+        2196.657
+      ],
+      "medianMs": 2339.462
+    },
+    "wasmGrowthBytes": 1234,
+    "interpretation": "The medians are close relative to run-to-run variation on the shared host. This batch does not establish a compile-time gain."
+  },
+  "liveMain": {
+    "gdev": "e0d37e0706c816212fe3d46059b27bf21bd2359e",
+    "cleanSource": true,
+    "freshModules": 276,
+    "wasmBytes": 2711216,
+    "wasmSha256": "a4847f808d58685094925f7a163fb7f42285f6e0342c7f06ffe0c59dea1dc8fa",
+    "note": "Independent live build includes intervening Gdev changes. Pinned measurements above isolate the salt changes."
+  },
+  "tradeoff": "Builder cancellation may release cargo and needs the salt owner. A tick with eligible daytime builders can construct the flocking lookup twice. Other ticks skip the extra lookup. The economy samples check outputs only."
+}
