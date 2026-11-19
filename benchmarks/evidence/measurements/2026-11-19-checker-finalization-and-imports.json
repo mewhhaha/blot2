@@ -1,0 +1,567 @@
+{
+  "inputs": {
+    "beforeCommit": "bdc7fa307a4dcba50851e037bb8e23256e0c1001",
+    "beforeExecutable": "2733383129ec25eb85ab4327a40ddc0dec4bc8f0bfe32261dca5e3419f7c2e7b",
+    "afterExecutable": "5f864563c3ce93cd4ed2641bcf63ff2c073397ac9b527b4e93b136b3d76357ae",
+    "afterSource": "c437089b3385ef01ca10c7ba026e7148b9d879db80c606072b088214e4de43ed",
+    "gdev": "e3dd4286e10c11b5dd4118adf215fcf8036a74ab",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "cpu": "Ryzen 7 3800X, 8 physical cores, 16 logical CPUs"
+  },
+  "methods": {
+    "trace": "Fresh 279-module project, eight workers. Diagnostic-only hooks on the previous compiler, grouped by module check and finalization batch. A generic site is a pending index, original type and source position. Epochs include all type and effect writes in the module. Named type and constructor reads are directly indexed checker uses. Later lowering, publication, usage scans and serialization can also require a definition.",
+    "times": "Alternating paired fresh compiler processes with warm filesystem, measured from opening the project to receiving the Wasm. Gdev profiles and retained edits are separate runs. Durations are milliseconds. Pairs sampled on this shared host. Descriptive 95% percentile interval for the median paired saving, 4,000 resamples with seed 65361.",
+    "programs": "benchmarks/tools/bench_type_checker.py --pairs 12, cli build-project with the repository prelude and profile counters. Every pair asserts output hash or exact diagnostic agreement."
+  },
+  "trace": {
+    "moduleChecks": 279,
+    "catalogRequests": 194957,
+    "catalogCopies": 31398,
+    "finishBatches": 279,
+    "finalRequests": 442302,
+    "primitiveFinalRequests": 164414,
+    "genericAttempts": 33751,
+    "distinctFinalRoots": 166575,
+    "distinctGenericSites": 27065,
+    "distinctSiteEpochs": 33682,
+    "copiedNominalSlots": 31398,
+    "nominalSlotsDirectlyRead": 3039,
+    "nominalSlotsIncludingConstructorReads": 3059,
+    "genericExpansionPathCounts": {
+      "141": 6221,
+      "107": 578
+    }
+  },
+  "nominalTrials": {
+    "explicitNames": {
+      "status": "failed",
+      "compiled": false,
+      "compiler": "64e4a4488676218c9d7a383f4e8f20f45c0da031a69b8a00add9e1ff475c9a1e",
+      "diagnostics": [
+        {
+          "file": "rig.blot",
+          "code": "unknown_field",
+          "stage": "check-project",
+          "start": 11740,
+          "end": 11750
+        }
+      ]
+    },
+    "checkerDemand": {
+      "status": "failed",
+      "compiled": false,
+      "compiler": "c6a8203e026671920a43e09477c3d4cd71163aeaf778e216f00c5a6f66b4d24b",
+      "diagnostics": [
+        {
+          "file": "world_storage.blot",
+          "code": "own_argument",
+          "stage": "lower",
+          "start": 36550,
+          "end": 36562
+        }
+      ]
+    },
+    "reachableGraph": {
+      "status": "completed",
+      "compiled": true,
+      "compiler": "6d979b274e07a8b5993947972bf582ec11813b786a48358eb937fb71182def7d",
+      "bytes": 2732918,
+      "wasm": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+      "importNodes": 180849,
+      "resolveVisits": 3438262
+    },
+    "threeModules": {
+      "explicitNames": "unknown_field",
+      "checkerDemandWasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "controlWasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "executedInputsAndResults": [0, 42, 1337]
+    }
+  },
+  "workloads": {
+    "generics-32": {
+      "checkMs": {
+        "before": [11.685, 12.654, 19.347, 26.387, 21.135, 13.878, 11.771, 13.154, 15.182, 23.849, 12.383, 11.84],
+        "after": [16.547, 12.82, 16.097, 11.668, 17.769, 16.418, 13.184, 16.705, 15.968, 12.211, 15.155, 14.617],
+        "medians": [13.516, 15.561],
+        "pairedSaving": -1.099,
+        "saving95": [-2.775, 3.308],
+        "fasterPairs": 4
+      },
+      "resolveVisits": [21287, 21276],
+      "typeNodes": [6021, 6021],
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-256": {
+      "checkMs": {
+        "before": [36.575, 23.432, 34.193, 26.527, 24.534, 20.329, 24.529, 21.218, 26.26, 27.888, 23.589, 22.807],
+        "after": [22.571, 23.774, 30.343, 32.385, 25.558, 21.594, 28.155, 24.11, 21.038, 26.011, 28.879, 27.223],
+        "medians": [24.532, 25.785],
+        "pairedSaving": -1.145,
+        "saving95": [-4.021, 2.864],
+        "fasterPairs": 4
+      },
+      "resolveVisits": [48391, 48380],
+      "typeNodes": [12293, 12293],
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-1024": {
+      "checkMs": {
+        "before": [73.242, 69.404, 90.681, 74.838, 64.22, 71.108, 65.711, 84.728, 83.879, 63.989, 69.724, 58.85],
+        "after": [105.596, 71.665, 97.901, 69.828, 67.982, 70.689, 67.021, 64.651, 85.307, 60.213, 86.301, 67.66],
+        "medians": [70.416, 70.258],
+        "pairedSaving": -1.845,
+        "saving95": [-8.015, 2.098],
+        "fasterPairs": 4
+      },
+      "resolveVisits": [141319, 141308],
+      "typeNodes": [33797, 33797],
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "callbacks-32": {
+      "checkMs": {
+        "before": [12.982, 12.647, 33.976, 19.024, 11.873, 10.091, 11.699, 16.367, 15.696, 14.268, 12.251, 15.723],
+        "after": [12.537, 11.607, 20.342, 13.77, 12.846, 11.271, 11.181, 15.964, 17.723, 18.575, 11.998, 11.011],
+        "medians": [13.625, 12.692],
+        "pairedSaving": 0.424,
+        "saving95": [-1.077, 2.876],
+        "fasterPairs": 8
+      },
+      "resolveVisits": [19856, 19850],
+      "typeNodes": [6040, 6040],
+      "wasm": "67bfdb438fbb0912bb0973a9bc1cbda3619cc64f9661c2073eec82666d0c764f",
+      "diagnostics": []
+    },
+    "callbacks-256": {
+      "checkMs": {
+        "before": [20.631, 34.619, 21.577, 21.285, 20.003, 20.838, 20.36, 22.939, 22.398, 24.057, 25.879, 19.42],
+        "after": [37.368, 23.206, 17.844, 21.623, 20.271, 19.887, 19.75, 37.964, 21.911, 19.534, 22.008, 22.525],
+        "medians": [21.431, 21.767],
+        "pairedSaving": 0.548,
+        "saving95": [-1.721, 3.802],
+        "fasterPairs": 7
+      },
+      "resolveVisits": [36656, 36650],
+      "typeNodes": [12312, 12312],
+      "wasm": "50499618ae0256a2956ef6e30db912fbf89fd3c25db015f0da105eb89d0e1097",
+      "diagnostics": []
+    },
+    "fields-8": {
+      "checkMs": {
+        "before": [11.585, 11.878, 13.606, 14.113, 16.533, 12.118, 10.654, 11.513, 15.622, 19.351, 11.226, 13.846],
+        "after": [9.807, 9.86, 19.009, 10.641, 11.726, 11.289, 17.848, 14.288, 13.065, 12.947, 11.658, 13.411],
+        "medians": [12.862, 12.337],
+        "pairedSaving": 1.304,
+        "saving95": [-1.603, 3.014],
+        "fasterPairs": 8
+      },
+      "resolveVisits": [17342, 17336],
+      "typeNodes": [5102, 5102],
+      "wasm": "7c79d7c3871bee543509da6443e2eeb2df72638dac03ec03bd56be6bda8d9620",
+      "diagnostics": []
+    },
+    "fields-64": {
+      "checkMs": {
+        "before": [9.841, 11.546, 33.801, 12.446, 17.848, 22.632, 11.52, 12.526, 15.218, 19.743, 14.194, 11.858],
+        "after": [12.83, 11.67, 14.25, 11.994, 17.192, 11.031, 12.0, 13.103, 14.308, 13.711, 13.764, 9.902],
+        "medians": [13.36, 12.966],
+        "pairedSaving": 0.554,
+        "saving95": [-0.302, 3.994],
+        "fasterPairs": 8
+      },
+      "resolveVisits": [17342, 17336],
+      "typeNodes": [5102, 5102],
+      "wasm": "f507104a0ef2400ac0ad34e6c34e0248774597b2afa9329067e7eaa455d4edb8",
+      "diagnostics": []
+    },
+    "fields-256": {
+      "checkMs": {
+        "before": [22.026, 32.512, 14.09, 25.257, 14.886, 12.223, 12.545, 12.546, 13.351, 11.67, 12.181, 16.625],
+        "after": [12.287, 11.945, 25.792, 20.152, 11.934, 13.226, 15.958, 13.032, 13.584, 13.493, 12.508, 11.543],
+        "medians": [13.721, 13.129],
+        "pairedSaving": -0.28,
+        "saving95": [-1.413, 5.094],
+        "fasterPairs": 5
+      },
+      "resolveVisits": [17342, 17336],
+      "typeNodes": [5102, 5102],
+      "wasm": "b1c850958f14a99d67a047af364d423a641fc22e76382e8362554c0de49fab5d",
+      "diagnostics": []
+    },
+    "shared-pair-3": {
+      "checkMs": {
+        "before": [12.922, 13.136, 13.415, 20.262, 9.941, 10.887, 9.798, 13.339, 11.834, 16.502, 14.061, 10.735],
+        "after": [17.382, 12.332, 11.767, 13.555, 10.859, 10.564, 13.099, 16.857, 12.497, 13.169, 9.764, 19.07],
+        "medians": [13.029, 12.798],
+        "pairedSaving": -0.17,
+        "saving95": [-3.409, 2.49],
+        "fasterPairs": 6
+      },
+      "resolveVisits": [17806, 17800],
+      "typeNodes": [5198, 5198],
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-6": {
+      "checkMs": {
+        "before": [17.624, 15.707, 11.457, 13.663, 11.574, 15.023, 10.994, 10.636, 16.366, 11.973, 17.79, 14.095],
+        "after": [12.88, 14.795, 18.2, 18.123, 12.4, 13.276, 11.965, 12.226, 15.448, 20.758, 11.042, 12.041],
+        "medians": [13.879, 13.078],
+        "pairedSaving": 0.043,
+        "saving95": [-3.025, 1.901],
+        "fasterPairs": 6
+      },
+      "resolveVisits": [18894, 18888],
+      "typeNodes": [5366, 5366],
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-9": {
+      "checkMs": {
+        "before": [24.828, 31.793, 13.475, 15.877, 14.824, 19.826, 15.523, 19.455, 21.129, 18.305, 17.422, 13.06],
+        "after": [22.411, 31.47, 21.468, 13.307, 12.062, 21.234, 20.411, 15.718, 14.607, 13.458, 16.232, 14.424],
+        "medians": [17.864, 15.975],
+        "pairedSaving": 1.803,
+        "saving95": [-1.386, 3.249],
+        "fasterPairs": 8
+      },
+      "resolveVisits": [20648, 20642],
+      "typeNodes": [5622, 5622],
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "imports-2": {
+      "checkMs": {
+        "before": [15.216, 17.359, 22.924, 15.333, 11.969, 11.313, 12.004, 19.198, 20.149, 22.089, 16.135, 12.465],
+        "after": [15.25, 21.545, 12.13, 12.737, 13.188, 19.923, 12.376, 32.817, 13.792, 12.463, 13.93, 12.154],
+        "medians": [15.734, 13.49],
+        "pairedSaving": 0.138,
+        "saving95": [-2.703, 4.477],
+        "fasterPairs": 6
+      },
+      "resolveVisits": [18280, 18211],
+      "typeNodes": [5682, 5682],
+      "wasm": "6f018f68abb78305f7ce55cda65b6347fb3bbd7e8379d70e5f2b020710449981",
+      "diagnostics": []
+    },
+    "imports-8": {
+      "checkMs": {
+        "before": [20.41, 17.429, 20.049, 25.507, 17.716, 20.957, 15.107, 22.437, 21.023, 34.668, 22.871, 16.085],
+        "after": [15.761, 20.265, 16.913, 20.249, 14.427, 17.34, 20.586, 21.476, 16.543, 19.698, 20.622, 16.33],
+        "medians": [20.684, 18.519],
+        "pairedSaving": 3.213,
+        "saving95": [0.358, 4.565],
+        "fasterPairs": 9
+      },
+      "resolveVisits": [20330, 20261],
+      "typeNodes": [6967, 6967],
+      "wasm": "702c73f4ced1161dd826abbf564e65acaf286c3d9b95511d0b0186933979df59",
+      "diagnostics": []
+    },
+    "imports-32": {
+      "checkMs": {
+        "before": [42.203, 48.339, 27.205, 26.616, 25.206, 29.583, 29.47, 48.023, 31.091, 32.926, 26.338, 26.217],
+        "after": [27.344, 28.361, 30.053, 36.929, 30.239, 46.953, 34.213, 32.249, 29.305, 30.123, 26.74, 33.805],
+        "medians": [29.526, 30.181],
+        "pairedSaving": -1.625,
+        "saving95": [-6.311, 8.831],
+        "fasterPairs": 5
+      },
+      "resolveVisits": [28442, 28373],
+      "typeNodes": [12079, 12079],
+      "wasm": "fc9566df6adec848cedab5290618e1c60d8d2402a9238a465ae444747b6456ea",
+      "diagnostics": []
+    },
+    "indirect-nominals-1": {
+      "checkMs": {
+        "before": [16.863, 15.109, 13.461, 20.353, 13.738, 21.23, 13.028, 18.098, 12.483, 13.656, 12.437, 15.757],
+        "after": [13.204, 13.596, 13.086, 15.173, 12.153, 14.028, 17.805, 13.33, 11.794, 18.361, 16.13, 11.77],
+        "medians": [14.424, 13.463],
+        "pairedSaving": 1.549,
+        "saving95": [-1.659, 4.377],
+        "fasterPairs": 9
+      },
+      "resolveVisits": [17845, 17839],
+      "typeNodes": [5468, 5468],
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-16": {
+      "checkMs": {
+        "before": [12.087, 15.639, 19.388, 14.626, 11.843, 20.869, 10.571, 13.732, 16.841, 11.744, 21.715, 12.273],
+        "after": [26.35, 13.759, 25.297, 12.098, 11.392, 13.748, 15.541, 17.191, 12.795, 17.067, 14.22, 13.188],
+        "medians": [14.179, 13.989],
+        "pairedSaving": -0.232,
+        "saving95": [-5.147, 3.287],
+        "fasterPairs": 6
+      },
+      "resolveVisits": [17845, 17839],
+      "typeNodes": [5603, 5603],
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-128": {
+      "checkMs": {
+        "before": [18.834, 20.912, 16.347, 19.637, 13.941, 11.847, 12.473, 11.983, 14.86, 14.819, 15.854, 13.971],
+        "after": [12.836, 12.49, 32.158, 12.896, 11.251, 20.484, 14.171, 29.751, 18.102, 11.834, 16.324, 14.507],
+        "medians": [14.84, 14.339],
+        "pairedSaving": -0.503,
+        "saving95": [-5.94, 4.492],
+        "fasterPairs": 5
+      },
+      "resolveVisits": [17845, 17839],
+      "typeNodes": [6611, 6611],
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "imported-generics": {
+      "checkMs": {
+        "before": [14.693, 13.263, 20.898, 15.335, 13.247, 31.054, 13.196, 14.027, 14.468, 15.108, 16.394, 14.744],
+        "after": [14.589, 20.456, 13.56, 11.421, 18.854, 38.265, 14.968, 26.956, 14.241, 18.975, 27.537, 13.307],
+        "medians": [14.718, 16.911],
+        "pairedSaving": -2.82,
+        "saving95": [-7.202, 0.832],
+        "fasterPairs": 5
+      },
+      "resolveVisits": [18712, 18706],
+      "typeNodes": [5873, 5873],
+      "wasm": "f23de5c8fdb9ede651ed865429bbcf28b0b99838772661f5c490a203900a87b4",
+      "diagnostics": []
+    },
+    "owned-reads": {
+      "checkMs": {
+        "before": [12.675, 13.229, 13.02, 17.049, 25.349, 17.111, 23.709, 15.321, 15.978, 26.734, 12.814, 13.119],
+        "after": [14.341, 13.679, 22.91, 16.009, 11.357, 19.494, 12.42, 12.761, 14.141, 17.76, 21.933, 14.171],
+        "medians": [15.649, 14.256],
+        "pairedSaving": 0.295,
+        "saving95": [-2.024, 5.767],
+        "fasterPairs": 6
+      },
+      "resolveVisits": [21223, 21217],
+      "typeNodes": [6662, 6662],
+      "wasm": "b2ced6756a5576c52162b9bff705894ad18d88b6d74480d4e77196423fca3d6d",
+      "diagnostics": []
+    },
+    "sort-merge": {
+      "checkMs": {
+        "before": [18.215, 12.487, 12.064, 14.921, 11.444, 15.651, 18.749, 16.853, 11.324, 19.894, 12.941, 11.82],
+        "after": [16.986, 12.16, 14.043, 13.32, 11.101, 17.088, 17.281, 13.0, 13.069, 18.852, 12.425, 11.855],
+        "medians": [13.931, 13.195],
+        "pairedSaving": 0.429,
+        "saving95": [-0.736, 1.348],
+        "fasterPairs": 8
+      },
+      "resolveVisits": [21255, 21249],
+      "typeNodes": [6203, 6203],
+      "wasm": "0ee4b2c6753d620ae84654db29cd932181bce211a147d7a58ae19933e614c1d1",
+      "diagnostics": []
+    },
+    "sort-quick": {
+      "checkMs": {
+        "before": [13.277, 22.758, 27.721, 13.123, 11.68, 12.349, 15.7, 12.632, 11.933, 13.02, 36.285, 10.95],
+        "after": [13.76, 25.528, 11.661, 13.771, 11.857, 13.2, 11.528, 12.951, 17.657, 12.958, 13.774, 11.788],
+        "medians": [13.072, 13.079],
+        "pairedSaving": -0.401,
+        "saving95": [-0.845, 2.117],
+        "fasterPairs": 4
+      },
+      "resolveVisits": [20428, 20422],
+      "typeNodes": [5968, 5968],
+      "wasm": "84dffbc9703e7453edbd8bd81bcb146be99c9a755145b96b7258967af86806aa",
+      "diagnostics": []
+    },
+    "rejected-generic": {
+      "checkMs": {
+        "before": [9.931, 11.882, 17.743, 15.088, 14.97, 11.138, 16.39, 26.718, 10.267, 12.059, 12.956, 17.548],
+        "after": [14.791, 10.509, 14.382, 12.862, 11.697, 12.393, 13.534, 11.041, 12.851, 10.166, 12.407, 17.504],
+        "medians": [13.963, 12.629],
+        "pairedSaving": 1.633,
+        "saving95": [-0.606, 3.065],
+        "fasterPairs": 9
+      },
+      "resolveVisits": [17536, 17525],
+      "typeNodes": [5147, 5147],
+      "wasm": null,
+      "diagnostics": [
+        {
+          "code": "missing_associated",
+          "start": 75,
+          "end": 78,
+          "message": "No compatible associated implementation exists"
+        }
+      ]
+    }
+  },
+  "gdev": {
+    "freshMs": {
+      "before": [2030.554, 1675.214, 1518.082, 1549.135, 1766.093, 1340.323, 1546.717, 955.057, 1108.681, 1108.154, 1149.056, 1102.794, 1053.766, 1539.723, 1534.836, 1526.949, 1667.309, 2017.101],
+      "after": [1600.609, 1615.642, 1573.43, 1880.237, 1710.854, 1450.784, 1442.922, 1508.346, 1120.686, 983.246, 1086.839, 1110.716, 901.148, 1205.961, 1461.548, 1545.759, 2283.787, 2146.276],
+      "medians": [1530.892, 1484.947],
+      "pairedSaving": 23.658,
+      "saving95": [-82.904, 88.542],
+      "fasterPairs": 9
+    },
+    "bytes": 2732918,
+    "sha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+    "checkStageMs": {
+      "before": [798.052, 877.892, 874.032, 802.026, 799.406, 837.607],
+      "after": [897.226, 817.442, 817.455, 825.033, 865.384, 924.291],
+      "medians": [819.816, 845.208],
+      "pairedSaving": -44.493,
+      "saving95": [-92.929, 58.514],
+      "fasterPairs": 2
+    },
+    "workerCpuMs": {
+      "before": [2679.873, 2643.27, 2652.873, 2700.378, 2614.533, 2758.549],
+      "after": [2871.455, 2666.558, 2719.022, 2689.487, 2760.541, 2738.655],
+      "medians": [2666.373, 2728.838],
+      "pairedSaving": -44.718,
+      "saving95": [-168.795, 15.392],
+      "fasterPairs": 2
+    },
+    "peakRssMiB": {
+      "before": [255.34, 249.602, 240.586, 255.668, 243.984, 268.754],
+      "after": [245.105, 259.797, 254.34, 250.109, 250.809, 252.195],
+      "medians": [252.471, 251.502],
+      "pairedSaving": -0.633,
+      "saving95": [-11.975, 13.396],
+      "fasterPairs": 3
+    },
+    "work": {
+      "resolve_depth_entries": [3805459, 3800957],
+      "resolve_nodes_added": [417619, 417619],
+      "unify_pairs": [473720, 473720],
+      "import_depth_entries": [836337, 836337],
+      "import_nodes_added": [305416, 305416]
+    },
+    "retainedMs": {
+      "fresh": {
+        "before": [1958.134, 2816.489, 2354.187, 1926.195],
+        "after": [2071.939, 2795.547, 2031.939, 2011.784],
+        "medians": [2156.16, 2051.939],
+        "pairedSaving": -32.324,
+        "saving95": [-113.806, 322.248],
+        "fasterPairs": 2
+      },
+      "edit": {
+        "before": [136.904, 178.26, 95.061, 96.275],
+        "after": [218.524, 120.035, 106.838, 106.233],
+        "medians": [116.59, 113.437],
+        "pairedSaving": -10.867,
+        "saving95": [-81.62, 58.225],
+        "fasterPairs": 1
+      },
+      "reject": {
+        "before": [921.95, 902.831, 974.681, 600.182],
+        "after": [1774.198, 989.275, 778.565, 811.459],
+        "medians": [912.391, 900.367],
+        "pairedSaving": -148.86,
+        "saving95": [-852.248, 196.116],
+        "fasterPairs": 1
+      },
+      "syntax": {
+        "before": [166.53, 175.095, 152.652, 145.818],
+        "after": [252.596, 179.792, 146.192, 131.264],
+        "medians": [159.591, 162.992],
+        "pairedSaving": 0.882,
+        "saving95": [-86.066, 14.554],
+        "fasterPairs": 2
+      },
+      "lex": {
+        "before": [207.627, 164.232, 163.147, 137.512],
+        "after": [224.092, 175.409, 155.007, 146.945],
+        "medians": [163.69, 165.208],
+        "pairedSaving": -10.305,
+        "saving95": [-16.464, 8.14],
+        "fasterPairs": 1
+      },
+      "recover": {
+        "before": [94.375, 96.059, 98.093, 79.525],
+        "after": [107.636, 114.396, 113.675, 92.259],
+        "medians": [95.217, 110.655],
+        "pairedSaving": -14.421,
+        "saving95": [-18.337, -12.734],
+        "fasterPairs": 0
+      }
+    }
+  },
+  "checks": {
+    "gate": "ok | 1113 passed | 0 failed | 100 ignored (1m7s)",
+    "isolated": "resolution_views",
+    "ink": {
+      "guestChecks": 283,
+      "outcomes": "3b0445a71475b3f975f445f6d3a564cce6a7080f754caefce77f3ec5d24e34e4"
+    },
+    "frame": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "replayFiles": 242,
+    "freshEditOracles": [
+      "edit",
+      "reject",
+      "syntax",
+      "lex"
+    ]
+  },
+  "cpuSamples": {
+    "method": "Three separate alternating pairs on release binaries using gprofng 1 ms CPU sampling across workers. Inclusive function CPU in milliseconds. Nested paths overlap. OS load uncontrolled.",
+    "runs": [
+      {
+        "pair": 0,
+        "mode": "control",
+        "inclusiveCpuMs": {
+          "finishFacts": 223,
+          "resolveUse": 261,
+          "copyNominal": 140
+        }
+      },
+      {
+        "pair": 0,
+        "mode": "candidate",
+        "inclusiveCpuMs": {
+          "finishFacts": 234,
+          "resolveUse": 261,
+          "copyNominal": 157
+        }
+      },
+      {
+        "pair": 1,
+        "mode": "candidate",
+        "inclusiveCpuMs": {
+          "finishFacts": 202,
+          "resolveUse": 234,
+          "copyNominal": 120
+        }
+      },
+      {
+        "pair": 1,
+        "mode": "control",
+        "inclusiveCpuMs": {
+          "finishFacts": 223,
+          "resolveUse": 249,
+          "copyNominal": 143
+        }
+      },
+      {
+        "pair": 2,
+        "mode": "control",
+        "inclusiveCpuMs": {
+          "finishFacts": 223,
+          "resolveUse": 277,
+          "copyNominal": 160
+        }
+      },
+      {
+        "pair": 2,
+        "mode": "candidate",
+        "inclusiveCpuMs": {
+          "finishFacts": 236,
+          "resolveUse": 290,
+          "copyNominal": 142
+        }
+      }
+    ]
+  }
+}

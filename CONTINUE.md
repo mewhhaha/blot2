@@ -1,5 +1,13 @@
 # Working on Blot and Gdev
 
+The type checker now reuses settled expression and binding types and generic
+call arguments. In 279 Gdev modules this removes 275,727 repeated final
+root resolutions and 6,799 repeated argument resolutions and snapshots.
+Fresh Gdev Main took **1,531 → 1,485 ms** across 18 paired builds with
+identical Wasm. Of 31,398 imported named types, direct checker reads touched
+3,059. Any future lazy import design must also supply lowering's ownership
+facts. [Measurements and import experiments](tasks/FAST_COMPILE.md#final-types-generic-calls-and-imported-definitions)
+
 The type checker now shares repeated tuple and record shapes in inferred
 generic results. On 13 nested pair declarations, checking went from
 **33.9 to 4.3 ms** and type nodes fell from **32,934 to 880**. The new

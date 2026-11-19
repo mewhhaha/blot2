@@ -60,6 +60,25 @@ def programs(directory):
         source = folder / "main.blot"
         source.write_text("\n".join([*imports, entry]) + "\n")
         cases[name] = source
+    # The caller sees Point only through carry's inferred return type.
+    # Vary the public catalog around it while keeping the caller identical.
+    for width in [1, 16, 128]:
+        name = f"indirect-nominals-{width}"
+        folder = directory / name
+        folder.mkdir()
+        types = ["type Point is data = $Point { x: U32 }"]
+        for index in range(1, width):
+            types.append(f"type Extra{index} is data = $Extra{index} {{ x: U32 }}")
+        (folder / "producer.blot").write_text("\n".join([
+            *types, "func make (x: U32): Point => return $Point { x: x }", "",
+        ]))
+        (folder / "bridge.blot").write_text(
+            'import { make } from "./producer"\n'
+            "func carry (n: U32) => return make n\n")
+        source = folder / "main.blot"
+        source.write_text('import { carry } from "./bridge"\n'
+                          "entry func answer (n: U32): U32 => return (carry n).x\n")
+        cases[name] = source
     fixtures = ROOT / "compiler-goose/tests/fixtures"
     cases["imported-generics"] = fixtures / "closure-fixtures/main.blot"
     cases["owned-reads"] = fixtures / "direct/terminal_scratch_reads.blot"

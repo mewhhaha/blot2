@@ -92,6 +92,60 @@ guest checks passed. Gdev's Wasm, hardware frame, trace and all 242 replay files
 matched. An edit and three rejected revisions matched fresh compiler sessions.
 [Samples, source and compiler identities](../benchmarks/evidence/measurements/2026-11-19-inferred-signatures.json) · [Reproducible scaling families](../benchmarks/tools/bench_type_scaling.ts)
 
+### Final types, generic calls and imported definitions
+
+A diagnostic build traced one fresh Gdev Main compilation across 279 modules.
+Each module finished once. A root is the type ID attached to an expression,
+a dispatch signature, a binding or its published signature.
+
+| Work in the previous checker | Observed on Gdev | Change |
+| --- | ---: | --- |
+| Final type requests | 442,302 requests for 166,575 distinct roots | Reuse the first successful answer for each root during the final read-only batch. |
+| Generic calls | 33,751 attempts, including 69 repeat attempts with identical module type and effect versions | Keep the solver's wakeups. Reuse the resolved arguments on 6,799 expansions and build a memoized result only when the nested check succeeds. |
+| Named type imports | 194,957 catalog requests, 31,398 distinct copies | Look up opaque storage only when creating a copy. Preserve the catalog consumed by lowering and by dependent modules. |
+
+The finalization table ends before any list element can be replaced. Modules
+with associated type projections keep their existing per-visit accounting.
+An unrelated write can change a module version, so the retry count is a
+lower bound on calls that received identical inputs. A generic memo replay
+can bind variables before a later argument fails to match. That fallback
+resolves the arguments again.
+
+Direct indexed checker reads of nominal definitions or their constructors
+touched 3,059 of the 31,398 copied definitions. This counts reads during
+type checking. Lowering, ownership, serialization and subsequent imports
+have additional consumers. Three experiments exercised the distinction.
+
+- Importing only explicitly named types made a three-file program reject
+  `(carry n).x`. The caller imports a function, its result carries the
+  original producer's record type, and reading its field needs that
+  definition. Gdev also reported `unknown_field` at `scene.cast` in Ink.
+- Loading the definition from the originating module on the first checker
+  lookup recovered byte-identical Wasm on the three-file program and returned
+  0, 42 and 1,337 for those inputs. Gdev then reported `own_argument` for
+  `access.robot` in `world_storage.blot` during lowering.
+- Completing definitions for nominal types found anywhere in the local type graph recovered byte-identical Gdev Wasm and lowered imported type nodes from 305,416 to 180,849.
+
+The two release compilers produced the same 2,732,918-byte Gdev Wasm.
+Fresh compilation took **1,531 → 1,485 ms** over 18 alternating pairs.
+The median within-pair saving was 23.7 ms
+with a descriptive 95% interval of -82.9 to 88.5 ms.
+In six separate profiled pairs, the check phase took 820 → 845 ms
+and aggregate worker CPU took 2,666 → 2,729 ms. Worker CPU includes
+other frontend work. Total type-resolution visits fell from
+3,805,459 to 3,800,957.
+
+All 22 checker workloads matched their release controls on Wasm or diagnostics,
+including three programs with one indirectly used record among 1, 16 or 128
+public types. The full gate passed, including 1,113 guest and host tests with
+100 existing skips. All 283 Ink checks passed. The Gdev frame and 120-frame
+packet replay matched the references, and four retained-source edit results
+matched independent fresh builds.
+
+![Fresh Gdev compile time across 18 paired runs](../benchmarks/evidence/measurements/2026-11-19-checker-finalization-and-imports.png)
+
+[Matched measurements, toolchain identities and import experiments](../benchmarks/evidence/measurements/2026-11-19-checker-finalization-and-imports.json)
+
 ### Measurement plan
 
 1. **Finalizing inferred types.** After solving a module, the checker needs to
