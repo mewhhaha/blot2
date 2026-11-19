@@ -124,7 +124,22 @@ have additional consumers. Three experiments exercised the distinction.
   lookup recovered byte-identical Wasm on the three-file program and returned
   0, 42 and 1,337 for those inputs. Gdev then reported `own_argument` for
   `access.robot` in `world_storage.blot` during lowering.
-- Completing definitions for nominal types found anywhere in the local type graph recovered byte-identical Gdev Wasm and lowered imported type nodes from 305,416 to 180,849.
+- Loading definitions for every nominal identity found in the module's type
+  graph, including nodes added while loading other definitions, recovered
+  byte-identical Gdev Wasm. This reduced imported type nodes from **305,416
+  to 180,849 (41%)**. The prototype passed 1,110 guest and host tests, failed
+  three and skipped 100. Recovery after a rejected edit rechecked three modules
+  instead of one. A worker edit rechecked three instead of two. The checker
+  also accepted a program at 16,861 inference steps that must fail at that
+  budget. Four of the 192 fixture records differed only in work counters.
+  [Reproducible prototype against 1e23aea6](../benchmarks/evidence/measurements/experiments/2026-11-19-demand-nominal-imports.patch)
+
+The production compiler retains eager catalog publication. The next import
+experiment should give a public type a stable producer identity in the
+interface used for invalidation, and move loading its payload behind that
+identity. Use rejection, recovery and both sides of the 16,862-step boundary
+as the first three checks. Release timing for the rejected prototype was
+stopped once its regressions reproduced.
 
 The two release compilers produced the same 2,732,918-byte Gdev Wasm.
 Fresh compilation took **1,531 → 1,485 ms** over 18 alternating pairs.

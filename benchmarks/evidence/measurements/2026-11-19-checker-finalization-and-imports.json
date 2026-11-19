@@ -70,7 +70,41 @@
       "bytes": 2732918,
       "wasm": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
       "importNodes": 180849,
-      "resolveVisits": 3438262
+      "resolveVisits": 3438262,
+      "experimentBase": "1e23aea671953a5ad17616c7da985b066b8370c9",
+      "sourcePatch": "experiments/2026-11-19-demand-nominal-imports.patch",
+      "importNodesBefore": 305416,
+      "resolveVisitsBefore": 3805459,
+      "focusedGuestTests": {
+        "passed": 23,
+        "ignored": 2
+      },
+      "allGuestAndHost": {
+        "passed": 1110,
+        "failed": 3,
+        "ignored": 100
+      },
+      "failures": [
+        {
+          "test": "retained_project_execution: an imported name change preserves earlier checks and rechecks callers",
+          "observation": "After rejection, recovery rechecked 3 modules instead of 1; reproduced independently."
+        },
+        {
+          "test": "worker_determinism: frontend and lowering workers emit identical Wasm and diagnostics for every worker count",
+          "observation": "An edit rechecked 3 modules instead of 2."
+        },
+        {
+          "test": "worker_determinism: project workers preserve the exact associated type budget across imports",
+          "observation": "Accepted a build at 16,861 inference steps that the release rejects. Reproduced independently."
+        }
+      ],
+      "references": {
+        "matched": 188,
+        "total": 192,
+        "differences": "Only type-node/effect-row counters differed in the other four fixtures."
+      },
+      "decision": "Rejected for production. A complete Gdev build produced identical Wasm. The retained and budget contracts failed. Release emission was stopped after reproducing the failures; no optimized timing is attributed to this variant.",
+      "devEditComparison": "The earlier debug control exceeded the bounded Gdev edit comparison deadline before emitting its first result. The retained regression above is from a separate focused test."
     },
     "threeModules": {
       "explicitNames": "unknown_field",
