@@ -6,10 +6,12 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `f7013484`, with Gdev `73b4b2c`,
-Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **759.1 ms**
-median with eight frontend workers and emitted **2,639,638 bytes** across
-271 modules. [Fresh, edit and integration measurements](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
+The qualified compiler is Blot `86973157`, with Gdev `73b4b2c`,
+Ink `3f2e603` and Pen `ad9766c`. Fresh Gdev Main took **854.7 ms**
+median, down from 922.2 ms across 20 process pairs. With the compiler and
+project files evicted from the filesystem page cache, the median was
+**914.5 ms**. All 271 modules produced the same 2,639,638-byte Main.
+[Cold build measurements and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-cold-decimals.json)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev
@@ -53,7 +55,7 @@ one Wasm operand. Other body edits still use module-level checking.
 | Gdev Pen | 919 passed, 112 failed, 44 unbuilt | 1,220 passed, 108 failed, all 210 modules execute |
 | Ink Pen | 268 passed, 1 failed, 3 unbuilt | 280 passed, all 73 modules execute |
 | Ink native | 92 passed, 21 failed on the pre-services reference | 111 passed, 2 failed |
-| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,100 guest and host tests passed, 100 ignored |
+| Compiler | | 192 recorded Wasm fixtures, 212 lowering fixtures, both direct references, 1,101 guest and host tests passed, 100 ignored |
 
 All 919 prior Gdev passes survived. Of the earlier failures, 34 now pass.
 Another 267 newly executable checks pass and 30 fail. The remaining 108

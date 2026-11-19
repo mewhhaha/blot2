@@ -3,6 +3,44 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Cold Gdev builds, 19 November 2026
+
+The parser used to find the nearest binary32 value by searching its bit range
+and comparing arbitrary-precision integers at each step. Common decimal
+literals now need one multiply or divide. Both operands are exactly representable
+in the destination precision, so that operation makes the only rounding decision.
+Longer literals and extreme exponents still use the exact converter. Asset readers
+apply the same rule at binary64 precision. The shader reader keeps token offsets
+in one immutable input buffer, eliminating a separate allocation for each spelling.
+
+| Fresh compile to complete Wasm | Previous | Optimized | Faster pairs |
+| --- | ---: | ---: | ---: |
+| Fresh Gdev Main | 922.2 ms | 854.7 ms | 17 / 20 |
+| Main, files read from disk | 1,013.6 ms | 914.5 ms | 8 / 8 |
+| Fresh Gdev Devtools | 475.1 ms | 448.1 ms | 4 / 8 |
+| Fresh Main, second window | 906.4 ms | 867.8 ms | 11 / 16 |
+
+The project worker default used eight checkers for Main. The host also ran other
+workloads. The earlier 703 ms median came from a separate machine-load window.
+Use the within-window pairs to compare compiler changes. Devtools won four of
+eight pairs, so its timing is inconclusive. Four separately
+traced pairs put asset preparation at **74.6 → 50.5 ms** and
+source loading at **80.8 → 76.9 ms**. The new compiler spent
+**451.5 ms** checking. Asset preparation recorded
+236,483 → 78,707 allocations. The disk trials
+evicted the executable and project files in private copies before every run
+and verified zero resident file pages. System libraries and filesystem metadata stayed warm.
+
+An independent reader benchmark generated the same modules for all 67 Gdev
+shaders. Across nine runs the previous reader took 57.3 ms, the decimal change
+alone took 31.1 ms and the combined change took 23.2 ms. An additional 6,782
+numeric inputs matched binary32 and binary64 references, including values on
+both sides of a rounding midpoint. All named application outcomes, the inspected
+frame and all 242 files in the 120-frame replay matched.
+
+[Trials, phase profiles and qualification](../benchmarks/evidence/measurements/2026-11-19-gdev-cold-decimals.json) ·
+[Paired timing runner](../scripts/integration/time_gdev_parse.ts)
+
 ## Broad edits to shared modules, 19 November 2026
 
 Adding an unused public function to Ink math produced the same Gdev Main Wasm

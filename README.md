@@ -19,8 +19,9 @@ candidate, evidence and requirements.
 
 Changing scene history capacity in Gdev returns the complete Wasm in
 **35.0 ms**, down from **82.2 ms** on the same source.
-The compiler reuses all checked bodies and updates one operand. A fresh build
-of Main took **759.1 ms** median and emitted **2,639,638 bytes**.
+The compiler reuses all checked bodies and updates one operand. Fresh Gdev Main
+now takes **854.7 ms** median, down from **922.2 ms** across 20
+paired builds of the same 2,639,638-byte Wasm. [Cold compile measurements](benchmarks/evidence/measurements/2026-11-19-gdev-cold-decimals.json)
 [Paired timings and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
 
 ![Gdev capacity edit time and type checking](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.png)
