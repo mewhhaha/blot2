@@ -17,9 +17,15 @@ active index and its separate render and cleanup journals move with it. The
 checker rejects use of a saved active-index alias after an edit. A copied pile
 snapshot retains its original contents. Miner throws check their landings
 before publishing edits, and later workers see each successful withdrawal in
-order. The authoring helper `salt.replace_stacks_into` still resizes borrowed
-arrays when replacing a collection.
+order.
 [Existing-pile tests and measurements](../benchmarks/evidence/measurements/2026-11-19-owned-pile-edits.json)
+
+Whole-pile replacement takes the salt owner and a fixed input array. It
+writes rows and ordered active slots into reusable buffers and rebuilds the
+spatial grid through its owner. Lazy preparation after restore uses the
+same rebuild. Replacement assigns fresh IDs and restore recovers the saved
+IDs. Reading an alias of the old grid after replacement is rejected.
+[Whole-pile ownership qualification](../benchmarks/evidence/measurements/2026-11-19-owned-pile-replacement.json)
 
 On 19 November 2026 the last four Ink `lent` declarations became read-only
 scene and prepared-physics ranges. Gdev had already removed its last two

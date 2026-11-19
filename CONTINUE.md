@@ -1,5 +1,19 @@
 # Working on Blot and Gdev
 
+Whole-pile replacement now takes and returns the salt owner. Authoring 66
+piles, replacing them with zero and then one, and restoring the original save
+recovers all original IDs, the active slots and the last pile's grid lookup.
+The compiler rejects a retained alias of the old grid. The same owning rebuild
+prepares a restored world for hauling.
+
+All 1,345 existing Gdev outcomes matched and both new checks passed (1,240
+passes and 107 existing failures). All 242 replay files, the hardware frame
+and its trace matched. Across seven fresh eight-worker pairs on a shared host,
+median Main compile time went from 1,297 to 1,212 ms. Main shrank by 2,543
+bytes to 2,718,922. The lookup workload took 2.76 → 2.63 ms with 2,000
+piles and 0.55 → 0.59 ms with 256.
+[Replacement and restore qualification](benchmarks/evidence/measurements/2026-11-19-owned-pile-replacement.json)
+
 Editing an existing salt pile now takes and returns its owner. Active piles
 stay in slot order. A relocated pile queues its own slot for cleanup, and a
 sparse sweep produces the same saved world as a full sweep. Player pickups,
@@ -139,12 +153,13 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
    A borrowed `@storage.push` changed a saved alias's length from one to two.
    A borrowed `@storage.truncate` changed it to zero. An `own` helper
    rejects the live alias, and an explicit copy preserves its length.
-   Next migrate Gdev's `salt.replace_stacks_into` and its borrowed grid
-   rebuild. Replacement issues fresh pile IDs. Check that their order, the
-   active prefix and spatial lookups survive replacement, and that a saved
-   world restores its original IDs. The [source scan](scripts/integration/count_stores.py)
-   counts **987 store-shaped lines** across the pinned Gdev and Ink sources,
-   down from 1,004 on the same inputs. This includes rejection fixtures.
+   Next migrate the validated save rows in Gdev's `salt.decode_rows_into`.
+   Its brick, pile and stash buffers still grow through the borrowed helper
+   `write_rows`. Check malformed rows before modifying any destination,
+   preserve saved IDs and compare an encoded world before and after restore.
+   The [source scan](scripts/integration/count_stores.py) counts **976
+   store-shaped lines** across the pinned Gdev and Ink sources, down from
+   986 on the same inputs. This includes rejection fixtures.
    Gdev and Ink have **zero `lent` declarations**, down from 15. The compiler
    still accepts `lent` and shared stores to arrays while callers migrate.
 2. Reduce committed linear memory while preserving the contiguous scratch

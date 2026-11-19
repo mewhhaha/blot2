@@ -1,0 +1,321 @@
+{
+  "scope": "Whole-collection pile replacement, rebinding the active prefix and spatial grid, and lazy preparation for hauling.",
+  "inputs": {
+    "blot": "1bce0ab97c408208fefe8a9131bc87722e9cced6",
+    "gdevControl": "71bb02ded62b105a0675e1682556eaa47f66cd3b",
+    "gdevCandidate": "13abafeb0bf3a482f8e727bbd6e75706f43f88b3",
+    "ink": "a2d53352c32ed7f1dcbf44a3d514a531a7a92b3e",
+    "compilerSha256": "d0eb64e6cd73cad33d30233d105a3c439189dd7fc8ebb2fe0057f853c4d90109",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "penBinarySha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "penBlotPluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "guestAbi": 8,
+    "sessionProtocol": 2,
+    "note": "Isolated Gdev source archives, same compiler, std and Ink. All intervening Gdev commit changes were outside the build and test inputs."
+  },
+  "tests": {
+    "control": {
+      "passed": 1238,
+      "failed": 107,
+      "modules": 214
+    },
+    "candidate": {
+      "passed": 1240,
+      "failed": 107,
+      "modules": 215
+    },
+    "changedExisting": 0,
+    "added": [
+      [
+        "tests/pile_caches.blot",
+        "test_replacement_rebuilds_active_slots_and_grid_and_restore_recovers_ids"
+      ],
+      [
+        "tests/rejected/aliased_pile_replacement.blot",
+        "rejected: own_argument"
+      ]
+    ],
+    "failureSetSha256": "356f0c417033e86bfb1ce91b5bae6c0c24463874138ba13c8677ec7cac52d011",
+    "hashFormat": "UTF-8 compact JSON, sorted [module, check] pairs."
+  },
+  "laws": [
+    "Author 66 piles and index slots 1 and 65 as active. Querying the spatial grid at the last pile returns slot 65.",
+    "Replace all piles with zero, then one. Both active and spatial state clear and new IDs start after all 66 previous IDs.",
+    "The input array and a copied snapshot keep their original IDs. Restore the saved snapshot and rebuild derived state. Its numeric encoding, active slots and grid hit agree with the original.",
+    "The compiler reports own_argument for reading an alias of the old grid points after replacement."
+  ],
+  "integration": {
+    "penCheck": "Main, Devtools, saved state adapter and 552 assets passed.",
+    "penCodegen": "Generated bindings current.",
+    "replayFrames": 120,
+    "identicalFiles": 242,
+    "replayManifestSha256": "f1ab3f3332a31b3a81d7fcb823e773d8fc3ba5aa0a0b4418bec6319f654117a8",
+    "manifestFormat": "UTF-8 compact JSON sorted by relative file path with SHA-256 digest values.",
+    "hardwareFrame": {
+      "width": 640,
+      "height": 480,
+      "pngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "traceSha256": "58aae684b0bd9dd5863ee799aa4782fd0d968e493451a058624a7c5292c0f88a"
+    },
+    "publishedTreeMainSha256": "1f4c3976a679fd9fd73932a2619e05515f4d5d12bf7d036cdfd9b1349801160e"
+  },
+  "compile": {
+    "method": "Seven pairs, alternating first variant, eight frontend workers, fresh native compiler per build, warm files, shared host. Timed from opening the compiler session to receiving Wasm. Excludes Deno startup and project configuration discovery.",
+    "base": {
+      "freshModules": 276,
+      "wasmBytes": 2721465,
+      "sha256": "bba05b11c85ea165c7fa6b31f572899fa0381ab3f67bd045ff8da0fc49912492",
+      "milliseconds": [
+        1126.078,
+        1075.578,
+        1148.49,
+        1383.31,
+        1578.231,
+        1296.527,
+        1459.657
+      ],
+      "medianMs": 1296.527
+    },
+    "candidate": {
+      "freshModules": 276,
+      "wasmBytes": 2718922,
+      "sha256": "1f4c3976a679fd9fd73932a2619e05515f4d5d12bf7d036cdfd9b1349801160e",
+      "milliseconds": [
+        1089.656,
+        1150.195,
+        1051.28,
+        1211.866,
+        1282.298,
+        1518.282,
+        1452.057
+      ],
+      "medianMs": 1211.866
+    }
+  },
+  "guestBenchmarks": {
+    "method": "One instance per variant. Alternating call order, 15 warmups and 17 measured repetitions per guest; verify every output lane against the control on every call. Inputs include collection preparation and use.",
+    "workloads": [
+      {
+        "file": "performance/modernize/pile_lookup.blot",
+        "entry": "identities",
+        "input": [
+          32
+        ],
+        "lanes": 38,
+        "sha256": "06b06a213a4250449f7076a75373ccca151316e3daad43da0d66f5f6b0cf3bef",
+        "beforeMs": [
+          0.2314,
+          0.247,
+          0.2112,
+          0.2764,
+          0.2779,
+          0.2096,
+          0.5145,
+          0.2324,
+          0.25,
+          0.1919,
+          0.2777,
+          0.576,
+          0.1744,
+          0.1709,
+          0.217,
+          0.2062,
+          0.2046
+        ],
+        "afterMs": [
+          0.4298,
+          0.2098,
+          0.2063,
+          0.6267,
+          0.2606,
+          0.2007,
+          0.2021,
+          0.2337,
+          0.2509,
+          0.1939,
+          0.229,
+          0.1833,
+          0.1726,
+          1.0502,
+          0.2498,
+          0.2115,
+          0.2208
+        ],
+        "beforeMedianMs": 0.2314,
+        "afterMedianMs": 0.2208
+      },
+      {
+        "file": "performance/modernize/pile_lookup.blot",
+        "entry": "identities",
+        "input": [
+          256
+        ],
+        "lanes": 262,
+        "sha256": "0da105914b9cba18c188f9234ff3259a1566e22d29cdb2f58ce38de3577013dc",
+        "beforeMs": [
+          0.8139,
+          0.5539,
+          0.805,
+          0.7623,
+          0.5974,
+          0.6513,
+          0.8093,
+          0.7627,
+          0.6106,
+          0.4545,
+          0.4278,
+          0.4433,
+          0.3812,
+          0.3719,
+          0.3745,
+          0.3797,
+          0.4598
+        ],
+        "afterMs": [
+          0.7579,
+          0.5933,
+          0.5966,
+          0.9431,
+          0.6092,
+          0.5953,
+          1.2956,
+          0.6156,
+          0.5918,
+          0.3644,
+          0.3748,
+          0.375,
+          0.3728,
+          0.3718,
+          0.3542,
+          0.3869,
+          0.3921
+        ],
+        "beforeMedianMs": 0.5539,
+        "afterMedianMs": 0.5918
+      },
+      {
+        "file": "performance/modernize/pile_lookup.blot",
+        "entry": "identities",
+        "input": [
+          2000
+        ],
+        "lanes": 2006,
+        "sha256": "7ac0e8de3fcf75d7944d4ffdef1d4252f4433ed6ecc66dcf95cd413dcb0fb69f",
+        "beforeMs": [
+          3.4951,
+          3.514,
+          2.1808,
+          2.2798,
+          2.0346,
+          2.2777,
+          3.5072,
+          2.9354,
+          2.6554,
+          2.7568,
+          3.3075,
+          4.9673,
+          2.9811,
+          3.2307,
+          1.9352,
+          1.9421,
+          1.9248
+        ],
+        "afterMs": [
+          3.2183,
+          3.3665,
+          3.2837,
+          2.5465,
+          1.9801,
+          2.5635,
+          2.0438,
+          2.9142,
+          4.1819,
+          2.9632,
+          2.5863,
+          3.2564,
+          3.2991,
+          2.6284,
+          2.3764,
+          2.1468,
+          1.893
+        ],
+        "beforeMedianMs": 2.7568,
+        "afterMedianMs": 2.6284
+      },
+      {
+        "file": "performance/sparse-work.blot",
+        "entry": "landings_after",
+        "input": [
+          160,
+          16,
+          4
+        ],
+        "lanes": 1,
+        "sha256": "6a86d807ccaa6d043183e8dce35f68d976e43e59bb809db038aac0179025deb4",
+        "beforeMs": [
+          0.5041,
+          0.6072,
+          0.7102,
+          1.1868,
+          0.6498,
+          0.7774,
+          0.8024,
+          0.7508,
+          0.6528,
+          0.5834,
+          0.617,
+          0.6265,
+          0.6441,
+          0.6572,
+          0.6303,
+          0.6527,
+          0.6195
+        ],
+        "afterMs": [
+          0.5416,
+          0.5253,
+          0.4474,
+          0.7697,
+          0.6353,
+          0.7501,
+          0.7624,
+          0.5928,
+          0.614,
+          0.5916,
+          0.5661,
+          0.5987,
+          0.5739,
+          0.588,
+          0.5694,
+          0.6446,
+          0.6097
+        ],
+        "beforeMedianMs": 0.6498,
+        "afterMedianMs": 0.5928
+      }
+    ]
+  },
+  "sourceScan": {
+    "before": {
+      "gdev": {
+        "storeLines": 793,
+        "lent": 0
+      },
+      "ink": {
+        "storeLines": 193,
+        "lent": 0
+      }
+    },
+    "after": {
+      "gdev": {
+        "storeLines": 783,
+        "lent": 0
+      },
+      "ink": {
+        "storeLines": 193,
+        "lent": 0
+      }
+    }
+  },
+  "remaining": "Save decoding still copies validated rows into borrowed brick, pile and stash buffers. Restore now uses the owning lazy grid rebuild. The global borrowed-resize rule remains open."
+}
