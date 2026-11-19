@@ -612,6 +612,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::ParameterAn
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::ParameterAnnotation,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::PendingObligation)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::PendingObligation,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::PendingRange)->bool {return equalFields(left,right);}
+fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::PendingRange,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::PhysicalField)->bool {return equalFields(left,right);}
 fn blot_check_check::blotStructuralHash<StructuralSink>(value:blot_check_check::PhysicalField,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_check::PredicateRun)->bool {return equalFields(left,right);}

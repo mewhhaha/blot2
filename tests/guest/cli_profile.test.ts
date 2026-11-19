@@ -134,6 +134,78 @@ Deno.test("project API reports clocks only when profiled", async () => {
   }
 });
 
+Deno.test("independent field requirements take linear candidate scans", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const count = 128;
+  const lines = Array.from(
+    { length: count },
+    (_, i) => `func read${i} x => return x.value`,
+  );
+  lines.push(
+    `entry func answer (x: U32): U32 => return read0 {value: read${
+      count - 1
+    } {value: x}}`,
+  );
+  try {
+    await Deno.writeTextFile(entry, lines.join("\n"));
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude: null,
+      profileBackend: true,
+      frontendWorkers: 1,
+    });
+    try {
+      const result = await compiler.build();
+      if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
+      const { checking } = result.stats.phaseProfile as {
+        checking: Record<string, number>;
+      };
+      assert(checking.candidates >= count);
+      assert(checking.candidate_scans <= 8 * count, JSON.stringify(checking));
+      const { instance } = await WebAssembly.instantiate(result.bytes);
+      assert.equal((instance.exports.answer as (x: number) => number)(42), 42);
+    } finally {
+      await compiler.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
+Deno.test("ownership analysis finishes for repeated generic pair composition", async () => {
+  const directory = await Deno.makeTempDir();
+  const entry = `${directory}/main.blot`;
+  const lines = ["func duplicate x => return (x, x)"];
+  let previous = "duplicate";
+  for (let i = 1; i < 6; i++) {
+    lines.push(`func compose${i} x => return ${previous} (${previous} x)`);
+    previous = `compose${i}`;
+  }
+  lines.push("entry const answer = 42");
+  try {
+    await Deno.writeTextFile(entry, lines.join("\n"));
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry,
+      prelude: null,
+    });
+    try {
+      const result = await compiler.build({
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
+      const { instance } = await WebAssembly.instantiate(result.bytes);
+      assert.equal((instance.exports.answer as WebAssembly.Global).value, 42);
+    } finally {
+      await compiler.dispose();
+    }
+  } finally {
+    await Deno.remove(directory, { recursive: true });
+  }
+});
+
 Deno.test("profile scratch directory is removed", async () => {
   await Deno.remove(root, { recursive: true });
 });

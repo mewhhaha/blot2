@@ -702,6 +702,15 @@ recursive fn same(self_: const Analyzer&, left: Fact, right: Fact) -> bool {
 
 // ---- Types -------------------------------------------------------------
 
+// These queries ask whether any part has a property. In a homogeneous pair
+// both edges reach the same type under the same substitution and depth.
+// Following both doubles the work at every level of a nested pair.
+fn storageQueryParts(m: const Module&, n: blot_check_types::Node) -> const u32[:] {
+    let parts = m.types.list(blot_check_types::List { start: n.a, len: n.b });
+    if parts.len == 2 && parts[0] == parts[1] { return parts[..1]; }
+    return parts;
+}
+
 // Whether a value of `ty` can hold storage. Unknown shapes can.
 fn holds(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
     let known, cached = holdsKnown(self_, ty);
@@ -732,7 +741,7 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
     if (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.function { return true; }
     if n.tag == blot_check_types::Tag.product {
-        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
+        for item in storageQueryParts(m, n) {
             if holdsIn(self_, m, item, variables, arguments, depth + 1) { return true; }
         }
         return false;
@@ -825,7 +834,7 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
         return partsIn(self_, m, n.a, want, variables, arguments, depth + 1);
     }
     if n.tag == blot_check_types::Tag.product {
-        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
+        for item in storageQueryParts(m, n) {
             if partsIn(self_, m, item, want, variables, arguments, depth + 1) { return true; }
         }
         return false;
@@ -1679,7 +1688,7 @@ recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth:
     if n.tag == blot_check_types::Tag.usage { return occurs(m, variable, n.a, data, depth + 1); }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occurs(m, variable, n.a, data, depth + 1); }
     if n.tag == blot_check_types::Tag.product {
-        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occurs(m, variable, item, data, depth + 1) { return true; } }
+        for item in storageQueryParts(m, n) { if occurs(m, variable, item, data, depth + 1) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
@@ -1703,7 +1712,7 @@ recursive fn openType(m: const Module&, ty: u32, depth: i64) -> bool {
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return true; }
     if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return openType(m, n.a, depth + 1); }
     if n.tag == blot_check_types::Tag.product {
-        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if openType(m, item, depth + 1) { return true; } }
+        for item in storageQueryParts(m, n) { if openType(m, item, depth + 1) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
