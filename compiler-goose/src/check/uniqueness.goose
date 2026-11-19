@@ -1735,7 +1735,7 @@ recursive fn occursInSink(m: const Module&, variable: u32, ty: u32, inside: bool
     if n.tag == blot_check_types::Tag.usage { return occursInSink(m, variable, n.a, inside, depth + 1); }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursInSink(m, variable, n.a, inside, depth + 1); }
     if n.tag == blot_check_types::Tag.product {
-        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursInSink(m, variable, item, inside, depth + 1) { return true; } }
+        for item in storageQueryParts(m, n) { if occursInSink(m, variable, item, inside, depth + 1) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
@@ -1816,6 +1816,10 @@ recursive fn instanceOwns(self_: Analyzer&, m: const Module&, pattern: u32, actu
         if p.b != a.b { return true; }
         let left = m.types.list(blot_check_types::List { start: p.a, len: p.b });
         let right = m.types.list(blot_check_types::List { start: a.a, len: a.b });
+        // Both the scheme and its instantiation must repeat the child.
+        if left.len == 2 && left[0] == left[1] && right[0] == right[1] {
+            return instanceOwns(self_, m, left[0], right[0], variable, depth + 1);
+        }
         for item, at in left { if instanceOwns(self_, m, item, right[at], variable, depth + 1) { return true; } }
         return false;
     }

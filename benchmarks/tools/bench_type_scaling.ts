@@ -7,8 +7,10 @@ const directory = await Deno.makeTempDir();
 const entry = resolve(directory, "main.blot");
 function source(kind: string, size: number) {
   const lines = [];
-  if (kind === "composition") {
-    lines.push("func layer0 x => return (x, x)");
+  if (kind === "composition" || kind === "mixedComposition") {
+    let seed = "(x, x)";
+    if (kind === "mixedComposition") seed = "(x, 0, x)";
+    lines.push(`func layer0 x => return ${seed}`);
     for (let i = 1; i < size; i++) {
       lines.push(`func layer${i} x => return layer${i - 1} (layer${i - 1} x)`);
     }
@@ -39,9 +41,10 @@ function source(kind: string, size: number) {
 }
 try {
   // Isolate type inference so later passes cannot hide its scaling curve.
-  for (const kind of ["pair", "namedPair", "composition"]) {
+  for (const kind of ["pair", "namedPair", "composition", "mixedComposition"]) {
     let limit = 13;
     if (kind === "composition") limit = 11;
+    if (kind === "mixedComposition") limit = 6;
     for (let size = 1; size <= limit; size++) {
       await Deno.writeTextFile(entry, source(kind, size));
       const result = await new Deno.Command(executable, {
@@ -68,11 +71,20 @@ try {
       if (!check.success) break;
     }
   }
-  for (const kind of ["identity", "fields", "annotated", "composition"]) {
+  for (
+    const kind of [
+      "identity",
+      "fields",
+      "annotated",
+      "composition",
+      "mixedComposition",
+    ]
+  ) {
     let sizes = [32, 64, 128, 256, 512, 1024, 2048, 4096];
     if (kind === "composition") {
       sizes = Array.from({ length: 11 }, (_, index) => index + 1);
     }
+    if (kind === "mixedComposition") sizes = [1, 2, 3, 4, 5, 6];
     for (const size of sizes) {
       const body = source(kind, size);
       await Deno.writeTextFile(entry, body);

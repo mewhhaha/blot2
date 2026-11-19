@@ -179,7 +179,7 @@ Deno.test("ownership analysis finishes for repeated generic pair composition", a
   const entry = `${directory}/main.blot`;
   const lines = ["func duplicate x => return (x, x)"];
   let previous = "duplicate";
-  for (let i = 1; i < 6; i++) {
+  for (let i = 1; i < 10; i++) {
     lines.push(`func compose${i} x => return ${previous} (${previous} x)`);
     previous = `compose${i}`;
   }
