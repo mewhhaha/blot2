@@ -5,7 +5,31 @@ import check.effects;
 import check.type_store_snapshot;
 import support.error;
 
+fn effectHistory() {
+    let ok=blot_error::Error.none;
+    var store,init=blot_check_effects::initWithOptions(blot_check_effects::Options{..});assert(init==ok);
+    let row,error=store.fresh();assert(error==ok);
+    let saved=store.mark();
+    let future,err=store.resolve(row,5);assert(err==ok && store.node(future).cursor==5);
+    let labelled,le=store.row([1 as u32],blot_check_effects::Tail.closed);assert(le==ok);
+    match store.node(row).tail {
+        variable v => {
+            assert(store.appendVersionAt(v.value,0,2)==ok);
+            assert(store.appendVersionAt(v.value,labelled,4)==ok);
+        },
+        _ => {assert(false);},
+    }
+    let first,e1=store.resolve(row,0);assert(e1==ok && first==0);
+    let second,e2=store.resolve(row,3);assert(e2==ok && store.node(second).labels.len==1);
+    let past,e3=store.resolve(future,0);assert(e3==ok && past==future);
+    let later,e4=store.resolve(future,7);assert(e4==ok && store.node(later).cursor==7);
+    store.rollback(saved);
+    let reset,e5=store.resolve(row,0);assert(e5==ok && reset==row);
+    store.deinit();
+}
+
 fn main() {
+    effectHistory();
     functionUnification();
     assert(selectionUnification(false)==blot_error::Error.type_limit);
     assert(selectionUnification(true)==blot_error::Error.type_limit);

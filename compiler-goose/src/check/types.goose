@@ -1090,6 +1090,7 @@ fn freshEffects(self_: Store&) -> blot_check_effects::Id, Error { let id, error 
 fn resolveEffects(self_: Store&, effect_row: blot_check_effects::Id, at: Cursor) -> blot_check_effects::Id, Error { if self_.use_closed_graphs { synchronizeClosedGraphs(self_); } return resolveOperationRow(self_, effect_row, at, 0); }
 recursive fn resolveOperationRow(self_: Store&, root: blot_check_effects::Id, at: Cursor, depth: i64) -> blot_check_effects::Id, Error {
     self_.normalization.row_requests += 1; if depth >= 1024 { return 0, blot_error::Error.type_limit; }
+    if root == 0 { return 0, blot_error::Error.none; }
     let id, error = self_.effects.resolve(root, at); if error != blot_error::Error.none { return 0, effectError(error); }
     let row_ = row(self_, id); if row_.labels.len == 0 { return id, blot_error::Error.none; }
     if self_.use_closed_rows && self_.use_closed_graphs && id >= self_.closed_row_index.len {

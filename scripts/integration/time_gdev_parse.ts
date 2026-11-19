@@ -11,6 +11,7 @@ const { values } = parseArgs({
     before: { type: "string" },
     after: { type: "string" },
     rounds: { type: "string", default: "12" },
+    "frontend-workers": { type: "string" },
     edits: { type: "boolean" },
     profile: { type: "boolean" },
     wasm: { type: "string" },
@@ -18,6 +19,11 @@ const { values } = parseArgs({
   },
 });
 assert(values.before && values.after, "Supply both compiler executable paths");
+let workers: number | undefined;
+if (values["frontend-workers"] !== undefined) {
+  workers = Number(values["frontend-workers"]);
+  assert(Number.isInteger(workers) && workers >= 1 && workers <= 16);
+}
 const rounds = Number(values.rounds);
 assert(Number.isSafeInteger(rounds) && rounds > 0);
 const gdev = resolve(values["gdev-root"]);
@@ -63,6 +69,7 @@ for (let round = 1; round <= rounds; round++) {
     const open = performance.now();
     const compiler = await createZigProjectCompiler({
       ...projects.get(mode)!,
+      frontendWorkers: workers,
       profileBackend: values.profile,
     });
     try {

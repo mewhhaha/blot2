@@ -1,0 +1,455 @@
+{
+  "workload": "Fresh Gdev Main, 276 modules, eight requested frontend workers, one compiler process per sample, warm filesystem and shared AMD Ryzen 7 3800X. End-to-end time includes opening the client and receiving the Wasm. Instrumented clock and memset observations are separate from headline timings.",
+  "inputs": {
+    "baseCommit": "500811ec4d06a0ed6274685e6a66d693767e841c",
+    "controlCompilerSha256": "0fc42e17c911702b038a2f39f000c22dfc8b5ec42688080ea6d767d0780877f3",
+    "candidateCompilerSha256": "cd0d873675d675f7d870b2f4332b10ccc8bb7033d134785a6823b3c613682a3b",
+    "releaseSourceIdentity": "62ce8d3d5f0e7fce6c0dbcbc4ddddf0968e6dc2c47da1972b572a00385695f86",
+    "clangSha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "gooseSha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "penCommit": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "integration": {
+    "gdev": "13abafeb0bf3a482f8e727bbd6e75706f43f88b3",
+    "ink": "a2d53352c32ed7f1dcbf44a3d514a531a7a92b3e",
+    "main_wasm": "1f4c3976a679fd9fd73932a2619e05515f4d5d12bf7d036cdfd9b1349801160e",
+    "main_bytes": 2718922,
+    "frame": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frame_trace": "58aae684b0bd9dd5863ee799aa4782fd0d968e493451a058624a7c5292c0f88a",
+    "pen": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "replay_frames": 120,
+    "identical_replay_files": 242,
+    "compiler": "cd0d873675d675f7d870b2f4332b10ccc8bb7033d134785a6823b3c613682a3b",
+    "compiler_identity": "82eab60cf1a2509f89f60b741d073acbf76f3b2b910cdf378705722dbc9d5a47"
+  },
+  "method": {
+    "timing": "time_gdev_parse.ts --before CONTROL --after CANDIDATE --gdev-root PINNED_GDEV --frontend-workers 8. Two alternating rounds of 14 and 16 pairs. Five separate pairs used --edits. All success outputs and rejection diagnostics compared for equality.",
+    "processorClocks": "Separate alternating profiled builds. Read completed per-module clocks from the shared worker queue, summing all 276 job intervals per phase. Check plus freeze/publication plus lower equals the compiler-reported worker CPU on every run. Aggregate CPU can exceed wall time with eight workers.",
+    "memset": "Counted out-of-line calls with value zero from capability_contracts.validate and validateTerms by caller address in each optimized binary and all forked workers. A second pass counted calls of at least 1024 bytes by caller across the executable. Inlined writes and time are excluded. Both runs returned the reference Wasm. Validator histogram entries are [calls, bytes], by size or other.",
+    "pairedIntervals": "Paired median of control minus candidate, in ms. 95% percentile bootstrap, 2000 samples with seed 17; positive values favor candidate."
+  },
+  "results": {
+    "fresh": {
+      "controlMs": 889.511,
+      "candidateMs": 863.707,
+      "pairedMedianSavedMs": 22.632,
+      "wins": 20,
+      "pairs": 30,
+      "pairedBootstrap95Ms": [-1.063, 34.25],
+      "belowOneSecond": {
+        "control": 24,
+        "candidate": 22
+      },
+      "slowestMs": {
+        "control": 1452.1,
+        "candidate": 1736.8
+      }
+    },
+    "profile": {
+      "checking": {
+        "controlMs": 1664.539,
+        "candidateMs": 1657.168,
+        "pairedMedianSavedMs": 37.18,
+        "wins": 9,
+        "pairs": 15,
+        "pairedBootstrap95Ms": [-53.919, 75.313]
+      },
+      "interface": {
+        "controlMs": 152.316,
+        "candidateMs": 155.361,
+        "pairedMedianSavedMs": -1.508,
+        "wins": 7,
+        "pairs": 15,
+        "pairedBootstrap95Ms": [-3.08, 3.485]
+      },
+      "lowering": {
+        "controlMs": 313.604,
+        "candidateMs": 327.293,
+        "pairedMedianSavedMs": -12.433,
+        "wins": 4,
+        "pairs": 15,
+        "pairedBootstrap95Ms": [-18.219, -3.417]
+      },
+      "checkStageWall": {
+        "controlMs": 506.107,
+        "candidateMs": 496.783,
+        "pairedMedianSavedMs": 7.413,
+        "wins": 9,
+        "pairs": 15,
+        "pairedBootstrap95Ms": [-14.225, 32.26]
+      }
+    },
+    "work": {
+      "control": {
+        "workerSlots": 8,
+        "workerJobs": 276,
+        "replyBytes": 74372057,
+        "typeNodes": 1362360,
+        "resolveEntries": 3770660,
+        "resolveNodes": 414145,
+        "unifyPairs": 469214,
+        "variableViews": 225862,
+        "compositeProbes": 882800
+      },
+      "candidate": {
+        "workerSlots": 8,
+        "workerJobs": 276,
+        "replyBytes": 74372435,
+        "typeNodes": 1360654,
+        "resolveEntries": 3758368,
+        "resolveNodes": 412439,
+        "unifyPairs": 469214,
+        "variableViews": 225862,
+        "compositeProbes": 880482
+      }
+    },
+    "retained": {
+      "edit": {
+        "controlMs": 47.83,
+        "candidateMs": 48.365,
+        "pairedMedianSavedMs": 0.12,
+        "wins": 3,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-15.077, 12.89]
+      },
+      "fresh": {
+        "controlMs": 872.467,
+        "candidateMs": 901.171,
+        "pairedMedianSavedMs": -26.661,
+        "wins": 2,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-240.815, 60.912]
+      },
+      "syntax": {
+        "controlMs": 71.103,
+        "candidateMs": 71.07,
+        "pairedMedianSavedMs": 0.001,
+        "wins": 3,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-12.19, 2.26]
+      },
+      "lex": {
+        "controlMs": 69.593,
+        "candidateMs": 72.724,
+        "pairedMedianSavedMs": -3.336,
+        "wins": 1,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-4.239, 4.567]
+      },
+      "recover": {
+        "controlMs": 46.402,
+        "candidateMs": 45.678,
+        "pairedMedianSavedMs": 1.498,
+        "wins": 3,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-4.825, 3.647]
+      },
+      "reject": {
+        "controlMs": 353.757,
+        "candidateMs": 353.066,
+        "pairedMedianSavedMs": -3.001,
+        "wins": 2,
+        "pairs": 5,
+        "pairedBootstrap95Ms": [-82.338, 32.714]
+      }
+    }
+  },
+  "memoryClears": {
+    "control": {
+      "validatorExternalCalls": 32440,
+      "validatorBytes": 1780514816,
+      "validatorHistogram": {
+        "4096": [6488, 26574848],
+        "65536": [12976, 850395136],
+        "69632": [12976, 903544832],
+        "other": [0, 0]
+      },
+      "binaryCallsOfAtLeast1KiBBytes": 2908156583,
+      "topFiveFunctions": [
+        [
+          "blot_check_capability_contracts_validate_g31_1751",
+          [32440, 1780514816]
+        ],
+        [
+          "blot_check_capability_contracts_instantiate_g31_1748",
+          [13407, 182882304]
+        ],
+        [
+          "blot_reuse_project_check_persistentProducer_g24",
+          [922, 93631038]
+        ],
+        [
+          "blot_check_capability_contracts_canonicalBody_g31_6260",
+          [1736, 68126464]
+        ],
+        [
+          "blot_reuse_dependency_snapshot_freezeMode_g30_13968",
+          [2004, 67069334]
+        ]
+      ]
+    },
+    "candidate": {
+      "validatorExternalCalls": 1880,
+      "validatorBytes": 301485,
+      "validatorHistogram": {
+        "4096": [0, 0],
+        "65536": [0, 0],
+        "69632": [0, 0],
+        "other": [1880, 301485]
+      },
+      "binaryCallsOfAtLeast1KiBBytes": 1003206246,
+      "topFiveFunctions": [
+        [
+          "blot_check_capability_contracts_instantiate_g31_1748",
+          [13407, 182882304]
+        ],
+        [
+          "blot_reuse_project_check_persistentProducer_g24",
+          [926, 93863753]
+        ],
+        [
+          "blot_check_check_suite_g16_3366",
+          [4097, 66708080]
+        ],
+        [
+          "blot_reuse_partial_dependency_runPersistent_g29",
+          [686, 50898658]
+        ],
+        [
+          "blot_check_check_publishChecked_g16",
+          [4243, 42034266]
+        ]
+      ]
+    }
+  },
+  "rejected": {
+    "change": "Memoize final expression roots and fast-path terminal child variables.",
+    "fresh": {
+      "controlMs": 975.14,
+      "candidateMs": 969.268,
+      "pairedMedianSavedMs": 3.604,
+      "wins": 7,
+      "pairs": 14,
+      "pairedBootstrap95Ms": [-57.729, 50.511]
+    },
+    "resolveDepthVisits": {
+      "control": 3770660,
+      "candidate": 3766931
+    }
+  },
+  "samples": {
+    "fresh": [
+      [1452.136, 1288.509],
+      [1163.915, 1074.991],
+      [1158.779, 1467.984],
+      [1149.655, 1414.199],
+      [969.25, 1557.462],
+      [958.464, 1158.531],
+      [1093.51, 1736.816],
+      [914.945, 1213.804],
+      [893.365, 905.149],
+      [870.926, 841.027],
+      [848.133, 856.349],
+      [934.864, 821.274],
+      [1048.754, 925.266],
+      [958.536, 885.106],
+      [840.55, 807.612],
+      [859.241, 831.415],
+      [840.276, 821.279],
+      [910.156, 840.835],
+      [879.762, 935.118],
+      [906.627, 871.065],
+      [840.734, 838.776],
+      [885.657, 880.999],
+      [880.851, 833.157],
+      [823.542, 827.626],
+      [840.941, 827.297],
+      [897.95, 878.892],
+      [878.962, 852.757],
+      [872.621, 793.259],
+      [865.675, 836.512],
+      [870.423, 823.18]
+    ],
+    "retained": {
+      "edit": [
+        [55.095, 54.976],
+        [45.738, 48.365],
+        [47.552, 45.7],
+        [47.83, 62.907],
+        [60.069, 47.179]
+      ],
+      "fresh": [
+        [872.467, 975.018],
+        [855.605, 1096.42],
+        [864.442, 891.102],
+        [906.115, 901.171],
+        [915.826, 854.914]
+      ],
+      "lex": [
+        [68.485, 72.724],
+        [69.593, 73.048],
+        [70.251, 73.587],
+        [68.008, 70.033],
+        [72.188, 67.621]
+      ],
+      "recover": [
+        [49.1, 47.602],
+        [43.811, 48.637],
+        [47.184, 44.46],
+        [43.566, 45.678],
+        [46.402, 42.754]
+      ],
+      "reject": [
+        [353.757, 436.095],
+        [342.989, 363.214],
+        [341.319, 344.319],
+        [361.063, 353.066],
+        [355.912, 323.198]
+      ],
+      "syntax": [
+        [71.103, 83.292],
+        [70.55, 70.549],
+        [70.672, 76.204],
+        [73.001, 70.741],
+        [72.246, 71.07]
+      ]
+    },
+    "profile": [
+      [0, "control", 1929712, 179830, 366174, 1126.592, 617896],
+      [0, "candidate", 1827443, 165211, 357425, 910.575, 536731],
+      [1, "candidate", 1719392, 157294, 342217, 903.039, 519590],
+      [1, "control", 1901609, 174036, 363416, 1041.335, 591951],
+      [2, "control", 1735619, 164277, 328204, 1059.977, 575575],
+      [2, "candidate", 2049249, 189953, 412449, 1052.948, 634594],
+      [3, "candidate", 1588029, 151667, 314899, 869.446, 486497],
+      [3, "control", 1693217, 153822, 319364, 913.464, 526781],
+      [4, "control", 1712036, 154412, 319319, 881.986, 507473],
+      [4, "candidate", 1674856, 155920, 335008, 878.287, 500060],
+      [5, "candidate", 1657168, 153748, 319047, 913.7, 524652],
+      [5, "control", 1598263, 146491, 301302, 897.926, 510427],
+      [6, "control", 1547620, 146199, 292664, 904.082, 463279],
+      [6, "candidate", 1472596, 142714, 296081, 848.356, 456094],
+      [7, "candidate", 1615437, 152083, 316341, 850.049, 470848],
+      [7, "control", 1560607, 143940, 296419, 825.523, 448327],
+      [8, "control", 1490261, 143460, 284307, 839.351, 463706],
+      [8, "candidate", 1613417, 155910, 327293, 852.867, 468090],
+      [9, "candidate", 1556148, 148499, 311930, 877.363, 474267],
+      [9, "control", 1606391, 146209, 304937, 857.815, 489163],
+      [10, "control", 1665202, 152708, 321623, 893.857, 495784],
+      [10, "candidate", 1597307, 148136, 319036, 873.659, 487132],
+      [11, "candidate", 1661745, 151626, 330684, 893.174, 514633],
+      [11, "control", 1607826, 152136, 306778, 873.309, 499979],
+      [12, "control", 1633328, 152316, 311576, 843.253, 465244],
+      [12, "candidate", 1670600, 155396, 324009, 923.923, 496783],
+      [13, "candidate", 1639927, 155361, 331823, 865.053, 473847],
+      [13, "control", 1664539, 152285, 313604, 891.897, 506107],
+      [14, "control", 1757279, 158663, 334104, 940.947, 538274],
+      [14, "candidate", 1681966, 158590, 342255, 890.517, 508157]
+    ],
+    "pairFormat": ["controlMs", "candidateMs"],
+    "profileColumns": ["i", "side", "check_us", "freeze_us", "lower_us", "total_ms", "check_wall_us"]
+  },
+  "qualification": {
+    "semanticFixtures": 192,
+    "fixtureCountersChanged": {
+      "captured-callable-fixtures/captured-builtin.blot": {
+        "type_nodes": [5232, 5231]
+      },
+      "captured-callable-fixtures/captured-effect.blot": {
+        "effect_rows": [2737, 2736],
+        "type_nodes": [5273, 5272]
+      },
+      "direct/carried_owners.blot": {
+        "effect_rows": [2912, 2907],
+        "type_nodes": [5666, 5654]
+      },
+      "direct/closures.blot": {
+        "effect_rows": [3019, 3017],
+        "type_nodes": [5800, 5795]
+      },
+      "direct/comprehensions.blot": {
+        "type_nodes": [6060, 6059]
+      },
+      "direct/empty_literals.blot": {
+        "type_nodes": [7659, 7649]
+      },
+      "direct/generated_from_filter.blot": {
+        "type_nodes": [7698, 7689]
+      },
+      "direct/inferred_types.blot": {
+        "type_nodes": [7568, 7559]
+      },
+      "direct/iterators.blot": {
+        "type_nodes": [8309, 8307]
+      },
+      "package/mixed-composition.blot": {
+        "type_nodes": [5772, 5771]
+      },
+      "package/ordinary-control.blot": {
+        "type_nodes": [5293, 5292]
+      },
+      "primitive-aliases.blot": {
+        "type_nodes": [7065, 7041]
+      },
+      "provider-fixtures/lifetime-cost.blot": {
+        "type_nodes": [5495, 5493]
+      },
+      "scoped-loop-refinement.blot": {
+        "type_nodes": [10096, 10087]
+      }
+    },
+    "newEngineLaws": ["resolution_views.effectHistory", "capability_validation: both scratch sizes, distinct arities, conflicting word roles, and empty words"]
+  },
+  "liveCheckout": {
+    "method": "Separate run of six fresh alternating pairs on the active workspace under concurrent host work. Gdev was dirty with local gameplay and asset edits. During this batch, the unrelated Ink tests/fixtures/pen/provenance.json changed. The reachable Wasm matched on every run. These six pairs are excluded from the pinned result.",
+    "state": {
+      "before": {
+        "gdev": {
+          "head": "b2d2f5b70a10ff85082617086a1c7e1d615695f0",
+          "untracked": [],
+          "binaryDiffSha256": "9203082bf6acf5d0272340994bbf57f25d3c8ae6f92fd1289e7804e096295244"
+        },
+        "ink": {
+          "head": "184b7ce3705e063ee61af8c2c1c3568415176bb9",
+          "untracked": [],
+          "binaryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "blot2": {
+          "head": "500811ec4d06a0ed6274685e6a66d693767e841c",
+          "untracked": [],
+          "binaryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "after": {
+        "gdev": {
+          "head": "b2d2f5b70a10ff85082617086a1c7e1d615695f0",
+          "untracked": [],
+          "binaryDiffSha256": "9203082bf6acf5d0272340994bbf57f25d3c8ae6f92fd1289e7804e096295244"
+        },
+        "ink": {
+          "head": "184b7ce3705e063ee61af8c2c1c3568415176bb9",
+          "untracked": [],
+          "binaryDiffSha256": "5d7db0d4d031024034fd74fc7a9f57ad978188ba28e192ffae901e6d0b2f8256"
+        },
+        "blot2": {
+          "head": "500811ec4d06a0ed6274685e6a66d693767e841c",
+          "untracked": [],
+          "binaryDiffSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      "stable": false
+    },
+    "wasmSha256": "f9fae42dfb0bfed23f174458d0f987c9f6a1e42eacc359144c892966f3c36c21",
+    "wasmBytes": 2732664,
+    "freshMs": [
+      [2732.792, 3200.364],
+      [2588.057, 2207.979],
+      [1981.655, 2070.121],
+      [1835.661, 1989.133],
+      [2525.077, 2408.936],
+      [1699.427, 2366.841]
+    ],
+    "controlMedianMs": 2253.366,
+    "candidateMedianMs": 2287.41
+  }
+}

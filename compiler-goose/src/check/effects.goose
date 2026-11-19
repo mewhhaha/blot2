@@ -174,7 +174,21 @@ fn shortcut(self_: Store&, first: u32) -> u32 {
     return current;
 }
 fn resolve(self_: Store&, root: Id, at: Cursor) -> Id, Error {
-    match node(self_, root).tail { variable => {}, _ => { return root, blot_error::Error.none; }, }
+    let original = node(self_, root);
+    match original.tail {
+        variable v => {
+            let writes = self_.variables.items[v.value];
+            // An unchanged tail still carries its cursor into later substitutions.
+            if at <= original.cursor && (writes.last == none || self_.versions.items[writes.last].position < original.cursor) {
+                return root, blot_error::Error.none;
+            }
+            if original.labels.len == 0 && writes.first != none {
+                let first = self_.versions.items[writes.first];
+                if first.position >= max(at, original.cursor) && first.replacement == 0 { return 0, blot_error::Error.none; }
+            }
+        },
+        _ => { return root, blot_error::Error.none; },
+    }
     if !self_.use_resolution_cache || at != 0 || root == 0 ||
        self_.physical_epoch >= none || self_.mutation_epoch >= none {
         return resolveUncached(self_, root, at);

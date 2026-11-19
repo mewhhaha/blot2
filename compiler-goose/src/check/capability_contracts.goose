@@ -66,7 +66,25 @@ recursive fn parameterDepth(self_: View, root: Id, remaining: i64&, depth: i64) 
 }
 fn validate(self_: View, root: Id, arity: u32, portable: bool) -> Error {
     if self_.nodes.len == 0 || self_.nodes.len > 4096 || self_.words.len > 65536 || root >= self_.nodes.len || arity > 16 || self_.nodes[0] != (Term { Tag.empty , ..}) { return blot_error::Error.invalid_capability_contract; }
-    var visits: i64 = 0; var depths: u8[4096] = [0; 4096]; var roles: u8[65536] = [0; 65536];
+    // Most exported contracts have just a handful of terms.
+    if self_.nodes.len <= 32 && self_.words.len <= 64 {
+        var depths: u8[32]; var roles: u8[64] = [0; 64]; var scopes: u32[32] = [0; 32];
+        return validateTerms(self_, root, arity, portable, depths[..], roles[..], scopes[..]);
+    }
+    let depths = validation_depths.alloc_slice(self_.nodes.len);
+    let roles = validation_roles.alloc_slice(self_.words.len);
+    let scopes = validation_scopes.alloc_slice(self_.nodes.len);
+    for &role in roles { role = 0; }
+    for &mask in scopes { mask = 0; }
+    let error = validateTerms(self_, root, arity, portable, depths, roles, scopes);
+    validation_scopes.free_slice(scopes); validation_roles.free_slice(roles); validation_depths.free_slice(depths);
+    return error;
+}
+reusable[] var validation_depths: u8[>..];
+reusable[] var validation_roles: u8[>..];
+reusable[] var validation_scopes: u32[>..];
+fn validateTerms(self_: View, root: Id, arity: u32, portable: bool, depths: u8[:], roles: u8[:], scopes: u32[:]) -> Error {
+    var visits: i64 = 0;
     for node, index in self_.nodes { visits += 1; if visits > 65536 { return blot_error::Error.capability_analysis_limit; }
         match node.tag {
             empty, unknown => { if node.a != 0 || node.b != 0 || node.c != 0 { return blot_error::Error.invalid_capability_contract; } },
@@ -90,10 +108,10 @@ fn validate(self_: View, root: Id, arity: u32, portable: bool) -> Error {
         } }
         if height >= 128 { return blot_error::Error.capability_analysis_limit; } depths[index] = height as u8;
     }
-    var reached: bool[4096][17] = [[false; 4096]; 17]; var remaining = 65536 - visits; return boundScopes(self_, root, arity, 0, reached, remaining, 0);
+    var remaining = 65536 - visits; return boundScopes(self_, root, arity, 0, scopes, remaining, 0);
 }
-recursive fn boundScopes(self_: View, root: Id, arity: u32, callable_arity: u32, reached: bool[4096][17]&, remaining: i64&, depth: i64) -> Error {
-    if depth >= 128 || remaining == 0 { return blot_error::Error.capability_analysis_limit; } remaining -= 1; if reached[callable_arity][root] { return blot_error::Error.none; } reached[callable_arity][root] = true; let node = self_.nodes[root];
+recursive fn boundScopes(self_: View, root: Id, arity: u32, callable_arity: u32, reached: u32[:], remaining: i64&, depth: i64) -> Error {
+    if depth >= 128 || remaining == 0 { return blot_error::Error.capability_analysis_limit; } remaining -= 1; let scope = (1 as u32) << callable_arity; if (reached[root] & scope) != 0 { return blot_error::Error.none; } reached[root] |= scope; let node = self_.nodes[root];
     match node.tag {
         parameter => { if callable_arity != 0 || node.a >= arity { return blot_error::Error.invalid_capability_contract; } },
         argument => { if callable_arity == 0 || node.a >= callable_arity { return blot_error::Error.invalid_capability_contract; } },

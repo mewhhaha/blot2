@@ -29,7 +29,13 @@ Changing scene history capacity in Gdev returns the complete Wasm in
 The compiler reuses all checked bodies and updates one operand.
 [Capacity edit measurements](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
 
-Fresh Gdev Main took **743.7 ms** across 20 alternating process pairs.
+The capability checker now uses scratch space sized to each contract. On the
+Gdev pile-replacement checkpoint, 22 of 30 fresh builds finished within one
+second. [Paired builds and checker measurements](benchmarks/evidence/measurements/2026-11-19-gdev-checker.json)
+
+![Fresh Gdev compile time and validator memory clearing before and after the checker change](benchmarks/evidence/measurements/2026-11-19-gdev-checker.png)
+
+An earlier Gdev snapshot took **743.7 ms** across 20 alternating process pairs.
 Indexing requirements by their function cut Gdev's candidate scans from
 **2,417,106 to 180,773**. Thirteen layers of inferred tuples still create
 32,934 type nodes. Naming the repeated shape takes 1,043.

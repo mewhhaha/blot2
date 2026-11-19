@@ -447,7 +447,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2105,
-     "type_nodes": 5232,
+     "type_nodes": 5231,
      "type_versions": 791,
      "wasm_bytes": 2760
     }
@@ -476,7 +476,7 @@
       "use_expansions": 16
      },
      "core_nodes": 945,
-     "effect_rows": 2737,
+     "effect_rows": 2736,
      "emitted_functions": 37,
      "filename": "captured-callable-fixtures/captured-effect.blot",
      "files": 2,
@@ -487,7 +487,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2129,
-     "type_nodes": 5273,
+     "type_nodes": 5272,
      "type_versions": 796,
      "wasm_bytes": 2827
     }
@@ -1508,7 +1508,7 @@
       "use_expansions": 28
      },
      "core_nodes": 1020,
-     "effect_rows": 2912,
+     "effect_rows": 2907,
      "emitted_functions": 29,
      "filename": "direct/carried_owners.blot",
      "files": 2,
@@ -1519,7 +1519,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2225,
-     "type_nodes": 5666,
+     "type_nodes": 5654,
      "type_versions": 885,
      "wasm_bytes": 3540
     }
@@ -1548,7 +1548,7 @@
       "use_expansions": 31
      },
      "core_nodes": 1018,
-     "effect_rows": 3019,
+     "effect_rows": 3017,
      "emitted_functions": 48,
      "filename": "direct/closures.blot",
      "files": 2,
@@ -1559,7 +1559,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2274,
-     "type_nodes": 5800,
+     "type_nodes": 5795,
      "type_versions": 910,
      "wasm_bytes": 3658
     }
@@ -1639,7 +1639,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2480,
-     "type_nodes": 6060,
+     "type_nodes": 6059,
      "type_versions": 973,
      "wasm_bytes": 5605
     }
@@ -1799,7 +1799,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2866,
-     "type_nodes": 7659,
+     "type_nodes": 7649,
      "type_versions": 1146,
      "wasm_bytes": 3091
     }
@@ -1879,7 +1879,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2894,
-     "type_nodes": 7698,
+     "type_nodes": 7689,
      "type_versions": 1152,
      "wasm_bytes": 2713
     }
@@ -1999,7 +1999,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2911,
-     "type_nodes": 7568,
+     "type_nodes": 7559,
      "type_versions": 1125,
      "wasm_bytes": 2837
     }
@@ -2039,7 +2039,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2985,
-     "type_nodes": 8309,
+     "type_nodes": 8307,
      "type_versions": 1211,
      "wasm_bytes": 4407
     }
@@ -4890,7 +4890,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 2477,
-     "type_nodes": 5772,
+     "type_nodes": 5771,
      "type_versions": 878,
      "wasm_bytes": 0
     }
@@ -4937,7 +4937,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 2229,
-     "type_nodes": 5293,
+     "type_nodes": 5292,
      "type_versions": 810,
      "wasm_bytes": 0
     }
@@ -5149,7 +5149,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 2885,
-     "type_nodes": 7065,
+     "type_nodes": 7041,
      "type_versions": 1072,
      "wasm_bytes": 12501
     }
@@ -5198,7 +5198,7 @@
      "stage": "build-project",
      "success": false,
      "syntax_nodes": 2339,
-     "type_nodes": 5495,
+     "type_nodes": 5493,
      "type_versions": 837,
      "wasm_bytes": 0
     }
@@ -8242,7 +8242,7 @@
      "stage": "build-project",
      "success": true,
      "syntax_nodes": 3879,
-     "type_nodes": 10096,
+     "type_nodes": 10087,
      "type_versions": 1601,
      "wasm_bytes": 7559
     }
