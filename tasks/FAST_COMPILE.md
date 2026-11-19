@@ -3,6 +3,98 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Type inference and ownership, 19 November 2026
+
+Every inferred field access leaves a requirement that a future caller must
+satisfy. When finishing a function's type, the checker previously searched
+requirements from every earlier function in the module. It now records the
+first and last pending requirement for each binding. Mutually recursive
+functions still examine their combined range in insertion order. After a
+speculative rollback the range may grow wider, and the existing owner and
+scope checks still select the live requirements.
+
+With 4,096 independent field readers the previous compiler examined
+8,394,752 candidates. The new one examines 4,096. On Gdev Main the same
+50,977 candidates came from **2,417,106 → 180,773 scans**. The whole checker
+still performs other work, including unification and effect checking. Across
+four single-worker builds, the candidate scan routine fell from 54 to 10 CPU
+samples. Three routines that resolve types accounted for 588 of 6,642 samples
+in the indexed compiler. They remain a larger target on ordinary Gdev code.
+
+| Gdev Main | Previous | Release | Faster pairs |
+| --- | ---: | ---: | ---: |
+| Fresh process, whole Main | 766.3 ms | 743.7 ms | 15 / 20 |
+| Fresh process, file data evicted | 745.9 ms | 757.1 ms | 4 / 8 |
+| File data evicted, second window | 795.2 ms | 780.5 ms | 5 / 8 |
+| Checking, production worker count | 443.0 ms | 433.6 ms | 6 / 8 |
+| Checking, one worker | 1,057.9 ms | 1,041.8 ms | 4 / 6 |
+
+Each fresh process regenerated assets, checked all 271 modules and returned
+the same 2,639,638-byte Wasm. The production check phase includes
+worker-side lowering. Each disk trial verified zero resident file pages for
+the copied compiler, assets and sources. Across both windows the disk median
+was 753.2 → 768.1 ms, with 9 of 16 pairs faster. The two windows disagree
+on the direction of the disk result. Other workloads ran on the host.
+The full compiler gate passed 1,103 guest and host tests with
+100 skipped. Every named Gdev and Ink result, the inspected frame
+and all 242 replay files matched the previous release.
+
+### Which programs scale badly?
+
+These families have a constant entry that returns 42. The compiler checks
+every declaration even when the entry does not call it. There are two
+distinct ways to make very short programs expensive.
+
+- **An inferred signature grows at every layer.** Start with
+  `func layer0 x => return x`. Let each new layer return a pair of calls to
+  the previous layer, such as `(layer0 x, layer0 x)`. From layer counts 10
+  through 13, inference allocated 4,122, 8,238, 16,450 and 32,934 type
+  nodes. Giving the repeated shape a name with
+  `type Pair a is data = $Pair (a, a)` and wrapping each pair in `$Pair`
+  took 685, 783, 916 and 1,043 nodes. A named type can express the outer
+  result as `Pair a`, referring to its payload definition once.
+- **A later pass expands a type the checker already shares.** Start with
+  `func duplicate x => return (x, x)` and repeatedly compose each function
+  with itself. Six function declarations took just 378 type nodes. In the
+  previous compiler the full build exceeded three seconds. During a separate
+  1.5-second build, 1,269 of 1,341 CPU samples landed in the ownership query
+  that checks whether a type contains owned or borrowed parts. It followed both
+  references to the same child in the type graph.
+  Queries about storage, borrowing, callability and type-variable occurrence
+  now visit a repeated pair child once at the same depth and substitution.
+  When matching a generic type against a concrete one, the shortcut also
+  checks that the concrete pair repeats its child. Six layers now build in
+  2.4 ms and ten layers in 7.9 ms in the generated benchmark. With
+  `func duplicate x => return (x, 0, x)`, the checker still needs only 378
+  type nodes for six layers, but the full build again crosses the three-second
+  limit. That remains a release reproducer.
+
+Keep field inference and allow named types at public boundaries. First make
+ownership queries record which nodes they have visited, including both node
+identities when comparing types. The result also depends on the substitution,
+remaining depth and active recursive data definitions. A general graph walk
+has to respect that context. The acceptance case is a repeated child separated
+by another tuple element, as in `(x, 0, x)`. Check the same exported Wasm,
+ownership diagnostics and Gdev wall time. Next, share completed, immutable
+subtypes when publishing a function signature. Inference variables can
+change during solving, so reusing their answers requires tracking the solver version.
+Measure both the tuple family and Gdev before extending sharing across the
+type store. Count graph visits against a work limit in the passes after
+inference as well. Today the
+eleven-function composition reaches the checker's `nesting_limit`, while a
+much smaller program could previously stall downstream.
+
+Core ML provides a relevant theoretical example. Kanellakis, Mairson and
+Mitchell give small polymorphic programs with exponentially growing principal
+types. The Blot measurements above establish a concrete growth curve for this
+implementation. Deriving a complexity bound for the Blot language would
+require a separate proof. [Unification and ML Type Reconstruction](https://cs.brown.edu/research/pubs/techreports/reports/CS-90-26.html)
+
+![Compiler work for field readers and nested pair types](../benchmarks/evidence/measurements/2026-11-19-type-scaling.svg)
+
+[Generated workloads](../benchmarks/tools/bench_type_scaling.ts) ·
+[Timing pairs, compiler identities and qualification](../benchmarks/evidence/measurements/2026-11-19-type-scaling.json)
+
 ## Cold Gdev builds, 19 November 2026
 
 The parser used to find the nearest binary32 value by searching its bit range

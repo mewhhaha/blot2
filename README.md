@@ -19,10 +19,16 @@ candidate, evidence and requirements.
 
 Changing scene history capacity in Gdev returns the complete Wasm in
 **35.0 ms**, down from **82.2 ms** on the same source.
-The compiler reuses all checked bodies and updates one operand. Fresh Gdev Main
-now takes **854.7 ms** median, down from **922.2 ms** across 20
-paired builds of the same 2,639,638-byte Wasm. [Cold compile measurements](benchmarks/evidence/measurements/2026-11-19-gdev-cold-decimals.json)
-[Paired timings and qualification](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
+The compiler reuses all checked bodies and updates one operand.
+[Capacity edit measurements](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.json)
+
+Fresh Gdev Main took **743.7 ms** across 20 alternating process pairs.
+Indexing requirements by their function cut Gdev's candidate scans from
+**2,417,106 to 180,773**. Thirteen layers of inferred tuples still create
+32,934 type nodes. Naming the repeated shape takes 1,043.
+[Cold timings and type-system assessment](tasks/FAST_COMPILE.md#type-inference-and-ownership-19-november-2026)
+
+![Compiler work for field readers and nested pairs](benchmarks/evidence/measurements/2026-11-19-type-scaling.svg)
 
 ![Gdev capacity edit time and type checking](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.png)
 
