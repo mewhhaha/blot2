@@ -36,7 +36,9 @@ type ConsumerResult=blot_reuse_dependency_consumer::Result;
 type ConsumerDiagnostic=blot_reuse_dependency_consumer::Diagnostic;
 type Stats=blot_reuse_dependency_consumer::Stats;
 reusable[] var result_bytes:u8[>..]=[];
-reusable[] var core_owners:Owner[>..]=[];
+// A scalar revision shares the immutable tables and owns only a new node slice.
+struct CoreOwners { tables:Owner=Owner{}, nodes:Owner=Owner{} }
+reusable[] var core_owners:CoreOwners[>..]=[];
 fn copyResultBytes(bytes:const u8[:])->u8[:] {let result=result_bytes.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
 fn releaseResultBytes(bytes:u8[:]) {if bytes.len!=0 {result_bytes.free_slice(bytes);}}
 struct Result {result:ConsumerResult=default<ConsumerResult>(),diagnostic_filename:blot_support::Option<u8[:]> =blot_support::none<u8[:]>(),source_bytes:i64=0,fresh_modules:i64=0,cached_modules:i64=0}
@@ -45,7 +47,7 @@ fn deinit(self_:Result&) {self_.result.deinit();if self_.diagnostic_filename.pre
 // the unit vector, the paths and the flags; unit_owners owns each Core. A
 // cached Core is a copy of the admitted seed's (raw frozen input carries no
 // lifetime authority in this port); `borrowed` marks those positions.
-struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:Owner[:]=default<Owner[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
+struct Prepared {units:Core[:]=default<Core[:]>(),paths:const u8[:][:]=default<const u8[:][:]>(),borrowed:bool[:]=default<bool[:]>(),entry:u32=0,source_bytes:i64=0,stats:Stats=default<Stats>(),catalog_owner:Owner=Owner{},unit_owners:CoreOwners[:]=default<CoreOwners[:]>(),wire_owner:blot_project_packet::Owner=default<blot_project_packet::Owner>()}
 // Re-publish the owned runs without retaining the temporary header.
 fn publishPrepared(value:Prepared)->Prepared {
  assert(value.catalog_owner.unique());
@@ -54,7 +56,7 @@ fn publishPrepared(value:Prepared)->Prepared {
  return Prepared{units:units,paths:paths,borrowed:borrowed,entry:value.entry,source_bytes:value.source_bytes,stats:value.stats,catalog_owner:value.catalog_owner,unit_owners:unit_owners,wire_owner:value.wire_owner};
 }
 fn deinit(self_:Prepared&) {
- for &owner in self_.unit_owners {owner.release();}if self_.unit_owners.len!=0 {core_owners.free_slice(self_.unit_owners);}
+ for &owners in self_.unit_owners {owners.nodes.release();owners.tables.release();}if self_.unit_owners.len!=0 {core_owners.free_slice(self_.unit_owners);}
  if self_.wire_owner.slot!=0 {self_.wire_owner.deinit();}
  self_.catalog_owner.release();self_=Prepared{};
 }
@@ -160,14 +162,14 @@ fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_sup
    let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);let copied,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(source));timing.exit();if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ir=copied;
    ir.value.unit=id;ready.stats.body_lowerings+=ir.value.body_lowerings;ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
   }
-  ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index]=ir.owner;
+  ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index].tables=ir.owner;
   if ir.value.diagnostics.len!=0 {let issue=ir.value.diagnostics[0];let diagnostic,error=blot_reuse_dependency_consumer::init(id,"lower",coreCodeName(issue.code),issue.span,issue.message());if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}return blot_support::some(diagnostic),blot_error::Error.none;}
  }
  return blot_support::none<ConsumerDiagnostic>(),blot_error::Error.none;
 }
 fn allocateCatalog(ready:Prepared&,count:i64)->Error {
  let units,error=blot_reuse_dependency_payload::alloc<Core>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.units=units;for &unit in ready.units {unit=default<Core>();}
- ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=Owner{};}
+ ready.unit_owners=core_owners.alloc_slice(count);for &owner in ready.unit_owners {owner=CoreOwners{};}
  let borrowed,error=blot_reuse_dependency_payload::alloc<bool>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.borrowed=borrowed;for &flag in ready.borrowed {flag=false;}
  let paths,error=blot_reuse_dependency_payload::alloc<const u8[:]>(ready.catalog_owner,count);if error!=blot_error::Error.none {return error;}ready.paths=paths;for &path in ready.paths {path=default<const u8[:]>();}
  return blot_error::Error.none;

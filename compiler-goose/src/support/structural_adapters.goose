@@ -2238,6 +2238,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_module_visibility:
 fn blot_reuse_module_visibility::blotStructuralHash<StructuralSink>(value:blot_reuse_module_visibility::Work,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::ContextDetails)->bool {return equalFields(left,right);}
 fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::ContextDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::CoreOwners)->bool {return equalFields(left,right);}
+fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::CoreOwners,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::ExplanationDetails)->bool {return equalFields(left,right);}
 fn blot_reuse_partial_dependency::blotStructuralHash<StructuralSink>(value:blot_reuse_partial_dependency::ExplanationDetails,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_reuse_partial_dependency::HoleDetails)->bool {return equalFields(left,right);}

@@ -375,31 +375,39 @@ fn lowerRetainedUnit(source:const Project&,checked:const blot_check_check::Check
  ready.stats.body_lowerings+=core.value.body_lowerings;
  ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
  ready.units[id-1]=blot_reuse_dependency_owned_headers::canonical(core.owner,core.value);
- ready.unit_owners[id-1]=core.owner;
+ ready.unit_owners[id-1].tables=core.owner;
  return blot_error::Error.none;
 }
 
-fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&)->Error {
- if previous.unit_owners[index].lease==0 {
-  // All clean cold entries share one immutable typed decode. Keep it only
-  // while a surviving unit still refers to that initial build's tables.
-  if ready.wire_owner.slot==0 {
-   let owner,error=previous.wire_owner.retain();
-   if error!=blot_error::Error.none {return error;}
-   ready.wire_owner=owner;
-  }
-  let units=previous.catalog_owner.mutable(previous.units);
-  ready.units[index]=units[index];
- } else {
-  // Recover the mutable header before retaining the immutable published Core.
-  if !previous.unit_owners[index].unique() {return blot_error::Error.invalid_artifact;}
-  let core=blot_reuse_dependency_owned_headers::canonical(previous.unit_owners[index],previous.units[index]);
-  let owner,error=previous.unit_owners[index].retain();
+fn reuseRetainedCore(previous:const Prepared&,index:i64,ready:Prepared&,literal:u32=0,bits:u32=0)->Error {
+ let prior=previous.unit_owners[index];
+ if prior.tables.lease!=0 {
+  let owner,error=prior.tables.retain();
   if error!=blot_error::Error.none {return error;}
-  ready.unit_owners[index]=owner;
-  ready.units[index]=core;
+  ready.unit_owners[index].tables=owner;
+ } else if ready.wire_owner.slot==0 {
+  // The initial parallel check puts every unit's tables in one immutable packet.
+  let owner,error=previous.wire_owner.retain();
+  if error!=blot_error::Error.none {return error;}
+  ready.wire_owner=owner;
  }
- ready.borrowed[index]=true;
+ let units=previous.catalog_owner.mutable(previous.units);
+ ready.units[index]=units[index];
+ if literal!=0 {
+  let owner,error=blot_reuse_dependency_payload::init();
+  if error!=blot_error::Error.none {return error;}
+  ready.unit_owners[index].nodes=owner;
+  let nodes,error=blot_reuse_dependency_payload::copy<blot_check_core::Node>(ready.unit_owners[index].nodes,units[index].nodes);
+  if error!=blot_error::Error.none {return error;}
+  nodes[literal].a=bits;
+  ready.units[index].nodes=nodes;
+  ready.units[index].owner_id=blot_native::fresh_owner_id();
+ } else if prior.nodes.lease!=0 {
+  let owner,error=prior.nodes.retain();
+  if error!=blot_error::Error.none {return error;}
+  ready.unit_owners[index].nodes=owner;
+ }
+ ready.borrowed[index]=literal==0;
  return blot_error::Error.none;
 }
 
@@ -450,6 +458,79 @@ fn checkRetainedPersistent(source:Project&,previous:const Retained&,previous_cor
  return Preparation.ready{publishPrepared(ready)},blot_error::Error.none;
 }
 
+// A U32 passed by value to an ordinary function has the same type, effects
+// and ownership at every value. Keep source positions and the old interface
+// only when the sole change is inside that one decimal token.
+fn editedInteger(old:const Unit&,next:const Unit&)->u32 {
+ if old.source.len!=next.source.len || old.tree.nodes.len!=next.tree.nodes.len {return 0;}
+ var first:i64=0;
+ while first<old.source.len && old.source[first]==next.source[first] {first++;}
+ if first==old.source.len {return 0;}
+ for node,i in next.tree.nodes.items {
+  if node.tag!=blot_parse_ast::tag_integer {continue;}
+  let span=next.tree.spans.items[i];
+  if span.start>first || span.end<=first {continue;}
+  let prior=old.tree.nodes.items[i];
+  let before=old.tree.spans.items[i];
+  if prior.tag!=node.tag || prior.a==node.a || before.start!=span.start || before.end!=span.end {return 0;}
+  for at in span.start..span.end {
+   if old.source[at]<48 || old.source[at]>57 || next.source[at]<48 || next.source[at]>57 {return 0;}
+  }
+  if old.source[span.end..]!=next.source[span.end..] {return 0;}
+  return i as u32;
+ }
+ return 0;
+}
+
+// Match the syntax and its checked use. An index, loop bound, pattern,
+// intrinsic, or proof can depend on the value of an integer during checking.
+fn boundIntegerCall(tree:const Tree&,literal:u32)->u32 {
+ for node,i in tree.nodes.items {
+  if node.tag!=blot_parse_ast::tag_let_stmt {continue;}
+  let binding=tree.binding(i as u32);
+  if binding.fallback!=0 || binding.where.len!=0 || tree.node(binding.pattern).tag!=blot_parse_ast::tag_pattern_name {continue;}
+  var head=binding.value;
+  var found=false;
+  while tree.node(head).tag==blot_parse_ast::tag_apply {
+   let apply=tree.node(head);
+   if tree.node(apply.b).tag!=blot_parse_ast::tag_integer {break;}
+   found=found || apply.b==literal;
+   head=apply.a;
+  }
+  if found && tree.node(head).tag==blot_parse_ast::tag_name {return binding.value;}
+ }
+ return 0;
+}
+
+fn revisedCallLiteral(old:const Unit&,next:const Unit&,core:const Core&)->u32,u32 {
+ let literal=editedInteger(old,next);
+ if literal==0 {return 0,0;}
+ let call=boundIntegerCall(next.tree,literal);
+ if call==0 {return 0,0;}
+ let span=next.tree.span(literal);
+ let call_span=next.tree.span(call);
+ var id:u32=0;
+ var target:u32=0;
+ for node,i in core.nodes {
+  let site=core.spans[i];
+  if site.start==span.start && site.end==span.end {
+   if id!=0 || node.tag!=blot_check_core::Tag.constant || node.ty!=blot_check_types::u32_type ||
+      node.a!=old.tree.node(literal).a {return 0,0;}
+   id=i as u32;
+  }
+  if site.start==call_span.start && site.end==call_span.end && node.tag==blot_check_core::Tag.call {
+   if target!=0 || core.calls[node.a].target.unit==0 || core.calls[node.a].target.unit==core.unit {return 0,0;}
+   target=i as u32;
+  }
+ }
+ if id==0 || target==0 {return 0,0;}
+ let invocation=core.nodes[target];
+ for operand in core.extra[invocation.b..invocation.b+invocation.c] {
+  if operand==id {return id,next.tree.node(literal).a;}
+ }
+ return 0,0;
+}
+
 fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:const Retained&,previous_core:const Prepared&,changed:bool[:],affected:const bool[:],debits:ModuleDebit[:],packets:const u8[:][:],ready:Prepared&)->Error {
  let owned=retained_packet_tables.realloc_slice(packets,packets.len);
  let cache .= engine.persistentCache();
@@ -467,13 +548,19 @@ fn rebuildRetainedPersistent(engine:blot_reuse_project_check::Engine&,previous:c
    for edge in engine.source.unitImports(unit) {if propagated[edge.target-1] {inherited=true;break;}}
    changed[index]=affected[index] || inherited || engine.source.unit(unit).source!=previous.source.unit(unit).source;
   }
+  var literal:u32=0;
+  var bits:u32=0;
+  if changed[index] && !inherited && !affected[index] {
+   literal,bits=revisedCallLiteral(previous.source.unit(unit),engine.source.unit(unit),previous_core.units[index]);
+   if literal!=0 {changed[index]=false;}
+  }
   if !changed[index] {
    let debit=previous.debits[index];
    if debit.resolution>engine.resolution_remaining || debit.associated>engine.associated_remaining {return blot_error::Error.invalid_artifact;}
    engine.resolution_remaining-=debit.resolution;
    engine.associated_remaining-=debit.associated;
    debits[index]=debit;
-   let error=reuseRetainedCore(previous_core,index,ready);
+   let error=reuseRetainedCore(previous_core,index,ready,literal,bits);
    if error!=blot_error::Error.none {return error;}
    continue;
   }

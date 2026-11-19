@@ -44,7 +44,7 @@ export type ZigProjectStats = { [key: string]: Json };
 export type ZigProjectBuildStats = ZigProjectStats & {
   frontend: ZigProjectStats;
   sourceBytes: number;
-  /** Modules checked for this build and modules reused from a session or bundle. */
+  /** Modules with fresh Core for this build and modules reused from a session or bundle. */
   freshModules: number;
   cachedModules: number;
   /** Distinct source acquisitions (including overlays) and prior syntax trees copied this build. */

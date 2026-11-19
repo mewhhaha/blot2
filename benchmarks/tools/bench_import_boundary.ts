@@ -98,6 +98,9 @@ async function build(
   return {
     ms,
     checked: result.stats.freshModules,
+    elaboratedBodies: result.stats.frontend.body_elaborations,
+    loweredBodies: result.stats.frontend.body_lowerings,
+    relocatedOperands: result.stats.relocatedOperands,
     modules: result.stats.freshModules + result.stats.cachedModules,
     bytes: result.bytes.length,
     sha256: await sha(result.bytes),
@@ -176,13 +179,15 @@ for (let round = 0; round < Math.min(repeats, 4); round++) {
         (await build(client, versions.base)).sha256,
         oracles[layout].base,
       );
-      const { sha256, checked, ms } = await build(client, versions.storage);
-      assert.equal(sha256, oracles[layout].storage);
+      const storage = await build(client, versions.storage);
+      assert.equal(storage.sha256, oracles[layout].storage);
       directStorageAfterFresh.push({
         round: round + 1,
         layout: sources[layout].layout,
-        checked,
-        ms,
+        checked: storage.checked,
+        ms: storage.ms,
+        elaboratedBodies: storage.elaboratedBodies,
+        relocatedOperands: storage.relocatedOperands,
       });
     } finally {
       await client.dispose();

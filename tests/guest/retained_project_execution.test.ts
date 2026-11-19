@@ -514,3 +514,88 @@ Deno.test("an imported name change preserves earlier checks and rechecks callers
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("an integer call argument can reuse a checked body across edits and rejection", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const dep = dir + "/numbers.blot";
+  const numbers = "func sum (a: U32) -> (b: U32): U32 => return @u32.add a b\n";
+  const imports = ['import * as numbers from "./numbers"'];
+  for (let i = 0; i < 14; i++) {
+    await Deno.writeTextFile(dir + "/d" + i + ".blot", "const marker = 1\n");
+    imports.push("import * as d" + i + ' from "./d' + i + '"');
+  }
+  const source = imports.join("\n") +
+    "\nentry func answer (): U32 => return do:\n" +
+    "  let a = numbers.sum 64 17\n" +
+    "  let b = numbers.sum 64 17\n" +
+    "  return @u32.add a b\n";
+  await Deno.writeTextFile(entry, source);
+  await Deno.writeTextFile(dep, numbers);
+  const options = {
+    entry,
+    prelude: null,
+    executable: Deno.args[0],
+    frontendWorkers: 8,
+  };
+  const session = await createZigProjectCompiler(options);
+  let revision = 0;
+  async function compare(
+    text: string,
+    want: number | null,
+    reuse = false,
+    dependency = numbers,
+  ) {
+    const request = { sources: { [entry]: text, [dep]: dependency } };
+    const oracle = await createZigProjectCompiler({
+      ...options,
+      frontendWorkers: 1,
+    });
+    try {
+      const actual = await session.build(request),
+        fresh = await oracle.build(request);
+      if (want === null) {
+        assert(!actual.success && !fresh.success);
+        assert.deepEqual(actual.diagnostics, fresh.diagnostics);
+        assert.equal(actual.revision, revision);
+        return;
+      }
+      assert(actual.success && fresh.success);
+      assert.equal(actual.revision, ++revision);
+      assert.deepEqual(actual.bytes, fresh.bytes);
+      if (reuse) assert.equal(actual.stats.frontend.body_elaborations, 0);
+      const guest = await instantiateGuest(actual.bytes);
+      try {
+        assert.equal(guest.call("answer", null), want);
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await oracle.dispose();
+    }
+  }
+  try {
+    await compare(source, 162);
+    const edit = source.replace("a = numbers.sum 64", "a = numbers.sum 65");
+    await compare(edit, 163, true);
+    await compare(edit, null, false, "func sum (a: Bool) -> (b: U32): U32 => return b\n");
+    const tail = edit.replace("b = numbers.sum 64 17", "b = numbers.sum 64 99");
+    await compare(tail, 245, true);
+    await compare(tail.replace("65 17", "15 17"), 195, true); // Changes signed LEB width.
+    await compare(source.replaceAll("64 17", "400 23"), 846);
+    await compare(source, 162);
+    const store = source.replace(
+      "return @u32.add a b",
+      "let lanes: Array U32 = #[0]\n  lanes[0] = a\n  return @u32.add lanes[0] b",
+    );
+    await compare(store, 162);
+    await compare(store.replace("a = numbers.sum 64", "a = numbers.sum 65"), 163, true);
+    const staged = source.replace("entry func answer", "func total") +
+      "entry func answer (): U32 => return #run (total ())\n";
+    await compare(staged, 162);
+    await compare(staged.replace("a = numbers.sum 64", "a = numbers.sum 65"), 163, true);
+  } finally {
+    await session.dispose();
+    await Deno.remove(dir, { recursive: true });
+  }
+});
