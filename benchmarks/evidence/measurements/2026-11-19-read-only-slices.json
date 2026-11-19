@@ -1,0 +1,377 @@
+{
+  "date": "2026-11-19",
+  "scope": "Read-only slices, retiring application lent declarations, and the remaining escape through borrowed array growth.",
+  "compiler": {
+    "parent": "0ebc71692baaca337710b1aac3d255c0d5c8527b",
+    "previousBinarySha256": "e6344e087a4fb32a095fbe91f11121baca0f9c803d340215570ad564eb8b8391",
+    "binarySha256": "d0eb64e6cd73cad33d30233d105a3c439189dd7fc8ebb2fe0057f853c4d90109",
+    "sourceIdentity": "943eca6b4b00d6a9eabdc25f878a3db8b3d64ee8554bad09452ea332812e5f04",
+    "sourceManifest": "compiler-goose/build/source-identity.json",
+    "abi": 8,
+    "sessionProtocol": 2
+  },
+  "inputs": {
+    "pinnedGdev": "ae21d7f0bbfcc2230ac9264c1fe9c7118f4bd51d",
+    "gdevOverlay": {
+      "commit": "59d882880076a2757ae2b9c23a33786cdb560ed7",
+      "files": [
+        "src/buildings/construction_kit.blot",
+        "tests/construction_kit.blot"
+      ]
+    },
+    "ink": "c6f63a369856dec7ab5d71f3ba43f523025ecbe1",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "penBinarySha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "std": "This Blot revision. The benchmark motion overlay equals Ink lib/motion.blot byte for byte.",
+    "previousDesignTrials": "2026-11-19-language-design.json"
+  },
+  "compilerGate": {
+    "command": "deno task test:compiler",
+    "releaseGuests": {
+      "passed": 1109,
+      "failed": 0,
+      "ignored": 100
+    },
+    "wasmFixtures": 192,
+    "uniquenessFixtures": 212,
+    "directReferences": {
+      "runtimeBytes": 3373,
+      "writerBytes": 352
+    },
+    "pack": true
+  },
+  "readOnlySlice": {
+    "beforeSource": [
+      "func overwrite state => return do:",
+      "  state.rows[0] = 42",
+      "entry func answer (): U32 => return do:",
+      "  let owner = #[5, 7, 11]",
+      "  let window = &owner[1..3]",
+      "  overwrite {rows: window}",
+      "  return owner[1]"
+    ],
+    "previousWasmReturned": 42,
+    "oldWasmSha256": "2aafc9d5ff2c3b624bc8d6f305e5c86135cf5c704b19c0ffff6cfe4728392c39",
+    "candidate": "type_mismatch on an indexed store to View, including a generic record field. The regression also reads the same field before writing.",
+    "positive": "Mutable fixed and resizable arrays passed through the same generic writer returned 83.",
+    "inkNegative": "tests/rejected/scene_query_storage.blot returns type_mismatch during checking.",
+    "diagnostic": {
+      "code": "type_mismatch",
+      "stage": "check-project",
+      "message": "Types do not match"
+    },
+    "importedWriter": {
+      "source": [
+        "func assign state: Unit => return do:",
+        "  let old = state.rows[0]",
+        "  state.rows[0] = @u32.add old 40"
+      ],
+      "frontendWorkers": [
+        1,
+        8
+      ],
+      "slice": "type_mismatch in both modes",
+      "resizableOwner": "Both Wasm builds returned 42."
+    }
+  },
+  "remainingGrowth": {
+    "execution": "blotc build-project SOURCE OUTPUT --std-root std --prelude std/prelude.blot; instantiateGuest(OUTPUT), call answer with Unit.",
+    "witnesses": {
+      "borrowed-growth": {
+        "source": [
+          "func append (rows: ResizeArray U32): Unit => return @storage.push rows 8",
+          "entry func answer (): U32 => return do:",
+          "  let owner: ResizeArray U32 = #[7]",
+          "  let saved = owner",
+          "  append owner",
+          "  return saved.length"
+        ],
+        "outcome": 2
+      },
+      "borrowed-growth-truncate": {
+        "source": [
+          "func shrink (rows: ResizeArray U32): Unit => return @storage.truncate rows 0",
+          "entry func answer (): U32 => return do:",
+          "  let owner: ResizeArray U32 = #[7]",
+          "  let saved = owner",
+          "  shrink owner",
+          "  return saved.length"
+        ],
+        "outcome": 0
+      },
+      "owned-growth-alias": {
+        "source": [
+          "func append (rows: own ResizeArray U32): ResizeArray U32 => return do:",
+          "  @storage.push rows 8",
+          "  return rows",
+          "entry func answer (): U32 => return do:",
+          "  let owner: ResizeArray U32 = #[7]",
+          "  let saved = owner",
+          "  owner := append owner",
+          "  return saved.length + owner.length"
+        ],
+        "outcome": "own_argument"
+      },
+      "owned-growth-copy": {
+        "source": [
+          "func append (rows: own ResizeArray U32): ResizeArray U32 => return do:",
+          "  @storage.push rows 8",
+          "  return rows",
+          "entry func answer (): U32 => return do:",
+          "  let owner: ResizeArray U32 = #[7]",
+          "  let saved = @storage.copy owner",
+          "  owner := append owner",
+          "  return saved.length * 10 + owner.length"
+        ],
+        "outcome": 12
+      }
+    },
+    "ownedCopyValue": "10 times the saved length plus the new length. Saved 1, new 2."
+  },
+  "ownershipCensus": {
+    "scanner": "scripts/integration/count_stores.py",
+    "method": "Approximate source shapes in Gdev src, pen, test_support, tests, devtools, performance and Ink lib, tests.",
+    "startingStoreLines": 1190,
+    "startingLentDeclarations": 15,
+    "storeLinesIncludingIntentionalFailure": 1005,
+    "intentionalFailure": "Ink tests/rejected/scene_query_storage.blot",
+    "withoutNewRejection": 1004,
+    "lentDeclarations": 0,
+    "gdev": 812,
+    "ink": 193
+  },
+  "gdev": {
+    "pinned": {
+      "passed": 1224,
+      "failed": 108,
+      "unbuiltModules": 0,
+      "totalModules": 210,
+      "namedResultsCompared": 1332,
+      "namedChanges": [],
+      "namedOutcomesSha256": "31d0e222c8016856487adb2d87cc9777ddb7c847ad6b98542c72d6ab2a084c02",
+      "previewTest": "test_kit_reaches_world_chunks_and_menu_previews_without_changing_draw_order; also checks source mesh survives conversion."
+    },
+    "workingCheckout": {
+      "gdev": "59d882880076a2757ae2b9c23a33786cdb560ed7",
+      "main": {
+        "bytes": 2656937,
+        "sha256": "f827c775acd35ee8b069cab7b8ce23fd231d12bb3c4d15f3ee0161b429ab2a83",
+        "fresh": 272
+      },
+      "scope": "Includes separately developed game and asset changes. Uncommitted shader/model edits were present.",
+      "modules": 210,
+      "passed": 1225,
+      "failed": 108,
+      "unbuiltModules": 0,
+      "namedDifferencesFromPinned": [
+        {
+          "test": "tests/robot_flight.blot:test_a_falling_gnorp_rights_itself_before_touchdown",
+          "pinned": null,
+          "live": "ok"
+        },
+        {
+          "test": "tests/robot_flight.blot:test_a_gnorp_standing_still_keeps_its_pose",
+          "pinned": "ok",
+          "live": null
+        },
+        {
+          "test": "tests/robot_flight.blot:test_a_gnorp_standing_still_settles_on_both_feet",
+          "pinned": null,
+          "live": "ok"
+        }
+      ]
+    },
+    "replay": {
+      "method": "Previous and new compiler on the same pinned sources and assets. Independent project and cache roots, 120 frames each. Compared each relative filename and SHA-256.",
+      "files": 242,
+      "differences": 0,
+      "manifestSha256": "f69927af57047fbfd111289aa547aed7ab55e91e8851681d6352491f1f808238"
+    },
+    "hardwareFrame": {
+      "size": [
+        640,
+        480
+      ],
+      "inspected": true,
+      "method": "Compared PNG and trace to the pinned frame before the scene query and construction preview changes.",
+      "sha256": {
+        "frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+        "frames.trace": "b9df8add551a580caf952c0f7d953ed3863af23199d6e1fe9cf989ce53c272ac"
+      }
+    }
+  },
+  "ink": {
+    "guest": {
+      "passed": 282,
+      "failed": 0,
+      "modules": 74
+    },
+    "native": {
+      "passed": 111,
+      "failed": [
+        "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+        "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+      ]
+    },
+    "generator": "pen tool ink -- generate tools/generate.json passed",
+    "format": "pen tool ink -- fmt --check passed",
+    "preparedPhysics": {
+      "entry": "tests/prepared-physics.blot",
+      "sizeAndHash": [
+        {
+          "rev": "ad45137",
+          "bytes": 318835,
+          "sha": "0cee15ef93b5a1a78e5cfb059b4264a0f2a4c422bc2bbe4e4dc2b9755f32135f"
+        },
+        {
+          "rev": "c6f63a369856dec7ab5d71f3ba43f523025ecbe1",
+          "bytes": 330838,
+          "sha": "350aae570b69bb9c843905f81708e4e33b6efd0751470e2a1f50cb052b8d12ca"
+        }
+      ],
+      "scope": "Same previous compiler for both Ink source variants, two runs per variant, size and workload. Mixed timings.",
+      "results": [
+        {
+          "size": 256,
+          "export": "workload",
+          "result": {
+            "0": 54.2900505065918,
+            "1": 128
+          },
+          "previousMs": [
+            105.18,
+            29.19
+          ],
+          "candidateMs": [
+            134.248,
+            25.452
+          ]
+        },
+        {
+          "size": 256,
+          "export": "walker_workload",
+          "result": {
+            "0": 54.3060417175293,
+            "1": 128
+          },
+          "previousMs": [
+            16.668,
+            38.842
+          ],
+          "candidateMs": [
+            17.235,
+            14.2
+          ]
+        },
+        {
+          "size": 256,
+          "export": "joint_workload",
+          "result": {
+            "0": 54.703800201416016,
+            "1": 128
+          },
+          "previousMs": [
+            51.412,
+            15.067
+          ],
+          "candidateMs": [
+            102.112,
+            33.725
+          ]
+        },
+        {
+          "size": 2048,
+          "export": "workload",
+          "result": {
+            "0": 54.2900505065918,
+            "1": 128
+          },
+          "previousMs": [
+            48.313,
+            57.467
+          ],
+          "candidateMs": [
+            86.677,
+            61.973
+          ]
+        },
+        {
+          "size": 2048,
+          "export": "walker_workload",
+          "result": {
+            "0": 54.3060417175293,
+            "1": 128
+          },
+          "previousMs": [
+            41.864,
+            110.086
+          ],
+          "candidateMs": [
+            51.231,
+            40.986
+          ]
+        },
+        {
+          "size": 2048,
+          "export": "joint_workload",
+          "result": {
+            "0": 54.703800201416016,
+            "1": 128
+          },
+          "previousMs": [
+            50.469,
+            46.071
+          ],
+          "candidateMs": [
+            43.897,
+            46.849
+          ]
+        }
+      ]
+    }
+  },
+  "freshGdev": {
+    "entry": "src/main.blot",
+    "workers": 8,
+    "modules": 271,
+    "wasmBytes": 2656241,
+    "wasmSha256": "05fb8bc4e03f32a3b39b866bdaf32ec7d4b0d6423bf5a84da6d3b72538198889",
+    "method": "Six alternating pairs of fresh project compiler processes, opening through the host API. Previous binary and candidate compiled the identical pinned source. Files were warm. Shared machine. Each returned identical bytes.",
+    "ms": {
+      "previous": [
+        996.407,
+        907.605,
+        909.716,
+        890.136,
+        810.366,
+        813.525
+      ],
+      "candidate": [
+        1340.817,
+        1110.547,
+        900.219,
+        845.076,
+        842.869,
+        844.79
+      ]
+    },
+    "medianMs": {
+      "previous": 898.87,
+      "candidate": 872.648
+    },
+    "overlappingSuiteMedianMs": 1547.565,
+    "overlappingSuiteMs": [
+      1584.396,
+      1510.734,
+      1750.802,
+      1407.493,
+      1502.676,
+      1607.259
+    ],
+    "overlappingSuiteNote": "Candidate-only sample overlapped a separate live-game qualification. Excluded from the paired timing."
+  },
+  "stagedAssetLookup": {
+    "fixture": "tests/host/build_inputs.test.ts",
+    "method": "The staged function reads the selected input, constructs an indexed byte table with a callback, and returns a runtime function with a declared U32 -> U32 interface. Checks execute that function after switching or editing the selected file, missing-input rollback, and reuse after editing an unselected file."
+  }
+}

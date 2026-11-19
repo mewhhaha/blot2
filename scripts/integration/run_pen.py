@@ -12,14 +12,15 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PEN = ROOT.parent / 'pen/target/release/pen'
-PROJECT = ROOT.parent / 'gdev'
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--gdev-root', type=Path, default=ROOT.parent / 'gdev', help='Gdev checkout or pinned project snapshot supplying the scene and assets.')
 parser.add_argument('--launch', action='store_true', help='Launch after the candidate builds successfully.')
 parser.add_argument('--hardware', action='store_true', help='Use the available GPU instead of requiring a software adapter.')
 parser.add_argument('--output', type=Path, help='New output directory; default is a unique attempt directory beside this script.')
 parser.add_argument('--compiled-main', type=Path, help='Load a previously built actual main through Pen bundle mode, without recompiling.')
 parser.add_argument('--expected-wasm-sha256', help='Required with --compiled-main: the reviewed build artifact hash.')
 args = parser.parse_args()
+PROJECT = args.gdev_root.resolve()
 if bool(args.compiled_main) != bool(args.expected_wasm_sha256):
     parser.error('--compiled-main and --expected-wasm-sha256 must be supplied together')
 if not args.launch:

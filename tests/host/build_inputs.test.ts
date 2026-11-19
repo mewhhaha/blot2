@@ -25,9 +25,14 @@ import { file as dark } from "./dark"
 import { alternate } from "./select"
 import { include } from "std/build"
 func catalog () => return { bytes: include (if alternate then dark else light), version: 7 }
+func make_lookup (): (U32 -> U32) => return do:
+  let bytes = (catalog ()).bytes
+  let table = @array.generate (@array.length bytes) (func (i: U32) => return @u32.add i (@array.get bytes i))
+  return func (i: U32): U32 => return @array.get table i
 entry func read () => return do:
   let asset = #run (catalog ())
   return asset.bytes
+entry func lookup (i: U32): U32 => return (#run (make_lookup ())) i
 `;
   const selection = (other: boolean) =>
     `const alternate = ${other}
@@ -59,6 +64,9 @@ entry func read () => return do:
         Array.from(guest.call("read", null) as Uint32Array),
         Array.from(expected),
       );
+      for (const [index, byte] of expected.entries()) {
+        assert.equal(guest.call("lookup", index), index + byte);
+      }
     } finally {
       guest.dispose();
     }

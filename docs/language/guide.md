@@ -881,9 +881,10 @@ for stack in stacks_of access:                          // what a loop walks,
 access := step access
 ```
 
-A view (`&rows[a..b]`) is such a borrowed value: given to a call that
-keeps nothing, `rows` is its holder's own again after the call; bound to a
-name, after that name's last read.
+A slice (`&rows[a..b]`) borrows its owner's elements for reading.
+Assigning through its index is a type error, including through a slice
+stored in a record or passed to a generic writer. After the last read, the
+owner can be updated with `rows[i] := next`.
 
 It is kept, as before, where it is put into a record, a tuple or an
 array, given to a function value, or where a loop carries an element that
@@ -922,7 +923,12 @@ rules above still hold around it:
   storage the function was given, and for a value given to an effect
   operation, whose handler may keep it.
 - `@simd.store` on an array the function does not own is a store too.
-- An array is not appended to in place unless the function owns it.
+- Appending to an immutable `Array` can reuse its allocation when the
+  function owns it. A `ResizeArray` has separate operations that change its
+  length in place. During migration, `@storage.push` and
+  `@storage.truncate` on a borrowed parameter still change the length seen
+  by other names. To preserve a snapshot, copy it before handing the original
+  to a helper with an `own` parameter.
 
 **`lent` functions.** A function that still returns or keeps what it was
 lent is marked `lent`, before `func` or `const`; so is a constant that

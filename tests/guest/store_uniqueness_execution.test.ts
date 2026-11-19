@@ -549,3 +549,27 @@ entry func each_round (n: U32) : U32 => return do:
     }
   }
 });
+
+Deno.test("a shared store cannot write through a slice or through a helper with a field constraint", async () => {
+  const declarations = `type Row is data = $Row {value: U32}
+func change state => return do:
+  let old = state.rows[0].value
+  state.rows[0].value = old + 40
+func slice (rows: Array Row): &[Row] => return &rows[0..rows.length]
+`;
+  for (const assignment of ["view[0].value = 42", "change {rows: view}"]) {
+    await compileExpectedFailure(declarations + `entry func test (): U32 => return do:
+  let rows = #[$Row {value: 1}]
+  let view = slice rows
+  ${assignment}
+  return rows[0].value
+`, "type_mismatch");
+  }
+  await compileAndRun(declarations + `entry func test () => return do:
+  let fixed = #[$Row {value: 1}]
+  let resized: ResizeArray Row = #[$Row {value: 2}]
+  change {rows: fixed}
+  change {rows: resized}
+  return fixed[0].value + resized[0].value
+`, guest => equal(guest.call("test", null), 83));
+});

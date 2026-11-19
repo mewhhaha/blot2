@@ -7,12 +7,26 @@ Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
 The Goose compiler now resolves a binary operation on its left operand and
-can evaluate an ordinary callback or return a closure from `#run`. The full
-compiler gate passed 1,108 guest and host tests. The same 120-frame Gdev
-input produced identical packets and final state with the previous compiler.
-At Gdev `aaad3f5` and Ink `00d5b3a`, all 210 Gdev test modules execute,
-with 1,224 checks passing and 108 failing. Ink passes 281 guest checks.
+can evaluate an ordinary callback or return a closure from `#run`. A
+declared function can use this to build a lookup table from an asset at
+compile time and accept its index at runtime.
 [Qualification and exact inputs](benchmarks/evidence/measurements/2026-11-19-language-design.json)
+
+A borrowed slice now rejects indexed stores, including writes through a
+generic record field. The old compiler let such a helper change the middle
+element of `#[5, 7, 11]` to 42 through a slice. Ink's collision and physics
+queries now expose read-only ranges. Gdev builds its optional construction
+previews separately so the original drawing stays available. The compiler
+gate passed 1,109 tests. Ink passed 282 guest checks. The pinned Gdev
+hardware screenshot and trace matched the previous frame, as did all 242
+files of the 120-frame compiler comparison. All 1,332 named Gdev test
+outcomes matched the control (1,224 passed, 108 failed). On six paired
+fresh builds with eight workers and warm files, the previous compiler took
+899 ms and this release took 873 ms at the median. Both emitted the same
+2,656,241-byte Main. The standalone prepared-physics fixture grew by 12,003
+bytes. Its normal, walker and joint workloads returned the same results at
+256 and 2,048 static colliders.
+[Slice and ownership qualification](benchmarks/evidence/measurements/2026-11-19-read-only-slices.json)
 
 Gdev's hauling planner now imports the salt read model independently. Its
 Wasm returns the expected height even when the salt writer has a type error.
@@ -91,15 +105,17 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
 
 ## Remaining work
 
-1. Migrate the remaining shared writers and borrowed returns. The
-   [source scan](scripts/integration/count_stores.py) finds **1,008 candidate
-   store lines and six `lent` declarations**, down from 1,190 and 15.
-   Terrain snapshots, the devtools clock, station title animation and prepared
-   path tables now have explicit owners. The residual Gdev salt and hand
-   callbacks borrow overlapping parts of the world. Compute a salt update
-   from the read views, let those views end and apply the result to the owned
-   world. Retire the mutation form of `=`, `lent` and their migration tools
-   after the remaining applications move.
+1. Require an owner for changes to an array's length as well as its elements.
+   A borrowed `@storage.push` changed a saved alias's length from one to two.
+   A borrowed `@storage.truncate` changed it to zero. An `own` helper
+   rejects the live alias, and an explicit copy preserves its length.
+   Start with Gdev's salt insertion and active-index update. They grow two
+   arrays in the same transaction. Compute the update from read views, end
+   those views, then apply both changes to one owned salt state and return it.
+   The [source scan](scripts/integration/count_stores.py) finds **1,004
+   candidate store lines** plus one deliberately rejected regression.
+   Gdev and Ink have **zero `lent` declarations**, down from 15. The compiler
+   still accepts `lent` and shared stores to arrays while callers migrate.
 2. Reduce committed linear memory while preserving the contiguous scratch
    allocation fast path. The two remaining Ink native failures enforce memory
    limits for dense bodies, snapshots, UI and text. Default modules start at

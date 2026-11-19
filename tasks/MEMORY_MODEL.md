@@ -3,6 +3,16 @@
 The active migration count, next caller family and executed Gdev comparison
 are in [CONTINUE.md](../CONTINUE.md). Counts below belong to their source checkpoints.
 
+On 19 November 2026 the last four Ink `lent` declarations became read-only
+scene and prepared-physics ranges. Gdev had already removed its last two
+frame alias declarations. The checker rejects indexed writes through a slice,
+including a slice passed to a generic field writer. Ordinary borrowed
+`ResizeArray` parameters can still change an alias's length through
+`@storage.push` and `@storage.truncate`. The executed three-way comparison
+covers a borrowed helper, an `own` helper with a live alias, and the same
+owning call with an explicit snapshot.
+[Qualification and source witnesses](../benchmarks/evidence/measurements/2026-11-19-read-only-slices.json)
+
 The owner's direction (14 November 2026): "Just immutable and then our goal
 is to reuse as much memory as possible", aiming at "efficient immutability.
 Maybe even more efficient than mutable languages." The syntax is in

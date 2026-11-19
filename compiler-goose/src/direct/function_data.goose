@@ -91,6 +91,9 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
     let m .= g.units[f.unit - 1];
     let info = m.updateInfo(id);
     let selectors = m.updateSelectors(id);
+    if tagOf(g, container.ty) == blot_direct_types::Tag.view {
+        return neverVal(), g.fail(m, id, "Cannot write through a borrowed slice");
+    }
     let position_value, error = expr(g, f, selectors[at].index);
     if error != blot_direct_types::Error.none { return position_value, error; }
     let index, error = scalarLocal(g, f, position_value, id);
