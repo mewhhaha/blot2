@@ -1,0 +1,786 @@
+{
+  "compiler": {
+    "baseSource": "0f47c8e037826f7f56a51e9761704f1ecba2e859",
+    "baselineSha256": "cd0d873675d675f7d870b2f4332b10ccc8bb7033d134785a6823b3c613682a3b",
+    "candidateSha256": "2892dbbc3ca099732fae6d849ccc207700a12a8189b90527ffa9023080196e6c",
+    "candidateSourceIdentity": "994d4e59ee67478b4d6220b0c075cd6a1cf961386cb21fe7544d667e4f0abdc1",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "CPU": "Ryzen 7 3800X, 8 physical cores, 16 logical CPUs"
+  },
+  "method": {
+    "smallPrograms": "benchmarks/tools/bench_type_checker.py. Build-project CLI with repository prelude and --profile. Each pair runs the same source twice in separate compiler processes. Variant order alternates by round; checkUs is wall time around checking the project, including worker completion and diagnostic collection, not thread CPU.",
+    "smallProgramQualification": "Each pair must emit identical Wasm or the same required diagnostic code, span and message. Separately instantiated each accepted candidate and checked a value via the guest ABI. Sort inputs were size 100000, two measured iterations and one warmup, using the reference checksum.",
+    "contracts": "Repeated Store.instantiate with identical portable record recipe, varying header length and root index; two reachable nonzero terms for every size. Same Goose -O2, clang -O2, thread CPU ns, 22 alternating matched pairs. Includes validation, copying, store initialization and amortized loop cost. Sources differ only in capability_contracts.goose.",
+    "memset": "Out-of-line libc memset(value=0,size>=1024) returning into capability_contracts.instantiate/instantiateBody/instantiateTerms in one fresh eight-worker Gdev compile per compiler. Counts include inlined helpers; exclude smaller fills, inline stores and other callers. Wasm digest matched.",
+    "gdev": "Same pinned project for all trials. scripts/integration/time_gdev_parse.ts starts a fresh compiler and times project open to complete, validated Wasm. Files warm in OS cache; host load uncontrolled. Separate profiled runs with one and eight workers. Retained changes run within a live session.",
+    "uncertainty": "Medians. Savings are control minus candidate in corresponding pairs. Intervals are descriptive 95% percentile intervals from 10000 resamples of complete paired differences with seed 65361; no correction for multiple workloads."
+  },
+  "contractNsPerCall": {
+    "3": {
+      "control": [1006.5, 770.8, 1035.9, 778.8, 744.6, 991.1, 1082.2, 812.1, 819.4, 988.4, 1101.7, 943.9, 1046.5, 1057.6, 1038.3, 886.4, 789.8, 815.6, 827.4, 876.4, 1066.9, 932.1],
+      "candidate": [660.0, 426.3, 477.8, 676.3, 382.0, 660.5, 550.9, 675.4, 378.3, 478.4, 646.3, 396.1, 623.3, 691.1, 564.1, 394.0, 482.7, 617.2, 631.6, 625.1, 673.0, 394.2],
+      "medians": [938.0, 590.7],
+      "pairedMedianSaving": 380.2,
+      "pairedSaving95": [330.7, 473.9],
+      "fasterPairs": 22,
+      "iterationsPerSample": 53333
+    },
+    "32": {
+      "control": [862.2, 927.3, 878.0, 1155.2, 849.5, 845.4, 836.4, 868.4, 839.7, 1284.7, 1389.5, 866.0, 1044.1, 845.7, 881.4, 844.4, 849.7, 897.5, 895.2, 840.5, 840.4, 1311.3],
+      "candidate": [921.1, 517.2, 519.0, 754.1, 521.7, 676.7, 552.2, 840.2, 520.4, 769.7, 785.3, 781.5, 594.6, 825.0, 516.9, 519.8, 517.9, 815.5, 675.7, 860.7, 767.3, 507.2],
+      "medians": [867.2, 676.2],
+      "pairedMedianSaving": 322.0,
+      "pairedSaving95": [125.4, 364.4],
+      "fasterPairs": 20,
+      "iterationsPerSample": 5000
+    },
+    "33": {
+      "control": [935.5, 933.1, 950.4, 950.1, 912.6, 914.1, 947.9, 907.4, 906.6, 1559.9, 1570.4, 932.9, 1352.2, 940.5, 917.1, 912.5, 934.1, 904.7, 925.2, 900.9, 984.4, 1110.2],
+      "candidate": [1036.6, 614.2, 678.0, 907.3, 619.4, 899.0, 627.2, 982.6, 662.4, 686.3, 935.8, 919.1, 647.8, 962.1, 605.5, 634.5, 620.4, 622.8, 622.1, 930.0, 907.0, 610.0],
+      "medians": [933.6, 670.2],
+      "pairedMedianSaving": 280.0,
+      "pairedSaving95": [45.6, 312.7],
+      "fasterPairs": 18,
+      "iterationsPerSample": 4848
+    },
+    "257": {
+      "control": [1614.4, 1660.4, 1638.3, 1996.8, 1671.4, 1624.9, 2330.7, 1614.8, 1610.4, 2702.3, 2728.0, 1626.8, 2463.5, 1585.4, 1597.2, 1638.0, 1671.1, 1618.7, 1615.7, 1595.0, 2084.7, 1713.2],
+      "candidate": [1828.1, 1193.0, 1864.0, 1784.4, 1246.8, 1283.1, 1240.6, 1928.6, 1322.1, 1249.8, 1389.5, 1837.8, 1221.2, 1243.5, 1192.1, 1221.7, 1556.8, 1247.6, 1276.5, 1811.9, 1815.5, 1316.0],
+      "medians": [1638.1, 1299.6],
+      "pairedMedianSaving": 341.8,
+      "pairedSaving95": [212.5, 414.9],
+      "fasterPairs": 17,
+      "iterationsPerSample": 622
+    },
+    "4096": {
+      "control": [13205.9, 13923.9, 13958.4, 14096.4, 12521.3, 12184.7, 12368.6, 12986.9, 15247.4, 21877.9, 21738.1, 13056.3, 16280.3, 12180.3, 12612.2, 12157.2, 12707.2, 12508.3, 14696.8, 15366.5, 20996.9, 12713.7],
+      "candidate": [12061.7, 10310.7, 13761.7, 14432.2, 10616.1, 11111.7, 10424.0, 18080.3, 10884.7, 11158.2, 10502.8, 12689.6, 10546.7, 10416.2, 10679.7, 10292.6, 10576.2, 10807.4, 10544.0, 15963.9, 15228.1, 10366.9],
+      "medians": [13131.1, 10743.6],
+      "pairedMedianSaving": 1918.9,
+      "pairedSaving95": [1386.9, 3249.8],
+      "fasterPairs": 19,
+      "iterationsPerSample": 300
+    }
+  },
+  "contractBenchGoose": [
+    "import check.capability_contracts;",
+    "import support.error;",
+    "import support.native;",
+    "type Term=blot_check_capability_contracts::Term;",
+    "fn main() {",
+    " var terms:Term[4096]=default<Term[4096]>();var args:u32[1]=[0];var fields:u32[2]=[20000,1];",
+    " terms[1]=Term{blot_check_capability_contracts::Tag.parameter,0,..};",
+    " for root in [2 as u32,31 as u32,32 as u32,256 as u32,4095 as u32] {",
+    "  terms[root]=Term{blot_check_capability_contracts::Tag.record,0,2,..};",
+    "  let recipe=blot_check_capability_contracts::Recipe{1,root,terms[..root+1],fields[..]};",
+    "  let iterations=max(300,160000/((root as i64)+1));",
+    "  let start=blot_native::thread_cpu_ns();",
+    "  var store,error=blot_check_capability_contracts::init();assert(error==blot_error::Error.none);store.limits.visits=20000000;",
+    "  for i in iterations {",
+    "   let result,failure=store.instantiate(recipe,args[..]);assert(failure==blot_error::Error.none && result==1);",
+    "  }",
+    "  let elapsed=blot_native::thread_cpu_ns()-start;assert(store.visits==iterations*2);store.deinit();",
+    "  print(root,\" \",iterations,\" \",elapsed);",
+    " }",
+    "}"
+  ],
+  "corpus": {
+    "generics-32": {
+      "typeNodes": 6021,
+      "bodies": 192,
+      "resolveVisits": 21287,
+      "unifyPairs": 1594,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [8.739, 7.913, 8.544, 8.164, 7.487, 14.367, 13.22, 11.378, 8.092, 8.027, 8.839, 9.338, 9.38, 15.066, 13.445, 7.698],
+        "candidate": [13.438, 9.349, 9.943, 10.2, 8.18, 8.534, 7.59, 9.6, 8.169, 8.756, 10.361, 8.94, 7.857, 8.104, 8.061, 7.519],
+        "medians": [8.789, 8.645],
+        "pairedMedianSaving": 0.051,
+        "pairedSaving95": [-1.399, 2.891],
+        "fasterPairs": 8
+      },
+      "buildMs": {
+        "control": [17.63, 11.791, 13.078, 12.328, 10.998, 20.699, 20.202, 15.927, 14.487, 11.777, 13.774, 14.12, 13.341, 22.451, 19.057, 11.745],
+        "candidate": [26.476, 14.292, 13.945, 14.155, 11.834, 12.905, 11.182, 14.763, 12.878, 13.316, 15.028, 14.065, 11.92, 13.593, 12.321, 11.343],
+        "medians": [13.947, 13.454],
+        "pairedMedianSaving": 0.228,
+        "pairedSaving95": [-1.254, 3.95],
+        "fasterPairs": 9
+      },
+      "executedResult": true
+    },
+    "generics-256": {
+      "typeNodes": 12293,
+      "bodies": 416,
+      "resolveVisits": 48391,
+      "unifyPairs": 3162,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [23.004, 20.237, 18.298, 17.528, 18.887, 18.25, 22.84, 21.814, 14.579, 13.845, 15.898, 15.569, 16.298, 17.619, 17.089, 13.581],
+        "candidate": [19.427, 14.444, 16.403, 15.725, 15.511, 14.313, 22.643, 16.925, 18.974, 15.14, 14.128, 17.526, 14.943, 18.093, 14.373, 14.969],
+        "medians": [17.573, 15.618],
+        "pairedMedianSaving": 1.786,
+        "pairedSaving95": [-0.474, 3.376],
+        "fasterPairs": 11
+      },
+      "buildMs": {
+        "control": [30.99, 29.465, 25.184, 24.551, 26.279, 24.042, 31.69, 29.333, 20.169, 19.626, 21.789, 22.312, 22.942, 23.979, 23.298, 19.526],
+        "candidate": [27.502, 20.312, 22.604, 21.919, 21.908, 21.049, 29.803, 23.481, 28.618, 21.032, 19.456, 24.158, 21.838, 24.787, 21.388, 21.338],
+        "medians": [24.011, 21.913],
+        "pairedMedianSaving": 2.121,
+        "pairedSaving95": [-0.808, 3.034],
+        "fasterPairs": 11
+      },
+      "executedResult": true
+    },
+    "generics-1024": {
+      "typeNodes": 33797,
+      "bodies": 1184,
+      "resolveVisits": 141319,
+      "unifyPairs": 8538,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [48.999, 52.212, 43.79, 53.084, 46.025, 41.329, 42.561, 40.757, 37.366, 43.8, 46.152, 44.252, 42.196, 45.758, 42.238, 42.891],
+        "candidate": [56.889, 53.786, 44.61, 40.672, 54.415, 42.939, 39.707, 43.355, 54.362, 40.17, 40.651, 41.955, 38.628, 43.454, 40.233, 53.614],
+        "medians": [43.795, 43.147],
+        "pairedMedianSaving": 0.593,
+        "pairedSaving95": [-4.75, 2.933],
+        "fasterPairs": 8
+      },
+      "buildMs": {
+        "control": [65.048, 69.013, 59.06, 67.692, 58.137, 53.631, 56.925, 54.04, 49.554, 58.517, 57.594, 57.854, 57.099, 61.883, 54.803, 58.491],
+        "candidate": [74.28, 66.635, 56.829, 52.959, 70.784, 59.924, 52.941, 56.79, 69.326, 54.347, 52.477, 55.299, 52.655, 57.604, 52.104, 69.472],
+        "medians": [57.995, 56.809],
+        "pairedMedianSaving": 2.466,
+        "pairedSaving95": [-6.293, 4.17],
+        "fasterPairs": 10
+      },
+      "executedResult": true
+    },
+    "callbacks-32": {
+      "typeNodes": 6040,
+      "bodies": 192,
+      "resolveVisits": 19856,
+      "unifyPairs": 1539,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": "67bfdb438fbb0912bb0973a9bc1cbda3619cc64f9661c2073eec82666d0c764f",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [10.396, 8.269, 9.179, 9.734, 10.198, 8.031, 11.558, 9.635, 6.964, 9.728, 9.969, 9.655, 9.752, 11.29, 8.987, 9.127],
+        "candidate": [13.572, 11.159, 7.541, 8.58, 9.673, 8.925, 8.607, 8.991, 10.227, 11.984, 9.327, 6.709, 8.383, 7.066, 7.339, 11.791],
+        "medians": [9.691, 8.958],
+        "pairedMedianSaving": 0.643,
+        "pairedSaving95": [-2.256, 1.638],
+        "fasterPairs": 10
+      },
+      "buildMs": {
+        "control": [15.417, 14.212, 13.869, 14.06, 15.492, 12.221, 17.588, 15.042, 11.002, 14.554, 14.655, 13.982, 14.947, 17.383, 13.217, 13.722],
+        "candidate": [18.907, 15.748, 11.354, 13.406, 14.471, 16.053, 13.045, 14.63, 15.187, 19.67, 13.562, 10.474, 12.941, 11.477, 11.685, 18.047],
+        "medians": [14.383, 14.017],
+        "pairedMedianSaving": 0.838,
+        "pairedSaving95": [-3.49, 2.006],
+        "fasterPairs": 10
+      },
+      "executedResult": 43
+    },
+    "callbacks-256": {
+      "typeNodes": 12312,
+      "bodies": 416,
+      "resolveVisits": 36656,
+      "unifyPairs": 2659,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": "50499618ae0256a2956ef6e30db912fbf89fd3c25db015f0da105eb89d0e1097",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [13.727, 13.806, 15.629, 12.917, 13.745, 12.279, 11.376, 12.964, 15.841, 12.145, 14.061, 15.233, 17.657, 18.498, 12.64, 15.648],
+        "candidate": [16.241, 14.177, 13.512, 13.439, 13.044, 13.96, 13.338, 14.943, 18.466, 13.615, 12.819, 18.127, 12.721, 15.478, 14.619, 16.825],
+        "medians": [13.775, 14.069],
+        "pairedMedianSaving": -1.324,
+        "pairedSaving95": [-1.979, 0.701],
+        "fasterPairs": 5
+      },
+      "buildMs": {
+        "control": [20.271, 20.667, 22.742, 18.818, 19.776, 17.745, 17.195, 19.367, 22.281, 18.032, 20.074, 21.819, 25.826, 25.693, 18.499, 23.59],
+        "candidate": [23.058, 22.471, 21.218, 20.204, 18.81, 20.02, 19.617, 21.76, 26.312, 20.679, 19.346, 25.574, 20.196, 22.067, 21.523, 23.558],
+        "medians": [20.172, 21.37],
+        "pairedMedianSaving": -2.039,
+        "pairedSaving95": [-2.647, 0.728],
+        "fasterPairs": 6
+      },
+      "executedResult": 43
+    },
+    "fields-8": {
+      "typeNodes": 5102,
+      "bodies": 161,
+      "resolveVisits": 17342,
+      "unifyPairs": 1371,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "7c79d7c3871bee543509da6443e2eeb2df72638dac03ec03bd56be6bda8d9620",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [9.569, 6.78, 11.469, 7.141, 7.118, 6.668, 6.601, 6.818, 6.222, 6.633, 6.439, 6.881, 6.66, 7.41, 8.166, 7.629],
+        "candidate": [9.016, 6.86, 6.73, 9.276, 6.694, 6.369, 12.526, 6.853, 8.822, 9.492, 8.459, 7.929, 11.221, 8.066, 9.776, 8.538],
+        "medians": [6.849, 8.498],
+        "pairedMedianSaving": -0.979,
+        "pairedSaving95": [-2.31, -0.035],
+        "fasterPairs": 4
+      },
+      "buildMs": {
+        "control": [14.751, 10.517, 17.655, 10.794, 11.114, 10.192, 10.195, 10.331, 10.224, 10.302, 10.576, 10.668, 10.031, 11.871, 13.195, 11.729],
+        "candidate": [16.4, 10.416, 10.506, 14.482, 10.001, 11.257, 18.351, 11.536, 12.593, 14.52, 12.305, 11.29, 18.225, 11.81, 14.939, 13.081],
+        "medians": [10.622, 12.449],
+        "pairedMedianSaving": -1.5,
+        "pairedSaving95": [-2.716, -0.622],
+        "fasterPairs": 4
+      },
+      "executedResult": 41
+    },
+    "fields-64": {
+      "typeNodes": 5102,
+      "bodies": 161,
+      "resolveVisits": 17342,
+      "unifyPairs": 1427,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "f507104a0ef2400ac0ad34e6c34e0248774597b2afa9329067e7eaa455d4edb8",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [9.985, 7.874, 7.135, 7.278, 7.726, 6.226, 6.152, 27.595, 7.46, 8.886, 8.391, 10.84, 6.599, 7.187, 11.919, 10.223],
+        "candidate": [9.079, 10.24, 10.154, 9.533, 6.934, 10.781, 8.797, 8.604, 7.057, 7.282, 7.479, 6.793, 12.52, 9.724, 9.113, 9.007],
+        "medians": [7.8, 9.043],
+        "pairedMedianSaving": 0.597,
+        "pairedSaving95": [-2.537, 1.216],
+        "fasterPairs": 9
+      },
+      "buildMs": {
+        "control": [15.533, 12.949, 10.764, 11.748, 12.812, 9.645, 9.532, 34.336, 11.597, 13.379, 12.452, 16.07, 10.588, 10.888, 18.253, 15.341],
+        "candidate": [14.339, 15.567, 15.501, 14.937, 10.787, 16.353, 13.361, 13.649, 10.768, 11.008, 11.897, 11.525, 18.888, 15.615, 13.905, 14.165],
+        "medians": [12.632, 14.035],
+        "pairedMedianSaving": 0.692,
+        "pairedSaving95": [-3.829, 2.025],
+        "fasterPairs": 9
+      },
+      "executedResult": 41
+    },
+    "fields-256": {
+      "typeNodes": 5102,
+      "bodies": 161,
+      "resolveVisits": 17342,
+      "unifyPairs": 1619,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "b1c850958f14a99d67a047af364d423a641fc22e76382e8362554c0de49fab5d",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [9.764, 8.34, 8.1, 7.458, 9.839, 7.646, 7.032, 7.262, 10.908, 8.435, 8.485, 7.108, 13.651, 12.85, 7.578, 7.274],
+        "candidate": [9.969, 8.67, 7.494, 10.701, 7.568, 12.022, 7.036, 9.979, 6.982, 9.971, 10.329, 7.305, 7.434, 7.873, 8.0, 8.038],
+        "medians": [8.22, 8.019],
+        "pairedMedianSaving": -0.268,
+        "pairedSaving95": [-1.536, 1.037],
+        "fasterPairs": 5
+      },
+      "buildMs": {
+        "control": [17.109, 14.282, 14.098, 13.143, 17.063, 12.748, 12.225, 12.438, 18.422, 15.14, 14.7, 11.974, 23.088, 22.247, 12.842, 13.582],
+        "candidate": [17.083, 14.782, 13.031, 19.216, 13.459, 19.477, 11.944, 18.77, 12.142, 15.758, 16.725, 12.633, 12.841, 15.231, 13.521, 14.278],
+        "medians": [14.19, 14.53],
+        "pairedMedianSaving": -0.559,
+        "pairedSaving95": [-1.342, 1.815],
+        "fasterPairs": 7
+      },
+      "executedResult": 41
+    },
+    "shared-pair-3": {
+      "typeNodes": 5194,
+      "bodies": 164,
+      "resolveVisits": 17866,
+      "unifyPairs": 1378,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [9.177, 7.606, 10.405, 9.34, 8.884, 6.935, 6.65, 9.609, 6.649, 7.209, 6.919, 6.89, 7.936, 9.139, 7.609, 6.933],
+        "candidate": [8.681, 8.811, 7.249, 6.767, 12.837, 7.395, 7.204, 7.364, 8.486, 6.194, 8.258, 6.764, 8.718, 9.193, 6.999, 6.779],
+        "medians": [7.607, 7.38],
+        "pairedMedianSaving": 0.036,
+        "pairedSaving95": [-0.833, 0.61],
+        "fasterPairs": 8
+      },
+      "buildMs": {
+        "control": [13.658, 11.996, 15.868, 14.112, 13.102, 12.925, 10.52, 13.892, 10.611, 11.015, 10.944, 11.05, 12.351, 13.618, 11.303, 10.438],
+        "candidate": [13.657, 13.824, 11.4, 10.625, 17.662, 11.492, 11.038, 11.722, 12.358, 9.547, 12.364, 10.345, 13.547, 13.919, 10.562, 10.6],
+        "medians": [12.174, 11.607],
+        "pairedMedianSaving": -0.08,
+        "pairedSaving95": [-1.196, 1.433],
+        "fasterPairs": 8
+      },
+      "executedResult": 42
+    },
+    "shared-pair-6": {
+      "typeNodes": 5622,
+      "bodies": 167,
+      "resolveVisits": 21808,
+      "unifyPairs": 1399,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [10.998, 8.495, 7.9, 7.005, 7.1, 14.012, 6.652, 8.465, 7.404, 6.856, 8.612, 9.194, 12.211, 10.507, 7.438, 7.418],
+        "candidate": [11.636, 9.571, 9.564, 10.488, 11.855, 7.461, 7.1, 9.711, 6.908, 9.52, 10.425, 7.629, 7.897, 9.213, 12.778, 12.707],
+        "medians": [8.183, 9.567],
+        "pairedMedianSaving": -1.161,
+        "pairedSaving95": [-2.664, 0.496],
+        "fasterPairs": 5
+      },
+      "buildMs": {
+        "control": [16.307, 12.55, 11.819, 10.451, 11.26, 20.513, 10.341, 13.195, 11.372, 10.26, 13.052, 13.768, 17.944, 15.016, 11.088, 10.919],
+        "candidate": [17.212, 14.052, 13.862, 15.54, 17.581, 11.168, 10.993, 14.917, 11.241, 13.707, 15.958, 11.762, 11.815, 14.334, 19.24, 18.786],
+        "medians": [12.184, 14.193],
+        "pairedMedianSaving": -1.612,
+        "pairedSaving95": [-3.487, 0.131],
+        "fasterPairs": 5
+      },
+      "executedResult": 42
+    },
+    "shared-pair-9": {
+      "typeNodes": 9178,
+      "bodies": 170,
+      "resolveVisits": 53960,
+      "unifyPairs": 1420,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [15.252, 13.851, 20.843, 19.421, 11.82, 11.052, 13.952, 12.391, 11.21, 11.028, 14.012, 11.873, 13.778, 12.33, 18.059, 13.587],
+        "candidate": [18.303, 13.733, 15.503, 10.77, 11.489, 10.642, 18.789, 12.172, 14.141, 10.999, 13.528, 12.683, 12.531, 12.531, 18.433, 11.74],
+        "medians": [13.683, 12.607],
+        "pairedMedianSaving": 0.168,
+        "pairedSaving95": [-0.506, 0.733],
+        "fasterPairs": 10
+      },
+      "buildMs": {
+        "control": [21.54, 19.805, 29.714, 25.489, 16.768, 15.478, 19.16, 18.701, 16.284, 16.055, 19.305, 17.863, 20.625, 17.99, 25.275, 19.864],
+        "candidate": [25.004, 18.979, 21.047, 15.906, 16.049, 15.247, 25.276, 17.494, 19.824, 15.788, 18.679, 17.526, 17.471, 17.86, 25.869, 16.774],
+        "medians": [19.233, 17.693],
+        "pairedMedianSaving": 0.482,
+        "pairedSaving95": [-0.164, 1.858],
+        "fasterPairs": 12
+      },
+      "executedResult": 42
+    },
+    "imports-2": {
+      "typeNodes": 5682,
+      "bodies": 163,
+      "resolveVisits": 18280,
+      "unifyPairs": 1389,
+      "importVisits": 993,
+      "importedSchemes": 90,
+      "wasmSha256": "6f018f68abb78305f7ce55cda65b6347fb3bbd7e8379d70e5f2b020710449981",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [8.335, 7.757, 11.479, 7.595, 7.22, 12.494, 9.375, 8.593, 8.626, 10.349, 9.317, 8.475, 7.704, 10.256, 14.816, 7.88],
+        "candidate": [11.203, 11.704, 10.079, 8.021, 7.304, 8.584, 8.811, 8.154, 7.858, 7.624, 8.465, 7.341, 9.036, 10.64, 7.764, 9.827],
+        "medians": [8.61, 8.524],
+        "pairedMedianSaving": 0.502,
+        "pairedSaving95": [-0.858, 1.134],
+        "fasterPairs": 9
+      },
+      "buildMs": {
+        "control": [12.603, 11.445, 16.903, 12.256, 10.754, 19.42, 14.135, 12.772, 12.264, 14.935, 14.703, 12.461, 12.488, 15.574, 20.826, 11.851],
+        "candidate": [16.75, 16.898, 14.808, 12.017, 10.893, 13.751, 13.654, 12.407, 11.837, 11.485, 12.97, 10.996, 13.697, 16.219, 12.058, 15.067],
+        "medians": [12.688, 13.312],
+        "pairedMedianSaving": 0.396,
+        "pairedSaving95": [-0.645, 1.733],
+        "fasterPairs": 10
+      },
+      "executedResult": 4
+    },
+    "imports-8": {
+      "typeNodes": 6967,
+      "bodies": 169,
+      "resolveVisits": 20330,
+      "unifyPairs": 1490,
+      "importVisits": 2469,
+      "importedSchemes": 228,
+      "wasmSha256": "702c73f4ced1161dd826abbf564e65acaf286c3d9b95511d0b0186933979df59",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [10.273, 10.933, 11.145, 11.487, 11.514, 9.632, 14.942, 13.288, 11.453, 11.685, 13.458, 12.962, 11.285, 13.653, 10.066, 15.22],
+        "candidate": [9.832, 10.308, 13.628, 9.323, 9.935, 9.99, 12.101, 10.91, 9.58, 12.036, 10.721, 9.604, 12.705, 13.032, 10.014, 13.721],
+        "medians": [11.5, 10.514],
+        "pairedMedianSaving": 1.062,
+        "pairedSaving95": [0.052, 2.164],
+        "fasterPairs": 12
+      },
+      "buildMs": {
+        "control": [15.117, 15.691, 16.516, 16.631, 15.999, 13.952, 21.165, 18.988, 16.946, 17.51, 18.618, 17.891, 17.015, 19.934, 14.456, 21.974],
+        "candidate": [15.601, 15.006, 20.538, 13.478, 14.202, 14.501, 17.009, 17.657, 14.231, 17.662, 16.647, 14.114, 18.487, 18.023, 14.708, 19.178],
+        "medians": [16.98, 16.124],
+        "pairedMedianSaving": 1.564,
+        "pairedSaving95": [-0.252, 2.715],
+        "fasterPairs": 10
+      },
+      "executedResult": 16
+    },
+    "imports-32": {
+      "typeNodes": 12079,
+      "bodies": 193,
+      "resolveVisits": 28442,
+      "unifyPairs": 1874,
+      "importVisits": 8373,
+      "importedSchemes": 780,
+      "wasmSha256": "fc9566df6adec848cedab5290618e1c60d8d2402a9238a465ae444747b6456ea",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [17.194, 17.652, 17.755, 17.353, 25.027, 20.097, 17.689, 26.623, 23.003, 20.315, 19.222, 26.346, 26.147, 22.481, 17.799, 24.872],
+        "candidate": [22.441, 17.364, 25.317, 17.837, 16.729, 16.549, 24.928, 21.52, 24.233, 21.367, 28.602, 16.877, 19.758, 19.606, 21.794, 27.31],
+        "medians": [20.206, 21.444],
+        "pairedMedianSaving": -0.768,
+        "pairedSaving95": [-3.995, 3.548],
+        "fasterPairs": 7
+      },
+      "buildMs": {
+        "control": [24.016, 24.244, 24.499, 23.865, 33.157, 27.454, 24.452, 35.259, 30.858, 27.39, 27.505, 34.957, 36.238, 29.845, 25.554, 33.337],
+        "candidate": [30.8, 24.146, 33.881, 24.485, 23.133, 22.799, 31.944, 30.995, 32.533, 28.502, 41.237, 23.295, 27.473, 27.56, 30.037, 34.329],
+        "medians": [27.48, 29.27],
+        "pairedMedianSaving": -0.806,
+        "pairedSaving95": [-4.483, 4.264],
+        "fasterPairs": 7
+      },
+      "executedResult": 64
+    },
+    "imported-generics": {
+      "typeNodes": 5873,
+      "bodies": 170,
+      "resolveVisits": 18712,
+      "unifyPairs": 1438,
+      "importVisits": 1033,
+      "importedSchemes": 92,
+      "wasmSha256": "f23de5c8fdb9ede651ed865429bbcf28b0b99838772661f5c490a203900a87b4",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [10.339, 11.308, 9.645, 7.422, 7.643, 8.056, 7.943, 12.001, 8.736, 10.205, 9.031, 10.642, 10.365, 13.782, 11.835, 8.249],
+        "candidate": [9.095, 8.731, 7.838, 7.776, 8.083, 8.553, 8.434, 11.171, 10.038, 10.49, 7.918, 7.978, 8.299, 8.52, 13.926, 11.822],
+        "medians": [9.925, 8.537],
+        "pairedMedianSaving": 0.272,
+        "pairedSaving95": [-0.491, 1.807],
+        "fasterPairs": 8
+      },
+      "buildMs": {
+        "control": [16.619, 16.005, 14.492, 11.762, 11.551, 12.511, 12.082, 18.733, 13.004, 14.972, 14.11, 15.757, 14.842, 21.03, 16.79, 12.41],
+        "candidate": [14.295, 12.923, 11.931, 11.79, 12.404, 12.806, 14.607, 16.577, 14.767, 14.96, 12.005, 12.415, 12.415, 13.3, 18.778, 18.041],
+        "medians": [14.667, 13.111],
+        "pairedMedianSaving": 1.058,
+        "pairedSaving95": [-0.895, 2.427],
+        "fasterPairs": 9
+      },
+      "executedResult": 41
+    },
+    "owned-reads": {
+      "typeNodes": 6662,
+      "bodies": 173,
+      "resolveVisits": 21223,
+      "unifyPairs": 2054,
+      "importVisits": 366,
+      "importedSchemes": 33,
+      "wasmSha256": "b2ced6756a5576c52162b9bff705894ad18d88b6d74480d4e77196423fca3d6d",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [11.163, 11.779, 8.33, 7.999, 7.672, 7.801, 9.831, 7.846, 8.86, 11.2, 15.13, 12.342, 8.995, 14.032, 8.289, 8.025],
+        "candidate": [9.893, 9.293, 12.885, 8.147, 7.93, 9.685, 8.173, 8.991, 8.369, 8.778, 8.974, 8.833, 9.931, 9.095, 9.094, 8.17],
+        "medians": [8.927, 8.982],
+        "pairedMedianSaving": 0.173,
+        "pairedSaving95": [-0.805, 2.422],
+        "fasterPairs": 8
+      },
+      "buildMs": {
+        "control": [16.631, 17.629, 12.605, 12.293, 11.894, 11.748, 15.398, 12.103, 13.933, 16.461, 21.524, 18.847, 13.43, 21.232, 12.771, 12.591],
+        "candidate": [15.469, 14.419, 19.088, 12.359, 12.138, 14.705, 12.739, 14.028, 12.744, 13.565, 13.598, 13.737, 14.88, 14.295, 13.76, 12.425],
+        "medians": [13.681, 13.748],
+        "pairedMedianSaving": 0.664,
+        "pairedSaving95": [-0.989, 2.896],
+        "fasterPairs": 9
+      },
+      "executedResult": 31
+    },
+    "sort-merge": {
+      "typeNodes": 6203,
+      "bodies": 168,
+      "resolveVisits": 21255,
+      "unifyPairs": 1877,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "0ee4b2c6753d620ae84654db29cd932181bce211a147d7a58ae19933e614c1d1",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [10.543, 7.809, 8.811, 7.537, 7.994, 6.839, 8.733, 9.317, 10.023, 7.933, 7.667, 8.534, 9.192, 7.872, 9.794, 7.42],
+        "candidate": [12.079, 11.659, 8.293, 7.652, 7.981, 7.265, 13.522, 7.039, 9.019, 10.749, 11.646, 7.59, 7.936, 7.683, 9.854, 7.468],
+        "medians": [8.264, 8.137],
+        "pairedMedianSaving": -0.054,
+        "pairedSaving95": [-1.536, 0.567],
+        "fasterPairs": 7
+      },
+      "buildMs": {
+        "control": [17.646, 12.509, 14.0, 11.379, 12.995, 10.556, 13.857, 13.985, 14.77, 12.822, 13.009, 13.419, 13.711, 12.158, 14.63, 11.61],
+        "candidate": [17.387, 17.54, 12.858, 11.886, 12.716, 11.189, 21.05, 11.218, 13.495, 16.961, 18.191, 12.383, 12.776, 12.453, 14.984, 11.967],
+        "medians": [13.214, 12.817],
+        "pairedMedianSaving": -0.324,
+        "pairedSaving95": [-2.246, 0.935],
+        "fasterPairs": 7
+      },
+      "executedResult": 2548773
+    },
+    "sort-quick": {
+      "typeNodes": 5968,
+      "bodies": 166,
+      "resolveVisits": 20428,
+      "unifyPairs": 1804,
+      "importVisits": 240,
+      "importedSchemes": 21,
+      "wasmSha256": "84dffbc9703e7453edbd8bd81bcb146be99c9a755145b96b7258967af86806aa",
+      "diagnostics": [],
+      "checkMs": {
+        "control": [9.63, 7.681, 10.36, 10.754, 8.274, 7.423, 12.209, 9.703, 7.289, 7.073, 8.938, 8.82, 8.811, 10.928, 7.805, 7.624],
+        "candidate": [11.022, 8.419, 10.626, 7.326, 7.719, 7.255, 9.172, 9.839, 10.468, 8.098, 9.475, 7.369, 9.113, 10.63, 8.186, 10.823],
+        "medians": [8.816, 9.143],
+        "pairedMedianSaving": -0.284,
+        "pairedSaving95": [-0.738, 0.298],
+        "fasterPairs": 6
+      },
+      "buildMs": {
+        "control": [14.862, 11.985, 15.668, 16.336, 13.209, 11.927, 19.616, 14.151, 11.236, 11.558, 14.109, 14.128, 13.568, 17.63, 11.823, 12.209],
+        "candidate": [17.664, 13.078, 16.29, 12.062, 12.589, 11.714, 13.564, 15.017, 15.85, 12.429, 14.156, 12.223, 14.542, 16.794, 12.645, 16.897],
+        "medians": [13.838, 13.86],
+        "pairedMedianSaving": -0.722,
+        "pairedSaving95": [-0.979, 0.62],
+        "fasterPairs": 6
+      },
+      "executedResult": 2548773
+    },
+    "rejected-generic": {
+      "typeNodes": 5147,
+      "bodies": 161,
+      "resolveVisits": 17536,
+      "unifyPairs": 1376,
+      "importVisits": 261,
+      "importedSchemes": 23,
+      "wasmSha256": null,
+      "diagnostics": [
+        {
+          "code": "missing_associated",
+          "start": 75,
+          "end": 78,
+          "message": "No compatible associated implementation exists"
+        }
+      ],
+      "checkMs": {
+        "control": [10.917, 13.019, 8.832, 8.721, 6.265, 10.82, 8.965, 11.304, 9.378, 10.413, 6.615, 7.125, 11.599, 7.32, 11.764, 8.016],
+        "candidate": [9.991, 8.079, 6.764, 6.631, 7.076, 6.836, 8.714, 7.1, 8.054, 8.573, 7.444, 11.255, 9.121, 12.493, 11.2, 9.885],
+        "medians": [9.171, 8.326],
+        "pairedMedianSaving": 1.125,
+        "pairedSaving95": [-0.811, 2.09],
+        "fasterPairs": 11
+      },
+      "buildMs": {
+        "control": [13.018, 16.045, 11.554, 10.859, 7.959, 13.703, 10.989, 14.301, 11.802, 13.555, 8.425, 8.907, 14.011, 9.235, 14.759, 9.95],
+        "candidate": [14.335, 10.41, 8.753, 8.3, 9.696, 8.483, 10.98, 8.975, 9.901, 11.005, 9.451, 13.768, 11.49, 15.277, 13.91, 12.431],
+        "medians": [11.678, 10.695],
+        "pairedMedianSaving": 1.375,
+        "pairedSaving95": [-1.381, 2.559],
+        "fasterPairs": 10
+      }
+    }
+  },
+  "gdev": {
+    "source": "e3dd4286e10c11b5dd4118adf215fcf8036a74ab",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "sha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+    "bytes": 2732918,
+    "modules": 279,
+    "freshEightWorkersMs": {
+      "control": [963.273, 844.514, 932.93, 1004.201, 924.141, 1039.158, 988.856, 975.403, 954.433, 895.915, 973.73, 919.5, 1009.613, 951.117, 915.349, 1000.816, 976.245, 1557.396, 1542.161, 940.211, 958.33, 977.448, 984.783, 977.109],
+      "candidate": [921.204, 886.222, 907.574, 956.97, 1048.842, 1061.684, 958.632, 947.219, 999.551, 889.117, 898.812, 906.551, 1097.085, 978.833, 944.033, 1011.357, 1051.097, 1490.529, 1754.506, 1600.378, 968.321, 937.461, 975.602, 987.403],
+      "medians": [974.566, 971.962],
+      "pairedMedianSaving": -10.143,
+      "pairedSaving95": [-28.684, 25.356],
+      "fasterPairs": 11
+    },
+    "largeZeroFill": {
+      "control": {
+        "bySymbolCallsBytes": {
+          "blot_check_capability_contracts_instantiateBody_g31_2807": [367, 5115904],
+          "blot_check_capability_contracts_instantiate_g31_1748": [13563, 184995840]
+        },
+        "calls": 13930,
+        "bytes": 190111744
+      },
+      "candidate": {
+        "bySymbolCallsBytes": {
+          "blot_check_capability_contracts_instantiate_g31_1748": [4476, 73334784],
+          "blot_check_capability_contracts_instantiateBody_g31_2815": [148, 2424832]
+        },
+        "calls": 4624,
+        "bytes": 75759616
+      }
+    },
+    "profileMs": {
+      "wall": {
+        "control": [1080.622, 995.07, 912.561, 931.604, 981.93, 1057.317],
+        "candidate": [1049.572, 1063.585, 923.034, 961.681, 1039.801, 944.658],
+        "medians": [988.5, 1000.741],
+        "pairedMedianSaving": -20.275,
+        "pairedSaving95": [-63.193, 71.855],
+        "fasterPairs": 2
+      },
+      "checking": {
+        "control": [562.147, 567.8, 503.152, 495.953, 514.836, 527.164],
+        "candidate": [564.662, 546.014, 514.945, 542.18, 562.695, 506.48],
+        "medians": [521.0, 544.097],
+        "pairedMedianSaving": -7.154,
+        "pairedSaving95": [-47.043, 21.235],
+        "fasterPairs": 2
+      },
+      "workerCpuIncludingPublicationAndLowering": {
+        "control": [2392.499, 2442.999, 2194.377, 2222.583, 2336.016, 2318.914],
+        "candidate": [2468.549, 2361.569, 2331.626, 2324.564, 2435.605, 2322.106],
+        "medians": [2327.465, 2346.597],
+        "pairedMedianSaving": -87.82,
+        "pairedSaving95": [-119.615, 39.119],
+        "fasterPairs": 1
+      }
+    },
+    "oneMs": {
+      "wall": {
+        "control": [1886.51, 2184.71, 2460.306, 2251.732],
+        "candidate": [2069.952, 2159.157, 2316.516, 2698.943],
+        "medians": [2218.221, 2237.836],
+        "pairedMedianSaving": -78.944,
+        "pairedSaving95": [-447.211, 143.79],
+        "fasterPairs": 2
+      },
+      "checking": {
+        "control": [1251.882, 1436.696, 1621.918, 1406.419],
+        "candidate": [1335.689, 1423.01, 1513.831, 1607.973],
+        "medians": [1421.557, 1468.42],
+        "pairedMedianSaving": -35.061,
+        "pairedSaving95": [-201.554, 108.087],
+        "fasterPairs": 2
+      }
+    },
+    "retainedMs": {
+      "fresh": {
+        "control": [923.384, 971.226, 994.348, 1117.534, 1096.491, 1013.614],
+        "candidate": [905.452, 956.532, 1057.741, 1064.204, 962.078, 981.979],
+        "medians": [1003.981, 972.029],
+        "pairedMedianSaving": 24.783,
+        "pairedSaving95": [-24.35, 93.871],
+        "fasterPairs": 5,
+        "sha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf"
+      },
+      "edit": {
+        "control": [115.684, 60.956, 55.904, 66.764, 69.132, 48.65],
+        "candidate": [52.902, 50.79, 65.705, 54.595, 51.77, 60.239],
+        "medians": [63.86, 53.748],
+        "pairedMedianSaving": 11.168,
+        "pairedSaving95": [-10.695, 40.072],
+        "fasterPairs": 4,
+        "sha256": "22c003cffbf80e5cf653097cae9b9993430fff3df45ee9f848fdd7dac0204ab3"
+      },
+      "reject": {
+        "control": [370.227, 418.593, 394.022, 446.455, 446.065, 381.151],
+        "candidate": [355.504, 410.352, 489.023, 439.11, 433.578, 398.831],
+        "medians": [406.307, 421.965],
+        "pairedMedianSaving": 7.793,
+        "pairedSaving95": [-56.341, 13.605],
+        "fasterPairs": 4,
+        "diagnosticCodes": [
+          "unknown_value"
+        ]
+      },
+      "syntax": {
+        "control": [76.307, 89.575, 75.989, 84.934, 77.473, 93.068],
+        "candidate": [80.832, 89.08, 81.664, 96.798, 81.172, 93.6],
+        "medians": [81.204, 85.372],
+        "pairedMedianSaving": -4.112,
+        "pairedSaving95": [-8.769, -0.018],
+        "fasterPairs": 1,
+        "diagnosticCodes": [
+          "GPU_FRONTEND_MALFORMED_DELIMITER"
+        ]
+      },
+      "lex": {
+        "control": [76.161, 78.565, 74.009, 80.076, 72.519, 90.16],
+        "candidate": [76.985, 86.725, 84.54, 74.936, 102.728, 74.527],
+        "medians": [77.363, 80.762],
+        "pairedMedianSaving": -4.492,
+        "pairedSaving95": [-20.37, 10.386],
+        "fasterPairs": 2,
+        "diagnosticCodes": [
+          "LEX_UNEXPECTED_CHARACTER"
+        ]
+      },
+      "recover": {
+        "control": [51.967, 53.615, 46.702, 48.852, 46.844, 49.495],
+        "candidate": [49.092, 53.082, 62.48, 47.023, 46.904, 65.079],
+        "medians": [49.173, 51.087],
+        "pairedMedianSaving": 0.236,
+        "pairedSaving95": [-15.681, 2.352],
+        "fasterPairs": 3,
+        "sha256": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf"
+      }
+    }
+  },
+  "qualification": {
+    "releaseGate": "deno task test:compiler; harness 25 passed; recorded direct, uniqueness and fixture checks; package passed; guest and host suite 1112 passed, 0 failed, 100 ignored.",
+    "nativeLaws": [
+      "capability_validation",
+      "resolution_views"
+    ],
+    "freshMatchesRetained": [
+      "edit",
+      "reject",
+      "syntax",
+      "lex"
+    ],
+    "pen": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "hardwareFrameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "0 e7b11f25ea55285e 685c42a4adac06bb",
+    "hardwareFrameAndTraceEqualToControl": true,
+    "identicalReplayFiles": 242,
+    "replayFrames": 120
+  },
+  "recordAndImportRepeat": {
+    "method": "Separate confirmation on Linux logical CPU 6, warm files, 40 alternating pairs, same program generator and build-project options. Selected the two initial intervals that excluded zero.",
+    "fields-8": {
+      "control": [5.613, 5.844, 6.415, 5.934, 5.549, 8.363, 6.512, 5.648, 5.809, 5.665, 5.686, 5.411, 5.418, 5.555, 5.68, 5.479, 5.585, 5.4, 5.94, 5.392, 5.336, 5.508, 5.761, 5.332, 5.415, 5.502, 5.507, 5.946, 5.619, 5.708, 6.106, 6.135, 5.688, 5.77, 5.843, 5.79, 5.971, 5.644, 5.554, 5.919],
+      "candidate": [5.841, 5.373, 5.519, 5.722, 5.528, 6.024, 5.608, 5.947, 5.415, 5.341, 5.445, 5.531, 5.263, 5.371, 5.619, 5.494, 5.257, 5.62, 5.422, 5.785, 5.795, 5.665, 5.567, 5.723, 5.559, 5.361, 5.728, 5.923, 5.566, 5.912, 5.885, 6.014, 5.323, 5.467, 5.592, 5.353, 6.038, 5.426, 5.754, 5.549],
+      "medians": [5.672, 5.566],
+      "pairedMedianSaving": 0.148,
+      "pairedSaving95": [0.003, 0.231],
+      "fasterPairs": 26
+    },
+    "imports-8": {
+      "control": [8.021, 8.953, 8.558, 9.913, 8.455, 8.49, 9.101, 7.84, 8.045, 7.838, 8.272, 7.977, 7.864, 8.297, 8.387, 8.077, 7.957, 8.432, 8.117, 7.97, 8.104, 8.643, 8.142, 8.15, 8.337, 8.407, 8.577, 8.854, 8.202, 8.468, 7.932, 8.266, 8.511, 8.57, 8.501, 8.405, 8.163, 8.2, 8.282, 7.973],
+      "candidate": [8.686, 8.051, 8.479, 7.93, 8.185, 8.971, 9.075, 8.209, 7.817, 8.196, 7.931, 8.189, 7.679, 7.984, 8.154, 8.06, 8.317, 7.714, 8.357, 7.63, 8.116, 7.923, 8.008, 8.068, 8.083, 7.766, 8.436, 8.31, 8.496, 8.687, 8.004, 8.05, 8.229, 7.988, 8.185, 8.196, 7.868, 8.18, 8.381, 7.884],
+      "medians": [8.277, 8.135],
+      "pairedMedianSaving": 0.163,
+      "pairedSaving95": [0.023, 0.262],
+      "fasterPairs": 28
+    }
+  }
+}

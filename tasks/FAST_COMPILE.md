@@ -3,69 +3,76 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
-## Plan for publishing checked declarations early
+## General type-checker performance
 
-Give a caller access to the verified declarations it uses while the producer
-continues checking unrelated bodies. The pilot is a Blot2 compiler change.
-Use the existing Gdev sources, syntax and type inference. The baseline on
-Gdev `e3dd428` is **823 ms fresh**, including a **449 ms module-checking
-stage** in separate profiles. Three of four completion traces passed through
-robots → kites, and one through robots → cannon. Test both edges together so
-one cannot hide a gain on the other. [Baseline and control layouts](../benchmarks/evidence/measurements/2026-11-19-robot-interfaces.json)
+Type checking now builds a membership index for generalized type variables
+only when an unresolved constraint first needs it. Each later lookup tests
+one bit. Previously each lookup searched a list assembled from every binding
+in the module. Both versions use the exact type ID at the solver's current
+view. The timing comparison below includes both checker changes, so it does
+not isolate the duration of this lookup.
 
-1. **Measure how soon each caller could start.** Trace the producer facts
-   actually read when checking cannon and kites, including lookups that search
-   an entire namespace. Cannon names `Picked`, `Wake` and `wake_draw`. Kites
-   also reads builders and presentation functions. Follow their private
-   dependencies, reexports, constructors and implicit lookups. Record when
-   each required fact becomes final and when the caller's other imports are
-   ready. Replay both edges against the observed worker queue, first in today's
-   order and then with the required bodies checked first. Charge the measured
-   work for those bodies. The second run estimates the optimistic saving
-   before paying for a new packet or changing scheduling.
-   If the ceiling is small, investigate the measured type-resolution cost in
-   `finishFacts` before committing to a scheduler rewrite.
-2. **Prove one partial interface with the existing checker.** Start with
-   cannon's three names. In the producer's worker, use the normal module
-   headers and check the required bodies and their dependencies once. Keep
-   mutually recursive declarations together. Freeze the facts a caller can
-   observe, including binding identities, inferred types, effects, ownership
-   and callback contracts. Compare those facts with the corresponding entries
-   in the finished module before letting a caller use them. If a later
-   constraint, associated implementation, compile-time value or whole-module
-   check could change an answer, that import waits for the full interface.
-   A missing entry in a partial interface must never mean “unknown export.”
-3. **Let one producer release selected callers.** Extend the existing module
-   queue with one additional immutable publication for an eligible producer.
-   Register which callers accept it and which need the full interface. Wake
-   each caller once all its required publications have arrived. The producer
-   keeps its checker and finishes the remaining bodies and Core. Keep the early
-   packet local to the build; commit retained state only after full success.
-   Derive a conservative list of required facts from the current source and
-   its import environment. Use the traces to test that list. The same code
-   should handle cannon, kites and a small independent fixture. Measure
-   extra worker CPU, packet bytes, ready-to-start delay and
-   peak memory alongside elapsed time.
-4. **Decide whether to ship.** Alternate the current and candidate release
-   compilers on identical sources at eight workers. Use a short pilot first,
-   then 24 paired fresh builds for a promising candidate. Use the pre-split
-   Gdev revision as a second workload and one worker as the overhead control.
-   A proposed adoption target is **at least 20 ms median paired end-to-end
-   saving** on current Gdev, with a paired interval above zero and no
-   reproducible one-worker or retained-edit regression beyond timing noise.
-   Verify identical Wasm, deterministic diagnostics and inference-budget
-   outcomes. Exercise a bad unrelated producer body after early publication,
-   a changed callback contract, a reexport, recursion, and edit → rejection →
-   recovery against fresh builds. Run the compiler gate and Gdev integration
-   once on the final candidate. Use the measured result to decide whether
-   to extend early publication to more producers.
+The ownership checker now uses one table when it substitutes arguments into
+a function's contract. Validation establishes that every child precedes its
+parent. The checker walks backward to mark reachable terms, then forward to
+replace each mark with the resulting ID. It still validates the complete
+input and charges each reachable term in its original order.
 
-The implementation starts in [the module graph](../compiler-goose/src/reuse/persistent_project.goose),
-[the producer packet writer and reader](../compiler-goose/src/reuse/persistent_unit.goose)
-and [the native worker queue](../compiler-goose/native/check_queue.c).
-The [semantic checker](../compiler-goose/src/check/check_factory.goose) currently
-collects headers, validates module bodies and then publishes the checked result.
-The first task is to identify the earliest sound point inside that sequence.
+![Thread CPU per contract instantiation across five contract sizes](../benchmarks/evidence/measurements/2026-11-19-general-type-checker.png)
+
+Nineteen independent source workloads cover polymorphic operators, callbacks,
+field access, shared pairs, imports, ownership, sorting and rejection. The
+three-term contract took **938 → 591 ns** in isolation. Across complete
+programs, effects on checker wall time were mixed. In an initial 16 pairs,
+the eight-field case was slower and the eight-import case faster. In a separate
+40-pair run on one logical CPU, the eight-field medians were 5.67 → 5.57 ms
+and the eight-import medians were 8.28 → 8.14 ms.
+
+On identical Gdev source, large zero fills attributed to contract
+instantiation fell **190.1 → 75.8 MB**. Fresh compilation took **975 → 972 ms**
+at the median of 24 alternating eight-worker pairs. Eleven pairs favored the
+change, with a 95% interval for the paired saving of −29 to +25 ms. Separate
+profiled runs measured the checker stage at 521 → 544 ms. Retained edit,
+rejection and recovery all matched fresh builds. All 18 valid benchmark
+programs ran and returned the expected values, the invalid program kept its
+diagnostic, and Gdev's Wasm, hardware frame and 120-frame replay matched.
+[Samples, work counts and identities](../benchmarks/evidence/measurements/2026-11-19-general-type-checker.json) · [Paired source benchmark](../benchmarks/tools/bench_type_checker.py)
+
+**Next experiment.** Share identical, immutable children when constructing
+inferred generic signatures. A function returning a pair of calls to the
+preceding function took 21,808 type-resolution visits at six layers and
+53,960 at nine, while unification rose by only 21 pairs. Widening one record
+from eight to 256 fields added 248 unification pairs and zero resolution
+visits. Check the shared-pair family against independently inferred type
+variables, different solver views, and real imports before extending sharing.
+
+### Measurement plan
+
+1. **Finalizing inferred types.** After solving a module, the checker needs to
+   distinguish a variable generalized by a binding from one that is still
+   ambiguous. Isolate the lookup cost as both the number of generic bindings and the
+   number of unresolved obligations grow. Preserve exact type IDs, historical
+   variable views, diagnostic order and inference budgets. Then profile
+   normalization of expression types, binding types and dispatch signatures.
+   Earlier whole-root caches saved allocations without a repeatable speedup.
+2. **Ownership and effect checking.** Size work by the terms a checked contract
+   actually uses. Test tiny contracts, shared children, large contracts, and
+   rejection followed by recovery. Count initialized bytes and visits as well
+   as elapsed time. Exercise both direct and higher-order calls.
+3. **Constraint solving and imports.** Attribute remaining checker CPU to
+   field and operator obligations, unification and copying imported types.
+   Vary record width, polymorphic calls, shared nested types and import
+   fan-out independently. Choose the next change by how the work grows as
+   those inputs grow. Keep a small reproducer alongside a real library user.
+4. **Qualification.** Compare identical sources on two release compilers in
+   alternating order. Measure checker CPU separately from fresh process time
+   and retained edits. Check valid Wasm and results, invalid diagnostics,
+   budget boundaries and fresh recovery. Report regressions, neutral
+   workloads and changes in work counts alongside any improvements.
+
+Earlier measurements attributed 167 ms of sampled CPU to resolving final type
+facts and 122 ms to copying named types during module header collection. These
+are aggregate CPU observations from one Gdev run. [Profile and input identities](../benchmarks/evidence/measurements/2026-11-19-gdev-checker-diagnosis.json)
 
 ## Earlier robot interfaces, 19 November 2026
 

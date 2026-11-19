@@ -172,14 +172,47 @@ fn instantiateBody<H>(self_: Store&, header: H, arguments: const Id[:]) -> Id, E
     let error = header.view().validate(header.root, header.arity, true); if error != blot_error::Error.none { return 0, error; } if arguments.len != header.arity { return 0, blot_error::Error.invalid_capability_contract; }
     if self_.nodes.len == 0 { let id, error = append(self_, Term { Tag.empty , ..}); if error != blot_error::Error.none { return 0, error; } }
     for argument in arguments { if argument >= self_.nodes.len { return 0, blot_error::Error.invalid_capability_contract; } }
-    var needed: bool[4096] = [false; 4096]; needed[header.root] = true; var reverse = header.nodes.len;
-    while reverse != 0 { reverse -= 1; if !needed[reverse] { continue; } let term = header.nodes[reverse];
-        if term.tag == Tag.callable { needed[term.b] = true; needed[term.c] = true; }
-        if term.tag == Tag.wrapped || term.tag == Tag.project || term.tag == Tag.elements { needed[term.a] = true; }
-        else if term.tag == Tag.captures || term.tag == Tag.product || term.tag == Tag.record || term.tag == Tag.join { for child, index in header.view().children(term) { if term.tag == Tag.record && index % 2 == 0 { continue; } needed[child] = true; } }
+    // Validated terms refer only to earlier terms. The destination ID can
+    // replace the reachability mark as soon as all of its children are copied.
+    let count=(header.root as i64)+1;
+    if count<=32 {
+        var local:Id[32]=[0;32];
+        return instantiateTerms(self_,header.view(),header.root,arguments,local[..count]);
     }
-    var map: Id[4096] = [0;4096]; for index in 1..header.nodes.len { if !needed[index] { continue; } let error = visit(self_, 0); if error != blot_error::Error.none { return 0, error; } let id, error = copy(self_, header.view(), header.nodes[index], map, arguments); if error != blot_error::Error.none { return 0, error; } map[index] = id; }
-    return map[header.root], blot_error::Error.none;
+    let map=instantiation_ids.alloc_slice(count);
+    for &id in map {id=0;}
+    let result,failure=instantiateTerms(self_,header.view(),header.root,arguments,map);
+    instantiation_ids.free_slice(map);
+    return result,failure;
+}
+reusable[] var instantiation_ids:Id[>..];
+fn instantiateTerms(self_:Store&,source:View,root:Id,arguments:const Id[:],map:Id[:])->Id,Error {
+    map[root]=1;
+    var reverse=map.len;
+    while reverse>0 {
+        reverse-=1;
+        if map[reverse]==0 {continue;}
+        let term=source.nodes[reverse];
+        match term.tag {
+            callable=>{map[term.b]=1;map[term.c]=1;},
+            wrapped,project,elements=>{map[term.a]=1;},
+            captures,product,record,join=>{
+                for child,index in source.children(term) {
+                    if term.tag!=Tag.record || index%2!=0 {map[child]=1;}
+                }
+            },
+            _=>{},
+        }
+    }
+    map[0]=0;
+    for index in 1..map.len {
+        if map[index]==0 {continue;}
+        let error=visit(self_,0);if error!=blot_error::Error.none {return 0,error;}
+        let id,failure=copy(self_,source,source.nodes[index],map,arguments);
+        if failure!=blot_error::Error.none {return 0,failure;}
+        map[index]=id;
+    }
+    return map[root],blot_error::Error.none;
 }
 struct Frame { node: Id, next: u32 = 0 }
 fn instantiateCanonical<H>(self_: Store&, header: H, arguments: const Id[:]) -> Id, Error { let before = mark(self_); let id, error = canonicalBody(self_, header, arguments); if error != blot_error::Error.none { rollback(self_, before); } return id, error; }
@@ -195,10 +228,10 @@ fn canonicalBody<H>(self_: Store&, header: H, arguments: const Id[:]) -> Id, Err
             _ => {},
         }
         if pending != 0xffffffff { if depth == stack.len { return 0, blot_error::Error.capability_analysis_limit; } stack[depth] = Frame { pending , ..}; depth += 1; continue; }
-        let error = visit(self_, 0); if error != blot_error::Error.none { return 0, error; } let id, error = copy(self_, source, term, map, arguments); if error != blot_error::Error.none { return 0, error; } map[top.node] = id; depth -= 1;
+        let error = visit(self_, 0); if error != blot_error::Error.none { return 0, error; } let id, error = copy(self_, source, term, map[..], arguments); if error != blot_error::Error.none { return 0, error; } map[top.node] = id; depth -= 1;
     } return map[header.root], blot_error::Error.none;
 }
-fn copy(self_: Store&, source: View, term: Term, map: const Id[4096]&, arguments: const Id[:]) -> Id, Error {
+fn copy(self_: Store&, source: View, term: Term, map: const Id[:], arguments: const Id[:]) -> Id, Error {
     match term.tag {
         empty => { return 0, blot_error::Error.none; },
         unknown, argument => { return append(self_, term); },
@@ -251,7 +284,7 @@ recursive fn invokeDepth(self_: Store&, root: Id, arguments: const Id[:], depth:
             argument => { if node.a >= arguments.len { return 0, blot_error::Error.invalid_capability_contract; } result = arguments[node.a]; },
             parameter, authority => { return 0, blot_error::Error.invalid_capability_contract; },
             callable => { let id, error = append(self_, Term { Tag.callable, node.a, map[node.b], node.c , ..}); if error != blot_error::Error.none { return 0, error; } result = id; },
-            _ => { let id, error = copy(self_, self_.view(), node, map, arguments); if error != blot_error::Error.none { return 0, error; } result = id; },
+            _ => { let id, error = copy(self_, self_.view(), node, map[..], arguments); if error != blot_error::Error.none { return 0, error; } result = id; },
         } map[index] = result;
     }
     if callable.b == 0 { return map[callable.c], blot_error::Error.none; } let children: Id[2] = [map[callable.c], callable.b]; return aggregate(self_, Tag.join, children);

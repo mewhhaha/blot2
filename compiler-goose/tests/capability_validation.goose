@@ -4,7 +4,44 @@ import support.error;
 type Term = blot_check_capability_contracts::Term;
 type View = blot_check_capability_contracts::View;
 
+fn instantiation() {
+    var store,error=blot_check_capability_contracts::init();
+    assert(error==blot_error::Error.none);
+    var terms:Term[4096]=default<Term[4096]>();
+    var fields:u32[2]=[7000,1];
+    var arguments:u32[1]=[0];
+    terms[1]=Term{blot_check_capability_contracts::Tag.parameter,0,..};
+    for root in [0 as u32,31 as u32,32 as u32,4095 as u32] {
+        if root!=0 {terms[root]=Term{blot_check_capability_contracts::Tag.record,0,2,..};}
+        let recipe=blot_check_capability_contracts::Recipe{1,root,terms[..root+1],fields[..]};
+        let before=store.visits;
+        let result,failure=store.instantiate(recipe,arguments[..]);
+        assert(failure==blot_error::Error.none);
+        if root==0 {assert(result==0 && store.visits==before);}
+        else {
+            let term=store.nodes.items[result];
+            assert(term.tag==blot_check_capability_contracts::Tag.record);
+            let children=store.view().children(term);
+            assert(children.len==2 && children[0]==7000 && children[1]==0);
+            assert(store.visits==before+2);
+        }
+    }
+
+    let large=blot_check_capability_contracts::Recipe{1,4095,terms[..],fields[..]};
+    let saved=store.mark();
+    store.limits.visits=store.visits+1;
+    let _,limited=store.instantiate(large,arguments[..]);
+    assert(limited==blot_error::Error.capability_analysis_limit && store.mark()==saved);
+    // The portable recipe is validated in full even when the selected root is small.
+    terms[4095]=Term{blot_check_capability_contracts::Tag.wrapped,4095,..};
+    let bad=blot_check_capability_contracts::Recipe{1,1,terms[..],fields[..]};
+    let _,invalid=store.instantiate(bad,arguments[..]);
+    assert(invalid==blot_error::Error.invalid_capability_contract && store.mark()==saved);
+    store.deinit();
+}
+
 fn main() {
+    instantiation();
     let ok = blot_error::Error.none;
     let invalid = blot_error::Error.invalid_capability_contract;
     var nodes: Term[33] = default<Term[33]>();

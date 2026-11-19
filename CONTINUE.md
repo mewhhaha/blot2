@@ -1,5 +1,12 @@
 # Working on Blot and Gdev
 
+General type-checker work now avoids an eager scan of quantified variables
+and scales ownership-contract instantiation to the input. Three-term contracts
+took **938 → 591 ns**. Across 19 source workloads checker timings were mixed.
+Fresh Gdev Main took **975 → 972 ms** in 24 pairs with identical Wasm.
+The next experiment is sharing repeated subtypes in inferred generic
+signatures. [Checker results, scaling cases and plan](tasks/FAST_COMPILE.md#general-type-checker-performance)
+
 The checker sizes temporary storage to each capability contract. On pinned
 Gdev Main, validator calls to clear memory fell from 1.78 GB to 0.30 MB.
 Fresh compile medians were **890 → 864 ms** across 30 eight-worker pairs.
@@ -9,10 +16,8 @@ The median paired saving was 23 ms (95% bootstrap interval −1 to +34 ms).
 Splitting Gdev's robot motion, housing and staffing let four consumers start
 checking 33–73 ms before the full robot interface was ready. Fresh eight-worker
 builds went from **854 to 823 ms** with byte-identical Wasm across 24 pairs.
-The remaining path to world storage ran through kites in three traces and
-cannon in one. The next Blot2 experiment measures how early the checker can
-release both callers on the existing Gdev source.
-[Compiler implementation plan and adoption target](tasks/FAST_COMPILE.md#plan-for-publishing-checked-declarations-early)
+The active Blot2 work targets finalization, constraint solving and ownership
+checking across programs. [General type-checker plan](tasks/FAST_COMPILE.md#general-type-checker-performance)
 [Timings and queue traces](tasks/FAST_COMPILE.md#earlier-robot-interfaces-19-november-2026)
 
 An earlier Gdev revision took **870 ms** with eight workers and **1,434 ms**
