@@ -4,8 +4,14 @@ The checker sizes temporary storage to each capability contract. On pinned
 Gdev Main, validator calls to clear memory fell from 1.78 GB to 0.30 MB.
 Fresh compile medians were **890 → 864 ms** across 30 eight-worker pairs.
 The median paired saving was 23 ms (95% bootstrap interval −1 to +34 ms).
-The next largest source of large memory clears is contract instantiation at
-183 MB per fresh build. [Measurements and output checks](benchmarks/evidence/measurements/2026-11-19-gdev-checker.json)
+[Measurements and output checks](benchmarks/evidence/measurements/2026-11-19-gdev-checker.json)
+
+The current Gdev source took **870 ms** with eight workers and **1,434 ms**
+when the same workers shared two physical cores. An import chain through salt,
+pile search and robots accounts for about 436 ms of checking and publication
+CPU. The robot module was on the completion path in all six queue traces.
+Target earlier publication of the declarations its consumers need.
+[Phase timings, CPU contention and the dependency chain](tasks/FAST_COMPILE.md#fresh-gdev-compilation-under-cpu-contention-19-november-2026)
 
 `@spark` now maps bounded scalar expressions over one array in order.
 `@spawn` asks a scoped provider to admit a child with private Wasm state

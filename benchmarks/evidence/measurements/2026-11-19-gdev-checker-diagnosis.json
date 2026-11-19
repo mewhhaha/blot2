@@ -1,0 +1,729 @@
+{
+  "inputs": {
+    "blot": "0f47c8e037826f7f56a51e9761704f1ecba2e859",
+    "compilerSha256": "cd0d873675d675f7d870b2f4332b10ccc8bb7033d134785a6823b3c613682a3b",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "gdev": "dbc8d23c2dcb376c57b62d3065f51b4e24ddf816",
+    "gdevOld": "13abafeb0bf3a482f8e727bbd6e75706f43f88b3",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "snapshotSources": "git archive dbc8d23 -- pen.json src pen devtools tests; sibling Ink lib from 77697fe, repository std. The archived inputs reproduce live Wasm f9fae42d. Old Gdev from the pile-replacement checkpoint.",
+    "hardware": "Ryzen 7 3800X, 8 physical cores, 16 logical CPUs",
+    "outputByHash": {
+      "1f4c3976a679fd9fd73932a2619e05515f4d5d12bf7d036cdfd9b1349801160e": {
+        "sourceBytes": 2561261,
+        "wasmBytes": 2718922,
+        "modules": 276
+      },
+      "f9fae42dfb0bfed23f174458d0f987c9f6a1e42eacc359144c892966f3c36c21": {
+        "sourceBytes": 2580187,
+        "wasmBytes": 2732664,
+        "modules": 276
+      },
+      "a5e6d133c78236340084a20a648227f7caf9b0498a6388342ded49dbdf785b27": {
+        "sourceBytes": 2580416,
+        "wasmBytes": 2732741,
+        "modules": 276
+      }
+    }
+  },
+  "method": {
+    "timing": "Fresh session open through receipt of Wasm, warm files, eight frontend workers in every run. Matched live/pinned/two-physical-CPU cases rotated and reversed through six orderings, six rounds with and six without --profile. taskset -c 0,1 limits the entire test process tree. Session build timeout 12 seconds.",
+    "scheduling": "Read Linux /proc/thread-self/schedstat on worker exit; sum runnable wait and on-CPU time over all 14 exiting children (seven parse, seven checking). Excludes parent lane. CPU column is wait4 user+system for the Deno driver and all reaped descendants. Host pressure is the fraction of the trial during which any runnable task was stalled for CPU, from /proc/pressure/cpu. CPU and child wait columns sum concurrent work and cannot be added to elapsed time.",
+    "oneCpu": "Separate four paired profiled builds on the subsequently edited live checkout (a5e6d133); each pair used the same output. taskset -c 0 controlled the available CPU count. Reported separately from f9fae42d.",
+    "natural": "Eight more runs without an affinity limit, on the immutable snapshot, as competing workloads ran. OS scheduling was observed rather than controlled in these eight runs.",
+    "graph": "Read the native checked queue after all jobs completed. Validated all 276 module IDs and all 2390 dependency edges against a depth-first walk in loader source order, including reexports, asset modules and implicit prelude edges. Decoded worker packet tail with project_packet_codecs field order and verified counter sums against the compiler. Check, publish and lower CPU sums match the official worker CPU total for every profiled run.",
+    "criticalPath": "Model is the longest path in the observed DAG, weighted by the median of per-run check plus interface-publication CPU for each module. It excludes setup, serial assembly, lowering after publication and OS delays. Scenarios that shorten a weight hold all other costs and edges fixed. Six additional traces recorded actual claim, first interface ready and job finish using timestamps at the native queue mutex release. Every observed consumer started after every required interface was ready.",
+    "fill": "Timed unmodified, out-of-line libc memset(value=0, size>=1024) returning into capability_contracts.instantiate/instantiateBody in the release binary. Sum of wall intervals across calls on all workers, including clock overhead and descheduling. Separate six profiled-process-independent runs on archived f9fae42d. Inline stores and nonzero fills are excluded."
+  },
+  "medians": [
+    {
+      "mode": "pinned",
+      "profile": false,
+      "hashPrefix": "1f4c3976a679",
+      "samples": 6,
+      "wall": 885.891,
+      "open": 18.502,
+      "run": 2070.059,
+      "wait": 82.418,
+      "cpu": 2930.094,
+      "pressure": 6.045
+    },
+    {
+      "mode": "live",
+      "profile": false,
+      "hashPrefix": "f9fae42dfb0b",
+      "samples": 6,
+      "wall": 870.269,
+      "open": 17.781,
+      "run": 2083.448,
+      "wait": 81.752,
+      "cpu": 2977.566,
+      "pressure": 7.157
+    },
+    {
+      "mode": "two_cpus",
+      "profile": false,
+      "hashPrefix": "f9fae42dfb0b",
+      "samples": 6,
+      "wall": 1434.187,
+      "open": 15.701,
+      "run": 1731.659,
+      "wait": 4040.229,
+      "cpu": 2501.599,
+      "pressure": 16.46
+    },
+    {
+      "mode": "pinned",
+      "profile": true,
+      "hashPrefix": "1f4c3976a679",
+      "samples": 6,
+      "wall": 888.917,
+      "open": 16.56,
+      "run": 2101.542,
+      "wait": 84.593,
+      "cpu": 2982.858,
+      "pressure": 6.222,
+      "phasesMs": {
+        "other": 23.791,
+        "assets": 50.052,
+        "load": 111.814,
+        "lex": 0.177,
+        "parse": 0.885,
+        "check": 492.191,
+        "lower": 39.901,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 149.503
+      },
+      "workerCpuMs": [1623.443, 154.285, 324.556]
+    },
+    {
+      "mode": "live",
+      "profile": true,
+      "hashPrefix": "f9fae42dfb0b",
+      "samples": 6,
+      "wall": 854.412,
+      "open": 18.593,
+      "run": 2055.25,
+      "wait": 64.177,
+      "cpu": 2890.404,
+      "pressure": 5.091,
+      "phasesMs": {
+        "other": 20.386,
+        "assets": 52.082,
+        "load": 86.695,
+        "lex": 0.17,
+        "parse": 0.997,
+        "check": 491.712,
+        "lower": 32.178,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 140.012
+      },
+      "workerCpuMs": [1596.963, 147.411, 307.905]
+    },
+    {
+      "mode": "two_cpus",
+      "profile": true,
+      "hashPrefix": "f9fae42dfb0b",
+      "samples": 6,
+      "wall": 1448.503,
+      "open": 16.231,
+      "run": 1698.259,
+      "wait": 4120.034,
+      "cpu": 2448.247,
+      "pressure": 16.383,
+      "phasesMs": {
+        "other": 20.579,
+        "assets": 49.605,
+        "load": 146.724,
+        "lex": 0.169,
+        "parse": 0.855,
+        "check": 1018.179,
+        "lower": 31.081,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 143.147
+      },
+      "workerCpuMs": [1329.868, 126.339, 263.463]
+    },
+    {
+      "mode": "snapshot",
+      "profile": true,
+      "hashPrefix": "f9fae42dfb0b",
+      "samples": 8,
+      "wall": 1710.607,
+      "open": 34.964,
+      "run": 3140.162,
+      "wait": 1267.64,
+      "cpu": 4470.007,
+      "pressure": 37.545,
+      "phasesMs": {
+        "other": 38.967,
+        "assets": 119.351,
+        "load": 265.256,
+        "lex": 0.319,
+        "parse": 1.708,
+        "check": 913.209,
+        "lower": 40.553,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 259.176
+      },
+      "workerCpuMs": [2494.274, 230.494, 489.93]
+    },
+    {
+      "mode": "live",
+      "profile": true,
+      "hashPrefix": "a5e6d133c782",
+      "samples": 4,
+      "wall": 899.453,
+      "open": 19.582,
+      "run": 2203.903,
+      "wait": 75.854,
+      "cpu": 3119.839,
+      "pressure": 5.413,
+      "phasesMs": {
+        "other": 22.379,
+        "assets": 54.918,
+        "load": 92.316,
+        "lex": 0.172,
+        "parse": 0.872,
+        "check": 514.648,
+        "lower": 31.709,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 159.659
+      },
+      "workerCpuMs": [1734.587, 160.901, 346.001]
+    },
+    {
+      "mode": "one_cpu",
+      "profile": true,
+      "hashPrefix": "a5e6d133c782",
+      "samples": 4,
+      "wall": 3172.686,
+      "open": 22.805,
+      "run": 2240.583,
+      "wait": 12809.635,
+      "cpu": 3130.83,
+      "pressure": 30.619,
+      "phasesMs": {
+        "other": 26.44,
+        "assets": 61.923,
+        "load": 308.219,
+        "lex": 0.238,
+        "parse": 1.247,
+        "check": 2520.985,
+        "lower": 36.99,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 169.111
+      },
+      "workerCpuMs": [1780.755, 164.388, 351.688]
+    }
+  ],
+  "processorSample": {
+    "sampledCpuMs": 3456,
+    "inclusiveMs": {
+      "resolve": 475,
+      "solveFieldsFrom": 319,
+      "collectModuleHeaders": 297,
+      "coreBuilderLowerOwned": 247,
+      "finishFacts": 204,
+      "capabilityContractsInstantiate": 10
+    },
+    "callerAttributedMs": {
+      "finishFactsToResolve": 167,
+      "unifyInnerToResolve": 89,
+      "applicationFlowToResolve": 39,
+      "resolveUseToResolve": 32,
+      "collectModuleHeadersToCopyNominal": 122,
+      "collectModuleHeadersToIndexAssociated": 38
+    },
+    "method": "GNU gprofng collect app -F on -p 1 on the release compiler, first live checkout hash. One process tree, 1 ms sampling. Inclusive function totals can overlap."
+  },
+  "instantiationClears": {
+    "calls": 13775,
+    "bytes": 188002304,
+    "aggregateWallMs": [8.167, 15.868, 27.07, 20.857, 15.226, 6.968]
+  },
+  "work": {
+    "bodies": 6135,
+    "schemes": 18444,
+    "import_requests": 198195,
+    "type_nodes": 1372162,
+    "n.resolve_depth_entries": 3789417,
+    "n.unify_pairs": 473133,
+    "n.resolve_nodes_added": 417536,
+    "n.import_nodes_added": 300781
+  },
+  "modules": [
+    {
+      "path": "gdev/src/actors/robots.blot",
+      "checkMs": 86.383,
+      "freezeMs": 2.857,
+      "lowerMs": 16.111,
+      "directImports": 69,
+      "work": {
+        "bodies": 202,
+        "schemes": 420,
+        "import_requests": 2453,
+        "type_nodes": 67620,
+        "n.resolve_depth_entries": 202670,
+        "n.unify_pairs": 25311,
+        "n.resolve_nodes_added": 26703,
+        "n.import_nodes_added": 4862
+      }
+    },
+    {
+      "path": "gdev/src/world/salt.blot",
+      "checkMs": 52.589,
+      "freezeMs": 2.039,
+      "lowerMs": 7.16,
+      "directImports": 30,
+      "work": {
+        "bodies": 171,
+        "schemes": 204,
+        "import_requests": 1239,
+        "type_nodes": 46102,
+        "n.resolve_depth_entries": 154226,
+        "n.unify_pairs": 16863,
+        "n.resolve_nodes_added": 18258,
+        "n.import_nodes_added": 2911
+      }
+    },
+    {
+      "path": "gdev/src/game.blot",
+      "checkMs": 51.833,
+      "freezeMs": 7.333,
+      "lowerMs": 6.353,
+      "directImports": 81,
+      "work": {
+        "bodies": 33,
+        "schemes": 1265,
+        "import_requests": 5834,
+        "type_nodes": 62153,
+        "n.resolve_depth_entries": 130097,
+        "n.unify_pairs": 24619,
+        "n.resolve_nodes_added": 8295,
+        "n.import_nodes_added": 20998
+      }
+    },
+    {
+      "path": "gdev/src/ui/station.blot",
+      "checkMs": 50.411,
+      "freezeMs": 1.98,
+      "lowerMs": 5.802,
+      "directImports": 52,
+      "work": {
+        "bodies": 85,
+        "schemes": 337,
+        "import_requests": 3584,
+        "type_nodes": 41135,
+        "n.resolve_depth_entries": 127695,
+        "n.unify_pairs": 13225,
+        "n.resolve_nodes_added": 15263,
+        "n.import_nodes_added": 5039
+      }
+    },
+    {
+      "path": "gdev/src/world_storage.blot",
+      "checkMs": 44.584,
+      "freezeMs": 2.296,
+      "lowerMs": 4.585,
+      "directImports": 87,
+      "work": {
+        "bodies": 44,
+        "schemes": 350,
+        "import_requests": 3641,
+        "type_nodes": 52519,
+        "n.resolve_depth_entries": 134902,
+        "n.unify_pairs": 27727,
+        "n.resolve_nodes_added": 18003,
+        "n.import_nodes_added": 6274
+      }
+    },
+    {
+      "path": "ink/lib/editor.blot",
+      "checkMs": 34.87,
+      "freezeMs": 1.392,
+      "lowerMs": 4.824,
+      "directImports": 19,
+      "work": {
+        "bodies": 121,
+        "schemes": 230,
+        "import_requests": 1146,
+        "type_nodes": 25905,
+        "n.resolve_depth_entries": 82099,
+        "n.unify_pairs": 9374,
+        "n.resolve_nodes_added": 10834,
+        "n.import_nodes_added": 1499
+      }
+    },
+    {
+      "path": "gdev/pen/protocol_render.blot",
+      "checkMs": 28.654,
+      "freezeMs": 0.678,
+      "lowerMs": 5.451,
+      "directImports": 5,
+      "work": {
+        "bodies": 22,
+        "schemes": 44,
+        "import_requests": 1011,
+        "type_nodes": 14063,
+        "n.resolve_depth_entries": 37982,
+        "n.unify_pairs": 6480,
+        "n.resolve_nodes_added": 5549,
+        "n.import_nodes_added": 427
+      }
+    },
+    {
+      "path": "ink/lib/shapes.blot",
+      "checkMs": 28.055,
+      "freezeMs": 0.684,
+      "lowerMs": 5.628,
+      "directImports": 4,
+      "work": {
+        "bodies": 60,
+        "schemes": 86,
+        "import_requests": 532,
+        "type_nodes": 26436,
+        "n.resolve_depth_entries": 67148,
+        "n.unify_pairs": 10678,
+        "n.resolve_nodes_added": 10436,
+        "n.import_nodes_added": 377
+      }
+    },
+    {
+      "path": "gdev/src/ui/menu.blot",
+      "checkMs": 27.909,
+      "freezeMs": 1.53,
+      "lowerMs": 3.583,
+      "directImports": 43,
+      "work": {
+        "bodies": 72,
+        "schemes": 272,
+        "import_requests": 2771,
+        "type_nodes": 22110,
+        "n.resolve_depth_entries": 70715,
+        "n.unify_pairs": 7007,
+        "n.resolve_nodes_added": 8197,
+        "n.import_nodes_added": 3134
+      }
+    },
+    {
+      "path": "gdev/src/world/trails.blot",
+      "checkMs": 26.253,
+      "freezeMs": 1.135,
+      "lowerMs": 5.085,
+      "directImports": 27,
+      "work": {
+        "bodies": 95,
+        "schemes": 152,
+        "import_requests": 999,
+        "type_nodes": 19319,
+        "n.resolve_depth_entries": 51958,
+        "n.unify_pairs": 6896,
+        "n.resolve_nodes_added": 7081,
+        "n.import_nodes_added": 1478
+      }
+    },
+    {
+      "path": "gdev/src/ui/build_bar.blot",
+      "checkMs": 25.596,
+      "freezeMs": 1.377,
+      "lowerMs": 3.853,
+      "directImports": 41,
+      "work": {
+        "bodies": 64,
+        "schemes": 203,
+        "import_requests": 2766,
+        "type_nodes": 19250,
+        "n.resolve_depth_entries": 57708,
+        "n.unify_pairs": 6547,
+        "n.resolve_nodes_added": 7064,
+        "n.import_nodes_added": 2722
+      }
+    },
+    {
+      "path": "gdev/src/progression/goals.blot",
+      "checkMs": 25.419,
+      "freezeMs": 1.111,
+      "lowerMs": 3.17,
+      "directImports": 36,
+      "work": {
+        "bodies": 96,
+        "schemes": 239,
+        "import_requests": 2515,
+        "type_nodes": 22853,
+        "n.resolve_depth_entries": 63848,
+        "n.unify_pairs": 8063,
+        "n.resolve_nodes_added": 8319,
+        "n.import_nodes_added": 2669
+      }
+    }
+  ],
+  "criticalPathModel": {
+    "chainCpuMs": 435.74,
+    "chainBreakdown": [
+      ["blot2/std/prelude.blot", 7.78],
+      ["blot2/std/vector.blot", 3.82],
+      ["ink/lib/math.blot", 16.59],
+      ["ink/lib/lanes.blot", 4.51],
+      ["ink/lib/transform.blot", 6.46],
+      ["ink/lib/render.blot", 9.0],
+      ["ink/lib/brush.blot", 14.43],
+      ["ink/lib/editor.blot", 36.14],
+      ["gdev/src/effects/celebrations.blot", 6.37],
+      ["gdev/src/world/salt_simulation.blot", 9.43],
+      ["gdev/src/world/salt.blot", 54.68],
+      ["gdev/src/world/pile_batch.blot", 5.0],
+      ["gdev/src/actors/robots.blot", 89.08],
+      ["gdev/src/actors/minors.blot", 21.61],
+      ["gdev/src/actors/village.blot", 14.45],
+      ["gdev/src/world_storage.blot", 46.81],
+      ["gdev/src/buildings/construction.blot", 12.78],
+      ["gdev/src/game.blot", 59.02],
+      ["gdev/src/session.blot", 7.99],
+      ["gdev/src/main.blot", 9.78]
+    ],
+    "edgeRemovalUpperBound": [
+      {
+        "producer": "blot2/std/prelude.blot",
+        "consumer": "blot2/std/vector.blot",
+        "ms": 3.82
+      },
+      {
+        "producer": "blot2/std/vector.blot",
+        "consumer": "ink/lib/math.blot",
+        "ms": 3.82
+      },
+      {
+        "producer": "ink/lib/math.blot",
+        "consumer": "ink/lib/lanes.blot",
+        "ms": 4.51
+      },
+      {
+        "producer": "ink/lib/lanes.blot",
+        "consumer": "ink/lib/transform.blot",
+        "ms": 0.33
+      },
+      {
+        "producer": "ink/lib/transform.blot",
+        "consumer": "ink/lib/render.blot",
+        "ms": 0.33
+      },
+      {
+        "producer": "ink/lib/render.blot",
+        "consumer": "ink/lib/brush.blot",
+        "ms": 1.72
+      },
+      {
+        "producer": "ink/lib/brush.blot",
+        "consumer": "ink/lib/editor.blot",
+        "ms": 1.72
+      },
+      {
+        "producer": "ink/lib/editor.blot",
+        "consumer": "gdev/src/effects/celebrations.blot",
+        "ms": 12.18
+      },
+      {
+        "producer": "gdev/src/effects/celebrations.blot",
+        "consumer": "gdev/src/world/salt_simulation.blot",
+        "ms": 12.18
+      },
+      {
+        "producer": "gdev/src/world/salt_simulation.blot",
+        "consumer": "gdev/src/world/salt.blot",
+        "ms": 12.18
+      },
+      {
+        "producer": "gdev/src/world/salt.blot",
+        "consumer": "gdev/src/world/pile_batch.blot",
+        "ms": 5.0
+      },
+      {
+        "producer": "gdev/src/world/pile_batch.blot",
+        "consumer": "gdev/src/actors/robots.blot",
+        "ms": 5.0
+      },
+      {
+        "producer": "gdev/src/actors/robots.blot",
+        "consumer": "gdev/src/actors/minors.blot",
+        "ms": 6.31
+      },
+      {
+        "producer": "gdev/src/actors/minors.blot",
+        "consumer": "gdev/src/actors/village.blot",
+        "ms": 6.31
+      },
+      {
+        "producer": "gdev/src/actors/village.blot",
+        "consumer": "gdev/src/world_storage.blot",
+        "ms": 6.31
+      },
+      {
+        "producer": "gdev/src/world_storage.blot",
+        "consumer": "gdev/src/buildings/construction.blot",
+        "ms": 6.31
+      },
+      {
+        "producer": "gdev/src/buildings/construction.blot",
+        "consumer": "gdev/src/game.blot",
+        "ms": 6.31
+      },
+      {
+        "producer": "gdev/src/game.blot",
+        "consumer": "gdev/src/session.blot",
+        "ms": 7.99
+      },
+      {
+        "producer": "gdev/src/session.blot",
+        "consumer": "gdev/src/main.blot",
+        "ms": 7.99
+      }
+    ],
+    "priorityExperiments": [
+      {
+        "module": "gdev/src/actors/robots.blot",
+        "earlierByHalfMs": 44.54
+      },
+      {
+        "module": "gdev/src/game.blot",
+        "earlierByHalfMs": 29.51
+      },
+      {
+        "module": "gdev/src/world/salt.blot",
+        "earlierByHalfMs": 27.34
+      },
+      {
+        "module": "gdev/src/world_storage.blot",
+        "earlierByHalfMs": 6.31
+      },
+      {
+        "module": "ink/lib/editor.blot",
+        "earlierByHalfMs": 18.07
+      }
+    ]
+  },
+  "observedQueue": {
+    "observedRuns": 6,
+    "robotsOnLastChain": 6,
+    "queueWaitDefinition": "Sum of ready-to-claim gaps along the actual latest-publishing dependency chain to the last job. Time while a worker owns a module includes CPU and OS delays.",
+    "eventsPerTrace": 828,
+    "runs": [
+      {
+        "queueWallMs": 1287.27,
+        "onChainServiceWallMs": 1243.63,
+        "onChainCpuMs": 699.512,
+        "readyToClaimWallMs": 43.64,
+        "overlappedDependencyEdges": 65,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/ui/tree.blot", "ink/lib/ui.blot", "gdev/src/platform/access.blot", "gdev/src/world/rock.blot", "gdev/src/effects/impact.blot", "gdev/src/buildings/buildings.blot", "gdev/src/progression/progression.blot", "gdev/src/world/elements.blot", "gdev/src/actors/robots.blot", "gdev/src/actors/minors.blot", "gdev/src/actors/village.blot", "gdev/src/world_storage.blot", "gdev/src/buildings/construction.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 246.808, 134.403, 53.325, 46.156, 31.376, 26.465, 66.777, 681.96]
+      },
+      {
+        "queueWallMs": 1477.157,
+        "onChainServiceWallMs": 1435.604,
+        "onChainCpuMs": 780.804,
+        "readyToClaimWallMs": 41.554,
+        "overlappedDependencyEdges": 85,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/clock.blot", "ink/lib/app.blot", "ink/lib/render.blot", "ink/lib/brush.blot", "ink/lib/editor.blot", "gdev/src/effects/celebrations.blot", "gdev/src/world/salt_simulation.blot", "gdev/src/world/salt.blot", "gdev/src/world/pile_batch.blot", "gdev/src/actors/robots.blot", "gdev/src/progression/purchases.blot", "gdev/src/ui/station.blot", "gdev/src/debug/review_scenes.blot", "gdev/src/progression/scenes.blot", "gdev/src/ui/title.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 321.648, 185.435, 134.051, 44.5, 46.565, 65.09, 46.619, 633.248]
+      },
+      {
+        "queueWallMs": 2139.68,
+        "onChainServiceWallMs": 2090.054,
+        "onChainCpuMs": 741.19,
+        "readyToClaimWallMs": 49.627,
+        "overlappedDependencyEdges": 100,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/transform.blot", "ink/lib/render.blot", "ink/lib/ui.blot", "ink/lib/editor.blot", "gdev/src/effects/celebrations.blot", "gdev/src/world/salt_simulation.blot", "gdev/src/world/salt.blot", "gdev/src/world/pile_batch.blot", "gdev/src/actors/robots.blot", "gdev/src/progression/purchases.blot", "gdev/src/ui/station.blot", "gdev/src/debug/review_scenes.blot", "gdev/src/progression/scenes.blot", "gdev/src/ui/title.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 538.177, 291.25, 179.558, 234.778, 30.351, 33.71, 65.174, 766.681]
+      },
+      {
+        "queueWallMs": 1939.057,
+        "onChainServiceWallMs": 1885.051,
+        "onChainCpuMs": 761.64,
+        "readyToClaimWallMs": 54.006,
+        "overlappedDependencyEdges": 96,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/clock.blot", "ink/lib/app.blot", "ink/lib/render.blot", "ink/lib/brush.blot", "ink/lib/editor.blot", "gdev/src/effects/celebrations.blot", "gdev/src/world/salt_simulation.blot", "gdev/src/world/salt.blot", "gdev/src/world/pile_batch.blot", "gdev/src/actors/robots.blot", "gdev/src/progression/purchases.blot", "gdev/src/ui/station.blot", "gdev/src/debug/review_scenes.blot", "gdev/src/progression/scenes.blot", "gdev/src/ui/title.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 414.018, 259.398, 214.309, 100.621, 117.322, 54.48, 87.968, 690.94]
+      },
+      {
+        "queueWallMs": 2467.328,
+        "onChainServiceWallMs": 2418.205,
+        "onChainCpuMs": 771.646,
+        "readyToClaimWallMs": 49.122,
+        "overlappedDependencyEdges": 80,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/ui/tree.blot", "ink/lib/ui.blot", "ink/lib/editor.blot", "gdev/src/effects/celebrations.blot", "gdev/src/world/salt_simulation.blot", "gdev/src/world/salt.blot", "gdev/src/world/pile_batch.blot", "gdev/src/actors/robots.blot", "gdev/src/actors/minors.blot", "gdev/src/actors/village.blot", "gdev/src/world_storage.blot", "gdev/src/buildings/construction.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 491.167, 427.22, 279.244, 154.529, 74.428, 62.816, 72.119, 905.804]
+      },
+      {
+        "queueWallMs": 2475.907,
+        "onChainServiceWallMs": 2426.649,
+        "onChainCpuMs": 792.227,
+        "readyToClaimWallMs": 49.258,
+        "overlappedDependencyEdges": 80,
+        "chain": ["blot2/std/prelude.blot", "blot2/std/vector.blot", "ink/lib/math.blot", "ink/lib/lanes.blot", "ink/lib/clock.blot", "ink/lib/app.blot", "ink/lib/render.blot", "ink/lib/brush.blot", "ink/lib/editor.blot", "gdev/src/effects/celebrations.blot", "gdev/src/world/salt_simulation.blot", "gdev/src/world/salt.blot", "gdev/src/world/pile_batch.blot", "gdev/src/actors/robots.blot", "gdev/src/actors/minors.blot", "gdev/src/actors/village.blot", "gdev/src/world_storage.blot", "gdev/src/buildings/construction.blot", "gdev/src/game.blot", "gdev/src/session.blot", "gdev/src/main.blot"],
+        "workerActivityMs": [0.0, 489.673, 308.568, 195.991, 82.141, 100.56, 75.523, 103.153, 1120.297]
+      }
+    ]
+  },
+  "columns": ["round", "workload", "profile", "wasmHashPrefix", "elapsedMs", "sessionOpenMs", "exitingChildCpuMs", "exitingChildRunnableWaitMs", "processTreeCpuMs", "hostCpuPressurePct", "checkStageMs", "backendMs", "loadMs", "assetsMs", "lowerMs", "workerCheckCpuMs", "workerPublishCpuMs", "workerLowerCpuMs"],
+  "samples": [
+    [0, "pinned", false, "1f4c3976a679", 885.617, 19.364, 2019.26, 87.695, 2922.202, 4.598, null, null, null, null, null, null, null, null],
+    [0, "live", false, "f9fae42dfb0b", 867.149, 17.02, 2038.884, 88.767, 3024.41, 6.893, null, null, null, null, null, null, null, null],
+    [0, "two_cpus", false, "f9fae42dfb0b", 1436.323, 14.95, 1721.856, 3985.576, 2461.606, 15.351, null, null, null, null, null, null, null, null],
+    [1, "live", false, "f9fae42dfb0b", 1456.353, 18.541, 2412.747, 1346.399, 3498.243, 50.883, null, null, null, null, null, null, null, null],
+    [1, "two_cpus", false, "f9fae42dfb0b", 1645.586, 17.701, 1987.53, 4799.452, 2824.954, 20.742, null, null, null, null, null, null, null, null],
+    [1, "pinned", false, "1f4c3976a679", 1025.222, 22.027, 2319.708, 163.311, 3284.669, 14.226, null, null, null, null, null, null, null, null],
+    [2, "two_cpus", false, "f9fae42dfb0b", 1467.518, 15.746, 1760.321, 4073.431, 2529.397, 17.148, null, null, null, null, null, null, null, null],
+    [2, "pinned", false, "1f4c3976a679", 897.213, 19.617, 2060.476, 80.915, 2927.72, 6.99, null, null, null, null, null, null, null, null],
+    [2, "live", false, "f9fae42dfb0b", 890.32, 20.206, 2099.401, 63.478, 2970.074, 7.421, null, null, null, null, null, null, null, null],
+    [3, "two_cpus", false, "f9fae42dfb0b", 1432.051, 15.656, 1741.463, 4115.705, 2517.966, 16.407, null, null, null, null, null, null, null, null],
+    [3, "live", false, "f9fae42dfb0b", 873.389, 14.888, 2075.331, 140.974, 2985.057, 9.38, null, null, null, null, null, null, null, null],
+    [3, "pinned", false, "1f4c3976a679", 879.13, 17.641, 2082.053, 74.788, 2977.854, 5.989, null, null, null, null, null, null, null, null],
+    [4, "live", false, "f9fae42dfb0b", 843.019, 22.079, 2005.692, 52.628, 2797.565, 4.019, null, null, null, null, null, null, null, null],
+    [4, "pinned", false, "1f4c3976a679", 831.675, 16.168, 2043.072, 49.693, 2892.551, 4.653, null, null, null, null, null, null, null, null],
+    [4, "two_cpus", false, "f9fae42dfb0b", 1344.804, 17.756, 1653.17, 3808.191, 2344.992, 16.332, null, null, null, null, null, null, null, null],
+    [5, "pinned", false, "1f4c3976a679", 886.165, 15.15, 2079.642, 83.922, 2932.469, 6.101, null, null, null, null, null, null, null, null],
+    [5, "two_cpus", false, "f9fae42dfb0b", 1416.021, 14.08, 1651.07, 4007.027, 2485.231, 16.512, null, null, null, null, null, null, null, null],
+    [5, "live", false, "f9fae42dfb0b", 819.91, 16.472, 2091.565, 74.737, 2888.447, 5.58, null, null, null, null, null, null, null, null],
+    [6, "pinned", true, "1f4c3976a679", 857.734, 14.424, 1998.474, 38.843, 2839.283, 3.371, 476.626, 125.239, 110.998, 49.722, 43.73, 1541.849, 144.424, 296.048],
+    [6, "live", true, "f9fae42dfb0b", 833.188, 15.898, 2045.94, 61.706, 2846.113, 5.594, 473.17, 131.139, 94.132, 51.841, 30.973, 1556.734, 143.965, 302.996],
+    [6, "two_cpus", true, "f9fae42dfb0b", 1413.242, 16.05, 1623.303, 3935.591, 2418.316, 16.409, 993.91, 144.313, 146.669, 48.333, 27.754, 1306.739, 124.155, 258.274],
+    [7, "live", true, "f9fae42dfb0b", 840.522, 23.397, 1993.736, 57.932, 2807.713, 4.703, 467.612, 144.122, 85.66, 52.322, 31.121, 1526.862, 144.55, 298.889],
+    [7, "two_cpus", true, "f9fae42dfb0b", 1427.364, 14.191, 1756.409, 3956.316, 2475.243, 17.203, 1012.146, 150.077, 130.831, 45.127, 31.789, 1357.0, 126.665, 268.12],
+    [7, "pinned", true, "1f4c3976a679", 947.828, 20.698, 2165.279, 108.071, 3070.806, 9.62, 510.58, 159.333, 122.29, 56.72, 39.453, 1652.087, 155.282, 328.122],
+    [8, "two_cpus", true, "f9fae42dfb0b", 1438.861, 14.98, 1726.788, 4051.251, 2481.939, 15.922, 1013.791, 145.033, 145.704, 50.876, 30.373, 1350.729, 127.897, 265.832],
+    [8, "pinned", true, "1f4c3976a679", 889.859, 17.059, 2108.68, 78.159, 2989.605, 6.286, 484.451, 156.431, 113.813, 51.98, 28.676, 1608.226, 154.062, 323.649],
+    [8, "live", true, "f9fae42dfb0b", 919.486, 20.007, 2157.712, 122.661, 3047.014, 7.815, 512.265, 174.018, 90.603, 48.384, 35.594, 1664.098, 155.824, 335.284],
+    [9, "two_cpus", true, "f9fae42dfb0b", 1464.93, 17.737, 1706.338, 4249.78, 2508.197, 16.282, 1033.954, 137.389, 150.063, 52.104, 33.646, 1358.288, 128.666, 270.482],
+    [9, "live", true, "f9fae42dfb0b", 857.777, 17.178, 2086.601, 79.078, 2919.231, 5.48, 497.113, 136.843, 84.584, 53.042, 32.67, 1627.477, 149.238, 316.326],
+    [9, "pinned", true, "1f4c3976a679", 887.975, 16.061, 2111.699, 91.026, 2976.11, 6.159, 499.93, 142.575, 110.656, 50.179, 30.355, 1639.945, 154.507, 325.463],
+    [10, "live", true, "f9fae42dfb0b", 864.982, 21.006, 1995.707, 66.648, 2911.638, 4.694, 486.31, 140.323, 87.73, 54.221, 38.734, 1593.35, 148.387, 308.513],
+    [10, "pinned", true, "1f4c3976a679", 844.953, 15.131, 2012.44, 46.354, 2862.546, 3.852, 459.078, 142.562, 103.444, 49.268, 40.35, 1553.914, 150.822, 309.887],
+    [10, "two_cpus", true, "f9fae42dfb0b", 1467.913, 17.347, 1690.181, 4210.968, 2421.251, 16.811, 1047.965, 132.616, 146.778, 48.245, 34.281, 1309.007, 126.013, 261.094],
+    [11, "pinned", true, "1f4c3976a679", 954.565, 21.996, 2094.403, 106.491, 3030.722, 7.992, 523.903, 163.284, 112.63, 49.924, 43.613, 1638.66, 157.903, 331.7],
+    [11, "two_cpus", true, "f9fae42dfb0b", 1458.144, 16.413, 1678.581, 4188.818, 2397.225, 16.357, 1022.568, 141.982, 151.407, 57.864, 30.031, 1292.954, 124.1, 254.833],
+    [11, "live", true, "f9fae42dfb0b", 851.048, 16.349, 2064.559, 52.019, 2869.17, 3.234, 498.788, 139.701, 83.343, 46.29, 31.687, 1600.577, 146.435, 307.297],
+    [0, "snapshot", true, "f9fae42dfb0b", 2048.724, 36.861, 3566.399, 1933.678, 5118.812, 40.258, 1229.91, 317.122, 216.923, 115.29, 50.938, 2855.499, 267.022, 554.11],
+    [1, "snapshot", true, "f9fae42dfb0b", 3082.98, 36.504, 3538.064, 6324.547, 5054.951, 69.266, 2029.686, 322.848, 366.393, 163.24, 53.951, 2800.66, 260.755, 545.633],
+    [2, "snapshot", true, "f9fae42dfb0b", 3697.603, 74.077, 3443.933, 7472.55, 4970.865, 81.186, 2487.749, 388.236, 375.006, 189.701, 77.665, 2744.891, 248.1, 533.316],
+    [3, "snapshot", true, "f9fae42dfb0b", 1818.452, 33.424, 3168.105, 1843.541, 4602.763, 40.404, 1044.656, 209.453, 313.59, 123.731, 38.021, 2564.053, 236.813, 499.808],
+    [4, "snapshot", true, "f9fae42dfb0b", 1267.112, 24.457, 3017.409, 187.755, 4268.605, 9.21, 747.916, 203.152, 122.862, 77.443, 40.268, 2424.495, 224.175, 480.052],
+    [5, "snapshot", true, "f9fae42dfb0b", 1155.529, 18.577, 2932.889, 159.032, 3964.509, 7.76, 690.936, 177.87, 122.482, 60.93, 38.917, 2261.937, 212.484, 442.827],
+    [6, "snapshot", true, "f9fae42dfb0b", 1311.369, 19.962, 2848.685, 152.478, 4031.737, 21.556, 700.647, 308.9, 112.546, 61.003, 40.274, 2224.027, 210.514, 439.57],
+    [7, "snapshot", true, "f9fae42dfb0b", 1602.762, 51.889, 3112.219, 691.74, 4337.252, 34.833, 781.763, 206.739, 329.617, 123.411, 40.833, 2366.243, 219.148, 468.278],
+    [0, "live", true, "a5e6d133c782", 856.547, 21.399, 2051.875, 66.691, 2954.484, 4.574, 465.726, 154.512, 92.46, 56.969, 29.852, 1602.7, 148.607, 321.375],
+    [0, "one_cpu", true, "a5e6d133c782", 2984.488, 24.288, 1710.449, 9522.962, 2653.473, 31.652, 1898.368, 571.458, 235.59, 67.27, 63.888, 1316.984, 126.03, 263.445],
+    [1, "one_cpu", true, "a5e6d133c782", 4092.092, 40.025, 2781.279, 16445.47, 3880.82, 61.844, 3271.399, 196.087, 364.101, 116.281, 42.974, 2205.507, 203.431, 429.137],
+    [1, "live", true, "a5e6d133c782", 1250.391, 19.167, 2750.108, 504.404, 3898.5, 23.878, 796.186, 194.565, 92.172, 66.531, 42.563, 2248.596, 204.112, 461.407],
+    [2, "live", true, "a5e6d133c782", 942.359, 15.319, 2355.932, 85.018, 3285.194, 6.253, 548.694, 164.805, 94.503, 52.866, 29.37, 1866.474, 172.954, 370.627],
+    [2, "one_cpu", true, "a5e6d133c782", 3360.884, 21.323, 2385.529, 13581.654, 3342.038, 29.586, 2708.893, 140.959, 354.022, 56.576, 30.414, 1916.458, 170.844, 372.53],
+    [3, "one_cpu", true, "a5e6d133c782", 2892.586, 20.937, 2095.637, 12037.617, 2919.622, 22.579, 2333.076, 142.136, 262.416, 54.558, 31.006, 1645.052, 157.932, 330.846],
+    [3, "live", true, "a5e6d133c782", 851.5, 19.997, 2001.428, 50.057, 2866.593, 3.963, 480.601, 150.447, 84.791, 45.22, 33.565, 1569.236, 148.847, 311.726]
+  ]
+}

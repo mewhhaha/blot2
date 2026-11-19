@@ -3,6 +3,48 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Fresh Gdev compilation under CPU contention, 19 November 2026
+
+With compiler `0f47c8e0`, the previous Gdev checkpoint and the current source
+took **886 and 870 ms** in alternating fresh builds. Both checked 276 modules.
+The current source emitted the same Wasm as the earlier 2.29-second run.
+Giving its eight workers two physical cores raised the median to **1,434 ms**.
+The 14 forked parsing and checking children spent 82 ms runnable but waiting
+for CPU with normal affinity and 4,040 ms with two cores. These times sum
+across children. A separate busy-host run of the same Wasm took 3,698 ms,
+including 2,488 ms in the check stage, with 7,473 ms of aggregate runnable wait.
+CPU time also rose on the busy host. The earlier 2.29-second samples have no
+scheduler trace.
+
+![Gdev compilation phases under ordinary load, constrained CPU availability and busy host conditions](../benchmarks/evidence/measurements/2026-11-19-gdev-checker-diagnosis.png)
+
+On the current source, six ordinary profiled builds took **854 ms** at the
+median. The module check stage took **492 ms** and the Wasm backend took
+**140 ms**. Workers spent 1,597 ms of CPU in checking, 147 ms preparing and
+publishing interfaces and 308 ms lowering. Those worker CPU times overlap.
+Sampling one build attributed 475 ms of CPU to type resolution. Of that,
+167 ms came from recording final type information. Preparing module headers
+accounted for 297 ms, including 122 ms copying named types from imports.
+
+A consumer starts after its imported modules publish their inferred interfaces.
+Across 2,390 dependency edges, the longest chain by measured checking and
+publication cost spanned 20 modules and about **436 ms of CPU**. The chain
+runs through `salt.blot`, `pile_batch.blot` and `robots.blot`. The robot
+module took **86 ms** to check, made 202,670 type-resolution visits and
+appeared on the sequence of imports that determined completion in all six
+queue traces. Gdev's game module spent its own 52 ms checking 33 bodies
+and importing 1,265 schemes.
+
+The next compiler experiment is to let consumers of the robot module start
+once the declarations they use have verified interfaces, while independent
+bodies continue checking. In the measured graph, halving the robot module's
+time to publish shortens the longest chain by **45 ms**. This is a model
+estimate. Timing the other proposed target directly found 188 MB of large
+zero fills in capability contract instantiation on the current source. The
+calls took **16 ms** at the median summed across workers. The executable,
+Wasm hashes, source revisions, controlled runs, per-module costs and six
+queue traces are in the [diagnostic measurements](../benchmarks/evidence/measurements/2026-11-19-gdev-checker-diagnosis.json).
+
 ## Export signatures and module boundaries, 19 November 2026
 
 Declaring all 20 public functions and constants in Ink's motion module left
