@@ -2,6 +2,7 @@
 namespace blot_parse_lexer;
 import .token;
 import support.error;
+import support.native;
 type Tag = blot_parse_token::Tag;
 type Token = blot_parse_token::Token;
 type Error = blot_error::Error;
@@ -133,6 +134,18 @@ fn float_bits(text: const u8[:]) -> u32,Error {
  if leading==significant.len { return 0,blot_error::Error.none; }
  let exact=significant[leading..]; let magnitude=exact.len+exp10;
  if magnitude>40 { return 0,blot_error::Error.float_range; } if magnitude < -46 { return 0,blot_error::Error.none; }
+ // With an exact significand and power of ten, the one f32 operation
+ // rounds the decimal directly. Keep the midpoint comparison for wider inputs.
+ if exact.len<=8 && exp10>=-10 && exp10<=10 {
+  var integer:u32=0;
+  for byte in exact {integer=integer*10+(byte-'0') as u32;}
+  if integer<=16777216 {
+   let powers:f32[11]=[1.0,10.0,100.0,1000.0,10000.0,100000.0,1000000.0,10000000.0,100000000.0,1000000000.0,10000000000.0];
+   var value=integer as! f32;
+   if exp10<0 {value/=powers[-exp10];}else {value*=powers[exp10];}
+   return blot_native::f32_bits(value),blot_error::Error.none;
+  }
+ }
  var low: u32=0; var high: u32=0x7f800000;
  while low+1<high {
   let mid=low+(high-low)/2; let h,p=dyadic(mid);

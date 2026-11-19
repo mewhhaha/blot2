@@ -226,6 +226,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgs
 fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::Runs,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgsl::Token)->bool {return equalFields(left,right);}
 fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::Token,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgsl::TokenSpan)->bool {return equalFields(left,right);}
+fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::TokenSpan,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgsl::Tokens)->bool {return equalFields(left,right);}
 fn blot_backend_native_asset_wgsl::blotStructuralHash<StructuralSink>(value:blot_backend_native_asset_wgsl::Tokens,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_backend_native_asset_wgsl::Value)->bool {return equalFields(left,right);}

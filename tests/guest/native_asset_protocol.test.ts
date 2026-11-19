@@ -362,6 +362,52 @@ Deno.test("native asset wire: all readers and real executed Wasm", async () => {
   }
 });
 
+Deno.test("source and asset decimals round in their declared precision", async () => {
+  const peer = await host();
+  try {
+    // This decimal is just above the binary32 midpoint, but rounds to the
+    // midpoint in binary64. WGSL's asset reader converts via binary64.
+    const above = "1.0000000596046447753906250001";
+    const cases = [
+      ["short", "0.1", Math.fround(0.1)],
+      ["integer_limit", "16777216e-10", Math.fround(16777216e-10)],
+      ["larger_integer", "16777217e-10", Math.fround(16777217e-10)],
+      ["scale_limit", "7654321e10", Math.fround(7654321e10)],
+      ["wider_scale", "7654321e11", Math.fround(7654321e11)],
+      ["long_digits", "123456789012345e-22", Math.fround(123456789012345e-22)],
+      ["long_scale", "123456789012345e-23", Math.fround(123456789012345e-23)],
+      ["small", "1e-45", 2 ** -149],
+    ] as const;
+    const source = ['import * as shader from "./values.wgsl"'];
+    const shader = [];
+    const answers: Metadata = {};
+    for (const [name, literal, expected] of cases) {
+      source.push(`entry const src_${name} = ${literal}`);
+      source.push(`entry const asset_${name} = shader.${name}`);
+      shader.push(`const ${name}: f32 = ${literal};`);
+      answers["src_" + name] = expected;
+      answers["asset_" + name] = expected;
+    }
+    source.push(
+      `entry const src_above = ${above}`,
+      "entry const asset_above = shader.above",
+    );
+    shader.push(`const above: f32 = ${above};`);
+    answers.src_above = 1 + 2 ** -23;
+    answers.asset_above = 1;
+    await peer.write("main.blot", source.join("\n") + "\n");
+    await peer.write("values.wgsl", shader.join("\n"));
+    await peer.open({
+      imports: [definition(peer, "values.wgsl", "wgsl")],
+      roots: [],
+    });
+    await success(await peer.build(), answers);
+    await peer.close();
+  } finally {
+    await peer.cleanup();
+  }
+});
+
 Deno.test("native asset wire: mixed source/asset partitions, rejected edits, deletion and recovery", async () => {
   const peer = await host();
   try {

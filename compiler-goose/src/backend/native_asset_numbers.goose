@@ -23,7 +23,22 @@ fn decimal(text: const u8[:]) -> f64,bool {
     while at < text.len {
         let byte = text[at];if byte == '.' && !point {point = true;at++;continue;}if !digit(byte) {break;}any = true;if point {fraction++;}if byte != '0' {nonzero = true;}if nonzero {significant++;if kept < 1152 {numerator.multiplyAdd(10,(byte - '0') as u32);kept++;}else if byte != '0' {sticky = true;}}at++;
     }
-    if !any {return 0.0,false;}var exponent: i64 = 0;var exponent_negative = false;if at < text.len && (text[at] == 'e' || text[at] == 'E') {at++;if at < text.len && (text[at] == '-' || text[at] == '+') {exponent_negative = text[at] == '-';at++;}let first = at;while at < text.len && digit(text[at]) {if exponent < 1000000000 {exponent = min(exponent * 10 + (text[at] - '0') as i64,1000000000);}at++;}if first == at {return 0.0,false;}}if at != text.len {return 0.0,false;}if exponent_negative {exponent = -exponent;}var sign: u64 = 0;if negative {sign = 9223372036854775808;}if !nonzero {return blot_native::f64_from_bits(sign),true;}let order = exponent - fraction + significant - 1;if order > 400 {return blot_native::f64_from_bits(sign | 9218868437227405312),true;}if order < -400 {return blot_native::f64_from_bits(sign),true;}let decimal_exponent = exponent - fraction + significant - kept;var denominator = Big {words: [1;256],len: 1};for index in 1..256 {denominator.words[index] = 0;}if decimal_exponent >= 0 {for index in 0..decimal_exponent {numerator.multiplyAdd(10,0);}}else {for index in 0..-decimal_exponent {denominator.multiplyAdd(10,0);}}return ratio(numerator,denominator,negative,sticky),true;
+    if !any {return 0.0,false;}var exponent: i64 = 0;var exponent_negative = false;if at < text.len && (text[at] == 'e' || text[at] == 'E') {at++;if at < text.len && (text[at] == '-' || text[at] == '+') {exponent_negative = text[at] == '-';at++;}let first = at;while at < text.len && digit(text[at]) {if exponent < 1000000000 {exponent = min(exponent * 10 + (text[at] - '0') as i64,1000000000);}at++;}if first == at {return 0.0,false;}}if at != text.len {return 0.0,false;}if exponent_negative {exponent = -exponent;}var sign: u64 = 0;if negative {sign = 9223372036854775808;}if !nonzero {return blot_native::f64_from_bits(sign),true;}let order = exponent - fraction + significant - 1;if order > 400 {return blot_native::f64_from_bits(sign | 9218868437227405312),true;}if order < -400 {return blot_native::f64_from_bits(sign),true;}let decimal_exponent = exponent - fraction + significant - kept;
+    // All powers through 10^22 and every significand here are exact in f64.
+    // One multiply or divide gives the same rounding as the integer ratio.
+    if significant <= 15 && decimal_exponent >= -22 && decimal_exponent <= 22 {
+        var integer = numerator.words[0] as u64;
+        if numerator.len == 2 {integer |= (numerator.words[1] as u64) << 32;}
+        var value = integer as! f64;
+        var power = decimal_exponent;
+        if power < 0 {power = -power;}
+        var scale: f64 = 1.0;
+        for i in 0..power {scale *= 10.0;}
+        if decimal_exponent < 0 {value /= scale;}else {value *= scale;}
+        if negative {value = -value;}
+        return value,true;
+    }
+    var denominator = Big {words: [1;256],len: 1};for index in 1..256 {denominator.words[index] = 0;}if decimal_exponent >= 0 {for index in 0..decimal_exponent {numerator.multiplyAdd(10,0);}}else {for index in 0..-decimal_exponent {denominator.multiplyAdd(10,0);}}return ratio(numerator,denominator,negative,sticky),true;
 }
 fn finite(value: f64) -> bool {return (blot_native::f64_bits(value) & 9218868437227405312) != 9218868437227405312;}
 fn integral(value: f64) -> bool {let bits = blot_native::f64_bits(value) & 9223372036854775807;let exponent = ((bits >> 52) & 2047) as i64 - 1023;if exponent < 0 {return bits == 0;}if exponent >= 52 {return exponent != 1024;}return (bits & ((1 as u64 << (52 - exponent)) - 1)) == 0;}

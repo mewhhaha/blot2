@@ -29,13 +29,31 @@ reusable[] var lane_argument_runs:Value[>..]=[];
 fn copyOutput(bytes:const u8[:])->u8[:] {let result=output_pool.alloc_slice(bytes.len);for byte,index in bytes {result[index]=byte;}return result;}
 fn freeOutput(bytes:const u8[:]) {if bytes.len!=0 {output_pool.free_slice(bytes);}}
 fn deinit(result:Result&) {match result {source value=>{freeOutput(value.bytes);},issue value=>{freeOutput(value.value.message);},}result=Result.source{bytes:default<u8[:]>()};}
-struct Tokens {storage:Token[:] = default<Token[:]>(),items:Token[:] = default<Token[:]>(),len:i64=0}
-reusable[] var pool_Tokens:Token[>..]=[];
-reusable[] var token_text_runs:u8[>..]=[];
-fn rootedTokenText(text:const u8[:])->const u8[:] {if text.len==0 {return default<const u8[:]>();}return token_text_runs.realloc_slice(text,text.len);}
-fn ownTokenText(text:const u8[:])->const u8[:] {if text.len==0 {return default<const u8[:]>();}let owned=token_text_runs.alloc_slice(text.len);for byte,index in text {owned[index]=byte;}return owned;}
-fn push(self_:Tokens&,value:Token)->Error {let owned=Token{text:ownTokenText(value.text),start:value.start,end:value.end,number:value.number};let error=blot_support_pooled_buffer::push(self_,owned,pool_Tokens);if error!=blot_error::Error.none && owned.text.len!=0 {token_text_runs.free_slice(owned.text);}self_.len=self_.items.len;return error;}
-fn deinit(self_:Tokens&) {for token in self_.items {if token.text.len!=0 {token_text_runs.free_slice(token.text);}}blot_support_pooled_buffer::deinit(self_,pool_Tokens);self_.len=0;}
+// Token spellings all belong to one immutable shader, including names kept
+// by the reflection tables. Store offsets until the parser needs the text.
+struct TokenSpan {start:u32,end:u32,number:bool=false}
+struct Tokens {storage:TokenSpan[:] = default<TokenSpan[:]>(),items:TokenSpan[:] = default<TokenSpan[:]>(),source:const u8[:] = default<const u8[:]>(),len:i64=0}
+reusable[] var pool_Tokens:TokenSpan[>..]=[];
+reusable[] var shader_bytes:u8[>..]=[];
+fn rootedTokenText(text:const u8[:])->const u8[:] {
+    if text.len==0 {return default<const u8[:]>();}
+    let start=shader_bytes.range_index(text);
+    return shader_bytes[start..start+text.len];
+}
+fn push(self_:Tokens&,value:TokenSpan)->Error {
+    let error=blot_support_pooled_buffer::push(self_,value,pool_Tokens);
+    self_.len=self_.items.len;
+    return error;
+}
+fn deinit(self_:Tokens&) {
+    blot_support_pooled_buffer::deinit(self_,pool_Tokens);
+    if self_.source.len!=0 {shader_bytes.free_slice(self_.source);}
+    self_.len=0;
+}
+fn tokenAt(self_:const Tokens&,index:i64)->Token {
+    let span=self_.items[index];
+    return Token{text:self_.source[span.start..span.end],start:span.start,end:span.end,number:span.number};
+}
 struct Bindings {storage:Binding[:] = default<Binding[:]>(),items:Binding[:] = default<Binding[:]>(),len:i64=0}
 reusable[] var pool_Bindings:Binding[>..]=[];
 fn push(self_:Bindings&,value:Binding)->Error {let error=blot_support_pooled_buffer::push(self_,Binding{name:rootedTokenText(value.name),value:rootedValue(value.value)},pool_Bindings);self_.len=self_.items.len;return error;}
@@ -66,7 +84,7 @@ struct Reader {input:const u8[:],tokens:Tokens=Tokens{..},at:i64=0,visits:i64=0,
 fn deinit(self_:Reader&) {for run in self_.runs.items {if run.values.len!=0 {element_pool.free_slice(run.values);}}self_.runs.deinit();self_.tokens.deinit();self_.bindings.deinit();self_.binding_index.deinit();self_.aliases.deinit();self_.fields.deinit();self_.header.deinit();self_.body.deinit();}
 fn record(self_:Reader&,error:Error) {if self_.failure==blot_error::Error.none && error!=blot_error::Error.none {self_.failure=error;}}
 fn fail(self_:Reader&,token:Token,code:const u8[:],message:const u8[:]) {if self_.failure!=blot_error::Error.none {return;}self_.issue=blot_support::some(Issue{start:token.start,end:token.end,code:code,message:message});self_.failure=blot_error::Error.invalid_asset;}
-fn peek(self_:const Reader&)->Token {if self_.at>=self_.tokens.len {return Token{text:default<const u8[:]>(),start:self_.input.len as u32,end:self_.input.len as u32,..};}return self_.tokens.items[self_.at];}
+fn peek(self_:const Reader&)->Token {if self_.at>=self_.tokens.len {return Token{text:default<const u8[:]>(),start:self_.input.len as u32,end:self_.input.len as u32,..};}return self_.tokens.tokenAt(self_.at);}
 fn syntax(self_:Reader&) {self_.fail(self_.peek(),"asset_wgsl","Malformed WGSL asset");}
 fn budget(self_:Reader&,depth:i64)->bool {if self_.failure!=blot_error::Error.none {return false;}self_.visits+=1;if depth>128 || self_.visits>1000000 {self_.fail(self_.peek(),"asset_limit","WGSL asset exceeds the structural budget");return false;}return true;}
 fn is(self_:const Reader&,text:const u8[:])->bool {return self_.peek().text==text;}
@@ -83,7 +101,10 @@ fn identifierContinue(byte:u8)->bool {return identifierStart(byte) || digit(byte
 fn contains(text:const u8[:],byte:u8)->bool {for item in text {if item==byte {return true;}}return false;}
 fn starts(text:const u8[:],prefix:const u8[:])->bool {return text.len>=prefix.len && text[..prefix.len]==prefix;}
 fn ends(text:const u8[:],suffix:const u8[:])->bool {return text.len>=suffix.len && text[text.len-suffix.len..]==suffix;}
-fn lex(self_:Reader&) {if self_.input.len>limit {self_.fail(Token{text:default<const u8[:]>(),start:0,end:0,..},"asset_limit","WGSL asset exceeds 16 MiB");return;}var unicode:i64=0;while unicode<self_.input.len {let point,length,valid=blot_backend_native_asset_readers::decodePoint(self_.input,unicode);if !valid {self_.fail(Token{text:default<const u8[:]>(),start:0,end:self_.input.len as u32,..},"asset_unicode","WGSL asset must be valid UTF-8");return;}unicode+=length;}var pos:i64=0;while pos<self_.input.len && self_.failure==blot_error::Error.none {let byte=self_.input[pos];if contains(" \t\r\n",byte) {pos+=1;continue;}if starts(self_.input[pos..],"//") {while pos<self_.input.len && self_.input[pos]!='\n' {pos+=1;}continue;}if starts(self_.input[pos..],"/*") {let start=pos;pos+=2;var nesting:i64=1;while pos<self_.input.len && nesting!=0 {if starts(self_.input[pos..],"/*") {nesting+=1;if nesting>128 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(pos+2) as u32,..},"asset_limit","WGSL comment nesting exceeds 128");return;}pos+=2;}else if starts(self_.input[pos..],"*/") {nesting-=1;pos+=2;}else {pos+=1;}}if nesting!=0 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_wgsl","Unterminated WGSL block comment");return;}continue;}let start=pos;var number=false;if identifierStart(byte) {pos+=1;while pos<self_.input.len && identifierContinue(self_.input[pos]) {pos+=1;}}else if digit(byte) || (byte=='.' && pos+1<self_.input.len && digit(self_.input[pos+1])) {number=true;pos+=1;while pos<self_.input.len {let c=self_.input[pos];if identifierContinue(c) || c=='.' {pos+=1;}else if (c=='+' || c=='-') && pos>start && contains("eEpP",self_.input[pos-1]) {pos+=1;}else {break;}}}else {if !contains("@{}()[]<>,:;.=+-*/%!~&|^",byte) {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(start+1) as u32,..},"asset_wgsl","Invalid WGSL token");return;}pos+=1;if pos<self_.input.len && byte!='<' && byte!='>' {let pair=self_.input[start..pos+1];for op in ["->","==","!=","&&","||","+=","-=","*=","/=","%=","&=","|=","^=","++","--"] {if pair==op {pos+=1;break;}}}}if self_.tokens.len==1000000 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_limit","WGSL token count exceeds 1000000");return;}self_.record(self_.tokens.push(Token{text:self_.input[start..pos],start:start as u32,end:pos as u32,number:number}));}if self_.failure==blot_error::Error.none {self_.record(self_.tokens.push(Token{text:default<const u8[:]>(),start:pos as u32,end:pos as u32,..}));}}
+fn lex(self_:Reader&) {if self_.input.len>limit {self_.fail(Token{text:default<const u8[:]>(),start:0,end:0,..},"asset_limit","WGSL asset exceeds 16 MiB");return;}let source=shader_bytes.alloc_slice(self_.input.len);
+    for byte,index in self_.input {source[index]=byte;}
+    self_.tokens.source=source;
+    var unicode:i64=0;while unicode<self_.input.len {let point,length,valid=blot_backend_native_asset_readers::decodePoint(self_.input,unicode);if !valid {self_.fail(Token{text:default<const u8[:]>(),start:0,end:self_.input.len as u32,..},"asset_unicode","WGSL asset must be valid UTF-8");return;}unicode+=length;}var pos:i64=0;while pos<self_.input.len && self_.failure==blot_error::Error.none {let byte=self_.input[pos];if contains(" \t\r\n",byte) {pos+=1;continue;}if starts(self_.input[pos..],"//") {while pos<self_.input.len && self_.input[pos]!='\n' {pos+=1;}continue;}if starts(self_.input[pos..],"/*") {let start=pos;pos+=2;var nesting:i64=1;while pos<self_.input.len && nesting!=0 {if starts(self_.input[pos..],"/*") {nesting+=1;if nesting>128 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(pos+2) as u32,..},"asset_limit","WGSL comment nesting exceeds 128");return;}pos+=2;}else if starts(self_.input[pos..],"*/") {nesting-=1;pos+=2;}else {pos+=1;}}if nesting!=0 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_wgsl","Unterminated WGSL block comment");return;}continue;}let start=pos;var number=false;if identifierStart(byte) {pos+=1;while pos<self_.input.len && identifierContinue(self_.input[pos]) {pos+=1;}}else if digit(byte) || (byte=='.' && pos+1<self_.input.len && digit(self_.input[pos+1])) {number=true;pos+=1;while pos<self_.input.len {let c=self_.input[pos];if identifierContinue(c) || c=='.' {pos+=1;}else if (c=='+' || c=='-') && pos>start && contains("eEpP",self_.input[pos-1]) {pos+=1;}else {break;}}}else {if !contains("@{}()[]<>,:;.=+-*/%!~&|^",byte) {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:(start+1) as u32,..},"asset_wgsl","Invalid WGSL token");return;}pos+=1;if pos<self_.input.len && byte!='<' && byte!='>' {let pair=self_.input[start..pos+1];for op in ["->","==","!=","&&","||","+=","-=","*=","/=","%=","&=","|=","^=","++","--"] {if pair==op {pos+=1;break;}}}}if self_.tokens.len==1000000 {self_.fail(Token{text:default<const u8[:]>(),start:start as u32,end:pos as u32,..},"asset_limit","WGSL token count exceeds 1000000");return;}self_.record(self_.tokens.push(TokenSpan{start:start as u32,end:pos as u32,number:number}));}if self_.failure==blot_error::Error.none {self_.record(self_.tokens.push(TokenSpan{start:pos as u32,end:pos as u32,..}));}}
 
 fn attributes(self_:Reader&) {while self_.take("@") {self_.name();if self_.take("(") && !self_.take(")") {while self_.failure==blot_error::Error.none {self_.expression(0,0);if self_.take(")") {break;}self_.expect(",");if self_.take(")") {break;}}}}}
 recursive fn typeName(self_:Reader&,depth:i64)->const u8[:] {if !self_.budget(depth) {return default<const u8[:]>();}let token=self_.name();if self_.take("<") {var parameter:i64=0;while self_.failure==blot_error::Error.none {if self_.peek().number || (token.text=="array" && parameter==1) {self_.expression(8,depth+1);}else {self_.typeName(depth+1);}if self_.take(">") {break;}self_.expect(",");parameter+=1;}return default<const u8[:]>();}return token.text;}
@@ -101,7 +122,7 @@ fn emitBindings(self_:Reader&) {for binding in self_.bindings.items {if self_.fa
 fn emitInteger(self_:Reader&,value:u32) {var bytes:u8[>..<]=[];format(bytes,value);self_.put(self_.body,bytes);}
 fn emitFloat(self_:Reader&,value:f64) {var bytes:u8[>..<]=[];blot_backend_native_asset_numbers::float32(bytes,value);self_.put(self_.body,bytes);}
 fn constructor(text:const u8[:])->bool {return text=="array" || text=="bitcast" || starts(text,"vec") || starts(text,"mat");}
-fn operator(self_:const Reader&)->Operator {let text=self_.peek().text;if (self_.is("<") || self_.is(">")) && self_.at+1<self_.tokens.len {let next=self_.tokens.items[self_.at+1];if next.text==text && next.start==self_.peek().end {if self_.is("<") {return Operator{text:"<<",precedence:8,count:2};}return Operator{text:">>",precedence:8,count:2};}if next.text=="=" {if self_.is("<") {return Operator{text:"<=",precedence:7,count:2};}return Operator{text:">=",precedence:7,count:2};}}let precedences:u8[14]=[1,2,3,4,5,6,6,7,7,9,9,10,10,10];for candidate,index in ["||","&&","|","^","&","==","!=","<",">","+","-","*","/","%"] {if text==candidate {return Operator{text:text,precedence:precedences[index],..};}}return Operator{..};}
+fn operator(self_:const Reader&)->Operator {let text=self_.peek().text;if (self_.is("<") || self_.is(">")) && self_.at+1<self_.tokens.len {let next=self_.tokens.tokenAt(self_.at+1);if next.text==text && next.start==self_.peek().end {if self_.is("<") {return Operator{text:"<<",precedence:8,count:2};}return Operator{text:">>",precedence:8,count:2};}if next.text=="=" {if self_.is("<") {return Operator{text:"<=",precedence:7,count:2};}return Operator{text:">=",precedence:7,count:2};}}let precedences:u8[14]=[1,2,3,4,5,6,6,7,7,9,9,10,10,10];for candidate,index in ["||","&&","|","^","&","==","!=","<",">","+","-","*","/","%"] {if text==candidate {return Operator{text:text,precedence:precedences[index],..};}}return Operator{..};}
 recursive fn expression(self_:Reader&,minimum:u8,depth:i64)->Value {if !self_.budget(depth) {return Value{..};}var left=self_.prefix(depth+1);while self_.failure==blot_error::Error.none {let op=self_.operator();if op.precedence==0 || op.precedence<minimum {break;}self_.at+=op.count;let right=self_.expression(op.precedence+1,depth+1);left=self_.binaryValue(op.text,left,right,depth+1);}return left;}
 recursive fn prefix(self_:Reader&,depth:i64)->Value {
 if !self_.budget(depth) {
