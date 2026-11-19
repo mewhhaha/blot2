@@ -702,13 +702,30 @@ recursive fn same(self_: const Analyzer&, left: Fact, right: Fact) -> bool {
 
 // ---- Types -------------------------------------------------------------
 
-// These queries ask whether any part has a property. In a homogeneous pair
-// both edges reach the same type under the same substitution and depth.
-// Following both doubles the work at every level of a nested pair.
-fn storageQueryParts(m: const Module&, n: blot_check_types::Node) -> const u32[:] {
-    let parts = m.types.list(blot_check_types::List { start: n.a, len: n.b });
-    if parts.len == 2 && parts[0] == parts[1] { return parts[..1]; }
-    return parts;
+// Depth affects the nesting-limit answer. Each root query has fixed arguments;
+// entering a nominal definition gives its substitution and recursion stack a
+// fresh scope. An instantiation query uses the concrete type as its second key.
+struct WalkNode { ty: u32, other: u64, depth: i64 }
+fn hash(node: WalkNode) -> u64 {
+    return ::hash_combine(::hash_combine(::hash(node.ty), ::hash(node.other)), ::hash(node.depth));
+}
+struct WalkMemo {
+    direct_visits: i64 = 16,
+    scope: u64 = 0,
+    next_scope: u64 = 0,
+    answers: dictionary<WalkNode, bool> = dictionary<WalkNode, bool> {}
+}
+fn tracking(memo: WalkMemo&, depth: i64) -> bool {
+    if depth > 64 { return false; }
+    if memo.direct_visits == 0 { return true; }
+    memo.direct_visits -= 1;
+    return false;
+}
+fn enterNominal(memo: WalkMemo&) -> u64 {
+    let parent = memo.scope;
+    memo.next_scope += 1;
+    memo.scope = memo.next_scope;
+    return parent;
 }
 
 // Whether a value of `ty` can hold storage. Unknown shapes can.
@@ -727,7 +744,20 @@ fn holdsKnown(self_: Analyzer&, ty: u32) -> bool, bool {
     let bit: u8 = known;
     return bit != 0, true;
 }
-recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64) -> bool {
+fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64) -> bool {
+    var memo = WalkMemo {};
+    return holdsInMemo(self_, m, ty, variables, arguments, depth, memo);
+}
+recursive fn holdsInMemo(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return holdsInNode(self_, m, ty, variables, arguments, depth, memo); }
+    let key = WalkNode { ty, memo.scope, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = holdsInNode(self_, m, ty, variables, arguments, depth, memo);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
     if ty == blot_check_types::unit || ty == blot_check_types::boolean || ty == blot_check_types::u32_type || ty == blot_check_types::f32_type || ty == blot_check_types::never { return false; }
     if depth > 64 || ty >= m.types.nodes.len { return true; }
     for variable, at in variables { if variable == ty { return arguments[at]; } }
@@ -741,14 +771,14 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
     if (n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound) { return false; }
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor || n.tag == blot_check_types::Tag.function { return true; }
     if n.tag == blot_check_types::Tag.product {
-        for item in storageQueryParts(m, n) {
-            if holdsIn(self_, m, item, variables, arguments, depth + 1) { return true; }
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
+            if holdsInMemo(self_, m, item, variables, arguments, depth + 1, memo) { return true; }
         }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
         for index in 0..n.b {
-            if holdsIn(self_, m, m.types.recordField(n, index).ty, variables, arguments, depth + 1) { return true; }
+            if holdsInMemo(self_, m, m.types.recordField(n, index).ty, variables, arguments, depth + 1, memo) { return true; }
         }
         return false;
     }
@@ -762,7 +792,7 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
     let given = m.types.nominalArguments(n);
     if own.len != given.len || own.len > 16 { return true; }
     var bits: bool[16] = [false; 16];
-    for argument, at in given { bits[at] = holdsIn(self_, m, argument, variables, arguments, depth + 1); }
+    for argument, at in given { bits[at] = holdsInMemo(self_, m, argument, variables, arguments, depth + 1, memo); }
     // A recursive occurrence at the same arguments adds no storage its
     // first expansion lacks; one at other arguments might.
     for outer in self_.expanding {
@@ -774,10 +804,12 @@ recursive fn holdsIn(self_: Analyzer&, m: const Module&, ty: u32, variables: con
     }
     self_.expanding.push(Expansion { unit: n.a, decl: n.b, arguments: bits, len: own.len });
     var result = false;
+    let parent_scope = enterNominal(memo);
     for constructor in m.nominalConstructors(index) {
         let payload = m.constructor(constructor).payload;
-        if payload != 0 && holdsIn(self_, m, payload, own, bits[..own.len], depth + 1) { result = true; break; }
+        if payload != 0 && holdsInMemo(self_, m, payload, own, bits[..own.len], depth + 1, memo) { result = true; break; }
     }
+    memo.scope = parent_scope;
     self_.expanding.resize(self_.expanding.len - 1);
     return result;
 }
@@ -816,7 +848,20 @@ fn calls(self_: Analyzer&, m: const Module&, ty: u32) -> bool {
 }
 // Whether `ty` has a part that owns an array (`want` 0), a part that
 // borrows (1) or a function (2).
-recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64) -> bool {
+fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64) -> bool {
+    var memo = WalkMemo {};
+    return partsInMemo(self_, m, ty, want, variables, arguments, depth, memo);
+}
+recursive fn partsInMemo(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return partsInNode(self_, m, ty, want, variables, arguments, depth, memo); }
+    let key = WalkNode { ty, memo.scope, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = partsInNode(self_, m, ty, want, variables, arguments, depth, memo);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, variables: const u32[:], arguments: const bool[:], depth: i64, memo: WalkMemo&) -> bool {
     if ty == blot_check_types::unit || ty == blot_check_types::boolean || ty == blot_check_types::u32_type || ty == blot_check_types::f32_type || ty == blot_check_types::never { return false; }
     let want_owned = want == 0;
     if depth > 64 || ty >= m.types.nodes.len { return want == 1; }
@@ -826,22 +871,22 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.function { return want != 0; }
     if n.tag == blot_check_types::Tag.cursor { return want == 1; }
-    if n.tag == blot_check_types::Tag.usage { return partsIn(self_, m, n.a, want, variables, arguments, depth + 1); }
+    if n.tag == blot_check_types::Tag.usage { return partsInMemo(self_, m, n.a, want, variables, arguments, depth + 1, memo); }
     // A list is never written in place, so it owns only what its
     // elements do.
     if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list {
         if want_owned && n.tag == blot_check_types::Tag.array { return true; }
-        return partsIn(self_, m, n.a, want, variables, arguments, depth + 1);
+        return partsInMemo(self_, m, n.a, want, variables, arguments, depth + 1, memo);
     }
     if n.tag == blot_check_types::Tag.product {
-        for item in storageQueryParts(m, n) {
-            if partsIn(self_, m, item, want, variables, arguments, depth + 1) { return true; }
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) {
+            if partsInMemo(self_, m, item, want, variables, arguments, depth + 1, memo) { return true; }
         }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
         for index in 0..n.b {
-            if partsIn(self_, m, m.types.recordField(n, index).ty, want, variables, arguments, depth + 1) { return true; }
+            if partsInMemo(self_, m, m.types.recordField(n, index).ty, want, variables, arguments, depth + 1, memo) { return true; }
         }
         return false;
     }
@@ -852,11 +897,11 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
         let kind = blot_check_storage_types::identity(n.a, n.b).value;
         if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize {
             if want == 0 { return true; }
-            for argument in m.types.nominalArguments(n) { if partsIn(self_, m, argument, want, variables, arguments, depth + 1) { return true; } }
+            for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
             return false;
         }
         if want != 2 { return want == 1; }
-        for argument in m.types.nominalArguments(n) { if partsIn(self_, m, argument, want, variables, arguments, depth + 1) { return true; } }
+        for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
         return false;
     }
     if n.a == 0xffffffff { return want == 1; }
@@ -868,7 +913,7 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
     let given = m.types.nominalArguments(n);
     if own.len != given.len || own.len > 16 { return want == 1; }
     var bits: bool[16] = [false; 16];
-    for argument, at in given { bits[at] = partsIn(self_, m, argument, want, variables, arguments, depth + 1); }
+    for argument, at in given { bits[at] = partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo); }
     // A recursive occurrence at the same arguments adds nothing its first
     // expansion lacks; one at other arguments might.
     for outer in self_.expanding {
@@ -880,10 +925,12 @@ recursive fn partsIn(self_: Analyzer&, m: const Module&, ty: u32, want: u8, vari
     }
     self_.expanding.push(Expansion { unit: n.a, decl: n.b, arguments: bits, len: own.len });
     var result = false;
+    let parent_scope = enterNominal(memo);
     for constructor in m.nominalConstructors(index) {
         let payload = m.constructor(constructor).payload;
-        if payload != 0 && partsIn(self_, m, payload, want, own, bits[..own.len], depth + 1) { result = true; break; }
+        if payload != 0 && partsInMemo(self_, m, payload, want, own, bits[..own.len], depth + 1, memo) { result = true; break; }
     }
+    memo.scope = parent_scope;
     self_.expanding.resize(self_.expanding.len - 1);
     return result;
 }
@@ -1673,7 +1720,20 @@ fn calleeBinding(self_: const Analyzer&, m: const Module&, node: u32) -> u32 {
 }
 // Whether `variable` occurs in `ty`; with `data`, not counting what is
 // under a function type. A shape this cannot read counts as holding it.
-recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth: i64) -> bool {
+fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth: i64) -> bool {
+    var memo = WalkMemo {};
+    return occursMemo(m, variable, ty, data, depth, memo);
+}
+recursive fn occursMemo(m: const Module&, variable: u32, ty: u32, data: bool, depth: i64, memo: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return occursNode(m, variable, ty, data, depth, memo); }
+    let key = WalkNode { ty, 0, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = occursNode(m, variable, ty, data, depth, memo);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn occursNode(m: const Module&, variable: u32, ty: u32, data: bool, depth: i64, memo: WalkMemo&) -> bool {
     if ty == variable { return true; }
     if ty == 0 || ty >= m.types.nodes.len { return false; }
     if depth > 64 { return true; }
@@ -1682,21 +1742,21 @@ recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth:
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return false; }
     if n.tag == blot_check_types::Tag.function {
         if data { return false; }
-        return occurs(m, variable, n.a, data, depth + 1) || occurs(m, variable, n.b, data, depth + 1);
+        return occursMemo(m, variable, n.a, data, depth + 1, memo) || occursMemo(m, variable, n.b, data, depth + 1, memo);
     }
     // `own T` in a function type's parameter, and the other usage wrappers.
-    if n.tag == blot_check_types::Tag.usage { return occurs(m, variable, n.a, data, depth + 1); }
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occurs(m, variable, n.a, data, depth + 1); }
+    if n.tag == blot_check_types::Tag.usage { return occursMemo(m, variable, n.a, data, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursMemo(m, variable, n.a, data, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
-        for item in storageQueryParts(m, n) { if occurs(m, variable, item, data, depth + 1) { return true; } }
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursMemo(m, variable, item, data, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
-        for index in 0..n.b { if occurs(m, variable, m.types.recordField(n, index).ty, data, depth + 1) { return true; } }
+        for index in 0..n.b { if occursMemo(m, variable, m.types.recordField(n, index).ty, data, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.nominal {
-        for argument in m.types.nominalArguments(n) { if occurs(m, variable, argument, data, depth + 1) { return true; } }
+        for argument in m.types.nominalArguments(n) { if occursMemo(m, variable, argument, data, depth + 1, memo) { return true; } }
         return false;
     }
     return true;
@@ -1705,47 +1765,75 @@ recursive fn occurs(m: const Module&, variable: u32, ty: u32, data: bool, depth:
 // may hold storage once the variable has its type. Inside a generic body it
 // is read as plain data, but it is not given to an `own` parameter out of
 // what the function was only lent.
-recursive fn openType(m: const Module&, ty: u32, depth: i64) -> bool {
+fn openType(m: const Module&, ty: u32, depth: i64) -> bool {
+    var memo = WalkMemo {};
+    return openTypeMemo(m, ty, depth, memo);
+}
+recursive fn openTypeMemo(m: const Module&, ty: u32, depth: i64, memo: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return openTypeNode(m, ty, depth, memo); }
+    let key = WalkNode { ty, 0, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = openTypeNode(m, ty, depth, memo);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn openTypeNode(m: const Module&, ty: u32, depth: i64, memo: WalkMemo&) -> bool {
     if ty == 0 || ty >= m.types.nodes.len { return false; }
     if depth > 64 { return true; }
     let n = m.types.node(ty);
     if n.tag == blot_check_types::Tag.variable || n.tag == blot_check_types::Tag.rigid || n.tag == blot_check_types::Tag.bound { return true; }
-    if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return openType(m, n.a, depth + 1); }
+    if n.tag == blot_check_types::Tag.usage || n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return openTypeMemo(m, n.a, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
-        for item in storageQueryParts(m, n) { if openType(m, item, depth + 1) { return true; } }
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if openTypeMemo(m, item, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
-        for index in 0..n.b { if openType(m, m.types.recordField(n, index).ty, depth + 1) { return true; } }
+        for index in 0..n.b { if openTypeMemo(m, m.types.recordField(n, index).ty, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.nominal {
-        for argument in m.types.nominalArguments(n) { if openType(m, argument, depth + 1) { return true; } }
+        for argument in m.types.nominalArguments(n) { if openTypeMemo(m, argument, depth + 1, memo) { return true; } }
         return false;
     }
     return false;
 }
 // Whether `variable` occurs in `ty` inside growable storage, a reference or
 // a link: storage a function can put a value into for later.
-recursive fn occursInSink(m: const Module&, variable: u32, ty: u32, inside: bool, depth: i64) -> bool {
+fn occursInSink(m: const Module&, variable: u32, ty: u32, inside: bool, depth: i64) -> bool {
+    var memo = WalkMemo {};
+    return occursInSinkMemo(m, variable, ty, inside, depth, memo);
+}
+recursive fn occursInSinkMemo(m: const Module&, variable: u32, ty: u32, inside: bool, depth: i64, memo: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return occursInSinkNode(m, variable, ty, inside, depth, memo); }
+    var state: u32 = 0;
+    if inside { state = 1; }
+    let key = WalkNode { ty, state, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = occursInSinkNode(m, variable, ty, inside, depth, memo);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn occursInSinkNode(m: const Module&, variable: u32, ty: u32, inside: bool, depth: i64, memo: WalkMemo&) -> bool {
     if ty == variable { return inside; }
     if ty == 0 || ty >= m.types.nodes.len || depth > 64 { return false; }
     let n = m.types.node(ty);
-    if n.tag == blot_check_types::Tag.function { return occursInSink(m, variable, n.a, inside, depth + 1) || occursInSink(m, variable, n.b, inside, depth + 1); }
-    if n.tag == blot_check_types::Tag.usage { return occursInSink(m, variable, n.a, inside, depth + 1); }
-    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursInSink(m, variable, n.a, inside, depth + 1); }
+    if n.tag == blot_check_types::Tag.function { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo) || occursInSinkMemo(m, variable, n.b, inside, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.usage { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo); }
+    if n.tag == blot_check_types::Tag.array || n.tag == blot_check_types::Tag.list || n.tag == blot_check_types::Tag.cursor { return occursInSinkMemo(m, variable, n.a, inside, depth + 1, memo); }
     if n.tag == blot_check_types::Tag.product {
-        for item in storageQueryParts(m, n) { if occursInSink(m, variable, item, inside, depth + 1) { return true; } }
+        for item in m.types.list(blot_check_types::List { start: n.a, len: n.b }) { if occursInSinkMemo(m, variable, item, inside, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.record {
-        for index in 0..n.b { if occursInSink(m, variable, m.types.recordField(n, index).ty, inside, depth + 1) { return true; } }
+        for index in 0..n.b { if occursInSinkMemo(m, variable, m.types.recordField(n, index).ty, inside, depth + 1, memo) { return true; } }
         return false;
     }
     if n.tag == blot_check_types::Tag.nominal {
         let storage = blot_check_storage_types::identity(n.a, n.b);
         let sink = inside || (storage.present && storage.value != blot_check_storage_types::view);
-        for argument in m.types.nominalArguments(n) { if occursInSink(m, variable, argument, sink, depth + 1) { return true; } }
+        for argument in m.types.nominalArguments(n) { if occursInSinkMemo(m, variable, argument, sink, depth + 1, memo) { return true; } }
         return false;
     }
     return false;
@@ -1802,37 +1890,47 @@ fn sharedWith(self_: Analyzer&, shared: Value&, argument: Value) {
 // Whether `actual`, an instance of the scheme type `pattern`, gives
 // `variable` a type that owns an array. Where the two cannot be matched it
 // may.
-recursive fn instanceOwns(self_: Analyzer&, m: const Module&, pattern: u32, actual: u32, variable: u32, depth: i64) -> bool {
+fn instanceOwns(self_: Analyzer&, m: const Module&, pattern: u32, actual: u32, variable: u32, depth: i64) -> bool {
+    var memo = WalkMemo {};
+    var occurrences = WalkMemo {};
+    return instanceOwnsMemo(self_, m, pattern, actual, variable, depth, memo, occurrences);
+}
+recursive fn instanceOwnsMemo(self_: Analyzer&, m: const Module&, pattern: u32, actual: u32, variable: u32, depth: i64, memo: WalkMemo&, occurrences: WalkMemo&) -> bool {
+    if !tracking(memo, depth) { return instanceOwnsNode(self_, m, pattern, actual, variable, depth, memo, occurrences); }
+    let key = WalkNode { pattern, actual, depth };
+    let cached .= memo.answers.get(key);
+    if cached { let answer: bool = cached; return answer; }
+    let answer = instanceOwnsNode(self_, m, pattern, actual, variable, depth, memo, occurrences);
+    memo.answers.insert(key, answer);
+    return answer;
+}
+recursive fn instanceOwnsNode(self_: Analyzer&, m: const Module&, pattern: u32, actual: u32, variable: u32, depth: i64, memo: WalkMemo&, occurrences: WalkMemo&) -> bool {
     if pattern == variable { return owns(self_, m, actual); }
-    if !occurs(m, variable, pattern, false, 0) { return false; }
+    if !occursMemo(m, variable, pattern, false, 0, occurrences) { return false; }
     if depth > 64 || actual == 0 || actual >= m.types.nodes.len || pattern >= m.types.nodes.len { return true; }
     let p = m.types.node(pattern);
     let a = m.types.node(actual);
     if p.tag != a.tag { return true; }
-    if p.tag == blot_check_types::Tag.function { return instanceOwns(self_, m, p.a, a.a, variable, depth + 1) || instanceOwns(self_, m, p.b, a.b, variable, depth + 1); }
-    if p.tag == blot_check_types::Tag.usage { return instanceOwns(self_, m, p.a, a.a, variable, depth + 1); }
-    if p.tag == blot_check_types::Tag.array || p.tag == blot_check_types::Tag.list || p.tag == blot_check_types::Tag.cursor { return instanceOwns(self_, m, p.a, a.a, variable, depth + 1); }
+    if p.tag == blot_check_types::Tag.function { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences) || instanceOwnsMemo(self_, m, p.b, a.b, variable, depth + 1, memo, occurrences); }
+    if p.tag == blot_check_types::Tag.usage { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences); }
+    if p.tag == blot_check_types::Tag.array || p.tag == blot_check_types::Tag.list || p.tag == blot_check_types::Tag.cursor { return instanceOwnsMemo(self_, m, p.a, a.a, variable, depth + 1, memo, occurrences); }
     if p.tag == blot_check_types::Tag.product {
         if p.b != a.b { return true; }
         let left = m.types.list(blot_check_types::List { start: p.a, len: p.b });
         let right = m.types.list(blot_check_types::List { start: a.a, len: a.b });
-        // Both the scheme and its instantiation must repeat the child.
-        if left.len == 2 && left[0] == left[1] && right[0] == right[1] {
-            return instanceOwns(self_, m, left[0], right[0], variable, depth + 1);
-        }
-        for item, at in left { if instanceOwns(self_, m, item, right[at], variable, depth + 1) { return true; } }
+        for item, at in left { if instanceOwnsMemo(self_, m, item, right[at], variable, depth + 1, memo, occurrences) { return true; } }
         return false;
     }
     if p.tag == blot_check_types::Tag.record {
         if p.b != a.b { return true; }
-        for index in 0..p.b { if instanceOwns(self_, m, m.types.recordField(p, index).ty, m.types.recordField(a, index).ty, variable, depth + 1) { return true; } }
+        for index in 0..p.b { if instanceOwnsMemo(self_, m, m.types.recordField(p, index).ty, m.types.recordField(a, index).ty, variable, depth + 1, memo, occurrences) { return true; } }
         return false;
     }
     if p.tag == blot_check_types::Tag.nominal {
         let left = m.types.nominalArguments(p);
         let right = m.types.nominalArguments(a);
         if p.a != a.a || p.b != a.b || left.len != right.len { return true; }
-        for item, at in left { if instanceOwns(self_, m, item, right[at], variable, depth + 1) { return true; } }
+        for item, at in left { if instanceOwnsMemo(self_, m, item, right[at], variable, depth + 1, memo, occurrences) { return true; } }
         return false;
     }
     return true;

@@ -5,11 +5,16 @@ import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 const executable = resolve(Deno.args[0] ?? "compiler-goose/build/blotc-goose");
 const directory = await Deno.makeTempDir();
 const entry = resolve(directory, "main.blot");
+const compositionSeeds = new Map([
+  ["composition", "(x, x)"],
+  ["mixedComposition", "(x, 0, x)"],
+  ["diamondComposition", "((x, 0), (0, x))"],
+  ["recordComposition", "{left: x, middle: 0, right: x}"],
+]);
 function source(kind: string, size: number) {
   const lines = [];
-  if (kind === "composition" || kind === "mixedComposition") {
-    let seed = "(x, x)";
-    if (kind === "mixedComposition") seed = "(x, 0, x)";
+  const seed = compositionSeeds.get(kind);
+  if (seed !== undefined) {
     lines.push(`func layer0 x => return ${seed}`);
     for (let i = 1; i < size; i++) {
       lines.push(`func layer${i} x => return layer${i - 1} (layer${i - 1} x)`);
@@ -41,10 +46,9 @@ function source(kind: string, size: number) {
 }
 try {
   // Isolate type inference so later passes cannot hide its scaling curve.
-  for (const kind of ["pair", "namedPair", "composition", "mixedComposition"]) {
+  for (const kind of ["pair", "namedPair", ...compositionSeeds.keys()]) {
     let limit = 13;
-    if (kind === "composition") limit = 11;
-    if (kind === "mixedComposition") limit = 6;
+    if (compositionSeeds.has(kind)) limit = 11;
     for (let size = 1; size <= limit; size++) {
       await Deno.writeTextFile(entry, source(kind, size));
       const result = await new Deno.Command(executable, {
@@ -76,15 +80,13 @@ try {
       "identity",
       "fields",
       "annotated",
-      "composition",
-      "mixedComposition",
+      ...compositionSeeds.keys(),
     ]
   ) {
     let sizes = [32, 64, 128, 256, 512, 1024, 2048, 4096];
-    if (kind === "composition") {
+    if (compositionSeeds.has(kind)) {
       sizes = Array.from({ length: 11 }, (_, index) => index + 1);
     }
-    if (kind === "mixedComposition") sizes = [1, 2, 3, 4, 5, 6];
     for (const size of sizes) {
       const body = source(kind, size);
       await Deno.writeTextFile(entry, body);

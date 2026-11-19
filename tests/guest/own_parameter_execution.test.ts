@@ -685,3 +685,17 @@ entry func run (n: U32) : U32 => return do:
   equal(diagnostic?.code, "spent_value");
   equal(diagnostic?.start, main.indexOf("world.size +"));
 });
+
+Deno.test("ownership queries distinguish a generic constructor's two substitutions", async () => {
+  function forward(lastType: string) {
+    // Reach the same payload definition at the same depth with different arguments.
+    const fields = [...Array<string>(20).fill("U32"), "Box U32", "Box " + lastType];
+    return `type Box a is data = $Box a
+func forward (x: (${fields.join(", ")})) => return x
+entry func answer (x: U32): U32 => return x
+`;
+  }
+  const options = { prelude: "none" };
+  await compileAndRun(forward("U32"), (guest) => equal(guest.call("answer", 42), 42), options);
+  await compileExpectedFailure(forward("(Array U32)"), "result_not_owned", undefined, options);
+});

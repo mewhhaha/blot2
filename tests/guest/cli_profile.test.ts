@@ -174,16 +174,30 @@ Deno.test("independent field requirements take linear candidate scans", async ()
   }
 });
 
-Deno.test("ownership analysis finishes for repeated generic pair composition", async () => {
+Deno.test("ownership analysis handles shared tuple and record subtrees", async () => {
   const directory = await Deno.makeTempDir();
   const entry = `${directory}/main.blot`;
-  const lines = ["func duplicate x => return (x, x)"];
-  let previous = "duplicate";
-  for (let i = 1; i < 10; i++) {
-    lines.push(`func compose${i} x => return ${previous} (${previous} x)`);
-    previous = `compose${i}`;
+  const lines = [];
+  for (
+    const [name, seed, layers] of [
+      ["pair", "(x, x)", 10],
+      ["mixed", "(x, 0, x)", 10],
+      ["diamond", "((x, 0), (0, x))", 8],
+      ["record", "{left: x, middle: 0, right: x}", 10],
+    ] as const
+  ) {
+    lines.push(`func ${name}0 x => return ${seed}`);
+    for (let i = 1; i < layers; i++) {
+      const previous = name + (i - 1);
+      lines.push(`func ${name}${i} x => return ${previous} (${previous} x)`);
+    }
   }
-  lines.push("entry const answer = 42");
+  lines.push(
+    "entry func answer (x: U32): U32 => return do:",
+    "  let (_, _, (_, _, (_, _, (_, _, right)))) = mixed2 x",
+    "  let ((left, _), _) = diamond0 right",
+    "  break (record0 left).right",
+  );
   try {
     await Deno.writeTextFile(entry, lines.join("\n"));
     const compiler = await createZigProjectCompiler({
@@ -197,7 +211,7 @@ Deno.test("ownership analysis finishes for repeated generic pair composition", a
       });
       if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
       const { instance } = await WebAssembly.instantiate(result.bytes);
-      assert.equal((instance.exports.answer as WebAssembly.Global).value, 42);
+      assert.equal((instance.exports.answer as (x: number) => number)(42), 42);
     } finally {
       await compiler.dispose();
     }
