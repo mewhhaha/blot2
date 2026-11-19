@@ -6,16 +6,15 @@ restore and editor hooks now pass their successor world to their callers.
 Ink runs its original 2,048-body prepared-physics workload. Pen releases
 invocation-scoped owners and callbacks immediately after a return or a trap.
 
-The qualified compiler is Blot `e9be6768`, with Gdev `73b4b2c`,
-Ink `3f2e603` and Pen `ad9766c`. The latest alternating comparison measured
-**766.3 → 743.7 ms** for a fresh Gdev Main and
-**753.2 → 768.1 ms** across 16 pairs with the project and compiler file data
-evicted (9 faster). All 271 modules produced the same 2,639,638-byte Wasm. Resolving
-the same field and other requirements now takes **180,773 candidate scans**,
-down from 2,417,106. Mixed tuples with shared type children still expose
-repeated work during ownership analysis.
-[Qualification and paired trials](benchmarks/evidence/measurements/2026-11-19-type-scaling.json) ·
-[Type-system assessment](tasks/FAST_COMPILE.md#type-inference-and-ownership-19-november-2026)
+The qualified compiler is Blot `be489b79`, with Gdev `73b4b2c`,
+Ink `3f2e603` and Pen `ad9766c`. Six layers of `(x, 0, x)` now produce
+runnable Wasm in **3.4 ms**, down from a three-second timeout.
+Gdev Main took **1,088.3 → 1,070.7 ms** over 16 alternating
+fresh-process pairs with warm file data (seven faster). All 271 modules produced the same
+2,639,638-byte Wasm. The remaining structural type growth occurs during
+inference when constructing nested signatures.
+[Qualification and paired trials](benchmarks/evidence/measurements/2026-11-19-shared-ownership.json) ·
+[Type-system assessment](tasks/FAST_COMPILE.md#shared-types-in-ownership-analysis-19-november-2026)
 
 Ordinary `#run` functions can construct records, tuples, constructors, arrays
 and lists. `std/build.include` reads project-declared files. A real Gdev

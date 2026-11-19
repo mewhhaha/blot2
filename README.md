@@ -28,7 +28,11 @@ Indexing requirements by their function cut Gdev's candidate scans from
 32,934 type nodes. Naming the repeated shape takes 1,043.
 [Cold timings and type-system assessment](tasks/FAST_COMPILE.md#type-inference-and-ownership-19-november-2026)
 
-![Compiler work for field readers and nested pairs](benchmarks/evidence/measurements/2026-11-19-type-scaling.svg)
+A six-layer mixed tuple that used to exceed three seconds now compiles in
+**3.4 ms**. Ownership analysis reuses the answer when a type is reached
+through multiple fields. [Shared-type measurements](benchmarks/evidence/measurements/2026-11-19-shared-ownership.json)
+
+![Compiler work for field readers and nested pairs](benchmarks/evidence/measurements/2026-11-19-type-scaling.png)
 
 ![Gdev capacity edit time and type checking](benchmarks/evidence/measurements/2026-11-19-gdev-call-literals.png)
 

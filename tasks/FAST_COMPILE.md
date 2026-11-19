@@ -3,6 +3,47 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Shared types in ownership analysis, 19 November 2026
+
+The old ownership checker followed both paths to a shared type each time it
+checked whether a value could own or borrow storage. A special case covered
+`(x, x)`. Putting zero between the two copies made six short functions take
+longer than three seconds. The checker now saves the answer per visited type
+after the first sixteen visits of a query. When matching a generic type to a
+concrete one, it keys the answer on both types. Depth, whether a value is
+inside a storage sink, and each nominal type substitution keep their original
+meaning. Small walks finish before allocating a table.
+
+| Repeated function composition | Layers | Previous full build | Current full build |
+| --- | ---: | ---: | ---: |
+| `(x, x)` | 10 | 13.1 ms | 18.4 ms |
+| `(x, 0, x)` | 6 | >3,000 ms | 3.4 ms |
+| `(x, 0, x)` | 10 | — | 14.3 ms |
+| `((x, 0), (0, x))` | 8 | — | 11.2 ms |
+| `{left: x, middle: 0, right: x}` | 10 | — | 13.6 ms |
+
+The general traversal slowed the ten-layer homogeneous pair in eight of
+nine comparisons. The previous compiler exceeded three seconds for six
+layers of the diamond and record shapes. Each release figure is the median of nine fresh project sessions
+timed from build request through complete Wasm. Each resulting module ran and
+returned 42. A regression test also selects a live input through the mixed
+tuple, the two distinct tuple branches and the record. A separate test places
+`Box U32` and `Box (Array U32)` at equal depth and verifies that returning
+borrowed storage is still rejected.
+
+Gdev Main compiled in **1,088.3 → 1,070.7 ms** over 16 alternating
+fresh-process pairs. Seven pairs favored the new compiler, so this run gives
+no clear whole-project speedup. The input came from Gdev's committed source
+and assets while its working tree contained unrelated edits. The complete
+2,639,638-byte Wasm, the inspected frame, all 242 replay files and
+the named Gdev and Ink outcomes matched. The separate inference benchmark
+still allocates 32,934 nodes for 13 layers of structural pairs and 1,043 for
+the named type. Sharing immutable nodes while building those signatures
+remains a separate experiment.
+
+[Measurements and qualification](../benchmarks/evidence/measurements/2026-11-19-shared-ownership.json) ·
+[Reproducible scaling cases](../benchmarks/tools/bench_type_scaling.ts)
+
 ## Type inference and ownership, 19 November 2026
 
 Every inferred field access leaves a requirement that a future caller must
@@ -66,16 +107,10 @@ distinct ways to make very short programs expensive.
   checks that the concrete pair repeats its child. Six layers now build in
   2.4 ms and ten layers in 7.9 ms in the generated benchmark. With
   `func duplicate x => return (x, 0, x)`, the checker still needs only 378
-  type nodes for six layers, but the full build again crosses the three-second
-  limit. That remains a release reproducer.
+  type nodes for six layers. The full build crossed the three-second limit
+  at this checkpoint. The shared-type change above fixes that case.
 
-Keep field inference and allow named types at public boundaries. First make
-ownership queries record which nodes they have visited, including both node
-identities when comparing types. The result also depends on the substitution,
-remaining depth and active recursive data definitions. A general graph walk
-has to respect that context. The acceptance case is a repeated child separated
-by another tuple element, as in `(x, 0, x)`. Check the same exported Wasm,
-ownership diagnostics and Gdev wall time. Next, share completed, immutable
+Field inference and named types at public boundaries remain available. Next, share completed, immutable
 subtypes when publishing a function signature. Inference variables can
 change during solving, so reusing their answers requires tracking the solver version.
 Measure both the tuple family and Gdev before extending sharing across the

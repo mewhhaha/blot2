@@ -1,0 +1,3518 @@
+{
+  "compiler": "be489b79ee6e43b66f50e41492e73bfa8415f79d",
+  "previous": "402712167903f25e7ecafb91cff282ffbc921880",
+  "executables": {
+    "before": "68ed7f0bdb9e44106069eacf305b01d1dc15152677bc07ca3a7cd704d18d56ee",
+    "after": "c2429570c26f5b3103c6c75a48b2c3e98d0992595bf183b19e8d85e2b13a57ee"
+  },
+  "sourceIdentity": "9aed457c7cd7b6ea63e2745d273eebeb524f96c13d85d19b3f8e4b203c8c9ded",
+  "configuration": {
+    "artifact_replay": false,
+    "c_flags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread"
+    ],
+    "cc_sha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "entry": "src/main.goose",
+    "goose_inline": "-O2",
+    "goose_sha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "host": "linux",
+    "host_entry": "blot_goose_main",
+    "inference_budget": 1000000,
+    "machine": "x86_64",
+    "runtime_sha256": "2fa374d203772eef4432aa8c0016bdda895c037b59bc3806a24b73768a37b79a",
+    "schema": 1,
+    "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
+  },
+  "projects": {
+    "gdev": "73b4b2c79928f4c1fe84e1f835f5c8420e838510",
+    "ink": "3f2e60322d6d60d5395be32280debaba1852caf9",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e"
+  },
+  "method": "All synthetic inputs are single modules with no prelude. Both the old CLI and the old profiled project sessions were stopped after 3 s. The new project sessions use one worker, with separate build-only and session-open-to-Wasm clocks. Each result is instantiated and the exported 42 is read. The guest suite separately executes the shallow data path. Gdev uses the production worker policy with a fresh process, warm file data and alternating compiler order. Phase and edit timings are separate.",
+  "fixture": "Gdev source and assets exported with git archive from the sibling checkout at the recorded commit to avoid concurrent working-tree edits. The clean Ink checkout supplied the library. Pen ran with its own release build of libsteam_api.so.",
+  "penBinarySha256": "e6cdea17b995d27d21158536d0de148e3ec932639584b82ffd91b5a8846b8ebf",
+  "penSteamLibrarySha256": "ec4797f76a206eb0af627af0f0788eb5a2eabf5dee38ee0a6affbaa44a645f4e",
+  "baselineControls": [
+    {
+      "case": "mixed6",
+      "timeoutMs": 3000
+    },
+    {
+      "case": "diamond6",
+      "timeoutMs": 3000
+    },
+    {
+      "case": "record6",
+      "timeoutMs": 3000
+    }
+  ],
+  "baselineApiControls": [
+    {
+      "name": "mixed6",
+      "deadlineMs": 3000,
+      "elapsedMs": 3002.982847,
+      "terminated": true
+    },
+    {
+      "name": "diamond6",
+      "deadlineMs": 3000,
+      "elapsedMs": 3001.6234789999994,
+      "terminated": true
+    },
+    {
+      "name": "record6",
+      "deadlineMs": 3000,
+      "elapsedMs": 3002.6279540000005,
+      "terminated": true
+    }
+  ],
+  "shapes": {
+    "diamond8": {
+      "buildMs": 11.249,
+      "openToWasmMs": 21.316
+    },
+    "record10": {
+      "buildMs": 13.641,
+      "openToWasmMs": 23.615
+    },
+    "mixed6": {
+      "buildMs": 3.352,
+      "openToWasmMs": 14.02
+    },
+    "mixed10": {
+      "buildMs": 14.254,
+      "openToWasmMs": 24.136
+    }
+  },
+  "shapeTrials": [
+    {
+      "name": "mixed6",
+      "round": 1,
+      "buildMs": 4.818216,
+      "openToWasmMs": 22.550344,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 1,
+      "buildMs": 14.406818000000001,
+      "openToWasmMs": 24.159502000000003,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 1,
+      "buildMs": 9.543847,
+      "openToWasmMs": 19.327189000000004,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 1,
+      "buildMs": 13.860409999999987,
+      "openToWasmMs": 23.61492699999998,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 2,
+      "buildMs": 14.079857000000004,
+      "openToWasmMs": 23.548471000000006,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 2,
+      "buildMs": 9.950900999999988,
+      "openToWasmMs": 19.59131099999999,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 2,
+      "buildMs": 14.532647999999995,
+      "openToWasmMs": 24.382036,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 2,
+      "buildMs": 4.8452780000000075,
+      "openToWasmMs": 18.45218600000001,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 3,
+      "buildMs": 15.35774600000002,
+      "openToWasmMs": 29.679102,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 3,
+      "buildMs": 27.277697999999987,
+      "openToWasmMs": 45.88826499999999,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 3,
+      "buildMs": 3.36089800000002,
+      "openToWasmMs": 14.225725000000011,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 3,
+      "buildMs": 16.131897000000038,
+      "openToWasmMs": 26.133443999999997,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 4,
+      "buildMs": 13.283534000000031,
+      "openToWasmMs": 23.215348000000006,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 4,
+      "buildMs": 3.268412000000012,
+      "openToWasmMs": 12.789815999999973,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 4,
+      "buildMs": 14.253546999999969,
+      "openToWasmMs": 25.221599999999967,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 4,
+      "buildMs": 15.082271999999989,
+      "openToWasmMs": 30.592607999999984,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 5,
+      "buildMs": 3.8821669999999813,
+      "openToWasmMs": 15.831276000000003,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 5,
+      "buildMs": 14.146402999999964,
+      "openToWasmMs": 23.581282999999985,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 5,
+      "buildMs": 9.80904099999998,
+      "openToWasmMs": 19.554290000000037,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 5,
+      "buildMs": 13.40775999999994,
+      "openToWasmMs": 22.847137999999973,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 6,
+      "buildMs": 14.19802100000004,
+      "openToWasmMs": 23.766144000000054,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 6,
+      "buildMs": 16.33802800000001,
+      "openToWasmMs": 31.350638000000004,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 6,
+      "buildMs": 13.641392999999994,
+      "openToWasmMs": 24.027971999999977,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 6,
+      "buildMs": 3.115079000000037,
+      "openToWasmMs": 13.259998999999993,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 7,
+      "buildMs": 12.119452000000024,
+      "openToWasmMs": 21.316108999999983,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 7,
+      "buildMs": 22.276433999999995,
+      "openToWasmMs": 32.184162000000015,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 7,
+      "buildMs": 3.2021550000000616,
+      "openToWasmMs": 14.019813,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 7,
+      "buildMs": 14.385137999999984,
+      "openToWasmMs": 24.136408999999958,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 8,
+      "buildMs": 13.103021000000012,
+      "openToWasmMs": 23.238652000000002,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 8,
+      "buildMs": 3.3523910000000114,
+      "openToWasmMs": 13.208530999999994,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 8,
+      "buildMs": 13.831013999999982,
+      "openToWasmMs": 23.320377000000008,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 8,
+      "buildMs": 9.603820999999925,
+      "openToWasmMs": 19.000587999999993,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed6",
+      "round": 9,
+      "buildMs": 3.2024860000000217,
+      "openToWasmMs": 12.834120000000098,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "mixed10",
+      "round": 9,
+      "buildMs": 21.49574000000007,
+      "openToWasmMs": 35.19440199999997,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "diamond8",
+      "round": 9,
+      "buildMs": 11.24883699999998,
+      "openToWasmMs": 24.740677000000005,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "name": "record10",
+      "round": 9,
+      "buildMs": 13.600565999999958,
+      "openToWasmMs": 23.557417999999984,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    }
+  ],
+  "homogeneousPairControls": {
+    "pair6": {
+      "before": 4.552,
+      "after": 4.204,
+      "fasterPairs": 5,
+      "pairs": 9
+    },
+    "pair10": {
+      "before": 13.067,
+      "after": 18.387,
+      "fasterPairs": 1,
+      "pairs": 9
+    }
+  },
+  "homogeneousPairTrials": [
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 1,
+      "buildMs": 4.552301,
+      "openToWasmMs": 19.052416,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 1,
+      "buildMs": 3.4139079999999993,
+      "openToWasmMs": 13.107318999999997,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 1,
+      "buildMs": 9.499903000000003,
+      "openToWasmMs": 26.601782999999998,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 1,
+      "buildMs": 14.552765000000008,
+      "openToWasmMs": 25.231188000000003,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 2,
+      "buildMs": 22.207202000000024,
+      "openToWasmMs": 36.964476000000005,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 2,
+      "buildMs": 11.754218000000009,
+      "openToWasmMs": 22.592022999999983,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 2,
+      "buildMs": 4.847462000000007,
+      "openToWasmMs": 20.98801500000002,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 2,
+      "buildMs": 4.725380000000001,
+      "openToWasmMs": 19.753028,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 3,
+      "buildMs": 3.963623000000041,
+      "openToWasmMs": 16.369950000000017,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 3,
+      "buildMs": 3.4897510000000125,
+      "openToWasmMs": 19.263427000000036,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 3,
+      "buildMs": 16.163306000000034,
+      "openToWasmMs": 30.78716700000001,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 3,
+      "buildMs": 18.730594999999994,
+      "openToWasmMs": 28.84156999999999,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 4,
+      "buildMs": 13.822108000000014,
+      "openToWasmMs": 23.590621999999996,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 4,
+      "buildMs": 10.59796,
+      "openToWasmMs": 23.660274000000015,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 4,
+      "buildMs": 3.3057719999999904,
+      "openToWasmMs": 13.762534000000016,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 4,
+      "buildMs": 4.785685000000001,
+      "openToWasmMs": 19.318040999999994,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 5,
+      "buildMs": 4.790303000000051,
+      "openToWasmMs": 19.56802700000003,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 5,
+      "buildMs": 3.3090889999999717,
+      "openToWasmMs": 13.580487999999946,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 5,
+      "buildMs": 10.46138099999996,
+      "openToWasmMs": 20.410438,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 5,
+      "buildMs": 18.39782200000002,
+      "openToWasmMs": 29.503908000000024,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 6,
+      "buildMs": 18.341766000000007,
+      "openToWasmMs": 33.44746199999997,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 6,
+      "buildMs": 17.474758000000065,
+      "openToWasmMs": 32.47530400000005,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 6,
+      "buildMs": 5.616173000000003,
+      "openToWasmMs": 20.44333000000006,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 6,
+      "buildMs": 4.189621999999986,
+      "openToWasmMs": 17.161743,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 7,
+      "buildMs": 4.27786900000001,
+      "openToWasmMs": 17.797330999999986,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 7,
+      "buildMs": 4.5765080000001035,
+      "openToWasmMs": 15.522489000000064,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 7,
+      "buildMs": 13.06687199999999,
+      "openToWasmMs": 27.794921000000045,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 7,
+      "buildMs": 18.387202000000002,
+      "openToWasmMs": 33.38752800000009,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 8,
+      "buildMs": 23.54599600000006,
+      "openToWasmMs": 39.38496600000008,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 8,
+      "buildMs": 13.918950999999993,
+      "openToWasmMs": 28.700400999999943,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 8,
+      "buildMs": 4.204319999999939,
+      "openToWasmMs": 17.543939999999907,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 8,
+      "buildMs": 4.390784000000053,
+      "openToWasmMs": 23.90820400000007,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair6",
+      "round": 9,
+      "buildMs": 4.659945999999991,
+      "openToWasmMs": 20.111079000000018,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair6",
+      "round": 9,
+      "buildMs": 5.004260000000045,
+      "openToWasmMs": 20.92267000000004,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "before",
+      "name": "pair10",
+      "round": 9,
+      "buildMs": 15.61189800000011,
+      "openToWasmMs": 30.46230000000014,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "after",
+      "name": "pair10",
+      "round": 9,
+      "buildMs": 13.577802999999903,
+      "openToWasmMs": 27.345926999999847,
+      "answer": 42,
+      "hash": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    }
+  ],
+  "scaling": [
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 14,
+      "checkUs": 677
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 42,
+      "checkUs": 901
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 78,
+      "checkUs": 919
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 122,
+      "checkUs": 1194
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 206,
+      "checkUs": 1364
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 338,
+      "checkUs": 1816
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 582,
+      "checkUs": 2202
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 982,
+      "checkUs": 2083
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 2054,
+      "checkUs": 3367
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 10,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 4122,
+      "checkUs": 10465
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 11,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 8238,
+      "checkUs": 8549
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 12,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 16450,
+      "checkUs": 15092
+    },
+    {
+      "mode": "check",
+      "kind": "pair",
+      "size": 13,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 32934,
+      "checkUs": 42565
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 18,
+      "checkUs": 960
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 61,
+      "checkUs": 956
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 112,
+      "checkUs": 1005
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 171,
+      "checkUs": 1068
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 230,
+      "checkUs": 1347
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 295,
+      "checkUs": 1303
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 382,
+      "checkUs": 1491
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 466,
+      "checkUs": 2281
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 566,
+      "checkUs": 3265
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 10,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 685,
+      "checkUs": 2931
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 11,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 783,
+      "checkUs": 3308
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 12,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 916,
+      "checkUs": 3599
+    },
+    {
+      "mode": "check",
+      "kind": "namedPair",
+      "size": 13,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 1043,
+      "checkUs": 4258
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 15,
+      "checkUs": 1014
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 47,
+      "checkUs": 898
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 87,
+      "checkUs": 1267
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 138,
+      "checkUs": 1110
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 226,
+      "checkUs": 1949
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 378,
+      "checkUs": 2092
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 658,
+      "checkUs": 3120
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 1194,
+      "checkUs": 3740
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 2242,
+      "checkUs": 5960
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 10,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 4314,
+      "checkUs": 7034
+    },
+    {
+      "mode": "check",
+      "kind": "composition",
+      "size": 11,
+      "success": false,
+      "diagnostics": [
+        "nesting_limit"
+      ],
+      "nodes": 6898,
+      "checkUs": 8771
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 15,
+      "checkUs": 762
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 47,
+      "checkUs": 994
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 87,
+      "checkUs": 941
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 138,
+      "checkUs": 1118
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 226,
+      "checkUs": 1202
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 378,
+      "checkUs": 1479
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 658,
+      "checkUs": 1885
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 1194,
+      "checkUs": 2621
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 2242,
+      "checkUs": 4731
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 10,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 4314,
+      "checkUs": 7432
+    },
+    {
+      "mode": "check",
+      "kind": "mixedComposition",
+      "size": 11,
+      "success": false,
+      "diagnostics": [
+        "nesting_limit"
+      ],
+      "nodes": 6898,
+      "checkUs": 9361
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 17,
+      "checkUs": 1301
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 57,
+      "checkUs": 962
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 126,
+      "checkUs": 1099
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 250,
+      "checkUs": 1252
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 466,
+      "checkUs": 1488
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 870,
+      "checkUs": 2364
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 1649,
+      "checkUs": 3219
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 3209,
+      "checkUs": 5847
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 6311,
+      "checkUs": 12062
+    },
+    {
+      "mode": "check",
+      "kind": "diamondComposition",
+      "size": 10,
+      "success": false,
+      "diagnostics": [
+        "nesting_limit"
+      ],
+      "nodes": 10188,
+      "checkUs": 18243
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 1,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 15,
+      "checkUs": 780
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 2,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 47,
+      "checkUs": 1041
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 3,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 87,
+      "checkUs": 999
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 4,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 138,
+      "checkUs": 1169
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 5,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 226,
+      "checkUs": 1887
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 6,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 378,
+      "checkUs": 2449
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 7,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 658,
+      "checkUs": 2868
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 8,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 1194,
+      "checkUs": 2840
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 9,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 2242,
+      "checkUs": 8032
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 10,
+      "success": true,
+      "diagnostics": [],
+      "nodes": 4314,
+      "checkUs": 11865
+    },
+    {
+      "mode": "check",
+      "kind": "recordComposition",
+      "size": 11,
+      "success": false,
+      "diagnostics": [
+        "nesting_limit"
+      ],
+      "nodes": 6898,
+      "checkUs": 8865
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 32,
+      "ms": 4.431301000000076,
+      "bytes": 782,
+      "checkUs": 1136,
+      "bodies": 33,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 231,
+      "schemeCalls": 33,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 64,
+      "ms": 2.7553360000001703,
+      "bytes": 1550,
+      "checkUs": 1158,
+      "bodies": 65,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 455,
+      "schemeCalls": 65,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 128,
+      "ms": 5.270005000000083,
+      "bytes": 3114,
+      "checkUs": 2542,
+      "bodies": 129,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 903,
+      "schemeCalls": 129,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 256,
+      "ms": 5.522835000000214,
+      "bytes": 6314,
+      "checkUs": 2752,
+      "bodies": 257,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1799,
+      "schemeCalls": 257,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 512,
+      "ms": 8.008269000000155,
+      "bytes": 12714,
+      "checkUs": 4461,
+      "bodies": 513,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 3591,
+      "schemeCalls": 513,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 1024,
+      "ms": 13.826735999999983,
+      "bytes": 25538,
+      "checkUs": 8415,
+      "bodies": 1025,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 7175,
+      "schemeCalls": 1025,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 2048,
+      "ms": 25.52209199999993,
+      "bytes": 52162,
+      "checkUs": 16262,
+      "bodies": 2049,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 14343,
+      "schemeCalls": 2049,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "identity",
+      "size": 4096,
+      "ms": 69.9571249999999,
+      "bytes": 105410,
+      "checkUs": 45841,
+      "bodies": 4097,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 28679,
+      "schemeCalls": 4097,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 32,
+      "ms": 5.601536000000124,
+      "bytes": 1070,
+      "checkUs": 2724,
+      "bodies": 33,
+      "scans": 32,
+      "candidates": 32,
+      "nodes": 231,
+      "schemeCalls": 33,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 64,
+      "ms": 7.292809000000034,
+      "bytes": 2126,
+      "checkUs": 3711,
+      "bodies": 65,
+      "scans": 64,
+      "candidates": 64,
+      "nodes": 455,
+      "schemeCalls": 65,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 128,
+      "ms": 12.108119999999872,
+      "bytes": 4266,
+      "checkUs": 8131,
+      "bodies": 129,
+      "scans": 128,
+      "candidates": 128,
+      "nodes": 903,
+      "schemeCalls": 129,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 256,
+      "ms": 15.366482000000133,
+      "bytes": 8618,
+      "checkUs": 10283,
+      "bodies": 257,
+      "scans": 256,
+      "candidates": 256,
+      "nodes": 1799,
+      "schemeCalls": 257,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 512,
+      "ms": 37.11515300000019,
+      "bytes": 17322,
+      "checkUs": 25452,
+      "bodies": 513,
+      "scans": 512,
+      "candidates": 512,
+      "nodes": 3591,
+      "schemeCalls": 513,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 1024,
+      "ms": 38.62007199999994,
+      "bytes": 34754,
+      "checkUs": 26716,
+      "bodies": 1025,
+      "scans": 1024,
+      "candidates": 1024,
+      "nodes": 7175,
+      "schemeCalls": 1025,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 2048,
+      "ms": 80.88674600000013,
+      "bytes": 70594,
+      "checkUs": 60095,
+      "bodies": 2049,
+      "scans": 2048,
+      "candidates": 2048,
+      "nodes": 14343,
+      "schemeCalls": 2049,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "fields",
+      "size": 4096,
+      "ms": 183.0333410000003,
+      "bytes": 142274,
+      "checkUs": 144066,
+      "bodies": 4097,
+      "scans": 4096,
+      "candidates": 4096,
+      "nodes": 28679,
+      "schemeCalls": 4097,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 32,
+      "ms": 3.995503000000099,
+      "bytes": 1742,
+      "checkUs": 1889,
+      "bodies": 33,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 327,
+      "schemeCalls": 33,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 64,
+      "ms": 4.068651999999929,
+      "bytes": 3470,
+      "checkUs": 1986,
+      "bodies": 65,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 647,
+      "schemeCalls": 65,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 128,
+      "ms": 5.778361000000132,
+      "bytes": 6954,
+      "checkUs": 3103,
+      "bodies": 129,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1287,
+      "schemeCalls": 129,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 256,
+      "ms": 20.730685999999878,
+      "bytes": 13994,
+      "checkUs": 11879,
+      "bodies": 257,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 2567,
+      "schemeCalls": 257,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 512,
+      "ms": 20.364700999999968,
+      "bytes": 28074,
+      "checkUs": 11480,
+      "bodies": 513,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 5127,
+      "schemeCalls": 513,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 1024,
+      "ms": 36.19121600000017,
+      "bytes": 56258,
+      "checkUs": 22076,
+      "bodies": 1025,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 10247,
+      "schemeCalls": 1025,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 2048,
+      "ms": 69.90900300000021,
+      "bytes": 113602,
+      "checkUs": 44201,
+      "bodies": 2049,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 20487,
+      "schemeCalls": 2049,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "annotated",
+      "size": 4096,
+      "ms": 118.65294499999982,
+      "bytes": 228290,
+      "checkUs": 76859,
+      "bodies": 4097,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 40967,
+      "schemeCalls": 4097,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 1,
+      "ms": 2.3551949999996395,
+      "bytes": 55,
+      "checkUs": 725,
+      "bodies": 2,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 15,
+      "schemeCalls": 2,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 2,
+      "ms": 3.0889109999998254,
+      "bytes": 97,
+      "checkUs": 1356,
+      "bodies": 3,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 47,
+      "schemeCalls": 3,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 3,
+      "ms": 2.700663000000077,
+      "bytes": 139,
+      "checkUs": 1156,
+      "bodies": 4,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 87,
+      "schemeCalls": 4,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 4,
+      "ms": 2.847892000000229,
+      "bytes": 181,
+      "checkUs": 1208,
+      "bodies": 5,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 138,
+      "schemeCalls": 5,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 5,
+      "ms": 2.971678000000338,
+      "bytes": 223,
+      "checkUs": 1214,
+      "bodies": 6,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 226,
+      "schemeCalls": 6,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 6,
+      "ms": 4.193569000000025,
+      "bytes": 265,
+      "checkUs": 2034,
+      "bodies": 7,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 378,
+      "schemeCalls": 7,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 7,
+      "ms": 3.9736219999999776,
+      "bytes": 307,
+      "checkUs": 1993,
+      "bodies": 8,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 658,
+      "schemeCalls": 8,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 8,
+      "ms": 5.569524000000456,
+      "bytes": 349,
+      "checkUs": 2824,
+      "bodies": 9,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1194,
+      "schemeCalls": 9,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 9,
+      "ms": 15.165469999999914,
+      "bytes": 391,
+      "checkUs": 7822,
+      "bodies": 10,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 2242,
+      "schemeCalls": 10,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 10,
+      "ms": 13.971380999999838,
+      "bytes": 433,
+      "checkUs": 7419,
+      "bodies": 11,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 4314,
+      "schemeCalls": 11,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "composition",
+      "size": 11,
+      "ms": 15.066131000000041,
+      "diagnostic": [
+        "nesting_limit"
+      ]
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 1,
+      "ms": 2.988319000000047,
+      "bytes": 58,
+      "checkUs": 1070,
+      "bodies": 2,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 15,
+      "schemeCalls": 2,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 2,
+      "ms": 2.3430920000000697,
+      "bytes": 100,
+      "checkUs": 866,
+      "bodies": 3,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 47,
+      "schemeCalls": 3,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 3,
+      "ms": 2.501854000000094,
+      "bytes": 142,
+      "checkUs": 1006,
+      "bodies": 4,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 87,
+      "schemeCalls": 4,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 4,
+      "ms": 3.131992000000082,
+      "bytes": 184,
+      "checkUs": 1204,
+      "bodies": 5,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 138,
+      "schemeCalls": 5,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 5,
+      "ms": 4.554325000000063,
+      "bytes": 226,
+      "checkUs": 1973,
+      "bodies": 6,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 226,
+      "schemeCalls": 6,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 6,
+      "ms": 3.7111619999996037,
+      "bytes": 268,
+      "checkUs": 1848,
+      "bodies": 7,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 378,
+      "schemeCalls": 7,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 7,
+      "ms": 4.14325400000007,
+      "bytes": 310,
+      "checkUs": 1952,
+      "bodies": 8,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 658,
+      "schemeCalls": 8,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 8,
+      "ms": 8.33308500000021,
+      "bytes": 352,
+      "checkUs": 4802,
+      "bodies": 9,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1194,
+      "schemeCalls": 9,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 9,
+      "ms": 8.984484000000066,
+      "bytes": 394,
+      "checkUs": 4132,
+      "bodies": 10,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 2242,
+      "schemeCalls": 10,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 10,
+      "ms": 21.667727000000014,
+      "bytes": 436,
+      "checkUs": 10326,
+      "bodies": 11,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 4314,
+      "schemeCalls": 11,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "mixedComposition",
+      "size": 11,
+      "ms": 11.706207000000177,
+      "diagnostic": [
+        "nesting_limit"
+      ]
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 1,
+      "ms": 2.92159300000003,
+      "bytes": 65,
+      "checkUs": 1027,
+      "bodies": 2,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 17,
+      "schemeCalls": 2,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 2,
+      "ms": 3.2641419999999925,
+      "bytes": 107,
+      "checkUs": 1337,
+      "bodies": 3,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 57,
+      "schemeCalls": 3,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 3,
+      "ms": 3.825960999999552,
+      "bytes": 149,
+      "checkUs": 1711,
+      "bodies": 4,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 126,
+      "schemeCalls": 4,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 4,
+      "ms": 4.2198090000001685,
+      "bytes": 191,
+      "checkUs": 1687,
+      "bodies": 5,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 250,
+      "schemeCalls": 5,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 5,
+      "ms": 4.501133999999638,
+      "bytes": 233,
+      "checkUs": 2039,
+      "bodies": 6,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 466,
+      "schemeCalls": 6,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 6,
+      "ms": 4.549766000000091,
+      "bytes": 275,
+      "checkUs": 2200,
+      "bodies": 7,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 870,
+      "schemeCalls": 7,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 7,
+      "ms": 9.269244999999955,
+      "bytes": 317,
+      "checkUs": 4266,
+      "bodies": 8,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1649,
+      "schemeCalls": 8,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 8,
+      "ms": 15.453758000000107,
+      "bytes": 359,
+      "checkUs": 8891,
+      "bodies": 9,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 3209,
+      "schemeCalls": 9,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 9,
+      "ms": 25.803777000000082,
+      "bytes": 401,
+      "checkUs": 15669,
+      "bodies": 10,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 6311,
+      "schemeCalls": 10,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "diamondComposition",
+      "size": 10,
+      "ms": 17.51207899999963,
+      "diagnostic": [
+        "nesting_limit"
+      ]
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 1,
+      "ms": 2.668380999999954,
+      "bytes": 79,
+      "checkUs": 1033,
+      "bodies": 2,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 15,
+      "schemeCalls": 2,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 2,
+      "ms": 2.4491750000001957,
+      "bytes": 121,
+      "checkUs": 892,
+      "bodies": 3,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 47,
+      "schemeCalls": 3,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 3,
+      "ms": 2.6895510000003924,
+      "bytes": 163,
+      "checkUs": 1022,
+      "bodies": 4,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 87,
+      "schemeCalls": 4,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 4,
+      "ms": 3.626321000000189,
+      "bytes": 205,
+      "checkUs": 1432,
+      "bodies": 5,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 138,
+      "schemeCalls": 5,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 5,
+      "ms": 2.9127149999999347,
+      "bytes": 247,
+      "checkUs": 1295,
+      "bodies": 6,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 226,
+      "schemeCalls": 6,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 6,
+      "ms": 3.4108619999997245,
+      "bytes": 289,
+      "checkUs": 1596,
+      "bodies": 7,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 378,
+      "schemeCalls": 7,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 7,
+      "ms": 5.476767999999993,
+      "bytes": 331,
+      "checkUs": 2727,
+      "bodies": 8,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 658,
+      "schemeCalls": 8,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 8,
+      "ms": 5.646930999999768,
+      "bytes": 373,
+      "checkUs": 2667,
+      "bodies": 9,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 1194,
+      "schemeCalls": 9,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 9,
+      "ms": 9.280055000000175,
+      "bytes": 415,
+      "checkUs": 4757,
+      "bodies": 10,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 2242,
+      "schemeCalls": 10,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 10,
+      "ms": 15.896880000000237,
+      "bytes": 457,
+      "checkUs": 7571,
+      "bodies": 11,
+      "scans": 0,
+      "candidates": 0,
+      "nodes": 4314,
+      "schemeCalls": 11,
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761"
+    },
+    {
+      "mode": "build",
+      "kind": "recordComposition",
+      "size": 11,
+      "ms": 13.50967300000002,
+      "diagnostic": [
+        "nesting_limit"
+      ]
+    }
+  ],
+  "freshMainMs": {
+    "before": 1088.259,
+    "after": 1070.705,
+    "fasterPairs": 7,
+    "pairs": 16
+  },
+  "checkMainMs": {
+    "before": 576.849,
+    "after": 579.668,
+    "fasterPairs": 3,
+    "pairs": 4
+  },
+  "editsMs": {
+    "edit": {
+      "before": 64.633,
+      "after": 50.232,
+      "fasterPairs": 2,
+      "pairs": 3
+    },
+    "fresh": {
+      "before": 971.969,
+      "after": 967.418,
+      "fasterPairs": 2,
+      "pairs": 3
+    },
+    "lex": {
+      "before": 74.687,
+      "after": 70.501,
+      "fasterPairs": 3,
+      "pairs": 3
+    },
+    "recover": {
+      "before": 46.064,
+      "after": 44.686,
+      "fasterPairs": 3,
+      "pairs": 3
+    },
+    "reject": {
+      "before": 392.755,
+      "after": 382.498,
+      "fasterPairs": 2,
+      "pairs": 3
+    },
+    "syntax": {
+      "before": 75.956,
+      "after": 79.244,
+      "fasterPairs": 2,
+      "pairs": 3
+    }
+  },
+  "gdevTrials": [
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "fresh",
+      "ms": 1013.305861,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "fresh",
+      "ms": 1104.1369980000002,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "fresh",
+      "ms": 1098.4562410000003,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "fresh",
+      "ms": 1082.1897159999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "fresh",
+      "ms": 1094.3282639999998,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "fresh",
+      "ms": 1124.8671489999997,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 4,
+      "step": "fresh",
+      "ms": 1063.1226660000002,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 4,
+      "step": "fresh",
+      "ms": 1114.177900999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 5,
+      "step": "fresh",
+      "ms": 969.5165419999994,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 5,
+      "step": "fresh",
+      "ms": 1121.1436460000004,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 6,
+      "step": "fresh",
+      "ms": 1064.3096370000003,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 6,
+      "step": "fresh",
+      "ms": 1003.3183070000014,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 7,
+      "step": "fresh",
+      "ms": 1117.8791390000006,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 7,
+      "step": "fresh",
+      "ms": 1060.261339999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 8,
+      "step": "fresh",
+      "ms": 1139.4043230000007,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 8,
+      "step": "fresh",
+      "ms": 1109.8927070000027,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 9,
+      "step": "fresh",
+      "ms": 1043.4304200000006,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 9,
+      "step": "fresh",
+      "ms": 1056.045573000003,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 10,
+      "step": "fresh",
+      "ms": 1077.100284,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 10,
+      "step": "fresh",
+      "ms": 1114.209766,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 11,
+      "step": "fresh",
+      "ms": 1105.889361999998,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 11,
+      "step": "fresh",
+      "ms": 1024.9751199999992,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 12,
+      "step": "fresh",
+      "ms": 1049.3504839999987,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 12,
+      "step": "fresh",
+      "ms": 1163.263171999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 13,
+      "step": "fresh",
+      "ms": 1237.1578100000006,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 13,
+      "step": "fresh",
+      "ms": 1106.8383600000016,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 14,
+      "step": "fresh",
+      "ms": 1370.5388139999995,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 14,
+      "step": "fresh",
+      "ms": 1014.9019500000031,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 15,
+      "step": "fresh",
+      "ms": 954.0931279999968,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 15,
+      "step": "fresh",
+      "ms": 1010.7165740000019,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 16,
+      "step": "fresh",
+      "ms": 1006.3209700000007,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 16,
+      "step": "fresh",
+      "ms": 1027.310325999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    }
+  ],
+  "profileTrials": [
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "fresh",
+      "ms": 984.187355,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 22405,
+        "assets": 40727,
+        "load": 125968,
+        "lex": 175,
+        "parse": 918,
+        "check": 574735,
+        "lower": 35227,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 153641
+      }
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "fresh",
+      "ms": 996.000233,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 22721,
+        "assets": 41411,
+        "load": 115602,
+        "lex": 266,
+        "parse": 920,
+        "check": 602803,
+        "lower": 38893,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 147390
+      }
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "fresh",
+      "ms": 945.6894109999998,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 19994,
+        "assets": 43702,
+        "load": 127302,
+        "lex": 169,
+        "parse": 840,
+        "check": 542530,
+        "lower": 34311,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 151434
+      }
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "fresh",
+      "ms": 985.7267470000002,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 21482,
+        "assets": 42687,
+        "load": 128539,
+        "lex": 186,
+        "parse": 860,
+        "check": 578962,
+        "lower": 43649,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 150541
+      }
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "fresh",
+      "ms": 1015.126487,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 21564,
+        "assets": 48127,
+        "load": 127912,
+        "lex": 227,
+        "parse": 867,
+        "check": 573399,
+        "lower": 32308,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 185695
+      }
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "fresh",
+      "ms": 981.881738,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 21586,
+        "assets": 55274,
+        "load": 134140,
+        "lex": 316,
+        "parse": 1242,
+        "check": 571740,
+        "lower": 32352,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 146481
+      }
+    },
+    {
+      "mode": "after",
+      "round": 4,
+      "step": "fresh",
+      "ms": 996.5992960000003,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 22868,
+        "assets": 45577,
+        "load": 121717,
+        "lex": 171,
+        "parse": 888,
+        "check": 587596,
+        "lower": 41245,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 155194
+      }
+    },
+    {
+      "mode": "before",
+      "round": 4,
+      "step": "fresh",
+      "ms": 1004.5995979999998,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0,
+      "phasesUs": {
+        "other": 22836,
+        "assets": 41246,
+        "load": 120872,
+        "lex": 191,
+        "parse": 842,
+        "check": 594635,
+        "lower": 39376,
+        "freeze": 0,
+        "validation": 0,
+        "backend": 163445
+      }
+    }
+  ],
+  "editTrials": [
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "fresh",
+      "ms": 978.260273,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "edit",
+      "ms": 64.63315799999998,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "reject",
+      "ms": 444.2872169999998,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "syntax",
+      "ms": 101.16690599999993,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "lex",
+      "ms": 104.29362800000013,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 1,
+      "step": "recover",
+      "ms": 57.95623000000023,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "fresh",
+      "ms": 967.4176360000001,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "edit",
+      "ms": 50.23214999999982,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "reject",
+      "ms": 375.3986110000001,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "syntax",
+      "ms": 79.24413499999991,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "lex",
+      "ms": 71.0816420000001,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 1,
+      "step": "recover",
+      "ms": 47.10350500000004,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "fresh",
+      "ms": 1002.1866989999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "edit",
+      "ms": 47.469098999999915,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "reject",
+      "ms": 437.0160070000002,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "syntax",
+      "ms": 100.17607300000054,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "lex",
+      "ms": 68.6568640000005,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 2,
+      "step": "recover",
+      "ms": 44.685849999999846,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "fresh",
+      "ms": 971.9693219999999,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "edit",
+      "ms": 65.58070899999984,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "reject",
+      "ms": 392.75467300000037,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "syntax",
+      "ms": 74.72079799999938,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "lex",
+      "ms": 74.15079400000013,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 2,
+      "step": "recover",
+      "ms": 46.06394,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "fresh",
+      "ms": 960.3832319999992,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "edit",
+      "ms": 48.52932400000009,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "reject",
+      "ms": 386.14470099999926,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "syntax",
+      "ms": 75.9564360000004,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "lex",
+      "ms": 74.68749399999979,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "before",
+      "round": 3,
+      "step": "recover",
+      "ms": 45.51388399999996,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "fresh",
+      "ms": 913.9430670000002,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 271,
+      "cached": 0
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "edit",
+      "ms": 61.35480699999971,
+      "success": true,
+      "hash": "e6d0bfe424c4ef2d98b4f0ef4823fd582fe4d047769fbd744a6b059dfdf82d60",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "reject",
+      "ms": 382.49814100000003,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "check-project",
+          "code": "unknown_value",
+          "start": 535,
+          "end": 535,
+          "message": "unknown value: unresolved_probe",
+          "offset_encoding": "utf8_bytes",
+          "utf16": null,
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "syntax",
+      "ms": 75.19672200000059,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "GPU_FRONTEND_MALFORMED_DELIMITER",
+          "start": 535,
+          "end": 536,
+          "message": "A source delimiter does not match its enclosing pair",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 535,
+            "end": 536
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "lex",
+      "ms": 70.50095800000054,
+      "success": false,
+      "diagnostics": [
+        {
+          "filename": "/home/jacobt/src/blot2/build/mixed-ownership/fixtures/gdev/src/effects/lighting_look.blot",
+          "stage": "parse-project",
+          "code": "LEX_UNEXPECTED_CHARACTER",
+          "start": 1901,
+          "end": 1902,
+          "message": "The source string token cannot be recognized",
+          "offset_encoding": "utf8_bytes",
+          "utf16": {
+            "start": 1901,
+            "end": 1902
+          },
+          "details": null
+        }
+      ]
+    },
+    {
+      "mode": "after",
+      "round": 3,
+      "step": "recover",
+      "ms": 43.675139000000854,
+      "success": true,
+      "hash": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+      "bytes": 2639638,
+      "fresh": 1,
+      "cached": 270
+    }
+  ],
+  "gate": {
+    "passed": 1104,
+    "ignored": 100,
+    "fixtures": "192 of 192 fixtures match the record",
+    "uniqueness": "uniqueness: 212 of 212 programs match the record (113 with rejections, 99 accepted)",
+    "direct": "runtime: ok (3373 bytes)\nwriter: ok (352 bytes)"
+  },
+  "qualification": {
+    "compilerSha256": "c2429570c26f5b3103c6c75a48b2c3e98d0992595bf183b19e8d85e2b13a57ee",
+    "mainBytes": 2639638,
+    "mainSha256": "8108ae44fb0362dc4c2943acabe22b23df1823028c176d3dcb0a030fc32ed350",
+    "replayFiles": 242,
+    "replayDifferences": [],
+    "gdev": {
+      "exit": 1,
+      "passed": 1220,
+      "failed": 108,
+      "differences": {},
+      "summary": [
+        "all               1220 passed, 108 failed, in 210 modules (143.7 s, 4 jobs)"
+      ],
+      "referenceLogSha256": "bc8ef5d1fa946fb927f255ddb4ebf67f4a43f7c2e55cafbb9e96d902f9545132",
+      "modules": 210,
+      "namedOutcomeChanges": 0
+    },
+    "ink": {
+      "exit": 1,
+      "passed": 280,
+      "failed": 0,
+      "differences": {},
+      "summary": [
+        "all               280 passed, 0 failed, in 73 modules (9.1 s, 2 jobs)"
+      ],
+      "referenceLogSha256": "a1a66556e88b604641e41f177a460436d6fa112020640f5665c7328342dc468e",
+      "modules": 73,
+      "namedOutcomeChanges": 0,
+      "native": {
+        "passed": 111,
+        "failed": [
+          "algorithm::dense_bodies_and_snapshots_keep_committed_memory_bounded",
+          "ui_reference::ui_and_text_adversarial_workloads_reuse_bounded_memory"
+        ],
+        "namedOutcomeChanges": 0
+      }
+    },
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTrace": "86d50101e7df18d021aadd441fa184ef24f8d6be16d94b4b49947cface03b08f",
+    "frameMatchesPrevious": true
+  },
+  "additionalEntries": {
+    "performance/traced_main.blot": {
+      "bytes": 2639804,
+      "sha256": "0f136bc80d6a0e41b3e663f082a907de647252d0457d03cacf3d168ba1472a60"
+    },
+    "performance/reference_main.blot": {
+      "bytes": 2643639,
+      "sha256": "e29e49be8f596e8ff93bdc3672ab876a505d3696216f75945f0aa5205d649415"
+    },
+    "performance/transport_reference_main.blot": {
+      "bytes": 2642164,
+      "sha256": "1609addb969b78915c5792f98740c13f14337451a838a387ea7b15716666e649"
+    }
+  }
+}
