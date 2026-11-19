@@ -1,13 +1,29 @@
 # Working on Blot and Gdev
 
-Player and worker drops now pass one salt owner through pile insertion, the
+Editing an existing salt pile now takes and returns its owner. Active piles
+stay in slot order. A relocated pile queues its own slot for cleanup, and a
+sparse sweep produces the same saved world as a full sweep. Player pickups,
+haulers and miners use this path. A miner sees earlier successful withdrawals
+in its tick and can retry a rejected throw without consuming a brick.
+
+On the pinned Gdev sources, all 1,340 existing test outcomes matched and
+three new checks passed (1,236 passes, 107 existing failures). All 242 files
+from the 120-frame replay, the hardware screenshot and its trace matched.
+Median fresh Main compile time was **966 → 989 ms** across seven eight-worker
+pairs with warm files. Main grew **4,929 bytes** to **2,716,145**. Across 17
+guest samples, batched edits took 0.408 → 0.373 ms, direct edits took
+0.624 → 0.693 ms and the short economy run took 8.44 → 8.88 ms. The complete
+published Gdev tree also built and rendered its first frame.
+[Inputs, checks and timings](benchmarks/evidence/measurements/2026-11-19-owned-pile-edits.json)
+
+The preceding insertion change made player and worker drops pass one salt owner through pile insertion, the
 active index and the cleanup journal. Of 400 seeded piles, the first cleanup
 previously queued 33 for another sweep. Checking the final positions left one
 genuine retry. After it clears, inserting at slot 400 selects only that slot.
 An explicit snapshot survives a later drop, and all three backing arrays keep
 their address and capacity when shortened from eight to six and grown to seven.
 
-The pinned Gdev comparison gained one repaired check and three new passes,
+That pinned Gdev comparison gained one repaired check and three new passes,
 with 107 existing failures. All 242 replay files and the hardware frame matched.
 Across seven fresh eight-worker build pairs on a shared host, median Main
 compile time went from 2,326 to 2,339 ms and Wasm grew by 1,234 bytes to
@@ -123,12 +139,12 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
    A borrowed `@storage.push` changed a saved alias's length from one to two.
    A borrowed `@storage.truncate` changed it to zero. An `own` helper
    rejects the live alias, and an explicit copy preserves its length.
-   Next migrate Gdev's `salt_simulation.write_stack`. Changing an existing
-   pile can move its active index and append to both update journals through
-   a borrowed salt record. Use insertion's owning boundary and compare active
-   ordering, journal contents and sparse cleanup against a full sweep.
-   The [source scan](scripts/integration/count_stores.py) finds **997
-   candidate store lines** plus one deliberately rejected regression.
+   Next migrate Gdev's `salt.replace_stacks_into` and its borrowed grid
+   rebuild. Replacement issues fresh pile IDs. Check that their order, the
+   active prefix and spatial lookups survive replacement, and that a saved
+   world restores its original IDs. The [source scan](scripts/integration/count_stores.py)
+   counts **987 store-shaped lines** across the pinned Gdev and Ink sources,
+   down from 1,004 on the same inputs. This includes rejection fixtures.
    Gdev and Ink have **zero `lent` declarations**, down from 15. The compiler
    still accepts `lent` and shared stores to arrays while callers migrate.
 2. Reduce committed linear memory while preserving the contiguous scratch

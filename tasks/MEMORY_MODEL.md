@@ -10,8 +10,16 @@ the count and credit. The Wasm probe observes the pile rows, active index and
 cleanup journal at lengths 8, 6 and 7. All three keep their original payload
 address, capacity and generation. Run
 `deno run -A benchmarks/language/salt_ownership.ts ../gdev` from the Blot root.
-Existing-pile edits still resize shared columns in `salt_simulation.write_stack`.
 [Source revisions, probes and comparison](../benchmarks/evidence/measurements/2026-11-19-owned-salt-insertion.json)
+
+Editing an existing pile now takes and returns the same salt owner. Its sorted
+active index and its separate render and cleanup journals move with it. The
+checker rejects use of a saved active-index alias after an edit. A copied pile
+snapshot retains its original contents. Miner throws check their landings
+before publishing edits, and later workers see each successful withdrawal in
+order. The authoring helper `salt.replace_stacks_into` still resizes borrowed
+arrays when replacing a collection.
+[Existing-pile tests and measurements](../benchmarks/evidence/measurements/2026-11-19-owned-pile-edits.json)
 
 On 19 November 2026 the last four Ink `lent` declarations became read-only
 scene and prepared-physics ranges. Gdev had already removed its last two

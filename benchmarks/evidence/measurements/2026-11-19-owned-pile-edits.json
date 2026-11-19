@@ -1,0 +1,486 @@
+{
+  "date": "2026-11-19",
+  "scope": "Ownership of existing Gdev pile edits, pickups, hauling, mine throws, active indices and the separate render and cleanup journals.",
+  "inputs": {
+    "blot": "a765ea54d0be537d9dadf9a9f7ba6d443ffa7126",
+    "compilerSha256": "d0eb64e6cd73cad33d30233d105a3c439189dd7fc8ebb2fe0057f853c4d90109",
+    "guestAbi": 8,
+    "projectSessionProtocol": 2,
+    "gdevProjectSessionIdentity": "63a7b221c923fa03a325038a2ba0e4e2eea3c5c78c5f7cc8db9918e1c4d3f4ff",
+    "ink": "a2d53352c32ed7f1dcbf44a3d514a531a7a92b3e",
+    "pen": "ad9766ca70c4939e29ee7262df9fb8dd55a42f1e",
+    "penBinarySha256": "c903437dffb5a86236a8e3f8d8dd6ff37d631509b94e8ce352f72df0717c4f6c",
+    "penBlotPluginSha256": "f8b6f79986f83f7764577bbffb5ca1a6d4e73de2c018ca39cde6e821f98d4601",
+    "gdevControl": "e0d37e0706c816212fe3d46059b27bf21bd2359e",
+    "pinnedCandidate": {
+      "base": "e0d37e0706c816212fe3d46059b27bf21bd2359e",
+      "applyGitDiffOfCommitToBase": "71bb02ded62b105a0675e1682556eaa47f66cd3b",
+      "pathsWithConcurrentSourceChanges": [
+        "src/actors/robots.blot",
+        "test_support/sparse_work.blot"
+      ],
+      "filesSha256": {
+        "performance/algorithm-audit.blot": "4cb5bc1c37f8f138b0e35a37036f82e0b588ce3956ed3293096cf9bb03cec803",
+        "performance/modernize/pile_lookup.blot": "7f54d94dac48bd1617ad3e264ddb9e6dc2a7ebad47f61e6f5368593ed57c41ac",
+        "src/actors/kites.blot": "21ff2cff5244a008fde9cd32b76aafd504e1d37a1cdde7fb4d1bd2265dd5b7f5",
+        "src/actors/minors.blot": "0bbf51a38e1285c1744f4e76200d441c819aa41f103b119d9126588a407563fa",
+        "src/actors/robots.blot": "aa64f7b345be9793fbade77ab9aa042c87a67ad7bdb32b507f454577f6ee269e",
+        "src/effects/pickup_outline.blot": "08a983b477f615ba811a72030716948f5648300973ebc48473d9de4319d9b403",
+        "src/player/hand.blot": "a32664fcea8f2006f88f56ed91979ae526dae8b896309f732b966a819f00c6e7",
+        "src/player/hover.blot": "0ce49ba4908d27ac425da986c0360543e65675785d352e4fb282c436dd23c121",
+        "src/progression/tutorial.blot": "9e045ef2d8dbe5187c71cea3ce74d353834ef257a020f6e60403654c81636799",
+        "src/world/material_batch.blot": "da7827741aabeb842cc47b977a15f8273b4872e6e20035b5ed2626b026658098",
+        "src/world/pile_batch.blot": "f524ccb9abdb25a717c34f25bfc2cd80a3a6478e9017ecacce3d84c39dbac7e9",
+        "src/world/salt.blot": "23b18a14de253b74fc3058b49817744056620a848473675fd5c4a1461b5ebafe",
+        "src/world/salt_simulation.blot": "89ab8ec6835a414561a1472dfc6110c6668f190159cf7f499a0d0baef4aa48a2",
+        "src/world/world_ground.blot": "f903e72593ef5324d5a5d5e305a21c75803aef6f1c9f1593cd9c27045173b0bc",
+        "test_support/sparse_work.blot": "77da9f5e58048550d5e9dbf2b2913659b7e5ec6f530f44d7e1ce2aad6bc0c064",
+        "tests/actor_inspection.blot": "70f1cff0fff1c957f70d6f9fd54e4c29473fa0de8861ca5dad99c4973e321318",
+        "tests/ascension_stream.blot": "3aef6252b6b64ce68b284dedb94ad11889fd96f31ef73059ff15e6cb4d79215a",
+        "tests/cannon.blot": "373819b62c84e32d7479c94623e62c1955daf3e307e49dc93b5cbfb145d87b36",
+        "tests/colony_controls.blot": "d1aea1d458e42630edd6abdbf6e1ada43fb573a13110c1e0617465ae6729fbb6",
+        "tests/construction_caches.blot": "b17e8d75e95060c1eb34330355410c5565a1ca3a3386bcd16dbc7bdb0604b93b",
+        "tests/construction_delivery.blot": "b8d00d34df95df909b1665e62f9450799132a3a92b9050604f03eab3b5e63716",
+        "tests/construction_hand.blot": "087662a27df1eafa59de6569f9d833a1b8592b55bd9df6d4c5b241d1bd135867",
+        "tests/deposits.blot": "8c7d0da04bec1c8457b20fc5b62455a18b55a90a3e7fb6adef6612de26c07e7f",
+        "tests/goals.blot": "46866fb55cd7c901054ac98ea340b9b1797d57315b2d3e0d470a6923a7abdf96",
+        "tests/hand_salt.blot": "def7e12fb619efd7f54747b82e0ac56d1089b073fd559930dee864a59fca4863",
+        "tests/hauling_plan.blot": "90111d3eb4b01cc87bdd7a7023e1cd3b219afc17a890c489769d7a1edc3ce815",
+        "tests/hauling_support/scenario.blot": "291c68a4fb836e57cddcb64db93c45b57a3196d4225ee0310f1b78e300aff91c",
+        "tests/interface_hand_gestures.blot": "101ca7fcfc900317411488c65815549221e61eeb830b62d76f5b7feaa81bb5b5",
+        "tests/kites.blot": "05607ffdbe7d02b47a77c070698ca35ba8657bc4cee1db8e7f20f67692bffe39",
+        "tests/live_transfers.blot": "5b78beb67f915ab2f2ece73c8b593e327ad7de35f7c6e1c80d79b0c56cf46968",
+        "tests/material_batch.blot": "6da2478f5d6f2d2d6570b6f472f189b0b799ba82ece9fb8005b19279cf35a4d7",
+        "tests/minor_routes.blot": "864edda637bfc616c50d75f9bc5bb430ea1a38616e100481b3e56bc1b4eab648",
+        "tests/minor_support/owned.blot": "f17c9109396992198886cd3c8ee876173189b49ca5e9d7eb1140729a99fda14a",
+        "tests/minors.blot": "1e09c3b3a4de3375168f02b282b0cee8cee115375c6dba75b316f3c124a1f2d3",
+        "tests/minors_game.blot": "cf268f08ffd1c1b9b1857868baade5f7c90a090c22ecb65664bbdab685ca8b3d",
+        "tests/performance_semantics.blot": "64afc35042521802aca684b43e93a7a980ff56dc034a19171f4f02bd77b04203",
+        "tests/pickup_preview.blot": "9ac02fb9ef84c1d4a5684bc49ba2f621ba956681949ed67cb4881a7ed1fffb0a",
+        "tests/pickup_visibility.blot": "d084bf09673748dcd8152d1c134e40ac0a35cacd7545aae8f8daaa0ac5731b07",
+        "tests/pile_caches.blot": "ceca77cffb6aab9867f3cbad388c124e815ab0ab859042b9d1db6e2d33180750",
+        "tests/progression.blot": "c848e18e129089604ffb01f609baec21a07e1b5a34bace825e8aba6ba99a281d",
+        "tests/rejected/aliased_salt_edit.blot": "31d7f9c88459836ec233ad20cf7e829e1ce7c050f1966732f620390f7f421ed3",
+        "tests/robot_delivery.blot": "48a735bda18b6e107cfadeec2ed5caba5b9818bc01719ba997b7a5d3f3576238",
+        "tests/robot_flocking.blot": "6344fa793876341a3309a3ffbadb3a214d476c6ddecbb72d52f1469fdd7ca6a3",
+        "tests/salt_flight.blot": "e29fc781de6b8bae7a6db27c38199d24642bb88ca0165338a8297012f780e775",
+        "tests/scaling.blot": "40079ee08242f418f95d33e955ef311e583af337c8edb6deb0d3bf3d27b3f677",
+        "tests/simulation_features.blot": "667a33ded3728c7c16d4e15c0eb1d50671a63aa2c1f26b18cec8049576f21486",
+        "tests/sparse_work.blot": "befe7796ed734dbc2c64a95664d59fe68c8f5084aedb55786b9d8be394d18b08"
+      }
+    },
+    "gdevPublished": "71bb02ded62b105a0675e1682556eaa47f66cd3b"
+  },
+  "penSuite": {
+    "invocation": "pen test-blot --jobs 3 --project <pinned-gdev> (each variant)",
+    "control": {
+      "modules": 213,
+      "passed": 1233,
+      "failed": 107
+    },
+    "candidate": {
+      "modules": 214,
+      "passed": 1236,
+      "failed": 107
+    },
+    "changedExistingOutcomes": 0,
+    "failureSetSha256": "356f0c417033e86bfb1ce91b5bae6c0c24463874138ba13c8677ec7cac52d011",
+    "hashFormat": "SHA-256 over UTF-8 compact JSON encoding of sorted [module, check] pairs.",
+    "passesAdded": [
+      [
+        "tests/performance_semantics.blot",
+        "test_existing_pile_edits_preserve_active_order_and_independent_journals"
+      ],
+      [
+        "tests/performance_semantics.blot",
+        "test_sparse_cleanup_after_a_pile_move_matches_full_sweep"
+      ],
+      [
+        "tests/rejected/aliased_salt_edit.blot",
+        "rejected: own_argument"
+      ]
+    ]
+  },
+  "witnesses": {
+    "activePileIndicesAfterInsertion": [
+      1,
+      2,
+      3
+    ],
+    "afterRemovingMiddleFirstLast": [],
+    "afterReactivating": [
+      4
+    ],
+    "renderJournalBeforeReset": [
+      3,
+      1,
+      2,
+      2,
+      1,
+      3,
+      4
+    ],
+    "cleanupJournalAfterRelocation": [
+      2
+    ],
+    "sparseCleanupSelectedAfterMove": [
+      1
+    ],
+    "sparseAndFullWorldEncodingsEqual": true,
+    "copiedSnapshotRetainsOriginalRows": true,
+    "unsnapshottedAliasDiagnostic": "own_argument",
+    "minerComparison": "tests/material_batch.blot compares individual throw results and state with the sequential fixture. Invalid throws leave their reservations and salt rows available to the next miner."
+  },
+  "runtimeIntegration": {
+    "penCheck": "Main and Devtools compiled, saved state adapter checked, 552 asset files linted.",
+    "codegen": "pen codegen --check --project <pinned-gdev> exited 0.",
+    "replay": {
+      "frames": 120,
+      "filesCompared": 242,
+      "identical": true,
+      "fileMapSha256": "f1ab3f3332a31b3a81d7fcb823e773d8fc3ba5aa0a0b4418bec6319f654117a8",
+      "hashFormat": "UTF-8 compact JSON object mapping relative file paths to SHA-256 digests, ordered by path."
+    },
+    "hardwareFrame": {
+      "pngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "traceSha256": "58aae684b0bd9dd5863ee799aa4782fd0d968e493451a058624a7c5292c0f88a",
+      "size": [
+        640,
+        480
+      ]
+    }
+  },
+  "freshCompile": {
+    "method": "Seven alternating pairs. Each trial starts a fresh native compiler process with eight workers and warm files; elapsed time covers opening the project session through receiving Main Wasm. Excludes project options discovery and Deno startup. Shared host; suites completed before timing.",
+    "base": {
+      "freshModules": 276,
+      "wasmBytes": 2711216,
+      "sha256": "a4847f808d58685094925f7a163fb7f42285f6e0342c7f06ffe0c59dea1dc8fa",
+      "milliseconds": [
+        908.214,
+        833.243,
+        875.583,
+        1163.561,
+        1094.709,
+        977.746,
+        966.02
+      ],
+      "medianMs": 966.02
+    },
+    "candidate": {
+      "freshModules": 276,
+      "wasmBytes": 2716145,
+      "sha256": "c07afcd161d594a85d0761423de679210636cc92852bec215810bdb9a1952e75",
+      "milliseconds": [
+        802.635,
+        820.534,
+        992.815,
+        1110.005,
+        896.529,
+        1018.928,
+        988.581
+      ],
+      "medianMs": 988.581
+    },
+    "sizeChangeBytes": 4929
+  },
+  "guestBenchmarks": {
+    "method": "Release compiler, eight workers. Compile each performance module directly. Instantiate one Wasm guest per variant and alternate call order. Discard 15 warmups per guest, retain 17 samples. The host compares every result lane after every call. Corpora include input construction and result encoding.",
+    "samples": [
+      {
+        "file": "performance/algorithm-audit.blot",
+        "entry": "edits_before",
+        "input": [
+          200,
+          48
+        ],
+        "lanes": 5096,
+        "sha256": "d7e51b377e789f1cbfcaa3ffaade101c5aa084fdeea06175290380c731585a93",
+        "beforeMs": [
+          0.767,
+          0.809,
+          0.86,
+          0.822,
+          0.541,
+          0.561,
+          0.754,
+          0.765,
+          0.851,
+          0.742,
+          0.5,
+          0.504,
+          0.517,
+          0.528,
+          0.622,
+          0.624,
+          0.604
+        ],
+        "afterMs": [
+          0.807,
+          0.84,
+          0.803,
+          0.699,
+          0.55,
+          0.764,
+          0.693,
+          0.735,
+          0.712,
+          0.738,
+          0.557,
+          0.575,
+          0.524,
+          0.461,
+          0.556,
+          0.627,
+          0.567
+        ],
+        "beforeMedianMs": 0.624,
+        "afterMedianMs": 0.693
+      },
+      {
+        "file": "performance/algorithm-audit.blot",
+        "entry": "edits_batched",
+        "input": [
+          200,
+          48
+        ],
+        "lanes": 5096,
+        "sha256": "d7e51b377e789f1cbfcaa3ffaade101c5aa084fdeea06175290380c731585a93",
+        "beforeMs": [
+          0.468,
+          0.392,
+          0.419,
+          0.348,
+          0.458,
+          0.443,
+          0.408,
+          0.304,
+          0.41,
+          0.325,
+          0.361,
+          0.379,
+          0.437,
+          0.429,
+          0.486,
+          0.331,
+          0.36
+        ],
+        "afterMs": [
+          0.346,
+          0.411,
+          0.358,
+          0.443,
+          0.425,
+          0.501,
+          0.373,
+          0.345,
+          0.349,
+          0.352,
+          0.335,
+          0.364,
+          0.381,
+          0.375,
+          0.398,
+          0.35,
+          0.407
+        ],
+        "beforeMedianMs": 0.408,
+        "afterMedianMs": 0.373
+      },
+      {
+        "file": "performance/sparse-work.blot",
+        "entry": "settle_after",
+        "input": [
+          160,
+          12,
+          6
+        ],
+        "lanes": 1944,
+        "sha256": "60528cfaef4890b238dbbcbeebbf4df1e2f2c7a01caa24bbdd8b43afedee813d",
+        "beforeMs": [
+          2.114,
+          0.762,
+          0.492,
+          0.615,
+          0.548,
+          0.623,
+          0.769,
+          0.707,
+          0.486,
+          0.434,
+          0.629,
+          0.506,
+          0.549,
+          0.594,
+          0.681,
+          0.575,
+          0.373
+        ],
+        "afterMs": [
+          0.472,
+          0.692,
+          0.483,
+          0.651,
+          0.51,
+          0.576,
+          0.759,
+          0.797,
+          0.563,
+          0.508,
+          0.55,
+          0.53,
+          0.494,
+          0.727,
+          0.659,
+          0.657,
+          0.575
+        ],
+        "beforeMedianMs": 0.594,
+        "afterMedianMs": 0.575
+      },
+      {
+        "file": "performance/sparse-work.blot",
+        "entry": "hauling_after",
+        "input": [
+          160,
+          16,
+          4
+        ],
+        "lanes": 1944,
+        "sha256": "48a7014a420644e7f31c4f3b282ef5e57ce6ddc6e481b7f3d38bee7b8c4f288d",
+        "beforeMs": [
+          0.478,
+          0.491,
+          0.545,
+          0.485,
+          0.486,
+          0.425,
+          0.54,
+          0.423,
+          0.375,
+          0.328,
+          0.425,
+          0.441,
+          0.581,
+          0.418,
+          0.39,
+          0.318,
+          0.426
+        ],
+        "afterMs": [
+          0.526,
+          0.519,
+          0.509,
+          0.568,
+          0.505,
+          0.528,
+          0.459,
+          0.585,
+          0.331,
+          0.364,
+          0.339,
+          0.528,
+          0.466,
+          0.459,
+          0.413,
+          0.332,
+          0.316
+        ],
+        "beforeMedianMs": 0.426,
+        "afterMedianMs": 0.466
+      },
+      {
+        "file": "performance/economy.blot",
+        "entry": "sample",
+        "input": [
+          1,
+          3,
+          2,
+          8
+        ],
+        "lanes": 12,
+        "sha256": "2679bec0e4106421d8f3f93550e472dd078b319f20561c02292cf5076577ecb4",
+        "beforeMs": [
+          10.953,
+          8.393,
+          9.71,
+          9.495,
+          8.194,
+          8.442,
+          7.956,
+          8.217,
+          8.745,
+          8.096,
+          9.161,
+          8.082,
+          7.464,
+          7.392,
+          9.177,
+          8.956,
+          8.617
+        ],
+        "afterMs": [
+          10.261,
+          12.293,
+          8.876,
+          11.109,
+          10.139,
+          8.888,
+          8.51,
+          8.648,
+          9.174,
+          10.605,
+          7.907,
+          9.164,
+          8.775,
+          7.764,
+          7.335,
+          8.117,
+          7.987
+        ],
+        "beforeMedianMs": 8.442,
+        "afterMedianMs": 8.876
+      }
+    ]
+  },
+  "sourceScan": {
+    "tool": "scripts/integration/count_stores.py",
+    "scope": "Gdev src, pen, test_support, tests, devtools, performance, and Ink lib and tests. Counts line shapes, including deliberate rejection fixtures.",
+    "results": {
+      "before": {
+        "gdev": {
+          "storeLines": 811,
+          "lent": 0
+        },
+        "ink": {
+          "storeLines": 193,
+          "lent": 0
+        }
+      },
+      "after": {
+        "gdev": {
+          "storeLines": 794,
+          "lent": 0
+        },
+        "ink": {
+          "storeLines": 193,
+          "lent": 0
+        }
+      }
+    }
+  },
+  "publishedMain": {
+    "sourceTree": "d3156773bc9d952dd0cb5d772733939ca08e9670",
+    "wasmBytes": 2721465,
+    "wasmSha256": "bba05b11c85ea165c7fa6b31f572899fa0381ab3f67bd045ff8da0fc49912492",
+    "hardwareFrameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "58aae684b0bd9dd5863ee799aa4782fd0d968e493451a058624a7c5292c0f88a",
+    "firstFrameCompleted": true,
+    "note": "Compiled and rendered the complete published source tree separately. Pinned comparisons exclude concurrent inspector and rendering changes."
+  },
+  "tradeoffs": [
+    "Flocking computes neighbourhoods for the common actor and pose prefix before handing over the salt owner. Game call sites reuse those results across construction, hauling and walking.",
+    "The active prefix keeps order by shifting indices when membership changes. Miner transactions collect successful row updates and apply them in order.",
+    "Authoring replacement and borrowed lazy-index/grid rebuilding are still open."
+  ]
+}
