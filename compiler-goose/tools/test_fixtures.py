@@ -4,9 +4,10 @@
 tests/fixtures/expected.json holds, for each program, what the Zig compiler
 gave on 15 November 2026, the day it was removed: the exit code, the SHA-256
 and size of the Wasm, and the JSON records without clocks, memory counts and
-`symbol_bytes` (which counts the absolute path). Where the Goose compiler is
-known to differ, `differences` holds its value beside Zig's; today that is the
-`type_nodes` counter of four programs.
+`symbol_bytes` (which counts the absolute path). The `differences` table holds
+reviewed work-counter changes beside their original values. Reusing unchanged
+types during substitution reduces `type_nodes` and, for two programs,
+`effect_rows`. The recorded diagnostics and Wasm are unchanged.
 
 The record of `direct/boxed_records.blot` is this compiler's (16 November
 2026): an update that leaves a boxed record's words as they were keeps its

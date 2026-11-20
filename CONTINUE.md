@@ -1,5 +1,13 @@
 # Working on Blot and Gdev
 
+The checker now skips substitution setup for schemes without variables or
+obligations and reuses unchanged types during substitution. Pinned Gdev
+created **20.8% fewer substitution nodes**, and the fixed 20-module
+dependency path created **31.4% fewer**. Fresh release builds measured
+**661 → 654 ms** in 24 pairs. The interval included zero. A retained
+lighting edit took **42 ms**, checking one module and emitting complete Wasm.
+[Substitution counts, timings and qualification](tasks/FAST_COMPILE.md#reusing-unchanged-types-during-substitution)
+
 Fixed scalar scans now reuse the checked array descriptor across a proved range.
 With release inlining the scan measured **13.45 → 12.87 µs** median and **25.86 →
 21.84 µs** p95. Pinned Gdev retained identical Wasm and measured **817 → 824 ms**

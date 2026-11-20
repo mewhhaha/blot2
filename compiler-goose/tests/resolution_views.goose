@@ -51,6 +51,30 @@ fn sharedSignatures() {
     store.deinit();
 }
 
+fn unchangedSubstitution() {
+    let ok = blot_error::Error.none;
+    var store, init = blot_check_types::init(); assert(init == ok);
+    let generic, ge = store.fresh(); assert(ge == ok);
+    let first, fe = store.fresh(); let second, se = store.fresh(); assert(fe == ok && se == ok);
+    let scalar, ne = store.nominal(blot_check_types::NominalIdentity{1,1}, []); assert(ne == ok);
+    let array, ae = store.array(scalar); assert(ae == ok);
+    let result, re = store.record([blot_check_types::Field{1,array}]); assert(re == ok);
+    let scheme, pe = store.function(generic, result); assert(pe == ok);
+    let before = store.nodes.len;
+    let left, le = store.substitute(scheme, [generic], [first]); assert(le == ok);
+    let right, rie = store.substitute(scheme, [generic], [second]); assert(rie == ok);
+    assert(store.nodes.len == before + 2);
+    assert(store.node(left).a == first && store.node(right).a == second);
+    assert(store.node(left).b == result && store.node(right).b == result);
+    assert(store.unify(first, blot_check_types::u32_type) == ok);
+    assert(store.unify(second, blot_check_types::boolean) == ok);
+    store.has_projections = true;
+    store.projection_limit = 1;
+    let denied, error = store.substitute(result, [generic], [first]);
+    assert(denied == 0 && error == blot_error::Error.type_limit);
+    store.deinit();
+}
+
 // Rehash can move every remembered slot just before a sparse epoch ends.
 fn rehashedResolutionCache() {
     for width in [6,22,32,33] {
@@ -151,6 +175,7 @@ fn main() {
     rehashedResolutionCache();
     sparseResolutionEpochs();
     sharedSignatures();
+    unchangedSubstitution();
     effectHistory();
     functionUnification();
     assert(selectionUnification(false)==blot_error::Error.type_limit);

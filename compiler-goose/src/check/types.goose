@@ -1704,13 +1704,17 @@ recursive fn substituteNode<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_
             let parameter, pe = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
             let result, re = substituteDepth(self_, value.b, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if re != blot_error::Error.none { return 0, re; }
             let row_, ee = substitutedRow(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if ee != blot_error::Error.none { return 0, ee; }
+            if parameter == value.a && result == value.b && row_ == value.c && !self_.has_rank_types && !self_.has_projections {
+                return root, blot_error::Error.none;
+            }
             return functionWithEffects(self_, parameter, result, row_);
         },
         product => {
-            let fields=substitution_ids.alloc_slice(value.b);let result,error=substituteProduct(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_ids.free_slice(fields);return result,error;
+            let fields=substitution_ids.alloc_slice(value.b);let result,error=substituteProduct(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_ids.free_slice(fields);return result,error;
         },
         array, list, cursor, resolver => {
             let next, error = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; }
+            if next == value.a && canReuseSubstitutedData(self_) { return root, blot_error::Error.none; }
             if value.tag == Tag.resolver { return resolver(self_, next); } return sequence(self_, value.tag, next);
         },
         provider => {
@@ -1725,11 +1729,13 @@ recursive fn substituteNode<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_
             return stateProvider(self_, read, write, state);
         },
         record => {
-            let fields=substitution_fields.alloc_slice(value.b);let result,error=substituteRecord(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_fields.free_slice(fields);return result,error;
+            let fields=substitution_fields.alloc_slice(value.b);let result,error=substituteRecord(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,fields);substitution_fields.free_slice(fields);return result,error;
         },
         nominal, projection, instance_selection => {
-            let original=nominalArguments(self_,value);let prior=substitution_ids.alloc_slice(original.len);for item,index in original {prior[index]=item;}let args=substitution_ids.alloc_slice(prior.len);
-            let result,error=substituteArguments(self_,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,prior,args);substitution_ids.free_slice(args);substitution_ids.free_slice(prior);return result,error;
+            let original=nominalArguments(self_,value);
+            if original.len == 0 && value.tag == Tag.nominal && !self_.has_projections { return root, blot_error::Error.none; }
+            let prior=substitution_ids.alloc_slice(original.len);for item,index in original {prior[index]=item;}let args=substitution_ids.alloc_slice(prior.len);
+            let result,error=substituteArguments(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,prior,args);substitution_ids.free_slice(args);substitution_ids.free_slice(prior);return result,error;
         },
         _ => { return root, blot_error::Error.none; },
     }
@@ -1752,13 +1758,50 @@ recursive fn substituteQuantifiedGoals<L,R>(self_:Store&,root:Id,value:Node,old:
 }
 reusable[] var substitution_ids:Id[>..];
 reusable[] var substitution_fields:Field[>..];
-recursive fn substituteProduct<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Id[:])->Id,Error {for i in value.b {let next,error=substituteDepth(self_,self_.extra.items[value.a+i],old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth+1);if error!=blot_error::Error.none {return 0,error;}fields[i]=next;}return product(self_,fields);}
-recursive fn substituteRecord<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Field[:])->Id,Error {for i in value.b {let field=recordField(self_,value,i);let next,error=substituteDepth(self_,field.ty,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth+1);if error!=blot_error::Error.none {return 0,error;}fields[i]=Field{field.name,next,..};}return record(self_,fields);}
-recursive fn substituteArguments<L,R>(self_:Store&,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,prior:const Id[:],args:Id[:])->Id,Error {
-            for child,index in prior { let next, error = substituteDepth(self_, child, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } args[index]=next; }
-            if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b , ..}, projectionMember(self_, value), args); }
-            if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b , ..}, args); }
-            return nominal(self_, NominalIdentity { value.a, value.b , ..}, args);
+// Rank and proof kinds can change the validity of a data child through its
+// inference variable. Projected stores retain their original inference work.
+fn canReuseSubstitutedData(self_: const Store&) -> bool {
+    return !self_.has_projections && !self_.has_rank_types && !self_.has_proof_kinds;
+}
+
+recursive fn substituteProduct<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Id[:])->Id,Error {
+    var changed = false;
+    for index in value.b {
+        let child = self_.extra.items[value.a + index];
+        let next, error = substituteDepth(self_, child, old, fresh_ids, old_rows, fresh_rows, leaves, row_leaves, copied, depth + 1);
+        if error != blot_error::Error.none { return 0, error; }
+        changed = changed || next != child;
+        fields[index] = next;
+    }
+    if !changed && canReuseSubstitutedData(self_) { return root, blot_error::Error.none; }
+    return product(self_, fields);
+}
+
+recursive fn substituteRecord<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,fields:Field[:])->Id,Error {
+    var changed = false;
+    for index in value.b {
+        let field = recordField(self_, value, index);
+        let next, error = substituteDepth(self_, field.ty, old, fresh_ids, old_rows, fresh_rows, leaves, row_leaves, copied, depth + 1);
+        if error != blot_error::Error.none { return 0, error; }
+        changed = changed || next != field.ty;
+        fields[index] = Field { field.name, next, .. };
+    }
+    if !changed && canReuseSubstitutedData(self_) { return root, blot_error::Error.none; }
+    return record(self_, fields);
+}
+
+recursive fn substituteArguments<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,prior:const Id[:],args:Id[:])->Id,Error {
+    var changed = false;
+    for child, index in prior {
+        let next, error = substituteDepth(self_, child, old, fresh_ids, old_rows, fresh_rows, leaves, row_leaves, copied, depth + 1);
+        if error != blot_error::Error.none { return 0, error; }
+        changed = changed || next != child;
+        args[index] = next;
+    }
+    if value.tag == Tag.projection { return projection(self_, NominalIdentity { value.a, value.b, .. }, projectionMember(self_, value), args); }
+    if value.tag == Tag.instance_selection { return instanceSelection(self_, NominalIdentity { value.a, value.b, .. }, args); }
+    if !changed && canReuseSubstitutedData(self_) { return root, blot_error::Error.none; }
+    return nominal(self_, NominalIdentity { value.a, value.b, .. }, args);
 }
 
 // Each generic call instantiates its own variables. Once its result has been

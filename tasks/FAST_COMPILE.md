@@ -3,6 +3,48 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Reusing unchanged types during substitution
+
+Checking the pinned 280-module Gdev build read 109,737 bindings. Of those,
+28,662 had quantified type or effect variables and 56,748 had a scheme with
+neither variables, obligations nor generative bindings. The latter now go
+straight to the same covariant opening step, which still gives each use its
+own effect variables.
+
+Substitution now reuses ordinary type nodes when the rewritten children and
+effect row match the original IDs. A nominal type without arguments can return
+immediately after checking for a direct replacement. Stores with associated
+projections still charge each substitution visit. Rank and proof checks still
+run where child kind validation can affect the result.
+
+| Pinned Gdev work | Release | Candidate |
+| --- | ---: | ---: |
+| Substitution requests | 192,370 | 135,622 |
+| Requests on the fixed 20-module dependency path | 65,812 | 53,761 |
+| Type nodes created by substitution | 146,830 | 116,226 |
+| Nodes created by substitution on that path | 58,088 | 39,837 |
+| Worker reply bytes | 67,169,848 | 66,886,409 |
+
+The allocation counts came from a diagnostic compiler. The release compilers
+were measured in alternating pairs with eight workers, fresh processes and a
+warm filesystem. The 95% intervals describe the median within-pair saving.
+
+| Gdev revision and workload | Pairs | Release median | Candidate median | Saving interval |
+| --- | ---: | ---: | ---: | ---: |
+| `4c98d07`, pinned fresh | 24 | 661 ms | 654 ms | −4 to +14 ms |
+| `b54b556`, fresh | 10 | 667 ms | 658 ms | −23 to +26 ms |
+| `4c98d07`, retained lighting edit | 4 | 42.1 ms | 42.3 ms | −2.4 to +3.8 ms |
+
+Both cold timing intervals include zero. Both source snapshots produced
+byte-identical Wasm. The lighting edit checks one module, and its output,
+three rejected edits and recovery matched the control and fresh sessions.
+The full compiler gate passed with 1,129 guest and host tests. The fixture
+references retain their Wasm and diagnostics, with 28 recorded changes to
+type-node or effect-row counts. The native substitution law verified that
+two uses can reuse the same return type while inferring different parameter
+types. All 283 Ink outcomes and the inspected Gdev frame and trace matched.
+[Compiler identities and paired results](../benchmarks/evidence/measurements/2026-11-20-unchanged-substitutions.json)
+
 ## Native compiler size and checker work
 
 On 20 November 2026, compiling Blot's generated C for size cut its Linux

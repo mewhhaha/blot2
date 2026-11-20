@@ -1,5 +1,242 @@
 {
- "differences": {},
+ "differences": {
+  "deferred_join.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5699,
+    "record": 0,
+    "zig": 5703
+   }
+  ],
+  "direct/comprehensions.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 6058,
+    "record": 0,
+    "zig": 6059
+   }
+  ],
+  "direct/dispatch.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 7059,
+    "record": 0,
+    "zig": 7061
+   }
+  ],
+  "direct/generic_comprehensions.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5734,
+    "record": 0,
+    "zig": 5735
+   }
+  ],
+  "direct/open_codec.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5260,
+    "record": 0,
+    "zig": 5263
+   }
+  ],
+  "direct/unused_stages.blot": [
+   {
+    "counter": "effect_rows",
+    "goose": 2813,
+    "record": 0,
+    "zig": 2816
+   },
+   {
+    "counter": "type_nodes",
+    "goose": 5457,
+    "record": 0,
+    "zig": 5466
+   }
+  ],
+  "direct/view_calls.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5465,
+    "record": 0,
+    "zig": 5473
+   }
+  ],
+  "discard-fixtures/eager-order.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5385,
+    "record": 0,
+    "zig": 5412
+   }
+  ],
+  "discard-fixtures/requests-abort.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5315,
+    "record": 1,
+    "zig": 5323
+   }
+  ],
+  "monad_break.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5235,
+    "record": 1,
+    "zig": 5236
+   }
+  ],
+  "nominal/generic-fields-and-associated.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5286,
+    "record": 0,
+    "zig": 5287
+   }
+  ],
+  "provider-fixtures/lifetime-cost.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5477,
+    "record": 1,
+    "zig": 5493
+   }
+  ],
+  "request-fixtures/effectful-dictionary-closure.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5344,
+    "record": 1,
+    "zig": 5347
+   }
+  ],
+  "request-fixtures/template-effect-bottom.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5329,
+    "record": 1,
+    "zig": 5336
+   }
+  ],
+  "request-fixtures/template-effects.blot": [
+   {
+    "counter": "effect_rows",
+    "goose": 2743,
+    "record": 1,
+    "zig": 2746
+   },
+   {
+    "counter": "type_nodes",
+    "goose": 5327,
+    "record": 1,
+    "zig": 5338
+   }
+  ],
+  "request-fixtures/template-local-effects.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5321,
+    "record": 1,
+    "zig": 5332
+   }
+  ],
+  "request-fixtures/template-local-f32-discard.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5238,
+    "record": 1,
+    "zig": 5242
+   }
+  ],
+  "request-fixtures/template-local-snapshot.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5233,
+    "record": 1,
+    "zig": 5237
+   }
+  ],
+  "request-fixtures/template-local-state-typed-scopes.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5363,
+    "record": 1,
+    "zig": 5365
+   }
+  ],
+  "result_selected_operand.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5553,
+    "record": 0,
+    "zig": 5557
+   }
+  ],
+  "retained-state-fixtures/latent-never-called.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5382,
+    "record": 1,
+    "zig": 5384
+   }
+  ],
+  "retained-state-fixtures/local-aliases.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5387,
+    "record": 1,
+    "zig": 5393
+   }
+  ],
+  "retained-state-fixtures/local-initializer-effects.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5532,
+    "record": 1,
+    "zig": 5552
+   }
+  ],
+  "retained-state-fixtures/local-snapshots-called.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5477,
+    "record": 1,
+    "zig": 5479
+   }
+  ],
+  "retained-state-fixtures/state-annotation-scopes.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5383,
+    "record": 1,
+    "zig": 5395
+   }
+  ],
+  "retained-state-fixtures/state-annotation-shared.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5359,
+    "record": 1,
+    "zig": 5371
+   }
+  ],
+  "retained-state-fixtures/unmet-qualifier.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 5377,
+    "record": 1,
+    "zig": 5379
+   }
+  ],
+  "scoped-opaque/main.blot": [
+   {
+    "counter": "type_nodes",
+    "goose": 6154,
+    "record": 0,
+    "zig": 6155
+   }
+  ]
+ },
  "programs": {
   "alias-project-fixtures/logical-long-2048.blot": {
    "exit": 0,

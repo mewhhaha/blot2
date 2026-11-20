@@ -1,0 +1,267 @@
+{
+  "controlSource": "ed4fc7e92f4fb36e634f490390c66b65e0f7b501",
+  "compiler": {
+    "control": "83475e1a469789e33cb4cc9bd44abfabed378dbf8c0b0ac00588e19cbe4017f5",
+    "candidate": "be36b1fcfb161718bf2e75b1fa82318765bf0e1c2a21377fa3aadef39cc38434",
+    "candidateSourceDigest": "87cad079d9ac6d09a97a9935bcd7877baaa90d547f0ea0ae8db6e885e8be8b52",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774"
+  },
+  "inputs": {
+    "pinnedGdev": "4c98d07cd13df544724d7323cd702358145cb993",
+    "latestGdev": "b54b556d2dd0b729af0dc7c51cabe656837b4cac",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "workers": 8,
+    "cpu": "AMD Ryzen 7 3800X",
+    "session": "Fresh native process with a warm filesystem. Alternating order."
+  },
+  "work": {
+    "control": {
+      "all": {
+        "bindingReads": 109737,
+        "resolveOnly": 24290,
+        "noVariables": 56785,
+        "genericReads": 28662,
+        "substitutionRequests": 192370,
+        "nonemptyRequests": 102573,
+        "visits": 359651,
+        "projectedVisits": 0,
+        "closedVisits": 27168,
+        "nonProjectedClosedVisits": 27168,
+        "nonProjectedCompositeVisits": 16038,
+        "repeatedNonProjectedClosedVisits": 14146
+      },
+      "fixedPath": {
+        "bindingReads": 24433,
+        "resolveOnly": 5819,
+        "noVariables": 12079,
+        "genericReads": 6535,
+        "substitutionRequests": 65812,
+        "nonemptyRequests": 43282,
+        "visits": 137705,
+        "projectedVisits": 0,
+        "closedVisits": 15167,
+        "nonProjectedClosedVisits": 15167,
+        "nonProjectedCompositeVisits": 8142,
+        "repeatedNonProjectedClosedVisits": 7510
+      },
+      "allocations": {
+        "project": {
+          "A": 146830,
+          "S": 19975
+        },
+        "fixedPath": {
+          "A": 58088,
+          "S": 12185
+        },
+        "fixedPathUnconstrainedSchemes": 12051
+      },
+      "unconstrained": 56748,
+      "created": {
+        "7": 94755,
+        "8": 9015,
+        "9": 2628,
+        "10": 31739,
+        "11": 7677,
+        "12": 3,
+        "26": 827,
+        "13": 186
+      },
+      "clones": {
+        "10": 14622,
+        "11": 3399,
+        "7": 1733,
+        "8": 126,
+        "9": 95
+      }
+    },
+    "candidate": {
+      "all": {
+        "bindingReads": 109737,
+        "resolveOnly": 24290,
+        "noVariables": 56785,
+        "genericReads": 28662,
+        "substitutionRequests": 135622,
+        "nonemptyRequests": 102573,
+        "visits": 359643,
+        "projectedVisits": 0,
+        "closedVisits": 31003,
+        "nonProjectedClosedVisits": 31003,
+        "nonProjectedCompositeVisits": 19489,
+        "repeatedNonProjectedClosedVisits": 19781
+      },
+      "fixedPath": {
+        "bindingReads": 24433,
+        "resolveOnly": 5819,
+        "noVariables": 12079,
+        "genericReads": 6535,
+        "substitutionRequests": 53761,
+        "nonemptyRequests": 43282,
+        "visits": 137697,
+        "projectedVisits": 0,
+        "closedVisits": 18634,
+        "nonProjectedClosedVisits": 18634,
+        "nonProjectedCompositeVisits": 11535,
+        "repeatedNonProjectedClosedVisits": 12446
+      },
+      "allocations": {
+        "project": {
+          "A": 116226,
+          "S": 137
+        },
+        "fixedPath": {
+          "A": 39837,
+          "S": 118
+        },
+        "fixedPathUnconstrainedSchemes": 12051
+      },
+      "unconstrained": 56748,
+      "created": {
+        "7": 89690,
+        "8": 7915,
+        "9": 2516,
+        "10": 11617,
+        "11": 3472,
+        "12": 3,
+        "26": 827,
+        "13": 186
+      },
+      "clones": {
+        "26": 137
+      }
+    }
+  },
+  "timings": {
+    "pinned": {
+      "pairs": 24,
+      "controlMedianMs": 660.941,
+      "candidateMedianMs": 654.407,
+      "medianPairedSavingMs": 1.595,
+      "savingIntervalMs": [
+        -3.891,
+        13.541
+      ],
+      "pairsFaster": 12
+    },
+    "latest": {
+      "pairs": 10,
+      "controlMedianMs": 667.076,
+      "candidateMedianMs": 658.227,
+      "medianPairedSavingMs": 15.28,
+      "savingIntervalMs": [
+        -22.845,
+        26.045
+      ],
+      "pairsFaster": 6
+    },
+    "edit": {
+      "pairs": 4,
+      "controlMedianMs": 42.123,
+      "candidateMedianMs": 42.256,
+      "medianPairedSavingMs": -0.075,
+      "savingIntervalMs": [
+        -2.371,
+        3.817
+      ],
+      "pairsFaster": 2
+    },
+    "recover": {
+      "pairs": 4,
+      "controlMedianMs": 40.743,
+      "candidateMedianMs": 39.235,
+      "medianPairedSavingMs": 2.288,
+      "savingIntervalMs": [
+        -3.76,
+        3.633
+      ],
+      "pairsFaster": 3
+    },
+    "reject": {
+      "pairs": 4,
+      "controlMedianMs": 270.746,
+      "candidateMedianMs": 267.729,
+      "medianPairedSavingMs": 3.557,
+      "savingIntervalMs": [
+        -2.703,
+        7.32
+      ],
+      "pairsFaster": 3
+    },
+    "syntax": {
+      "pairs": 4,
+      "controlMedianMs": 63.76,
+      "candidateMedianMs": 63.678,
+      "medianPairedSavingMs": 0.094,
+      "savingIntervalMs": [
+        -1.4,
+        1.277
+      ],
+      "pairsFaster": 2
+    },
+    "lex": {
+      "pairs": 4,
+      "controlMedianMs": 61.207,
+      "candidateMedianMs": 61.602,
+      "medianPairedSavingMs": -0.308,
+      "savingIntervalMs": [
+        -1.595,
+        1.914
+      ],
+      "pairsFaster": 2
+    },
+    "fields8CheckRecheck": {
+      "pairs": 32,
+      "controlMedianMs": 4.951,
+      "candidateMedianMs": 5.0,
+      "medianPairedSavingMs": -0.051,
+      "savingIntervalMs": [
+        -0.123,
+        0.015
+      ],
+      "pairsFaster": 12
+    }
+  },
+  "wasm": {
+    "pinned": {
+      "sha256": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70",
+      "bytes": 2754496
+    },
+    "latest": {
+      "sha256": "be433cb5ffcfeb45525e41ed97f6581645b35f4c875de23a2129476f6474df8d",
+      "bytes": 2741062
+    }
+  },
+  "workerReplyBytes": [
+    67169848,
+    66886409
+  ],
+  "hostLoad": {
+    "pinned": [
+      "3.14 3.11 4.43 1/2361 1811100",
+      "5.27 3.58 4.55 1/2357 1811864"
+    ],
+    "latest": [
+      "5.27 3.58 4.55 1/2357 1811865",
+      "4.87 3.57 4.53 1/2356 1812187"
+    ]
+  },
+  "qualification": {
+    "guestsPassed": 1129,
+    "guestsIgnored": 100,
+    "fixturePrograms": 192,
+    "changedWorkCounterPrograms": 28,
+    "uniquenessPrograms": 212,
+    "directFixtures": 2,
+    "inkExecutedTests": 283,
+    "inkOutcomesSha256": "3b0445a71475b3f975f445f6d3a564cce6a7080f754caefce77f3ec5d24e34e4",
+    "pngSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "frameTraceSha256": "f977a25b1db098c7e078a601df504c2da942ea7a5a17838fece34af1934ef6b8",
+    "generalCases": 22,
+    "generalSamplePairsPerCase": 8,
+    "nativeLaws": "resolution_views",
+    "nativeLawReceipt": "1795195273997741433",
+    "freshEditOracles": 4
+  },
+  "raw": "2026-11-20-unchanged-substitutions.raw.json.gz"
+}
