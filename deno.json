@@ -1,6 +1,7 @@
 {
   "tasks": {
     "build:compiler": "deno run --allow-read --allow-run=sh scripts/build_compiler.ts",
+    "build:compiler:pgo": "sh compiler-goose/build.sh --pgo",
     "build:compiler:dev": "deno run --allow-read --allow-run=sh scripts/build_compiler.ts --dev",
     "blot": "deno run --allow-read --allow-write --allow-run --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR host/cli.ts",
     "bpm": "deno run --allow-read --allow-write --allow-run=git --allow-env=HOME,XDG_CACHE_HOME,BPM_CACHE_DIR host/bpm.ts",

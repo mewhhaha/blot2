@@ -12,6 +12,11 @@ goose=$goose_root/build-precision/goose
 if [ ! -x "$goose" ] || [ ! -s "$goose" ]; then
   sh "$here/tools/upstream-32a4f44/build.sh"
 fi
+if [ "${1:-}" = "--pgo" ]; then
+  shift
+  exec python3 "$here/tools/build_profiled.py" --goose "$goose" \
+    --stdlib "$goose_root/source-precision/stdlib" "$@"
+fi
 exec python3 "$here/build.py" --goose "$goose" --cc clang \
   --stdlib "$goose_root/source-precision/stdlib" \
   --stage-timeout 3000 --total-timeout 3400 "$@"

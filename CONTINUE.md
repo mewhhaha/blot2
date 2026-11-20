@@ -1,11 +1,13 @@
 # Working on Blot and Gdev
 
-Gdev `b7e0c94` separates robot and cannon storage and robot presentation
-from the simulation modules. Fresh Main builds measured **823 → 800 ms**
-in 24 pairs under load and **730 → 690 ms** in 16 pairs under lighter
-load. The inspected hardware frame and 120-frame replay matched. The
-publication path now runs through station panel, output and hover.
-[Cold build measurements and queue traces](tasks/FAST_COMPILE.md#checking-gdev-storage-and-rendering-without-the-robot-simulation)
+On Gdev `b853542`, world storage can check ahead of the hover and output UI.
+Session startup can check ahead of the game. With the optional profile-guided
+compiler, fresh Main builds measured **1,218 → 1,069 ms** and **803 → 692 ms**
+in two windows of 24 pairs each. On identical Gdev source the compiler change
+alone measured **1,209 → 1,151 ms**.
+The hardware frame and 120-frame replay matched. The checker now waits
+on review scenes, title and game at the end of its longest import path.
+[Source, native compiler and qualification](tasks/FAST_COMPILE.md#checking-the-game-and-session-independently)
 
 The checker now skips substitution setup for schemes without variables or
 obligations and reuses unchanged types during substitution. Pinned Gdev

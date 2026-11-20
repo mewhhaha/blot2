@@ -1,0 +1,815 @@
+{
+  "inputs": {
+    "blotCompilerSource": "3ca61f7a9b94a0ccc4849e6cb704adc8d7ae2464",
+    "originalGdev": "b7e0c94802760b56abbc713477c44f92fccecaa0",
+    "splitGdev": "b853542344064baedaed25797f6be752ca5f49df",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "std": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "penExecutable": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "cc": "clang version 23.1.5",
+    "host": "AMD Ryzen 7 3800X, Linux x86-64",
+    "release": {
+      "bytes": 11616256,
+      "sha256": "be36b1fcfb161718bf2e75b1fa82318765bf0e1c2a21377fa3aadef39cc38434"
+    },
+    "experimentalProfiled": {
+      "bytes": 11363768,
+      "sha256": "cc463f1e00d69997065eba602d2c3f5190402948c72610b927c85f0f2f469a68"
+    },
+    "qualifiedProfiled": {
+      "bytes": 11332944,
+      "sha256": "7ecf4130c3df1c103b05723f19ebf165169a590dc44e02ffb457b33892154678"
+    },
+    "qualifiedSourceIdentity": "e8f8c80739e9fb3c14eda8475d5db35a0e75b9d39d2b968bef72c62b4063fb4f",
+    "qualifiedWireIdentity": "c7d8c26cd87b7b64767bc1f95af4a113780c851158798ec8dff61bce89d1af6c",
+    "releaseWireIdentity": "e496142aafbbe3926527ae9f717cfc37efb4e511893ec95a741e3eb2876fc3e2",
+    "qualifiedProfileFlags": [
+      "-std=gnu11",
+      "-D_GNU_SOURCE",
+      "-O2",
+      "-pthread",
+      "-fprofile-instr-use=../c53a2f809f6407c61e63692c5932f46ea3fbbceac1cbda62bbb42aedbd8d394a.profdata"
+    ]
+  },
+  "method": "Fresh native processes, warm source files, alternating order within pairs, eight frontend workers except single-worker controls. Gdev timings cover session open to complete Wasm. Held-out CLI times cover process spawn through exit and Wasm file write. Intervals are paired bootstrap median savings, 20000 resamples, seed 13.",
+  "experiments": {
+    "pilot": "Only player state, output state and demolition split, pinned release compiler.",
+    "source": "Final source vs baseline, pinned release compiler, bench overlapped an independent Clang build.",
+    "preview": "Drop-preview test, final vs baseline sources, ordinary compiler.",
+    "native": "Experimental C-only profile vs ordinary compiler on final Gdev source.",
+    "combined": "Baseline source and ordinary compiler vs final source and experimental C-only profile.",
+    "single": "Same as native with one worker.",
+    "repeat": "Second 24-pair window of the exact delivered compiler and source, after the CLI and phase runs.",
+    "qualified-source": "Final source vs baseline, ordinary compiler in the qualification window.",
+    "qualified-native": "Deliverable PGO compiler vs ordinary release, same final Gdev source.",
+    "qualified-combined": "Delivered PGO compiler plus final source vs ordinary release plus baseline source.",
+    "qualified-single": "Deliverable PGO compiler vs ordinary release on the final Gdev source, one worker.",
+    "heldOutCli": "Separate untrained Ink and Blot entries, eight frontend workers; no Gdev assets."
+  },
+  "timings": {
+    "pilot": {
+      "control": {
+        "medianMs": 769.841,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 785.176,
+        "wasmBytes": 2741012,
+        "wasmSha256": "81d6264e0a997e51bc6ba6c68e7a1bd62230d5fa114c0ac6bcc561c8f1867a1d",
+        "modules": 287
+      },
+      "pairs": 16,
+      "wins": 4,
+      "medianPairedSavingMs": -8.948,
+      "saving95Ms": [
+        -20.523,
+        -2.077
+      ]
+    },
+    "source": {
+      "control": {
+        "medianMs": 1095.189,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 1017.197,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 24,
+      "wins": 21,
+      "medianPairedSavingMs": 65.096,
+      "saving95Ms": [
+        24.877,
+        103.66
+      ],
+      "loadAverages": [
+        [
+          "26.21",
+          "17.80",
+          "10.11"
+        ],
+        [
+          "21.23",
+          "17.76",
+          "10.51"
+        ]
+      ]
+    },
+    "preview": {
+      "control": {
+        "medianMs": 1053.764,
+        "wasmBytes": 33513,
+        "wasmSha256": "fa459e02678edaa5dfec067f08c8d859f97605aa9c63119f63e57cdaffd1635b",
+        "modules": 285
+      },
+      "split": {
+        "medianMs": 677.706,
+        "wasmBytes": 33513,
+        "wasmSha256": "fa459e02678edaa5dfec067f08c8d859f97605aa9c63119f63e57cdaffd1635b",
+        "modules": 165
+      },
+      "pairs": 12,
+      "wins": 12,
+      "medianPairedSavingMs": 381.02,
+      "saving95Ms": [
+        354.733,
+        418.608
+      ]
+    },
+    "native": {
+      "control": {
+        "medianMs": 768.241,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 717.664,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 24,
+      "wins": 21,
+      "medianPairedSavingMs": 47.242,
+      "saving95Ms": [
+        25.094,
+        75.477
+      ],
+      "loadAverages": [
+        [
+          "17.23",
+          "17.22",
+          "10.94"
+        ],
+        [
+          "17.52",
+          "17.65",
+          "11.41"
+        ]
+      ]
+    },
+    "combined": {
+      "control": {
+        "medianMs": 768.569,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 677.47,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 16,
+      "wins": 16,
+      "medianPairedSavingMs": 81.548,
+      "saving95Ms": [
+        72.393,
+        104.368
+      ],
+      "loadAverages": [
+        [
+          "17.52",
+          "17.65",
+          "11.41"
+        ],
+        [
+          "15.08",
+          "17.09",
+          "11.35"
+        ]
+      ]
+    },
+    "single": {
+      "control": {
+        "medianMs": 1707.686,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 1455.644,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 6,
+      "wins": 6,
+      "medianPairedSavingMs": 262.778,
+      "saving95Ms": [
+        183.285,
+        299.985
+      ],
+      "loadAverages": [
+        [
+          "15.08",
+          "17.09",
+          "11.35"
+        ],
+        [
+          "12.15",
+          "16.29",
+          "11.21"
+        ]
+      ]
+    },
+    "qualified-native": {
+      "control": {
+        "medianMs": 1208.888,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 1151.111,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 24,
+      "wins": 21,
+      "medianPairedSavingMs": 69.434,
+      "saving95Ms": [
+        46.685,
+        107.282
+      ],
+      "loadAverages": [
+        [
+          "27.97",
+          "22.18",
+          "16.27"
+        ],
+        [
+          "25.74",
+          "22.67",
+          "16.79"
+        ]
+      ]
+    },
+    "qualified-combined": {
+      "control": {
+        "medianMs": 1218.153,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 1069.116,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 24,
+      "wins": 23,
+      "medianPairedSavingMs": 146.175,
+      "saving95Ms": [
+        118.997,
+        185.234
+      ],
+      "loadAverages": [
+        [
+          "21.13",
+          "20.07",
+          "15.27"
+        ],
+        [
+          "27.97",
+          "22.18",
+          "16.27"
+        ]
+      ]
+    },
+    "qualified-source": {
+      "control": {
+        "medianMs": 882.665,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 809.874,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 16,
+      "wins": 16,
+      "medianPairedSavingMs": 60.29,
+      "saving95Ms": [
+        41.455,
+        82.324
+      ],
+      "loadAverages": [
+        [
+          "25.74",
+          "22.67",
+          "16.79"
+        ],
+        [
+          "18.88",
+          "21.30",
+          "16.52"
+        ]
+      ]
+    },
+    "qualified-single": {
+      "control": {
+        "medianMs": 1865.992,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 1582.772,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 6,
+      "wins": 6,
+      "medianPairedSavingMs": 284.936,
+      "saving95Ms": [
+        216.609,
+        395.477
+      ],
+      "loadAverages": [
+        [
+          "18.88",
+          "21.30",
+          "16.52"
+        ],
+        [
+          "15.14",
+          "20.29",
+          "16.29"
+        ]
+      ]
+    },
+    "repeat": {
+      "control": {
+        "medianMs": 803.401,
+        "wasmBytes": 2741012,
+        "wasmSha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e",
+        "modules": 284
+      },
+      "split": {
+        "medianMs": 692.082,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "pairs": 24,
+      "wins": 24,
+      "medianPairedSavingMs": 109.291,
+      "saving95Ms": [
+        103.674,
+        117.478
+      ],
+      "loadAverages": [
+        [
+          "9.24",
+          "18.12",
+          "15.72"
+        ],
+        [
+          "7.74",
+          "16.74",
+          "15.35"
+        ]
+      ]
+    },
+    "heldOutCli": {
+      "../ink/tests/physics.blot": {
+        "control": {
+          "medianMs": 271.954,
+          "wasmBytes": 295830,
+          "wasmSha256": "6eb64d54f86e1a7c13446869a2dc82d6b81b564145cedeacb5eadafae4a5f54c"
+        },
+        "split": {
+          "medianMs": 237.163,
+          "wasmBytes": 295830,
+          "wasmSha256": "6eb64d54f86e1a7c13446869a2dc82d6b81b564145cedeacb5eadafae4a5f54c"
+        },
+        "pairs": 16,
+        "wins": 16,
+        "medianPairedSavingMs": 34.099,
+        "saving95Ms": [
+          30.607,
+          40.691
+        ]
+      },
+      "../ink/tests/dialogs.blot": {
+        "control": {
+          "medianMs": 164.473,
+          "wasmBytes": 45852,
+          "wasmSha256": "3ef9300f6b95de894b1ea497422e0decbb294cc4f609ec0d48323a26a57ec11e"
+        },
+        "split": {
+          "medianMs": 152.425,
+          "wasmBytes": 45852,
+          "wasmSha256": "3ef9300f6b95de894b1ea497422e0decbb294cc4f609ec0d48323a26a57ec11e"
+        },
+        "pairs": 16,
+        "wins": 15,
+        "medianPairedSavingMs": 12.553,
+        "saving95Ms": [
+          9.999,
+          18.042
+        ]
+      },
+      "benchmarks/checked-grid/trees.blot": {
+        "control": {
+          "medianMs": 30.506,
+          "wasmBytes": 4869,
+          "wasmSha256": "8d423a0216c59b2deb8a7554b711665d4502a22e5eacc6ce55d5eba41d66a431"
+        },
+        "split": {
+          "medianMs": 28.394,
+          "wasmBytes": 4869,
+          "wasmSha256": "8d423a0216c59b2deb8a7554b711665d4502a22e5eacc6ce55d5eba41d66a431"
+        },
+        "pairs": 16,
+        "wins": 15,
+        "medianPairedSavingMs": 1.746,
+        "saving95Ms": [
+          1.055,
+          4.21
+        ]
+      }
+    }
+  },
+  "qualifiedPhaseMediansMs": {
+    "control": {
+      "other": 18.6785,
+      "assets": 48.7785,
+      "load": 83.939,
+      "lex": 0.213,
+      "parse": 0.9239999999999999,
+      "check": 386.84799999999996,
+      "lower": 30.645,
+      "freeze": 0.0,
+      "validation": 0.0,
+      "backend": 137.2735,
+      "summedCheckerWorkerCpuMs": 1890.4335
+    },
+    "pgo": {
+      "other": 17.5315,
+      "assets": 56.8705,
+      "load": 88.726,
+      "lex": 0.152,
+      "parse": 0.835,
+      "check": 342.77,
+      "lower": 32.5735,
+      "freeze": 0.0,
+      "validation": 0.0,
+      "backend": 134.072,
+      "summedCheckerWorkerCpuMs": 1660.316
+    }
+  },
+  "queue": {
+    "reference": {
+      "modules": 284,
+      "edges": 2506,
+      "modeledChainCpuMs": 481.982,
+      "modeledChain": [
+        "blot2/std/prelude.blot",
+        "blot2/std/vector.blot",
+        "ink/lib/math.blot",
+        "ink/lib/lanes.blot",
+        "ink/lib/clock.blot",
+        "ink/lib/app.blot",
+        "ink/lib/render.blot",
+        "ink/lib/brush.blot",
+        "ink/lib/editor.blot",
+        "gdev/src/effects/celebrations.blot",
+        "gdev/src/world/salt_simulation.blot",
+        "gdev/src/world/salt.blot",
+        "gdev/src/player/interaction.blot",
+        "gdev/src/progression/tutorial.blot",
+        "gdev/src/ui/station_panel.blot",
+        "gdev/src/ui/output.blot",
+        "gdev/src/player/hover.blot",
+        "gdev/src/world_storage.blot",
+        "gdev/src/buildings/construction.blot",
+        "gdev/src/game.blot",
+        "gdev/src/session.blot",
+        "gdev/src/main.blot"
+      ],
+      "checkingMedianMs": 579.899,
+      "summedWorkerMedianMs": 2588.441,
+      "publicationPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/array.blot",
+          "ink/lib/changes.blot",
+          "ink/lib/journal.blot",
+          "ink/lib/ecs.blot",
+          "ink/lib/persist.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    },
+    "shipping": {
+      "modules": 287,
+      "edges": 2513,
+      "modeledChainCpuMs": 444.966,
+      "modeledChain": [
+        "blot2/std/prelude.blot",
+        "blot2/std/vector.blot",
+        "ink/lib/math.blot",
+        "ink/lib/lanes.blot",
+        "ink/lib/clock.blot",
+        "ink/lib/app.blot",
+        "ink/lib/render.blot",
+        "ink/lib/brush.blot",
+        "ink/lib/editor.blot",
+        "gdev/src/effects/celebrations.blot",
+        "gdev/src/world/salt_simulation.blot",
+        "gdev/src/world/salt.blot",
+        "gdev/src/player/interaction.blot",
+        "gdev/src/progression/tutorial.blot",
+        "gdev/src/ui/station_panel.blot",
+        "gdev/src/ui/station.blot",
+        "gdev/src/debug/review_scenes.blot",
+        "gdev/src/progression/scenes.blot",
+        "gdev/src/ui/title.blot",
+        "gdev/src/game.blot",
+        "gdev/src/main.blot"
+      ],
+      "checkingMedianMs": 557.416,
+      "summedWorkerMedianMs": 2527.449,
+      "publicationPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    }
+  },
+  "qualification": {
+    "fullGate": {
+      "seconds": 414.35,
+      "phases": {
+        "harness": 3.021,
+        "release-build": 368.634,
+        "reference-direct": 0.319,
+        "reference-uniqueness": 3.693,
+        "reference-fixtures": 5.601,
+        "pack": 0.865,
+        "guests": 32.192
+      },
+      "guests": "ok | 1129 passed | 0 failed | 100 ignored (31s)",
+      "tooling": "ok | 25 passed | 0 failed (2s)"
+    },
+    "profiledGuestSuite": "ok | 1129 passed | 0 failed | 100 ignored (37s)",
+    "profiledFixtures": "192 of 192 fixtures match the record",
+    "profiledUniqueness": "uniqueness: 212 of 212 programs match the record (113 with rejections, 99 accepted)",
+    "penCheck": true,
+    "penCodegenCheck": true,
+    "tests": {
+      "ok": 158,
+      "FAILED": 18
+    },
+    "testModules": 22,
+    "framePng": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "trace": "4f0d9ebbd6e8ffb6449afdb9df12b1e009a531be6dae35b0803fb6f5b3853b72",
+    "replayFiles": 242,
+    "packetManifest": "b94e22cefa3c6d4fcc6b5658f5c3514c91bd811d5ed139a1118fd288e403c37b",
+    "referenceRenderers": {
+      "reference_main": {
+        "frames": 24,
+        "frameHash": "c10d12b212a919b4788acbd929ae5e50173852ac691a51feb5996ac33c58244f",
+        "finalStateHash": "b71227a29e4d0ef5c305204a8060650a5c4002fbc54cd5dd24597b2658d38d52"
+      },
+      "transport_reference_main": {
+        "frames": 24,
+        "frameHash": "c10d12b212a919b4788acbd929ae5e50173852ac691a51feb5996ac33c58244f",
+        "finalStateHash": "b71227a29e4d0ef5c305204a8060650a5c4002fbc54cd5dd24597b2658d38d52"
+      }
+    }
+  },
+  "raw": "2026-11-20-gdev-profile-guided.raw.json.gz",
+  "buildCost": {
+    "profiledCompilerTimedStagesSeconds": 450.9,
+    "profiledStages": [
+      [
+        "emit runtime",
+        0.102
+      ],
+      [
+        "compile runtime",
+        0.401
+      ],
+      [
+        "compile allocation_observer",
+        0.101
+      ],
+      [
+        "compile check_queue",
+        0.101
+      ],
+      [
+        "compile main",
+        0.101
+      ],
+      [
+        "compile platform",
+        0.101
+      ],
+      [
+        "compile request_cache",
+        0.101
+      ],
+      [
+        "compile request_supervisor",
+        0.101
+      ],
+      [
+        "compile request_transport",
+        0.101
+      ],
+      [
+        "emit program",
+        60.211
+      ],
+      [
+        "compile and link program",
+        29.026
+      ],
+      [
+        "emit runtime",
+        0.101
+      ],
+      [
+        "compile runtime",
+        0.701
+      ],
+      [
+        "compile allocation_observer",
+        0.101
+      ],
+      [
+        "compile check_queue",
+        0.101
+      ],
+      [
+        "compile main",
+        0.1
+      ],
+      [
+        "compile platform",
+        0.201
+      ],
+      [
+        "compile request_cache",
+        0.1
+      ],
+      [
+        "compile request_supervisor",
+        0.101
+      ],
+      [
+        "compile request_transport",
+        0.201
+      ],
+      [
+        "emit program",
+        66.237
+      ],
+      [
+        "compile and link program",
+        292.522
+      ]
+    ],
+    "ordinaryCompilerFullGateBuildSeconds": 368.63
+  }
+}

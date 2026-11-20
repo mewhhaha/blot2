@@ -29,8 +29,15 @@ From the repository root:
   sibling checkouts and the tests' default path run this file.
 - `deno task build:compiler:dev` writes a debug compiler,
   `compiler-goose/build/blotc-goose-dev`, in about a minute and a half.
+- `deno task build:compiler:pgo` writes `compiler-goose/build/blotc-goose-pgo`.
+  This release target needs Clang's profile runtime and matching
+  `llvm-profdata`. It runs five small Blot programs through an instrumented
+  compiler, then uses their execution counts to optimize the native compiler.
+  The merged profile's SHA-256 is part of the compiler identity. To build
+  Gdev with it, run `deno run -A scripts/integration/build_gdev.ts
+  --compiler compiler-goose/build/blotc-goose-pgo --frontend-workers 8`.
 
-Both run `compiler-goose/build.sh`, which takes `--release`, `--output FILE`
+The regular builds run `compiler-goose/build.sh`, which takes `--release`, `--output FILE`
 and `--cflag=FLAG`. It needs clang, cmake, ninja and Python 3. A rebuilt
 compiler has a new identity, so dependency bundles made by the previous
 build are declined as stale.

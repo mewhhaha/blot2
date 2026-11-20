@@ -3,6 +3,72 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Checking the game and session independently
+
+The save format uses hover and hand gesture state, and a new session allocates
+the output panel's counters. Those definitions now live with their codecs
+and storage. Ordinary construction can check without the demolition code
+that removes entities from the world. The initial camera, orbit and stash
+belong to the level, so session startup can check independently of the game.
+The two benchmark renderers now instantiate their stages in their own entries.
+The saved framing retains schema 26.
+
+Moving the state and demolition definitions alone took **770 → 785 ms** in
+16 cold-build pairs. After moving startup and the reference entries too,
+the ordinary compiler measured **1,095 → 1,017 ms** across 24 pairs under load and
+**883 → 810 ms** in a separate 16-pair window. The drop-preview test stopped
+importing the entire game to get its camera. It checked 165 modules instead
+of 285 and took **1,054 → 678 ms** in 12 pairs. The previous and new
+layouts use the same native compiler.
+
+Three pairs of separately profiled Gdev builds checked every import edge
+against the worker publication trace. The longest path weighted by check
+and publication CPU fell from 482 to 445 ms. The end of the new path ran
+through station, review scenes, scenes, title, game and main in every run.
+The old path passed through world storage, construction, game and session.
+
+## Profile-guided native compiler
+
+The optional `deno task build:compiler:pgo` target counts executions while
+compiling a grid traversal, a hash table, merge sort, an expression
+evaluator and Mandelbrot. Clang uses these counts to choose which paths to
+inline and how to lay them out. Gdev and Ink are held-out workloads. The
+regular build remains available for compiler development.
+
+| Fresh process | Pairs | Before | After | Faster pairs | 95% interval for paired saving |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Gdev Main, source plus PGO | 24 | 1,218 ms | 1,069 ms | 23 | +119 to +185 ms |
+| Gdev Main, source plus PGO, second window | 24 | 803 ms | 692 ms | 24 | +104 to +117 ms |
+| Gdev Main, PGO on identical source | 24 | 1,209 ms | 1,151 ms | 21 | +47 to +107 ms |
+| Gdev Main, PGO with one worker | 6 | 1,866 ms | 1,583 ms | 6 | +217 to +395 ms |
+| physics, PGO on identical source | 16 | 272 ms | 237 ms | 16 | +31 to +41 ms |
+| dialogs, PGO on identical source | 16 | 164 ms | 152 ms | 15 | +10 to +18 ms |
+| trees, PGO on identical source | 16 | 31 ms | 28 ms | 15 | +1 to +4 ms |
+
+Each Gdev pair alternated the two compilers or layouts on a warm filesystem
+from a new project session through receipt of complete Wasm. Gdev used
+eight checker workers unless the table specifies one. The three CLI
+workloads time process start through writing the Wasm and exiting. On
+identical source, both compilers emitted identical bytes in every pair.
+The PGO executable is 11.33 MB, compared with 11.62 MB for
+the regular release. On final Gdev source, four separately profiled pairs
+measured checking at 387 → 343 ms and backend at 137 → 134 ms.
+Asset preparation took 49 → 57 ms and loading took 84 → 89 ms in that window.
+
+The ordinary compiler passed the full release gate. Both binaries passed
+1,129 guest and host tests with 100 ignored and matched all 192 Wasm and
+212 ownership references. Building the ordinary release took
+369 seconds during this run. The two profiled build passes spent
+451 seconds in their timed stages, including training-binary construction.
+The release builds overlapped on this host.
+
+The source layout adds 54 bytes to Main's Wasm. Its hardware frame, trace
+and all 242 files from a 120-frame replay matched the original layout.
+Both reference renderers matched their original frames and final save
+across 24 more frames each. Pen project and codegen checks passed, and all
+176 targeted Gdev outcomes matched, including 18 existing failures.
+[Inputs, native build identities, raw paired samples and qualification](../benchmarks/evidence/measurements/2026-11-20-gdev-profile-guided.json)
+
 ## Checking Gdev storage and rendering without the robot simulation
 
 Blot's workers already publish a module's interface after type checking

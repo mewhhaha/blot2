@@ -1,24 +1,41 @@
 // deno run -A benchmarks/tools/bench_gdev_layouts.ts CONTROL CANDIDATE [PAIRS] [WORKERS]
+// Optional: --entry FILE --control-compiler FILE --candidate-compiler FILE
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
+import { parseArgs } from "node:util";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
 
+const release = "compiler-goose/build/blotc-goose";
+const { values, positionals } = parseArgs({
+  args: Deno.args,
+  allowPositionals: true,
+  options: {
+    entry: { type: "string", default: "src/main.blot" },
+    "control-compiler": { type: "string", default: release },
+    "candidate-compiler": { type: "string", default: release },
+  },
+});
 const [control, candidate, pairArgument = "24", workerArgument = "8"] =
-  Deno.args;
+  positionals;
+assert(positionals.length <= 4, "Expected at most four positional arguments");
 const pairs = Number(pairArgument);
 const workers = Number(workerArgument);
 assert(control && candidate, "Supply two Gdev project roots");
 assert(Number.isInteger(pairs) && pairs > 0, "Supply a positive pair count");
 assert(Number.isInteger(workers) && workers >= 1 && workers <= 16);
 const layouts = [
-  { name: "control", folder: control },
-  { name: "split", folder: candidate },
+  { name: "control", folder: control, compiler: values["control-compiler"] },
+  { name: "split", folder: candidate, compiler: values["candidate-compiler"] },
 ];
-const compiler = resolve("compiler-goose/build/blotc-goose");
 const projects = await Promise.all(
-  layouts.map(({ folder }) =>
-    gdevProject(resolve(folder), resolve("std"), "src/main.blot", compiler)
+  layouts.map(({ folder, compiler }) =>
+    gdevProject(
+      resolve(folder),
+      resolve("std"),
+      values.entry,
+      resolve(compiler),
+    )
   ),
 );
 const hashes = new Map<number, string>();
