@@ -1,14 +1,13 @@
 # Working on Blot and Gdev
 
-On Gdev `38cc5de`, the title can check while console presets compile, and
-the recruitment preset can open its dialog without importing the full station
-UI. Eight-worker fresh Main builds measured **710 → 696 ms** in 24
-directory-swapped pairs. The paired saving interval includes zero. In three
-separate traces the checker measured **327 → 308 ms**. The first frame,
-recruitment capture and 120-frame replay matched. Next, measure the cost of
-individual declarations in `game.blot`. Every observed path to Main still
-passes through it, and it took 47 ms to publish its interface.
-[Timings, dependency checks and runtime qualification](tasks/FAST_COMPILE.md#checking-scene-startup-and-the-station-dialog)
+On Gdev `cc4bbbf`, a running compiler rebuilds input, simulation and
+rendering edits in **201, 182 and 189 ms** median, down from **235, 206
+and 207 ms**. Fresh Main took **702 → 697 ms** across 32 pairs, within
+timing uncertainty. The next target is the backend on a structural edit.
+Adding a multiplication to one simulation call cost **117 ms** in the backend,
+and just **one of 7,028** emitted function bodies changed. Both GPU captures,
+the replay and both reference renderers matched.
+[Stage timings, comparison with fresh Wasm and qualification](tasks/FAST_COMPILE.md#checking-game-stages-independently)
 
 The checker now skips substitution setup for schemes without variables or
 obligations and reuses unchanged types during substitution. Pinned Gdev

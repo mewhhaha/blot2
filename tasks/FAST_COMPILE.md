@@ -3,6 +3,61 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Checking game stages independently
+
+Gdev `cc4bbbf` gives input, fixed-step simulation and presentation their own
+modules. The stage composition and public game constructors remain in
+`game.blot`. Each stage runs the systems in their previous order.
+
+To locate the cost, the same compiler checked successively longer prefixes of
+`game.blot` with identical imports and a scalar entry point. The imports and
+entry alone took 9 ms. Adding `game_using` cost 21 ms for checking and
+interface publication across five paired runs. In a second probe, restoring
+the actual bodies inside this function added about 9 ms for simulation,
+5 ms each for interface and event handling, and 3 ms for presentation.
+These marginal costs include changes in the types the compiler publishes.
+
+| Complete Gdev Wasm build | Pairs | Before | After | Faster pairs | 95% interval for paired saving |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Edit input routing | 8 | 235 ms | 201 ms | 8 | +16 to +53 ms |
+| Edit simulation timing | 8 | 206 ms | 182 ms | 8 | +19 to +31 ms |
+| Edit render scale | 8 | 207 ms | 189 ms | 8 | +11 to +26 ms |
+| Fresh process and session | 32 | 702 ms | 697 ms | 18 | −21 to +20 ms |
+
+The edits each started from a fresh Main build in a running compiler session.
+Every edit matched an independent fresh build byte for byte. Every revert
+restored its original Wasm. Both layouts ran with the same profile-guided
+compiler, eight workers and a warm filesystem. The cold comparison exchanged
+the two equal-length source directories halfway through.
+
+![Complete Wasm rebuild after three game-stage edits](../benchmarks/evidence/measurements/2026-11-20-gdev-game-stages.png)
+
+In five separately traced pairs, the time between starting `game.blot` and
+publishing its interface fell from 48 to 11 ms. Whole-project checking
+measured 310 → 314 ms. Four of five candidate paths waited on world storage
+and then an event or presentation stage. A separate pilot moving the
+`FrameAccess` type out of storage took 656 → 660 ms across 12 fresh pairs.
+That type stays with storage. The working change added 659 bytes to Main,
+which now emits 2,741,576 bytes.
+
+The next compiler experiment is to reuse more emitted functions after an
+expression changes. Scaling one simulation call by 0.5 took 30 ms in checking
+and 117 ms in the backend. Of 7,028 emitted function bodies, 7,027 were
+byte-identical at the same index, and the full image grew by 18 bytes. The
+[existing scalar edit path](#reusing-emitted-function-bodies-after-a-scalar-edit)
+handles literal changes. The multiplication adds a new operation. This edit
+gives a test case for extending reuse while checking the full output against
+fresh compilation.
+
+The initial and recruitment GPU screenshots, both frame traces and all 242
+files from a 120-frame replay matched. The standard and transport reference
+renderers matched frames and final saved state over another 24 frames each.
+Pen project and codegen checks passed. Across 15 affected guest test files,
+106 tests passed and 22 failures reproduced on the baseline. The title
+autosave test checks the documented 15-second interval through the real game.
+[Build identities, phase timings and edit inputs](../benchmarks/evidence/measurements/2026-11-20-gdev-game-stages.json) ·
+[Raw timings, checker paths, test outcomes and packet hashes](../benchmarks/evidence/measurements/2026-11-20-gdev-game-stages.raw.json.gz)
+
 ## Checking scene startup and the station dialog
 
 Gdev `38cc5de` lets the title start a new scene without importing console

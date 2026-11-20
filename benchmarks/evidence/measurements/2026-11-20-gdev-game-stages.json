@@ -1,0 +1,530 @@
+{
+  "inputs": {
+    "originalGdev": "38cc5deb0ebb97c975b5aa5c60ac54b53a902d3b",
+    "candidateGdev": "cc4bbbf22d35d7b91acd02957a8bdce38bdda90b",
+    "blot": "797b7a7e81e096c41fb547d263f437f76e26192f",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "pen": "360f2c46fad1a250e5923a99188d1746745da8af",
+    "runtimeHostSha256": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "pgoSha256": "7ecf4130c3df1c103b05723f19ebf165169a590dc44e02ffb457b33892154678",
+    "penCheckCompilerSha256": "be36b1fcfb161718bf2e75b1fa82318765bf0e1c2a21377fa3aadef39cc38434",
+    "machine": "AMD Ryzen 7 3800X, Linux x86-64, Deno 2.9.8"
+  },
+  "method": {
+    "fresh": "Eight workers, fresh compiler process and project session, warm filesystem. Interleaved source trees in equal-length directories. Sixteen AB/BA pairs per directory assignment then swapped. Timer starts before opening session, stops after receipt of complete output.",
+    "retained": "Eight interleaved pairs per edit in freshly opened sessions. Time from edit request to complete Wasm after the initial compile. Compared each edited hash with an independently opened fresh session and each revert with its original hash.",
+    "attribution": "Same src/game.blot import set checked as its own project entry with a scalar export. Five runs per prefix of the source declarations in alternating order. Nested callback probe retained surrounding declarations and replaced remaining bodies with identity callbacks. Costs use worker-reported check plus publication time and paired differences; they include interface changes and are not exclusive native function timings.",
+    "profiles": "Five alternated pairs of instrumented Main builds with the same PGO binary and equal-length paths. Every source edge validated against the dependency queue.",
+    "pairedInterval": "Median paired savings with 20,000 bootstrap resamples and seed 13. Positive means shorter candidate time."
+  },
+  "main": {
+    "control": {
+      "medianMs": 702.172,
+      "wasmBytes": 2740917,
+      "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+      "modules": 289
+    },
+    "split": {
+      "medianMs": 697.478,
+      "wasmBytes": 2741576,
+      "wasmSha256": "fca784b74c5fd5bb36f0f9852683d70583a4440d560407f0bd528dfd08d5c00e",
+      "modules": 293
+    },
+    "pairs": 32,
+    "wins": 18,
+    "medianPairedSavingMs": 8.52,
+    "saving95Ms": [
+      -21.214,
+      19.603
+    ]
+  },
+  "retained": {
+    "simulation": {
+      "control": {
+        "medianMs": 205.96,
+        "wasmBytes": 2740935,
+        "wasmSha256": "c8663236141358b3beb21b33f853a916c06504958390af72341767b652fb819a",
+        "modules": 2
+      },
+      "split": {
+        "medianMs": 181.805,
+        "wasmBytes": 2741594,
+        "wasmSha256": "6c8a29023ecc8a482dba3414c767d11c5c2d75bd7995c46bbeba4bc24fe156ac",
+        "modules": 3
+      },
+      "pairs": 8,
+      "wins": 8,
+      "medianPairedSavingMs": 23.214,
+      "saving95Ms": [
+        18.742,
+        31.358
+      ]
+    },
+    "presentation": {
+      "control": {
+        "medianMs": 206.764,
+        "wasmBytes": 2740931,
+        "wasmSha256": "4d9aee548c31a05138cd048bc56797906564f65dd8a9511b81cace5ed12eb24e",
+        "modules": 2
+      },
+      "split": {
+        "medianMs": 189.303,
+        "wasmBytes": 2741590,
+        "wasmSha256": "531e6a8bb26a445d4b928563ce8060ad6eae0b1e83d74f223c86b9ecc724dd49",
+        "modules": 3
+      },
+      "pairs": 8,
+      "wins": 8,
+      "medianPairedSavingMs": 19.379,
+      "saving95Ms": [
+        10.827,
+        26.334
+      ]
+    },
+    "events": {
+      "control": {
+        "medianMs": 234.671,
+        "wasmBytes": 2740949,
+        "wasmSha256": "b1df7b212696d7f91e17ccd3bf89bf475e328a0de5d7f40229818acda3a637fd",
+        "modules": 2
+      },
+      "split": {
+        "medianMs": 201.027,
+        "wasmBytes": 2741608,
+        "wasmSha256": "c45aeb003bb10e391eee1340d34ce607d898c1192af9a24b5e59b75eda0d14f9",
+        "modules": 3
+      },
+      "pairs": 8,
+      "wins": 8,
+      "medianPairedSavingMs": 37.74,
+      "saving95Ms": [
+        15.779,
+        52.662
+      ]
+    }
+  },
+  "simulationEditPhasesMs": {
+    "control": {
+      "other": 6.97,
+      "assets": 10.482,
+      "load": 19.024,
+      "lex": 0.243,
+      "parse": 0.79,
+      "check": 44.359,
+      "lower": 6.692,
+      "freeze": 5.112,
+      "validation": 0.0,
+      "backend": 117.127
+    },
+    "candidate": {
+      "other": 7.098,
+      "assets": 11.294,
+      "load": 19.51,
+      "lex": 0.089,
+      "parse": 0.179,
+      "check": 29.985,
+      "lower": 5.797,
+      "freeze": 3.413,
+      "validation": 0.0,
+      "backend": 116.835
+    }
+  },
+  "simulationEditWasmBodies": {
+    "before": 7028,
+    "after": 7028,
+    "sameOrdinal": 7027,
+    "identicalBodyMultiset": 7027,
+    "backendOutputByteDelta": 18
+  },
+  "edits": {
+    "simulation": [
+      "access := hover.update access seconds",
+      "access := hover.update access (seconds * 0.5)"
+    ],
+    "presentation": [
+      "frame.settings[0].render_scale = scene_scale",
+      "frame.settings[0].render_scale = scene_scale * 0.75"
+    ],
+    "events": [
+      "if level_controls access ():",
+      "if level_controls access () and context.width > 100.0:"
+    ]
+  },
+  "attribution": {
+    "attribution": {
+      "imports and scalar entry": {
+        "cumulativeMedianMs": 9.148,
+        "pairedIncrementMedianMs": null
+      },
+      "editor_toolbar": {
+        "cumulativeMedianMs": 10.382,
+        "pairedIncrementMedianMs": 1.327
+      },
+      "control predicates": {
+        "cumulativeMedianMs": 10.603,
+        "pairedIncrementMedianMs": 0.179
+      },
+      "level_receive": {
+        "cumulativeMedianMs": 10.788,
+        "pairedIncrementMedianMs": 0.276
+      },
+      "layer": {
+        "cumulativeMedianMs": 11.482,
+        "pairedIncrementMedianMs": 0.654
+      },
+      "draw_world": {
+        "cumulativeMedianMs": 13.646,
+        "pairedIncrementMedianMs": 2.38
+      },
+      "render_world": {
+        "cumulativeMedianMs": 16.28,
+        "pairedIncrementMedianMs": 3.041
+      },
+      "autosave": {
+        "cumulativeMedianMs": 16.479,
+        "pairedIncrementMedianMs": 0.44
+      },
+      "game_using": {
+        "cumulativeMedianMs": 37.241,
+        "pairedIncrementMedianMs": 20.836
+      },
+      "game and title_start": {
+        "cumulativeMedianMs": 39.07,
+        "pairedIncrementMedianMs": 2.733
+      },
+      "played and schema": {
+        "cumulativeMedianMs": 41.665,
+        "pairedIncrementMedianMs": 2.957
+      }
+    },
+    "bodies": {
+      "stage callbacks returning their inputs": {
+        "cumulativeMedianMs": 17.364,
+        "pairedIncrementMedianMs": null
+      },
+      "reset": {
+        "cumulativeMedianMs": 17.825,
+        "pairedIncrementMedianMs": 0.613
+      },
+      "begin": {
+        "cumulativeMedianMs": 18.226,
+        "pairedIncrementMedianMs": 0.139
+      },
+      "normalize": {
+        "cumulativeMedianMs": 18.379,
+        "pairedIncrementMedianMs": -0.421
+      },
+      "checkpoint": {
+        "cumulativeMedianMs": 18.251,
+        "pairedIncrementMedianMs": 0.408
+      },
+      "route": {
+        "cumulativeMedianMs": 19.043,
+        "pairedIncrementMedianMs": 0.043
+      },
+      "interface": {
+        "cumulativeMedianMs": 23.925,
+        "pairedIncrementMedianMs": 5.288
+      },
+      "event": {
+        "cumulativeMedianMs": 28.77,
+        "pairedIncrementMedianMs": 5.014
+      },
+      "update": {
+        "cumulativeMedianMs": 37.703,
+        "pairedIncrementMedianMs": 8.533
+      },
+      "present": {
+        "cumulativeMedianMs": 40.72,
+        "pairedIncrementMedianMs": 3.17
+      }
+    }
+  },
+  "pilots": {
+    "pilot": {
+      "control": {
+        "medianMs": 635.458,
+        "wasmBytes": 2740917,
+        "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+        "modules": 289
+      },
+      "split": {
+        "medianMs": 635.616,
+        "wasmBytes": 2741844,
+        "wasmSha256": "91c31b58bc5e4a776acf5db579f33fe7ccb1410c8beefb55d19bb90981ca95a1",
+        "modules": 293
+      },
+      "pairs": 10,
+      "wins": 6,
+      "medianPairedSavingMs": 4.248,
+      "saving95Ms": [
+        -8.437,
+        15.779
+      ]
+    },
+    "frame-pilot": {
+      "control": {
+        "medianMs": 655.625,
+        "wasmBytes": 2740917,
+        "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+        "modules": 289
+      },
+      "split": {
+        "medianMs": 660.483,
+        "wasmBytes": 2742680,
+        "wasmSha256": "32d539236999b94ad439eb0442195e109777d310071f88b089748212b2b7cf85",
+        "modules": 294
+      },
+      "pairs": 12,
+      "wins": 7,
+      "medianPairedSavingMs": 5.632,
+      "saving95Ms": [
+        -18.306,
+        48.301
+      ]
+    },
+    "narrow": {
+      "control": {
+        "medianMs": 670.127,
+        "wasmBytes": 2740917,
+        "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+        "modules": 289
+      },
+      "split": {
+        "medianMs": 655.747,
+        "wasmBytes": 2743832,
+        "wasmSha256": "4c3ef5274402a369afb031d0e0a2acc0730114a99ccfad4a123ecfaae5ca14fe",
+        "modules": 289
+      },
+      "pairs": 12,
+      "wins": 8,
+      "medianPairedSavingMs": 11.709,
+      "saving95Ms": [
+        -12.561,
+        34.36
+      ]
+    }
+  },
+  "profile": {
+    "reference": {
+      "modules": 289,
+      "edges": 2530,
+      "checkMedianMs": 310.478,
+      "workerCpuMedianMs": 1666.753,
+      "phasesMs": {
+        "other": 21.047,
+        "assets": 60.912,
+        "load": 114.592,
+        "lex": 0.151,
+        "parse": 0.709,
+        "check": 310.478,
+        "lower": 37.179,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 130.694
+      },
+      "units": {
+        "game": {
+          "readyMs": 279.919,
+          "claimToPublicationMs": 48.482
+        },
+        "main": {
+          "readyMs": 288.192,
+          "claimToPublicationMs": 8.415
+        },
+        "world_storage": {
+          "readyMs": 229.671,
+          "claimToPublicationMs": 42.444
+        },
+        "actors/robots": {
+          "readyMs": 212.304,
+          "claimToPublicationMs": 64.499
+        },
+        "ui/station": {
+          "readyMs": 226.506,
+          "claimToPublicationMs": 38.878
+        }
+      },
+      "observedPaths": [
+        [
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/hud.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/debug/scene_command.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/debug/scene_command.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    },
+    "shipping": {
+      "modules": 293,
+      "edges": 2614,
+      "checkMedianMs": 313.937,
+      "workerCpuMedianMs": 1732.87,
+      "phasesMs": {
+        "other": 23.279,
+        "assets": 61.06,
+        "load": 124.04,
+        "lex": 0.156,
+        "parse": 0.717,
+        "check": 313.937,
+        "lower": 36.211,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 153.67
+      },
+      "units": {
+        "game": {
+          "readyMs": 279.453,
+          "claimToPublicationMs": 11.218
+        },
+        "main": {
+          "readyMs": 290.705,
+          "claimToPublicationMs": 8.872
+        },
+        "game/events": {
+          "readyMs": 268.221,
+          "claimToPublicationMs": 22.002
+        },
+        "game/simulation": {
+          "readyMs": 263.696,
+          "claimToPublicationMs": 18.918
+        },
+        "game/presentation": {
+          "readyMs": 265.391,
+          "claimToPublicationMs": 19.419
+        },
+        "game/controls": {
+          "readyMs": 209.205,
+          "claimToPublicationMs": 5.287
+        },
+        "world_storage": {
+          "readyMs": 239.485,
+          "claimToPublicationMs": 52.466
+        },
+        "actors/robots": {
+          "readyMs": 219.327,
+          "claimToPublicationMs": 56.263
+        },
+        "ui/station": {
+          "readyMs": 240.422,
+          "claimToPublicationMs": 40.734
+        }
+      },
+      "observedPaths": [
+        [
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game/events.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game/presentation.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game/events.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/game/events.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/hud.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game/events.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    }
+  },
+  "qualification": {
+    "targetedFiles": 15,
+    "passes": 106,
+    "matchingExistingFailures": 22,
+    "penCheck": true,
+    "penCodegenCheck": true,
+    "hardware": {
+      "frame/frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "frame/frames.trace": "4f0d9ebbd6e8ffb6449afdb9df12b1e009a531be6dae35b0803fb6f5b3853b72",
+      "shots/recruitment.png": "a70e292c311016e90cfd0d66f0ba2570e1bae9adc700570a2880b2415bdd3e6f",
+      "recruitment.trace": "f92f4e4abfd3d8d8a3cbd03f4b14dc0de24ccdad59257cc180152243d723fe9b"
+    },
+    "matchedReplayFiles": 242,
+    "replayFrames": 120,
+    "referenceRenderers": {
+      "reference": {
+        "frame_hash": "c10d12b212a919b4788acbd929ae5e50173852ac691a51feb5996ac33c58244f",
+        "final_state_hash": "b71227a29e4d0ef5c305204a8060650a5c4002fbc54cd5dd24597b2658d38d52"
+      },
+      "transport_reference": {
+        "frame_hash": "c10d12b212a919b4788acbd929ae5e50173852ac691a51feb5996ac33c58244f",
+        "final_state_hash": "b71227a29e4d0ef5c305204a8060650a5c4002fbc54cd5dd24597b2658d38d52"
+      }
+    }
+  },
+  "raw": {
+    "filename": "2026-11-20-gdev-game-stages.raw.json.gz",
+    "sha256": "aedb7fd5cdff86ba64d1299b4088aced500952c87f5fa1818937ef2a8c14a13e"
+  }
+}
