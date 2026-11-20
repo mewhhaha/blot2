@@ -1,13 +1,14 @@
 # Working on Blot and Gdev
 
-On pinned Gdev Main, fresh eight-worker compilation measured **690 → 682 ms** in
-20 alternating pairs. The checker cleared **48.81 → 2.28 million** cache slots
-and made **117,618 fewer** type-resolution visits. The interval includes zero.
-A second check on the newer 279-module Gdev commit measured 705 → 700 ms (12 pairs).
-The next measured target is constructor finalization. Resolving constructor
-signatures and payloads still accounts for 589,219 visits, including 91,559
-on the longest modeled dependency chain.
-[Cache measurements, timing and qualification](tasks/FAST_COMPILE.md#type-resolution-on-the-module-dependency-chain)
+Imported constructor finalization now takes **56,129 visits**, down from
+589,219 on pinned Gdev Main. The whole checker makes **14.4% fewer**
+type-resolution visits. Fresh builds measured **1,057 → 1,041 ms** in 20
+alternating pairs on the shared host. The latest committed Gdev tested
+(`e9cc6a8`) measured **1,138 → 1,071 ms** in six pairs. Both timing intervals
+include zero. All three tested Gdev revisions kept byte-identical Wasm.
+Unification now accounts for 993,040 visits, including 241,411 on the fixed
+dependency chain. Measure its operand reads by shape and outcome next.
+[Constructor measurements, timings and qualification](tasks/FAST_COMPILE.md#finishing-imported-constructor-types)
 
 On Gdev Main the Wasm backend read 728 constructor signatures, all from their
 defining modules. Workers now omit all **41,786** imported copies. This removed

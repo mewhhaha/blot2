@@ -3,6 +3,68 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Finishing imported constructor types
+
+The checker revisited 42,622 constructors when finishing the 280 modules in
+pinned Gdev Main. Of the 589,219 recursive type-resolution visits, 581,297
+were to imported signatures and payloads. None of the imported roots changed.
+Two local roots did change, adding nine nodes.
+
+During import, the checker now records one byte for a constructor when its
+copied signature and payload are both closed. A closed type has no unresolved
+variables or projections. Its copied children are immutable, so later
+inference in the importing module cannot change it. The byte records the
+maximum depth of the two types. Finalization can skip both walks when that
+depth fits the current resolution limit. Open types and local constructors
+still go through inference. Projected modules and editor completions keep
+their original resolution order and budget charges.
+
+| Recursive type-resolution visits | Previous | Current |
+| --- | ---: | ---: |
+| Constructor signatures | 332,958 | 39,097 |
+| Constructor payloads | 256,261 | 17,032 |
+| Constructors on the fixed 20-module dependency chain | 91,559 | 9,814 |
+| All checker work across 280 modules | 3,700,542 | 3,167,566 |
+
+Skipping the constructor walks added 114 visits at later sites, mostly in
+pattern coverage. The net reduction was 532,976 visits. Type allocations
+stayed at 1,355,631 and worker replies at 67,169,848 bytes. Unification,
+where the checker reconciles two types, now accounts for 993,040 visits,
+including 241,411 on the fixed dependency chain.
+
+Fresh release builds on the shared eight-core host used eight workers and a
+warm filesystem. Each pair alternated which compiler ran first.
+
+| Gdev revision | Pairs | Previous median | Current median | 95% interval for paired saving |
+| --- | ---: | ---: | ---: | ---: |
+| Pinned 280-module comparison, `4c98d07` | 20 | 1,057 ms | 1,041 ms | −37 to +36 ms |
+| 279-module comparison, `33aab6e` | 12 | 1,058 ms | 1,088 ms | −15 to +17 ms |
+| Latest committed snapshot tested, `e9cc6a8` | 6 | 1,138 ms | 1,071 ms | −78 to +146 ms |
+
+On the pinned snapshot, checking measured 605 → 599 ms in eight profiled
+pairs. The median paired difference for a full build was 2 ms slower.
+All three timing intervals include zero. The small 16-reader forwarding
+benchmark still took 1,572 type-resolution visits at each catalog width
+(1, 16 and 128) on both compilers.
+
+![Constructor resolution visits and fresh Gdev build timings](../benchmarks/evidence/measurements/2026-11-20-constructor-finalization.png)
+
+All three revisions emitted the same Wasm as the control. The full compiler
+gate passed, as did all 283 Ink checks. The pinned Gdev frame, trace and
+242 replay files matched. All 22 general checker cases preserved Wasm or
+diagnostics, including rejection. Retained edits, rejection and recovery
+matched independent fresh builds at the checked revisions. Exact projection
+budget boundaries held in serial and worker builds.
+
+The next measurement should split unification's 993,040 visits by operand
+shape and outcome. Its explicit reads of the two operand types account for
+868,219 visits. The remaining 124,821 occur in related work such as checking
+whether a variable would contain itself. Salt, robots and world storage
+account for 128,512 unification visits on the fixed dependency chain.
+[Measurements, controls and compiler identities](../benchmarks/evidence/measurements/2026-11-20-constructor-finalization.json) ·
+[Per-module work profiler](../benchmarks/evidence/measurements/experiments/2026-11-20-resolution-work.py) ·
+[Forwarding benchmark](../benchmarks/tools/bench_forwarded_constructors.ts)
+
 ## Type resolution on the module dependency chain
 
 A module can start checking once its imports have published their inferred
@@ -60,7 +122,7 @@ same 2,733,364-byte Wasm for that snapshot.
 
 ![Cache work and release times for pinned Gdev Main](../benchmarks/evidence/measurements/2026-11-20-resolution-chain.png)
 
-The full compiler gate passed. All 19 general checker programs preserved Wasm
+The full compiler gate passed. All 22 general checker programs preserved Wasm
 or diagnostics, as did retained edits, three rejected revisions and recovery.
 All 283 Ink checks passed. Gdev's 2,754,496-byte Wasm, hardware frame and
 242 replay files matched the previous release. Native tests cover rehashing,

@@ -1,0 +1,692 @@
+{
+  "inputs": {
+    "controlCommit": "76c8a4183528f88d46de939d868d397e4d093ed0",
+    "controlExecutable": "59a03c56dc84549dbd648de2bbced8e98a1399459490673005ae40dbffa061ff",
+    "candidateExecutable": "3c8fc04fd6aff8a5b125f81344046001048167ef3cc55d3ae752a1ff0f81c416",
+    "candidateSourceDigest": "049a111fcad825c854b867e4977b4648f04eecb6aaea4465c3e85bea205e35d7",
+    "gooseSha256": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "ccSha256": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "gdev": "4c98d07cd13df544724d7323cd702358145cb993",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "pen": "6e68d2f739bf98f2e28c86e3a063beb4edc517e3",
+    "sourceBytes": 2627325,
+    "workers": 8,
+    "modules": 280,
+    "load": {
+      "freshStart": "18.88 47.15 38.70 9/2939 1216494",
+      "freshEnd": "20.02 43.42 37.83 14/2601 1224539",
+      "profileStart": "20.02 43.42 37.83 13/2601 1224539",
+      "profileEnd": "19.61 41.84 37.43 8/2409 1229688",
+      "retainedStart": "19.61 41.84 37.43 9/2409 1229688",
+      "retainedEnd": "19.64 41.12 37.25 15/2434 1233460"
+    },
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor"
+  },
+  "method": "Release timings use fresh processes, a warm filesystem and alternating order on the same machine. Intervals bootstrap the median paired control minus candidate time. Path CPU sums check and publication on the fixed baseline dependency path. The unoptimized diagnostic copies count visits only.",
+  "work": {
+    "control": {
+      "project": {
+        "total": 3700542,
+        "constructorSignature": 332958,
+        "constructorPayload": 256261,
+        "constructorTotal": 589219,
+        "byCaller": {
+          "types_unifyWalk": 993036,
+          "check_settledType": 513871,
+          "check_ordinaryApplication": 362877,
+          "finish.constructor.scheme.root": 332958,
+          "check_applicationFlow": 325916,
+          "finish.constructor.payload": 256261,
+          "check_resolveUse": 199582,
+          "check_attemptPendingBody": 90306,
+          "finish.predicate.signature": 64599,
+          "check_certifiedLambdaType": 57266,
+          "check_normalizeList": 51533,
+          "check_schemeCandidateScan": 45390,
+          "check_summarizePublic": 43298,
+          "check_projectConstructorFields": 39492,
+          "check_summarizeFlags": 32120
+        }
+      },
+      "fixedDependencyPath": {
+        "total": 938355,
+        "constructorSignature": 52330,
+        "constructorPayload": 39229,
+        "constructorTotal": 91559,
+        "byCaller": {
+          "types_unifyWalk": 241411,
+          "check_settledType": 119252,
+          "check_ordinaryApplication": 89159,
+          "check_applicationFlow": 84792,
+          "finish.constructor.scheme.root": 52330,
+          "check_resolveUse": 51489,
+          "finish.constructor.payload": 39229,
+          "check_attemptPendingBody": 35649,
+          "finish.predicate.signature": 26876,
+          "check_projectConstructorFields": 19573,
+          "check_schemeCandidateScan": 19445,
+          "finish.predicate.ty": 15171,
+          "check_certifiedLambdaType": 14158,
+          "check_summarizePublic": 11163,
+          "check_summarizeFlags": 10903
+        }
+      }
+    },
+    "candidate": {
+      "project": {
+        "total": 3167566,
+        "constructorSignature": 39097,
+        "constructorPayload": 17032,
+        "constructorTotal": 56129,
+        "byCaller": {
+          "types_unifyWalk": 993040,
+          "check_settledType": 513871,
+          "check_ordinaryApplication": 362877,
+          "check_applicationFlow": 325916,
+          "check_resolveUse": 199582,
+          "check_attemptPendingBody": 90306,
+          "finish.predicate.signature": 64599,
+          "check_certifiedLambdaType": 57266,
+          "check_normalizeList": 51533,
+          "check_schemeCandidateScan": 45390,
+          "check_summarizePublic": 43298,
+          "check_projectConstructorFields": 39492,
+          "finish.constructor.scheme.root": 39097,
+          "check_summarizeFlags": 32120,
+          "check_projectMethod": 28335
+        }
+      },
+      "fixedDependencyPath": {
+        "total": 856642,
+        "constructorSignature": 6594,
+        "constructorPayload": 3220,
+        "constructorTotal": 9814,
+        "byCaller": {
+          "types_unifyWalk": 241411,
+          "check_settledType": 119252,
+          "check_ordinaryApplication": 89159,
+          "check_applicationFlow": 84792,
+          "check_resolveUse": 51489,
+          "check_attemptPendingBody": 35649,
+          "finish.predicate.signature": 26876,
+          "check_projectConstructorFields": 19573,
+          "check_schemeCandidateScan": 19445,
+          "finish.predicate.ty": 15174,
+          "check_certifiedLambdaType": 14158,
+          "check_summarizePublic": 11163,
+          "check_summarizeFlags": 10903,
+          "check_expandInformedUses": 10542,
+          "check_pendingMemberSelection": 8937
+        }
+      }
+    },
+    "baselineConstructorRoots": {
+      "local": {
+        "roots": 1672,
+        "visits": 7922,
+        "changedRoots": 2,
+        "nodesAdded": 9,
+        "effectRowsAdded": 0,
+        "absentReads": 146,
+        "projectedReads": 0
+      },
+      "imported": {
+        "roots": 83572,
+        "visits": 581297,
+        "changedRoots": 0,
+        "nodesAdded": 0,
+        "effectRowsAdded": 0,
+        "absentReads": 12166,
+        "projectedReads": 0
+      }
+    },
+    "typeNodes": [1355631, 1355631],
+    "workerReplyBytes": [67169848, 67169848],
+    "changedNonConstructorSites": {
+      "check_checkCoverageRows": [571, 593],
+      "check_coveredVariants": [179, 254],
+      "finish.predicate.other": [237, 239],
+      "finish.predicate.result": [15298, 15306],
+      "finish.predicate.ty": [24556, 24559],
+      "types_unifyWalk": [993036, 993040]
+    },
+    "fixedDependencyPath": [
+      "blot2/std/prelude.blot",
+      "blot2/std/vector.blot",
+      "ink/lib/math.blot",
+      "ink/lib/lanes.blot",
+      "ink/lib/clock.blot",
+      "ink/lib/app.blot",
+      "ink/lib/render.blot",
+      "ink/lib/brush.blot",
+      "ink/lib/editor.blot",
+      "gdev/src/effects/celebrations.blot",
+      "gdev/src/world/salt_simulation.blot",
+      "gdev/src/world/salt.blot",
+      "gdev/src/actors/robot_staffing.blot",
+      "gdev/src/actors/robots.blot",
+      "gdev/src/buildings/cannon.blot",
+      "gdev/src/world_storage.blot",
+      "gdev/src/buildings/construction.blot",
+      "gdev/src/game.blot",
+      "gdev/src/session.blot",
+      "gdev/src/main.blot"
+    ],
+    "normalization": {
+      "unify_resolve_calls": [953558, 953558],
+      "unify_resolve_entries": [868215, 868219],
+      "unify_pairs": [476779, 476779],
+      "resolve_nodes_added": [418971, 418971]
+    },
+    "fixedPathUnificationByModule": {
+      "blot2/std/prelude.blot": 4451,
+      "blot2/std/vector.blot": 1280,
+      "ink/lib/math.blot": 16492,
+      "ink/lib/lanes.blot": 2597,
+      "ink/lib/clock.blot": 932,
+      "ink/lib/app.blot": 1189,
+      "ink/lib/render.blot": 5561,
+      "ink/lib/brush.blot": 13821,
+      "ink/lib/editor.blot": 22524,
+      "gdev/src/effects/celebrations.blot": 2883,
+      "gdev/src/world/salt_simulation.blot": 3673,
+      "gdev/src/world/salt.blot": 48973,
+      "gdev/src/actors/robot_staffing.blot": 4784,
+      "gdev/src/actors/robots.blot": 45837,
+      "gdev/src/buildings/cannon.blot": 10526,
+      "gdev/src/world_storage.blot": 33702,
+      "gdev/src/buildings/construction.blot": 5278,
+      "gdev/src/game.blot": 16234,
+      "gdev/src/session.blot": 482,
+      "gdev/src/main.blot": 192
+    }
+  },
+  "timings": {
+    "freshMs": {
+      "control": [1119.542, 1058.919, 1055.944, 906.073, 996.679, 1021.261, 1078.258, 1051.62, 1054.529, 1084.594, 1057.73, 1050.463, 1040.254, 1107.977, 1078.419, 1039.921, 963.947, 1092.684, 1060.623, 1679.919],
+      "candidate": [1074.896, 995.816, 1020.178, 997.428, 1017.606, 935.614, 1083.175, 1162.781, 1018.011, 1027.093, 1070.483, 1104.386, 1031.942, 984.366, 1076.527, 1046.307, 1197.188, 1225.168, 1035.373, 1921.376],
+      "medians": [1056.837, 1040.84],
+      "medianPairedSavingMs": -1.513,
+      "medianSaving95Ms": [-37.425, 36.142],
+      "wins": 10
+    },
+    "checkMs": {
+      "control": [618.916, 659.076, 659.237, 574.421, 576.231, 568.061, 601.303, 607.807],
+      "candidate": [670.66, 662.914, 622.743, 606.627, 563.891, 571.116, 552.142, 591.213],
+      "medians": [604.555, 598.92],
+      "medianPairedSavingMs": 4.643,
+      "medianSaving95Ms": [-32.206, 36.494],
+      "wins": 4
+    },
+    "workerCpuMs": {
+      "control": [2499.101, 2574.402, 2480.795, 2466.722, 2468.691, 2467.111, 2507.346, 2469.121],
+      "candidate": [2634.469, 2592.903, 2546.428, 2487.011, 2386.283, 2490.527, 2356.846, 2409.213],
+      "medians": [2474.958, 2488.769],
+      "medianPairedSavingMs": -19.395,
+      "medianSaving95Ms": [-65.633, 82.408],
+      "wins": 3
+    },
+    "fixedPathCpuMs": {
+      "control": [505.958, 537.444, 521.937, 500.34, 483.507, 495.442, 518.188, 495.896],
+      "candidate": [554.77, 541.452, 537.83, 497.322, 481.91, 492.738, 489.196, 472.694],
+      "medians": [503.149, 495.03],
+      "medianPairedSavingMs": 2.15,
+      "medianSaving95Ms": [-15.893, 23.202],
+      "wins": 5
+    },
+    "secondaryFreshMs": {
+      "control": [1225.558, 1088.174, 1257.634, 1092.801, 1066.848, 1006.235, 1017.068, 1003.333, 1017.916, 1049.742, 1079.005, 1032.164],
+      "candidate": [1152.078, 1190.189, 1125.997, 1090.222, 1085.918, 1113.992, 1014.402, 1013.052, 985.905, 1060.721, 1090.827, 1037.433],
+      "medians": [1058.295, 1088.07],
+      "medianPairedSavingMs": -7.494,
+      "medianSaving95Ms": [-15.446, 17.338],
+      "wins": 5
+    }
+  },
+  "secondary": {
+    "gdev": "33aab6ef667d68efcb6521a9af8e4992feba34c9",
+    "modules": 279,
+    "wasmBytes": 2733364,
+    "wasmSha256": "0451cda33c3b8544116ef1176d6076168f5c1d2e0e97af4404148fa6da2c1920"
+  },
+  "retainedMs": {
+    "edit": {
+      "control": [56.698, 53.208, 64.625],
+      "candidate": [60.704, 53.966, 67.133],
+      "medians": [56.698, 60.704],
+      "medianPairedSavingMs": -2.507,
+      "medianSaving95Ms": [-4.006, -0.758],
+      "wins": 0
+    },
+    "fresh": {
+      "control": [1087.471, 1046.921, 1015.811],
+      "candidate": [1029.49, 981.959, 1118.632],
+      "medians": [1046.921, 1029.49],
+      "medianPairedSavingMs": 57.981,
+      "medianSaving95Ms": [-102.821, 64.962],
+      "wins": 2
+    },
+    "lex": {
+      "control": [82.078, 102.669, 84.513],
+      "candidate": [82.625, 114.22, 90.199],
+      "medians": [84.513, 90.199],
+      "medianPairedSavingMs": -5.686,
+      "medianSaving95Ms": [-11.551, -0.547],
+      "wins": 0
+    },
+    "recover": {
+      "control": [47.622, 60.498, 59.353],
+      "candidate": [55.578, 50.655, 54.368],
+      "medians": [59.353, 54.368],
+      "medianPairedSavingMs": 4.984,
+      "medianSaving95Ms": [-7.956, 9.843],
+      "wins": 2
+    },
+    "reject": {
+      "control": [456.511, 445.218, 436.716],
+      "candidate": [413.241, 428.678, 377.759],
+      "medians": [445.218, 413.241],
+      "medianPairedSavingMs": 43.27,
+      "medianSaving95Ms": [16.54, 58.957],
+      "wins": 3
+    },
+    "syntax": {
+      "control": [99.648, 88.227, 92.218],
+      "candidate": [101.613, 98.711, 85.09],
+      "medians": [92.218, 98.711],
+      "medianPairedSavingMs": -1.965,
+      "medianSaving95Ms": [-10.485, 7.129],
+      "wins": 1
+    }
+  },
+  "forwardedConstructorBenchmark": {
+    "1": {
+      "checkMs": {
+        "control": [34.823, 39.923, 33.176, 36.409, 38.667, 40.23, 32.092, 28.817, 26.818, 29.342, 39.769, 41.871],
+        "candidate": [34.743, 33.972, 34.638, 36.649, 38.261, 41.656, 42.617, 28.087, 32.709, 41.632, 36.712, 35.339],
+        "medians": [35.616, 35.994],
+        "medianPairedSavingMs": -0.08,
+        "medianSaving95Ms": [-3.676, 1.893],
+        "wins": 6
+      },
+      "resolveVisits": [1572, 1572],
+      "workerReplyBytes": 93284,
+      "typeNodes": 759,
+      "wasmSha256": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    },
+    "16": {
+      "checkMs": {
+        "control": [29.137, 29.313, 35.577, 34.205, 35.078, 44.127, 28.129, 26.757, 22.953, 32.363, 28.518, 44.902],
+        "candidate": [32.971, 35.209, 35.822, 30.946, 35.933, 37.501, 37.455, 29.804, 22.685, 26.444, 35.932, 42.559],
+        "medians": [30.838, 35.516],
+        "medianPairedSavingMs": -0.55,
+        "medianSaving95Ms": [-4.865, 2.801],
+        "wins": 5
+      },
+      "resolveVisits": [1572, 1572],
+      "workerReplyBytes": 176813,
+      "typeNodes": 1074,
+      "wasmSha256": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    },
+    "128": {
+      "checkMs": {
+        "control": [40.875, 35.582, 25.001, 25.073, 27.332, 29.911, 34.537, 31.143, 30.257, 30.009, 30.039, 22.993],
+        "candidate": [52.049, 39.415, 28.693, 26.798, 21.368, 20.748, 29.093, 40.473, 36.792, 34.368, 26.152, 24.048],
+        "medians": [30.024, 28.893],
+        "medianPairedSavingMs": -2.708,
+        "medianSaving95Ms": [-5.447, 4.665],
+        "wins": 4
+      },
+      "resolveVisits": [1572, 1572],
+      "workerReplyBytes": 801892,
+      "typeNodes": 3426,
+      "wasmSha256": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    }
+  },
+  "generalCheckers": {
+    "callbacks-256": {
+      "checkMs": {
+        "control": [19.426, 15.508, 14.446, 16.629, 24.578, 18.938, 14.19, 19.999, 20.25, 20.533],
+        "candidate": [19.28, 16.984, 13.395, 15.366, 18.905, 19.828, 15.365, 15.625, 17.335, 24.093],
+        "medians": [19.182, 17.16],
+        "medianPairedSavingMs": 0.598,
+        "medianSaving95Ms": [-1.183, 2.915],
+        "wins": 6
+      },
+      "resolveVisits": [36008, 36008],
+      "wasmSha256": "50499618ae0256a2956ef6e30db912fbf89fd3c25db015f0da105eb89d0e1097",
+      "diagnostics": []
+    },
+    "callbacks-32": {
+      "checkMs": {
+        "control": [10.495, 9.236, 11.587, 7.996, 11.088, 11.711, 9.057, 11.004, 7.2, 10.586],
+        "candidate": [12.35, 9.054, 11.218, 7.816, 17.08, 16.541, 9.068, 9.639, 10.055, 15.441],
+        "medians": [10.54, 10.636],
+        "medianPairedSavingMs": -0.933,
+        "medianSaving95Ms": [-4.83, 0.275],
+        "wins": 4
+      },
+      "resolveVisits": [19208, 19208],
+      "wasmSha256": "67bfdb438fbb0912bb0973a9bc1cbda3619cc64f9661c2073eec82666d0c764f",
+      "diagnostics": []
+    },
+    "fields-256": {
+      "checkMs": {
+        "control": [10.801, 9.359, 8.145, 12.396, 9.335, 8.88, 8.832, 11.876, 10.542, 16.661],
+        "candidate": [11.465, 10.479, 11.816, 9.461, 11.346, 7.85, 10.143, 11.467, 13.01, 13.031],
+        "medians": [9.95, 11.405],
+        "medianPairedSavingMs": -0.892,
+        "medianSaving95Ms": [-2.011, 1.672],
+        "wins": 4
+      },
+      "resolveVisits": [16697, 16697],
+      "wasmSha256": "b1c850958f14a99d67a047af364d423a641fc22e76382e8362554c0de49fab5d",
+      "diagnostics": []
+    },
+    "fields-64": {
+      "checkMs": {
+        "control": [7.826, 8.765, 9.738, 7.376, 11.732, 8.254, 10.02, 8.291, 9.781, 10.8],
+        "candidate": [11.853, 8.232, 8.836, 10.064, 12.015, 10.564, 7.082, 12.503, 10.523, 8.713],
+        "medians": [9.252, 10.293],
+        "medianPairedSavingMs": -0.513,
+        "medianSaving95Ms": [-3.169, 1.31],
+        "wins": 4
+      },
+      "resolveVisits": [16697, 16697],
+      "wasmSha256": "f507104a0ef2400ac0ad34e6c34e0248774597b2afa9329067e7eaa455d4edb8",
+      "diagnostics": []
+    },
+    "fields-8": {
+      "checkMs": {
+        "control": [11.314, 7.93, 6.852, 7.244, 11.948, 7.167, 9.355, 9.571, 11.382, 10.688],
+        "candidate": [9.422, 7.538, 10.283, 10.719, 11.929, 9.114, 6.981, 8.359, 11.428, 10.206],
+        "medians": [9.463, 9.814],
+        "medianPairedSavingMs": 0.205,
+        "medianSaving95Ms": [-1.947, 1.212],
+        "wins": 6
+      },
+      "resolveVisits": [16697, 16697],
+      "wasmSha256": "7c79d7c3871bee543509da6443e2eeb2df72638dac03ec03bd56be6bda8d9620",
+      "diagnostics": []
+    },
+    "generics-1024": {
+      "checkMs": {
+        "control": [47.923, 42.016, 57.492, 53.254, 66.929, 48.061, 52.774, 66.737, 45.315, 72.12],
+        "candidate": [52.648, 51.117, 57.154, 52.422, 95.293, 70.179, 63.527, 51.469, 50.351, 61.043],
+        "medians": [53.014, 54.901],
+        "medianPairedSavingMs": -4.881,
+        "medianSaving95Ms": [-15.61, 5.707],
+        "wins": 4
+      },
+      "resolveVisits": [140666, 140666],
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-256": {
+      "checkMs": {
+        "control": [22.465, 19.946, 20.802, 21.609, 22.934, 21.428, 22.531, 15.281, 18.152, 34.889],
+        "candidate": [15.578, 20.227, 19.206, 22.255, 21.892, 19.83, 17.211, 20.902, 15.737, 25.781],
+        "medians": [21.519, 20.029],
+        "medianPairedSavingMs": 1.597,
+        "medianSaving95Ms": [-0.281, 5.32],
+        "wins": 7
+      },
+      "resolveVisits": [47738, 47738],
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-32": {
+      "checkMs": {
+        "control": [8.369, 12.681, 9.855, 11.942, 11.398, 12.876, 13.04, 11.939, 12.101, 12.048],
+        "candidate": [8.76, 10.091, 12.868, 11.275, 13.315, 11.259, 16.406, 10.382, 10.685, 11.573],
+        "medians": [11.995, 11.267],
+        "medianPairedSavingMs": 0.571,
+        "medianSaving95Ms": [-1.917, 1.557],
+        "wins": 6
+      },
+      "resolveVisits": [20634, 20634],
+      "wasmSha256": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "imported-generics": {
+      "checkMs": {
+        "control": [10.264, 11.444, 13.215, 12.981, 9.867, 7.934, 11.691, 13.776, 17.096, 14.85],
+        "candidate": [10.071, 7.901, 12.277, 12.276, 10.374, 14.268, 13.062, 13.997, 11.742, 12.952],
+        "medians": [12.336, 12.276],
+        "medianPairedSavingMs": 0.449,
+        "medianSaving95Ms": [-0.796, 2.241],
+        "wins": 6
+      },
+      "resolveVisits": [18028, 18028],
+      "wasmSha256": "f23de5c8fdb9ede651ed865429bbcf28b0b99838772661f5c490a203900a87b4",
+      "diagnostics": []
+    },
+    "imports-2": {
+      "checkMs": {
+        "control": [9.535, 10.73, 9.769, 13.347, 14.087, 12.404, 11.601, 12.987, 7.691, 11.827],
+        "candidate": [11.084, 9.131, 14.458, 10.817, 11.048, 9.819, 10.565, 15.842, 7.852, 13.95],
+        "medians": [11.714, 10.933],
+        "medianPairedSavingMs": 0.438,
+        "medianSaving95Ms": [-2.202, 2.53],
+        "wins": 5
+      },
+      "resolveVisits": [17563, 17563],
+      "wasmSha256": "6f018f68abb78305f7ce55cda65b6347fb3bbd7e8379d70e5f2b020710449981",
+      "diagnostics": []
+    },
+    "imports-32": {
+      "checkMs": {
+        "control": [20.944, 27.741, 26.367, 26.639, 26.241, 22.962, 20.314, 21.295, 18.851, 29.876],
+        "candidate": [21.734, 25.904, 30.164, 27.969, 23.423, 21.066, 27.215, 21.993, 21.241, 22.305],
+        "medians": [24.602, 22.864],
+        "medianPairedSavingMs": -0.744,
+        "medianSaving95Ms": [-2.564, 1.896],
+        "wins": 4
+      },
+      "resolveVisits": [27545, 27545],
+      "wasmSha256": "fc9566df6adec848cedab5290618e1c60d8d2402a9238a465ae444747b6456ea",
+      "diagnostics": []
+    },
+    "imports-8": {
+      "checkMs": {
+        "control": [13.467, 12.233, 14.089, 13.6, 13.011, 12.749, 14.815, 16.386, 9.455, 12.74],
+        "candidate": [14.402, 13.879, 16.026, 12.858, 14.381, 13.036, 13.962, 14.827, 10.898, 17.192],
+        "medians": [13.239, 14.171],
+        "medianPairedSavingMs": -1.152,
+        "medianSaving95Ms": [-1.69, 0.742],
+        "wins": 3
+      },
+      "resolveVisits": [19577, 19577],
+      "wasmSha256": "702c73f4ced1161dd826abbf564e65acaf286c3d9b95511d0b0186933979df59",
+      "diagnostics": []
+    },
+    "indirect-nominals-1": {
+      "checkMs": {
+        "control": [10.871, 8.978, 10.214, 9.527, 11.738, 9.033, 11.165, 7.248, 8.171, 10.935],
+        "candidate": [8.939, 10.171, 9.965, 11.707, 7.782, 7.42, 8.763, 7.732, 7.72, 24.927],
+        "medians": [9.87, 8.851],
+        "medianPairedSavingMs": 0.35,
+        "medianSaving95Ms": [-1.332, 2.007],
+        "wins": 6
+      },
+      "resolveVisits": [17197, 17197],
+      "wasmSha256": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-128": {
+      "checkMs": {
+        "control": [7.768, 9.217, 11.066, 8.511, 10.414, 8.91, 10.723, 12.391, 7.945, 14.284],
+        "candidate": [12.253, 8.546, 9.815, 16.075, 8.81, 11.784, 9.903, 11.133, 9.791, 12.47],
+        "medians": [9.816, 10.518],
+        "medianPairedSavingMs": 0.746,
+        "medianSaving95Ms": [-2.874, 1.428],
+        "wins": 6
+      },
+      "resolveVisits": [17197, 17197],
+      "wasmSha256": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-16": {
+      "checkMs": {
+        "control": [11.91, 8.129, 10.33, 11.525, 9.821, 10.55, 10.785, 8.923, 8.086, 11.766],
+        "candidate": [10.683, 9.111, 14.769, 8.509, 10.379, 11.633, 8.627, 10.823, 7.863, 10.575],
+        "medians": [10.44, 10.477],
+        "medianPairedSavingMs": -0.167,
+        "medianSaving95Ms": [-1.441, 1.675],
+        "wins": 5
+      },
+      "resolveVisits": [17197, 17197],
+      "wasmSha256": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "owned-reads": {
+      "checkMs": {
+        "control": [11.125, 11.804, 16.049, 9.968, 11.671, 7.801, 11.455, 12.82, 11.712, 10.777],
+        "candidate": [10.139, 11.799, 12.244, 8.777, 18.266, 8.692, 13.089, 12.776, 13.022, 14.083],
+        "medians": [11.563, 12.51],
+        "medianPairedSavingMs": -0.443,
+        "medianSaving95Ms": [-2.308, 0.986],
+        "wins": 5
+      },
+      "resolveVisits": [20476, 20476],
+      "wasmSha256": "b2ced6756a5576c52162b9bff705894ad18d88b6d74480d4e77196423fca3d6d",
+      "diagnostics": []
+    },
+    "rejected-generic": {
+      "checkMs": {
+        "control": [7.692, 8.787, 9.365, 11.059, 8.595, 10.065, 8.063, 9.561, 9.904, 15.431],
+        "candidate": [13.519, 11.267, 10.928, 10.428, 10.542, 32.767, 7.5, 8.229, 11.944, 8.974],
+        "medians": [9.463, 10.735],
+        "medianPairedSavingMs": -1.755,
+        "medianSaving95Ms": [-3.934, 0.948],
+        "wins": 4
+      },
+      "resolveVisits": [16883, 16883],
+      "wasmSha256": null,
+      "diagnostics": [
+        {
+          "code": "missing_associated",
+          "start": 75,
+          "end": 78,
+          "message": "No compatible associated implementation exists"
+        }
+      ]
+    },
+    "shared-pair-3": {
+      "checkMs": {
+        "control": [13.076, 10.959, 11.441, 9.928, 8.407, 7.23, 10.77, 14.201, 10.367, 19.097],
+        "candidate": [10.366, 12.269, 10.543, 10.281, 11.362, 9.757, 9.035, 10.504, 11.379, 16.051],
+        "medians": [10.864, 10.523],
+        "medianPairedSavingMs": 0.273,
+        "medianSaving95Ms": [-1.769, 2.71],
+        "wins": 5
+      },
+      "resolveVisits": [17146, 17146],
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-6": {
+      "checkMs": {
+        "control": [13.369, 12.461, 10.218, 11.988, 7.845, 8.517, 10.345, 13.114, 8.128, 17.618],
+        "candidate": [9.898, 10.73, 19.085, 12.386, 10.048, 8.183, 10.124, 12.527, 8.512, 11.63],
+        "medians": [11.166, 10.427],
+        "medianPairedSavingMs": 0.277,
+        "medianSaving95Ms": [-1.294, 1.902],
+        "wins": 6
+      },
+      "resolveVisits": [18216, 18216],
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-9": {
+      "checkMs": {
+        "control": [14.425, 12.627, 13.201, 14.937, 12.684, 13.708, 11.56, 15.139, 10.046, 12.777],
+        "candidate": [14.001, 11.849, 13.515, 16.626, 10.99, 10.853, 12.004, 14.894, 11.101, 12.083],
+        "medians": [12.989, 12.043],
+        "medianPairedSavingMs": 0.335,
+        "medianSaving95Ms": [-0.685, 1.194],
+        "wins": 6
+      },
+      "resolveVisits": [19952, 19952],
+      "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "sort-merge": {
+      "checkMs": {
+        "control": [9.804, 12.604, 14.765, 12.954, 10.461, 8.424, 13.891, 12.807, 12.198, 11.109],
+        "candidate": [13.203, 11.433, 15.667, 13.129, 10.326, 8.652, 9.668, 13.483, 12.101, 10.134],
+        "medians": [12.401, 11.767],
+        "medianPairedSavingMs": -0.039,
+        "medianSaving95Ms": [-0.676, 0.975],
+        "wins": 5
+      },
+      "resolveVisits": [20265, 20265],
+      "wasmSha256": "0ee4b2c6753d620ae84654db29cd932181bce211a147d7a58ae19933e614c1d1",
+      "diagnostics": []
+    },
+    "sort-quick": {
+      "checkMs": {
+        "control": [11.936, 11.167, 10.949, 12.36, 9.962, 9.102, 11.836, 10.672, 11.136, 11.46],
+        "candidate": [15.042, 10.402, 13.924, 9.924, 10.879, 7.358, 9.044, 10.549, 10.915, 9.548],
+        "medians": [11.151, 10.476],
+        "medianPairedSavingMs": 0.493,
+        "medianSaving95Ms": [-1.426, 2.09],
+        "wins": 7
+      },
+      "resolveVisits": [19468, 19468],
+      "wasmSha256": "84dffbc9703e7453edbd8bd81bcb146be99c9a755145b96b7258967af86806aa",
+      "diagnostics": []
+    }
+  },
+  "qualification": {
+    "compilerGate": "ok | 1119 passed | 0 failed | 100 ignored (36s)",
+    "retainedAgainstFresh": [
+      {
+        "step": "edit",
+        "matched": true
+      },
+      {
+        "step": "reject",
+        "matched": true
+      },
+      {
+        "step": "syntax",
+        "matched": true
+      },
+      {
+        "step": "lex",
+        "matched": true
+      }
+    ],
+    "exactBudgetCutoffs": [
+      [2902, 2903],
+      [3630, 3631],
+      [16861, 16862]
+    ],
+    "wasmBytes": 2754496,
+    "wasmSha256": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70",
+    "inkTests": 283,
+    "pen": {
+      "ink": "3b0445a71475b3f975f445f6d3a564cce6a7080f754caefce77f3ec5d24e34e4",
+      "frame": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "trace": "f977a25b1db098c7e078a601df504c2da942ea7a5a17838fece34af1934ef6b8",
+      "replayFiles": 242,
+      "replayManifest": "77d60ddc217654fe3fe8ce76c06b60006f5d4fd93a2ebd88bdae9a4bcdd9ad0e"
+    }
+  },
+  "latestGdev": {
+    "commit": "e9cc6a84a56186a89f75da70e63ea36e70900eee",
+    "modules": 280,
+    "wasmBytes": 2740076,
+    "wasmSha256": "08f51e1eecfc3b2b5252fe47bf5cec67275a40dc3cdfe944ee5e8d5c2dea424e",
+    "freshMs": {
+      "control": [1011.993, 1085.986, 995.38, 1278.221, 1359.222, 1190.272],
+      "candidate": [1016.436, 1102.949, 1010.762, 1039.556, 1306.388, 1329.28],
+      "medians": [1138.129, 1071.252],
+      "medianPairedSavingMs": -9.912,
+      "medianSaving95Ms": [-77.985, 145.749],
+      "wins": 2
+    }
+  }
+}

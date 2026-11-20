@@ -70,6 +70,7 @@ try {
               parallel_jobs: number;
               parallel_worker_reply_bytes: number;
               type_nodes: number;
+              normalization: { resolve_depth_entries: number };
             };
           };
           assert.equal(
@@ -100,6 +101,8 @@ try {
               workerJobs: profile.checking.parallel_jobs,
               replyBytes: profile.checking.parallel_worker_reply_bytes,
               typeNodes: profile.checking.type_nodes,
+              resolveVisits:
+                profile.checking.normalization.resolve_depth_entries,
             }),
           );
         } finally {

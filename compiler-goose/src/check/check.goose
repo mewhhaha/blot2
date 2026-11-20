@@ -948,6 +948,7 @@ struct Engine {
     contract_states: dictionary<u32,Engine_contract_states_state>&,
     contract_depth: i64 = 0,
     constructors: Constructor[>..]&,
+    imported_constructor_heights: u8[>..]&,
     type_env: TypeEnvironment = TypeEnvironment {..},
     row_env: RowEnvironment = RowEnvironment {..},
     computation_annotations: blot_check_types::Id[>..<]&,
@@ -1738,6 +1739,12 @@ fn copyNominalDefinition(self_:Engine&,producer:DeclarationCatalog,source:Nomina
     copier.deinit();
     return index,error;
 }
+// Copied type children have their own immutable spans. A closed copy therefore
+// remains resolved when inference invalidates the store's transient caches.
+fn copiedConstructorHeight(self_:const Engine&,root:u32)->u8 {
+    if root==0 {return 1;}
+    return self_.types.closedHeight(root);
+}
 fn copyNominalBody(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,producer:DeclarationCatalog,source:Nominal,defer_result:bool)->u32,blot_error::Error {
     var variables:u32[>..<]=[];for old in producer.types.list(source.variables) {let fresh,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}var parameters:u32[>..<]=[];for old in producer.types.list(source.parameters) {let parameter,err=copier.copy(old,0);if err!=blot_error::Error.none {return 0,err;}parameters.push(parameter);}
     let index=self_.nominals.len as u32;let quantified,err=self_.types.saveList(variables);if err!=blot_error::Error.none {return 0,err;}let names,err=self_.types.saveList(producer.types.list(source.parameter_names));if err!=blot_error::Error.none {return 0,err;}let patterns,err=self_.copyParameterPatterns(producer.parameter_patterns,source.patterns,copier);if err!=blot_error::Error.none {return 0,err;}let alias_rows,err=copier.quantifiedRows(source.alias_rows);if err!=blot_error::Error.none {return 0,err;}let parameter_list,err=self_.types.saveList(parameters);if err!=blot_error::Error.none {return 0,err;}var alias:u32=0;if source.alias!=0 {let value,err=copier.copy(source.alias,0);if err!=blot_error::Error.none {return 0,err;}alias=value;}
@@ -1774,6 +1781,13 @@ fn copyNominalBody(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,
         }
         let own=self_.constructors.len as u32;
         self_.constructors.push(Constructor{identity:ctor.identity,nominal:index,tag:ctor.tag,name:ctor.name,scheme:blot_check_types::Scheme{root:root,variables:quantified,..},payload:payload,declared_record:ctor.declared_record,deferred_result:delayed,..});
+        let signature_height=self_.copiedConstructorHeight(root);
+        let payload_height=self_.copiedConstructorHeight(payload);
+        // Editor completion can load another projected scheme after finalization.
+        if !self_.editor_marker.present && signature_height!=0 && payload_height!=0 {
+            while self_.imported_constructor_heights.len<own {self_.imported_constructor_heights.push(0);}
+            self_.imported_constructor_heights.push(max(signature_height,payload_height));
+        }
         self_.catalogs.constructor_identities.insert(ctor.identity,own);
         constructors.push(own);
     }
@@ -3638,7 +3652,7 @@ for &nominal in self_.nominals[1..] {
 {let err=self_.normalizeList(nominal.parameters);if err!=blot_error::Error.none {return err;}}
 {let err=self_.normalizeList(nominal.variables);if err!=blot_error::Error.none {return err;}}
 }
-for &constructor in self_.constructors[1..] {
+for &constructor,offset in self_.constructors[1..] {
 if constructor.deferred_result && self_.types.has_projections {
     // Every original resolution visit counts toward the public projection budget.
     let root,err=self_.constructorRoot(constructor,false);
@@ -3646,8 +3660,13 @@ if constructor.deferred_result && self_.types.has_projections {
     constructor.scheme.root=root;
     constructor.deferred_result=false;
 }
+let index=offset+1;
+var height:u8=0;
+if index<self_.imported_constructor_heights.len {height=self_.imported_constructor_heights[index];}
+if self_.types.has_projections || height==0 || height>self_.types.resolution_depth_limit {
 {let value,err=self_.types.resolve(constructor.scheme.root,0);if err!=blot_error::Error.none {return err;}constructor.scheme.root=value;}
 {let value,err=self_.types.resolve(constructor.payload,0);if err!=blot_error::Error.none {return err;}constructor.payload=value;}
+}
 {let err=self_.normalizeList(constructor.scheme.variables);if err!=blot_error::Error.none {return err;}}
 }
 for &family in self_.effect_families[1..] {
