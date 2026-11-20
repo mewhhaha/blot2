@@ -1,0 +1,1086 @@
+{
+  "issue": "https://github.com/mewhhaha/blot2/issues/48",
+  "identities": {
+    "blot_compiler_source": "ed4fc7e92f4fb36e634f490390c66b65e0f7b501",
+    "blot_compiler_sha256": "83475e1a469789e33cb4cc9bd44abfabed378dbf8c0b0ac00588e19cbe4017f5",
+    "pen": "752066bc3828eca78c35f5f84721e1909ffe7cb2",
+    "gdev": "54f299aad22e3e80e7cc3d5b2c54fa0875a0d8e0",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "native_route_driver_sha256": "c4f52d2fd6b8eb9beef4fa1dddeb3516e86b1dbabf27dcd007387030b679d39f",
+    "route": {
+      "source": "0b46b7fe22a9b455e780b5505ea1331b722a2a3e80f98b9f123942ba3d832cd3",
+      "wasm": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69",
+      "bytes": 43704
+    },
+    "kernel_inputs": {
+      "test_support/path_plans.blot": "849cda45fb535bb11675bf2e5403c5bc24531e5670239918b38450557b133f76",
+      "../ink/lib/navigation/lookahead.blot": "9d55a52f8637c132ccf4c5d818648b3d494cf7547cf522d1d4c53ee54d426dac",
+      "../ink/lib/navigation/locomotion.blot": "e676488d3deed2f1c150643bcc38445c8c08f63d8a19e69727d9dc77104fabc8",
+      "../ink/lib/navigation/ground.blot": "93899402d293759314a3252642d03aeff8f7f5903ee09588fe617a942b0ed99b"
+    },
+    "process_fixture_source_sha256": "5ccc174d3e0f20b847115439ac5f3f5dd0b39f6c47d09f14343c80e5b5fc29ac",
+    "process_fixture_wasm_sha256": "3234dc56b65deda4f3f141dcdcb02f7aa826509e3648991f160dd672f08258bc",
+    "deno": {
+      "deno": "2.9.8",
+      "v8": "15.0.245.2-rusty",
+      "typescript": "6.0.3"
+    },
+    "native_rust": "1.99.0 (b940084d7 2026-09-28)",
+    "native_wasmtime": "49.0.3 (Pen Cargo.lock)",
+    "host_cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "logical_cpus": 16,
+    "blot_host": "4474fc3caa5c6639d7352eff8c848419f61e80ed"
+  },
+  "qualification": [
+    {
+      "order": 1,
+      "executed": "Same fixed Gdev forecast Wasm in Deno and native Pen. Compare float bits of every ordered lane over 4, 32 and 128 queries with direct and 1/2/4/8 copied workers. Four-route cases preserve the result and selection from Gdev's existing direct entry. Empty and uneven batches with a domain error match direct. A separate executed-Wasm test reverses delivery and tests signed zero, infinity and U32 above 2^24.",
+      "scope": "Small deterministic fixture geometry reconstructed from an immutable seed. Native measurement uses Pen's one-shot copied workers and creates a fresh sandboxed guest for each copied job. Production A* and live Gdev application state retain their own qualification."
+    },
+    {
+      "order": 2,
+      "executed": "Deno copy-ledger laws cover two snapshots with the same revision, old worker termination after reservation, stale and null replies, real Wasm trap, oversized guest packet, indefinite Wasm loop, exact remaining budget, one byte below, competing pools and rollover after staging before result assembly. Each successful recovery yields the full original direct result once, and retirement keeps allowance until thread exit. Live and retiring pools also share a worker-slot and linear-memory cap; a saturated pool and a one-byte-under worker-memory allowance stay direct without cold installation. Slots become available after physical exit.",
+      "scope": "All explicit numeric payload copies are charged including both host transfers and both Wasm ABI packet copies. The compiler's fixed transport bank limits a returned packet before host result validation; page padding only widens the bound. The native Pen worker tests still run blocking drivers. No native hard-budget result follows from this Deno ledger."
+    },
+    {
+      "order": 3,
+      "executed": "Deno and native Pen cooperative processes return admission before initialization, retain private guest state, enforce one-slot mailboxes, rotate turns with a shared work allowance, and wake when the next turn sees a command. Faulting startup and step, cancellation, restore with retained results and replayed admissions/refusals and applied ticks are tested on real Wasm.",
+      "scope": "Native scheduler stays on its caller thread. Only trusted bounded programs may register. The reference replay uses an executed Blot world fold and no production game integration."
+    },
+    {
+      "order": 4,
+      "executed": "Direct source sparks and scoped spawn have formatter, rejection and executed Wasm coverage. This compiler rejects @spark.within with unknown_intrinsic. The ordinary ABI 8 fromPacket and toPacket paths copy input and output payloads in Wasm, so the host-assisted route profile cannot establish the source form's zero-copy guarantee.",
+      "scope": "The reported times below cover route computation, dispatch, array copies, join and selection for the four-query case. Allocation, wait and copy time are not separately timed. No automatic policy is enabled; renderer and production Gdev frame latency require a separate integration."
+    }
+  ],
+  "deno": {
+    "method": "Two independent Deno processes. Four warmups and 21 alternating samples per cell in each. Timing includes observed driver work, marshalling and complete result retrieval. Copy counters include the warmups and both modes in each window.",
+    "route_stage_ms": [
+      {
+        "size": 4,
+        "direct": {
+          "p50": 0.405952,
+          "p95": 0.734136,
+          "p99": 0.756118
+        },
+        "setup_ms": [
+          50.331125,
+          30.013097
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1000,
+            "guestUnpack": 1000,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1000,
+            "guestUnpack": 1000,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          }
+        ],
+        "worker_count": 1,
+        "copied": {
+          "p50": 0.550402,
+          "p95": 0.887428,
+          "p99": 0.963492
+        }
+      },
+      {
+        "size": 32,
+        "direct": {
+          "p50": 2.513509,
+          "p95": 2.563975,
+          "p99": 2.604883
+        },
+        "setup_ms": [
+          50.331125,
+          30.013097
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6600,
+            "guestUnpack": 6600,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6600,
+            "guestUnpack": 6600,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          }
+        ],
+        "worker_count": 1,
+        "copied": {
+          "p50": 2.763405,
+          "p95": 2.84521,
+          "p99": 2.896869
+        }
+      },
+      {
+        "size": 128,
+        "direct": {
+          "p50": 7.465382,
+          "p95": 9.982454,
+          "p99": 10.116278
+        },
+        "setup_ms": [
+          50.331125,
+          30.013097
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 25800,
+            "guestUnpack": 25800,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 25800,
+            "guestUnpack": 25800,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          }
+        ],
+        "worker_count": 1,
+        "copied": {
+          "p50": 10.288396,
+          "p95": 10.775702,
+          "p99": 11.191483
+        }
+      },
+      {
+        "size": 4,
+        "direct": {
+          "p50": 0.300647,
+          "p95": 0.354734,
+          "p99": 0.356748
+        },
+        "setup_ms": [
+          73.171061,
+          57.102523
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1100,
+            "guestUnpack": 1100,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1100,
+            "guestUnpack": 1100,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          }
+        ],
+        "worker_count": 2,
+        "copied": {
+          "p50": 0.33446,
+          "p95": 0.435338,
+          "p99": 0.501734
+        }
+      },
+      {
+        "size": 32,
+        "direct": {
+          "p50": 2.228488,
+          "p95": 2.610474,
+          "p99": 2.637275
+        },
+        "setup_ms": [
+          73.171061,
+          57.102523
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6700,
+            "guestUnpack": 6700,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6700,
+            "guestUnpack": 6700,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          }
+        ],
+        "worker_count": 2,
+        "copied": {
+          "p50": 1.453083,
+          "p95": 1.700374,
+          "p99": 2.034829
+        }
+      },
+      {
+        "size": 128,
+        "direct": {
+          "p50": 7.509881,
+          "p95": 7.8504,
+          "p99": 8.32932
+        },
+        "setup_ms": [
+          73.171061,
+          57.102523
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 25900,
+            "guestUnpack": 25900,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 25900,
+            "guestUnpack": 25900,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          }
+        ],
+        "worker_count": 2,
+        "copied": {
+          "p50": 5.248667,
+          "p95": 5.921712,
+          "p99": 6.363471
+        }
+      },
+      {
+        "size": 4,
+        "direct": {
+          "p50": 0.319728,
+          "p95": 0.352821,
+          "p99": 0.449816
+        },
+        "setup_ms": [
+          154.444289,
+          121.291391
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1300,
+            "guestUnpack": 1300,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1300,
+            "guestUnpack": 1300,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          }
+        ],
+        "worker_count": 4,
+        "copied": {
+          "p50": 0.41306,
+          "p95": 0.579833,
+          "p99": 0.652761
+        }
+      },
+      {
+        "size": 32,
+        "direct": {
+          "p50": 2.29803,
+          "p95": 2.48195,
+          "p99": 2.540962
+        },
+        "setup_ms": [
+          154.444289,
+          121.291391
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6900,
+            "guestUnpack": 6900,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 6900,
+            "guestUnpack": 6900,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          }
+        ],
+        "worker_count": 4,
+        "copied": {
+          "p50": 0.87004,
+          "p95": 1.192117,
+          "p99": 1.252873
+        }
+      },
+      {
+        "size": 128,
+        "direct": {
+          "p50": 4.971469,
+          "p95": 7.145609,
+          "p99": 7.278542
+        },
+        "setup_ms": [
+          154.444289,
+          121.291391
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 26100,
+            "guestUnpack": 26100,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 26100,
+            "guestUnpack": 26100,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          }
+        ],
+        "worker_count": 4,
+        "copied": {
+          "p50": 2.811832,
+          "p95": 3.078795,
+          "p99": 3.281009
+        }
+      },
+      {
+        "size": 4,
+        "direct": {
+          "p50": 0.342411,
+          "p95": 0.523546,
+          "p99": 0.576997
+        },
+        "setup_ms": [
+          275.54601,
+          269.037441
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1300,
+            "guestUnpack": 1300,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 400,
+            "dispatch": 400,
+            "guestInput": 1300,
+            "guestUnpack": 1300,
+            "guestPack": 313600,
+            "guestOutput": 313600,
+            "assemble": 156800
+          }
+        ],
+        "worker_count": 8,
+        "copied": {
+          "p50": 0.373084,
+          "p95": 0.443333,
+          "p99": 0.502045
+        }
+      },
+      {
+        "size": 32,
+        "direct": {
+          "p50": 1.843695,
+          "p95": 2.333417,
+          "p99": 2.363865
+        },
+        "setup_ms": [
+          275.54601,
+          269.037441
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 7300,
+            "guestUnpack": 7300,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 3200,
+            "dispatch": 3200,
+            "guestInput": 7300,
+            "guestUnpack": 7300,
+            "guestPack": 2508800,
+            "guestOutput": 2508800,
+            "assemble": 1254400
+          }
+        ],
+        "worker_count": 8,
+        "copied": {
+          "p50": 0.957305,
+          "p95": 1.103879,
+          "p99": 1.191887
+        }
+      },
+      {
+        "size": 128,
+        "direct": {
+          "p50": 4.990245,
+          "p95": 5.777277,
+          "p99": 7.185224
+        },
+        "setup_ms": [
+          275.54601,
+          269.037441
+        ],
+        "payload_copies_each_window": [
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 26500,
+            "guestUnpack": 26500,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          },
+          {
+            "prepare": 0,
+            "install": 0,
+            "snapshot": 12800,
+            "dispatch": 12800,
+            "guestInput": 26500,
+            "guestUnpack": 26500,
+            "guestPack": 10035200,
+            "guestOutput": 10035200,
+            "assemble": 5017600
+          }
+        ],
+        "worker_count": 8,
+        "copied": {
+          "p50": 2.385557,
+          "p95": 2.557764,
+          "p99": 2.594834
+        }
+      }
+    ],
+    "four_plans_with_selection_ms": [
+      {
+        "serial_shared": {
+          "p50": 0.363111,
+          "p95": 0.385423,
+          "p99": 0.476186
+        },
+        "worker_count": 1,
+        "copied": {
+          "p50": 0.526377,
+          "p95": 0.692797,
+          "p99": 0.832182
+        }
+      },
+      {
+        "serial_shared": {
+          "p50": 0.296078,
+          "p95": 0.354834,
+          "p99": 0.444375
+        },
+        "worker_count": 2,
+        "copied": {
+          "p50": 0.393989,
+          "p95": 0.448933,
+          "p99": 0.506594
+        }
+      },
+      {
+        "serial_shared": {
+          "p50": 0.318045,
+          "p95": 0.418306,
+          "p99": 0.48906
+        },
+        "worker_count": 4,
+        "copied": {
+          "p50": 0.466867,
+          "p95": 0.498037,
+          "p99": 0.517024
+        }
+      },
+      {
+        "serial_shared": {
+          "p50": 0.248548,
+          "p95": 0.337211,
+          "p99": 0.385302
+        },
+        "worker_count": 8,
+        "copied": {
+          "p50": 0.430278,
+          "p95": 0.518937,
+          "p99": 0.533374
+        }
+      }
+    ],
+    "prepared_route_transport_capacity_upper_bytes": 2161660,
+    "route_128_eight_workers_copy_bytes": 604224,
+    "route_128_direct_copy_bytes": 402440,
+    "route_128_eight_workers_reservation_including_recovery_bytes": 20060196,
+    "shared_worker_limits": {
+      "workers": 8,
+      "maximum_worker_linear_bytes": 536870912
+    }
+  },
+  "native": {
+    "method": "Dev-profile Rust host and standard Wasmtime engine. Each cell observes one first response then four warmup and 21 alternating paired samples. Workers use Pen's copied value jobs and 64 MiB per-sandbox memory limit. The 16,384-lane worker cap requires at least four worker jobs for 128 rows, even when there is only one worker.",
+    "unrestricted_route_stage_ms": [
+      {
+        "workers": 1,
+        "queries": 4,
+        "jobs": 1,
+        "direct": {
+          "p50": 0.309047,
+          "p95": 0.454725,
+          "p99": 0.466516
+        },
+        "copied": {
+          "p50": 0.576135,
+          "p95": 0.638484,
+          "p99": 0.687667
+        },
+        "worker_pool_setup_ms": 0.061097,
+        "first_direct_ms": 0.627452,
+        "first_copied_ms": 1.173381
+      },
+      {
+        "workers": 1,
+        "queries": 32,
+        "jobs": 1,
+        "direct": {
+          "p50": 2.474673,
+          "p95": 3.359184,
+          "p99": 3.648824
+        },
+        "copied": {
+          "p50": 3.199851,
+          "p95": 4.392187,
+          "p99": 7.854306
+        },
+        "worker_pool_setup_ms": 0.061097,
+        "first_direct_ms": 3.555146,
+        "first_copied_ms": 4.139126
+      },
+      {
+        "workers": 1,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 11.633699,
+          "p95": 16.35961,
+          "p99": 18.579529
+        },
+        "copied": {
+          "p50": 11.467002,
+          "p95": 16.746175,
+          "p99": 17.567135
+        },
+        "worker_pool_setup_ms": 0.061097,
+        "first_direct_ms": 9.292229,
+        "first_copied_ms": 10.748377
+      },
+      {
+        "workers": 2,
+        "queries": 4,
+        "jobs": 2,
+        "direct": {
+          "p50": 0.608006,
+          "p95": 0.629407,
+          "p99": 0.650446
+        },
+        "copied": {
+          "p50": 0.963321,
+          "p95": 1.282678,
+          "p99": 1.355707
+        },
+        "worker_pool_setup_ms": 0.101041,
+        "first_direct_ms": 0.959754,
+        "first_copied_ms": 1.485023
+      },
+      {
+        "workers": 2,
+        "queries": 32,
+        "jobs": 2,
+        "direct": {
+          "p50": 3.690724,
+          "p95": 4.806184,
+          "p99": 6.560137
+        },
+        "copied": {
+          "p50": 2.02096,
+          "p95": 2.773951,
+          "p99": 2.86753
+        },
+        "worker_pool_setup_ms": 0.101041,
+        "first_direct_ms": 4.678161,
+        "first_copied_ms": 2.902486
+      },
+      {
+        "workers": 2,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 13.015916,
+          "p95": 14.821086,
+          "p99": 14.850592
+        },
+        "copied": {
+          "p50": 10.556742,
+          "p95": 11.289555,
+          "p99": 11.403601
+        },
+        "worker_pool_setup_ms": 0.101041,
+        "first_direct_ms": 14.590227,
+        "first_copied_ms": 10.728438
+      },
+      {
+        "workers": 4,
+        "queries": 4,
+        "jobs": 4,
+        "direct": {
+          "p50": 0.457871,
+          "p95": 0.611663,
+          "p99": 0.639385
+        },
+        "copied": {
+          "p50": 1.442802,
+          "p95": 1.688569,
+          "p99": 1.780314
+        },
+        "worker_pool_setup_ms": 0.128955,
+        "first_direct_ms": 0.614778,
+        "first_copied_ms": 2.184762
+      },
+      {
+        "workers": 4,
+        "queries": 32,
+        "jobs": 4,
+        "direct": {
+          "p50": 3.644065,
+          "p95": 4.779954,
+          "p99": 4.837954
+        },
+        "copied": {
+          "p50": 3.072219,
+          "p95": 4.064114,
+          "p99": 4.072941
+        },
+        "worker_pool_setup_ms": 0.128955,
+        "first_direct_ms": 4.702336,
+        "first_copied_ms": 2.414118
+      },
+      {
+        "workers": 4,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 9.417247,
+          "p95": 14.522008,
+          "p99": 14.702631
+        },
+        "copied": {
+          "p50": 6.506125,
+          "p95": 9.5452,
+          "p99": 9.672482
+        },
+        "worker_pool_setup_ms": 0.128955,
+        "first_direct_ms": 14.665752,
+        "first_copied_ms": 9.398271
+      },
+      {
+        "workers": 8,
+        "queries": 4,
+        "jobs": 4,
+        "direct": {
+          "p50": 0.315519,
+          "p95": 0.629927,
+          "p99": 0.635658
+        },
+        "copied": {
+          "p50": 2.196074,
+          "p95": 2.316732,
+          "p99": 2.426441
+        },
+        "worker_pool_setup_ms": 0.259503,
+        "first_direct_ms": 0.753893,
+        "first_copied_ms": 1.851208
+      },
+      {
+        "workers": 8,
+        "queries": 32,
+        "jobs": 8,
+        "direct": {
+          "p50": 4.578972,
+          "p95": 4.674033,
+          "p99": 4.856269
+        },
+        "copied": {
+          "p50": 4.599522,
+          "p95": 5.042844,
+          "p99": 5.044717
+        },
+        "worker_pool_setup_ms": 0.259503,
+        "first_direct_ms": 4.316202,
+        "first_copied_ms": 3.996274
+      },
+      {
+        "workers": 8,
+        "queries": 128,
+        "jobs": 8,
+        "direct": {
+          "p50": 9.498863,
+          "p95": 13.489957,
+          "p99": 13.819253
+        },
+        "copied": {
+          "p50": 7.316254,
+          "p95": 7.790085,
+          "p99": 7.814781
+        },
+        "worker_pool_setup_ms": 0.259503,
+        "first_direct_ms": 18.478517,
+        "first_copied_ms": 7.454637
+      }
+    ],
+    "two_physical_cores_route_stage_ms": [
+      {
+        "workers": 1,
+        "queries": 4,
+        "jobs": 1,
+        "direct": {
+          "p50": 0.538774,
+          "p95": 0.55212,
+          "p99": 0.555075
+        },
+        "copied": {
+          "p50": 0.558151,
+          "p95": 1.110471,
+          "p99": 1.407665
+        },
+        "worker_pool_setup_ms": 0.064653,
+        "first_direct_ms": 0.54727,
+        "first_copied_ms": 0.964243
+      },
+      {
+        "workers": 1,
+        "queries": 32,
+        "jobs": 1,
+        "direct": {
+          "p50": 2.066678,
+          "p95": 2.090724,
+          "p99": 2.100801
+        },
+        "copied": {
+          "p50": 4.639136,
+          "p95": 4.881326,
+          "p99": 5.008659
+        },
+        "worker_pool_setup_ms": 0.064653,
+        "first_direct_ms": 2.063071,
+        "first_copied_ms": 4.658664
+      },
+      {
+        "workers": 1,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 8.31901,
+          "p95": 9.628278,
+          "p99": 9.658996
+        },
+        "copied": {
+          "p50": 13.910646,
+          "p95": 14.337779,
+          "p99": 14.652857
+        },
+        "worker_pool_setup_ms": 0.064653,
+        "first_direct_ms": 8.283282,
+        "first_copied_ms": 18.47481
+      },
+      {
+        "workers": 2,
+        "queries": 4,
+        "jobs": 2,
+        "direct": {
+          "p50": 0.273861,
+          "p95": 0.290813,
+          "p99": 0.314478
+        },
+        "copied": {
+          "p50": 0.691284,
+          "p95": 0.819687,
+          "p99": 0.919698
+        },
+        "worker_pool_setup_ms": 0.060705,
+        "first_direct_ms": 0.575885,
+        "first_copied_ms": 1.086094
+      },
+      {
+        "workers": 2,
+        "queries": 32,
+        "jobs": 2,
+        "direct": {
+          "p50": 2.095332,
+          "p95": 2.133384,
+          "p99": 2.136791
+        },
+        "copied": {
+          "p50": 1.697796,
+          "p95": 2.785223,
+          "p99": 2.809119
+        },
+        "worker_pool_setup_ms": 0.060705,
+        "first_direct_ms": 2.100141,
+        "first_copied_ms": 1.612814
+      },
+      {
+        "workers": 2,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 8.441723,
+          "p95": 8.648766,
+          "p99": 8.705926
+        },
+        "copied": {
+          "p50": 5.537964,
+          "p95": 8.117817,
+          "p99": 8.652113
+        },
+        "worker_pool_setup_ms": 0.060705,
+        "first_direct_ms": 8.411325,
+        "first_copied_ms": 5.434828
+      },
+      {
+        "workers": 4,
+        "queries": 4,
+        "jobs": 4,
+        "direct": {
+          "p50": 0.272809,
+          "p95": 0.281585,
+          "p99": 0.286144
+        },
+        "copied": {
+          "p50": 1.183149,
+          "p95": 1.469242,
+          "p99": 1.575003
+        },
+        "worker_pool_setup_ms": 0.12633,
+        "first_direct_ms": 0.574552,
+        "first_copied_ms": 1.502306
+      },
+      {
+        "workers": 4,
+        "queries": 32,
+        "jobs": 4,
+        "direct": {
+          "p50": 2.101844,
+          "p95": 2.116112,
+          "p99": 2.134166
+        },
+        "copied": {
+          "p50": 2.149405,
+          "p95": 2.655918,
+          "p99": 2.706693
+        },
+        "worker_pool_setup_ms": 0.12633,
+        "first_direct_ms": 2.118516,
+        "first_copied_ms": 2.089171
+      },
+      {
+        "workers": 4,
+        "queries": 128,
+        "jobs": 4,
+        "direct": {
+          "p50": 8.464416,
+          "p95": 9.340091,
+          "p99": 9.899834
+        },
+        "copied": {
+          "p50": 6.215672,
+          "p95": 8.506867,
+          "p99": 8.537174
+        },
+        "worker_pool_setup_ms": 0.12633,
+        "first_direct_ms": 8.442224,
+        "first_copied_ms": 6.65659
+      },
+      {
+        "workers": 8,
+        "queries": 4,
+        "jobs": 4,
+        "direct": {
+          "p50": 0.273981,
+          "p95": 0.290663,
+          "p99": 0.300762
+        },
+        "copied": {
+          "p50": 1.238714,
+          "p95": 1.563201,
+          "p99": 1.76275
+        },
+        "worker_pool_setup_ms": 0.209959,
+        "first_direct_ms": 0.51057,
+        "first_copied_ms": 1.755136
+      },
+      {
+        "workers": 8,
+        "queries": 32,
+        "jobs": 8,
+        "direct": {
+          "p50": 2.120529,
+          "p95": 2.180013,
+          "p99": 2.328436
+        },
+        "copied": {
+          "p50": 3.707296,
+          "p95": 4.412095,
+          "p99": 4.496234
+        },
+        "worker_pool_setup_ms": 0.209959,
+        "first_direct_ms": 2.112324,
+        "first_copied_ms": 3.713488
+      },
+      {
+        "workers": 8,
+        "queries": 128,
+        "jobs": 8,
+        "direct": {
+          "p50": 8.389283,
+          "p95": 8.462843,
+          "p99": 8.48766
+        },
+        "copied": {
+          "p50": 7.273412,
+          "p95": 8.117528,
+          "p99": 8.375477
+        },
+        "worker_pool_setup_ms": 0.209959,
+        "first_direct_ms": 8.388021,
+        "first_copied_ms": 9.297479
+      }
+    ],
+    "contention": "Separate run with affinity to logical CPUs 0 and 1 on different physical cores; background host load was uncontrolled.",
+    "persistent_direct_linear_memory_bytes": 49348608,
+    "coop_process_tests_passed": 3,
+    "other_host_tests_passed": 5,
+    "process_frame": {
+      "scope": "120 samples with two Wasm turns, enqueue, scheduler and polling. No renderer. Linear memory was unchanged throughout.",
+      "committed_linear_bytes": 98697216,
+      "p50_ns": 11823,
+      "p95_ns": 15810,
+      "p99_ns": 18184
+    }
+  },
+  "reproduce": [
+    "BLOT_ROUTE_WASM=build/issue-qualification/routes-final.wasm deno run -A benchmarks/language/spark_spawn.ts ../gdev compiler-goose/build/blotc-goose",
+    "deno test --allow-read --allow-write --allow-run --allow-env tests/guest/spark_spawn_execution.test.ts tests/guest/spark_copy_execution.test.ts tests/guest/process_replay_execution.test.ts -- compiler-goose/build/blotc-goose",
+    "From Pen: cargo test -p blot-host --test processes --test owned_storage --test worker_sessions -- --nocapture",
+    "From Pen: cargo run -p blot-host --example compare_routes -- ../blot2/build/issue-qualification/routes-final.wasm",
+    "From Pen after building: taskset -c 0,1 target/debug/examples/compare_routes ../blot2/build/issue-qualification/routes-final.wasm"
+  ],
+  "raw": "2026-11-20-spark-process-drivers.raw.json.gz",
+  "browser_report": "benchmarks/language/BROWSER_ROUTES.md"
+}
