@@ -232,3 +232,82 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
     await Deno.remove(directory, { recursive: true });
   }
 });
+
+Deno.test("forwarded record layouts survive producer edits and recovery across workers", async () => {
+  const dir = await Deno.makeTempDir();
+  const entry = dir + "/main.blot";
+  const point = dir + "/point.blot";
+  const definition = (field: string, value: number) =>
+    `type Point is data = $Point { other: U32, ${field}: U32 }
+func make () => return $Point { other: 90, ${field}: ${value} }
+`;
+  const options = { executable, entry, prelude: null };
+  try {
+    await Deno.writeTextFile(point, definition("x", 7));
+    await Deno.writeTextFile(
+      dir + "/bridge.blot",
+      'import { make } from "./point"\nfunc carry () => return make ()\n',
+    );
+    const imports: string[] = [];
+    let sum = "0";
+    for (let i = 0; i < 16; i++) {
+      await Deno.writeTextFile(
+        dir + `/r${i}.blot`,
+        'import { carry } from "./bridge"\nfunc read () => return (carry ()).x\n',
+      );
+      imports.push(`import { read as read${i} } from "./r${i}"`);
+      sum = `@u32.add (${sum}) (read${i} ())`;
+    }
+    await Deno.writeTextFile(
+      entry,
+      imports.join("\n") + "\nentry func answer (unused: U32): U32 => return " +
+        sum + "\n",
+    );
+    const workers = await createZigProjectCompiler({
+      ...options,
+      frontendWorkers: 8,
+      profileBackend: true,
+    });
+    try {
+      const revisions = [["x", 7], ["x", 9], ["y", 11], ["x", 7]] as const;
+      for (const [step, [field, value]] of revisions.entries()) {
+        const sources = { [point]: definition(field, value) };
+        const fresh = await createZigProjectCompiler({
+          ...options,
+          frontendWorkers: 1,
+        });
+        try {
+          const result = await workers.build({ sources });
+          const reference = await fresh.build({ sources });
+          assert.equal(result.success, reference.success);
+          if (field === "y") {
+            assert(!result.success && !reference.success);
+            assert.deepEqual(result.diagnostics, reference.diagnostics);
+            continue;
+          }
+          if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
+          assert(reference.success);
+          assert.deepEqual(result.bytes, reference.bytes);
+          if (Deno.build.os === "linux" && step === 0) {
+            const profile = result.stats.phaseProfile as {
+              checking: { parallel_jobs: number };
+            };
+            assert.equal(profile.checking.parallel_jobs, 19);
+          }
+          const guest = await instantiateGuest(result.bytes);
+          try {
+            assert.equal(guest.call("answer", 0), value * 16);
+          } finally {
+            guest.dispose();
+          }
+        } finally {
+          await fresh.dispose();
+        }
+      }
+    } finally {
+      await workers.dispose();
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

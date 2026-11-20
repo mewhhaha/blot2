@@ -22,6 +22,8 @@ struct Nominal {
     variables: List, patterns: List = List {..}, parameter_names: List = List {..},
     constructors: List = List {..}, alias: Id = 0, alias_rows: List = List {..},
 }
+// Only private worker packets use this reserved type ID for an origin reference.
+let forwarded_constructor:u32=0xffffffff;
 struct Constructor {
     private: bool = false, identity: Identity, nominal: u32, tag: u32, name: u32,
     scheme: blot_check_types::Scheme = blot_check_types::Scheme {..}, payload: Id = 0,

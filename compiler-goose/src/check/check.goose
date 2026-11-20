@@ -741,6 +741,7 @@ struct CatalogIndex {
     implementation_names: dictionary<Qualified,u32>&,
     contract_identities: dictionary<Identity,u32>&,
     nominal_identities: dictionary<Identity,u32>&,
+    producer_nominal_indices: dictionary<Identity,u32>&,
     constructor_identities: dictionary<Identity,u32>&,
     nominal_names: dictionary<Qualified,u32>&,
     constructor_names: dictionary<Qualified,u32>&,
@@ -1687,7 +1688,50 @@ recursive fn collectAnnotationNames(self_:Engine&,id:u32,depth:i64)->blot_error:
 }
 recursive fn collectEffectArgumentNames(self_:Engine&,id:u32,depth:i64)->blot_error::Error {if depth>=1024 {return blot_error::Error.type_limit;}let node=self_.tree.node(id);if node.tag==blot_parse_ast::tag_type_apply {let err=self_.collectEffectArgumentNames(node.a,depth+1);if err!=blot_error::Error.none {return err;}return self_.collectAnnotationNames(node.b,depth+1);}return blot_error::Error.none;}
 fn nominalIndex(self_:const Engine&,identity:Identity)->blot_support::Option<u32> {let scalar_lookup_24 .= self_.catalogs.nominal_identities.get(identity);if scalar_lookup_24 {let value:u32=scalar_lookup_24;return blot_support::some<u32>(value);}return blot_support::none<u32>();}
-fn copyNominal(self_:Engine&,producer:DeclarationCatalog,source_index:u32)->u32,blot_error::Error {var source=producer.nominals[source_index];let known=self_.nominalIndex(source.identity);if known.present {return known.value,blot_error::Error.none;}if source.is_opaque && self_.producer_storage.present {let storage=self_.producer_storage.value.lookup(source.identity);if storage.present {source.storage=storage.value;}}var copier=blot_check_check_scheme_import::init(producer.types,self_.types,self_.import_tables);let result,err=copyNominalBody(self_,copier,producer,source);copier.deinit();return result,err;}
+fn copyNominal(self_:Engine&,producer:DeclarationCatalog,source_index:u32)->u32,blot_error::Error {
+    var source=producer.nominals[source_index];
+    let known=self_.nominalIndex(source.identity);
+    if known.present {return known.value,blot_error::Error.none;}
+    if source.is_opaque && self_.producer_storage.present {
+        let storage=self_.producer_storage.value.lookup(source.identity);
+        if storage.present {source.storage=storage.value;}
+    }
+    // Persistent worker packets retain constructor identities and indices.
+    // A forwarding record reads its signature from the defining module.
+    if source.identity.unit!=producer.unit && source.constructors.len!=0 {
+        let first=producer.types.list(source.constructors)[0];
+        if producer.constructors[first].scheme.root==blot_reuse_principal_interface::forwarded_constructor {
+            return self_.copyForwardedNominal(source.identity);
+        }
+    }
+    return self_.copyNominalDefinition(producer,source);
+}
+fn copyForwardedNominal(self_:Engine&,identity:Identity)->u32,blot_error::Error {
+    if !self_.producer_storage.present {return 0,blot_error::Error.invalid_artifact;}
+    let project .= self_.producer_storage.value.context.borrow();
+    if !project {return 0,blot_error::Error.invalid_artifact;}
+    let module=project.catalogModule(identity.unit);
+    if !module.present {return 0,blot_error::Error.invalid_artifact;}
+    let producer=module.value.catalog();
+    let indices .= self_.catalogs.producer_nominal_indices;
+    if !indices.contains(identity) {
+        // Index the origin's own declarations together. Many imported names
+        // can refer back to a single module.
+        for nominal,index in producer.nominals[1..] {
+            if nominal.identity.unit!=identity.unit {break;}
+            if !nominal.private {indices.insert(nominal.identity,(index+1) as u32);}
+        }
+    }
+    let index .= indices.get(identity);
+    if !index {return 0,blot_error::Error.invalid_artifact;}
+    return self_.copyNominalDefinition(producer,producer.nominals[index]);
+}
+fn copyNominalDefinition(self_:Engine&,producer:DeclarationCatalog,source:Nominal)->u32,blot_error::Error {
+    var copier=blot_check_check_scheme_import::init(producer.types,self_.types,self_.import_tables);
+    let index,error=copyNominalBody(self_,copier,producer,source);
+    copier.deinit();
+    return index,error;
+}
 fn copyNominalBody(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,producer:DeclarationCatalog,source:Nominal)->u32,blot_error::Error {
     var variables:u32[>..<]=[];for old in producer.types.list(source.variables) {let fresh,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}var parameters:u32[>..<]=[];for old in producer.types.list(source.parameters) {let parameter,err=copier.copy(old,0);if err!=blot_error::Error.none {return 0,err;}parameters.push(parameter);}
     let index=self_.nominals.len as u32;let quantified,err=self_.types.saveList(variables);if err!=blot_error::Error.none {return 0,err;}let names,err=self_.types.saveList(producer.types.list(source.parameter_names));if err!=blot_error::Error.none {return 0,err;}let patterns,err=self_.copyParameterPatterns(producer.parameter_patterns,source.patterns,copier);if err!=blot_error::Error.none {return 0,err;}let alias_rows,err=copier.quantifiedRows(source.alias_rows);if err!=blot_error::Error.none {return 0,err;}let parameter_list,err=self_.types.saveList(parameters);if err!=blot_error::Error.none {return 0,err;}var alias:u32=0;if source.alias!=0 {let value,err=copier.copy(source.alias,0);if err!=blot_error::Error.none {return 0,err;}alias=value;}

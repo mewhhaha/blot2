@@ -134,12 +134,11 @@ have additional consumers. Three experiments exercised the distinction.
   budget. Four of the 192 fixture records differed only in work counters.
   [Reproducible prototype against 1e23aea6](../benchmarks/evidence/measurements/experiments/2026-11-19-demand-nominal-imports.patch)
 
-The production compiler retains eager catalog publication. The next import
-experiment should give a public type a stable producer identity in the
-interface used for invalidation, and move loading its payload behind that
-identity. Use rejection, recovery and both sides of the 16,862-step boundary
-as the first three checks. Release timing for the rejected prototype was
-stopped once its regressions reproduced.
+A later control run reproduced both edit-count failures with the unmodified
+debug compiler and with unmodified optimized Goose output compiled by Clang
+at `-O0`. The unmodified release compiler passed both. All three controls
+enforced the inference budget. The demand-loading prototype did change that
+boundary. Production still imports local checker definitions eagerly.
 
 The two release compilers produced the same 2,732,918-byte Gdev Wasm.
 Fresh compilation took **1,531 → 1,485 ms** over 18 alternating pairs.
@@ -160,6 +159,50 @@ matched independent fresh builds.
 ![Fresh Gdev compile time across 18 paired runs](../benchmarks/evidence/measurements/2026-11-19-checker-finalization-and-imports.png)
 
 [Matched measurements, toolchain identities and import experiments](../benchmarks/evidence/measurements/2026-11-19-checker-finalization-and-imports.json)
+
+### Forwarding constructor signatures between workers
+
+A module can pass a record through without naming its type. When a worker
+publishes such a module, it now sends the constructor's defining module and
+declaration identity with its ordinary catalog entry. A consumer uses that
+identity to read the signature from the definition. It still builds the local
+type nodes required to check fields and lower ownership. Each consumer indexes
+a defining module's own public declarations together on first use.
+
+This applies to public, transparent data types without type parameters.
+Aliases, opaque types and polymorphic families keep their full representation.
+Standalone dependency archives still encode their own constructor signatures.
+Retained builds propagate a changed producer through a forwarding module even
+when its own interface bytes stay identical.
+
+On current Gdev Main (280 modules), worker replies fell from **77,044,322
+to 71,234,006 bytes**, while local imports still created 306,968 type nodes.
+Fresh builds took **690 → 687 ms** across 18 alternating eight-worker pairs.
+The median paired saving was 3 ms (95% interval −18 to +15 ms). In six
+separate profiled pairs, checking took 370 → 377 ms. The earlier 279-module
+Gdev snapshot showed the same traffic reduction, 75.3 → 69.8 MB.
+
+| Public data types forwarded to 16 readers | Worker bytes before | Worker bytes after | Local type nodes, both |
+| ---: | ---: | ---: | ---: |
+| 1 | 96,300 | 95,220 | 779 |
+| 16 | 217,361 | 200,064 | 1,634 |
+| 128 | 1,122,535 | 984,295 | 8,018 |
+
+Every width ran 19 worker jobs and returned 112 from the same Wasm. All 22
+checker workloads matched their controls on Wasm or diagnostics. The full
+release gate passed 1,117 guest and host tests with 100 existing skips.
+The 283 configured Ink checks, Gdev hardware frame, trace and all 242 files
+from the 120-frame replay matched the control on current Gdev source.
+A valid edit, three rejected revisions and recovery matched the control;
+the edited output and each rejection also matched independent fresh sessions.
+
+The next target is the 306,968 local import nodes. Measure which constructor
+payloads are first read by inference and which by ownership lowering before
+deferring their local copies. Keep exact inference-budget debits in both paths.
+
+![Worker reply bytes and 18 fresh Gdev build pairs](../benchmarks/evidence/measurements/2026-11-20-forwarded-constructors.png)
+
+[Raw paired measurements and inputs](../benchmarks/evidence/measurements/2026-11-20-forwarded-constructors.json) · [Worker benchmark](../benchmarks/tools/bench_forwarded_constructors.ts)
 
 ### Measurement plan
 

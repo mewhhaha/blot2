@@ -1,13 +1,18 @@
 # Working on Blot and Gdev
 
-The type checker now reuses settled expression and binding types and generic
-call arguments. In 279 Gdev modules this removes 275,727 repeated final
-root resolutions and 6,799 repeated argument resolutions and snapshots.
-Fresh Gdev Main took **1,531 → 1,485 ms** across 18 paired builds with
-identical Wasm. Of 31,398 imported named types, direct checker reads touched
-3,059. A prototype supplied lowering's ownership facts and cut imported nodes
-by 41%, but over-invalidated retained modules and changed an inference-budget
-boundary. Its patch and reproductions are saved for the next design. [Measurements and import experiments](tasks/FAST_COMPILE.md#final-types-generic-calls-and-imported-definitions)
+Workers now forward public constructor identities and look up their signatures
+in the defining module. On current Gdev Main, this cut worker replies from
+**77.0 to 71.2 MB**. Fresh eight-worker compile time was **690 → 687 ms** across
+18 pairs, with identical 2,754,496-byte Wasm. The full compiler gate, Ink
+checks, Gdev frame and replay passed against the control. The next target is
+the **306,968 type nodes** still copied locally during imports.
+[Work counts, timing spread and qualification](tasks/FAST_COMPILE.md#forwarding-constructor-signatures-between-workers)
+
+The previous checker change reused settled expression and binding types and
+generic call arguments. An earlier prototype cut imported nodes by 41% but
+changed an exact inference-budget boundary. Its two edit-count failures also
+reproduce on the unmodified debug compiler. The optimized release passes both.
+[Finalization measurements and import experiments](tasks/FAST_COMPILE.md#final-types-generic-calls-and-imported-definitions)
 
 The type checker now shares repeated tuple and record shapes in inferred
 generic results. On 13 nested pair declarations, checking went from
