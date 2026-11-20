@@ -1,0 +1,121 @@
+{
+  "source": "ed4fc7e92f4fb36e634f490390c66b65e0f7b501",
+  "toolchain": "clang version 23.1.5",
+  "host": "AMD Ryzen 7 3800X (Linux x86_64)",
+  "method": "Alternating compiler order in each pair. New compiler process, warm filesystem, eight frontend workers. integration/build_gdev.ts totalCompileMs covers session open through receipt of Wasm.",
+  "compactFlags": [
+    "-Oz",
+    "-ffunction-sections",
+    "-fdata-sections",
+    "-fuse-ld=lld",
+    "-Wl,--gc-sections,--icf=safe"
+  ],
+  "linkInputs": "Recompiled the same generated Blot C and linked the existing release runtime objects. Applied strip --strip-unneeded to a copy of the linked executable.",
+  "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+  "binaries": {
+    "release": {
+      "bytes": 11608064,
+      "sha256": "83475e1a469789e33cb4cc9bd44abfabed378dbf8c0b0ac00588e19cbe4017f5"
+    },
+    "releaseStripped": {
+      "bytes": 11157128,
+      "sha256": "e2c1675e7a4f209905179f4c9b6b2a917e304e452c4766721b2fb254375230b3"
+    },
+    "compactUnstripped": {
+      "bytes": 8364240,
+      "sha256": "69ecd1b0d1830441ae755d9022314cf4a7ff1312c8ddd9c3877430474b488013"
+    },
+    "compact": {
+      "bytes": 7923984,
+      "sha256": "51e1d3d8c2138d2115af8137609f2f3205cb34b4baadf91e66e754c7be8364d9"
+    }
+  },
+  "workloads": [
+    {
+      "gdev": "4c98d07cd13df544724d7323cd702358145cb993",
+      "wasmBytes": 2754496,
+      "wasmSha256": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70",
+      "medianMs": {
+        "release": 661.429,
+        "compact": 890.016
+      },
+      "pairsMs": [
+        {
+          "release": 667.155,
+          "compact": 860.141
+        },
+        {
+          "compact": 900.187,
+          "release": 626.467
+        },
+        {
+          "release": 629.713,
+          "compact": 886.149
+        },
+        {
+          "compact": 851.005,
+          "release": 644.819
+        },
+        {
+          "release": 696.406,
+          "compact": 888.058
+        },
+        {
+          "compact": 867.161,
+          "release": 666.348
+        },
+        {
+          "release": 675.601,
+          "compact": 898.724
+        },
+        {
+          "compact": 891.974,
+          "release": 650.133
+        },
+        {
+          "release": 661.824,
+          "compact": 904.507
+        },
+        {
+          "compact": 857.228,
+          "release": 674.276
+        },
+        {
+          "release": 660.615,
+          "compact": 913.347
+        },
+        {
+          "compact": 900.918,
+          "release": 661.035
+        }
+      ]
+    },
+    {
+      "gdev": "54f299aad22e3e80e7cc3d5b2c54fa0875a0d8e0",
+      "wasmBytes": 2740576,
+      "wasmSha256": "0f113a3fbb9720866c6266ba3dbb2b6096debd1bb121ee082529ec9f5bb92420",
+      "medianMs": {
+        "release": 659.902,
+        "compact": 873.555
+      },
+      "pairsMs": [
+        {
+          "release": 642.885,
+          "compact": 895.105
+        },
+        {
+          "compact": 868.082,
+          "release": 676.919
+        },
+        {
+          "release": 633.228,
+          "compact": 859.492
+        },
+        {
+          "compact": 879.028,
+          "release": 677.466
+        }
+      ]
+    }
+  ]
+}

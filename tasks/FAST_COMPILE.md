@@ -3,6 +3,43 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Native compiler size and checker work
+
+On 20 November 2026, compiling Blot's generated C for size cut its Linux
+executable by 3.68 MB. The smaller compiler took longer on every paired
+fresh Gdev build. Each pair produced byte-identical guest Wasm.
+
+| Blot compiler | Executable | Pinned Gdev, 12 pairs | Gdev `54f299a`, 4 pairs |
+| --- | ---: | ---: | ---: |
+| Release | 11.61 MB | 661 ms | 660 ms |
+| Size-optimized and stripped | 7.92 MB | 890 ms | 874 ms |
+
+Stripping symbols alone brought the release executable to 11.16 MB.
+The size experiment used Clang `-Oz`, removed unused sections, folded
+eligible identical code, and reused the release runtime objects. The
+ordinary release remains the default. [Build identities, flags and paired
+samples](../benchmarks/evidence/measurements/2026-11-20-native-compiler-size.json)
+
+Theo's ts-rust demonstration identifies three different Neon builds. The
+`int-size9` executable (`a30b80c14`) went from 47.44 to 7.97 MB against
+v0.8.0. The `fe6/fe7` build checked a warm T3 Code edit in 46.2 ms against
+980 ms. A profile-guided build measured a 1.51× geometric mean speedup
+across six projects. The size commit did not resolve in the public upstream
+repository when checked on 20 November. An earlier public change documents
+the separate 11.1% saving from stripping and folding identical code.
+[Size demonstration](https://www.youtube.com/watch?v=HQlk9RGx2dk&t=1160s) ·
+[Warm check and type counts](https://www.youtube.com/watch?v=HQlk9RGx2dk&t=1176s) ·
+[Six-project run](https://www.youtube.com/watch?v=HQlk9RGx2dk&t=1190s) ·
+[Public size patch](https://github.com/pingdotgg/ts-rust/pull/110)
+
+The checker result worth testing in Blot is Sentry's reduction from 26.3
+million generic type instantiations to 10.1 million. An instantiation
+constructs the type needed at a particular use of a generic definition.
+On the Gdev dependency chain, count how often Blot reconstructs the same
+fully determined type and how much CPU those repeats use. Use these counts
+to decide whether to reuse more closed types. Uses with fresh inference
+variables must keep their independent constraints.
+
 ## Unifying ordinary function types
 
 The unifier reconciles two type descriptions. On pinned Gdev Main it read
