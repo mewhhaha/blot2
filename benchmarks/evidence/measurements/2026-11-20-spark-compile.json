@@ -1,0 +1,249 @@
+{
+  "compilerSha256": "83475e1a469789e33cb4cc9bd44abfabed378dbf8c0b0ac00588e19cbe4017f5",
+  "frontendWorkers": 8,
+  "records": [
+    {
+      "fixture": "spark_routes",
+      "pair": 0,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 171.704,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 0,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 20.547,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 1,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 146.844,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 1,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 14.804,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 2,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 190.845,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 2,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 14.848,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 3,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 157.365,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 3,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 19.883,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 4,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 215.084,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 4,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 24.867,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 5,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 163.0,
+      "freshModules": 23,
+      "cachedModules": 0,
+      "wasmSha256": "9fe059920186a15983000976cb1c5314cece25f56061eab6152a26434017898a"
+    },
+    {
+      "fixture": "spark_routes",
+      "pair": 5,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 20.62,
+      "freshModules": 1,
+      "cachedModules": 22,
+      "wasmSha256": "02c5435658143507729872b6b6636b1a4e9e479cc7c0e01296b8a59aec2f2a69"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 0,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 85.373,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 0,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 10.559,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 1,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 86.043,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 1,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 12.013,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 2,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 57.907,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 2,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 10.032,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 3,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 75.577,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 3,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 9.804,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 4,
+      "session": "fresh",
+      "editedSource": false,
+      "ms": 58.224,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 4,
+      "session": "retained",
+      "editedSource": true,
+      "ms": 9.964,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 5,
+      "session": "fresh",
+      "editedSource": true,
+      "ms": 69.473,
+      "freshModules": 2,
+      "cachedModules": 0,
+      "wasmSha256": "dd25e69e9bfec44273b66921ac133b80f5f2894dbcb39dabce1195a818b485d0"
+    },
+    {
+      "fixture": "spark_spawn",
+      "pair": 5,
+      "session": "retained",
+      "editedSource": false,
+      "ms": 9.921,
+      "freshModules": 1,
+      "cachedModules": 1,
+      "wasmSha256": "56702adcf35fabf0046dc099729dcf498ef5c1ca797c62be701277a10d95a97e"
+    }
+  ],
+  "gdev": "54f299aad22e3e80e7cc3d5b2c54fa0875a0d8e0",
+  "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+  "method": "Six fresh compiler sessions per fixture, each followed by a body edit in the same session. Each version has three fresh and three retained observations. Timings start before session creation for fresh builds, or before the edit request for retained builds, and stop on receipt of Wasm. All 24 results were executed and their bytes matched across session modes."
+}

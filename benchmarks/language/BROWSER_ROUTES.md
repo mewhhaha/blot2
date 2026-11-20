@@ -23,3 +23,16 @@ python3 benchmarks/language/bench_browser_routes.py --chrome /path/to/chrome --w
 ```
 
 [Raw frames, Chrome version, affinity and cold setup](../evidence/measurements/spark-browser/routes.json.gz)
+
+## Compiling and editing the fixtures
+
+The native Blot compiler built the 23-module Gdev route fixture in **167.4 ms**
+from a fresh session. Editing the spawned route planner's initializer took
+**20.2 ms** and rechecked one module. The two-module scalar fixture took
+**72.5 ms** fresh and **10.0 ms** after changing the multiplier inside
+its spark. These are medians across six sessions per fixture. Both directions
+of each edit produced the same Wasm as a fresh build of that source. The
+edited entry point returned the expected value in all 24 executions.
+
+Reproduce with `deno run -A benchmarks/language/spark_compile.ts ../gdev`.
+[Individual builds, module counts and hashes](../evidence/measurements/2026-11-20-spark-compile.json)
