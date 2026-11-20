@@ -50,7 +50,7 @@
     {
       "order": 4,
       "executed": "Direct source sparks and scoped spawn have formatter, rejection and executed Wasm coverage. This compiler rejects @spark.within with unknown_intrinsic. The ordinary ABI 8 fromPacket and toPacket paths copy input and output payloads in Wasm, so the host-assisted route profile cannot establish the source form's zero-copy guarantee.",
-      "scope": "The reported times below cover route computation, dispatch, array copies, join and selection for the four-query case. Allocation, wait and copy time are not separately timed. No automatic policy is enabled; renderer and production Gdev frame latency require a separate integration."
+      "scope": "The untraced times below include route computation, dispatch, array copies, join and selection for the four-query case. The linked native trace reports packet preparation, admission, queueing, receive, whole-batch recovery and application, with per-site payload byte counts. No automatic policy is enabled. Renderer and production Gdev frame latency require a separate integration."
     }
   ],
   "deno": {
@@ -625,6 +625,7 @@
     }
   },
   "native": {
+    "route_stage_breakdown": "../../language/NATIVE_ROUTES.md",
     "method": "Dev-profile Rust host and standard Wasmtime engine. Each cell observes one first response then four warmup and 21 alternating paired samples. Workers use Pen's copied value jobs and 64 MiB per-sandbox memory limit. The 16,384-lane worker cap requires at least four worker jobs for 128 rows, even when there is only one worker.",
     "unrestricted_route_stage_ms": [
       {

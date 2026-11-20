@@ -83,6 +83,7 @@ The native copied worker profile uses a fresh sandbox per job. Keep four-route
 gameplay direct. The current evidence measures route stages with fixed inputs.
 Production Gdev placement and hard budgets for Pen's blocking prepared workers
 remain open. [Native and Deno evidence](benchmarks/evidence/measurements/2026-11-20-spark-process-drivers.json) ·
+[Native route stage breakdown](benchmarks/language/NATIVE_ROUTES.md) ·
 [Browser route stages](benchmarks/language/BROWSER_ROUTES.md) ·
 [Previous compiler, frame and replay qualification](benchmarks/evidence/measurements/2026-11-19-spark-spawn.json)
 
