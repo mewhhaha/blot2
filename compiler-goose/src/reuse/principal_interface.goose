@@ -28,6 +28,9 @@ struct Constructor {
     private: bool = false, identity: Identity, nominal: u32, tag: u32, name: u32,
     scheme: blot_check_types::Scheme = blot_check_types::Scheme {..}, payload: Id = 0,
     declared_record: bool = false,
+    // In a worker's checked module, scheme.root can hold the call parameter.
+    // The result of this pure monomorphic constructor is its family.
+    deferred_result: bool = false,
 }
 struct Associated { identity: Identity, member: u32, operator: blot_check_types::Operator, binding: u32 }
 struct EffectFamily {

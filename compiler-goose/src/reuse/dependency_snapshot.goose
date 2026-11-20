@@ -237,6 +237,7 @@ fn freezeMode(tree: const Tree&,checked: const Checked&,principal_only: bool,pub
   if publish_summaries && old.nominal!=0 && old.identity.unit!=checked.unit {
    let family=checked.nominals[old.nominal];
    if !family.private && !family.is_opaque && family.variables.len==0 && family.parameters.len==0 && family.alias==0 {
+    value.deferred_result=false;
     value.scheme=blot_check_types::Scheme {root:blot_reuse_principal_interface::forwarded_constructor,..};
     value.payload=0;
     constructors[index]=value;

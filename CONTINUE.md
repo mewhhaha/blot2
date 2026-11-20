@@ -1,12 +1,15 @@
 # Working on Blot and Gdev
 
-Workers now forward public constructor identities and look up their signatures
-in the defining module. On current Gdev Main, this cut worker replies from
-**77.0 to 71.2 MB**. Fresh eight-worker compile time was **690 → 687 ms** across
-18 pairs, with identical 2,754,496-byte Wasm. The full compiler gate, Ink
-checks, Gdev frame and replay passed against the control. The next target is
-the **306,968 type nodes** still copied locally during imports.
-[Work counts, timing spread and qualification](tasks/FAST_COMPILE.md#forwarding-constructor-signatures-between-workers)
+Workers now defer the return types of imported constructors with a known
+result and a fixed storage layout. This cut local import nodes on Gdev Main
+from **306,968 to 263,793** and produced identical 2,754,496-byte Wasm.
+Fresh compiles took **731 → 735 ms** across 18 eight-worker pairs. The timing
+interval included zero. The full gate, 283 Ink checks, Gdev hardware frame and
+120-frame replay passed. The next experiment is to trace which complete
+constructor signatures the backend and parent actually read after lowering.
+Workers still send 71.28 MB in replies.
+[Local import reads and release measurements](tasks/FAST_COMPILE.md#deferring-imported-constructor-results) ·
+[Worker traffic](tasks/FAST_COMPILE.md#forwarding-constructor-signatures-between-workers)
 
 The previous checker change reused settled expression and binding types and
 generic call arguments. An earlier prototype cut imported nodes by 41% but

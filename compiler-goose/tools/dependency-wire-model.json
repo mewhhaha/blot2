@@ -5409,7 +5409,9 @@
      "declared_record"
     ]
    ],
-   "unwired": []
+   "unwired": [
+    "deferred_result"
+   ]
   },
   {
    "name": "[]reuse.principal_interface.Constructor",

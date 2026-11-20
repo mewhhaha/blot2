@@ -1727,16 +1727,56 @@ fn copyForwardedNominal(self_:Engine&,identity:Identity)->u32,blot_error::Error 
     return self_.copyNominalDefinition(producer,producer.nominals[index]);
 }
 fn copyNominalDefinition(self_:Engine&,producer:DeclarationCatalog,source:Nominal)->u32,blot_error::Error {
+    var defer_result=false;
+    if !self_.source_validation && source.closed_storage && !source.private && !source.is_opaque &&
+        source.variables.len==0 && source.parameters.len==0 && source.alias==0 && self_.producer_storage.present {
+        let project .= self_.producer_storage.value.context.borrow();
+        if project {defer_result=project.persistent_cache!=0;}
+    }
     var copier=blot_check_check_scheme_import::init(producer.types,self_.types,self_.import_tables);
-    let index,error=copyNominalBody(self_,copier,producer,source);
+    let index,error=copyNominalBody(self_,copier,producer,source,defer_result);
     copier.deinit();
     return index,error;
 }
-fn copyNominalBody(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,producer:DeclarationCatalog,source:Nominal)->u32,blot_error::Error {
+fn copyNominalBody(self_:Engine&,copier:blot_check_check_scheme_import::Copier&,producer:DeclarationCatalog,source:Nominal,defer_result:bool)->u32,blot_error::Error {
     var variables:u32[>..<]=[];for old in producer.types.list(source.variables) {let fresh,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}copier.mapping.insert(producer.types.head(old,0),fresh);variables.push(fresh);}var parameters:u32[>..<]=[];for old in producer.types.list(source.parameters) {let parameter,err=copier.copy(old,0);if err!=blot_error::Error.none {return 0,err;}parameters.push(parameter);}
     let index=self_.nominals.len as u32;let quantified,err=self_.types.saveList(variables);if err!=blot_error::Error.none {return 0,err;}let names,err=self_.types.saveList(producer.types.list(source.parameter_names));if err!=blot_error::Error.none {return 0,err;}let patterns,err=self_.copyParameterPatterns(producer.parameter_patterns,source.patterns,copier);if err!=blot_error::Error.none {return 0,err;}let alias_rows,err=copier.quantifiedRows(source.alias_rows);if err!=blot_error::Error.none {return 0,err;}let parameter_list,err=self_.types.saveList(parameters);if err!=blot_error::Error.none {return 0,err;}var alias:u32=0;if source.alias!=0 {let value,err=copier.copy(source.alias,0);if err!=blot_error::Error.none {return 0,err;}alias=value;}
     self_.nominals.push(Nominal{ affine:source.affine, has_usage:source.has_usage, closed_storage:source.closed_storage, private:source.private, is_opaque:source.is_opaque, storage:source.storage, identity:source.identity, name:source.name, parameters:parameter_list, variables:quantified, patterns:patterns, parameter_names:names, alias:alias, alias_rows:alias_rows, .. });if source.has_usage {self_.types.has_usage_types=true;}self_.catalogs.nominal_identities.insert(source.identity,index);
-    var constructors:u32[>..<]=[];for old in producer.types.list(source.constructors) {if source.is_opaque {continue;}let ctor=producer.constructors[old];let own=self_.constructors.len as u32;let root,err=copier.copy(ctor.scheme.root,0);if err!=blot_error::Error.none {return 0,err;}var payload:u32=0;if ctor.payload!=0 {let value,err=copier.copy(ctor.payload,0);if err!=blot_error::Error.none {return 0,err;}payload=value;}self_.constructors.push(Constructor{identity:ctor.identity,nominal:index,tag:ctor.tag,name:ctor.name,scheme:blot_check_types::Scheme{root:root,variables:quantified, ..},payload:payload,declared_record:ctor.declared_record, ..});self_.catalogs.constructor_identities.insert(ctor.identity,own);constructors.push(own);}
+    var constructors:u32[>..<]=[];
+    for old in producer.types.list(source.constructors) {
+        if source.is_opaque {continue;}
+        let ctor=producer.constructors[old];
+        var signature=ctor.scheme.root;
+        var delayed=false;
+        if defer_result {
+            // Complete archives may also supply this catalog. Verify the pure
+            // constructor returns this exact family before dropping its root.
+            let root=producer.types.node(signature);
+            var result=root;
+            var parameter:u32=0;
+            if ctor.payload!=0 && root.tag==blot_check_types::Tag.function && root.c==0 {
+                result=producer.types.node(root.b);
+                parameter=root.a;
+            }
+            if (ctor.payload==0 || parameter!=0) && result.tag==blot_check_types::Tag.nominal &&
+                result.a==source.identity.unit && result.b==source.identity.decl && producer.types.nominalArguments(result).len==0 {
+                signature=parameter;
+                delayed=true;
+            }
+        }
+        let root,err=copier.copy(signature,0);
+        if err!=blot_error::Error.none {return 0,err;}
+        var payload:u32=0;
+        if ctor.payload!=0 {
+            let value,err=copier.copy(ctor.payload,0);
+            if err!=blot_error::Error.none {return 0,err;}
+            payload=value;
+        }
+        let own=self_.constructors.len as u32;
+        self_.constructors.push(Constructor{identity:ctor.identity,nominal:index,tag:ctor.tag,name:ctor.name,scheme:blot_check_types::Scheme{root:root,variables:quantified,..},payload:payload,declared_record:ctor.declared_record,deferred_result:delayed,..});
+        self_.catalogs.constructor_identities.insert(ctor.identity,own);
+        constructors.push(own);
+    }
     let catalog,err=self_.types.saveList(constructors);if err!=blot_error::Error.none {return 0,err;}self_.nominals[index].constructors=catalog;return index,blot_error::Error.none;
 }
 fn copyEffectFamily(self_:Engine&,producer:DeclarationCatalog,source_index:u32)->u32,blot_error::Error {let source=producer.effect_families[source_index];let scalar_lookup_25 .= self_.catalogs.effect_family_identities.get(source.identity);if scalar_lookup_25 {let known:u32=scalar_lookup_25;return known,blot_error::Error.none;}var copier=blot_check_check_scheme_import::init(producer.types,self_.types,self_.import_tables);let family,err=copyEffectFamilyBody(self_,copier,producer,source);copier.deinit();return family,err;}
@@ -1990,7 +2030,20 @@ fn validateMemberRequirements(self_:Engine&,index:u32)->blot_error::Error {let m
 fn validateMemberRequirementsBody(self_:Engine&,member:ContractMember,contract:Contract,source:u32,start:i64)->blot_error::Error {let normalized,err=self_.normalizeAssociated(member.root,source,true);if err!=blot_error::Error.none {return err;}var cursor=start;while cursor<self_.pending.len {let pending=self_.pending[cursor];let wanted=pending.value;if wanted.kind==blot_check_types::ObligationKind.contract && wanted.identity==contract.identity {cursor+=1;continue;}var supplied=false;for given in self_.contract_predicates[contract.predicates.start..contract.predicates.start+contract.predicates.len] {let same,err=self_.unifyRequirement(wanted,given);if err!=blot_error::Error.none {return err;}if same {supplied=true;break;}}if supplied {cursor+=1;continue;}let open,err=self_.requirementOpen(wanted);if err!=blot_error::Error.none {return err;}if open || wanted.kind==blot_check_types::ObligationKind.contract {let err=self_.diagnostic(Code.missing_predicate,source);if err!=blot_error::Error.none {return err;}cursor+=1;continue;}self_.pending[cursor].suspended=false;let attempted,err=self_.attemptPending(cursor,self_.pending[cursor]);if err!=blot_error::Error.none {return err;}if !self_.pending[cursor].solved {let err=self_.diagnostic(Code.missing_predicate,source);if err!=blot_error::Error.none {return err;}}cursor+=1;}return blot_error::Error.none;}
 fn constructorStorageType(self_:Engine&,index:u32)->u32,blot_error::Error {return self_.constructorUse(index,true);}
 fn canonicalRecordType(self_:Engine&,record:blot_check_types::Node)->u32,blot_error::Error {if record.b==1 {return self_.types.recordField(record,0).ty,blot_error::Error.none;}let fields=equation_type_ids.alloc_slice(record.b);for index in 0..record.b {fields[index]=self_.types.recordField(record,index).ty;}let root,err=self_.types.product(fields);equation_type_ids.free_slice(fields);return root,err;}
-fn constructorUse(self_:Engine&,index:u32,storage:bool)->u32,blot_error::Error {let metadata=self_.constructors[index];let principal=metadata.scheme;var root=principal.root;if storage && metadata.payload!=0 && self_.types.node(metadata.payload).tag==blot_check_types::Tag.record {let value,err=self_.types.function(metadata.payload,self_.types.node(principal.root).b);if err!=blot_error::Error.none {return 0,err;}root=value;}let old=equation_type_ids.alloc_slice(principal.variables.len);let type_span_39=checkedTypeList(self_.types,principal.variables);for index in 0..(type_span_39.len as i64) {let value=self_.types.list(type_span_39)[index];old[index]=value;}let fresh=equation_type_ids.alloc_slice(old.len);let result,err=constructorUseVariables(self_,root,old,fresh);equation_type_ids.free_slice(fresh);equation_type_ids.free_slice(old);return result,err;}
+fn constructorRoot(self_:Engine&,metadata:Constructor,storage:bool)->u32,blot_error::Error {
+    var root=metadata.scheme.root;
+    if metadata.deferred_result {
+        let result,err=self_.types.nominal(self_.nominals[metadata.nominal].identity,[]);
+        if err!=blot_error::Error.none || metadata.payload==0 {return result,err;}
+        if storage && self_.types.node(metadata.payload).tag==blot_check_types::Tag.record {root=metadata.payload;}
+        return self_.types.function(root,result);
+    }
+    if storage && metadata.payload!=0 && self_.types.node(metadata.payload).tag==blot_check_types::Tag.record {
+        return self_.types.function(metadata.payload,self_.types.node(root).b);
+    }
+    return root,blot_error::Error.none;
+}
+fn constructorUse(self_:Engine&,index:u32,storage:bool)->u32,blot_error::Error {let metadata=self_.constructors[index];let principal=metadata.scheme;let root,err=self_.constructorRoot(metadata,storage);if err!=blot_error::Error.none {return 0,err;}let old=equation_type_ids.alloc_slice(principal.variables.len);let type_span_39=checkedTypeList(self_.types,principal.variables);for index in 0..(type_span_39.len as i64) {let value=self_.types.list(type_span_39)[index];old[index]=value;}let fresh=equation_type_ids.alloc_slice(old.len);let result,err=constructorUseVariables(self_,root,old,fresh);equation_type_ids.free_slice(fresh);equation_type_ids.free_slice(old);return result,err;}
 fn constructorUseVariables(self_:Engine&,root:u32,old:const u32[:],fresh:u32[:])->u32,blot_error::Error {for &id in fresh {let value,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}id=value;}return self_.types.substitute(root,old,fresh);}
 fn dataHeaders(self_:Engine&)->blot_error::Error {let ast_walk_20_count=self_.tree.roots.items.len;for ast_walk_20_index in 0..ast_walk_20_count {let id=self_.tree.roots.items[ast_walk_20_index];let node=self_.tree.node(id);if node.tag!=blot_parse_ast::tag_data_decl && node.tag!=blot_parse_ast::tag_type_alias_decl {continue;}let key=Qualified{namespace_:0,member:node.a, ..};if self_.catalogs.nominal_names.contains(key) {let err=self_.diagnostic(Code.duplicate_name,id);if err!=blot_error::Error.none {return err;}continue;}let index=self_.nominals.len as u32;let traits=blot_parse_ast::declaration_traits(self_.tree,id);var identity=Identity{unit:self_.unit,decl:id, ..};if traits.is_opaque {identity.decl=node.a|blot_check_types::opaque_name_bit;}self_.nominals.push(Nominal{private:traits.private,is_opaque:traits.is_opaque,declaration:id,identity:identity,name:node.a,parameters:blot_check_types::List{..},variables:blot_check_types::List{..}, ..});self_.catalogs.nominal_identities.insert(identity,index);self_.catalogs.nominal_names.insert(key,index);}for ordinal in 1..self_.nominals.len {let nominal=self_.nominals[ordinal];if nominal.identity.unit!=self_.unit {continue;}let node=self_.tree.node(nominal.declaration);let meta=checkedAstRange(self_.tree,node.c,node.c+4);if self_.tree.list(meta)[3]!=0 {let err=self_.diagnostic(Code.unsupported_attribute,nominal.declaration);if err!=blot_error::Error.none {return err;}}self_.type_env.clear();self_.row_env.clear();let parameters=equation_type_ids.alloc_slice(self_.tree.list(meta)[1]);let patterns=equation_type_ids.alloc_slice(self_.tree.list(meta)[1]);let err=dataHeaderParameters(self_,ordinal as u32,meta,parameters,patterns);equation_type_ids.free_slice(patterns);equation_type_ids.free_slice(parameters);if err!=blot_error::Error.none {return err;}}self_.type_env.clear();self_.row_env.clear();return blot_error::Error.none;}
 fn dataHeaderParameters(self_:Engine&,index:u32,meta:blot_parse_ast::List,parameters:u32[:],patterns:u32[:])->blot_error::Error {let syntax_source_17=blot_parse_ast::List{self_.tree.list(meta)[0],self_.tree.list(meta)[1], ..};let syntax_count_17=self_.tree.list(syntax_source_17).len;for ordinal in 0..syntax_count_17 {let parameter=self_.tree.list(syntax_source_17)[ordinal];let parsed,err=self_.parameterAnnotation(parameter,0);if err!=blot_error::Error.none {return err;}parameters[ordinal]=parsed.ty;patterns[ordinal]=parsed.pattern;}let names=equation_type_ids.alloc_slice(self_.type_env.items.len);let variables=equation_type_ids.alloc_slice(names.len);for entry,ordinal in self_.type_env.items {names[ordinal]=entry.name;variables[ordinal]=entry.ty;}let err=dataHeaderLists(self_,index,parameters,patterns,names,variables);equation_type_ids.free_slice(variables);equation_type_ids.free_slice(names);return err;}
@@ -3530,6 +3583,13 @@ for &nominal in self_.nominals[1..] {
 {let err=self_.normalizeList(nominal.variables);if err!=blot_error::Error.none {return err;}}
 }
 for &constructor in self_.constructors[1..] {
+if constructor.deferred_result && self_.types.has_projections {
+    // Every original resolution visit counts toward the public projection budget.
+    let root,err=self_.constructorRoot(constructor,false);
+    if err!=blot_error::Error.none {return err;}
+    constructor.scheme.root=root;
+    constructor.deferred_result=false;
+}
 {let value,err=self_.types.resolve(constructor.scheme.root,0);if err!=blot_error::Error.none {return err;}constructor.scheme.root=value;}
 {let value,err=self_.types.resolve(constructor.payload,0);if err!=blot_error::Error.none {return err;}constructor.payload=value;}
 {let err=self_.normalizeList(constructor.scheme.variables);if err!=blot_error::Error.none {return err;}}

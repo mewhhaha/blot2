@@ -233,6 +233,21 @@ Deno.test("opaque representation edits invalidate storage while preserving the p
   }
 });
 
+async function writeForwardedReaders(dir: string, reader: string) {
+  const imports: string[] = [];
+  let sum = "0";
+  for (let i = 0; i < 16; i++) {
+    await Deno.writeTextFile(dir + `/r${i}.blot`, reader);
+    imports.push(`import { read as r${i} } from "./r${i}"`);
+    sum = `@u32.add (${sum}) (r${i} n)`;
+  }
+  await Deno.writeTextFile(
+    dir + "/main.blot",
+    imports.join("\n") + "\nentry func answer (n: U32): U32 => return " + sum +
+      "\n",
+  );
+}
+
 Deno.test("forwarded record layouts survive producer edits and recovery across workers", async () => {
   const dir = await Deno.makeTempDir();
   const entry = dir + "/main.blot";
@@ -248,20 +263,9 @@ func make () => return $Point { other: 90, ${field}: ${value} }
       dir + "/bridge.blot",
       'import { make } from "./point"\nfunc carry () => return make ()\n',
     );
-    const imports: string[] = [];
-    let sum = "0";
-    for (let i = 0; i < 16; i++) {
-      await Deno.writeTextFile(
-        dir + `/r${i}.blot`,
-        'import { carry } from "./bridge"\nfunc read () => return (carry ()).x\n',
-      );
-      imports.push(`import { read as read${i} } from "./r${i}"`);
-      sum = `@u32.add (${sum}) (read${i} ())`;
-    }
-    await Deno.writeTextFile(
-      entry,
-      imports.join("\n") + "\nentry func answer (unused: U32): U32 => return " +
-        sum + "\n",
+    await writeForwardedReaders(
+      dir,
+      'import { carry } from "./bridge"\nfunc read (n: U32): U32 => return (carry ()).x\n',
     );
     const workers = await createZigProjectCompiler({
       ...options,
@@ -307,6 +311,119 @@ func make () => return $Point { other: 90, ${field}: ${value} }
     } finally {
       await workers.dispose();
     }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("forwarded constructor calls preserve the projection budget at the cutoff", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(
+      dir + "/types.blot",
+      [
+        "type Point is data = $Point { other: U32, x: U32 }",
+        "type Identity a is contract = { type Item = a }",
+        "func make (n: U32): Point => return $Point { other: 90, x: n }",
+      ].join("\n") + "\n",
+    );
+    await Deno.writeTextFile(
+      dir + "/bridge.blot",
+      [
+        'import { make } from "./types"',
+        'export { Identity } from "./types"',
+        "func carry n => return make n",
+      ].join("\n") + "\n",
+    );
+    await writeForwardedReaders(
+      dir,
+      [
+        'import * as bridge from "./bridge"',
+        "type Marker = bridge.Identity.Item U32",
+        "func read (n: U32): U32 => return (bridge.carry n).x",
+      ].join("\n") + "\n",
+    );
+    for (const inferenceBudget of [2902, 2903]) {
+      const outputs = [];
+      for (const frontendWorkers of [1, 8]) {
+        const client = await createZigProjectCompiler({
+          entry: dir + "/main.blot",
+          executable,
+          prelude: null,
+          frontendWorkers,
+          inferenceBudget,
+        });
+        try {
+          const result = await client.build();
+          assert.equal(result.success, inferenceBudget === 2903);
+          if (result.success) {
+            const guest = await instantiateGuest(result.bytes);
+            try {
+              assert.equal(guest.call("answer", 7), 112);
+            } finally {
+              guest.dispose();
+            }
+            outputs.push(result.bytes);
+          } else {
+            assert.equal(result.diagnostics[0].code, "associated_limit");
+            outputs.push(result.diagnostics);
+          }
+        } finally {
+          await client.dispose();
+        }
+      }
+      assert.deepEqual(outputs[0], outputs[1]);
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("workers lower complete forwarded signatures for all constructor forms", async () => {
+  const dir = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(
+      dir + "/types.blot",
+      "type Choice is data = $Empty | $Count U32 | $Point { x: U32, y: U32 }\n",
+    );
+    await Deno.writeTextFile(
+      dir + "/bridge.blot",
+      'export { Choice, Empty, Count, Point } from "./types"\n',
+    );
+    await writeForwardedReaders(
+      dir,
+      [
+        'import { Choice, Empty, Count, Point } from "./bridge"',
+        "func val (c: Choice): U32 => return case c of",
+        "  $Empty => 3",
+        "  $Count n => n",
+        "  $Point { x, y } => @u32.add x y",
+        "func read (n: U32): U32 => return @u32.add (val $Empty) (@u32.add (val ($Count n)) (val ($Point {x: n, y: 1})))",
+      ].join("\n") + "\n",
+    );
+    const outputs = [];
+    for (const frontendWorkers of [1, 8]) {
+      const client = await createZigProjectCompiler({
+        entry: dir + "/main.blot",
+        executable,
+        prelude: null,
+        frontendWorkers,
+      });
+      try {
+        const result = await client.build();
+        if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
+        const guest = await instantiateGuest(result.bytes);
+        try {
+          assert.equal(guest.call("answer", 7), 288);
+        } finally {
+          guest.dispose();
+        }
+        outputs.push(result.bytes);
+      } finally {
+        await client.dispose();
+      }
+    }
+    assert.deepEqual(outputs[0], outputs[1]);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

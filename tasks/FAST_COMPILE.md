@@ -196,13 +196,55 @@ from the 120-frame replay matched the control on current Gdev source.
 A valid edit, three rejected revisions and recovery matched the control;
 the edited output and each rejection also matched independent fresh sessions.
 
-The next target is the 306,968 local import nodes. Measure which constructor
-payloads are first read by inference and which by ownership lowering before
-deferring their local copies. Keep exact inference-budget debits in both paths.
-
 ![Worker reply bytes and 18 fresh Gdev build pairs](../benchmarks/evidence/measurements/2026-11-20-forwarded-constructors.png)
 
 [Raw paired measurements and inputs](../benchmarks/evidence/measurements/2026-11-20-forwarded-constructors.json) · [Worker benchmark](../benchmarks/tools/bench_forwarded_constructors.ts)
+
+### Deferring imported constructor results
+
+A constructor such as `$Point { x, y }` always returns `Point`. Previously,
+each importing worker copied the whole function type into its local inference
+store. For public types with a fixed layout and no type parameters, workers now
+keep the argument and the storage layout. They reconstruct the result when a
+constructor is used or its complete signature is needed in the Core IR.
+Modules with associated type projections still visit the whole signature
+during finalization to preserve the inference budget.
+
+On the baseline, 181,216 of Gdev's 306,968 local import nodes came from
+public data types without type parameters. Body inference and ownership
+checking together read 31,819 distinct nodes in that group. Finalization
+visited 179,671 and Core lowering visited all 181,216. The trace counts
+indexed reads. A node can be visited in several phases, and several local
+nodes can map to the same Core type. Two runs agreed for every module.
+
+Deferring only re-exported constructor results removed 37,023 local import
+nodes. Extending it to direct imports removed **43,175** in total, bringing
+Gdev down to **263,793** (14.1% fewer). The broader change preserves named
+fields for ownership and produces the same 2,754,496-byte Wasm.
+
+Across 18 alternating release pairs on eight workers, a fresh Gdev compile
+took **731 → 735 ms**. The 95% interval for the paired change ranged from
+5 ms faster to 19 ms slower. Six separate profiled pairs put checking at
+**395 → 393 ms**. Worker replies grew by 44,472 bytes to 71.28 MB. The
+128-record, 16-reader benchmark used **8,018 → 3,426** total checker nodes
+and took **23.3 → 20.8 ms** to check. Its timing interval also included zero.
+
+All 22 checker workloads matched on Wasm or diagnostics. The release gate
+passed 1,119 guest and host tests with 100 existing skips. The 283 Ink checks,
+Gdev hardware frame and trace, and 242 files from the 120-frame replay matched
+the baseline. A valid edit, three different failing edits and recovery matched
+fresh compiles. Three exact inference-budget boundaries held.
+
+The next experiment is to count which constructor signatures are actually
+read **after** Core lowering, by the backend and the parent process. That
+will show whether a worker can omit unused signatures from its reply and
+how many bytes this could save. The current trace ends at Core ownership
+checking.
+
+![Imported types read by each compiler phase and nodes saved on Gdev](../benchmarks/evidence/measurements/2026-11-20-local-constructor-signatures.png)
+
+[Paired release measurements and phase counts](../benchmarks/evidence/measurements/2026-11-20-local-constructor-signatures.json) ·
+[Reproduce the baseline read trace](../benchmarks/evidence/measurements/experiments/2026-11-20-import-read-trace.py)
 
 ### Measurement plan
 
