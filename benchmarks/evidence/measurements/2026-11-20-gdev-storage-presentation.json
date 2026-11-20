@@ -1,0 +1,426 @@
+{
+  "inputs": {
+    "blot": "3ca61f7a9b94a0ccc4849e6cb704adc8d7ae2464",
+    "compiler": "be36b1fcfb161718bf2e75b1fa82318765bf0e1c2a21377fa3aadef39cc38434",
+    "baselineGdev": "b54b556d2dd0b729af0dc7c51cabe656837b4cac",
+    "candidateGdev": "b7e0c94802760b56abbc713477c44f92fccecaa0",
+    "candidateGdevTree": "4ae23b1e31df255212d015d05ee34be8ab1f3d50",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "penExecutable": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "workers": 8
+  },
+  "method": "New native compiler process per trial, warm filesystem, alternating order, open through complete Wasm. Each layout must reproduce its own SHA-256. Four separate profiled pairs verified every scheduler edge against the source graph.",
+  "timings": {
+    "initialSplit": {
+      "pairs": 24,
+      "controlMedianMs": 800.118,
+      "candidateMedianMs": 758.326,
+      "medianPairedSavingMs": 40.335,
+      "savingIntervalMs": [
+        33.524,
+        56.692
+      ],
+      "pairsFaster": 22
+    },
+    "finalSplit": {
+      "pairs": 24,
+      "controlMedianMs": 822.908,
+      "candidateMedianMs": 799.894,
+      "medianPairedSavingMs": 17.582,
+      "savingIntervalMs": [
+        3.496,
+        34.907
+      ],
+      "pairsFaster": 19,
+      "hostLoad": [
+        "26.65 23.41 11.79 14/2576 1831491",
+        "16.30 21.19 11.53 5/2541 1832570"
+      ]
+    },
+    "secondFinalWindow": {
+      "pairs": 16,
+      "controlMedianMs": 729.689,
+      "candidateMedianMs": 689.563,
+      "medianPairedSavingMs": 37.675,
+      "savingIntervalMs": [
+        30.033,
+        53.951
+      ],
+      "pairsFaster": 15,
+      "hostLoad": [
+        "5.27 15.80 10.62 1/2526 1834575",
+        "4.64 14.97 10.45 1/2584 1835212"
+      ]
+    }
+  },
+  "wasm": {
+    "control": {
+      "bytes": 2741062,
+      "sha256": "be433cb5ffcfeb45525e41ed97f6581645b35f4c875de23a2129476f6474df8d"
+    },
+    "split": {
+      "bytes": 2741012,
+      "sha256": "466090c51e28ec8847a9b30a655cdec3cb1059a3d28c08ecb74b385dc80e4a8e"
+    }
+  },
+  "graph": {
+    "control": {
+      "modules": 281,
+      "edges": 2460,
+      "modeledChainCpuMs": 369.03,
+      "modeledChain": [
+        "blot2/std/prelude.blot",
+        "blot2/std/vector.blot",
+        "ink/lib/math.blot",
+        "ink/lib/lanes.blot",
+        "ink/lib/transform.blot",
+        "ink/lib/render.blot",
+        "ink/lib/brush.blot",
+        "ink/lib/editor.blot",
+        "gdev/src/effects/celebrations.blot",
+        "gdev/src/world/salt_simulation.blot",
+        "gdev/src/world/salt.blot",
+        "gdev/src/actors/robot_staffing.blot",
+        "gdev/src/actors/robots.blot",
+        "gdev/src/actors/kites.blot",
+        "gdev/src/world_storage.blot",
+        "gdev/src/buildings/construction.blot",
+        "gdev/src/game.blot",
+        "gdev/src/session.blot",
+        "gdev/src/main.blot"
+      ],
+      "checkMsMedian": 421.318,
+      "checkerWorkerCpuMsMedian": 1854.4740000000002,
+      "replyBytesMedian": 65918743.0,
+      "lastPublicationPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/kites.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/kites.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/actors/kites.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/buildings/cannon.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    },
+    "split": {
+      "modules": 284,
+      "edges": 2506,
+      "modeledChainCpuMs": 349.429,
+      "modeledChain": [
+        "blot2/std/prelude.blot",
+        "blot2/std/vector.blot",
+        "ink/lib/math.blot",
+        "ink/lib/lanes.blot",
+        "ink/lib/transform.blot",
+        "ink/lib/render.blot",
+        "ink/lib/brush.blot",
+        "ink/lib/editor.blot",
+        "gdev/src/effects/celebrations.blot",
+        "gdev/src/world/salt_simulation.blot",
+        "gdev/src/world/salt.blot",
+        "gdev/src/player/interaction.blot",
+        "gdev/src/progression/tutorial.blot",
+        "gdev/src/ui/station_panel.blot",
+        "gdev/src/ui/output.blot",
+        "gdev/src/player/hover.blot",
+        "gdev/src/world_storage.blot",
+        "gdev/src/buildings/construction.blot",
+        "gdev/src/game.blot",
+        "gdev/src/session.blot",
+        "gdev/src/main.blot"
+      ],
+      "checkMsMedian": 400.9465,
+      "checkerWorkerCpuMsMedian": 1882.4360000000001,
+      "replyBytesMedian": 66466331.0,
+      "lastPublicationPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/output.blot",
+          "gdev/src/player/hover.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/buildings/construction.blot",
+          "gdev/src/game.blot",
+          "gdev/src/session.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    }
+  },
+  "brokenDependencyWitness": [
+    {
+      "root": "control",
+      "name": "save",
+      "success": false,
+      "status": [
+        {
+          "module": "robots.blot",
+          "code": "unknown_value"
+        }
+      ]
+    },
+    {
+      "root": "control",
+      "name": "kites",
+      "success": false,
+      "status": [
+        {
+          "module": "robots.blot",
+          "code": "unknown_value"
+        }
+      ]
+    },
+    {
+      "root": "control",
+      "name": "cannon",
+      "success": false,
+      "status": [
+        {
+          "module": "robots.blot",
+          "code": "unknown_value"
+        }
+      ]
+    },
+    {
+      "root": "split",
+      "name": "save",
+      "success": true,
+      "status": {
+        "modules": 245,
+        "valid": true
+      }
+    },
+    {
+      "root": "split",
+      "name": "kites",
+      "success": true,
+      "status": {
+        "modules": 139,
+        "valid": true
+      }
+    },
+    {
+      "root": "split",
+      "name": "cannon",
+      "success": true,
+      "status": {
+        "modules": 139,
+        "valid": true
+      }
+    }
+  ],
+  "explicitSignaturesSurvey": [
+    {
+      "module": "salt.blot",
+      "checked": 171,
+      "missing": 133
+    },
+    {
+      "module": "tutorial.blot",
+      "checked": 75,
+      "missing": 71
+    },
+    {
+      "module": "station_panel.blot",
+      "checked": 40,
+      "missing": 38
+    },
+    {
+      "module": "output.blot",
+      "checked": 28,
+      "missing": 27
+    },
+    {
+      "module": "hover.blot",
+      "checked": 29,
+      "missing": 29
+    },
+    {
+      "module": "world_storage.blot",
+      "checked": 44,
+      "missing": 42
+    }
+  ],
+  "qualification": {
+    "penCheck": true,
+    "penCodegenCheck": true,
+    "targetedExactCandidate": {
+      "modules": 13,
+      "ok": 81,
+      "FAILED": 15
+    },
+    "boundedIntermediateSuite": {
+      "modules": 190,
+      "ok": 1067,
+      "FAILED": 100
+    },
+    "frameSha256": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+    "traceSha256": "4f0d9ebbd6e8ffb6449afdb9df12b1e009a531be6dae35b0803fb6f5b3853b72",
+    "replayFiles": 242,
+    "replayManifestSha256": "b94e22cefa3c6d4fcc6b5658f5c3514c91bd811d5ed139a1118fd288e403c37b"
+  },
+  "raw": "2026-11-20-gdev-storage-presentation.raw.json.gz"
+}

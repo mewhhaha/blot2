@@ -1,5 +1,12 @@
 # Working on Blot and Gdev
 
+Gdev `b7e0c94` separates robot and cannon storage and robot presentation
+from the simulation modules. Fresh Main builds measured **823 → 800 ms**
+in 24 pairs under load and **730 → 690 ms** in 16 pairs under lighter
+load. The inspected hardware frame and 120-frame replay matched. The
+publication path now runs through station panel, output and hover.
+[Cold build measurements and queue traces](tasks/FAST_COMPILE.md#checking-gdev-storage-and-rendering-without-the-robot-simulation)
+
 The checker now skips substitution setup for schemes without variables or
 obligations and reuses unchanged types during substitution. Pinned Gdev
 created **20.8% fewer substitution nodes**, and the fixed 20-module

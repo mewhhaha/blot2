@@ -3,6 +3,47 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Checking Gdev storage and rendering without the robot simulation
+
+Blot's workers already publish a module's interface after type checking
+and before lowering. They can start a caller as soon as every imported
+interface is ready. Gdev's save code, kites and cannons previously waited
+on the robot simulation for codecs, state types and presentation helpers.
+Gdev `b7e0c94` puts these definitions in small modules and imports them
+directly. The old and new layouts use the same compiler executable.
+
+| Fresh Main with eight workers | Pairs | Original median | Split median | 95% interval for median paired saving |
+| --- | ---: | ---: | ---: | ---: |
+| Final source under load | 24 | 823 ms | 800 ms | 3 to 35 ms |
+| Final source under lighter load | 16 | 730 ms | 690 ms | 30 to 54 ms |
+
+The split won 19 of 24 and 15 of 16 alternating pairs. Each session started
+a fresh compiler process with warm source files. In four separate profiled
+pairs the checking phase fell from **421 to 401 ms**. Total checker-worker
+CPU rose from 1,854 to 1,882 ms, including publication and lowering. The
+longest path weighted by median check and publication CPU fell from **369
+to 349 ms**. Kites started 84–98 ms before the robot interface was ready.
+The scheduler traces confirm that the same import edge no longer gates
+cannon or storage.
+
+Three isolation probes added a bad name to the original simulation source.
+In separate fresh sessions, cannon, kites and world storage each compiled
+with the split and each rejected the original source. The split emits
+50 fewer Wasm bytes. The first hardware frame, its trace and all 242 files
+from a 120-frame replay matched. Pen project checks and codegen checks
+passed. The final targeted run matched all 96 original outcomes in 13
+modules, including 15 existing failures. A broader bounded run on the
+intermediate split matched 1,167 outcomes across 190 modules.
+
+All four final publication traces now run through station panel, output,
+hover and world storage. Storage uses only hover's saved type, initial
+value and codec. These are a candidate for the next boundary. The
+`check-exports` survey found 340 of 387 declarations missing complete
+written signatures across six modules on the new path. Publishing a
+compiler interface earlier will need to account for those inferred
+signatures and any effects or ownership facts computed from bodies.
+[Paired timings, isolation witnesses and queue traces](../benchmarks/evidence/measurements/2026-11-20-gdev-storage-presentation.json)
+
 ## Reusing unchanged types during substitution
 
 Checking the pinned 280-module Gdev build read 109,737 bindings. Of those,
