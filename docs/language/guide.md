@@ -1258,6 +1258,29 @@ UTF-16 surrogates and invalid scalar values. No numeric ABI change is needed.
 explicit `Array U32 -> U32 ! {Foreign}` host callback or return the `Text` to
 the host.
 
+`text.parse_u32 value` accepts a nonempty sequence of ASCII decimal digits
+in a Text or borrowed text slice, returning `$Some number` (leading zeroes
+are allowed) or `$Nothing` for any other character, an empty sequence or U32
+overflow. It does not trim whitespace or accept signs.
+`text.is_whitespace` recognizes the Unicode White_Space property.
+`text.split_whitespace source` lazily yields borrowed, nonempty words separated
+by those characters. `text.lines source` yields borrowed lines separated by
+LF, removing CR immediately before LF. Interior empty lines are preserved;
+an empty source has no lines and a terminal LF does not add another line.
+Keep the source alive while using either iterator or any returned slice.
+For example, the following sums decimal tokens (rejecting malformed words):
+
+```blot
+import * as text from "std/text"
+entry func total (source: Text): U32 => do:
+  let sum = 0
+  for word in text.split_whitespace source:
+    let $Some number = text.parse_u32 word else:
+      @panic "expected U32"
+    sum := self + number
+  return sum
+```
+
 `text.from_u32` formats a decimal integer. `text.from_f32_fixed places value`
 formats 0–6 fractional places and returns `$Nothing` for non-finite values or
 when the scaled result does not fit U32. `text.Format` is an ordinary contract:

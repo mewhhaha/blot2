@@ -24,6 +24,68 @@ func from_scalars (values: own Array U32) : Maybe Text => return do:
   break $Some values
 func scalars (value: own Text) => return value
 
+// Unicode White_Space, excluding the zero-width space and BOM.
+func is_whitespace (value: U32): Bool => return
+  (value >= 9 and value <= 13)
+  or value == 0x20 or value == 0x85 or value == 0xA0
+  or value == 0x1680 or (value >= 0x2000 and value <= 0x200A)
+  or value == 0x2028 or value == 0x2029 or value == 0x202F
+  or value == 0x205F or value == 0x3000
+
+// Borrowed, nonempty words separated by Unicode whitespace. The input owns
+// the scalars; taking a word or copying the cursor does not copy the text.
+type Words is data = $Words { source: &[U32], index: U32 }
+func split_whitespace (source: Text): Words => return
+  $Words { source: &source[0..source.length], index: 0 }
+func Words.iter (cursor: Words): Words => return cursor
+func Words.next (cursor: Words): Maybe (&[U32], Words) => do:
+  let source = cursor.source
+  let start = cursor.index
+  for index in start..source.length:
+    if Bool.not (is_whitespace source[index]):
+      break
+    start := self + 1
+  if start >= source.length:
+    return $Nothing
+  let end = start
+  for index in start..source.length:
+    if is_whitespace source[index]:
+      break
+    end := self + 1
+  return $Some (&source[start..end], $Words { source, index: end })
+
+// Split on LF, removing a CR immediately before it. Interior empty lines
+// remain, but an empty input or a final LF does not add a line.
+type Lines is data = $Lines { source: &[U32], index: U32 }
+func lines (source: Text): Lines => return
+  $Lines { source: &source[0..source.length], index: 0 }
+func Lines.iter (cursor: Lines): Lines => return cursor
+func Lines.next (cursor: Lines): Maybe (&[U32], Lines) => do:
+  let source = cursor.source
+  let start = cursor.index
+  if start >= source.length:
+    return $Nothing
+  for index in start..source.length:
+    if source[index] == 10:
+      let end = if index > start and source[index - 1] == 13 then index - 1 else index
+      return $Some (&source[start..end], $Lines { source, index: index + 1 })
+  return $Some (&source[start..source.length], $Lines { source, index: source.length })
+
+// Accept a nonempty sequence of ASCII decimal digits, including a borrowed
+// text slice. Reject signs, whitespace, other characters and U32 overflow.
+func parse_u32 value: Maybe U32 => do:
+  if value.length == 0:
+    return $Nothing
+  let result = 0
+  for ch in value:
+    if ch < 48 or ch > 57:
+      return $Nothing
+    let digit: U32 = ch - 48
+    if result > (0xFFFF_FFFF - digit) / 10:
+      return $Nothing
+    result := self * 10 + digit
+  return $Some result
+
 // Append into a persistent List; one conversion produces the final Array.
 type Builder = List U32
 func builder () : Builder => return []
