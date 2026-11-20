@@ -3,6 +3,49 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Checking scene startup and the station dialog
+
+Gdev `38cc5de` lets the title start a new scene without importing console
+presets. A recruitment preset shares the station's open, close and focus code
+with gameplay and can check without loading the board renderer. To check
+each boundary, a private function with an undefined name was added in memory
+to the excluded module. The old dependent entry reported that error. The
+new one compiled and produced valid Wasm.
+
+| Fresh build | Pairs | Before | After | Faster pairs | 95% interval for paired saving |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Main, equal-length paths exchanged halfway | 24 | 710 ms | 696 ms | 15 | −3 to +26 ms |
+| Main, archived control and working checkout | 24 | 670 ms | 616 ms | 24 | +35 to +62 ms |
+| Title import, equal-length paths | 12 | 484 ms | 417 ms | 12 | +61 to +82 ms |
+| Review scenes import, equal-length paths | 12 | 507 ms | 447 ms | 12 | +33 to +72 ms |
+
+Each pair alternated source layouts using the same profile-guided compiler,
+eight workers and a warm filesystem. Main includes session open through
+complete Wasm. The import entries each export a constant so they isolate the
+work of loading and checking the selected module and its dependencies. Title
+went from 240 modules to 208 and review scenes from 195 to 175. Main checks
+all gameplay plus the two new modules (287 → 289). The more tightly matched
+Main comparison gives a smaller estimate with an interval that includes zero.
+
+![Fresh Main and isolated import compilation times](../benchmarks/evidence/measurements/2026-11-20-gdev-scene-imports.png)
+
+In three separately instrumented pairs at equal-length paths, checking fell
+from **327 to 308 ms** median while total checker worker CPU rose from
+1,583 to 1,631 ms. The title published its interface 27 ms earlier. Every
+control trace ended with station → review scenes → scenes → title → game
+→ main. Two candidate traces reached game through robots and the console
+handler, one through world storage. Checking `game.blot` through interface
+publication took 47 ms median on that shared tail. Measure which declarations
+consume it before changing the game-stage layout.
+
+Main's Wasm shrank by **149 bytes** to **2,740,917 bytes**. Pen's project and
+codegen checks passed. Both versions produced the same first hardware frame,
+focused recruitment screenshot, frame traces and all 242 files from the
+120-frame replay. All 105 named outcomes across 13 affected guest test files
+agreed (90 passed, 15 existing failures). All four review-scene tests passed.
+[Identities, phases and sample summaries](../benchmarks/evidence/measurements/2026-11-20-gdev-scene-imports.json) ·
+[Raw pairs, queue traces, test outcomes and replay hashes](../benchmarks/evidence/measurements/2026-11-20-gdev-scene-imports.raw.json.gz)
+
 ## Checking the game and session independently
 
 The save format uses hover and hand gesture state, and a new session allocates

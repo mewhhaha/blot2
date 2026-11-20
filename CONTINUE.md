@@ -1,13 +1,14 @@
 # Working on Blot and Gdev
 
-On Gdev `b853542`, world storage can check ahead of the hover and output UI.
-Session startup can check ahead of the game. With the optional profile-guided
-compiler, fresh Main builds measured **1,218 → 1,069 ms** and **803 → 692 ms**
-in two windows of 24 pairs each. On identical Gdev source the compiler change
-alone measured **1,209 → 1,151 ms**.
-The hardware frame and 120-frame replay matched. The checker now waits
-on review scenes, title and game at the end of its longest import path.
-[Source, native compiler and qualification](tasks/FAST_COMPILE.md#checking-the-game-and-session-independently)
+On Gdev `38cc5de`, the title can check while console presets compile, and
+the recruitment preset can open its dialog without importing the full station
+UI. Eight-worker fresh Main builds measured **710 → 696 ms** in 24
+directory-swapped pairs. The paired saving interval includes zero. In three
+separate traces the checker measured **327 → 308 ms**. The first frame,
+recruitment capture and 120-frame replay matched. Next, measure the cost of
+individual declarations in `game.blot`. Every observed path to Main still
+passes through it, and it took 47 ms to publish its interface.
+[Timings, dependency checks and runtime qualification](tasks/FAST_COMPILE.md#checking-scene-startup-and-the-station-dialog)
 
 The checker now skips substitution setup for schemes without variables or
 obligations and reuses unchanged types during substitution. Pinned Gdev

@@ -1,0 +1,436 @@
+{
+  "inputs": {
+    "gdevBefore": "b853542344064baedaed25797f6be752ca5f49df",
+    "gdevAfter": "38cc5deb0ebb97c975b5aa5c60ac54b53a902d3b",
+    "blot": "cc95e26b3e41bebc0fdf36eb5869c0e2e865b7a1",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "penSource": "360f2c46fad1a250e5923a99188d1746745da8af",
+    "penSha256": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "pgoCompilerSha256": "7ecf4130c3df1c103b05723f19ebf165169a590dc44e02ffb457b33892154678",
+    "penCheckCompilerSha256": "be36b1fcfb161718bf2e75b1fa82318765bf0e1c2a21377fa3aadef39cc38434",
+    "host": "Linux x86-64, AMD Ryzen 7 3800X, Deno 2.9.8"
+  },
+  "method": {
+    "main": "benchmarks/tools/bench_gdev_layouts.ts, eight workers, new process/session per build, warm filesystem, alternate A/B and B/A. Timed from session open through complete Wasm. All results validate, and each source emits one stable SHA-256.",
+    "mainEqualPaths": "Two same-length paths with identical project directory and sibling aliases. Twelve pairs per assignment. Exchanged project directories and repeated for twelve pairs. Hardlinked source files match the ones in the checkout measurement.",
+    "mainWorkingCheckout": "Separate 24 pairs from an archived baseline versus the working checkout. Absolute project paths have different lengths.",
+    "imports": "12 pairs each. In-memory src/__import_only.blot imports the measured module as part and exports entry const answer = 42. A separate probe adds an invalid private name to station (review) or review_scenes (title).",
+    "interval": "Percentile bootstrap of median paired control minus candidate, 20,000 resamples with seed 13. Positive indicates a shorter candidate build.",
+    "profiles": "Three separately instrumented pairs using the identical PGO binary in the equal-length directories. The source graph matches every queue edge. Start and public-interface-ready are milliseconds from the first claimed module. Sample clocks include host scheduling."
+  },
+  "measurements": {
+    "mainEqualPaths": {
+      "control": {
+        "medianMs": 710.296,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 695.514,
+        "wasmBytes": 2740917,
+        "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+        "modules": 289
+      },
+      "pairs": 24,
+      "wins": 15,
+      "medianPairedSavingMs": 10.698,
+      "saving95Ms": [
+        -3.363,
+        26.419
+      ]
+    },
+    "mainWorkingCheckout": {
+      "control": {
+        "medianMs": 669.726,
+        "wasmBytes": 2741066,
+        "wasmSha256": "a1c77735f068e673387832f2b35ff2eb91682593fbf3ffcbf96f9a5ed5a800a5",
+        "modules": 287
+      },
+      "split": {
+        "medianMs": 615.811,
+        "wasmBytes": 2740917,
+        "wasmSha256": "a0cdf6c2afe2da96e0ce053e3bd40c9708177fa02044ba12a2202cffc9c07a07",
+        "modules": 289
+      },
+      "pairs": 24,
+      "wins": 24,
+      "medianPairedSavingMs": 50.275,
+      "saving95Ms": [
+        34.819,
+        61.846
+      ]
+    },
+    "title": {
+      "control": {
+        "medianMs": 484.369,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 240
+      },
+      "split": {
+        "medianMs": 416.699,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 208
+      },
+      "pairs": 12,
+      "wins": 12,
+      "medianPairedSavingMs": 69.5,
+      "saving95Ms": [
+        61.005,
+        81.989
+      ]
+    },
+    "review": {
+      "control": {
+        "medianMs": 507.093,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 195
+      },
+      "split": {
+        "medianMs": 447.053,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 175
+      },
+      "pairs": 12,
+      "wins": 12,
+      "medianPairedSavingMs": 47.203,
+      "saving95Ms": [
+        32.701,
+        72.399
+      ]
+    },
+    "titleWorkingCheckout": {
+      "control": {
+        "medianMs": 452.837,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 240
+      },
+      "split": {
+        "medianMs": 369.216,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 208
+      },
+      "pairs": 12,
+      "wins": 12,
+      "medianPairedSavingMs": 82.171,
+      "saving95Ms": [
+        76.562,
+        101.021
+      ]
+    },
+    "reviewWorkingCheckout": {
+      "control": {
+        "medianMs": 401.899,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 195
+      },
+      "split": {
+        "medianMs": 369.349,
+        "wasmBytes": 1721,
+        "wasmSha256": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+        "modules": 175
+      },
+      "pairs": 12,
+      "wins": 12,
+      "medianPairedSavingMs": 34.629,
+      "saving95Ms": [
+        23.879,
+        48.462
+      ]
+    }
+  },
+  "profile": {
+    "reference": {
+      "modules": 287,
+      "edges": 2513,
+      "checkWallMs": 326.655,
+      "checkWorkerCpuMs": 1583.005,
+      "modeledChainCpuMs": 286.149,
+      "phasesMs": {
+        "other": 18.926,
+        "assets": 55.589,
+        "load": 114.457,
+        "lex": 0.162,
+        "parse": 0.741,
+        "check": 326.655,
+        "lower": 36.267,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 121.382
+      },
+      "moduleTimingMedianMs": {
+        "src/ui/station": {
+          "start": 184.159,
+          "publicInterfaceReady": 220.024,
+          "checkThroughPublication": 39.458
+        },
+        "src/progression/scenes": {
+          "start": 224.975,
+          "publicInterfaceReady": 232.119,
+          "checkThroughPublication": 7.733
+        },
+        "src/debug/review_scenes": {
+          "start": 220.045,
+          "publicInterfaceReady": 224.959,
+          "checkThroughPublication": 5.149
+        },
+        "src/actors/robots": {
+          "start": 151.882,
+          "publicInterfaceReady": 205.415,
+          "checkThroughPublication": 53.533
+        },
+        "src/world_storage": {
+          "start": 186.02,
+          "publicInterfaceReady": 222.554,
+          "checkThroughPublication": 36.534
+        },
+        "src/ui/title": {
+          "start": 232.134,
+          "publicInterfaceReady": 240.605,
+          "checkThroughPublication": 8.287
+        },
+        "src/game": {
+          "start": 240.644,
+          "publicInterfaceReady": 286.669,
+          "checkThroughPublication": 44.429
+        },
+        "src/main": {
+          "start": 286.7,
+          "publicInterfaceReady": 301.74,
+          "checkThroughPublication": 7.765
+        }
+      },
+      "lastImportPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/transform.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/player/interaction.blot",
+          "gdev/src/progression/tutorial.blot",
+          "gdev/src/ui/station_panel.blot",
+          "gdev/src/ui/station.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/progression/scenes.blot",
+          "gdev/src/ui/title.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    },
+    "shipping": {
+      "modules": 289,
+      "edges": 2530,
+      "checkWallMs": 308.008,
+      "checkWorkerCpuMs": 1630.563,
+      "modeledChainCpuMs": 270.903,
+      "phasesMs": {
+        "other": 18.228,
+        "assets": 67.623,
+        "load": 114.258,
+        "lex": 0.152,
+        "parse": 0.776,
+        "check": 308.008,
+        "lower": 29.944,
+        "freeze": 0.0,
+        "validation": 0.0,
+        "backend": 122.105
+      },
+      "moduleTimingMedianMs": {
+        "src/ui/station": {
+          "start": 190.48,
+          "publicInterfaceReady": 229.998,
+          "checkThroughPublication": 42.722
+        },
+        "src/ui/station_dialog": {
+          "start": 142.947,
+          "publicInterfaceReady": 147.11,
+          "checkThroughPublication": 5.203
+        },
+        "src/progression/scenes": {
+          "start": 193.745,
+          "publicInterfaceReady": 202.698,
+          "checkThroughPublication": 8.953
+        },
+        "src/debug/review_scenes": {
+          "start": 215.815,
+          "publicInterfaceReady": 222.686,
+          "checkThroughPublication": 6.517
+        },
+        "src/debug/scene_command": {
+          "start": 222.703,
+          "publicInterfaceReady": 229.029,
+          "checkThroughPublication": 6.326
+        },
+        "src/actors/robots": {
+          "start": 157.966,
+          "publicInterfaceReady": 215.74,
+          "checkThroughPublication": 63.811
+        },
+        "src/world_storage": {
+          "start": 192.361,
+          "publicInterfaceReady": 231.238,
+          "checkThroughPublication": 42.948
+        },
+        "src/ui/title": {
+          "start": 202.743,
+          "publicInterfaceReady": 214.046,
+          "checkThroughPublication": 11.303
+        },
+        "src/game": {
+          "start": 231.255,
+          "publicInterfaceReady": 278.796,
+          "checkThroughPublication": 47.359
+        },
+        "src/main": {
+          "start": 278.824,
+          "publicInterfaceReady": 286.884,
+          "checkThroughPublication": 8.401
+        }
+      },
+      "lastImportPaths": [
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/ui/tree.blot",
+          "ink/lib/ui.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/debug/scene_command.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/actors/robot_staffing.blot",
+          "gdev/src/actors/robots.blot",
+          "gdev/src/debug/review_scenes.blot",
+          "gdev/src/debug/scene_command.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ],
+        [
+          "blot2/std/prelude.blot",
+          "blot2/std/vector.blot",
+          "ink/lib/math.blot",
+          "ink/lib/lanes.blot",
+          "ink/lib/clock.blot",
+          "ink/lib/app.blot",
+          "ink/lib/render.blot",
+          "ink/lib/brush.blot",
+          "ink/lib/editor.blot",
+          "gdev/src/effects/celebrations.blot",
+          "gdev/src/world/salt_simulation.blot",
+          "gdev/src/world/salt.blot",
+          "gdev/src/world/material_batch.blot",
+          "gdev/src/actors/minors.blot",
+          "gdev/src/actors/village.blot",
+          "gdev/src/world_storage.blot",
+          "gdev/src/game.blot",
+          "gdev/src/main.blot"
+        ]
+      ]
+    }
+  },
+  "runtime": {
+    "penCheck": true,
+    "codegenCheck": true,
+    "targetedFiles": 13,
+    "passing": 90,
+    "existingFailures": 15,
+    "observationsIdentical": true,
+    "gpuAndTraceSha256": {
+      "frame/frame.png": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "frame/frames.trace": "4f0d9ebbd6e8ffb6449afdb9df12b1e009a531be6dae35b0803fb6f5b3853b72",
+      "shots/recruitment.png": "a70e292c311016e90cfd0d66f0ba2570e1bae9adc700570a2880b2415bdd3e6f",
+      "recruitment.trace": "f92f4e4abfd3d8d8a3cbd03f4b14dc0de24ccdad59257cc180152243d723fe9b"
+    },
+    "recruitmentScript": "wait=100 console=7,8 wait=30 shot=recruitment quit",
+    "recruitmentTraceFrames": 133,
+    "unchangedPacketFiles": 242,
+    "replayFrames": 120
+  },
+  "raw": {
+    "filename": "2026-11-20-gdev-scene-imports.raw.json.gz",
+    "sha256": "b5bfd861ebf60b02f8990fb5911c45543db63d314d06c181c24b50215b1c24e2"
+  }
+}
