@@ -1,6 +1,6 @@
 # 121 — Qualify and measure the owned applications
 
-- **Status:** Pending; no new execution or performance evidence claimed.
+- **Status:** Checked-grid and release-engine qualification recorded below. Whole-application storage qualification remains open.
 - **Dependencies:** 120 final candidate. Preserve baseline artifacts before
   retirement; do not rebuild the baseline after deleting its implementation.
 - **Contract:** [Review](../docs/compiler/STORAGE_REWRITE_REVIEW.md),
@@ -72,3 +72,34 @@ baseline. Worker fixture memory likewise is not Gdev world memory.
 ## Evidence
 
 Pending. The source review and task files are not benchmark results.
+
+## Checked arrays and release inlining
+
+On 20 November 2026, seven alternating, randomized rounds on a pinned CPU ran the same guest Wasm in both Pen release-engine modes. The two answers for the 120 × 120 tree and hill grids were 1357/565440 and 238/238. All cases matched in Blot and Rust, including recovery from a trapped invocation. Timings below are warm guest p50 / p95 in microseconds across 175 calls per cell.
+
+| Kernel | Blot off | Blot on | Rust on |
+| --- | ---: | ---: | ---: |
+| Tree sightlines | 3384 / 3499 | 1245 / 1287 | 574 / 594 |
+| Reverse BFS | 2626 / 2744 | 802 / 820 | 283 / 313 |
+| Fixed scalar scan | 67.54 / 73.29 | 13.29 / 16.11 | 8.86 / 11.29 |
+| Initialized writes | 269.29 / 282.80 | 42.24 / 54.34 | 13.55 / 15.22 |
+| Local view | 36.04 / 40.12 | 8.02 / 8.14 | 2.02 / 2.05 |
+| Grid parse | 325.20 / 340.50 | 213.06 / 230.85 | 17.75 / 19.03 |
+| Packet length only | 1.74 / 1.79 | 1.72 / 2.15 | 0.05 / 0.06 |
+
+The direct compiler emits checked calls. Inlining removed all three native call sites in `sight`. In `distances` it cut 28 sites to four and removed all 14 calls to `runtime.address`. The scalar scan still had an inner bounds branch with engine inlining enabled.
+
+| Median cold stage | Trees off → on | Hills off → on |
+| --- | ---: | ---: |
+| AOT compile, ms | 8.66 → 22.92 | 11.25 → 29.04 |
+| Deserialize, µs | 96 → 99 | 108 → 112 |
+| Instantiate and bind, µs | 319 → 311 | 308 → 321 |
+| First whole packet, µs | 3614 → 1521 | 2818 → 1071 |
+| AOT bytes | 31,616 → 43,936 | 37,816 → 50,160 |
+| Peak process RSS, KiB | 20,572 → 26,808 | 20,668 → 29,160 |
+
+Pen explicitly selects Cranelift inlining for release and portable AOT, with development off. The cache key changes with this setting and Wasmtime rejects artifacts compiled with the other mode in both directions. Inlined frames may be absent from release backtraces. The debug profile preserves their boundaries. The 22 native host laws include traps, effects, cache corruption, native packages, stack diagnostics and guest disposal.
+
+A real Ink ordered hash over 16,384 keys returned 2,809,217,323 in both modes. Median execution fell from 171 to 62 µs. Both modes passed the same 283 Ink checks. Three fresh-cache hardware Gdev launches per mode used identical 2,754,496-byte Main Wasm. All six produced identical 640 × 480 PNGs and guest traces. Median first complete frame was 2225 ms off and 3056 ms on, including startup and rendering. This cost supports retaining the fast development default. No full-game steady-state speedup is claimed from one-frame runs.
+
+[Sources and reproduction](../benchmarks/checked-grid/README.md) · [Matched kernels, metadata and raw distributions](../benchmarks/evidence/measurements/checked-grid/release.json.gz) · [Ink and Gdev application runs](../benchmarks/evidence/measurements/checked-grid/applications.json.gz) · [Pen engine and compatibility test](https://github.com/mewhhaha/pen/commit/3a6a531)

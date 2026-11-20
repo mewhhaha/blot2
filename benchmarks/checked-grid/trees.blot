@@ -1,0 +1,32 @@
+import * as grid from "./grid"
+
+// Return whether the edge is visible and how many trees can be seen.
+func sight (map: grid.Grid) -> (origin: U32) -> (direction: grid.Direction): (Bool, U32) => return do:
+  let height = map.cells[origin]
+  let position = origin
+  let distance = 0
+  for ever:
+    let $Some next = grid.neighbor map position direction else:
+      break (true, distance)
+    distance := self + 1
+    if map.cells[next] >= height:
+      break (false, distance)
+    position := next
+
+entry func solve (source: Text): Array U32 => do:
+  let map = grid.parse source
+  let visible_count = 0
+  let best = 0
+  for index in 0..map.cells.length:
+    if map.cells[index] < 48 or map.cells[index] > 57:
+      @panic "expected digit heights"
+    let visible = false
+    let scenic = 1
+    for direction in grid.directions:
+      let (clear, distance) = sight map index direction
+      visible := self or clear
+      scenic := self * distance
+    if visible:
+      visible_count := self + 1
+    best := max self scenic
+  return #[visible_count, best]

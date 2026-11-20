@@ -1,0 +1,8 @@
+entry func solve (values: Array U32): Array U32 => do:
+  let sum = 0
+  let weighted = 0
+  for i in 0..values.length:
+    let value = values[i]
+    sum := self + value
+    weighted := self + value * (i & 7)
+  return #[sum, weighted]

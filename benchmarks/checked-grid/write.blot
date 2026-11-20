@@ -1,0 +1,9 @@
+import * as array from "std/array"
+entry func solve (values: Array U32): Array U32 => do:
+  let dest = array.fill values.length 0
+  for i in 0..dest.length:
+    dest[i] := values[i] + i
+  let sum = 0
+  for value in dest:
+    sum := self + value
+  return #[sum, dest.length]

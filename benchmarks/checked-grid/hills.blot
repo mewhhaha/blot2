@@ -1,0 +1,55 @@
+import * as grid from "./grid"
+import * as array from "std/array"
+import * as iter from "std/iter"
+
+const unseen: U32 = 0xFFFF_FFFF
+func elevation (ch: U32): U32 => return
+  if ch == 83 then 97 else if ch == 69 then 122 else ch
+
+func marker (target: U32) -> (cells: Array U32): U32 => do:
+  let matches = func ch => return ch == target
+  let $Some index = iter.position matches cells else:
+    @panic "missing marker"
+  if iter.any matches (iter.drop (index + 1) cells):
+    @panic "duplicate marker"
+  return index
+
+// One reverse breadth-first search finds the distance from every reachable cell.
+func distances (map: grid.Grid) -> (finish: U32): Array U32 => do:
+  let steps = array.fill map.cells.length unseen
+  let queue = array.fill map.cells.length 0
+  steps[finish] := 0
+  queue[0] := finish
+  let head = 0
+  let tail = 1
+  for ever:
+    if head == tail:
+      break
+    let here = queue[head]
+    head := self + 1
+    for direction in grid.directions:
+      let $Some next = grid.neighbor map here direction else:
+        continue
+      if steps[next] != unseen:
+        continue
+      if elevation map.cells[next] + 1 < elevation map.cells[here]:
+        continue
+      steps[next] := steps[here] + 1
+      queue[tail] := next
+      tail := self + 1
+  return steps
+
+entry func solve (source: Text): Array U32 => do:
+  let map = grid.parse source
+  for ch in map.cells:
+    let level = elevation ch
+    if level < 97 or level > 122:
+      @panic "invalid elevation"
+  let start = marker 83 map.cells
+  let finish = marker 69 map.cells
+  let steps = distances map finish
+  let best = unseen
+  for (i, ch) in iter.enumerate map.cells:
+    if elevation ch == 97:
+      best := min self steps[i]
+  return #[steps[start], best]

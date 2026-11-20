@@ -1,0 +1,29 @@
+import * as text from "std/text"
+
+type Grid = { width: U32, height: U32, cells: Array U32 }
+type Direction is data = $Left | $Right | $Up | $Down
+const directions: Array Direction = #[$Left, $Right, $Up, $Down]
+
+func parse (source: Text): Grid => do:
+  let cells: GrowArray U32 = #[]
+  let width = 0
+  let height = 0
+  for row in text.lines source:
+    if row.length == 0:
+      @panic "empty grid row"
+    if height == 0:
+      width := row.length
+    if row.length != width:
+      @panic "grid must be rectangular"
+    for ch in row:
+      cells.push ch
+    height := self + 1
+  if height == 0:
+    @panic "empty grid"
+  return { width, height, cells: @storage.freeze cells }
+
+func neighbor (map: Grid) -> (index: U32) -> (direction: Direction): Maybe U32 => return case direction of
+  $Left => if index % map.width > 0 then $Some (index - 1) else $Nothing
+  $Right => if index % map.width + 1 < map.width then $Some (index + 1) else $Nothing
+  $Up => if index >= map.width then $Some (index - map.width) else $Nothing
+  $Down => if index < map.cells.length - map.width then $Some (index + map.width) else $Nothing

@@ -1,0 +1,7 @@
+entry func solve (values: Array U32): Array U32 => do:
+  let start = values.length / 2
+  let slice = values.view start values.length
+  let sum = 0
+  for i in 0..slice.length:
+    sum := self + slice[i]
+  return #[sum, slice.length]
