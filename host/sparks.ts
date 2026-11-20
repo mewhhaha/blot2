@@ -21,15 +21,36 @@ export type SparkCopySite =
 export class SparkCopyBudget {
   #reserved = 0;
   #outstanding = 0;
+  #workers = 0;
+  #linearBytes = 0;
+  readonly #workerSlots: number;
+  readonly #workerBytes: number;
 
-  constructor(readonly ceiling: number) {
-    if (!Number.isSafeInteger(ceiling) || ceiling < 0) {
-      throw new RangeError("Invalid spark copy ceiling");
+  constructor(
+    readonly ceiling: number,
+    limits: { workers?: number; linearBytes?: number } = {},
+  ) {
+    this.#workerSlots = limits.workers ?? 8;
+    this.#workerBytes = limits.linearBytes ?? 512 * 1024 * 1024;
+    if (
+      [ceiling, this.#workerSlots, this.#workerBytes].some((n) =>
+        !Number.isSafeInteger(n) || n < 0
+      )
+    ) {
+      throw new RangeError("Invalid spark copy or worker limit");
     }
   }
 
   get reserved(): number {
     return this.#reserved;
+  }
+
+  get workersInUse(): number {
+    return this.#workers;
+  }
+
+  get workerLinearBytes(): number {
+    return this.#linearBytes;
   }
 
   beginFrame(): void {
@@ -47,6 +68,31 @@ export class SparkCopyBudget {
     return () => {
       if (!live) return;
       this.#outstanding -= bytes;
+      live = false;
+    };
+  }
+
+  reserveWorkers(count: number, bytes: number): (() => void) | undefined {
+    const total = count * bytes;
+    if (
+      !Number.isSafeInteger(count) || count < 0 ||
+      !Number.isSafeInteger(total) || total < 0
+    ) {
+      throw new RangeError("Invalid spark worker reservation");
+    }
+    if (
+      count > this.#workerSlots - this.#workers ||
+      total > this.#workerBytes - this.#linearBytes
+    ) {
+      return undefined;
+    }
+    this.#workers += count;
+    this.#linearBytes += total;
+    let live = true;
+    return () => {
+      if (!live) return;
+      this.#workers -= count;
+      this.#linearBytes -= total;
       live = false;
     };
   }
@@ -87,6 +133,7 @@ let nextWorker = 1;
 export class SparkPool {
   readonly #slots: Slot[] = [];
   #retiring?: Promise<void>;
+  #finishWorkers?: () => void;
   #attempt = 0;
   #busy = false;
   #closed = false;
@@ -163,7 +210,8 @@ export class SparkPool {
     let pool: SparkPool;
     try {
       const prefix = new Uint32Array(source ?? []);
-      pool = new SparkPool(await instantiateGuest(module), {
+      const guest = await instantiateGuest(module);
+      pool = new SparkPool(guest, {
         entry,
         width,
         workers,
@@ -171,6 +219,13 @@ export class SparkPool {
         copyBudget,
       }, prefix);
       pool.#copies.prepare += prefixBytes;
+      if (copyBudget && workers) {
+        pool.#finishWorkers = copyBudget.reserveWorkers(
+          workers,
+          guest.memoryBytes(),
+        );
+        if (!pool.#finishWorkers) workers = 0;
+      }
     } catch (error) {
       finish?.();
       throw error;
@@ -400,8 +455,10 @@ export class SparkPool {
   retireWorkers(): Promise<void> {
     if (this.#retiring) return this.#retiring;
     const slots = this.#slots.splice(0);
+    const finish = this.#finishWorkers;
+    this.#finishWorkers = undefined;
     this.#retiring = Promise.all(slots.map((slot) => slot.exited)).then(
-      () => {},
+      () => finish?.(),
     );
     for (const slot of slots) {
       slot.pending?.reject(new Error("Spark worker retired"));

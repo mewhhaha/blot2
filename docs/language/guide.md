@@ -2133,8 +2133,10 @@ packet is bounded by the fixed ABI 8 transport bank before the host checks
 its expected shape. A rejected worker reservation can still run directly if there is
 enough allowance for one guest call. If that also exceeds the allowance, the
 host reports a range error before copying. An unfinished attempt keeps its
-whole reservation across frame changes until its worker threads stop. The
-budget measures numeric payload copies. It excludes allocation, Wasm memory
+whole reservation across frame changes until its worker threads stop. Pools
+that share a budget also share its worker slots and worker linear-memory cap.
+Retiring threads occupy their slots and cap until exit. The payload budget
+excludes allocation, Wasm memory
 growth, and the kernel's own writes. The source form `@spark.within` is
 unavailable until its direct path can prove zero charged copies.
 

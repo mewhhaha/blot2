@@ -3,10 +3,11 @@ import { strict as assert } from "node:assert";
 import { resolve } from "node:path";
 import { cpus } from "node:os";
 import { instantiateGuest } from "../../host/guest.ts";
-import { SparkPool } from "../../host/sparks.ts";
+import { SparkCopyBudget, SparkPool } from "../../host/sparks.ts";
 import { ProcessHost } from "../../host/processes.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
 import { gdevProject } from "../../scripts/integration/gdev_project.ts";
+import { selectFour } from "./route_result.js";
 
 const root = resolve(Deno.args[0] ?? "../gdev");
 const executable = resolve(Deno.args[1] ?? "compiler-goose/build/blotc-goose");
@@ -29,6 +30,10 @@ async function build(stem: string) {
       signal: AbortSignal.timeout(15000),
     });
     if (!r.success) throw Error(JSON.stringify(r.diagnostics));
+    if (stem === "spark_routes") {
+      const output = Deno.env.get("BLOT_ROUTE_WASM");
+      if (output) await Deno.writeFile(output, r.bytes);
+    }
     return {
       module: await WebAssembly.compile(r.bytes),
       source: await sha(src),
@@ -68,25 +73,6 @@ async function compare(
     }
   }
   return Object.fromEntries(names.map((n) => [n, summary(times[n])]));
-}
-
-// Reconstruct the existing Gdev return shape, including its stable tie break.
-function selectFour(rows: Output) {
-  const actual: number[] = [];
-  let winner = 0;
-  for (let i = 0; i < 4; i++) {
-    const here = i * 392 + 1, best = winner * 392 + 1;
-    let better = rows[here] > rows[best];
-    if (rows[here] === rows[best]) {
-      better = rows[here + 2] < rows[best + 2];
-      if (rows[here] === 0 && rows[here + 3] !== rows[best + 3]) {
-        better = rows[here + 3] < rows[best + 3];
-      }
-    }
-    if (better) winner = i;
-    actual.push(...rows.subarray(here, here + rows[here - 1]));
-  }
-  return Float32Array.of(winner, ...actual);
 }
 
 const scalar = await build("spark_spawn"), route = await build("spark_routes");
@@ -134,7 +120,7 @@ try {
     }
     assert.equal(marked.fallbacks, 0);
   } finally {
-    marked.close();
+    await marked.close();
   }
   const seed = 11;
   const ref = game.call("serial_shared", seed) as Float32Array;
@@ -144,6 +130,7 @@ try {
   ) as Float32Array;
   assert.deepEqual(bits(selectFour(rows)), bits(ref));
   for (const workers of [1, 2, 4, 8]) {
+    const budget = new SparkCopyBudget(10 * game.numericPacketCapacity());
     const t = performance.now();
     const pool = await SparkPool.open(route.module, {
       entry: "routes",
@@ -151,35 +138,64 @@ try {
       prefix: Uint32Array.of(seed),
       workers,
       waitMs: 2000,
+      copyBudget: budget,
     });
     const setup_ms = performance.now() - t;
     try {
+      for (
+        const queries of [new Uint32Array(), Uint32Array.of(3, 99, 3, 1, 0)]
+      ) {
+        budget.beginFrame();
+        assert.deepEqual(
+          bits(await pool.run(queries)),
+          bits(pool.direct(queries)),
+        );
+      }
       for (const size of [4, 32, 128]) {
         const queries = Uint32Array.from({ length: size }, (_, i) => i % 4);
+        budget.beginFrame();
         const expected = pool.direct(queries);
+        const before = pool.copiedBytes;
         const result = await compare({
-          direct: () => pool.direct(queries),
-          workers: () => pool.run(queries),
+          direct: () => {
+            budget.beginFrame();
+            return pool.direct(queries);
+          },
+          workers: () => {
+            budget.beginFrame();
+            return pool.run(queries);
+          },
         }, expected);
-        routeRuns.push({ size, workers, setup_ms, result });
+        const copies = Object.fromEntries(
+          (Object.keys(before) as (keyof typeof before)[]).map((site) => [
+            site,
+            pool.copiedBytes[site] - before[site],
+          ]),
+        );
+        routeRuns.push({ size, workers, setup_ms, copies, result });
         if (size === 4) {
           const full = await compare({
             serial_shared: () =>
               game.call("serial_shared", seed) as Float32Array,
-            workers: async () => selectFour(await pool.run(queries)),
+            workers: async () => {
+              budget.beginFrame();
+              return selectFour(await pool.run(queries));
+            },
           }, ref);
           fullRouteRuns.push({ workers, result: full });
         }
       }
       assert.equal(pool.fallbacks, 0);
+      budget.beginFrame();
       const queries = Uint32Array.of(3, 99, 3, 1, 0);
       const expected = pool.direct(queries);
       const restart = pool.run(queries);
-      pool.retireWorkers();
+      const retired = pool.retireWorkers();
       assert.deepEqual(bits(await restart), bits(expected));
       assert.equal(pool.fallbacks, 1);
+      await retired;
     } finally {
-      pool.close();
+      await pool.close();
     }
   }
   for (

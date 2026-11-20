@@ -177,6 +177,62 @@ Deno.test("spark discards malformed or obsolete replies after an in-flight retir
   });
 });
 
+Deno.test("spark pools keep shared worker slots and linear memory reserved until exit", async () => {
+  await compileAndRun(fixture, async (guest, bytes) => {
+    const module = await WebAssembly.compile(bytes);
+    const memory = guest.memoryBytes();
+    const ceiling = 8 * guest.numericPacketCapacity();
+    const budget = new SparkCopyBudget(ceiling, {
+      workers: 2,
+      linearBytes: 2 * memory,
+    });
+    const options = {
+      entry: "with_world",
+      width: 1,
+      workers: 2,
+      prefix: Uint32Array.of(7, 20),
+      copyBudget: budget,
+    };
+    const first = await SparkPool.open(module, options);
+    const saturated = await SparkPool.open(module, options);
+    const rows = Uint32Array.of(0, 1);
+    try {
+      equal(budget.workersInUse, 2);
+      equal(budget.workerLinearBytes, 2 * memory);
+      equal(saturated.copiedBytes.install, 0);
+      equal(String(await saturated.run(rows)), "20,21");
+      const pending = first.run(rows);
+      const retired = first.retireWorkers();
+      equal(budget.workersInUse, 2);
+      equal(budget.workerLinearBytes, 2 * memory);
+      equal(String(await pending), "20,21");
+      await retired;
+      equal(budget.workersInUse, 0);
+      equal(budget.workerLinearBytes, 0);
+      const replacement = await SparkPool.open(module, options);
+      equal(replacement.copiedBytes.install, 16);
+      await replacement.close();
+    } finally {
+      await Promise.all([first.close(), saturated.close()]);
+    }
+    const tooLittle = new SparkCopyBudget(ceiling, {
+      workers: 2,
+      linearBytes: 2 * memory - 1,
+    });
+    const directOnly = await SparkPool.open(module, {
+      ...options,
+      copyBudget: tooLittle,
+    });
+    try {
+      equal(tooLittle.workersInUse, 0);
+      equal(directOnly.copiedBytes.install, 0);
+      equal(String(await directOnly.run(rows)), "20,21");
+    } finally {
+      await directOnly.close();
+    }
+  });
+});
+
 Deno.test("spark stages replies by their input index even when completion is reversed", async () => {
   await compileAndRun(fixture, async (_guest, bytes) => {
     const module = await WebAssembly.compile(bytes);
