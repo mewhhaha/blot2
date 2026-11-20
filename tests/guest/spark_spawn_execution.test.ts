@@ -187,6 +187,52 @@ entry func fragile_step (pair: Array U32): U32 => return @panic "step"
   );
 });
 
+Deno.test("a process skipped for the remaining work gets the next full allowance", async () => {
+  await compileAndRun(
+    program + `
+entry func slower (seed: U32): U32 => return seed
+entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
+`,
+    async (_guest, bytes) => {
+      const host = new ProcessHost(await WebAssembly.compile(bytes), [
+        { name: "planner", initWork: 1, stepWork: 1 },
+        { name: "slower", initWork: 1, stepWork: 2 },
+      ], 3, 1);
+      try {
+        const admit = (name: string) =>
+          host.admit(Uint32Array.of(10, ...new TextEncoder().encode(name)));
+        const left = admit("planner"), deferred = admit("slower"),
+          right = admit("planner");
+        equal(await host.advance(3), 3);
+        const first = host.send(left, 1);
+        const later = host.send(deferred, 20);
+        const third = host.send(right, 3);
+
+        equal(await host.advance(2), 2);
+        equal(host.poll(left)?.ticket, first);
+        equal(host.poll(right)?.ticket, third);
+        equal(host.poll(deferred), undefined);
+        const nextLeft = host.send(left, 4);
+        const nextRight = host.send(right, 5);
+
+        equal(await host.advance(2), 2);
+        equal(JSON.stringify(host.poll(deferred)), JSON.stringify({
+          ticket: later,
+          status: "done",
+          value: 30,
+        }));
+        equal(host.poll(left), undefined);
+        equal(host.poll(right), undefined);
+        equal(await host.advance(2), 2);
+        equal(host.poll(left)?.ticket, nextLeft);
+        equal(host.poll(right)?.ticket, nextRight);
+      } finally {
+        host.restore();
+      }
+    },
+  );
+});
+
 Deno.test("spark rejects unknown work and spawn checks its start operation and child entries", async () => {
   for (
     const body of ["@u32.div x 0", '@panic "fault"', "hidden x", "captured"]

@@ -136,6 +136,7 @@ export class ProcessHost {
     this.#running = true;
     const generation = this.#generation;
     let spent = 0;
+    let deferred: number | undefined;
     try {
       let skipped = 0;
       while (
@@ -148,10 +149,13 @@ export class ProcessHost {
         const starting = c.status === "starting";
         let cost = c.program.stepWork;
         if (starting) cost = c.program.initWork;
-        if (
-          (!starting && (c.status !== "ready" || !c.pending.size)) ||
-          cost > budget - spent
-        ) {
+        if (!starting && (c.status !== "ready" || !c.pending.size)) {
+          skipped++;
+          continue;
+        }
+        if (cost > budget - spent) {
+          // A turn that fits a fresh frame must get first chance next frame.
+          if (cost <= budget) deferred ??= id;
           skipped++;
           continue;
         }
@@ -187,6 +191,10 @@ export class ProcessHost {
       }
       return spent;
     } finally {
+      if (generation === this.#generation && deferred !== undefined) {
+        const index = this.#order.indexOf(deferred);
+        if (index !== -1) this.#cursor = index;
+      }
       this.#running = false;
     }
   }
