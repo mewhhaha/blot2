@@ -5,8 +5,9 @@ source compiler sessions. It currently covers generic functions, `Maybe`,
 `Result`, type witnesses, Bool, U32, and F32. Root declarations can shadow
 prelude names; the prelude keeps its own scope and nominal identities. Top-level
 bindings are public to other Blot modules. Import [text.blot](text.blot) for
-Unicode-scalar text operations, formatting, validation and a linear builder.
-Import [equality.blot](equality.blot) for structural equality contracts and
+Unicode-scalar text operations, decimal parsing, whitespace and line iterators,
+formatting, validation and a linear builder. Import
+[equality.blot](equality.blot) for structural equality contracts and
 [codec.blot](codec.blot) for explicit numeric-lane codecs; the
 [derivation guide](../docs/host/derive.md) shows opt-in equality, debug and
 codec generation from checked data declarations. Only the root module's
