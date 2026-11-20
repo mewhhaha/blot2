@@ -1,14 +1,18 @@
 # Working on Blot and Gdev
 
-Imported constructor finalization now takes **56,129 visits**, down from
-589,219 on pinned Gdev Main. The whole checker makes **14.4% fewer**
-type-resolution visits. Fresh builds measured **1,057 → 1,041 ms** in 20
-alternating pairs on the shared host. The latest committed Gdev tested
-(`e9cc6a8`) measured **1,138 → 1,071 ms** in six pairs. Both timing intervals
-include zero. All three tested Gdev revisions kept byte-identical Wasm.
-Unification now accounts for 993,040 visits, including 241,411 on the fixed
-dependency chain. Measure its operand reads by shape and outcome next.
-[Constructor measurements, timings and qualification](tasks/FAST_COMPILE.md#finishing-imported-constructor-types)
+On pinned Gdev Main, unification takes **17.2% fewer recursive resolver
+entries**. The checker makes **559,567 fewer** entries overall. Open function
+unification measured **19.94 → 15.39 ms** in an isolated CPU benchmark.
+Pinned eight-worker fresh builds measured **789 → 810 ms** across 24 pairs.
+The latest tested Gdev (`5e98f8b`) measured **1,022 → 991 ms** in six pairs.
+All four timing intervals include zero, and all four revisions kept identical
+Wasm. Next, sample variable substitution and effect-row handling on the
+unchanged function operands that still account for 540,795 recursive entries.
+[Unification work, release timings and qualification](tasks/FAST_COMPILE.md#unifying-ordinary-function-types)
+
+The preceding change cut imported constructor finalization from 589,219 to
+56,129 visits on the pinned input.
+[Constructor measurements](tasks/FAST_COMPILE.md#finishing-imported-constructor-types)
 
 On Gdev Main the Wasm backend read 728 constructor signatures, all from their
 defining modules. Workers now omit all **41,786** imported copies. This removed

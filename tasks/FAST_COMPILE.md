@@ -3,6 +3,80 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Unifying ordinary function types
+
+The unifier reconciles two type descriptions. On pinned Gdev Main it read
+953,558 operands. Functions accounted for 734,658 of the 868,219 recursive
+resolver entries inside those reads. In 193,105 function reads the type ID
+stayed the same and no type node or effect row was allocated.
+
+The checker now handles a builtin function argument or result directly
+inside its parent after checking the depth bound. It still resolves both
+operands in order. A read of an open variable follows its chronological
+substitutions once and returns the same cursor-specific view. Projected
+stores retain their recursive reads and exact budget charges.
+
+A unification starts with its first pair in a local variable. It acquires
+a pooled worklist only when there are child pairs to queue. The checker can
+also skip the two row-identity lookups when the store has never created a
+type that can denote an effect row or a region.
+
+| Work on 280 Gdev modules | Previous | Current |
+| --- | ---: | ---: |
+| Unification calls | 260,337 | 260,337 |
+| Calls that acquired a worklist | 260,337 | 94,061 |
+| Row-identity lookups directly inside the unifier | 953,558 | 0 |
+| Recursive entries inside explicit operand reads | 868,219 | 718,381 |
+| Recursive entries in all unification work | 993,040 | 822,121 |
+| Recursive entries across the checker | 3,167,566 | 2,607,999 |
+| Unification entries on the fixed 20-module path | 241,411 | 203,995 |
+
+The three project-wide resolver counts overlap. A builtin child still
+gets a closed-type and depth check. The reduction measures recursive calls
+avoided. Operand outcomes, type-node counts and effect-row allocations
+matched the control.
+
+In 16 alternating native trials, 100,000 scalar unifications took **15.78 →
+5.09 ms** of thread CPU. A separate workload reconciled 12,000 pairs of
+open, curried function types while advancing the solver between calls.
+It measured **19.94 → 15.39 ms** in an ordinary store and **19.67 →
+17.07 ms** in a store containing a region variable.
+
+Fresh compilation used eight workers, a new compiler process and a warm
+filesystem. Each pair used the same source and alternated the compiler order.
+
+| Gdev commit | Fresh pairs | Previous median | Current median | 95% interval for median paired saving |
+| --- | ---: | ---: | ---: | ---: |
+| `4c98d07`, pinned 280-module benchmark | 24 | 789 ms | 810 ms | −37 to +13 ms |
+| `33aab6e`, 279 modules | 12 | 959 ms | 967 ms | −62 to +85 ms |
+| `e9cc6a8`, 280 modules | 12 | 956 ms | 940 ms | −4 to +105 ms |
+| `5e98f8b`, 280 modules | 6 | 1,022 ms | 991 ms | −85 to +135 ms |
+
+On the pinned build, the median within-pair saving was 1.3 ms, and 13 of
+24 pairs favored the candidate. The checker phase measured 535 → 506 ms
+in eight separate profiled pairs. Its paired interval was −24 to +44 ms.
+These trials establish a reduction in resolver work and isolated CPU cost.
+The end-to-end timing difference remains inconclusive.
+
+![Unification resolver entries and Gdev release timings](../benchmarks/evidence/measurements/2026-11-20-unification-operands.png)
+
+The full compiler gate passed with 1,119 guest and host tests passing and
+100 ignored. Both compiler versions passed the native ordered-substitution,
+depth, node-limit, row/region and exact budget laws. All four Gdev revisions
+kept identical Wasm. Retained edits and rejections matched fresh builds.
+All 22 general checker cases kept their output or diagnostics. Three cases
+initially showed timing changes in 10 pairs. On a further 30 pairs each,
+all three intervals included zero. All 283 Ink checks, the inspected pinned
+Gdev frame, its trace and the 242 replay files matched.
+
+Unchanged function operands still account for 540,795 of the 718,381
+remaining recursive entries inside the operand reads. Sample release CPU
+inside these functions, distinguishing variable substitution and effect-row
+resolution, before choosing the next change.
+[Paired measurements and fingerprints](../benchmarks/evidence/measurements/2026-11-20-unification-operands.json) ·
+[Per-module profiler with `--unification`](../benchmarks/evidence/measurements/experiments/2026-11-20-resolution-work.py) ·
+[Isolated CPU benchmark](../benchmarks/evidence/measurements/experiments/2026-11-20-unification-operands.goose)
+
 ## Finishing imported constructor types
 
 The checker revisited 42,622 constructors when finishing the 280 modules in

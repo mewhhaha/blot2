@@ -22,7 +22,7 @@
     "schema": 1,
     "stdlib": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/source-precision/stdlib"
   },
-  "digest": "049a111fcad825c854b867e4977b4648f04eecb6aaea4465c3e85bea205e35d7",
+  "digest": "df14a24770ed2dffd8deeaa560904a15e0a27e7e12fcef7451edc3dbec62f0b7",
   "goose": "/home/jacobt/src/blot2/build/goose-port/upstream-d5ae5bb/build-precision/goose",
   "qualification": "unverified source and build inputs",
   "resource_roots": [
@@ -592,9 +592,9 @@
       "sha256": "897e5ef772eaae949d742f5f0e8861d7b34f0719560e97701dd6690fa331a66b"
     },
     {
-      "bytes": 233606,
+      "bytes": 234278,
       "path": "src/check/types.goose",
-      "sha256": "d1b30a189998e982c67d34bddff9e7f2b4bc62bd2f98dd63c852248a43d8a6b9"
+      "sha256": "e4b2df0e88e9a7f4d6a09aff92e7667614815e835dc13dab7eadb74ed5c9f671"
     },
     {
       "bytes": 157730,

@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("output", type=Path)
 parser.add_argument("--compiler-build", type=Path, default=Path("compiler-goose/build"))
 parser.add_argument("--gdev-root", type=Path, required=True)
+parser.add_argument("--unification", action="store_true", help="Count operand outcomes, row checks and worklist use")
 args = parser.parse_args()
 output = args.output.resolve()
 output.mkdir(parents=True, exist_ok=False)
@@ -27,6 +28,35 @@ insertions = Counter()
 
 def site(label):
     return sites.setdefault(label, len(sites))
+
+
+def unification_body(name, body):
+    if name.startswith("blot_check_types_unifyInner_"):
+        body, sites = re.subn(r"(?m)^( +t\d+ = blot_check_types_unifyWalk_[^\n]+;)$",
+                              r"\1\n    ++unifications; with_worklist += pending_g.storage_g.len != 0;", body)
+        assert sites == 1
+    elif name.startswith("blot_check_types_unifyWalk_"):
+        body, pops = re.subn(r"(blot_check_types_popUnification_[^(]+\([^)]*\))", r"(++popped, \1)", body)
+        body, checks = re.subn(r"(blot_check_types_rowIdentity_[^(]+\([^)]*\))", r"(++row_checks, \1)", body)
+        assert pops == 1 and checks >= 2
+
+        def operand(m):
+            indent, result, side = m.groups()
+            root = f"pair_g.{side}_g"
+            return indent + "{\n" + f"""
+            const unsigned root = {root};
+            unsigned tag = self__g->nodes_g->items_g.data[root].tag_g.tag;
+            unsigned long n = self__g->nodes_g->len_g, r = self__g->effects_g->rows_g->len_g;
+            unsigned long before = self__g->normalization_g->resolve_depth_entries_g;
+            if (!*self__g->has_rank_types_g) ++rank_free_reads;
+""" + m[0] + f"""
+            unsigned outcome = ({result} != root) | ((self__g->nodes_g->len_g != n) << 1)
+                               | ((self__g->effects_g->rows_g->len_g != r) << 2);
+            ++reads[tag][outcome]; work[tag][outcome] += self__g->normalization_g->resolve_depth_entries_g - before;
+            }}"""
+        body, reads = re.subn(r"(?m)^( +)(t\d+) = blot_check_types_resolveUnification_\w+\(self__g, pair_g\.([ab])_g,[^\n]+;", operand, body)
+        assert reads == 2
+    return body
 
 
 def instrument(match):
@@ -56,6 +86,8 @@ def instrument(match):
                 field_name = m[1].replace("(*", "").replace(")", "").replace("_g", "")
                 return f"    caller={site('finish.' + field_name)};\n" + m[0]
             body = re.sub(r"(?m)^ +t\d+ = blot_check_types_resolve_g[^\n]+?types_g, ([^,]+)", field, body)
+    if args.unification:
+        body = unification_body(name, body)
     return signature + prefix + body
 
 
@@ -66,6 +98,8 @@ observer = r'''
 #include <unistd.h>
 static int caller;
 static unsigned long visits[NSITES], resets, live, cleared, grows, initialized, rehashed;
+static unsigned long unifications, with_worklist, popped, row_checks, rank_free_reads;
+static unsigned long reads[64][8], work[64][8];
 static FILE *events(void) {
     static int pid;
     static FILE *out;
@@ -83,14 +117,23 @@ static void record_name(unsigned unit,const char *name,long len) {
 static void restore_caller(int *previous) { caller=*previous; }
 static void begin_counts(unsigned unit) {
     memset(visits,0,sizeof(visits));
+    if (UNIFICATION) {
+        unifications=with_worklist=popped=row_checks=rank_free_reads=0;
+        memset(reads,0,sizeof(reads)); memset(work,0,sizeof(work));
+    }
     resets=live=cleared=grows=initialized=rehashed=0;
 }
 static void end_counts(int *unit) {
     FILE *out=events();
+    if (UNIFICATION) {
+        fprintf(out,"U %d %lu %lu %lu %lu %lu\n",*unit,unifications,with_worklist,popped,row_checks,rank_free_reads);
+        for (unsigned t=0;t<64;t++) for(unsigned o=0;o<8;o++) if(reads[t][o])
+            fprintf(out,"O %d %u %u %lu %lu\n",*unit,t,o,reads[t][o],work[t][o]);
+    }
     for (unsigned i=0;i<NSITES;i++) if(visits[i]) fprintf(out,"V %d %u %lu\n",*unit,i,visits[i]);
     fprintf(out,"C %d %lu %lu %lu %lu %lu %lu\n",*unit,resets,live,cleared,grows,initialized,rehashed);
 }
-'''.replace("NSITES", str(len(sites))).replace("DIRECTORY", json.dumps(str(output)))
+'''.replace("UNIFICATION", str(int(args.unification))).replace("NSITES", str(len(sites))).replace("DIRECTORY", json.dumps(str(output)))
 marker = source.index("/* ==== runtime_ext.h ==== */")
 emission = output / "trace.c"
 emission.write_text(source[:marker] + observer + source[marker:])
@@ -111,6 +154,8 @@ labels = {v: k for k, v in sites.items()}
 counts = defaultdict(Counter)
 cache = {}
 names = {}
+unification = {}
+operands = defaultdict(dict)
 for log in output.glob("worker-*"):
     for line in log.read_text().splitlines():
         kind, raw_unit, rest = line.split(" ", 2)
@@ -121,6 +166,12 @@ for log in output.glob("worker-*"):
         elif kind == "V":
             key, value = map(int, rest.split())
             counts[unit][labels[key]] += value
+        elif kind == "U":
+            unification[unit] = dict(zip(["unifications", "withWorklist", "popped", "rowChecks", "rankFreeReads"],
+                                         map(int, rest.split()), strict=True))
+        elif kind == "O":
+            tag, outcome, reads, work = map(int, rest.split())
+            operands[unit][f"{tag}/{outcome}"] = [reads, work]
         elif kind == "C":
             assert unit not in cache
             cache[unit] = dict(zip(["resets", "live", "cleared", "grows", "initialized", "rehashScans"],
@@ -130,4 +181,10 @@ total = sum(count.total() for count in counts.values())
 assert total == report["stats"]["frontend"]["normalization"]["resolve_depth_entries"]
 wasm = Path(report["evidence"]) / "main.wasm"
 result = dict(wasmSha256=hashlib.sha256(wasm.read_bytes()).hexdigest(), counts=counts, cache=cache, names=names)
+if args.unification:
+    normalization = report["stats"]["frontend"]["normalization"]
+    assert set(unification) == set(names)
+    for i, key in enumerate(["unify_resolve_calls", "unify_resolve_entries"]):
+        assert sum(v[i] for unit in operands.values() for v in unit.values()) == normalization[key]
+    result.update(unification=unification, operands=operands)
 (output / "work.json").write_text(json.dumps(result, indent=1) + "\n")

@@ -866,36 +866,47 @@ recursive fn resolveDepth(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id
         return root, blot_error::Error.none;
     }
     if (self_.has_projections || self_.use_closed_graphs) && self_.use_resolution_cache && depth != 0 && root > never {
-        if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth); }
+        if height != 0 || self_.mutation_epoch == 0xffffffffffffffff || self_.effects.mutation_epoch == 0xffffffffffffffff { return resolveNode(self_, root, at, depth, height); }
         if self_.projection_resolution_types != self_.mutation_epoch || self_.projection_resolution_rows != self_.effects.mutation_epoch || self_.projection_resolution_limit != self_.resolution_depth_limit {
             self_.projection_resolutions.clear(); self_.projection_resolution_types = self_.mutation_epoch; self_.projection_resolution_rows = self_.effects.mutation_epoch; self_.projection_resolution_limit = self_.resolution_depth_limit;
         }
         if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
         let key = ProjectionResolution { root, at, depth as u32 , ..};
         block { let cached = self_.projection_resolutions.get(key); if cached { return cached, blot_error::Error.none; } }
-        let result, error = resolveNode(self_, root, at, depth); if error != blot_error::Error.none { return 0, error; }
+        let result, error = resolveNode(self_, root, at, depth, height); if error != blot_error::Error.none { return 0, error; }
         if self_.projection_resolutions.count < 65536 { self_.projection_resolutions.insert(key, result);if self_.projection_resolutions.failure!=blot_error::Error.none {return 0,self_.projection_resolutions.failure;} }
         return result, blot_error::Error.none;
     }
-    return resolveNode(self_, root, at, depth);
+    return resolveNode(self_, root, at, depth, height);
 }
-recursive fn resolveNode(self_: Store&, root: Id, at: Cursor, depth: i64) -> Id, Error {
+recursive fn resolveNode(self_: Store&, root: Id, at: Cursor, depth: i64, height: u8) -> Id, Error {
     block { let equation = self_.associated_equations.get(root); if equation { return resolveDepth(self_, equation, at, depth + 1); } }
     if self_.has_projections { let error = chargeProjection(self_); if error != blot_error::Error.none { return 0, error; } }
     if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
-    let height = closedHeight(self_, root);
     if height != 0 { if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; } return root, blot_error::Error.none; }
-    var id = root; var position = at;
-    while node(self_, id).tag == Tag.variable {
-        let variable = node(self_, id); position = max(position, variable.b); let write = replacement(self_, variable.a, position);
-        if !write.present { break; } id = write.value.replacement; position = write.value.position + 1;
+    var id = root; var position = at; var value = node(self_, id);
+    while value.tag == Tag.variable {
+        position = max(position, value.b);
+        let write = replacement(self_, value.a, position);
+        if !write.present { return variableView(self_, value.a, position); }
+        id = write.value.replacement; position = write.value.position + 1;
+        value = node(self_, id);
     }
-    if id != root { let height = closedHeight(self_, id); if height != 0 { if depth + height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; } return id, blot_error::Error.none; } }
-    let value = node(self_, id); let result, error = resolveSelected(self_, id, value, position, depth);
-    if self_.use_closed_graphs && value.tag != Tag.variable && self_.closed_generation != 0xffff {
+    if id != root { let target_height = closedHeight(self_, id); if target_height != 0 { if depth + target_height > self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; } return id, blot_error::Error.none; } }
+    let result, error = resolveSelected(self_, id, value, position, depth);
+    if self_.use_closed_graphs && self_.closed_generation != 0xffff {
         let refreshed = closedNodeHeight(self_, value); if refreshed != 0 { self_.nodes.items[id].closed_height = refreshed; self_.nodes.items[id].closed_generation = self_.closed_generation; }
     }
     return result, error;
+}
+// A builtin child can finish in the arrow's frame. Preserve the recursive
+// depth check and let projected stores charge their ordinary reads.
+recursive fn resolveFunctionChild(self_: Store&, child: Id, at: Cursor, depth: i64) -> Id, Error {
+    if child >= unit && child <= never && !self_.has_projections && closedHeight(self_, child) != 0 {
+        if depth >= self_.resolution_depth_limit { return 0, blot_error::Error.type_limit; }
+        return child, blot_error::Error.none;
+    }
+    return resolveDepth(self_, child, at, depth);
 }
 recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Cursor, depth: i64) -> Id, Error {
     match value.tag {
@@ -916,10 +927,9 @@ recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Curso
             let instance, ie = resolveInstance(self_, NominalIdentity { value.b, value.c , ..}, position, depth + 1); if ie != blot_error::Error.none { return 0, ie; }
             if child == value.a && instance.unit == value.b && instance.decl == value.c { return id, blot_error::Error.none; } return scoped(self_, child, instance);
         },
-        variable => { return variableView(self_, value.a, position); },
         function => {
-            let parameter, pe = resolveDepth(self_, value.a, position, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
-            let result, re = resolveDepth(self_, value.b, position, depth + 1); if re != blot_error::Error.none { return 0, re; }
+            let parameter, pe = resolveFunctionChild(self_, value.a, position, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
+            let result, re = resolveFunctionChild(self_, value.b, position, depth + 1); if re != blot_error::Error.none { return 0, re; }
             let effect_row, ee = resolveOperationRow(self_, value.c, position, depth + 1); if ee != blot_error::Error.none { return 0, ee; }
             if parameter == value.a && result == value.b && effect_row == value.c { return id, blot_error::Error.none; }
             return functionWithEffects(self_, parameter, result, effect_row);
@@ -1369,10 +1379,11 @@ recursive fn unifyInner<R>(self_:Store&,left:Id,right:Id,reporter:R,associated:b
  blot_support_pooled_buffer::deinit(pending,unification_pairs);blot_support_pooled_map::deinit(seen,unification_seen);return error;
 }
 recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associated: bool,seen:UnificationSeen&,pending:UnificationPending&) -> Error {
-    let initial=pushUnification(pending,Pair{left,right,..});if initial!=blot_error::Error.none {return initial;}
     let bounded = associated || self_.has_projections; var rank_active = false; var rank_remaining: i64 = 4096;
-    while pending.items.len > 0 {
-        let pair = popUnification(pending);
+    var first = true;
+    while first || pending.items.len > 0 {
+        var pair = Pair { left, right, ..};
+        if first { first = false; } else { pair = popUnification(pending); }
         if rank_active { if rank_remaining == 0 { return blot_error::Error.type_limit; } rank_remaining -= 1; }
         if bounded { let error = chargeProjection(self_); if error != blot_error::Error.none { return error; } }
         if pair.effect_row {
@@ -1383,13 +1394,17 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
         let a, ae = resolveUnification(self_, pair.a); if ae != blot_error::Error.none { return ae; }
         let b, be = resolveUnification(self_, pair.b); if be != blot_error::Error.none { return be; }
         let an = node(self_, a); let bn = node(self_, b);
-        if rowIdentity(self_, a) || rowIdentity(self_, b) {
-            if !rowIdentity(self_, a) || !rowIdentity(self_, b) { return mismatch(self_, reporter, a, b); }
-            let ar, are = rowType(self_, a); if are != blot_error::Error.none { return are; } let br, bre = rowType(self_, b); if bre != blot_error::Error.none { return bre; }
-            let error = unifyEffects(self_, ar, br); if error != blot_error::Error.none { return error; } continue;
+        // Only stores with rank types can contain a row or region identity.
+        if self_.has_rank_types {
+            let row_a = rowIdentity(self_, a); let row_b = rowIdentity(self_, b);
+            if row_a || row_b {
+                if !row_a || !row_b { return mismatch(self_, reporter, a, b); }
+                let ar, are = rowType(self_, a); if are != blot_error::Error.none { return are; } let br, bre = rowType(self_, b); if bre != blot_error::Error.none { return bre; }
+                let error = unifyEffects(self_, ar, br); if error != blot_error::Error.none { return error; } continue;
+            }
+            if an.tag == Tag.variable && self_.variables.items[an.a].region && !regionIdentity(self_, b) { return mismatch(self_, reporter, a, b); }
+            if bn.tag == Tag.variable && self_.variables.items[bn.a].region && !regionIdentity(self_, a) { return mismatch(self_, reporter, a, b); }
         }
-        if an.tag == Tag.variable && self_.variables.items[an.a].region && !regionIdentity(self_, b) { return mismatch(self_, reporter, a, b); }
-        if bn.tag == Tag.variable && self_.variables.items[bn.a].region && !regionIdentity(self_, a) { return mismatch(self_, reporter, a, b); }
         if a == b || a == never || b == never { continue; }
         if self_.has_rank_types && (isRank(an.tag) || isRank(bn.tag)) { rank_active = true; }
         if bounded || rank_active { let key = Pair { a, b , ..}; if blot_support_pooled_map::contains(seen,key) { continue; } blot_support_pooled_map::insert(seen,key,true,unification_seen); }

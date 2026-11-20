@@ -109,7 +109,45 @@ fn sparseResolutionEpochs() {
     store.deinit();
 }
 
+fn unificationBoundaries() {
+    let ok=blot_error::Error.none;
+    var store,init=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true,..});
+    assert(init==ok);
+    let x,xe=store.fresh();assert(xe==ok);
+    let arrow,ae=store.function(blot_check_types::u32_type,x);assert(ae==ok);
+    store.resolution_depth_limit=1;
+    let too_deep,de=store.resolve(arrow,0);assert(de==blot_error::Error.type_limit);
+    store.resolution_depth_limit=2;
+    let same,se=store.resolve(arrow,0);assert(se==ok && same==arrow);
+    let versions=store.versions.len;
+    assert(store.unify(x,blot_check_types::never)==ok && store.versions.len==versions);
+    store.projection_limit=0;
+    assert(store.unifyPattern(x,x)==blot_error::Error.type_limit);
+    assert(store.unify(x,x)==ok);
+    let region,ge=store.freshRegion();let row,re=store.freshRowType();
+    assert(ge==ok && re==ok);
+    for special in [region,row] {
+        assert(store.unify(special,blot_check_types::never)==blot_error::Error.type_mismatch);
+        assert(store.unify(blot_check_types::never,special)==blot_error::Error.type_mismatch);
+    }
+    store.deinit();
+
+    for limit in [2,3] {
+        var projected,ce=blot_check_types::initWithOptions(blot_check_types::Options{closed_graphs:true,..});assert(ce==ok);
+        let marker,me=projected.projection(blot_check_types::NominalIdentity{1,2,..},3,[blot_check_types::u32_type]);
+        let effect,ee=projected.freshEffects();
+        let arrow,ae=projected.functionWithEffects(blot_check_types::u32_type,blot_check_types::boolean,effect);
+        assert(me==ok && ee==ok && ae==ok && marker!=arrow);
+        projected.projection_limit=limit;
+        let value,error=projected.resolve(arrow,0);
+        if limit==2 {assert(error==blot_error::Error.type_limit);}
+        else {assert(error==ok && value==arrow && projected.projection_steps==3);}
+        projected.deinit();
+    }
+}
+
 fn main() {
+    unificationBoundaries();
     rehashedResolutionCache();
     sparseResolutionEpochs();
     sharedSignatures();
