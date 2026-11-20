@@ -695,8 +695,13 @@ func selected count => return
 ```
 
 The module includes `range start end`, `map`, `filter`, `take`, `take_while`,
-`enumerate`, `zip`, `zip_strict`, `windows`, `fold_left`, `any`, `all`,
-`collect_list` and `collect_array`. `take 0` never pulls its input. `zip` stops
+`drop`, `enumerate`, `zip`, `zip_strict`, `windows`, `fold_left`, `any`,
+`all`, `find`, `position`, `collect_list` and `collect_array`.
+`drop count values` skips up to count items on its first pull and traverses
+the rest in order. `find predicate values` returns the first matching value
+and `position predicate values` its zero-based U32 position in the traversal.
+Both return `$Nothing` when there is no match, propagate callback effects and
+stop pulling after a match. `take 0` never pulls its input. `zip` stops
 when either input ends and polls left before right; if the right ends first, one
 unpaired left value may have been consumed. `zip_strict` polls both and traps on
 unequal lengths. `windows width input` requires positive width and returns only

@@ -20,6 +20,22 @@ func Take.next (state: Take i) => return do:
     break $Nothing
   break $Some (value, $Take { remaining: state.remaining - 1, cursor: rest })
 
+// Skip on the first pull, then forward subsequent items in order.
+type Drop i is data = $Drop { remaining: U32, cursor: i }
+func drop count -> values => return $Drop { remaining: count, cursor: values.iter }
+func Drop.iter (cursor: Drop i) => return cursor
+func Drop.next (state: Drop i) => return do:
+  let cursor = state.cursor
+  for 0..state.remaining:
+    use step <- cursor.next
+    let $Some (_, rest) = step else:
+      break $Nothing
+    cursor := rest
+  use step <- cursor.next
+  let $Some (value, rest) = step else:
+    break $Nothing
+  break $Some (value, $Drop { remaining: 0, cursor: rest })
+
 type TakeWhile [i, p] is data = $TakeWhile { cursor: i, predicate: p }
 func take_while predicate -> values => return $TakeWhile { cursor: values.iter, predicate }
 func TakeWhile.iter (cursor: TakeWhile [i, p]) => return cursor
@@ -137,3 +153,20 @@ func all predicate -> values => return do:
     if Bool.not accepted:
       break false
   break true
+
+func find predicate -> values => return do:
+  for value in values:
+    use accepted <- predicate value
+    if accepted:
+      break $Some value
+  break $Nothing
+
+// Index in traversal order, starting at zero.
+func position predicate -> values: Maybe U32 => return do:
+  let index = 0
+  for value in values:
+    use accepted <- predicate value
+    if accepted:
+      break $Some index
+    index := self + 1
+  break $Nothing
