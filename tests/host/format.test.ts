@@ -75,6 +75,19 @@ Deno.test("formatter preserves spark and receive boundaries", async () => {
   equal(await formatSource(formatted), formatted);
 });
 
+Deno.test("formatter keeps ordered sparks and scoped spawn operands", async () => {
+  const source = `effect Start: Array U32->U32
+entry func planner (seed:U32):U32=> return seed
+entry func planner_step(pair:Array U32):U32=> return @u32.add pair[0] pair[1]
+func request(config:U32):U32 ! {Start}=> return @spawn Start planner config
+entry func double(xs:Array U32):Array U32=> return @spark #[@u32.add x x | x<-xs]
+`;
+  const formatted = await formatSource(source);
+  equal(formatted.includes("@spawn Start planner config"), true);
+  equal(formatted.includes("@spark #[@u32.add x x | x <- xs]"), true);
+  equal(await formatSource(formatted), formatted);
+});
+
 Deno.test("formatter preserves grouped curried parameter lists and named record calls", async () => {
   const source =
     `const area=func (width:U32) -> (height:U32)=> return @u32.mul width height

@@ -201,7 +201,7 @@ export class ProcessHost {
 
   #settle(c: Child, status: "closed" | "failed") {
     c.status = status;
-    c.guest?.dispose();
+    const guest = c.guest;
     c.guest = undefined;
     let terminal: "failed" | "cancelled" = "cancelled";
     if (status === "failed") terminal = "failed";
@@ -209,6 +209,12 @@ export class ProcessHost {
       c.events.push({ ticket, status: terminal });
     }
     c.pending.clear();
+    try {
+      guest?.dispose();
+    } catch {
+      // Lifecycle remains observable after even a failing guest teardown.
+      c.status = "failed";
+    }
   }
 
   close(id: number): void {

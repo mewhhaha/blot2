@@ -2117,12 +2117,26 @@ batch entry with `SparkPool.open(module, { entry, width, workers })` from
 `@mewhhaha/blot/sparks`. `pool.run(queries)` gives prepared workers disjoint
 contiguous rows. The input is a private U32 array. Each query must return
 exactly `width` lanes of the declared U32 or F32 result type, in input order.
-An optional copied U32 prefix supplies the same configuration to each batch.
+An optional copied U32 prefix supplies the same immutable configuration to
+each batch. The pool installs it once per prepared worker.
 The host registering a kernel is responsible for its purity, termination
 and row independence. On worker failure the pool retires its workers and
 recomputes the complete saved input directly. `pool.direct(queries)` runs
-the same entry in one guest call. `pool.close()` releases the workers.
-Worker selection is explicit. There is currently no hard copy-budget form.
+the same entry in one guest call. Await `pool.close()` to observe retirement.
+Worker selection is explicit.
+
+An explicit Deno driver can share a `SparkCopyBudget` across prepared pools.
+Call `beginFrame()` once per frame. Preparation and each dispatch reserve
+their worst-case array payload copies, including both host transfers, the
+guest's packet unpacking and packing, and direct recovery. The returned
+packet is bounded by the fixed ABI 8 transport bank before the host checks
+its expected shape. A rejected worker reservation can still run directly if there is
+enough allowance for one guest call. If that also exceeds the allowance, the
+host reports a range error before copying. An unfinished attempt keeps its
+whole reservation across frame changes until its worker threads stop. The
+budget measures numeric payload copies. It excludes allocation, Wasm memory
+growth, and the kernel's own writes. The source form `@spark.within` is
+unavailable until its direct path can prove zero charged copies.
 
 ```blot
 effect Start: Array U32 -> U32

@@ -36,7 +36,7 @@ export type ValueOf<T extends ValueType> = T extends "Array U32" ? Uint32Array
   : never;
 export type GuestValue = ValueOf<ValueType>;
 
-function isArrayType(type: ValueType): type is ArrayType {
+function isArrayType(type: ValueType | OwnerType): type is ArrayType {
   return type === "Array U32" || type === "Array F32";
 }
 
@@ -796,6 +796,7 @@ function arrayToWasm(
   argument: unknown,
   name: string,
   code: "invalid_argument" | "host_result" = "invalid_argument",
+  batch?: NumericArrayCall,
 ): number {
   if (
     !(type === "Array U32"
@@ -810,8 +811,9 @@ function arrayToWasm(
     );
   }
   const values = argument as Uint32Array | Float32Array;
-  const length = values.length;
-  const byteLength = length * 4;
+  const prefix = batch?.prefix;
+  const prefixLength = prefix?.length ?? 0;
+  const length = prefixLength + values.length;
   if (length >= 1_073_741_823) {
     throw new GuestError(
       code,
@@ -826,42 +828,60 @@ function arrayToWasm(
   // Allocation may grow memory, so acquire a fresh view only afterwards.
   const view = new DataView(arena.memory.buffer);
   view.setUint32(pointer, length, true);
+  batch?.observeCopy?.("guestInput", length * 4);
+  if (prefixLength && prefix) copyArrayWords(view, pointer + 4, prefix);
+  let words: Uint32Array;
+  if (values instanceof Uint32Array) words = values;
+  else words = new Uint32Array(values.buffer, values.byteOffset, values.length);
+  copyArrayWords(view, pointer + 4 + prefixLength * 4, words);
+  return pointer;
+}
+
+function copyArrayWords(view: DataView, start: number, words: Uint32Array) {
+  const { length, byteLength } = words;
   if (
-    littleEndian && length > 32 && values.buffer instanceof ArrayBuffer
+    littleEndian && length > 32 && words.buffer instanceof ArrayBuffer
   ) {
     // Byte copies avoid boxing every element and preserve F32 payload bits.
     // Use the view's range, not its entire possibly shared backing buffer.
-    new Uint8Array(arena.memory.buffer, pointer + 4, byteLength).set(
-      new Uint8Array(values.buffer, values.byteOffset, byteLength),
+    new Uint8Array(view.buffer, start, byteLength).set(
+      new Uint8Array(words.buffer, words.byteOffset, byteLength),
     );
   } else {
     // Small packets avoid extra byte views. Shared inputs retain no-tear U32
     // reads instead of observing a word as four independently changing bytes.
     // This is not a coherent snapshot of a concurrently modified whole array.
     // Raw words also preserve F32 payloads and handle big-endian hosts.
-    const input = type === "Array U32"
-      ? values as Uint32Array
-      : new Uint32Array(values.buffer, values.byteOffset, length);
     for (let index = 0; index < length; index++) {
-      view.setUint32(pointer + 4 + index * 4, input[index], true);
+      view.setUint32(start + index * 4, words[index], true);
     }
   }
-  return pointer;
 }
 
 function arrayFromWasm(
   arena: GuestArena,
   type: ArrayType,
   result: unknown,
+  batch?: NumericArrayCall,
 ): Uint32Array | Float32Array {
   const pointer = arrayRange(arena, result, 0);
   // Guest execution may also grow memory; never retain the input view.
   const view = new DataView(arena.memory.buffer);
   const length = view.getUint32(pointer, true);
   arrayRange(arena, pointer, length);
+  // The ABI wrapper has already packed this payload, even if its length is
+  // wrong for the registered batch. Refuse before the additional host copy.
+  batch?.observeCopy?.("guestPack", length * 4);
+  if (batch && length !== batch.resultLength) {
+    throw new GuestError(
+      "invalid_abi",
+      "Numeric batch result has the wrong length",
+    );
+  }
   const values = type === "Array U32"
     ? new Uint32Array(length)
     : new Float32Array(length);
+  batch?.observeCopy?.("guestOutput", length * 4);
   if (littleEndian && length > 32) {
     // Still copy out: the arena is reset/reused after the invocation, and a
     // host callback must never receive a mutable alias into guest storage.
@@ -902,6 +922,8 @@ type InvokeCallback = (value: GuestValue | DataValue) => unknown;
 export interface Guest {
   /** Committed linear-memory bytes, including temporary allocation capacity. */
   memoryBytes(): number;
+  /** Upper bound on one ABI 8 numeric payload in the fixed transport bank. */
+  numericPacketCapacity(): number;
   /** Temporary owners reclaimed by the previous invocation's finish hook. */
   lastReclaimedOwners(): number | undefined;
   readonly abi: GuestAbi;
@@ -914,13 +936,32 @@ export interface Guest {
   capabilityAsync<P extends ValueType, R extends ValueType>(
     callback: AsyncHostCallback<P, R>,
   ): HostCapability;
-  call(name: string, argument: unknown): GuestValue | GuestOwner;
+  call(
+    name: string,
+    argument: unknown,
+    batch?: NumericArrayCall,
+  ): GuestValue | GuestOwner;
   callAsync(name: string, argument: unknown): Promise<GuestValue | GuestOwner>;
   read(name: string): ScalarValue;
   cleanupDataType(name: string): CleanupDataType;
   cleanupDataCapability(definition: CleanupDataDefinition): HostCapability;
   releaseOwner(owner: GuestOwner): void;
   dispose(): void;
+}
+
+/** Fixed-width numeric array transport for an explicitly registered host batch. */
+export const numericArrayCopySites = [
+  "guestInput",
+  "guestUnpack",
+  "guestPack",
+  "guestOutput",
+] as const;
+export type NumericArrayCopySite = typeof numericArrayCopySites[number];
+
+export interface NumericArrayCall {
+  readonly resultLength: number;
+  readonly prefix?: Uint32Array;
+  readonly observeCopy?: (site: NumericArrayCopySite, bytes: number) => void;
 }
 
 // JSPI is optional for synchronous guests. Keep this structural definition until
@@ -1960,6 +2001,7 @@ export async function instantiateGuest(
     name: string,
     argument: unknown,
     asynchronous: boolean,
+    batch?: NumericArrayCall,
   ): { fn: GuestFunction; value: unknown; exported: CallableFunction } {
     idle();
     const fn = functions.get(name);
@@ -1967,6 +2009,16 @@ export async function instantiateGuest(
       throw new GuestError(
         "unknown_export",
         `Unknown function export ${name}`,
+      );
+    }
+    if (
+      batch &&
+      (!isArrayType(fn.result) || fn.parameter !== "Array U32" ||
+        !Number.isSafeInteger(batch.resultLength) || batch.resultLength < 0)
+    ) {
+      throw new GuestError(
+        "invalid_argument",
+        "Expected a fixed numeric array batch",
       );
     }
     if (fn.multiplicity === "once" && consumedOnce!.has(name)) {
@@ -2086,7 +2138,14 @@ export async function instantiateGuest(
       arena?.reset(0);
       if (typeof fn.parameter === "string" && isArrayType(fn.parameter)) {
         if (!arena) throw new Error("Validated array export has no arena");
-        value = arrayToWasm(arena, fn.parameter, argument, name);
+        value = arrayToWasm(
+          arena,
+          fn.parameter,
+          argument,
+          name,
+          "invalid_argument",
+          batch,
+        );
       }
       if (argumentType !== undefined && isArrayType(argumentType)) {
         if (!arena) throw new Error("Validated owner input has no arena");
@@ -2184,6 +2243,24 @@ export async function instantiateGuest(
       if (memory instanceof WebAssembly.Memory) return memory.buffer.byteLength;
       return 0;
     },
+    numericPacketCapacity() {
+      idle();
+      if (abi.version !== 8 || !arena) {
+        throw new GuestError(
+          "invalid_abi",
+          "Expected an ABI 8 numeric transport bank",
+        );
+      }
+      // Reset returns to the packet bank's base. The direct backend places the
+      // bank last in fixed memory. Page padding only makes the bound wider.
+      arena.reset(0);
+      try {
+        const base = arrayRange(arena, arena.allocate(4), 0);
+        return arena.memory.buffer.byteLength - base - 4;
+      } finally {
+        arena.reset(0);
+      }
+    },
     cleanupDataType(name) {
       idle();
       const parameter = functions.get(name)?.parameter;
@@ -2269,17 +2346,27 @@ export async function instantiateGuest(
       }
       return createCapability(definition, true);
     },
-    call(name, argument) {
+    call(name, argument, batch) {
       if (options.asynchronous) {
         throw new GuestError(
           "async_host_call",
           "An asynchronous guest requires callAsync()",
         );
       }
-      const { fn, value, exported } = begin(name, argument, false);
+      const { fn, value, exported } = begin(name, argument, false, batch);
       let outcome = 1;
       try {
-        const result = publicResult(fn.result, exported(value));
+        // An ABI 8 array entry unpacks the transport into a fresh guest array.
+        if (batch?.observeCopy) {
+          const length = (argument as Uint32Array).length +
+            (batch.prefix?.length ?? 0);
+          batch.observeCopy("guestUnpack", length * 4);
+        }
+        const raw = exported(value);
+        let result: GuestValue | GuestOwner;
+        if (batch) {
+          result = arrayFromWasm(arena!, fn.result as ArrayType, raw, batch);
+        } else result = publicResult(fn.result, raw);
         outcome = 0;
         return result;
       } finally {

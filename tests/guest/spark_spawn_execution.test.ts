@@ -16,6 +16,7 @@ Deno.test("spark source maps and worker recovery preserve bits, cardinality and 
 entry func snapshot (read: U32 -> Array U32 ! { Foreign }): Array U32 => return @spark #[@u32.add x x | x <- read 7]
 entry func keep_float (xs: Array F32): Array F32 => return @spark #[x | x <- xs]
 entry func negative (xs: Array U32): Array F32 => return @spark #[@f32.neg (@u32.to_f32 x) | x <- xs]
+entry func reciprocal (xs: Array U32): Array F32 => return @spark #[@f32.div 1.0 (@u32.to_f32 x) | x <- xs]
 `,
     async (guest, bytes) => {
       const floating = Float32Array.of(-0, Infinity, -Infinity, 1.25);
@@ -79,7 +80,26 @@ entry func negative (xs: Array U32): Array F32 => return @spark #[@f32.neg (@u32
         equal(pool.fallbacks, 1);
         equal((await pool.run(xs))[0], -255);
       } finally {
-        pool.close();
+        await pool.close();
+      }
+      const reciprocal = await SparkPool.open(module, {
+        entry: "reciprocal",
+        width: 1,
+        workers: 2,
+        waitMs: 2000,
+      });
+      try {
+        const rows = Uint32Array.of(1, 0, 4);
+        const direct = reciprocal.direct(rows);
+        const copied = await reciprocal.run(rows);
+        equal(direct[1], Infinity);
+        equal(
+          String(new Uint32Array(copied.buffer)),
+          String(new Uint32Array(direct.buffer)),
+        );
+        equal(reciprocal.fallbacks, 0);
+      } finally {
+        await reciprocal.close();
       }
     },
   );
@@ -194,14 +214,20 @@ entry func slower (seed: U32): U32 => return seed
 entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
 `,
     async (_guest, bytes) => {
-      const host = new ProcessHost(await WebAssembly.compile(bytes), [
-        { name: "planner", initWork: 1, stepWork: 1 },
-        { name: "slower", initWork: 1, stepWork: 2 },
-      ], 3, 1);
+      const host = new ProcessHost(
+        await WebAssembly.compile(bytes),
+        [
+          { name: "planner", initWork: 1, stepWork: 1 },
+          { name: "slower", initWork: 1, stepWork: 2 },
+        ],
+        3,
+        1,
+      );
       try {
         const admit = (name: string) =>
           host.admit(Uint32Array.of(10, ...new TextEncoder().encode(name)));
-        const left = admit("planner"), deferred = admit("slower"),
+        const left = admit("planner"),
+          deferred = admit("slower"),
           right = admit("planner");
         equal(await host.advance(3), 3);
         const first = host.send(left, 1);
@@ -216,11 +242,14 @@ entry func slower_step (pair: Array U32): U32 => return @u32.add pair[0] pair[1]
         const nextRight = host.send(right, 5);
 
         equal(await host.advance(2), 2);
-        equal(JSON.stringify(host.poll(deferred)), JSON.stringify({
-          ticket: later,
-          status: "done",
-          value: 30,
-        }));
+        equal(
+          JSON.stringify(host.poll(deferred)),
+          JSON.stringify({
+            ticket: later,
+            status: "done",
+            value: 30,
+          }),
+        );
         equal(host.poll(left), undefined);
         equal(host.poll(right), undefined);
         equal(await host.advance(2), 2);
@@ -245,6 +274,18 @@ Deno.test("spark rejects unknown work and spawn checks its start operation and c
   await compileExpectedFailure(
     "entry func nope (xs: Array U32) => return @spark #[x | x <- xs, x <- xs]\n",
     "spark_generator",
+  );
+  await compileExpectedFailure(
+    "entry func nope (xs: Array U32) => return @spark #[x | x <- xs, x < 8]\n",
+    "spark_generator",
+  );
+  await compileExpectedFailure(
+    "entry func nope (xs: List U32) => return @spark #[x | x <- xs]\n",
+    "type_mismatch",
+  );
+  await compileExpectedFailure(
+    "entry func nope (xs: Array U32) => return @spark.within 100 #[x | x <- xs]\n",
+    "unknown_intrinsic",
   );
   await compileExpectedFailure(
     program.replace("entry func planner_step", "func planner_step"),
