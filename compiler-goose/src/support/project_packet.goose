@@ -7,6 +7,7 @@ import support.native;
 import support.option;
 import support.bytes;
 import check.types;
+import check.core;
 import check.parameter_patterns;
 import .project_packet_owners;
 import .project_packet_codecs;
@@ -95,4 +96,43 @@ fn getFlat<T>(receiver:Reader&,value:T[:]& ) {
     run.move_from(values[..]);
     value=run;
     receiver.at=end;
+}
+
+// Only the Wasm preparation path sends this image. The parent resolves a
+// constructor's signature in its defining module. Each importing module still
+// needs its own catalog index, tag and payload type to interpret its Core.
+fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
+    var header=module;
+    header.constructors=default<blot_check_core::Constructor[:]>();
+    put(writer,header);
+    count(writer,module.constructors.len);
+    for c in module.constructors {
+        put(writer,c.identity.unit);
+        put(writer,c.identity.decl);
+        put(writer,c.nominal);
+        put(writer,c.tag);
+        put(writer,c.payload);
+        if c.identity.unit==module.unit {put(writer,c.scheme);}
+    }
+}
+
+fn getExecutionCore(reader:Reader&,module:blot_check_core::Module&) {
+    get(reader,module);
+    if reader.failure!=blot_error::Error.none {return;}
+    if module.unit==0 || module.constructors.len!=0 {reader.failure=blot_error::Error.invalid_artifact;return;}
+    let length=count(reader);
+    if reader.failure!=blot_error::Error.none || !reader.available(length*20) {return;}
+    let constructors,error=allocate(reader.owner,length,default<blot_check_core::Constructor>());
+    if error!=blot_error::Error.none {reader.failure=error;return;}
+    for &c in constructors {
+        c=default<blot_check_core::Constructor>();
+        get(reader,c.identity.unit);
+        get(reader,c.identity.decl);
+        get(reader,c.nominal);
+        get(reader,c.tag);
+        get(reader,c.payload);
+        if c.identity.unit==module.unit {get(reader,c.scheme);}
+        if reader.failure!=blot_error::Error.none {return;}
+    }
+    module.constructors=constructors;
 }

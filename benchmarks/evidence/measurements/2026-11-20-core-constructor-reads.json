@@ -1,0 +1,698 @@
+{
+  "inputs": {
+    "beforeBlot": "94969252a6c65fc4af7c8cd937fc46f235748990",
+    "controlExecutable": "454f973c8cfbbd447fa5b0492dd955b3d7e28da3fff5b3c9489b83171ab902b8",
+    "candidateExecutable": "82756bcecd2e006cc46eec258ab4d4680472e4ad78cc447860564da7c4c51049",
+    "candidateSource": "de1f36fb453905bcdbec27f583cc272164346ba4b3365dc4c52bbe22d2dc53e4",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "gdev": "4c98d07cd13df544724d7323cd702358145cb993",
+    "pinnedGdev": "e3dd4286e10c11b5dd4118adf215fcf8036a74ab",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "pen": "6e68d2f739bf98f2e28c86e3a063beb4edc517e3",
+    "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+    "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+    "cpu": "AMD Ryzen 7 3800X 8-Core Processor",
+    "penExecutable": "6ed5544d1ffc9dff66257dbb2f26c52cbdd1342dd6b29a2703d415ed1a8242b0",
+    "queueTrialGooseObject": "6f560ad5f5da436b8aa00a63dc5eba3ca9faba15e47edefb9f38b1459f3e4d94",
+    "lz4Version": "1.11.1"
+  },
+  "method": {
+    "fresh": "Separate compiler sessions on warm filesystem; eight workers. Alternating order. Session open to receiving Wasm; every build validates the same output. 24 release pairs, a separate 16-pair fresh window after integration, 6 profiled pairs, 4 retained sequences and 3 profiled pairs on earlier Gdev. time_gdev_parse.ts. Shared host.",
+    "time": "Milliseconds. Positive paired saving favors candidate. Intervals use 4,000 paired bootstrap resamples of the median difference (seed 94715). Substeps overlap.",
+    "diagnostic": "Pinned Goose C instrumented at reading Core constructor scheme fields in direct emission, frozen and staging validation, package checking, evidence and symbol roles. Counts start after parent accepts decoded Core. Raw copying, structural equality during retained edits and codec reads are outside this fresh execution trace. One gdev source/profile, all diagnostic Wasm hashes compared to the release. A repeated baseline capture matched every event. See experiments/2026-11-20-core-constructor-reads.py.",
+    "compression": "Experimental Linux queue variant. LZ4 1.11.1 on packets >=2048 bytes, retain raw bytes when smaller output does not fit. Core only, both streams at acceleration 4, both at 12. Stored byte totals measured inside queue, separate from compiler logical counters. Each mode tested on 12 stock baseline pairs, and 12 alternating pairs vs the same native object/queue with compression disabled, rotating order across contenders. Isolated constructor-table compression replayed captured flat bytes, verified round trips, and excludes framing.",
+    "fanout": "bench_forwarded_constructors.ts with 16 paired runs per width. 19 modules, 16 readers, 8 workers. All emitted the same bytes per width, executing 112.",
+    "serialControls": "22 checker programs, 12 pairs each using bench_type_checker.py, matching Wasm or exact diagnostics.",
+    "sourceRows": "One constructor has a 44-byte scheme and 20 bytes of identity, tag, family and payload metadata on this toolchain. The Core graph contains separate type nodes and type words."
+  },
+  "trace": {
+    "before": {
+      "modules": 280,
+      "corePacketBytes": 49267524,
+      "constructorRowsExcludingSentinels": 42622,
+      "declaredRows": 836,
+      "importedRows": 41786,
+      "importedRowsWithNonzeroRoot": 41786,
+      "readRows": 728,
+      "readImportedRows": 0,
+      "readDefinitions": 728,
+      "readSites": {
+        "blot_direct_types_variants_g17": {
+          "fieldReads": 2096,
+          "distinctRows": 728
+        },
+        "blot_direct_function_fromFieldConstraints_g20": {
+          "fieldReads": 20,
+          "distinctRows": 2
+        },
+        "blot_direct_function_constructedType_g20": {
+          "fieldReads": 6,
+          "distinctRows": 2
+        }
+      },
+      "typeNodes": 430782,
+      "typeWords": 1031732,
+      "executableNodes": 239017,
+      "wasm": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70"
+    },
+    "after": {
+      "modules": 280,
+      "corePacketBytes": 45156896,
+      "constructorRowsExcludingSentinels": 42622,
+      "declaredRows": 836,
+      "importedRows": 41786,
+      "importedRowsWithNonzeroRoot": 0,
+      "readRows": 728,
+      "readImportedRows": 0,
+      "readDefinitions": 728,
+      "readSites": {
+        "blot_direct_types_variants_g17": {
+          "fieldReads": 2096,
+          "distinctRows": 728
+        },
+        "blot_direct_function_fromFieldConstraints_g20": {
+          "fieldReads": 20,
+          "distinctRows": 2
+        },
+        "blot_direct_function_constructedType_g20": {
+          "fieldReads": 6,
+          "distinctRows": 2
+        }
+      },
+      "typeNodes": 350363,
+      "typeWords": 788642,
+      "executableNodes": 239017,
+      "wasm": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70"
+    },
+    "redaction": {
+      "erasedImportedSignatures": 41786,
+      "wasm": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70"
+    },
+    "baselineEventsReproduced": 45024
+  },
+  "gdev": {
+    "wasm": "b77f68c353833d29dee5a72beb799c9b044627724c91850adc83ac1a69070c70",
+    "wasmBytes": 2754496,
+    "modules": 280,
+    "work": {
+      "parallel_jobs": [280, 280],
+      "parallel_worker_reply_bytes": [71278478, 67167850],
+      "type_nodes": [1355631, 1355631],
+      "imported_schemes": [18859, 18859],
+      "import_requests": [199953, 199953],
+      "import_nodes_added": [263793, 263793],
+      "resolve_depth_entries": [3818160, 3818160],
+      "unify_pairs": [476779, 476779]
+    },
+    "phaseMs": {
+      "check": {
+        "before": [685.05, 668.727, 671.678, 533.627, 564.134, 488.981],
+        "after": [670.25, 629.598, 615.023, 555.465, 525.352, 548.963],
+        "medians": [616.43, 585.244],
+        "pairedSavingMs": 26.791,
+        "saving95Ms": [-40.91, 47.892],
+        "fasterPairs": 4
+      },
+      "lower": {
+        "before": [49.948, 50.095, 46.207, 40.368, 43.052, 34.895],
+        "after": [56.078, 43.821, 40.236, 38.912, 32.396, 36.714],
+        "medians": [44.63, 39.574],
+        "pairedSavingMs": 3.714,
+        "saving95Ms": [-3.974, 8.465],
+        "fasterPairs": 4
+      },
+      "backend": {
+        "before": [217.726, 234.11, 189.872, 185.091, 213.996, 166.701],
+        "after": [229.902, 221.386, 192.939, 169.661, 169.488, 164.476],
+        "medians": [201.934, 181.3],
+        "pairedSavingMs": 7.475,
+        "saving95Ms": [-7.621, 29.969],
+        "fasterPairs": 4
+      },
+      "workerCpu": {
+        "before": [2532.812, 2615.212, 2517.287, 2383.728, 2368.701, 2204.608],
+        "after": [2507.36, 2487.383, 2510.179, 2435.837, 2353.91, 2564.404],
+        "medians": [2450.507, 2497.372],
+        "pairedSavingMs": 10.949,
+        "saving95Ms": [-205.952, 76.64],
+        "fasterPairs": 4
+      }
+    },
+    "freshMs": {
+      "before": [1286.912, 1593.378, 1660.716, 1511.732, 1522.986, 1358.464, 1319.154, 1166.841, 1229.282, 1271.184, 1248.904, 1287.347, 1265.828, 1219.465, 1113.026, 1165.964, 1223.276, 1680.962, 1777.672, 1658.332, 1319.776, 2058.178, 1567.818, 1157.378],
+      "after": [1326.96, 1574.771, 1633.468, 1453.247, 1388.892, 1364.673, 1312.949, 1214.558, 1184.416, 1310.328, 1332.584, 1239.494, 1304.208, 1240.309, 1175.164, 1193.858, 1167.166, 1188.097, 1208.125, 1418.382, 1442.2, 1304.682, 1255.528, 1344.505],
+      "medians": [1303.25, 1307.505],
+      "pairedSavingMs": 12.406,
+      "saving95Ms": [-38.38, 53.169],
+      "fasterPairs": 13
+    },
+    "secondWindowMs": {
+      "before": [789.482, 813.047, 804.331, 805.364, 854.568, 789.294, 791.197, 1193.179, 855.959, 875.718, 864.246, 877.453, 891.548, 851.503, 865.768, 804.114],
+      "after": [776.557, 791.916, 887.144, 796.781, 780.39, 793.756, 756.806, 1043.567, 917.957, 934.086, 909.404, 866.297, 858.853, 872.696, 829.709, 840.023],
+      "medians": [853.035, 849.438],
+      "pairedSavingMs": 9.87,
+      "saving95Ms": [-35.909, 32.696],
+      "fasterPairs": 9
+    },
+    "secondWindowLoadAverage": [
+      [18.16259765625, 13.45458984375, 10.14892578125],
+      [15.6240234375, 13.22607421875, 10.162109375]
+    ],
+    "firstWindowLoadSample": {
+      "oneMinute": 29.32,
+      "fiveMinutes": 14.41,
+      "fifteenMinutes": 10.3,
+      "logicalCpus": 16,
+      "observed": "At the transition from 24 timed fresh pairs into the profiled pairs. Concurrent unrelated compiler workloads were active."
+    },
+    "retainedMs": {
+      "edit": {
+        "before": [55.94, 46.123, 45.025, 75.141],
+        "after": [45.648, 45.346, 62.672, 107.459],
+        "medians": [51.031, 54.16],
+        "pairedSavingMs": -8.435,
+        "saving95Ms": [-32.319, 10.292],
+        "fasterPairs": 2
+      },
+      "fresh": {
+        "before": [917.637, 908.307, 889.652, 1144.249],
+        "after": [762.467, 900.381, 1030.369, 1212.211],
+        "medians": [912.972, 965.375],
+        "pairedSavingMs": -30.018,
+        "saving95Ms": [-140.717, 155.17],
+        "fasterPairs": 2
+      },
+      "lex": {
+        "before": [61.955, 66.804, 70.345, 64.664],
+        "after": [66.527, 66.742, 100.901, 73.915],
+        "medians": [65.734, 70.329],
+        "pairedSavingMs": -6.911,
+        "saving95Ms": [-30.556, 0.062],
+        "fasterPairs": 1
+      },
+      "recover": {
+        "before": [40.643, 41.98, 41.103, 37.25],
+        "after": [41.179, 48.397, 58.131, 42.2],
+        "medians": [40.873, 45.298],
+        "pairedSavingMs": -5.683,
+        "saving95Ms": [-17.028, -0.536],
+        "fasterPairs": 0
+      },
+      "reject": {
+        "before": [325.197, 351.951, 343.71, 400.09],
+        "after": [323.765, 391.531, 482.3, 428.582],
+        "medians": [347.831, 410.056],
+        "pairedSavingMs": -34.036,
+        "saving95Ms": [-138.589, 1.433],
+        "fasterPairs": 1
+      },
+      "syntax": {
+        "before": [64.465, 68.543, 70.412, 66.706],
+        "after": [69.199, 75.531, 105.9, 94.449],
+        "medians": [67.625, 84.99],
+        "pairedSavingMs": -17.365,
+        "saving95Ms": [-35.488, -4.733],
+        "fasterPairs": 0
+      }
+    },
+    "interfaceBytes": [22010954, 22010954]
+  },
+  "pinnedGdev": {
+    "wasm": "896dfe16613d419ba4006227080915fbb289dc0d06b9f5542a840b5b26cbfcdf",
+    "wasmBytes": 2732918,
+    "modules": 279,
+    "work": {
+      "parallel_jobs": [279, 279],
+      "parallel_worker_reply_bytes": [69856871, 65849884],
+      "type_nodes": [1348972, 1348972],
+      "imported_schemes": [18696, 18696],
+      "import_requests": [198986, 198986],
+      "import_nodes_added": [262388, 262388],
+      "resolve_depth_entries": [3755418, 3755418],
+      "unify_pairs": [473720, 473720]
+    },
+    "phaseMs": {
+      "check": {
+        "before": [440.005, 479.16, 431.367],
+        "after": [430.252, 500.098, 443.288],
+        "medians": [440.005, 443.288],
+        "pairedSavingMs": -11.921,
+        "saving95Ms": [-20.938, 9.753],
+        "fasterPairs": 1
+      },
+      "lower": {
+        "before": [38.936, 39.926, 44.787],
+        "after": [42.051, 41.744, 39.728],
+        "medians": [39.926, 41.744],
+        "pairedSavingMs": -1.818,
+        "saving95Ms": [-3.115, 5.059],
+        "fasterPairs": 1
+      },
+      "backend": {
+        "before": [123.325, 124.57, 121.916],
+        "after": [124.266, 127.494, 124.268],
+        "medians": [123.325, 124.268],
+        "pairedSavingMs": -2.352,
+        "saving95Ms": [-2.924, -0.941],
+        "fasterPairs": 0
+      },
+      "workerCpu": {
+        "before": [2045.239, 2118.228, 2003.727],
+        "after": [1992.14, 2025.929, 2019.26],
+        "medians": [2045.239, 2019.26],
+        "pairedSavingMs": 53.099,
+        "saving95Ms": [-15.533, 92.299],
+        "fasterPairs": 2
+      }
+    }
+  },
+  "fanout": {
+    "1": {
+      "workerReplyBytes": [95258, 93284],
+      "checkerNodes": [759, 759],
+      "workerJobs": [19, 19],
+      "checkMs": {
+        "before": [20.707, 25.927, 19.05, 18.869, 21.47, 26.288, 24.488, 17.444, 20.456, 17.897, 18.685, 24.98, 18.823, 18.684, 25.106, 24.628],
+        "after": [25.729, 26.933, 24.42, 17.878, 23.739, 21.701, 26.878, 18.853, 26.218, 19.907, 18.407, 18.746, 18.558, 24.168, 24.067, 18.483],
+        "medians": [20.581, 22.72],
+        "pairedSavingMs": -1.208,
+        "saving95Ms": [-3.014, 0.991],
+        "fasterPairs": 7
+      },
+      "wasm": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    },
+    "16": {
+      "workerReplyBytes": [200387, 176813],
+      "checkerNodes": [1074, 1074],
+      "workerJobs": [19, 19],
+      "checkMs": {
+        "before": [24.806, 19.955, 19.42, 19.856, 18.188, 18.542, 19.544, 25.696, 23.836, 18.019, 18.024, 26.14, 18.358, 18.084, 17.686, 22.188],
+        "after": [18.272, 24.562, 18.435, 20.438, 18.011, 18.19, 17.723, 22.541, 27.191, 19.443, 26.565, 18.069, 18.069, 18.584, 19.882, 19.249],
+        "medians": [19.482, 18.916],
+        "pairedSavingMs": 0.233,
+        "saving95Ms": [-1.424, 1.821],
+        "fasterPairs": 9
+      },
+      "wasm": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    },
+    "128": {
+      "workerReplyBytes": [986746, 801892],
+      "checkerNodes": [3426, 3426],
+      "workerJobs": [19, 19],
+      "checkMs": {
+        "before": [26.318, 23.411, 20.761, 18.875, 18.744, 21.861, 21.738, 29.536, 26.111, 21.863, 23.747, 24.016, 20.132, 19.442, 19.924, 19.025],
+        "after": [19.469, 20.095, 25.869, 21.405, 25.196, 21.619, 24.954, 26.359, 22.582, 23.792, 25.781, 24.139, 18.759, 20.23, 17.88, 18.136],
+        "medians": [21.8, 22.101],
+        "pairedSavingMs": 0.059,
+        "saving95Ms": [-2.034, 2.044],
+        "fasterPairs": 8
+      },
+      "wasm": "b4a380f2c59ef07946eb48fac72678ba6291c72295ec99d8ad025ee0c129cb52"
+    }
+  },
+  "compressionTrials": {
+    "core": {
+      "acceleration": 4,
+      "interfaceBytes": 22010954,
+      "coreBytes": 19148332,
+      "totalBytes": 41159286,
+      "freshMsVsStock": {
+        "before": [844.779, 821.384, 811.132, 931.446, 906.113, 1392.088, 1264.913, 968.951, 921.843, 842.029, 810.931, 872.769],
+        "after": [879.092, 835.269, 872.585, 871.896, 845.72, 1316.399, 1432.134, 1260.895, 894.411, 837.989, 862.778, 858.034],
+        "medians": [889.441, 872.241],
+        "pairedSavingMs": -4.922,
+        "saving95Ms": [-56.65, 43.491],
+        "fasterPairs": 6
+      },
+      "freshMsVsMatchedNativeControl": {
+        "before": [836.295, 818.487, 786.761, 728.0, 770.391, 781.855, 743.831, 715.059, 714.754, 740.485, 777.859, 729.125],
+        "after": [825.855, 790.242, 726.785, 804.903, 764.419, 735.779, 716.391, 713.235, 723.917, 760.769, 773.694, 722.937],
+        "medians": [757.111, 748.274],
+        "pairedSavingMs": 6.08,
+        "saving95Ms": [-3.669, 27.843],
+        "fasterPairs": 9
+      }
+    },
+    "both": {
+      "acceleration": 4,
+      "interfaceBytes": 7106443,
+      "coreBytes": 19148615,
+      "totalBytes": 26255058,
+      "freshMsVsStock": {
+        "before": [691.333, 728.789, 807.547, 859.942, 837.42, 808.979, 802.912, 855.269, 812.223, 859.031, 857.495, 796.807],
+        "after": [811.085, 781.583, 791.716, 911.777, 846.169, 845.657, 848.124, 897.451, 866.291, 839.569, 819.366, 793.466],
+        "medians": [810.601, 842.613],
+        "pairedSavingMs": -39.43,
+        "saving95Ms": [-52.314, 9.586],
+        "fasterPairs": 4
+      },
+      "freshMsVsMatchedNativeControl": {
+        "before": [866.606, 788.91, 763.756, 754.482, 715.081, 900.642, 687.779, 736.392, 741.187, 724.689, 725.294, 707.184],
+        "after": [858.35, 821.958, 775.569, 765.683, 762.763, 838.897, 766.785, 764.411, 724.619, 711.755, 738.105, 769.867],
+        "medians": [738.79, 766.234],
+        "pairedSavingMs": -12.312,
+        "saving95Ms": [-40.365, 10.595],
+        "fasterPairs": 4
+      }
+    },
+    "fast": {
+      "acceleration": 12,
+      "interfaceBytes": 8140740,
+      "coreBytes": 22580967,
+      "totalBytes": 30721707,
+      "freshMsVsStock": {
+        "before": [888.051, 924.909, 812.137, 761.001, 811.487, 776.993, 824.729, 773.44, 825.135, 1248.188, 1222.74, 770.387],
+        "after": [863.521, 936.212, 912.909, 806.174, 824.146, 811.57, 858.16, 837.789, 814.984, 1116.307, 809.451, 872.632],
+        "medians": [818.433, 847.975],
+        "pairedSavingMs": -23.045,
+        "saving95Ms": [-54.761, 17.34],
+        "fasterPairs": 4
+      },
+      "freshMsVsMatchedNativeControl": {
+        "before": [802.442, 778.887, 793.409, 727.756, 745.192, 698.947, 807.585, 703.182, 775.437, 701.132, 701.642, 688.472],
+        "after": [854.188, 798.262, 773.351, 801.345, 785.132, 751.771, 745.838, 764.807, 742.249, 753.099, 718.255, 707.184],
+        "medians": [736.474, 758.953],
+        "pairedSavingMs": -29.658,
+        "saving95Ms": [-52.395, 1.723],
+        "fasterPairs": 3
+      }
+    }
+  },
+  "capturedPacketReplay": {
+    "core": 49267524,
+    "iface": 22010954,
+    "tablesWithEntries": 2745728,
+    "lz4ConstructorTables": 960332,
+    "ifaceLz4x1": 6816448,
+    "ifaceLz4x4": 7106435,
+    "ifaceLz4x12": 8140676,
+    "coreLz4x1": 18181540,
+    "coreLz4x4": 19148324,
+    "coreLz4x12": 22580145,
+    "units": 280,
+    "nonemptyTables": 280
+  },
+  "generalPrograms": {
+    "callbacks-256": {
+      "checkMs": {
+        "before": [12.613, 11.126, 11.24, 11.365, 11.557, 11.256, 11.413, 11.258, 11.197, 11.979, 15.726, 19.424],
+        "after": [11.611, 11.153, 11.578, 11.295, 11.063, 11.463, 11.447, 11.573, 11.348, 11.127, 15.984, 19.582],
+        "medians": [11.389, 11.455],
+        "pairedSavingMs": -0.093,
+        "saving95Ms": [-0.232, 0.282],
+        "fasterPairs": 4
+      },
+      "wasm": "50499618ae0256a2956ef6e30db912fbf89fd3c25db015f0da105eb89d0e1097",
+      "diagnostics": []
+    },
+    "callbacks-32": {
+      "checkMs": {
+        "before": [6.49, 6.692, 6.234, 6.687, 6.554, 6.507, 6.406, 6.708, 6.502, 10.683, 7.069, 10.227],
+        "after": [6.495, 6.182, 6.51, 6.277, 6.457, 6.591, 6.478, 6.665, 6.323, 6.474, 9.227, 16.053],
+        "medians": [6.62, 6.486],
+        "pairedSavingMs": 0.019,
+        "saving95Ms": [-0.18, 0.294],
+        "fasterPairs": 6
+      },
+      "wasm": "67bfdb438fbb0912bb0973a9bc1cbda3619cc64f9661c2073eec82666d0c764f",
+      "diagnostics": []
+    },
+    "fields-256": {
+      "checkMs": {
+        "before": [6.232, 10.082, 6.579, 6.575, 6.499, 6.523, 6.513, 6.508, 6.399, 10.919, 7.506, 11.97],
+        "after": [6.934, 8.526, 6.362, 6.514, 6.356, 6.506, 6.557, 6.551, 6.493, 6.468, 7.397, 9.864],
+        "medians": [6.549, 6.533],
+        "pairedSavingMs": 0.085,
+        "saving95Ms": [-0.044, 0.887],
+        "fasterPairs": 8
+      },
+      "wasm": "b1c850958f14a99d67a047af364d423a641fc22e76382e8362554c0de49fab5d",
+      "diagnostics": []
+    },
+    "fields-64": {
+      "checkMs": {
+        "before": [5.894, 6.04, 5.794, 6.032, 5.849, 5.87, 6.02, 6.181, 6.543, 6.299, 6.63, 9.901],
+        "after": [6.288, 6.386, 6.261, 6.054, 5.951, 6.002, 5.994, 5.808, 6.311, 6.026, 6.779, 10.008],
+        "medians": [6.036, 6.158],
+        "pairedSavingMs": -0.104,
+        "saving95Ms": [-0.248, 0.129],
+        "fasterPairs": 4
+      },
+      "wasm": "f507104a0ef2400ac0ad34e6c34e0248774597b2afa9329067e7eaa455d4edb8",
+      "diagnostics": []
+    },
+    "fields-8": {
+      "checkMs": {
+        "before": [6.013, 7.313, 5.688, 5.92, 5.92, 6.103, 5.809, 5.825, 6.324, 5.775, 9.91, 9.411],
+        "after": [6.078, 5.995, 5.963, 5.958, 5.914, 6.051, 5.938, 6.178, 6.087, 9.905, 8.218, 9.794],
+        "medians": [5.966, 6.065],
+        "pairedSavingMs": -0.052,
+        "saving95Ms": [-0.314, 0.144],
+        "fasterPairs": 5
+      },
+      "wasm": "7c79d7c3871bee543509da6443e2eeb2df72638dac03ec03bd56be6bda8d9620",
+      "diagnostics": []
+    },
+    "generics-1024": {
+      "checkMs": {
+        "before": [35.307, 34.719, 34.704, 50.971, 35.776, 36.075, 35.515, 35.359, 36.062, 35.08, 42.082, 64.443],
+        "after": [35.777, 34.569, 34.525, 34.724, 35.597, 35.057, 35.7, 53.812, 34.972, 35.683, 67.899, 80.733],
+        "medians": [35.645, 35.64],
+        "pairedSavingMs": -0.018,
+        "saving95Ms": [-8.447, 0.599],
+        "fasterPairs": 6
+      },
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-256": {
+      "checkMs": {
+        "before": [12.995, 17.182, 12.656, 12.699, 12.571, 12.678, 12.79, 12.971, 17.254, 12.662, 14.577, 28.827],
+        "after": [12.981, 22.058, 12.271, 12.493, 13.049, 12.772, 13.037, 19.73, 12.29, 12.605, 12.991, 30.047],
+        "medians": [12.88, 12.986],
+        "pairedSavingMs": -0.04,
+        "saving95Ms": [-0.849, 0.295],
+        "fasterPairs": 6
+      },
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "generics-32": {
+      "checkMs": {
+        "before": [6.835, 8.045, 6.462, 6.974, 6.763, 6.83, 6.942, 11.231, 11.361, 11.319, 6.693, 10.667],
+        "after": [7.512, 6.849, 6.47, 6.575, 6.805, 6.759, 7.145, 7.425, 6.791, 11.588, 11.674, 11.979],
+        "medians": [6.958, 6.997],
+        "pairedSavingMs": -0.025,
+        "saving95Ms": [-0.473, 0.797],
+        "fasterPairs": 5
+      },
+      "wasm": "d166feab4e0139533c4b66ff997a8a79ae9d3e50430e25274a0c558f520b0750",
+      "diagnostics": []
+    },
+    "imported-generics": {
+      "checkMs": {
+        "before": [6.896, 6.864, 7.517, 7.179, 7.102, 7.225, 7.328, 15.769, 6.899, 7.276, 11.138, 11.261],
+        "after": [6.806, 6.844, 7.366, 7.082, 7.07, 7.768, 7.029, 7.421, 7.309, 8.02, 10.63, 15.472],
+        "medians": [7.25, 7.338],
+        "pairedSavingMs": 0.061,
+        "saving95Ms": [-0.477, 0.225],
+        "fasterPairs": 8
+      },
+      "wasm": "f23de5c8fdb9ede651ed865429bbcf28b0b99838772661f5c490a203900a87b4",
+      "diagnostics": []
+    },
+    "imports-2": {
+      "checkMs": {
+        "before": [6.69, 16.186, 6.98, 6.896, 7.431, 6.883, 7.122, 6.663, 6.928, 7.067, 10.86, 11.808],
+        "after": [6.571, 6.653, 6.53, 11.832, 6.808, 7.008, 6.828, 6.834, 7.555, 7.205, 7.259, 12.635],
+        "medians": [7.024, 6.921],
+        "pairedSavingMs": -0.003,
+        "saving95Ms": [-0.399, 0.537],
+        "fasterPairs": 6
+      },
+      "wasm": "6f018f68abb78305f7ce55cda65b6347fb3bbd7e8379d70e5f2b020710449981",
+      "diagnostics": []
+    },
+    "imports-32": {
+      "checkMs": {
+        "before": [16.32, 15.075, 15.478, 15.316, 16.086, 15.478, 15.167, 15.152, 26.447, 15.529, 24.923, 25.843],
+        "after": [15.384, 15.509, 15.429, 15.96, 16.073, 15.489, 15.329, 16.02, 26.707, 25.308, 20.484, 23.639],
+        "medians": [15.503, 15.99],
+        "pairedSavingMs": -0.087,
+        "saving95Ms": [-0.539, 0.492],
+        "fasterPairs": 5
+      },
+      "wasm": "fc9566df6adec848cedab5290618e1c60d8d2402a9238a465ae444747b6456ea",
+      "diagnostics": []
+    },
+    "imports-8": {
+      "checkMs": {
+        "before": [8.372, 8.472, 8.423, 8.484, 8.756, 8.584, 8.564, 8.777, 8.705, 12.687, 12.889, 13.202],
+        "after": [8.214, 8.555, 8.621, 8.529, 8.617, 8.626, 8.531, 8.571, 14.664, 16.585, 9.582, 13.26],
+        "medians": [8.645, 8.619],
+        "pairedSavingMs": -0.043,
+        "saving95Ms": [-0.141, 0.148],
+        "fasterPairs": 5
+      },
+      "wasm": "702c73f4ced1161dd826abbf564e65acaf286c3d9b95511d0b0186933979df59",
+      "diagnostics": []
+    },
+    "indirect-nominals-1": {
+      "checkMs": {
+        "before": [6.316, 6.24, 6.536, 6.41, 6.405, 6.608, 6.568, 6.377, 6.43, 6.37, 12.248, 11.089],
+        "after": [6.197, 6.248, 6.454, 6.4, 6.56, 6.568, 10.728, 6.855, 6.725, 10.569, 11.085, 11.778],
+        "medians": [6.42, 6.646],
+        "pairedSavingMs": -0.081,
+        "saving95Ms": [-0.584, 0.061],
+        "fasterPairs": 5
+      },
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-128": {
+      "checkMs": {
+        "before": [6.657, 6.934, 7.093, 6.819, 7.167, 6.983, 6.947, 6.816, 6.795, 7.005, 9.969, 11.345],
+        "after": [6.729, 6.959, 6.993, 7.073, 6.892, 6.855, 6.886, 6.962, 6.947, 7.09, 11.217, 11.141],
+        "medians": [6.965, 6.96],
+        "pairedSavingMs": -0.048,
+        "saving95Ms": [-0.149, 0.114],
+        "fasterPairs": 5
+      },
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "indirect-nominals-16": {
+      "checkMs": {
+        "before": [6.27, 6.53, 6.512, 6.438, 6.427, 6.507, 6.63, 6.459, 6.652, 6.569, 10.096, 11.088],
+        "after": [6.36, 6.513, 10.588, 6.427, 11.289, 6.595, 11.274, 7.739, 6.633, 6.663, 8.991, 14.311],
+        "medians": [6.521, 7.201],
+        "pairedSavingMs": -0.092,
+        "saving95Ms": [-3.65, 0.014],
+        "fasterPairs": 4
+      },
+      "wasm": "2d551440fff199f1e42f8d6143adc50fd4e751e248268bf33aa8532f8075abf6",
+      "diagnostics": []
+    },
+    "owned-reads": {
+      "checkMs": {
+        "before": [6.949, 6.777, 7.153, 7.435, 7.077, 12.108, 11.851, 6.877, 7.306, 6.987, 11.649, 12.41],
+        "after": [7.09, 6.971, 7.087, 7.093, 7.029, 11.893, 12.127, 12.307, 7.104, 7.467, 16.469, 13.444],
+        "medians": [7.229, 7.285],
+        "pairedSavingMs": -0.167,
+        "saving95Ms": [-0.757, 0.134],
+        "fasterPairs": 5
+      },
+      "wasm": "b2ced6756a5576c52162b9bff705894ad18d88b6d74480d4e77196423fca3d6d",
+      "diagnostics": []
+    },
+    "rejected-generic": {
+      "checkMs": {
+        "before": [6.314, 5.844, 5.991, 6.129, 5.983, 6.145, 6.204, 6.139, 6.03, 10.496, 9.431, 11.903],
+        "after": [5.97, 5.835, 5.937, 6.189, 6.152, 6.445, 6.132, 11.185, 6.232, 6.169, 15.72, 15.351],
+        "medians": [6.142, 6.179],
+        "pairedSavingMs": -0.115,
+        "saving95Ms": [-1.874, 0.063],
+        "fasterPairs": 5
+      },
+      "wasm": null,
+      "diagnostics": [
+        {
+          "code": "missing_associated",
+          "start": 75,
+          "end": 78,
+          "message": "No compatible associated implementation exists"
+        }
+      ]
+    },
+    "shared-pair-3": {
+      "checkMs": {
+        "before": [5.838, 5.955, 6.881, 10.626, 6.105, 6.045, 6.107, 6.136, 5.924, 10.185, 7.363, 9.722],
+        "after": [5.909, 10.885, 6.017, 5.918, 6.183, 10.012, 6.033, 6.156, 6.161, 10.141, 9.062, 11.825],
+        "medians": [6.122, 6.172],
+        "pairedSavingMs": -0.074,
+        "saving95Ms": [-1.901, 0.059],
+        "fasterPairs": 4
+      },
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-6": {
+      "checkMs": {
+        "before": [6.09, 10.379, 6.035, 6.107, 6.396, 6.373, 6.511, 6.424, 6.29, 8.426, 9.88, 10.165],
+        "after": [6.158, 6.703, 6.169, 11.015, 6.109, 6.364, 6.306, 7.383, 6.208, 10.38, 6.998, 14.489],
+        "medians": [6.41, 6.534],
+        "pairedSavingMs": -0.03,
+        "saving95Ms": [-1.457, 0.246],
+        "fasterPairs": 6
+      },
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "shared-pair-9": {
+      "checkMs": {
+        "before": [7.602, 11.372, 7.469, 7.496, 7.567, 7.628, 7.654, 7.585, 7.437, 12.548, 8.11, 12.914],
+        "after": [7.236, 7.452, 7.782, 13.332, 7.88, 7.651, 7.593, 7.55, 7.522, 8.568, 10.065, 12.399],
+        "medians": [7.615, 7.716],
+        "pairedSavingMs": 0.006,
+        "saving95Ms": [-0.313, 0.441],
+        "fasterPairs": 6
+      },
+      "wasm": "74b4fe1e101e3346f7d72f0fd82ca588a8fef4de8ad70cd533b8528a8128d761",
+      "diagnostics": []
+    },
+    "sort-merge": {
+      "checkMs": {
+        "before": [6.702, 6.506, 6.76, 7.23, 6.642, 6.97, 6.826, 6.394, 6.477, 6.92, 13.773, 13.516],
+        "after": [6.414, 6.486, 6.885, 6.673, 6.772, 6.643, 6.622, 11.079, 6.602, 6.767, 10.119, 11.855],
+        "medians": [6.793, 6.72],
+        "pairedSavingMs": 0.178,
+        "saving95Ms": [-0.125, 0.442],
+        "fasterPairs": 8
+      },
+      "wasm": "0ee4b2c6753d620ae84654db29cd932181bce211a147d7a58ae19933e614c1d1",
+      "diagnostics": []
+    },
+    "sort-quick": {
+      "checkMs": {
+        "before": [6.624, 6.347, 7.874, 6.508, 6.525, 6.66, 6.784, 6.496, 6.516, 7.016, 10.758, 10.947],
+        "after": [6.374, 6.414, 6.447, 6.638, 6.506, 6.343, 6.469, 10.742, 6.569, 10.705, 13.302, 11.028],
+        "medians": [6.642, 6.537],
+        "pairedSavingMs": -0.06,
+        "saving95Ms": [-1.337, 0.282],
+        "fasterPairs": 5
+      },
+      "wasm": "84dffbc9703e7453edbd8bd81bcb146be99c9a755145b96b7258967af86806aa",
+      "diagnostics": []
+    }
+  },
+  "qualification": {
+    "compilerGate": "ok | 1119 passed | 0 failed | 100 ignored (27s)",
+    "fixtures": "192 of 192 fixtures match the record",
+    "uniqueness": "uniqueness: 212 of 212 programs match the record (113 with rejections, 99 accepted)",
+    "direct": [
+      "runtime: ok (3373 bytes)",
+      "writer: ok (352 bytes)"
+    ],
+    "freshOracles": [
+      "edit",
+      "reject",
+      "syntax",
+      "lex"
+    ],
+    "inkChecks": 283,
+    "integration": {
+      "ink": "3b0445a71475b3f975f445f6d3a564cce6a7080f754caefce77f3ec5d24e34e4",
+      "frame": "19a03f0a92e7ad3cd6c1480ab2e538cd57a4553963ffa03122d4b59a68b663e8",
+      "trace": "f977a25b1db098c7e078a601df504c2da942ea7a5a17838fece34af1934ef6b8",
+      "replayFiles": 242,
+      "replayManifest": "77d60ddc217654fe3fe8ce76c06b60006f5d4fd93a2ebd88bdae9a4bcdd9ad0e"
+    },
+    "forwardedConstructors": "19 modules; scalar, record and nullary constructors plus Box Bool and Box U32 resolved in the definition through a re-export. Serial and eight-worker Wasm identical, both executed 304.",
+    "inferenceBudgetCutoffs": {
+      "forwardedRecord": [2902, 2903],
+      "mixedVariants": [3630, 3631],
+      "associatedAcrossImports": [16861, 16862],
+      "outcomes": "First rejected and second accepted in serial and parallel modes; reported exact limits unchanged."
+    }
+  }
+}

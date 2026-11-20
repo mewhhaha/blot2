@@ -367,7 +367,7 @@ fn lowerWithRetainedCore(source:const Project&,checked:const CheckedProject&,pre
 fn lowerRetainedUnit(source:const Project&,checked:const blot_check_check::Checked&,id:u32,ready:Prepared&)->Error {
  let unit .= source.unit(id);
  let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);
- var core,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked,blot_reuse_project_check::moduleOrigins(source));
+ var core,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked,blot_reuse_project_check::moduleOrigins(source),true);
  timing.exit();
  if error!=blot_error::Error.none {return error;}
  if core.value.diagnostics.len!=0 {core.owner.release();return blot_error::Error.invalid_artifact;}

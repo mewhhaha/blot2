@@ -207,7 +207,7 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     let freeze_elapsed=cpuMicros(freeze_cpu);
     if error!=blot_error::Error.none {return error;}
     let lower_cpu=blot_native::thread_cpu_ns();
-    var core,error=blot_check_core_builder::lowerWithOrigins(current.tree,source.symbols,module.checked,moduleOrigins(source));
+    var core,error=blot_check_core_builder::lowerWithOrigins(current.tree,source.symbols,module.checked,moduleOrigins(source),true);
     let lower_elapsed=cpuMicros(lower_cpu);
     if error!=blot_error::Error.none {return error;}
     if source.symbols.missing_name || core.value.diagnostics.len!=0 {
@@ -218,7 +218,7 @@ fn publishPersistentUnit(source:Project&,module:const Module&,unit:u32,shared:u6
     var packet:u8[>..<]=[];
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,unit);
-    blot_project_packet::put(writer,core.value);
+    blot_project_packet::putExecutionCore(writer,core.value);
     blot_project_packet::put(writer,module.checked.body_elaborations);
     blot_project_packet::put(writer,module.checked.imported_schemes);
     blot_project_packet::put(writer,module.checked.types.normalization);

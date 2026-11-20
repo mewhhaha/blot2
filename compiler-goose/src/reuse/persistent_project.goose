@@ -187,7 +187,7 @@ fn readPersistentCore(bytes:const u8[:],unit:u32,ready:Prepared&,resolution:i64&
  var debit:i64=0;var candidates:i64=0;
  var check_cpu:u64=0;var freeze_cpu:u64=0;var lower_cpu:u64=0;
  blot_project_packet::get(reader,id);
- blot_project_packet::get(reader,core);
+ blot_project_packet::getExecutionCore(reader,core);
  blot_project_packet::get(reader,bodies);
  blot_project_packet::get(reader,schemes);
  blot_project_packet::get(reader,norm);

@@ -159,7 +159,7 @@ fn lowerUnits(source:Project&,checked:CheckedProject&,ready:Prepared&)->blot_sup
   if compiled {
    let copied,error=blot_reuse_dependency_payload::clone(compiled.core);if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ir=copied;ready.borrowed[index]=true;
   }else {
-   let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);let copied,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(source));timing.exit();if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ir=copied;
+   let timing=blot_phase_profile::enter(blot_phase_profile::Phase.lower);let copied,error=blot_check_core_builder::lowerWithOrigins(unit.tree,source.symbols,checked.module(id).checked,blot_reuse_project_check::moduleOrigins(source),true);timing.exit();if error!=blot_error::Error.none {return blot_support::none<ConsumerDiagnostic>(),error;}ir=copied;
    ir.value.unit=id;ready.stats.body_lowerings+=ir.value.body_lowerings;ready.stats.syntax_nodes+=unit.tree.nodes.len-1;
   }
   ready.units[index]=blot_reuse_dependency_owned_headers::canonical(ir.owner,ir.value);ready.unit_owners[index].tables=ir.owner;

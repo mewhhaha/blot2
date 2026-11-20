@@ -1,15 +1,18 @@
 # Working on Blot and Gdev
 
-Workers now defer the return types of imported constructors with a known
-result and a fixed storage layout. This cut local import nodes on Gdev Main
-from **306,968 to 263,793** and produced identical 2,754,496-byte Wasm.
-Fresh compiles took **731 → 735 ms** across 18 eight-worker pairs. The timing
-interval included zero. The full gate, 283 Ink checks, Gdev hardware frame and
-120-frame replay passed. The next experiment is to trace which complete
-constructor signatures the backend and parent actually read after lowering.
-Workers still send 71.28 MB in replies.
-[Local import reads and release measurements](tasks/FAST_COMPILE.md#deferring-imported-constructor-results) ·
-[Worker traffic](tasks/FAST_COMPILE.md#forwarding-constructor-signatures-between-workers)
+On Gdev Main the Wasm backend read 728 constructor signatures, all from their
+defining modules. Workers now omit all **41,786** imported copies. This removed
+**80,419 Core type nodes** and cut worker replies from **71.28 to 67.17 MB**.
+Fresh Gdev compiles measured **853 → 849 ms** in 16 pairs and **1,303 → 1,308
+ms** in a busier 24-pair window. Both timing intervals included zero. The
+2,754,496-byte Wasm, Ink outcomes, hardware frame and replay matched.
+The next target is the 3.82 million type-resolution visits. Attribute them to
+the modules that delay dependent work before changing the solver.
+[Constructor reads, packing experiment and release measurements](tasks/FAST_COMPILE.md#constructor-signatures-in-wasm-compilation)
+
+The previous change cut local inference nodes created by imports from
+306,968 to 263,793 by deferring known constructor results.
+[Local import reads and measurements](tasks/FAST_COMPILE.md#deferring-imported-constructor-results)
 
 The previous checker change reused settled expression and binding types and
 generic call arguments. An earlier prototype cut imported nodes by 41% but

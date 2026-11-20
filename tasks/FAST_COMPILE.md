@@ -235,16 +235,64 @@ Gdev hardware frame and trace, and 242 files from the 120-frame replay matched
 the baseline. A valid edit, three different failing edits and recovery matched
 fresh compiles. Three exact inference-budget boundaries held.
 
-The next experiment is to count which constructor signatures are actually
-read **after** Core lowering, by the backend and the parent process. That
-will show whether a worker can omit unused signatures from its reply and
-how many bytes this could save. The current trace ends at Core ownership
-checking.
-
 ![Imported types read by each compiler phase and nodes saved on Gdev](../benchmarks/evidence/measurements/2026-11-20-local-constructor-signatures.png)
 
 [Paired release measurements and phase counts](../benchmarks/evidence/measurements/2026-11-20-local-constructor-signatures.json) ·
 [Reproduce the baseline read trace](../benchmarks/evidence/measurements/experiments/2026-11-20-import-read-trace.py)
+
+### Constructor signatures in Wasm compilation
+
+The direct backend resolves a constructor in the module that defines its data
+type. On Gdev, the parent received 42,622 constructor entries. It read the
+signatures of 728 of the 836 defining entries and zero of the 41,786 imported
+entries. An independent run cleared every imported signature after decoding.
+It produced byte-identical Wasm. The trace counts semantic field reads during a
+fresh build. Packet copying and retained-build structural comparisons are
+outside that count.
+
+Wasm preparation now builds complete constructor signatures only in the
+defining module. Each importing module keeps the tag, family, identity and
+local payload type that ownership and field access use. Workers send those
+five words per imported entry. The checker still publishes full defining
+interfaces, and portable dependency archives use the complete Core schema.
+
+| Current Gdev, 280 modules | Before | After |
+| --- | ---: | ---: |
+| Imported signatures in execution Core | 41,786 | 0 |
+| Type nodes in execution Core | 430,782 | 350,363 |
+| Words in Core type lists | 1,031,732 | 788,642 |
+| Core replies | 49.27 MB | 45.16 MB |
+| Interface replies | 22.01 MB | 22.01 MB |
+| Total worker replies | 71.28 MB | 67.17 MB |
+
+Fresh Gdev compile medians were **1,303 → 1,308 ms** in a 24-pair window
+with concurrent compiler jobs, and **853 → 849 ms** in a separate 16-pair
+window. Both used eight workers and warm files. The paired 95% intervals
+included zero in both windows, spanning 38 ms slower to 53 ms faster and
+36 ms slower to 33 ms faster, respectively. In six separate profiled pairs,
+checking took **616 → 585 ms** and gathering Core **45 → 40 ms**. The checker
+still made 3.82 million type-resolution visits. Measure which of those visits
+delay the modules on the longest dependency chain.
+
+![Worker traffic and fresh Gdev build times across two timing windows](../benchmarks/evidence/measurements/2026-11-20-core-constructor-reads.png)
+
+The separate 128-record, 16-reader test sent **986,746 → 801,892 bytes**.
+Both compilers checked 19 modules and the Wasm returned 112. The earlier
+279-module Gdev revision sent **69.86 → 65.85 MB**. All 22 serial checker
+workloads matched on Wasm or diagnostics. The full release gate passed 1,119
+guest and host tests with 100 existing skips. All 283 Ink checks, Gdev's
+hardware frame and trace, and all 242 files of the 120-frame replay matched.
+Edits, rejections and recovery matched independent fresh compiles.
+
+Packing both full streams with LZ4 at acceleration 4 reduced traffic further,
+to 26.26 MB. It took 12 ms longer per fresh build at the paired median against
+the same queue with compression disabled (12 pairs, interval from 11 ms
+faster to 40 ms slower). Compressing Core alone saved 6 ms at the paired
+median, with an interval from 4 ms slower to 28 ms faster. The released
+compiler uses the smaller constructor representation directly.
+
+[Constructor read trace](../benchmarks/evidence/measurements/experiments/2026-11-20-core-constructor-reads.py) ·
+[Raw measurements and compiler identities](../benchmarks/evidence/measurements/2026-11-20-core-constructor-reads.json)
 
 ### Measurement plan
 

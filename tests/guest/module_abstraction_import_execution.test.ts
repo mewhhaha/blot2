@@ -379,26 +379,31 @@ Deno.test("forwarded constructor calls preserve the projection budget at the cut
   }
 });
 
-Deno.test("workers lower complete forwarded signatures for all constructor forms", async () => {
+Deno.test("workers resolve re-exported constructors in their defining module", async () => {
   const dir = await Deno.makeTempDir();
   try {
     await Deno.writeTextFile(
       dir + "/types.blot",
-      "type Choice is data = $Empty | $Count U32 | $Point { x: U32, y: U32 }\n",
+      [
+        "type Choice is data = $Empty | $Count U32 | $Point { x: U32, y: U32 }",
+        "type Box a is data = $Box { value: a }",
+      ].join("\n") + "\n",
     );
     await Deno.writeTextFile(
       dir + "/bridge.blot",
-      'export { Choice, Empty, Count, Point } from "./types"\n',
+      'export { Choice, Empty, Count, Point, Box } from "./types"\n',
     );
     await writeForwardedReaders(
       dir,
       [
-        'import { Choice, Empty, Count, Point } from "./bridge"',
+        'import { Choice, Empty, Count, Point, Box } from "./bridge"',
         "func val (c: Choice): U32 => return case c of",
         "  $Empty => 3",
         "  $Count n => n",
         "  $Point { x, y } => @u32.add x y",
-        "func read (n: U32): U32 => return @u32.add (val $Empty) (@u32.add (val ($Count n)) (val ($Point {x: n, y: 1})))",
+        "func boxed (box: Box Bool): U32 => return if box.value then 1 else 0",
+        "func count (box: Box U32): U32 => return box.value",
+        "func read (n: U32): U32 => return @u32.add (boxed ($Box {value: true})) (@u32.add (val $Empty) (@u32.add (val ($Count (count ($Box {value: n})))) (val ($Point {x: n, y: 1}))))",
       ].join("\n") + "\n",
     );
     const outputs = [];
@@ -414,7 +419,7 @@ Deno.test("workers lower complete forwarded signatures for all constructor forms
         if (!result.success) assert.fail(JSON.stringify(result.diagnostics));
         const guest = await instantiateGuest(result.bytes);
         try {
-          assert.equal(guest.call("answer", 7), 288);
+          assert.equal(guest.call("answer", 7), 304);
         } finally {
           guest.dispose();
         }
