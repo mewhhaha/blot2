@@ -51,7 +51,67 @@ fn sharedSignatures() {
     store.deinit();
 }
 
+// Rehash can move every remembered slot just before a sparse epoch ends.
+fn rehashedResolutionCache() {
+    for width in [6,22,32,33] {
+        var map=blot_check_types::Map_projection_resolutions{..};
+        for i in width {
+            let key=blot_check_types::ProjectionResolution{i as u32,0,1,..};
+            assert(map.insert(key,1));
+            assert(!map.insert(key,2));
+        }
+        var restored=blot_check_types::Map_projection_resolutions{..};
+        assert(restored.restore(map.slots,map.count)==blot_error::Error.none);
+        map.clear(); restored.clear();
+        for i in width {
+            let key=blot_check_types::ProjectionResolution{i as u32,0,1,..};
+            assert(map.insert(key,3) && restored.insert(key,3));
+        }
+        map.deinit(); restored.deinit();
+    }
+}
+
+// A dense cache followed by short inference epochs must forget old results.
+// The next dense phase and a restored live entry keep their exact charges.
+fn sparseResolutionEpochs() {
+    let ok=blot_error::Error.none;
+    var store,init=blot_check_types::init();
+    assert(init==ok);
+    store.has_projections=true;
+    var roots:u32[512]=[0;512];
+    for &root in roots {
+        let fresh,error=store.fresh();
+        assert(error==ok);
+        root=fresh;
+    }
+    for phase in 2 {
+        for root,index in roots {
+            let value,error=store.resolveDepth(root,0,1);
+            var expected=root;
+            if index<phase*64 {expected=blot_check_types::boolean;}
+            assert(error==ok && value==expected);
+        }
+        for i in 64 {
+            let changed=roots[phase*64+i];
+            assert(store.appendVersion(changed,blot_check_types::boolean)==ok);
+            let start=store.projection_steps;
+            let value,error=store.resolveDepth(changed,0,1);
+            assert(error==ok && value==blot_check_types::boolean && store.projection_steps==start+2);
+            if i==63 {
+                var snapshot,se=blot_check_type_store_snapshot::suspendStore(store);
+                assert(se==ok && blot_check_type_store_snapshot::restoreStore(snapshot,store)==ok);
+                assert(snapshot.deinit()==ok);
+            }
+            let cached,ce=store.resolveDepth(changed,0,1);
+            assert(ce==ok && cached==value && store.projection_steps==start+3);
+        }
+    }
+    store.deinit();
+}
+
 fn main() {
+    rehashedResolutionCache();
+    sparseResolutionEpochs();
     sharedSignatures();
     effectHistory();
     functionUnification();

@@ -1,13 +1,20 @@
 # Working on Blot and Gdev
 
+On pinned Gdev Main, fresh eight-worker compilation measured **690 → 682 ms** in
+20 alternating pairs. The checker cleared **48.81 → 2.28 million** cache slots
+and made **117,618 fewer** type-resolution visits. The interval includes zero.
+A second check on the newer 279-module Gdev commit measured 705 → 700 ms (12 pairs).
+The next measured target is constructor finalization. Resolving constructor
+signatures and payloads still accounts for 589,219 visits, including 91,559
+on the longest modeled dependency chain.
+[Cache measurements, timing and qualification](tasks/FAST_COMPILE.md#type-resolution-on-the-module-dependency-chain)
+
 On Gdev Main the Wasm backend read 728 constructor signatures, all from their
 defining modules. Workers now omit all **41,786** imported copies. This removed
 **80,419 Core type nodes** and cut worker replies from **71.28 to 67.17 MB**.
 Fresh Gdev compiles measured **853 → 849 ms** in 16 pairs and **1,303 → 1,308
 ms** in a busier 24-pair window. Both timing intervals included zero. The
 2,754,496-byte Wasm, Ink outcomes, hardware frame and replay matched.
-The next target is the 3.82 million type-resolution visits. Attribute them to
-the modules that delay dependent work before changing the solver.
 [Constructor reads, packing experiment and release measurements](tasks/FAST_COMPILE.md#constructor-signatures-in-wasm-compilation)
 
 The previous change cut local inference nodes created by imports from

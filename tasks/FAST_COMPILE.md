@@ -3,6 +3,72 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Type resolution on the module dependency chain
+
+A module can start checking once its imports have published their inferred
+interfaces. Across six fresh Gdev runs, world storage and game were on the
+path to the last interface every time. Robots was on it five times. Weighting
+each module by its median check and publication CPU time gave a 20-module
+path containing 965,193 of the original 3,818,160 resolution visits. This path
+accounts for work that can delay consumers. Queueing, lowering, and backend
+time are outside its weights.
+
+The checker discarded a table of nested type results whenever the solver
+changed. After one large inference step, even a step that populated three
+entries could scan thousands of slots. The table now remembers the first
+32 occupied positions. Short steps clear those positions directly, and dense
+steps keep the sequential scan. Restoring a saved solver rebuilds this index
+from the occupied slots. Ordinary calls also reuse the callee type they just
+resolved when the raw input is identical and the first read allocated no
+types or effect rows. Generative calls, calls that unwrap a callable type, and associated-type
+projections keep their required reads and budget charges.
+
+| Work on Gdev Main | Previous | Current |
+| --- | ---: | ---: |
+| Cache slots cleared across 280 modules | 48,805,480 | 2,276,974 |
+| Cache slots cleared on the 20-module path | 22,070,400 | 865,398 |
+| Table grows across the project | 2,353 | 2,353 |
+| Type-resolution visits across the project | 3,818,160 | 3,700,542 |
+| Visits inside ordinary application checking | 480,495 | 362,877 |
+| Visits on the 20-module path | 965,193 | 938,355 |
+
+The worker caches discarded the same 1,133,821 live entries. The type checker
+allocated the same 1,355,631 type nodes. The largest remaining consumers of
+resolution on the baseline path were unification (241,411 visits) and settling
+expression and binding types (119,252). Settling constructor signatures and
+payloads took 589,219 visits across the graph. That work recurs in modules
+that import and forward the same types, including both session and main.
+
+Returning sparse tables to the pool cut scans but made a dense/sparse
+alternation grow tables repeatedly. Its isolated time went from 2.50 to
+10.38 ms. With the retained table, 512 short steps following a dense step
+measured **17.61 → 0.69 ms**.
+Dense-only measured 1.30 → 1.43 ms and
+immediate alternation 1.40 → 1.42 ms
+in the same 16 paired runs. Both control intervals include zero.
+
+Fresh release builds measured **690 → 682 ms** over 20 alternating pairs
+with eight workers, a fresh compiler process and a warm filesystem. The 95%
+bootstrap interval for the median paired saving was -10 to +9 ms.
+The interval includes zero. In eight separate profiled pairs, the checking phase measured
+**372 → 366 ms**, and check-plus-publication CPU summed over the original path
+measured **331 → 326 ms**. All comparisons use the same committed
+Gdev, Ink and standard library snapshots. A separate 12-pair comparison on
+the newer committed 279-module Gdev snapshot (`33aab6e`) measured **705 → 700 ms**.
+Its paired interval was −28 to +34 ms. Both compiler binaries emitted the
+same 2,733,364-byte Wasm for that snapshot.
+
+![Cache work and release times for pinned Gdev Main](../benchmarks/evidence/measurements/2026-11-20-resolution-chain.png)
+
+The full compiler gate passed. All 19 general checker programs preserved Wasm
+or diagnostics, as did retained edits, three rejected revisions and recovery.
+All 283 Ink checks passed. Gdev's 2,754,496-byte Wasm, hardware frame and
+242 replay files matched the previous release. Native tests cover rehashing,
+restoring partial tables, and exact inference charges on a restored cache hit.
+[Raw measurements, controls and source identities](../benchmarks/evidence/measurements/2026-11-20-resolution-chain.json) ·
+[Per-module work profiler](../benchmarks/evidence/measurements/experiments/2026-11-20-resolution-work.py) ·
+[Isolated cache workload](../benchmarks/evidence/measurements/experiments/2026-11-20-cache-epochs.goose)
+
 ## General type-checker performance
 
 Type checking now builds a membership index for generalized type variables

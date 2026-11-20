@@ -2382,7 +2382,12 @@ fn each<F>(map: Map_associated_equations&) { for &slot in map.slots { if slot.ta
 
 reusable[] var pool_Map_associated_equations:dictionary_slot<Id,Id>[>..];
 fn restore(map:Map_associated_equations&,slots:const dictionary_slot<Id,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_Map_associated_equations.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return blot_error::Error.none;}
-struct Map_projection_resolutions { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<ProjectionResolution,Id>[:] = default<dictionary_slot<ProjectionResolution,Id>[:]>() }
+struct Map_projection_resolutions {
+    count:i64=0, failure:Error=blot_error::Error.none,
+    slots:dictionary_slot<ProjectionResolution,Id>[:]=default<dictionary_slot<ProjectionResolution,Id>[:]>(),
+    // Small epochs clear just the occupied slots. Larger epochs scan the table.
+    touched:i64[32]=[0;32],
+}
 fn probe(map: const Map_projection_resolutions&,key: ProjectionResolution) -> i64 {
     if map.count == 0 { return -1; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
@@ -2392,9 +2397,18 @@ fn get(map: const Map_projection_resolutions&,key: ProjectionResolution) -> Id? 
 fn contains(map: const Map_projection_resolutions&,key: ProjectionResolution) -> bool { return probe(map,key) >= 0; }
 fn release(slots: dictionary_slot<ProjectionResolution,Id>[:]) { if slots.len != 0 { pool_Map_projection_resolutions.free_slice(slots); } }
 fn grow(map: Map_projection_resolutions&,capacity: i64) {
-    if map.failure != blot_error::Error.none { return; } if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = blot_error::Error.out_of_memory; return; }
-    let replacement = pool_Map_projection_resolutions.alloc_slice(capacity); for &slot in replacement { slot = dictionary_slot<ProjectionResolution,Id> { default<ProjectionResolution>(),default<Id>(),0 }; }
-    for slot in map.slots { if slot.tag != 0 { var index = (slot.key.hash() & ((capacity - 1) as u64)) as i64; while replacement[index].tag != 0 { index = (index + 1) & (capacity - 1); } replacement[index] = slot; } }
+    if map.failure != blot_error::Error.none { return; }
+    if capacity < 8 || capacity > 0x1fffffffffffffff { map.failure = blot_error::Error.out_of_memory; return; }
+    let replacement = pool_Map_projection_resolutions.alloc_slice(capacity);
+    for &slot in replacement { slot = dictionary_slot<ProjectionResolution,Id> { default<ProjectionResolution>(),default<Id>(),0 }; }
+    var moved:i64=0;
+    for slot in map.slots {
+        if slot.tag==0 {continue;}
+        var index=(slot.key.hash() & ((capacity-1) as u64)) as i64;
+        while replacement[index].tag!=0 {index=(index+1) & (capacity-1);}
+        replacement[index]=slot;
+        if map.count<=map.touched.len {map.touched[moved]=index; moved+=1;}
+    }
     release(map.slots); map.slots = replacement;
 }
 fn insert(map: Map_projection_resolutions&,key: ProjectionResolution,value: Id) -> bool {
@@ -2402,20 +2416,47 @@ fn insert(map: Map_projection_resolutions&,key: ProjectionResolution,value: Id) 
     if map.slots.len == 0 { grow(map,8); } else if (map.count + 1) * 3 > map.slots.len * 2 { grow(map,map.slots.len * 2); }
     if map.failure != blot_error::Error.none { return false; }
     let hash = key.hash(); let tag = (hash as! u32) | 2147483648; let mask = map.slots.len - 1; var index = (hash & (mask as u64)) as i64;
-    loop { let present = map.slots[index].tag; if present == 0 { map.slots[index] = dictionary_slot<ProjectionResolution,Id> { key,value,tag }; map.count++; return true; } if present == tag && map.slots[index].key == key { map.slots[index] = dictionary_slot<ProjectionResolution,Id> { map.slots[index].key,value,tag }; return false; } index = (index + 1) & mask; }
+    loop {
+        let present=map.slots[index].tag;
+        if present==0 {
+            map.slots[index]=dictionary_slot<ProjectionResolution,Id>{key,value,tag};
+            if map.count<map.touched.len {map.touched[map.count]=index;}
+            map.count+=1;
+            return true;
+        }
+        if present==tag && map.slots[index].key==key {map.slots[index].val=value; return false;}
+        index=(index+1) & mask;
+    }
 }
-fn remove(map: Map_projection_resolutions&,key: ProjectionResolution) -> bool {
-    var hole = probe(map,key); if hole < 0 { return false; } let mask = map.slots.len - 1; var index = hole;
-    loop { index = (index + 1) & mask; let tag = map.slots[index].tag; if tag == 0 { break; } let home = (map.slots[index].key.hash() & (mask as u64)) as i64; if ((index - home) & mask) >= ((index - hole) & mask) { map.slots[hole] = map.slots[index]; hole = index; } }
-    map.slots[hole] = dictionary_slot<ProjectionResolution,Id> { default<ProjectionResolution>(),default<Id>(),0 }; map.count--; return true;
+fn clear(map: Map_projection_resolutions&) {
+    if map.count<=map.touched.len {
+        for index in map.touched[..map.count] {map.slots[index].tag=0;}
+    } else {
+        for &slot in map.slots {slot.tag=0;}
+    }
+    map.count=0;
 }
-fn clear(map: Map_projection_resolutions&) { for &slot in map.slots { slot.tag = 0; } map.count = 0; }
 fn deinit(map: Map_projection_resolutions&) { release(map.slots); map.slots=default<dictionary_slot<ProjectionResolution,Id>[:]>(); map.count = 0;map.failure=blot_error::Error.none; }
-fn clone(map: const Map_projection_resolutions&) -> Map_projection_resolutions { var copy = Map_projection_resolutions {..}; if map.slots.len != 0 { let slots = pool_Map_projection_resolutions.alloc_slice(map.slots.len); for slot,index in map.slots { slots[index] = slot; } copy.slots = slots; copy.count = map.count; } return copy; }
 fn each<F>(map: Map_projection_resolutions&) { for &slot in map.slots { if slot.tag != 0 { F(slot.key,&slot.val); } } }
 
 reusable[] var pool_Map_projection_resolutions:dictionary_slot<ProjectionResolution,Id>[>..];
-fn restore(map:Map_projection_resolutions&,slots:const dictionary_slot<ProjectionResolution,Id>[:],count:i64)->Error {map.deinit();if slots.len==0 {if count!=0 {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}let run=pool_Map_projection_resolutions.alloc_slice(slots.len);for slot,index in slots {run[index]=slot;}map.slots=run;map.count=count;return blot_error::Error.none;}
+fn restore(map:Map_projection_resolutions&,slots:const dictionary_slot<ProjectionResolution,Id>[:],count:i64)->Error {
+    map.deinit();
+    if count<0 || count>slots.len {return blot_error::Error.invalid_artifact;}
+    if slots.len==0 {return blot_error::Error.none;}
+    let run=pool_Map_projection_resolutions.alloc_slice(slots.len);
+    var live:i64=0;
+    for slot,index in slots {
+        run[index]=slot;
+        if slot.tag!=0 {
+            if live<map.touched.len {map.touched[live]=index;}
+            live+=1;
+        }
+    }
+    if live!=count {release(run); return blot_error::Error.invalid_artifact;}
+    map.slots=run; map.count=count;
+    return blot_error::Error.none;
+}
 struct Map_operation_chains { count: i64 = 0, failure:Error=blot_error::Error.none, slots: dictionary_slot<OperationKey,OperationChain>[:] = default<dictionary_slot<OperationKey,OperationChain>[:]>() }
 fn probe(map: const Map_operation_chains&,key: OperationKey) -> i64 {
     if map.count == 0 { return -1; }

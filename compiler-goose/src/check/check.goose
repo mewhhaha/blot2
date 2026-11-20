@@ -2967,7 +2967,63 @@ recursive fn applicationAfterArity(self_:Engine&,id:u32,node:blot_parse_ast::Nod
  if head.tag==blot_parse_ast::tag_intrinsic && self_.pool.get(head.a)=="@panic" {var argument=node.b;while self_.tree.node(argument).tag==blot_parse_ast::tag_group {argument=self_.tree.node(argument).a;}if self_.tree.node(argument).tag!=blot_parse_ast::tag_string {let err=self_.diagnostic(Code.call_arity,argument);if err!=blot_error::Error.none {return 0,err;}}return blot_check_types::never,blot_error::Error.none;}
  let projection,err=self_.productProjection(id);if err!=blot_error::Error.none {return 0,err;}if projection.present {return projection.value,blot_error::Error.none;}let associated,err=self_.associatedApplication(id);if err!=blot_error::Error.none {return 0,err;}if associated.present {return associated.value,blot_error::Error.none;}let result,err=self_.resultApplication(id);if err!=blot_error::Error.none {return 0,err;}if result.present {return result.value,blot_error::Error.none;}return self_.ordinaryApplication(id,leaf);
 }
-recursive fn ordinaryApplication(self_:Engine&,id:u32,leaf:u32)->u32,blot_error::Error {let node=self_.tree.node(id);let pending_begin=self_.pending.len;let expression,err=self_.expression(node.a);if err!=blot_error::Error.none {return 0,err;}let resolved,err=self_.types.resolve(expression,0);if err!=blot_error::Error.none {return 0,err;}let opened,err=self_.types.openCovariant(resolved);if err!=blot_error::Error.none {return 0,err;}var function_ty=opened;var rank_goals=blot_check_types::List{..};if self_.types.node(function_ty).tag==blot_check_types::Tag.forall {let instance,err=self_.types.instantiateRank(function_ty,false);if err!=blot_error::Error.none {return 0,err;}let body,err=self_.types.openCovariant(instance.body);if err!=blot_error::Error.none {return 0,err;}function_ty=body;rank_goals=instance.goals;self_.expr_types[node.a]=function_ty;}let qualified_id,err=self_.types.resolve(function_ty,0);if err!=blot_error::Error.none {return 0,err;}let qualified=self_.types.node(qualified_id);let cleanup=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_cleanup;let concurrent=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_concurrent;if qualified.tag==blot_check_types::Tag.usage && (qualified.b==blot_parse_ast::usagekind_once || qualified.b==blot_parse_ast::usagekind_many || cleanup || concurrent) {function_ty=qualified.a;}let fresh,err=self_.freshGenerativeInvocation(id,function_ty);if err!=blot_error::Error.none {return 0,err;}function_ty=fresh;self_.expr_types[node.a]=function_ty;if cleanup || concurrent {self_.expr_types[node.a]=qualified_id;}let root,err=self_.types.resolve(function_ty,0);if err!=blot_error::Error.none {return 0,err;}let function=self_.types.node(root);let saved=self_.exact_argument_types;let evidence,err=self_.evidenceCall(node.a,0);if err!=blot_error::Error.none {return 0,err;}self_.exact_argument_types=saved || evidence;let argument,error=ordinaryArgument(self_,node.b,function);self_.exact_argument_types=saved;if error!=blot_error::Error.none {return 0,error;}return ordinaryApplicationFinish(self_,id,leaf,node,pending_begin,function_ty,function,argument,rank_goals);}
+recursive fn ordinaryApplication(self_:Engine&,id:u32,leaf:u32)->u32,blot_error::Error {
+    let node=self_.tree.node(id);
+    let pending_begin=self_.pending.len;
+    let expression,err=self_.expression(node.a);
+    if err!=blot_error::Error.none {return 0,err;}
+    let resolved,err=self_.types.resolve(expression,0);
+    if err!=blot_error::Error.none {return 0,err;}
+    let opened,err=self_.types.openCovariant(resolved);
+    if err!=blot_error::Error.none {return 0,err;}
+    var function_ty=opened;
+    var rank_goals=blot_check_types::List{..};
+    if self_.types.node(function_ty).tag==blot_check_types::Tag.forall {
+        let instance,err=self_.types.instantiateRank(function_ty,false);
+        if err!=blot_error::Error.none {return 0,err;}
+        let body,err=self_.types.openCovariant(instance.body);
+        if err!=blot_error::Error.none {return 0,err;}
+        function_ty=body;
+        rank_goals=instance.goals;
+        self_.expr_types[node.a]=function_ty;
+    }
+    let qualified_input=function_ty;
+    let nodes_before=self_.types.nodes.len;
+    let rows_before=self_.types.effects.rows.len;
+    let qualified_id,err=self_.types.resolve(qualified_input,0);
+    if err!=blot_error::Error.none {return 0,err;}
+    let qualified=self_.types.node(qualified_id);
+    let cleanup=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_cleanup;
+    let concurrent=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_concurrent;
+    if qualified.tag==blot_check_types::Tag.usage && (qualified.b==blot_parse_ast::usagekind_once || qualified.b==blot_parse_ast::usagekind_many || cleanup || concurrent) {
+        function_ty=qualified.a;
+    }
+    // A repeat can hit a store limit if the first read built temporary
+    // nodes or rows. Projected calls also charge each visit to their budget.
+    let repeat=self_.types.has_projections || self_.generative_bindings.len!=0 ||
+        function_ty!=qualified_input || self_.types.nodes.len!=nodes_before || self_.types.effects.rows.len!=rows_before;
+    if self_.generative_bindings.len!=0 {
+        let fresh,err=self_.freshGenerativeInvocation(id,function_ty);
+        if err!=blot_error::Error.none {return 0,err;}
+        function_ty=fresh;
+    }
+    self_.expr_types[node.a]=function_ty;
+    if cleanup || concurrent {self_.expr_types[node.a]=qualified_id;}
+    var function=qualified;
+    if repeat {
+        let root,err=self_.types.resolve(function_ty,0);
+        if err!=blot_error::Error.none {return 0,err;}
+        function=self_.types.node(root);
+    }
+    let saved=self_.exact_argument_types;
+    let evidence,err=self_.evidenceCall(node.a,0);
+    if err!=blot_error::Error.none {return 0,err;}
+    self_.exact_argument_types=saved || evidence;
+    let argument,error=ordinaryArgument(self_,node.b,function);
+    self_.exact_argument_types=saved;
+    if error!=blot_error::Error.none {return 0,error;}
+    return ordinaryApplicationFinish(self_,id,leaf,node,pending_begin,function_ty,function,argument,rank_goals);
+}
 recursive fn ordinaryArgument(self_:Engine&,source:u32,function:blot_check_types::Node)->u32,blot_error::Error {if function.tag==blot_check_types::Tag.function {var wanted=function.a;let outer=self_.types.node(self_.types.head(wanted,0));if outer.tag==blot_check_types::Tag.usage && outer.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own) {wanted=outer.a;}let root,err=self_.types.resolve(wanted,0);if err!=blot_error::Error.none {return 0,err;}var taking=false;if self_.types.node(root).tag==blot_check_types::Tag.function {let first=self_.types.node(self_.types.head(self_.types.node(root).a,0));taking=first.tag==blot_check_types::Tag.usage && first.b==blot_check_types::usageCode(blot_parse_ast::usagekind_own);}if self_.types.node(root).tag==blot_check_types::Tag.forall || taking || self_.types.node(self_.types.head(wanted,0)).tag==blot_check_types::Tag.usage || blot_check_storage_types::isArray(self_.types,self_.types.head(wanted,0)) {return self_.contextualLambda(source,wanted);}}return self_.checkArgument(source);}
 recursive fn ordinaryApplicationFinish(self_:Engine&,id:u32,leaf:u32,node:blot_parse_ast::Node,pending_begin:i64,function_ty:u32,function:blot_check_types::Node,argument:u32,rank_goals:blot_check_types::List)->u32,blot_error::Error {
  if self_.has_tasks && self_.spawnUse(node.b).present {let err=self_.diagnostic(Code.task_capture_transfer,node.b);if err!=blot_error::Error.none {return 0,err;}}
