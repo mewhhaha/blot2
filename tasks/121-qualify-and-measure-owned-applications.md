@@ -103,3 +103,18 @@ Pen explicitly selects Cranelift inlining for release and portable AOT, with dev
 A real Ink ordered hash over 16,384 keys returned 2,809,217,323 in both modes. Median execution fell from 171 to 62 µs. Both modes passed the same 283 Ink checks. Three fresh-cache hardware Gdev launches per mode used identical 2,754,496-byte Main Wasm. All six produced identical 640 × 480 PNGs and guest traces. Median first complete frame was 2225 ms off and 3056 ms on, including startup and rendering. This cost supports retaining the fast development default. No full-game steady-state speedup is claimed from one-frame runs.
 
 [Sources and reproduction](../benchmarks/checked-grid/README.md) · [Matched kernels, metadata and raw distributions](../benchmarks/evidence/measurements/checked-grid/release.json.gz) · [Ink and Gdev application runs](../benchmarks/evidence/measurements/checked-grid/applications.json.gz) · [Pen engine and compatibility test](https://github.com/mewhhaha/pen/commit/3a6a531)
+
+### Reusing the descriptor in a scalar range
+
+A fixed scalar array already validates its owner and generation when the range reads its length. In a small straight-line loop containing only scalar operations and reads at the induction variable, the compiler now loads the base and extent from that same entry. The existing unsigned induction test proves the element is in bounds. The normal member-dispatch target must actually return the primitive length of its parameter. A custom prelude with different length semantics takes the ordinary path. Calls without a scalar forwarding proof, writes, resizes, views and early exits also retain checked lowering. The proof visits at most 96 Core nodes.
+
+With inlining enabled, the old native loop checked the same unsigned bound twice and loaded the array base each iteration. The new loop checks the range once and retains the base in a register. The element address is still a Wasm32 base plus a scaled index. Validation happens at the original range-end expression. The fixed-array scan produced 2,139 Wasm bytes (previously 2,179) and 21,080 native artifact bytes (previously 21,192).
+
+| Scan, 13 randomized rounds | Previous p50 / p95 µs | Checked range p50 / p95 µs | Rust p50 / p95 µs |
+| --- | ---: | ---: | ---: |
+| Release inlining | 13.45 / 25.86 | 12.87 / 21.84 | 9.16 / 18.52 |
+| Inlining off | 70.58 / 115.52 | 11.13 / 17.97 | 8.99 / 18.11 |
+
+The median paired process ratio with inlining was 0.941 and 11 of 13 pairs improved. A separate 13-pair run with the debug compiler producing the candidate Wasm improved 13 of 13 pairs. Source compilation of the small scan, including startup and std, measured 23.60 → 23.92 ms. The writer, view, grid, parser and packet controls produced identical Wasm under both compilers. The 283 Ink results and pinned Gdev's 2,754,496 Wasm bytes matched. Gdev's six paired fresh compiles with eight workers measured 817 → 824 ms under concurrent load, and its rendered frame and trace matched.
+
+[All 546 runtime processes and 182 fresh compiler timings](../benchmarks/evidence/measurements/checked-grid/checked-range.json.gz) · [Native instructions, Gdev timings and integration identities](../benchmarks/evidence/measurements/checked-grid/range-checks.json.gz)

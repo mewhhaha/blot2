@@ -254,6 +254,20 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) ->
     let address_function = g.runtime_().address;
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return 0, error; }
+    let range = f.checked_range;
+    if range.slot != 0xffffffff && index == range.index && tagOf(g, container.ty) == blot_direct_types::Tag.array &&
+        w(g, container, 0) == range.slot && w(g, container, 1) == range.generation {
+        let step, error = stride(g, f, element, id);
+        if error != blot_direct_types::Error.none { return 0, error; }
+        let address = local32(g, f);
+        lget(g, range.base);
+        lget(g, index);
+        i32Const(g, step);
+        op(g, OP_i32_mul);
+        op(g, OP_i32_add);
+        lset(g, address);
+        return address, blot_direct_types::Error.none;
+    }
     var position = index;
     if tagOf(g, container.ty) == blot_direct_types::Tag.view {
         lget(g, index);

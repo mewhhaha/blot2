@@ -49,7 +49,14 @@ type ValType = blot_direct_writer::ValType;
 type Chars = const u8[:];
 
 struct ScratchCut { target: u32 = 0, owner: u32 = 0, stack: u32 = 0 }
+struct CheckedRange {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    index: u32 = 0,
+    base: u32 = 0
+}
 struct Fn {
+    checked_range: CheckedRange = CheckedRange {},
     sites_base:i64=0,
     scratch_body: u32 = 0,
     scratch_cut: ScratchCut = ScratchCut {},

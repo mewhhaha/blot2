@@ -1,5 +1,11 @@
 # Working on Blot and Gdev
 
+Fixed scalar scans now reuse the checked array descriptor across a proved range.
+With release inlining the scan measured **13.45 → 12.87 µs** median and **25.86 →
+21.84 µs** p95. Pinned Gdev retained identical Wasm and measured **817 → 824 ms**
+across six fresh-build pairs under load.
+[Checked ranges, native instructions and controls](tasks/121-qualify-and-measure-owned-applications.md#reusing-the-descriptor-in-a-scalar-range)
+
 On pinned Gdev Main, unification takes **17.2% fewer recursive resolver
 entries**. The checker makes **559,567 fewer** entries overall. Open function
 unification measured **19.94 → 15.39 ms** in an isolated CPU benchmark.
