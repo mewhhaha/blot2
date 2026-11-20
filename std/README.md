@@ -400,9 +400,11 @@ work in `for` and comprehensions, including effectful traversal and early exit.
 Independent cursor copies retain their own positions.
 
 Import [iter.blot](iter.blot) for source-defined `range`, `zip`, `zip_strict`,
-`enumerate`, `windows`, `take`, `take_while`, `map`, `filter`, `fold_left`,
-`any`, `all`, `collect_list` and `collect_array`. Adapters are lazy; collection
-is explicit. `windows` requires positive width and returns complete List
+`enumerate`, `windows`, `take`, `take_while`, `drop`, `map`, `filter`,
+`fold_left`, `any`, `all`, `find`, `position`, `collect_list` and
+`collect_array`. Adapters are lazy; collection is explicit. `find` and
+`position` stop at the first match and return Maybe. `windows` requires
+positive width and returns complete List
 windows. `zip` polls left before right and stops at either end; `zip_strict`
 traps if lengths differ.
 [The protocol and examples](../docs/language/guide.md#lists-arrays-and-libraries)
