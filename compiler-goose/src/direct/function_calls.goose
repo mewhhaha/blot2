@@ -236,6 +236,48 @@ fn applyClosure(g: Generator&, f: Fn&, callee: Val, argument: Val, id: u32) -> V
 }
 recursive fn apply(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
+    // Unwind `receiver.method a1 ... aK` into a direct call without allocating
+    // intermediate partial-application closures or using `call_indirect`.
+    var chain_args: u32[8] = [0; 8];
+    var chain_len: i64 = 0;
+    var cursor = id;
+    while m.node(cursor).tag == blot_check_core::Tag.apply && chain_len < 8 {
+        chain_args[chain_len] = m.node(cursor).b;
+        chain_len += 1;
+        cursor = m.node(cursor).a;
+    }
+    if chain_len > 0 && m.node(cursor).tag == blot_check_core::Tag.project {
+        let proj = m.node(cursor);
+        let receiver, error = expr(g, f, proj.a);
+        if error != blot_direct_types::Error.none { return receiver, error; }
+        let field_val, target, is_method, error = projectFieldOrMethod(g, f, cursor, receiver);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if is_method {
+            let all_args = g.reserveVals(1 + chain_len);
+            g.s.vals[all_args.start] = receiver;
+            for step in 0..chain_len {
+                let arg_node = chain_args[chain_len - 1 - step];
+                let val, error = expr(g, f, arg_node);
+                if error != blot_direct_types::Error.none { return val, error; }
+                g.s.vals[all_args.start + 1 + step] = val;
+            }
+            let callee, error = calleeOf(g, f, target, all_args, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let rest, error = restType(g, f, callee, all_args.len as i64, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            return callTarget(g, f, target, all_args, callee, rest, id);
+        }
+        var current = field_val;
+        for step in 0..chain_len {
+            let arg_node = chain_args[chain_len - 1 - step];
+            let arg_val, error = expr(g, f, arg_node);
+            if error != blot_direct_types::Error.none { return arg_val, error; }
+            let applied, error = applyClosure(g, f, current, arg_val, id);
+            if error != blot_direct_types::Error.none { return applied, error; }
+            current = applied;
+        }
+        return current, blot_direct_types::Error.none;
+    }
     let n = m.node(id);
     let callee, error = expr(g, f, n.a);
     if error != blot_direct_types::Error.none { return callee, error; }
@@ -813,6 +855,11 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
         if inner_arguments.len > 8 { return neverVal(), false, blot_direct_types::Error.none; }
         for operand, at in inner_arguments { operands[at] = operand; }
         operand_count = inner_arguments.len;
+    } else if n.tag == blot_check_core::Tag.array_op || n.tag == blot_check_core::Tag.storage {
+        let children = tm.children(root);
+        if children.len == 0 || children.len > 8 { return neverVal(), false, blot_direct_types::Error.none; }
+        for operand, at in children { operands[at] = operand; }
+        operand_count = children.len;
     } else { return neverVal(), false, blot_direct_types::Error.none; }
     let forwarded = g.reserveVals(operand_count);
     for at in 0..operand_count {
@@ -829,6 +876,94 @@ recursive fn forward(g: Generator&, f: Fn&, tm: const Module&, body: const blot_
             }
         }
         if !found { return neverVal(), false, blot_direct_types::Error.none; }
+    }
+    if n.tag == blot_check_core::Tag.array_op {
+        let operation = tm.arrayOperation(root);
+        match operation {
+            length => {
+                if operand_count != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+                let length, error = lengthOf(g, f, g.s.vals[forwarded.start], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                return valOf1(g, blot_direct_types::u32_, length), true, blot_direct_types::Error.none;
+            },
+            get => {
+                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
+                return value, true, error;
+            },
+            fill, generate => {
+                if operand_count != 2 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                let count, error = scalarLocal(g, f, g.s.vals[forwarded.start], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                let value, error = emitFillOrGenerate(g, f, operation == blot_backend_collection_ops::Op.fill, count, g.s.vals[forwarded.start + 1], result, id);
+                return value, true, error;
+            },
+            _ => { return neverVal(), false, blot_direct_types::Error.none; },
+        }
+    }
+    if n.tag == blot_check_core::Tag.storage {
+        let operation, decoded = blot_check_storage_ops::opFromCode(n.c);
+        if decoded != blot_error::Error.none { return neverVal(), false, blot_direct_types::Error.none; }
+        match operation {
+            length => {
+                if operand_count != 1 { return neverVal(), false, blot_direct_types::Error.none; }
+                let length, error = lengthOf(g, f, g.s.vals[forwarded.start], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                return valOf1(g, blot_direct_types::u32_, length), true, blot_direct_types::Error.none;
+            },
+            read => {
+                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                let index, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                let value, error = readElement(g, f, g.s.vals[forwarded.start], index, id);
+                return value, true, error;
+            },
+            push => {
+                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                let pushed = g.s.vals[forwarded.start + 1];
+                let holds, herr = g.contentsHoldMemory(pushed.ty);
+                if herr != blot_direct_types::Error.none { return neverVal(), false, herr; }
+                if holds { return neverVal(), false, blot_direct_types::Error.none; }
+                let value, error = emitStoragePushVal(g, f, g.s.vals[forwarded.start], pushed, id);
+                return value, true, error;
+            },
+            truncate => {
+                if operand_count != 2 { return neverVal(), false, blot_direct_types::Error.none; }
+                let container = g.s.vals[forwarded.start];
+                let count, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                lget(g, w(g, container, 0));
+                lget(g, w(g, container, 1));
+                lget(g, count);
+                callf(g, g.runtime_().truncate);
+                return unitVal(), true, blot_direct_types::Error.none;
+            },
+            freeze => {
+                if operand_count != 1 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                let container = g.s.vals[forwarded.start];
+                lget(g, w(g, container, 0));
+                lget(g, w(g, container, 1));
+                callf(g, g.runtime_().freeze);
+                return Val { result, container.start, container.len }, true, blot_direct_types::Error.none;
+            },
+            copy => {
+                if operand_count != 1 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                let value, error = deepCopyValue(g, f, g.s.vals[forwarded.start], result, id, 0);
+                return value, true, error;
+            },
+            view => {
+                if operand_count != 3 || tagOf(g, result) == blot_direct_types::Tag.never { return neverVal(), false, blot_direct_types::Error.none; }
+                let start, error = scalarLocal(g, f, g.s.vals[forwarded.start + 1], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                let end, error = scalarLocal(g, f, g.s.vals[forwarded.start + 2], id);
+                if error != blot_direct_types::Error.none { return neverVal(), false, error; }
+                let value, error = emitStorageViewVal(g, f, g.s.vals[forwarded.start], start, end, result, id);
+                return value, true, error;
+            },
+            _ => { return neverVal(), false, blot_direct_types::Error.none; },
+        }
     }
     if n.tag == blot_check_core::Tag.associated {
         let left = g.s.vals[forwarded.start];

@@ -442,6 +442,7 @@ recursive fn logical(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let copied = copy(g, f, right, result, id);
             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
         }
+        popCheckedArraysAt(f, opened);
         op(g, OP_else_);
         i32Const(g, 0);
         lset(g, w(g, result, 0));
@@ -449,6 +450,7 @@ recursive fn logical(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let opened = open(g, f, OP_if_);
         i32Const(g, 1);
         lset(g, w(g, result, 0));
+        popCheckedArraysAt(f, opened);
         op(g, OP_else_);
         let right, error = stmt(g, f, n.b);
         if error != blot_direct_types::Error.none { return right, error; }

@@ -49,12 +49,37 @@ type ValType = blot_direct_writer::ValType;
 type Chars = const u8[:];
 
 struct ScratchCut { target: u32 = 0, owner: u32 = 0, stack: u32 = 0 }
+struct CheckedArray {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    base: u32 = 0,
+    length: u32 = 0,
+    depth: u32 = 0
+}
+struct CheckedGrow {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    entry: u32 = 0,
+    depth: u32 = 0
+}
+struct CheckedView {
+    slot: u32 = 0xffffffff,
+    generation: u32 = 0,
+    start: u32 = 0,
+    length: u32 = 0,
+    base: u32 = 0,
+    depth: u32 = 0
+}
 struct CheckedRange {
     slot: u32 = 0xffffffff,
     generation: u32 = 0,
     index: u32 = 0,
     base: u32 = 0,
-    length_ty: TId = 0
+    length_ty: TId = 0,
+    end_local: u32 = 0xffffffff,
+    is_view: bool = false,
+    trusted_view: bool = false,
+    view_start: u32 = 0
 }
 struct ComptimeFrame {
     binder: u32 = 0,
@@ -69,6 +94,12 @@ struct ComptimeFrame {
 }
 struct Fn {
     checked_range: CheckedRange = CheckedRange {},
+    checked_arrays: CheckedArray[16] = [CheckedArray {}; 16],
+    checked_arrays_len: i64 = 0,
+    checked_grows: CheckedGrow[8] = [CheckedGrow {}; 8],
+    checked_grows_len: i64 = 0,
+    checked_views: CheckedView[8] = [CheckedView {}; 8],
+    checked_views_len: i64 = 0,
     comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
     comptime_len: i64 = 0,
     sites_base:i64=0,
@@ -149,6 +180,134 @@ fn open(g: Generator&, f: Fn&, kind: u8) -> u32 {
 fn close(g: Generator&, f: Fn&) {
     g.s.code.push(OP_end);
     f.depth -= 1;
+    popCheckedArrays(f, f.depth);
+}
+fn popCheckedArrays(f: Fn&, max_depth: u32) {
+    while f.checked_arrays_len > 0 && f.checked_arrays[f.checked_arrays_len - 1].depth > max_depth {
+        f.checked_arrays_len -= 1;
+    }
+    while f.checked_grows_len > 0 && f.checked_grows[f.checked_grows_len - 1].depth > max_depth {
+        f.checked_grows_len -= 1;
+    }
+    while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth > max_depth {
+        f.checked_views_len -= 1;
+    }
+}
+fn popCheckedArraysAt(f: Fn&, depth: u32) {
+    while f.checked_arrays_len > 0 && f.checked_arrays[f.checked_arrays_len - 1].depth >= depth {
+        f.checked_arrays_len -= 1;
+    }
+    while f.checked_grows_len > 0 && f.checked_grows[f.checked_grows_len - 1].depth >= depth {
+        f.checked_grows_len -= 1;
+    }
+    while f.checked_views_len > 0 && f.checked_views[f.checked_views_len - 1].depth >= depth {
+        f.checked_views_len -= 1;
+    }
+}
+fn findCheckedArray(f: const Fn&, slot: u32, generation: u32) -> i64 {
+    var i = f.checked_arrays_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_arrays[i];
+        if entry.slot == slot && entry.generation == generation { return i; }
+    }
+    return -1;
+}
+fn recordCheckedArray(f: Fn&, slot: u32, generation: u32, base: u32, length: u32) {
+    if findCheckedArray(f, slot, generation) >= 0 { return; }
+    if f.checked_arrays_len >= 16 { return; }
+    f.checked_arrays[f.checked_arrays_len] = CheckedArray { slot: slot, generation: generation, base: base, length: length, depth: f.depth };
+    f.checked_arrays_len += 1;
+}
+fn findCheckedGrow(f: const Fn&, slot: u32, generation: u32) -> i64 {
+    var i = f.checked_grows_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_grows[i];
+        if entry.slot == slot && entry.generation == generation { return i; }
+    }
+    return -1;
+}
+fn recordCheckedGrow(f: Fn&, slot: u32, generation: u32, entry: u32) {
+    if findCheckedGrow(f, slot, generation) >= 0 { return; }
+    if f.checked_grows_len >= 8 { return; }
+    f.checked_grows[f.checked_grows_len] = CheckedGrow { slot: slot, generation: generation, entry: entry, depth: f.depth };
+    f.checked_grows_len += 1;
+}
+fn findCheckedView(f: const Fn&, slot: u32, generation: u32, start: u32, length: u32) -> i64 {
+    var i = f.checked_views_len;
+    while i > 0 {
+        i -= 1;
+        let entry = f.checked_views[i];
+        if entry.slot == slot && entry.generation == generation && entry.start == start && entry.length == length { return i; }
+    }
+    return -1;
+}
+fn recordCheckedView(f: Fn&, slot: u32, generation: u32, start: u32, length: u32, base: u32) {
+    if findCheckedView(f, slot, generation, start, length) >= 0 { return; }
+    if f.checked_views_len >= 8 { return; }
+    f.checked_views[f.checked_views_len] = CheckedView { slot: slot, generation: generation, start: start, length: length, base: base, depth: f.depth };
+    f.checked_views_len += 1;
+}
+fn invalidateCheckedArrayVal(g: const Generator&, f: Fn&, value: Val) {
+    if value.len == 0 { return; }
+    if f.checked_arrays_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_arrays_len {
+            let entry = f.checked_arrays[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.slot || local_id == entry.generation || local_id == entry.base || local_id == entry.length {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_arrays[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_arrays_len = out;
+    }
+    if f.checked_grows_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_grows_len {
+            let entry = f.checked_grows[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.slot || local_id == entry.generation || local_id == entry.entry {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_grows[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_grows_len = out;
+    }
+    if f.checked_views_len != 0 {
+        var out: i64 = 0;
+        for i in 0..f.checked_views_len {
+            let entry = f.checked_views[i];
+            var hit = false;
+            for at in 0..(value.len as i64) {
+                let local_id = g.s.words[value.start + at];
+                if local_id == entry.slot || local_id == entry.generation || local_id == entry.start || local_id == entry.length || local_id == entry.base {
+                    hit = true;
+                    break;
+                }
+            }
+            if !hit {
+                f.checked_views[out] = entry;
+                out += 1;
+            }
+        }
+        f.checked_views_len = out;
+    }
 }
 fn br(g: Generator&, f: const Fn&, value: u8, depth: u32) { opIndex(g, value, f.depth - depth); }
 

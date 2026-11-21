@@ -11,18 +11,42 @@ fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
 
 // ----- host boundary -----------------------------------------------------
 
-// A fresh fixed array copied from the host packet at `packet` (a local).
-fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32) -> Val, Error {
-    let packet_length = g.runtime_().packet_length;
+// A fresh fixed array from the host packet at `packet` (a local). When
+// `zero_copy` is true (pure non-callback entry parameter), open the transport
+// slice in place; `toPacket` copies with overlap-safe `memory.copy` and skips
+// zeroing so returning or aliasing the input remains sound.
+fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32, zero_copy: bool = false) -> Val, Error {
+    let rt = g.runtime_();
     let length = local32(g, f);
     lget(g, packet);
-    callf(g, packet_length);
+    callf(g, rt.packet_length);
     lset(g, length);
     let array_ty, error = g.types.intern(blot_direct_types::Tag.array, [g.types.node(ty).a]);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    let handle, error = create(g, f, array_ty, length, 0);
+    if zero_copy {
+        let base = local32(g, f);
+        lget(g, packet);
+        i32Const(g, 4);
+        op(g, OP_i32_add);
+        lset(g, base);
+        let bytes = emitScaledBytes(g, f, length, 4);
+        lget(g, bytes);
+        i32Const(g, rt.layout.transport_end);
+        lget(g, base);
+        op(g, OP_i32_sub);
+        op(g, OP_i32_gt_u);
+        trap(g, f);
+        lget(g, base);
+        lget(g, length);
+        lget(g, bytes);
+        callf(g, rt.open);
+        let handle, error = pop(g, f, array_ty, 0);
+        if error != blot_direct_types::Error.none { return handle, error; }
+        recordCheckedArray(f, w(g, handle, 0), w(g, handle, 1), base, length);
+        return Val { ty, handle.start, handle.len }, blot_direct_types::Error.none;
+    }
+    let handle, base, error = createUninit(g, f, array_ty, length, 0);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
-    let base = baseOf(g, f, handle);
     lget(g, base);
     lget(g, packet);
     i32Const(g, 4);
@@ -38,42 +62,38 @@ fn fromPacket(g: Generator&, f: Fn&, ty: Ty, packet: u32) -> Val, Error {
 }
 // Copies an array into a fresh host packet; returns its address local.
 fn toPacket(g: Generator&, f: Fn&, value: Val, id: u32) -> u32, Error {
-    let reset = g.runtime_().reset;
-    let allocate_function = g.runtime_().allocate;
+    let rt = g.runtime_();
     let length, error = lengthOf(g, f, value, id);
     if error != blot_direct_types::Error.none { return 0, error; }
-    i32Const(g, 0);
-    callf(g, reset);
-    op(g, OP_drop);
-    let packet = local32(g, f);
+    let max_words = (rt.layout.transport_end - rt.layout.transport_base - 4) / 4;
     lget(g, length);
-    i32Const(g, 4);
-    op(g, OP_i32_mul);
-    i32Const(g, 4);
+    i32Const(g, max_words);
+    op(g, OP_i32_gt_u);
+    trap(g, f);
+    let bytes = emitScaledBytes(g, f, length, 4);
+    let packet = constLocal(g, f, rt.layout.transport_base);
+    i32Const(g, rt.layout.transport_base + 4);
+    lget(g, bytes);
     op(g, OP_i32_add);
-    callf(g, allocate_function);
-    ltee(g, packet);
-    lget(g, length);
-    op(g, OP_i32_store);
-    uleb(g, 2);
-    uleb(g, 0);
+    gset(g, rt.transport_top);
     let opened = open(g, f, OP_block);
     lget(g, length);
     op(g, OP_i32_eqz);
     opIndex(g, OP_br_if, 0);
     let base = baseOf(g, f, value);
-    lget(g, packet);
-    i32Const(g, 4);
-    op(g, OP_i32_add);
+    i32Const(g, rt.layout.transport_base + 4);
     lget(g, base);
-    lget(g, length);
-    i32Const(g, 4);
-    op(g, OP_i32_mul);
+    lget(g, bytes);
     op(g, OP_prefix_fc);
     uleb(g, 10);
     op(g, 0);
     op(g, 0);
     close(g, f);
+    lget(g, packet);
+    lget(g, length);
+    op(g, OP_i32_store);
+    uleb(g, 2);
+    uleb(g, 0);
     return packet, blot_direct_types::Error.none;
 }
 // A closure calling host callback `slot` of table 1.
@@ -567,7 +587,7 @@ fn emitExport(g: Generator&, m: const Module&, body: const blot_check_core::Body
         if error != blot_direct_types::Error.none { return error; }
         argument = made;
     } else if isArray(parameter_abi) {
-        let made, error = fromPacket(g, f, parameter, 0);
+        let made, error = fromPacket(g, f, parameter, 0, true);
         if error != blot_direct_types::Error.none { return error; }
         argument = made;
     } else if parameter != blot_direct_types::unit {

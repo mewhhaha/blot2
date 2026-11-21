@@ -408,10 +408,96 @@ entry func main (): U32 =>
       unlinkedCalls = callsInDot(bytes);
     },
   );
-  // In unlinked dot, both a[i] and b[i] call runtime.address (higher index than runtime.check).
-  // In linked dot, both drop runtime.address and only check handle liveness (lower index).
-  const unlinkedAddrCall = unlinkedCalls[unlinkedCalls.length - 1];
-  if (linkedCalls.includes(unlinkedAddrCall)) {
-    throw new Error(`Expected linked #[n; U32] dot to omit runtime.address (${unlinkedAddrCall}), got calls=${JSON.stringify(linkedCalls)} vs unlinked=${JSON.stringify(unlinkedCalls)}`);
+  // Both linked and unlinked dot hoist handle validation (runtime.check, no
+  // runtime.address calls), and linked #[n; U32] dot also elides the inline
+  // bounds-check trap on b[i] (0 unreachable opcodes vs >0 unlinked).
+  function trapsInDot(wasm: Uint8Array): number {
+    let p = 8;
+    const readU = () => {
+      let v = 0, s = 0;
+      while (true) {
+        const b = wasm[p++];
+        v |= (b & 127) << s;
+        if (!(b & 128)) return v;
+        s += 7;
+      }
+    };
+    const bodies: Uint8Array[] = [];
+    while (p < wasm.length) {
+      const id = wasm[p++];
+      const size = readU();
+      const end = p + size;
+      if (id === 10) {
+        const count = readU();
+        for (let i = 0; i < count; i++) {
+          const bsize = readU();
+          bodies.push(wasm.slice(p, p + bsize));
+          p += bsize;
+        }
+      }
+      p = end;
+    }
+    const dotBody = bodies.slice(-6).reduce((a, b) => (b.length > a.length ? b : a));
+    let q = 0;
+    const readBU = () => {
+      let v = 0, s = 0;
+      while (true) {
+        const b = dotBody[q++];
+        v |= (b & 127) << s;
+        if (!(b & 128)) return v;
+        s += 7;
+      }
+    };
+    const decls = readBU();
+    for (let i = 0; i < decls; i++) {
+      readBU();
+      q++;
+    }
+    let traps = 0;
+    while (q < dotBody.length) {
+      const op = dotBody[q++];
+      if (op === 0x00) traps++;
+      else if (op === 0x02 || op === 0x03 || op === 0x04) q++;
+      else if (op === 0x0c || op === 0x0d || op === 0x10 || op === 0x20 || op === 0x21 || op === 0x22 || op === 0x23 || op === 0x24 || op === 0x41) {
+        while ((dotBody[q++] & 0x80) !== 0) {}
+      } else if (op === 0x28 || op === 0x36) {
+        while ((dotBody[q++] & 0x80) !== 0) {}
+        while ((dotBody[q++] & 0x80) !== 0) {}
+      } else if (op === 0x43) q += 4;
+    }
+    return traps;
+  }
+  let linkedTraps = -1;
+  let unlinkedTraps = -1;
+  await compileAndRun(
+    `
+func dot (a: #[n; U32]) -> (b: #[n; U32]): U32 =>
+  let acc = 0
+  for i in 0..a.length:
+    acc := self + a[i] * b[i]
+  return acc
+entry func main (): U32 =>
+  let a: #[4; U32] = #[1, 2, 3, 4]
+  let b: #[4; U32] = #[10, 20, 30, 40]
+  return dot a b
+`,
+    (_guest, bytes) => { linkedTraps = trapsInDot(bytes); },
+  );
+  await compileAndRun(
+    `
+func dot (a: #[U32]) -> (b: #[U32]): U32 =>
+  let acc = 0
+  for i in 0..a.length:
+    acc := self + a[i] * b[i]
+  return acc
+entry func main (): U32 =>
+  let a = #[1, 2, 3, 4]
+  let b = #[10, 20, 30, 40]
+  return dot a b
+`,
+    (_guest, bytes) => { unlinkedTraps = trapsInDot(bytes); },
+  );
+  if (linkedCalls.some((c) => c > 6) || linkedTraps !== 0 || unlinkedTraps <= 0) {
+    throw new Error(`Expected linked #[n; U32] dot to elide b[i] bounds trap (0 traps vs >0 unlinked), got linkedTraps=${linkedTraps} unlinkedTraps=${unlinkedTraps} calls=${JSON.stringify(linkedCalls)}`);
   }
 });

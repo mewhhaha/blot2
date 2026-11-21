@@ -111,4 +111,53 @@ entry const invalid = func (): U32 => return do:
       await compiler.close();
     }
   });
+
+  Deno.test(`method push of memory-holding values preserves caller temporary stack reclamation`, async () => {
+    const source = `
+type Boxed = { a: U32, b: U32, c: U32, d: U32, e: U32, view: &[U32] }
+func make_row (base: &[U32]) -> (i: U32): Boxed =>
+  return { a: i, b: i + 1, c: i + 2, d: i + 3, e: i + 4, view: base }
+entry func main (count: U32): U32 =>
+  let backing: #[U32] = #[10, 20, 30, 40]
+  let view = &backing[0..backing.length]
+  let out: #[+Boxed] = #[]
+  for i in 0 .. count:
+    out.push (make_row view i)
+  let total = 0
+  for row in out:
+    total := self + row.a + row.view[0]
+  return total
+`;
+    const dir = await Deno.makeTempDir();
+    const path = `${dir}/main.blot`;
+    await Deno.writeTextFile(path, source);
+    const compiler = await createZigProjectCompiler({
+      executable,
+      entry: path,
+      stdRoot: new URL("../../std", import.meta.url).pathname,
+      prelude: new URL("../../std/prelude.blot", import.meta.url).pathname,
+      storage: {
+        temporaryBytes: 2048,
+        growerBytes: 65536,
+        persistentBytes: 256,
+        transportBytes: 1024,
+        ownerCapacity: 64,
+      },
+    });
+    try {
+      const built = await compiler.build();
+      assert(built.success, JSON.stringify(built));
+      const guest = await instantiateGuest(built.bytes);
+      try {
+        // 256 iterations * boxed Boxed would overflow 2 KiB temporary stack if
+        // forwarding `out.push` poisoned caller memory_stores and blocked release.
+        assert.equal(guest.call("main", 256), 256 * 255 / 2 + 256 * 10);
+      } finally {
+        guest.dispose();
+      }
+    } finally {
+      await compiler.close();
+      await Deno.remove(dir, { recursive: true });
+    }
+  });
 }

@@ -327,6 +327,7 @@ fn leaveHandles(g: Generator&, f: Fn&, depth: u32) -> Error {
             } else {
                 let cerr = copy(g, f, final, hc.outer, 0);
                 if cerr != blot_direct_types::Error.none { return cerr; }
+                invalidateCheckedArrayVal(g, f, hc.outer);
             }
         }
         has_restore = true;

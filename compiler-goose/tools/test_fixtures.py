@@ -24,6 +24,14 @@ Blot vNext Checkpoint 2 (21 November 2026) re-recorded `direct/boxed_records.blo
 in place on single-use updates (FBIP), eliminating one `newBlock` + `memoryCopy`
 in `nested` while preserving aliasing safety in `fields`.
 
+Runtime performance Checkpoint R1 (22 November 2026) re-recorded the Wasm bytes
+and emitted function counts of 51 direct-backend fixtures: scoped `CheckedArray`
+/ `CheckedGrow` / `CheckedView` handle hoisting, in-place owner loop carries,
+method-call `apply(project(...))` unwinding, single-op array/storage forwarding,
+`createUninit` + dynamic repeated-byte `memory.fill`, inline `storage.push` fast
+path, zero-allocation `continue` release skipping, and zero-copy pure entry
+packet input. All exit codes, diagnostics, and frontend counters are unchanged.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

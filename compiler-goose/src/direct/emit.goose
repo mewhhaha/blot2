@@ -136,6 +136,7 @@ struct Label {
     unchanged: u32 = 0xffffffff,
     release_owner: u32 = 0,
     release_stack: u32 = 0,
+    allocations: u32 = 0,
     used: bool = false,
     // The local that allows iteration releases (no memory-holding value was
     // stored during the body), and the carried owner slots that must

@@ -35,6 +35,7 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             }
         }
     }
+    popCheckedArraysAt(f, opened);
     op(g, OP_else_);
     if n.c != 0 {
         let otherwise, error = stmt(g, f, n.c);
@@ -723,6 +724,7 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                         if present {
                             let copied = copy(g, f, value, target, id);
                             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
+                            invalidateCheckedArrayVal(g, f, target);
                         }
                     }
                 }
@@ -957,7 +959,7 @@ fn hasWord(g: const Generator&, value: Val, wanted: u32) -> bool {
 }
 // Copies `values` into `targets` through temporaries, so a value may read a
 // target that an earlier assignment already overwrote.
-fn assign(g: Generator&, f: const Fn&, values: Vals, targets: Vals, id: u32) -> Error {
+fn assign(g: Generator&, f: Fn&, values: Vals, targets: Vals, id: u32) -> Error {
     let staged = g.reserveVals(values.len);
     for at in 0..(values.len as i64) {
         let value = g.s.vals[values.start + at];
@@ -980,8 +982,12 @@ fn assign(g: Generator&, f: const Fn&, values: Vals, targets: Vals, id: u32) -> 
         }
     }
     for at in 0..(values.len as i64) {
-        let copied = copy(g, f, g.s.vals[staged.start + at], g.s.vals[targets.start + at], id);
+        let staged_val = g.s.vals[staged.start + at];
+        let target = g.s.vals[targets.start + at];
+        if sameWords(g, staged_val, target) { continue; }
+        let copied = copy(g, f, staged_val, target, id);
         if copied != blot_direct_types::Error.none { return copied; }
+        invalidateCheckedArrayVal(g, f, target);
     }
     return blot_direct_types::Error.none;
 }
@@ -1072,61 +1078,64 @@ fn assignCarries(g: Generator&, f: Fn&, values: Vals, targets: Vals, slots: Word
     }
     return assign(g, f, Vals { plain_values.start, plain }, Vals { plain_targets.start, plain }, id);
 }
-// Only scalar arithmetic and reads of the induction variable from this array
-// may share the descriptor validated by the range end. Bound this optional
-// inspection independently of the checker's own complexity budget.
-recursive fn stableScan(g: const Generator&, m: const Module&, id: u32, owner: u32, index: u32, left: i64&, reads: bool&) -> bool {
-    if id == 0 || left <= 0 { return false; }
-    left -= 1;
-    let n = m.node(id);
-    match n.tag {
-        suite, block_ => {
-            for child in m.children(id) {
-                if !stableScan(g, m, child, owner, index, left, reads) { return false; }
-            }
-            return true;
-        },
-        bind => {
-            return scratchScalarType(m, m.typeOf(n.b)) && stableScan(g, m, n.b, owner, index, left, reads);
-        },
-        update => {
-            let change = m.updateInfo(id);
-            return !change.store && change.path.len == 0 && change.selectors.len == 0 &&
-                stableScan(g, m, change.root, owner, index, left, reads) &&
-                stableScan(g, m, change.value, owner, index, left, reads);
-        },
-        constant => { return scratchScalarType(m, n.ty); },
-        reference => {
-            let ref = localRef(m, id);
-            if ref == 0 || !scratchScalarType(m, n.ty) { return false; }
-            let binding = m.binding(ref);
-            return binding.scheme.variables.len == 0 &&
-                (binding.kind == blot_reuse_principal_interface::Kind.local || binding.kind == blot_reuse_principal_interface::Kind.parameter);
-        },
-        scalar, associated, logical => {
-            if !scratchScalarType(m, n.ty) || n.op == blot_check_core::Op.none { return false; }
-            return stableScan(g, m, n.a, owner, index, left, reads) &&
-                (n.b == 0 || stableScan(g, m, n.b, owner, index, left, reads));
-        },
-        call => {
-            let call = m.call(id);
-            if !scratchScalarType(m, n.ty) || !scratchScalarCallee(g, m, call) { return false; }
-            for arg in call.arguments {
-                if !stableScan(g, m, arg, owner, index, left, reads) { return false; }
-            }
-            return true;
-        },
-        array_op, storage => {
-            if n.tag == blot_check_core::Tag.array_op {
-                if m.arrayOperation(id) != blot_backend_collection_ops::Op.get { return false; }
-            } else if n.c != blot_check_storage_ops::opCode(blot_check_storage_ops::Op.read) { return false; }
-            let args = m.children(id);
-            if args.len != 2 || localRef(m, args[0]) != owner || localRef(m, args[1]) != index { return false; }
-            reads = true;
-            return true;
-        },
-        _ => { return false; },
+// Speculatively validates a View handle and computes its shifted base address
+// without trapping; returns 0 in `vbase` when the view is stale, out-of-bounds,
+// or (if `require_immutable`) backed by mutable growable storage.
+fn tryHoistViewBase(g: Generator&, f: Fn&, vslot: u32, vgen: u32, vstart: u32, vlen: u32, step: u32, require_immutable: bool) -> u32 {
+    let rt = g.runtime_();
+    let vbase = constLocal(g, f, 0);
+    lget(g, vslot);
+    i32Const(g, 0);
+    op(g, OP_i32_ne);
+    lget(g, vslot);
+    i32Const(g, rt.layout.owner_capacity);
+    op(g, OP_i32_lt_u);
+    op(g, OP_i32_and);
+    let slot_ok = open(g, f, OP_if_);
+    let entry = local32(g, f);
+    lget(g, vslot);
+    i32Const(g, 4);
+    op(g, OP_i32_shl);
+    i32Const(g, rt.layout.owner_table);
+    op(g, OP_i32_add);
+    ltee(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_generation);
+    lget(g, vgen);
+    op(g, OP_i32_eq);
+    let gen_ok = open(g, f, OP_if_);
+    let end_pos = local32(g, f);
+    lget(g, vstart);
+    lget(g, vlen);
+    op(g, OP_i32_add);
+    ltee(g, end_pos);
+    lget(g, vstart);
+    op(g, OP_i32_ge_u);
+    lget(g, end_pos);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
+    op(g, OP_i32_le_u);
+    op(g, OP_i32_and);
+    if require_immutable {
+        lget(g, entry);
+        op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_capacity);
+        i32Const(g, blot_direct_runtime::heap_flag | blot_direct_runtime::frozen_flag);
+        op(g, OP_i32_and);
+        i32Const(g, blot_direct_runtime::heap_flag);
+        op(g, OP_i32_ne);
+        op(g, OP_i32_and);
     }
+    let bounds_ok = open(g, f, OP_if_);
+    let elem_base = local32(g, f);
+    lget(g, entry);
+    op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
+    lset(g, elem_base);
+    let shifted = emitOffsetAddress(g, f, elem_base, vstart, step);
+    lget(g, shifted);
+    lset(g, vbase);
+    close(g, f);
+    close(g, f);
+    close(g, f);
+    return vbase;
 }
 
 // A prelude member can be replaced. Recognize its actual one-argument body
@@ -1202,38 +1211,276 @@ fn rangeSizedLength(g: Generator&, f: Fn&, info: blot_check_core::LoopInfo) -> T
     return coreSizedLength(m, m.typeOf(receiver));
 }
 
-fn scanOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> Val {
+// Conservative check that a loop body cannot grow, shrink, or move a live
+// View's backing owner (allows reads, writes, branches, exits, and proved
+// scalar calls; rejects storage growth/shrink and opaque calls).
+recursive fn noStorageResize(g: const Generator&, m: const Module&, id: u32, left: i64&) -> bool {
+    if id == 0 { return true; }
+    if left <= 0 { return false; }
+    left -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_, product, record, construct, array => {
+            for child in m.children(id) {
+                if !noStorageResize(g, m, child, left) { return false; }
+            }
+            return true;
+        },
+        bind => { return noStorageResize(g, m, n.b, left); },
+        return_ => { return noStorageResize(g, m, n.a, left); },
+        break_ => {
+            for child in m.children(id) {
+                if !noStorageResize(g, m, child, left) { return false; }
+            }
+            return true;
+        },
+        if_value, if_stmt => {
+            return noStorageResize(g, m, n.a, left) &&
+                noStorageResize(g, m, n.b, left) &&
+                noStorageResize(g, m, n.c, left);
+        },
+        update => {
+            let change = m.updateInfo(id);
+            if !noStorageResize(g, m, change.root, left) || !noStorageResize(g, m, change.value, left) { return false; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && !noStorageResize(g, m, sel.index, left) { return false; }
+            }
+            return true;
+        },
+        constant, reference, panic => { return true; },
+        project => {
+            let proj = m.projection(n.b);
+            let variants = m.projectionVariants(n.b);
+            if variants.len != 0 { return noStorageResize(g, m, n.a, left); }
+            let receiver_ty = m.types.node(m.typeOf(n.a)).tag;
+            if receiver_ty == blot_check_types::Tag.record || receiver_ty == blot_check_types::Tag.product {
+                return noStorageResize(g, m, n.a, left);
+            }
+            // Allow standard `.length` / `.view` projection checks conservatively by
+            // inspecting `n.a` only when it's a known pure length call.
+            let receiver_local = localRef(m, n.a);
+            if receiver_local != 0 {
+                let spelling = m.fieldSpelling(proj.field);
+                if spelling.present && spelling.value == "length" { return true; }
+            }
+            return false;
+        },
+        scalar, associated, logical => {
+            if n.tag == blot_check_core::Tag.associated && n.op == blot_check_core::Op.none { return false; }
+            return noStorageResize(g, m, n.a, left) && noStorageResize(g, m, n.b, left);
+        },
+        call => {
+            let call = m.call(id);
+            if !scratchScalarCallee(g, m, call) { return false; }
+            for arg in call.arguments {
+                if !noStorageResize(g, m, arg, left) { return false; }
+            }
+            return true;
+        },
+        array_op => {
+            match m.arrayOperation(id) {
+                length, get => {
+                    for child in m.children(id) {
+                        if !noStorageResize(g, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        storage => {
+            let op_kind, ok = blot_check_storage_ops::opFromCode(n.c);
+            if ok != blot_error::Error.none { return false; }
+            match op_kind {
+                length, read, view => {
+                    for child in m.children(id) {
+                        if !noStorageResize(g, m, child, left) { return false; }
+                    }
+                    return true;
+                },
+                _ => { return false; },
+            }
+        },
+        _ => { return false; },
+    }
+}
+fn rangeOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> Val, bool {
     let m .= g.units[f.unit - 1];
-    if info.pattern == 0 { return neverVal(); }
+    if info.pattern == 0 { return neverVal(), false; }
     let pattern = m.pattern(info.pattern);
-    if pattern.tag != blot_check_core::PatternTag.bind { return neverVal(); }
+    if pattern.tag != blot_check_core::PatternTag.bind { return neverVal(), false; }
     let n = m.node(info.end);
     var owner: u32 = 0;
     if n.tag == blot_check_core::Tag.project { owner = localRef(m, n.a); }
     else { owner = lengthReceiver(m, info.end); }
-    if owner == 0 { return neverVal(); }
+    if owner == 0 { return neverVal(), false; }
     let handle, found = bindGet(g, f, owner);
-    if !found || tagOf(g, handle.ty) != blot_direct_types::Tag.array { return neverVal(); }
-    let element = g.types.node(handle.ty).a;
-    if !isScalarTag(tagOf(g, element)) { return neverVal(); }
+    if !found { return neverVal(), false; }
+    let tag = tagOf(g, handle.ty);
+    if tag != blot_direct_types::Tag.array && tag != blot_direct_types::Tag.view { return neverVal(), false; }
     if n.tag == blot_check_core::Tag.project {
         let identity, present = g.receiverIdentity(handle.ty);
-        if !present { return neverVal(); }
+        if !present { return neverVal(), false; }
         let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, blot_check_types::Operator.none);
-        if !exists || !g.hasUnit(target.unit) { return neverVal(); }
+        if !exists || !g.hasUnit(target.unit) { return neverVal(), false; }
         let unit .= g.units[target.unit - 1];
         let body .= unit.body(target.binding);
-        if !body || !body.is_function { return neverVal(); }
+        if !body || !body.is_function { return neverVal(), false; }
         let params = unit.bodyParameters(body);
-        if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return neverVal(); }
+        if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return neverVal(), false; }
     }
-    for carry in m.loopCarries(id) {
-        if !scratchScalarType(m, m.binding(carry.iteration).ty) { return neverVal(); }
+    if tag == blot_direct_types::Tag.view {
+        var budget: i64 = 256;
+        if !noStorageResize(g, m, info.body, budget) { return neverVal(), false; }
+        return handle, true;
     }
-    var budget: i64 = 96;
-    var reads = false;
-    if !stableScan(g, m, info.body, owner, pattern.a, budget, reads) || !reads { return neverVal(); }
-    return handle;
+    return handle, false;
+}
+fn inBindingSet(set: const u32[64]&, len: i64, b: u32) -> bool {
+    for i in 0..len { if set[i] == b { return true; } }
+    return false;
+}
+fn addBindingSet(set: u32[64]&, len: i64&, b: u32) {
+    if b == 0 || inBindingSet(set, len, b) || len >= 64 { return; }
+    set[len] = b;
+    len += 1;
+}
+recursive fn exprPreservesHandle(m: const Module&, id: u32, same: const u32[64]&, same_len: i64, depth: i64) -> bool {
+    if id == 0 || depth >= 32 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        reference => {
+            let b = localRef(m, id);
+            return b != 0 && inBindingSet(same, same_len, b);
+        },
+        update => {
+            let info = m.updateInfo(id);
+            let sels = m.updateSelectors(id);
+            return sels.len > 0 && sels[0].kind == blot_check_core::UpdateKind.index &&
+                exprPreservesHandle(m, info.root, same, same_len, depth + 1);
+        },
+        array_op => {
+            if m.arrayOperation(id) != blot_backend_collection_ops::Op.simd_store { return false; }
+            let ch = m.children(id);
+            return ch.len > 0 && exprPreservesHandle(m, ch[0], same, same_len, depth + 1);
+        },
+        block_, suite => {
+            let ch = m.children(id);
+            if ch.len == 1 { return exprPreservesHandle(m, ch[0], same, same_len, depth + 1); }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn carryStaysInPlace(m: const Module&, loop_id: u32, carry_at: i64, iter_binding: u32, backedge_binding: u32, budget: i64&) -> bool {
+    var same: u32[64] = [0; 64];
+    var same_len: i64 = 0;
+    addBindingSet(same, same_len, iter_binding);
+    if !scanCarryInPlace(m, loop_id, carry_at, m.loopInfo(loop_id).body, same, same_len, budget) { return false; }
+    return backedge_binding == 0 || inBindingSet(same, same_len, backedge_binding);
+}
+recursive fn scanCarryInPlace(m: const Module&, loop_id: u32, carry_at: i64, id: u32, same: u32[64]&, same_len: i64&, budget: i64&) -> bool {
+    if id == 0 { return true; }
+    if budget <= 0 { return false; }
+    budget -= 1;
+    let n = m.node(id);
+    match n.tag {
+        suite, block_ => {
+            for child in m.children(id) {
+                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+            }
+            return true;
+        },
+        bind => {
+            if !scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) { return false; }
+            if exprPreservesHandle(m, n.b, same, same_len, 0) { addBindingSet(same, same_len, n.a); }
+            return true;
+        },
+        if_stmt, if_value => {
+            if !scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget) ||
+                !scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) ||
+                !scanCarryInPlace(m, loop_id, carry_at, n.c, same, same_len, budget) { return false; }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
+                    addBindingSet(same, same_len, merge.result);
+                }
+            }
+            return true;
+        },
+        match_ => {
+            for inp in m.matchInputs(id) {
+                if !scanCarryInPlace(m, loop_id, carry_at, inp, same, same_len, budget) { return false; }
+            }
+            for arm in m.matchArms(id) {
+                if !scanCarryInPlace(m, loop_id, carry_at, arm.guard_, same, same_len, budget) ||
+                    !scanCarryInPlace(m, loop_id, carry_at, arm.body, same, same_len, budget) { return false; }
+            }
+            for merge in m.branchMerges(id) {
+                if inBindingSet(same, same_len, merge.then_binding) && inBindingSet(same, same_len, merge.else_binding) {
+                    addBindingSet(same, same_len, merge.result);
+                }
+            }
+            return true;
+        },
+        loop_ => {
+            let ninfo = m.loopInfo(id);
+            if !scanCarryInPlace(m, loop_id, carry_at, ninfo.first, same, same_len, budget) ||
+                !scanCarryInPlace(m, loop_id, carry_at, ninfo.end, same, same_len, budget) { return false; }
+            let ncarries = m.loopCarries(id);
+            for nc, nc_at in ncarries {
+                if inBindingSet(same, same_len, nc.incoming) {
+                    if carryStaysInPlace(m, id, nc_at, nc.iteration, nc.backedge, budget) {
+                        addBindingSet(same, same_len, nc.iteration);
+                        addBindingSet(same, same_len, nc.outgoing);
+                    }
+                }
+            }
+            return scanCarryInPlace(m, loop_id, carry_at, ninfo.body, same, same_len, budget);
+        },
+        break_ => {
+            let vals = m.breakValues(id);
+            for child in vals {
+                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+            }
+            if n.a == loop_id {
+                if carry_at >= vals.len || !exprPreservesHandle(m, vals[carry_at], same, same_len, 0) { return false; }
+            }
+            return true;
+        },
+        pattern_bind => {
+            return scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget) &&
+                scanCarryInPlace(m, loop_id, carry_at, n.c, same, same_len, budget);
+        },
+        update => {
+            let info = m.updateInfo(id);
+            if !scanCarryInPlace(m, loop_id, carry_at, info.root, same, same_len, budget) ||
+                !scanCarryInPlace(m, loop_id, carry_at, info.value, same, same_len, budget) { return false; }
+            for sel in m.updateSelectors(id) {
+                if sel.kind == blot_check_core::UpdateKind.index && !scanCarryInPlace(m, loop_id, carry_at, sel.index, same, same_len, budget) { return false; }
+            }
+            return true;
+        },
+        call => {
+            for arg in m.call(id).arguments {
+                if !scanCarryInPlace(m, loop_id, carry_at, arg, same, same_len, budget) { return false; }
+            }
+            return true;
+        },
+        product, record, array, array_op, storage => {
+            for child in m.children(id) {
+                if !scanCarryInPlace(m, loop_id, carry_at, child, same, same_len, budget) { return false; }
+            }
+            return true;
+        },
+        construct => { return scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget); },
+        return_, project, result_associated, fork_ => { return scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget); },
+        scalar, associated, logical, apply => {
+            return scanCarryInPlace(m, loop_id, carry_at, n.a, same, same_len, budget) &&
+                scanCarryInPlace(m, loop_id, carry_at, n.b, same, same_len, budget);
+        },
+        constant, reference, panic, closure => { return true; },
+        _ => { return false; },
+    }
 }
 recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
@@ -1256,6 +1503,17 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         let value = g.s.vals[incoming.start + at];
         let held, error = copiedBox(g, f, value.ty, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
+        let ctag = tagOf(g, value.ty);
+        var in_place = false;
+        if !held && (ctag == blot_direct_types::Tag.array || ctag == blot_direct_types::Tag.grow || ctag == blot_direct_types::Tag.resize) {
+            var cbudget: i64 = 256;
+            in_place = carryStaysInPlace(m, id, at, carries[at].iteration, carries[at].backedge, cbudget);
+        }
+        if in_place {
+            g.s.vals[iteration.start + at] = value;
+            g.s.vals[outgoing.start + at] = value;
+            continue;
+        }
         if held {
             g.s.words[slots.start + at] = 1;
             let reserved, error = newBlock(g, f, value.ty, id);
@@ -1283,6 +1541,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var end = neverVal();
     var has_source = false;
     var source = neverVal();
+    var source_view_base: u32 = 0xffffffff;
     var range = CheckedRange {};
     match info.kind {
         forever => {},
@@ -1293,27 +1552,40 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return first, error; }
             let copied = copy(g, f, first, valOf1(g, blot_direct_types::u32_, index), id);
             if copied != blot_direct_types::Error.none { return neverVal(), copied; }
-            let limit, error = fresh(g, f, blot_direct_types::u32_, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            end = limit;
-            let handle = scanOwner(g, f, id, info);
-            if handle.ty != blot_direct_types::never {
-                // The source already reads length here, even on an empty range.
-                // Read the same checked entry's base before entering the loop.
-                let entry = local32(g, f);
+            let handle, is_view = rangeOwner(g, f, id, info);
+            if handle.ty != blot_direct_types::never && !is_view {
+                let base, len = ensureCheckedArray(g, f, handle);
+                end = valOf1(g, blot_direct_types::u32_, len);
                 range.slot = w(g, handle, 0);
                 range.generation = w(g, handle, 1);
-                range.base = local32(g, f);
-                lget(g, range.slot);
-                lget(g, range.generation);
-                callf(g, g.runtime_().check);
-                ltee(g, entry);
-                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_length);
-                lset(g, w(g, end, 0));
-                lget(g, entry);
-                op(g, OP_i32_load); uleb(g, 2); uleb(g, blot_direct_runtime::entry_base);
-                lset(g, range.base);
+                range.base = base;
+                range.end_local = len;
+            } else if handle.ty != blot_direct_types::never && is_view {
+                let vslot = w(g, handle, 0);
+                let vgen = w(g, handle, 1);
+                let vstart = w(g, handle, 2);
+                let vlen = w(g, handle, 3);
+                end = valOf1(g, blot_direct_types::u32_, vlen);
+                let element, elem_err = elementOf(g, f, handle.ty, id);
+                if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+                let step, step_err = stride(g, f, element, id);
+                if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+                let cv = findCheckedView(f, vslot, vgen, vstart, vlen);
+                if cv >= 0 {
+                    range.base = f.checked_views[cv].base;
+                    range.trusted_view = true;
+                } else {
+                    range.base = tryHoistViewBase(g, f, vslot, vgen, vstart, vlen, step, false);
+                }
+                range.slot = vslot;
+                range.generation = vgen;
+                range.end_local = vlen;
+                range.is_view = true;
+                range.view_start = vstart;
             } else {
+                let limit, error = fresh(g, f, blot_direct_types::u32_, id);
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                end = limit;
                 let last, error = expr(g, f, info.end);
                 if error != blot_direct_types::Error.none { return last, error; }
                 let copied = copy(g, f, last, end, id);
@@ -1331,6 +1603,37 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let length, error = lengthOf(g, f, source, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
             end = valOf1(g, blot_direct_types::u32_, length);
+            if tagOf(g, source.ty) == blot_direct_types::Tag.array {
+                let base, len = ensureCheckedArray(g, f, source);
+                range.slot = w(g, source, 0);
+                range.generation = w(g, source, 1);
+                range.base = base;
+                range.end_local = len;
+            } else if tagOf(g, source.ty) == blot_direct_types::Tag.view {
+                let vslot = w(g, source, 0);
+                let vgen = w(g, source, 1);
+                let vstart = w(g, source, 2);
+                let vlen = w(g, source, 3);
+                let element, elem_err = elementOf(g, f, source.ty, id);
+                if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+                let step, step_err = stride(g, f, element, id);
+                if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+                let cv = findCheckedView(f, vslot, vgen, vstart, vlen);
+                if cv >= 0 {
+                    range.slot = vslot;
+                    range.generation = vgen;
+                    range.base = f.checked_views[cv].base;
+                    range.end_local = vlen;
+                    range.is_view = true;
+                    range.trusted_view = true;
+                    range.view_start = vstart;
+                } else {
+                    var budget: i64 = 256;
+                    let static_safe = noStorageResize(g, m, info.body, budget);
+                    let vbase = tryHoistViewBase(g, f, vslot, vgen, vstart, vlen, step, !static_safe);
+                    source_view_base = vbase;
+                }
+            }
         },
     }
     let exit = open(g, f, OP_block);
@@ -1354,9 +1657,35 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         lset(g, index);
         var item = neverVal();
         if has_source {
-            let element, error = readElement(g, f, source, current, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
-            item = element;
+            if source_view_base != 0xffffffff {
+                let element, elem_err = elementOf(g, f, source.ty, id);
+                if elem_err != blot_direct_types::Error.none { return neverVal(), elem_err; }
+                let step, step_err = stride(g, f, element, id);
+                if step_err != blot_direct_types::Error.none { return neverVal(), step_err; }
+                let addr = local32(g, f);
+                lget(g, source_view_base);
+                let fast = open(g, f, OP_if_);
+                let fast_addr = emitOffsetAddress(g, f, source_view_base, current, step);
+                lget(g, fast_addr);
+                lset(g, addr);
+                popCheckedArraysAt(f, fast);
+                op(g, OP_else_);
+                let slow_addr, slow_err = elementAddress(g, f, source, current, id);
+                if slow_err != blot_direct_types::Error.none { return neverVal(), slow_err; }
+                lget(g, slow_addr);
+                lset(g, addr);
+                close(g, f);
+                let loaded, lerr = loadElement(g, f, addr, 0, element, id);
+                if lerr != blot_direct_types::Error.none { return neverVal(), lerr; }
+                item = loaded;
+            } else {
+                let previous_range = f.checked_range;
+                f.checked_range = range;
+                let element, error = readElement(g, f, source, current, id);
+                f.checked_range = previous_range;
+                if error != blot_direct_types::Error.none { return neverVal(), error; }
+                item = element;
+            }
         } else { item = valOf1(g, blot_direct_types::u32_, current); }
         if info.pattern != 0 {
             let tested = test_(g, f, info.pattern, item, false, 0, id);
@@ -1393,7 +1722,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let stores = f.memory_stores;
     let unused = g.newSlot();
     let labels_mark = s.labels.len;
-    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, slots: slots, allow: allow, guards: guards });
+    s.labels.push(blot_direct_emit::Label { target: id, depth: exit, result: unused, kind: blot_direct_emit::LabelKind.loop_, top: top, iteration: iteration, outgoing: outgoing, unchanged: unchanged, has_release: release, release_owner: owner_mark, release_stack: stack_mark, allocations: allocations, slots: slots, allow: allow, guards: guards });
     let previous_range = f.checked_range;
     f.checked_range = range;
     let body, error = stmt(g, f, info.body);
@@ -1543,7 +1872,7 @@ recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if n.op == blot_check_core::Op.continue_ {
             let assigned = assignCarries(g, f, values, label.iteration, label.slots, label.unchanged, label.release_owner, label.release_stack, id);
             if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
-            if label.has_release {
+            if label.has_release && f.allocations != label.allocations {
                 releaseIteration(g, f, label);
                 g.s.labels[at].used = true;
             }

@@ -172,31 +172,37 @@ recursive fn indexedUpdate(g: Generator&, f: Fn&, id: u32, container: Val, at: i
         }
         ty = g.types.recordField(record, position).ty;
     }
-    var old = neverVal();
-    if offset == 0 {
-        let loaded, error = loadElement(g, f, address, 0, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        old = loaded;
-    } else {
-        let loaded, error = loadAt(g, f, address, offset, ty, id);
-        if error != blot_direct_types::Error.none { return neverVal(), error; }
-        old = loaded;
-    }
     if offset != 0 {
         let boxed, error = isBoxed(g, f, ty, id);
         if error != blot_direct_types::Error.none { return neverVal(), error; }
         if boxed { return neverVal(), g.fail(m, id, "update of a boxed field inside an element"); }
     }
-    bindPut(g, f, info.self_binding, old);
+    if info.self_binding != 0 && uses(g, f, info.self_binding) != 0 {
+        var old = neverVal();
+        if offset == 0 {
+            let loaded, error = loadElement(g, f, address, 0, ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            old = loaded;
+        } else {
+            let loaded, error = loadAt(g, f, address, offset, ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            old = loaded;
+        }
+        bindPut(g, f, info.self_binding, old);
+    }
     let replacement, error = stmt(g, f, info.value);
     if error != blot_direct_types::Error.none { return replacement, error; }
     if replacement.ty == blot_direct_types::never { return replacement, blot_direct_types::Error.none; }
     let noted = noteStore(g, f, replacement);
     if noted != blot_direct_types::Error.none { return neverVal(), noted; }
-    // The value may have grown the owner through an alias, moving its storage:
-    // find the element again before writing.
-    let target, error = elementAddress(g, f, container, index, id, container_core_ty);
-    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    // A fixed array never moves or shrinks; only growable/resizable owners
+    // can reallocate during `info.value` and need a fresh address lookup.
+    var target = address;
+    if tagOf(g, container.ty) != blot_direct_types::Tag.array {
+        let recomputed, error = elementAddress(g, f, container, index, id, container_core_ty);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        target = recomputed;
+    }
     if g.runtime_().has_fork {
         let bytes, berr = flatBytes(g, f, replacement.ty, id);
         if berr != blot_direct_types::Error.none { return neverVal(), berr; }
@@ -807,18 +813,20 @@ fn unwrapVariant(g: Generator&, f: const Fn&, value: Val, tag: u32, id: u32) -> 
     return Val { payload_ty, start, words.len as u32 }, blot_direct_types::Error.none;
 }
 
-recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+// Resolves `project` node `id` on an already-evaluated `value`: either returns
+// a data field value (`is_method = false`) or the associated method target
+// (`is_method = true`) so callers like `apply` can emit a direct call without
+// allocating a partial-application closure.
+recursive fn projectFieldOrMethod(g: Generator&, f: Fn&, id: u32, value: Val) -> Val, BindingRef, bool, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    let value, error = expr(g, f, n.a);
-    if error != blot_direct_types::Error.none { return value, error; }
     let projection = m.projection(n.b);
     let variants = m.projectionVariants(n.b);
-    // Constructor fields are named by the projecting unit's catalog.
     var name_symbol = projection.field;
     if variants.len == 1 && projection.nominal.decl == 0 && g.types.node(value.ty).tag == blot_direct_types::Tag.tuple {
-        if variants[0].field >= g.types.tupleItems(value.ty).len { return neverVal(), g.fail(m, id, "tuple projection out of range"); }
-        return tupleItem(g, f, value, variants[0].field, id);
+        if variants[0].field >= g.types.tupleItems(value.ty).len { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "tuple projection out of range"); }
+        let field_val, error = tupleItem(g, f, value, variants[0].field, id);
+        return field_val, BindingRef { 0, 0 }, false, error;
     }
     let nominal_field = variants.len != 0 && projection.nominal.decl != 0;
     if nominal_field {
@@ -827,49 +835,53 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             let identity = m.nominal(constructor.nominal).identity;
             if !sameNominal(identity, projection.nominal) || constructor.tag != variants[0].tag { continue; }
             let payload = m.types.node(constructor.payload);
-            if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), g.fail(m, id, "constructor field projection"); }
+            if payload.tag != blot_check_types::Tag.record || variants[0].field >= payload.b { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "constructor field projection"); }
             name_symbol = m.types.recordField(payload, variants[0].field).name;
             found = true;
             break;
         }
-        if !found { return neverVal(), g.fail(m, id, "projected constructor missing from the catalog"); }
-        if variants.len > 1 { return sharedField(g, f, value, n.b, name_symbol, id); }
+        if !found { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected constructor missing from the catalog"); }
+        if variants.len > 1 {
+            let field_val, error = sharedField(g, f, value, n.b, name_symbol, id);
+            return field_val, BindingRef { 0, 0 }, false, error;
+        }
     }
     let spelling = m.fieldSpelling(name_symbol);
-    if !spelling.present { return neverVal(), g.fail(m, id, "projected field without a spelling"); }
+    if !spelling.present { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field without a spelling"); }
     let name = g.types.fieldName(spelling.value);
     var record = value;
     if g.types.node(value.ty).tag == blot_direct_types::Tag.nominal {
         let cases, error = g.types.variants(value.ty);
-        if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+        if error != blot_direct_types::Error.none { return neverVal(), BindingRef { 0, 0 }, false, g.typeFailure(m, id); }
         if cases.len == 1 {
             let unwrapped, error = unwrapVariant(g, f, value, g.types.variant_tags[cases.tags], id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != blot_direct_types::Error.none { return neverVal(), BindingRef { 0, 0 }, false, error; }
             record = unwrapped;
         } else if nominal_field && variants.len == 1 {
             let unwrapped, error = unwrapVariant(g, f, value, variants[0].tag, id);
-            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            if error != blot_direct_types::Error.none { return neverVal(), BindingRef { 0, 0 }, false, error; }
             record = unwrapped;
         }
     }
     let position = g.types.findField(record.ty, name);
-    if position >= 0 { return recordField(g, f, record, position, id); }
-    if nominal_field { return neverVal(), g.fail(m, id, "projected field missing"); }
-    // Not a data field: a receiver member, called with the value.
-    if tagOf(g, value.ty) == blot_direct_types::Tag.record { return neverVal(), g.fail(m, id, "projected field missing"); }
+    if position >= 0 {
+        let field_val, error = recordField(g, f, record, position, id);
+        return field_val, BindingRef { 0, 0 }, false, error;
+    }
+    if nominal_field { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field missing"); }
+    if tagOf(g, value.ty) == blot_direct_types::Tag.record { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "projected field missing"); }
     let identity, has_identity = g.receiverIdentity(value.ty);
     if !has_identity {
         g.failOpen(m, id);
         g.put("member of a ");
         g.put(blot_direct_types::tagName(g.types.node(value.ty).tag));
-        return neverVal(), g.failClose();
+        return neverVal(), BindingRef { 0, 0 }, false, g.failClose();
     }
     var target, has_target = g.dispatchTarget(m, identity, projection.field, blot_check_types::Operator.none);
     if !has_target && (tagOf(g, value.ty) == blot_direct_types::Tag.grow || tagOf(g, value.ty) == blot_direct_types::Tag.resize) {
         target, has_target = g.dispatchTarget(m, blot_check_types::NominalIdentity { 0, 0xffffffff }, projection.field, blot_check_types::Operator.none);
     }
     if !has_target {
-        // Fallback: trait implementation method whose first head argument matches value.ty.
         let want_spell = spelling.value;
         var found_trait = BindingRef { 0, 0 };
         for unit in g.units {
@@ -891,7 +903,7 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                     let msp = unit.fieldSpelling(member.name);
                     if !msp.present || msp.value != want_spell { continue; }
                     let cand = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
-                    if found_trait.binding != 0 && found_trait != cand { return neverVal(), g.fail(m, id, "ambiguous trait member on comptime field"); }
+                    if found_trait.binding != 0 && found_trait != cand { return neverVal(), BindingRef { 0, 0 }, false, g.fail(m, id, "ambiguous trait member on comptime field"); }
                     found_trait = cand;
                 }
             }
@@ -906,8 +918,18 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         g.put("no member ");
         g.put(spelling.value);
         g.put(" for this receiver");
-        return neverVal(), g.failClose();
+        return neverVal(), BindingRef { 0, 0 }, false, g.failClose();
     }
+    return neverVal(), target, true, blot_direct_types::Error.none;
+}
+recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    let value, error = expr(g, f, n.a);
+    if error != blot_direct_types::Error.none { return value, error; }
+    let field_val, target, is_method, error = projectFieldOrMethod(g, f, id, value);
+    if error != blot_direct_types::Error.none { return neverVal(), error; }
+    if !is_method { return field_val, blot_direct_types::Error.none; }
     let arguments = g.saveVals([value]);
     let callee, error = calleeOf(g, f, target, arguments, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
