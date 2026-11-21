@@ -76,7 +76,7 @@ Deno.test("an array length member supplied by a prelude keeps its own semantics"
     new URL("../../std/prelude.blot", import.meta.url),
   );
   const standard =
-    "func Array.length (values: Array a): U32 => return @array.length values";
+    "func Array.length (values: #[a]): U32 => @array.length values";
   assert.ok(prelude.includes(standard));
   const file = await Deno.makeTempFile({ suffix: ".blot" });
   try {

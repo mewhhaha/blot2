@@ -1,8 +1,8 @@
 // This file is executable: just compile examples/prelude.blot
 // std/prelude.blot supplies Maybe, Result, combinators, and numeric operators.
 
-entry const increment = func (value: U32) : U32 => return value + 1
-entry const doubled = func (value: U32) : U32 => return value * 2
+entry func increment (value: U32): U32 => value + 1
+entry func doubled (value: U32): U32 => value * 2
 
 // A closure captures its immutable argument; functions are ordinary values.
 entry const add_two = U32.add 2
@@ -10,33 +10,33 @@ entry const transform = compose doubled increment
 
 entry const const_answer = Maybe.unwrap_or 0 $ Maybe.map transform $ $Some 20
 
-entry const answer = func () => return do:
+entry func answer () =>
   let candidate = Maybe.map add_two ($Some 40)
   let $Some value = candidate else:
-    break 0
-  break Result.unwrap_or 0 $ Result.map identity $ $Ok value
+    return 0
+  return Result.unwrap_or 0 $ Result.map identity $ $Ok value
 
 // One generic function and one local lambda each work at distinct types.
-entry const generic_identity = func () => return do:
-  let same = func value => return value
+entry func generic_identity () =>
+  let same = func value => value
   let enabled = same (identity true)
   if enabled:
-    break same (identity 42)
-  break 0
+    return same (identity 42)
+  return 0
 
 // Backticks call source functions; application binds more tightly.
-const plus = func left => return func right => return left + right
-entry const named_operator = func () => return 20 `plus` 22
+func plus left -> right => left + right
+entry func named_operator () => 20 `plus` 22
 
-entry const inspect = func (enabled: Bool) => return do:
+entry func inspect (enabled: Bool) =>
   let candidate = $Some (if enabled then $Some 42 else $Nothing)
-  break case candidate of
+  return case candidate of
     $Some ($Some value) => value
     $Some $Nothing => 0
     $Nothing => 0
 
-entry const recover = func (enabled: Bool) => return do:
+entry func recover (enabled: Bool) =>
   let candidate = if enabled then $Ok 42 else $Err false
   if let $Ok value = candidate:
-    break value
-  break 0
+    return value
+  return 0

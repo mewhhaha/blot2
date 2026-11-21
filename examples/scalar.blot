@@ -1,26 +1,26 @@
 // Executable scalar slice: native parsing, checking and Wasm emission.
-entry const U32.increment = func value => return @u32.add value 1
+entry func U32.increment value => @u32.add value 1
 
 entry const base: U32 = @u32.add 20 21
 entry const max_value: U32 = 0xFFFF_FFFF
 
-entry const answer = func () : U32 => return do:
+entry func answer (): U32 =>
   let result: U32 = U32.increment base
-  break result
+  return result
 
 // use also accepts pure computations; it does not introduce an effect itself.
-entry const bound_answer = func () : U32 => return do:
+entry func bound_answer (): U32 =>
   use result: U32 <- U32.increment base
   use ()
-  break result
+  return result
 
-entry const capped = func (value: U32) : U32 => return do:
+entry func capped (value: U32): U32 =>
   if @u32.lt value 42:
-    break value
-  break 42
+    return value
+  return 42
 
-entry const choose = func (condition: Bool) : U32 => return do:
+entry func choose (condition: Bool): U32 =>
   if condition:
-    break 20
+    return 20
   else:
-    break 22
+    return 22

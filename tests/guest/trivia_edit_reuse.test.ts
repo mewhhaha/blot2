@@ -11,13 +11,14 @@ const stdRoot = `${repo}std`;
 // project session match fresh builds, including diagnostic positions in the
 // edited text.
 Deno.test("retained trivia and real edits match fresh builds", async () => {
-  for (const name of ["ecs", "syntax", "monads"]) {
+  for (const name of ["ecs", "syntax", "prelude"]) {
     const entry = `${repo}examples/${name}.blot`;
     const original = await Deno.readTextFile(entry);
     const firstLine = original.indexOf("\n");
     const lines = original.split("\n");
     const code = lines.findIndex((line) =>
-      line.startsWith("const ") || line.startsWith("entry const ")
+      line.startsWith("const ") || line.startsWith("entry const ") ||
+      line.startsWith("func ") || line.startsWith("entry func ")
     );
     assert(code >= 0, name);
     const withComment = [

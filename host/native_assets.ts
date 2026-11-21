@@ -113,9 +113,10 @@ export function captureNativeAssets(
     modules.add(module);
     if (
       typeof item.kind !== "string" ||
-      !["input", "json", "catalog", "text", "tunables", "wgsl", "reference"].includes(
-        item.kind,
-      )
+      !["input", "json", "catalog", "text", "tunables", "wgsl", "reference"]
+        .includes(
+          item.kind,
+        )
     ) {
       throw new TypeError("Invalid native asset reader kind");
     }

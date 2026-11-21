@@ -19,57 +19,56 @@ infixl 70 (*) = mul
 infixl 70 (/) = div
 infixl 70 (%) = rem
 
-func add left -> right => return @type.call "add" left right
-func sub left -> right => return @type.call "sub" left right
-func mul left -> right => return @type.call "mul" left right
-func div left -> right => return @type.call "div" left right
-func rem left -> right => return @type.call "rem" left right
-func bit_and left -> right => return @type.call "bit_and" left right
-func bit_or left -> right => return @type.call "bit_or" left right
-func bit_xor left -> right => return @type.call "bit_xor" left right
-func shl value -> count => return @type.call "shl" value count
-func shr value -> count => return @type.call "shr" value count
-func bit_not value => return value.bit_not
-func eq left -> right => return @type.call "eq" left right
-func ne left -> right => return @type.call "ne" left right
-func lt left -> right => return @type.call "lt" left right
-func le left -> right => return @type.call "le" left right
-func gt left -> right => return @type.call "gt" left right
-func ge left -> right => return @type.call "ge" left right
+func add left -> right => @type.call "add" left right
+func sub left -> right => @type.call "sub" left right
+func mul left -> right => @type.call "mul" left right
+func div left -> right => @type.call "div" left right
+func rem left -> right => @type.call "rem" left right
+func bit_and left -> right => @type.call "bit_and" left right
+func bit_or left -> right => @type.call "bit_or" left right
+func bit_xor left -> right => @type.call "bit_xor" left right
+func shl value -> count => @type.call "shl" value count
+func shr value -> count => @type.call "shr" value count
+func bit_not value => value.bit_not
+func eq left -> right => @type.call "eq" left right
+func ne left -> right => @type.call "ne" left right
+func lt left -> right => @type.call "lt" left right
+func le left -> right => @type.call "le" left right
+func gt left -> right => @type.call "gt" left right
+func ge left -> right => @type.call "ge" left right
 
 type Maybe a is data = $Some a | $Nothing
 type Result [value, error] is data = $Ok value | $Err error
 type Iteration [state, result] is data = $Continue state | $Done result
 type Type witness is data = $Type witness
 // Text stores Unicode scalar values; std/text validates external scalar arrays.
-type Text = Array U32
+type Text = #[U32]
 
 // The expected result selects its type's ordinary `from` member.
-func from value => return @type.result "from" value
+func from value => @type.result "from" value
 
 // A resolver sequences through the selected type's ordinary pure/bind members.
-func monad constructor => return @do.monad constructor
-func F32.from value => return value.to_f32
-func U32.from value => return value.to_u32
-func F32.to_f32 (value: F32) => return value
-func U32.to_u32 (value: U32) => return value
+func monad constructor => @do.monad constructor
+func F32.from value => value.to_f32
+func U32.from value => value.to_u32
+func F32.to_f32 (value: F32) => value
+func U32.to_u32 (value: U32) => value
 
-func identity value => return value
-func apply function -> value => return function value
-func pipe value -> function => return function value
-func always value -> ignored => return value
-func compose outer -> inner -> value => return outer (inner value)
-func flip combine -> right -> left => return combine left right
-func on combine -> project -> left -> right => return
-  combine (project left) (project right)
+func identity value => value
+func apply function -> value => function value
+func pipe value -> function => function value
+func always value -> ignored => value
+func compose outer -> inner -> value => outer (inner value)
+func flip combine -> right -> left => combine left right
+func on combine -> project -> left -> right => combine (project left) (project right)
 
-func Bool.not value => return if value then false else true
-func Bool.eq left -> right => return if left then right else Bool.not right
-func Bool.ne left -> right => return Bool.not (Bool.eq left right)
+func Bool.not value => if value then false else true
+func Bool.eq left -> right => if left then right else Bool.not right
+func Bool.ne left -> right => Bool.not (Bool.eq left right)
 
-func Type.eq left -> right => return case left, right of
+func Type.eq left -> right => case left, right of
   $Type a, $Type b => @type.same a b
-func Type.ne left -> right => return Bool.not (Type.eq left right)
+func Type.ne left -> right => Bool.not (Type.eq left right)
 
 const U32.add = @u32.add
 const U32.sub = @u32.sub
@@ -80,16 +79,16 @@ const U32.rem = @u32.rem
 const U32.bit_and = @u32.bit_and
 const U32.bit_or = @u32.bit_or
 const U32.bit_xor = @u32.bit_xor
-func U32.bit_not value => return @u32.bit_xor value 0xFFFFFFFF
+func U32.bit_not value => @u32.bit_xor value 0xFFFFFFFF
 const U32.shl = @u32.shl
 const U32.shr = @u32.shr
-func U32.abs value => return value
+func U32.abs value => value
 const U32.eq = @u32.eq
 const U32.lt = @u32.lt
-func U32.ne left -> right => return Bool.not (U32.eq left right)
-func U32.le left -> right => return Bool.not (U32.lt right left)
-func U32.gt left -> right => return U32.lt right left
-func U32.ge left -> right => return Bool.not (U32.lt left right)
+func U32.ne left -> right => Bool.not (U32.eq left right)
+func U32.le left -> right => Bool.not (U32.lt right left)
+func U32.gt left -> right => U32.lt right left
+func U32.ge left -> right => Bool.not (U32.lt left right)
 const U32.to_f32 = @u32.to_f32
 
 const F32.add = @f32.add
@@ -110,40 +109,37 @@ const F32.ceil = @f32.ceil
 const F32.trunc = @f32.trunc
 // Truncates toward zero and saturates; NaN/negative values become zero.
 const F32.to_u32 = @f32.to_u32
-func F32.min left -> right => return if F32.lt left right then left else right
-func F32.max left -> right => return if F32.gt left right then left else right
-func F32.clamp low -> high -> value => return
-  F32.min high (F32.max low value)
-func F32.lerp left -> right -> weight => return
-  F32.add left (F32.mul (F32.sub right left) weight)
-func F32.square value => return F32.mul value value
-func F32.length3 x -> y -> z => return
-  F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
-func F32.is_finite value => return F32.le (F32.abs value) 3.402823466e38
+func F32.min left -> right => if F32.lt left right then left else right
+func F32.max left -> right => if F32.gt left right then left else right
+func F32.clamp low -> high -> value => F32.min high (F32.max low value)
+func F32.lerp left -> right -> weight => F32.add left (F32.mul (F32.sub right left) weight)
+func F32.square value => F32.mul value value
+func F32.length3 x -> y -> z => F32.sqrt (F32.add (F32.add (F32.square x) (F32.square y)) (F32.square z))
+func F32.is_finite value => F32.le (F32.abs value) 3.402823466e38
 
 // A positive finite period wraps finite values into [0, period).
-func F32.wrap period -> value => return do:
+func F32.wrap period -> value =>
   let wrapped = F32.sub value (F32.mul period (F32.floor (F32.div value period)))
   if F32.ge wrapped period:
-    break 0.0
+    return 0.0
   if F32.lt wrapped 0.0:
-    break F32.add wrapped period
-  break wrapped
+    return F32.add wrapped period
+  return wrapped
 
-func F32.lerp_angle left -> right -> weight => return do:
+func F32.lerp_angle left -> right -> weight =>
   let difference = F32.sub (F32.wrap 6.283185307 (F32.add (F32.sub right left) 3.141592654)) 3.141592654
-  break F32.add left (F32.mul difference weight)
+  return F32.add left (F32.mul difference weight)
 
 // Split 2*pi keeps range reduction accurate for |radians| <= 8192.
 // Outside that explicit range, trig returns NaN instead of inaccurate geometry.
-func f32_reduced_radians value => return do:
+func f32_reduced_radians value =>
   if F32.gt (F32.abs value) 8192.0:
-    break F32.div 0.0 0.0
+    return F32.div 0.0 0.0
   let turns = F32.floor (F32.add (F32.mul value 0.15915494309189535) 0.5)
-  break F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
+  return F32.sub (F32.sub value (F32.mul turns 6.28125)) (F32.mul turns 0.001935307179586477)
 
 // Fold to [-pi/2, pi/2], then evaluate the degree-11 Taylor polynomial.
-func f32_sin_reduced angle => return do:
+func f32_sin_reduced angle =>
   let x = if F32.gt angle 1.570796327 then F32.sub 3.141592654 angle
     else if F32.lt angle (-1.570796327) then F32.sub (-3.141592654) angle
     else angle
@@ -152,9 +148,9 @@ func f32_sin_reduced angle => return do:
   let term_7 = F32.add (-1.984126984126984e-4) (F32.mul square term_9)
   let term_5 = F32.add 8.333333333333333e-3 (F32.mul square term_7)
   let term_3 = F32.add (-1.666666666666667e-1) (F32.mul square term_5)
-  break F32.mul x (F32.add 1.0 (F32.mul square term_3))
+  return F32.mul x (F32.add 1.0 (F32.mul square term_3))
 
-func f32_cos_reduced value => return do:
+func f32_cos_reduced value =>
   let angle = F32.abs value
   let outside = F32.gt angle 1.570796327
   let x = if outside then F32.sub 3.141592654 angle else angle
@@ -165,27 +161,27 @@ func f32_cos_reduced value => return do:
   let term_4 = F32.add 4.166666666666667e-2 (F32.mul square term_6)
   let term_2 = F32.add (-0.5) (F32.mul square term_4)
   let result = F32.add 1.0 (F32.mul square term_2)
-  break if outside then F32.neg result else result
+  return if outside then F32.neg result else result
 
-func F32.sin value => return f32_sin_reduced (f32_reduced_radians value)
-func F32.cos value => return f32_cos_reduced (f32_reduced_radians value)
-func F32.sin_cos value => return do:
+func F32.sin value => f32_sin_reduced (f32_reduced_radians value)
+func F32.cos value => f32_cos_reduced (f32_reduced_radians value)
+func F32.sin_cos value =>
   let angle = f32_reduced_radians value
-  break (f32_sin_reduced angle, f32_cos_reduced angle)
+  return (f32_sin_reduced angle, f32_cos_reduced angle)
 
 // Like division, tan is unbounded near odd multiples of pi/2.
-func F32.tan value => return do:
+func F32.tan value =>
   let angle = f32_reduced_radians value
-  break F32.div (f32_sin_reduced angle) (f32_cos_reduced angle)
+  return F32.div (f32_sin_reduced angle) (f32_cos_reduced angle)
 
 const pi = 3.141592653589793
 const tau = 6.283185307179586
-func abs value => return value.abs
-func min left -> right => return if left < right then left else right
-func max left -> right => return if left > right then left else right
-func clamp low -> high -> value => return min high (max low value)
-func lerp left -> right => return @type.call "lerp" left right
-func square value => return value * value
+func abs value => value.abs
+func min left -> right => if left < right then left else right
+func max left -> right => if left > right then left else right
+func clamp low -> high -> value => min high (max low value)
+func lerp left -> right => @type.call "lerp" left right
+func square value => value * value
 const sqrt = F32.sqrt
 const floor = F32.floor
 const ceil = F32.ceil
@@ -198,57 +194,57 @@ const wrap = F32.wrap
 const lerp_angle = F32.lerp_angle
 const is_finite = F32.is_finite
 const saturate = clamp 0.0 1.0
-func smoothstep low -> high -> value => return do:
+func smoothstep low -> high -> value =>
   let t = saturate ((value - low) / (high - low))
-  break t * t * (3.0 - 2.0 * t)
+  return t * t * (3.0 - 2.0 * t)
 
-func Maybe.pure value => return $Some value
-func Maybe.map transform -> candidate => return case candidate of
+func Maybe.pure value => $Some value
+func Maybe.map transform -> candidate => case candidate of
   $Some value => $Some (transform value)
   $Nothing => $Nothing
-func Maybe.bind candidate -> next => return case candidate of
+func Maybe.bind candidate -> next => case candidate of
   $Some value => next value
   $Nothing => $Nothing
 // Finish each callback before advancing, so iteration uses constant stack.
-func Maybe.iterate initial -> step => return do:
+func Maybe.iterate initial -> step =>
   let state = initial
   for ever:
     use candidate <- step state
     if let $Some ($Done result) = candidate:
-      break $Some result
+      return $Some result
     let $Some ($Continue next) = candidate else:
-      break $Nothing
+      return $Nothing
     state := next
-func Maybe.unwrap_or fallback -> candidate => return case candidate of
+func Maybe.unwrap_or fallback -> candidate => case candidate of
   $Some value => value
   $Nothing => fallback
-func Maybe.is_some candidate => return case candidate of
+func Maybe.is_some candidate => case candidate of
   $Some _ => true
   $Nothing => false
-func Maybe.filter predicate -> candidate => return case candidate of
+func Maybe.filter predicate -> candidate => case candidate of
   $Some value => if predicate value then candidate else $Nothing
   $Nothing => $Nothing
-func Maybe.flatten candidate => return case candidate of
+func Maybe.flatten candidate => case candidate of
   $Some inner => inner
   $Nothing => $Nothing
-func Maybe.unwrap_or_else fallback -> candidate => return case candidate of
+func Maybe.unwrap_or_else fallback -> candidate => case candidate of
   $Some value => value
   $Nothing => fallback ()
-func Maybe.to_result error -> candidate => return case candidate of
+func Maybe.to_result error -> candidate => case candidate of
   $Some value => $Ok value
   $Nothing => $Err error
 
-func Result.pure value => return $Ok value
-func Result.map transform -> candidate => return case candidate of
+func Result.pure value => $Ok value
+func Result.map transform -> candidate => case candidate of
   $Ok value => $Ok (transform value)
   $Err error => $Err error
-func Result.map_error transform -> candidate => return case candidate of
+func Result.map_error transform -> candidate => case candidate of
   $Ok value => $Ok value
   $Err error => $Err (transform error)
-func Result.bind candidate -> next => return case candidate of
+func Result.bind candidate -> next => case candidate of
   $Ok value => next value
   $Err error => $Err error
-func Result.iterate initial -> step => return do:
+func Result.iterate initial -> step =>
   let state = initial
   for ever:
     use candidate <- step state
@@ -256,71 +252,65 @@ func Result.iterate initial -> step => return do:
       state := next
     else:
       if let $Ok ($Done result) = candidate:
-        break $Ok result
+        return $Ok result
       if let $Err error = candidate:
-        break $Err error
-func Result.unwrap_or fallback -> candidate => return case candidate of
+        return $Err error
+func Result.unwrap_or fallback -> candidate => case candidate of
   $Ok value => value
   $Err _ => fallback
-func Result.unwrap_or_else fallback -> candidate => return case candidate of
+func Result.unwrap_or_else fallback -> candidate => case candidate of
   $Ok value => value
   $Err _ => fallback ()
-func Result.to_maybe candidate => return case candidate of
+func Result.to_maybe candidate => case candidate of
   $Ok value => $Some value
   $Err _ => $Nothing
 
-func Array.length (values: Array a): U32 => return @array.length values
-func GrowArray.length (values: GrowArray a): U32 => return @storage.length values
-func ResizeArray.length (values: ResizeArray a): U32 => return @storage.length values
-func View.length (values: View a): U32 => return @storage.length values
-func Array.at (values: Array a) -> (index: U32) => return @array.get values index
-func GrowArray.at (values: GrowArray a) -> (index: U32) => return @storage.read values index
-func ResizeArray.at (values: ResizeArray a) -> (index: U32) => return @storage.read values index
-func View.at (values: View a) -> (index: U32) => return @storage.read values index
-func Array.from_list (values: List a): Array a => return @array.from_list values
-func List.from_array (values: Array a): List a => return @list.from_array values
-func List.length (values: List a): U32 => return @list.length values
-func List.is_empty (values: List a): Bool => return List.length values == 0
-func Array.is_empty (values: Array a): Bool => return Array.length values == 0
-func Array.get (values: Array a) -> (index: U32): Maybe a => return do:
+func Array.length (values: #[a]): U32 => @array.length values
+func GrowArray.length (values: #[+a]): U32 => @storage.length values
+func ResizeArray.length (values: #[~a]): U32 => @storage.length values
+func View.length (values: &[a]): U32 => @storage.length values
+func Array.at (values: #[a]) -> (index: U32) => @array.get values index
+func GrowArray.at (values: #[+a]) -> (index: U32) => @storage.read values index
+func ResizeArray.at (values: #[~a]) -> (index: U32) => @storage.read values index
+func View.at (values: &[a]) -> (index: U32) => @storage.read values index
+func Array.from_list (values: List a): #[a] => @array.from_list values
+func List.from_array (values: #[a]): List a => @list.from_array values
+func List.length (values: List a): U32 => @list.length values
+func List.is_empty (values: List a): Bool => List.length values == 0
+func Array.is_empty (values: #[a]): Bool => Array.length values == 0
+func Array.get (values: #[a]) -> (index: U32): Maybe a =>
   if index < Array.length values:
-    break $Some (@array.get values index)
-  break $Nothing
-func Array.set (values: Array a) -> (index: U32) -> (value: a): Maybe (Array a) => return do:
+    return $Some (@array.get values index)
+  return $Nothing
+func Array.set (values: #[a]) -> (index: U32) -> (value: a): Maybe #[a] =>
   if index < Array.length values:
-    break $Some (@array.set values index value)
-  break $Nothing
+    return $Some (@array.set values index value)
+  return $Nothing
 
 // Iteration is ordinary associated dispatch. A step returns an item and the
 // next immutable cursor; retaining either cursor preserves its own position.
-func List.iter values => return @list.cursor values
-func Array.iter values => return @array.cursor values
-func Cursor.iter (cursor: Cursor collection) => return cursor
-func Cursor.next cursor => return
-  if @cursor.has cursor
-  then $Some (@cursor.value cursor, @cursor.advance cursor)
-  else $Nothing
+func List.iter values => @list.cursor values
+func Array.iter values => @array.cursor values
+func Cursor.iter (cursor: Cursor collection) => cursor
+func Cursor.next cursor => if @cursor.has cursor then $Some (@cursor.value cursor, @cursor.advance cursor) else $Nothing
 
 // Pool iteration borrows a captured range. Growth preserves its addresses and
 // initial length; shortening the owner while traversal is live is rejected.
 type PoolCursor a is data = $PoolCursor { values: &[a], index: U32 }
-func GrowArray.iter (values: GrowArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
-func ResizeArray.iter (values: ResizeArray a) => return $PoolCursor {values: &values[0..values.length], index: 0}
-func View.iter (values: &[a]) => return $PoolCursor {values, index: 0}
-func PoolCursor.next (cursor: PoolCursor a) => return
-  if cursor.index < cursor.values.length
-  then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1})
-  else $Nothing
+func GrowArray.iter (values: #[+a]) => $PoolCursor {values: &values[0..values.length], index: 0}
+func ResizeArray.iter (values: #[~a]) => $PoolCursor {values: &values[0..values.length], index: 0}
+func View.iter (values: &[a]) => $PoolCursor {values, index: 0}
+func PoolCursor.next (cursor: PoolCursor a) => if cursor.index < cursor.values.length then $Some (cursor.values[cursor.index], $PoolCursor {values: cursor.values, index: cursor.index + 1}) else $Nothing
 
 // Mutation dispatch keeps the owner mode explicit in each selected signature.
-func GrowArray.push (values: GrowArray a) -> (value: a) => return @storage.push values value
-func ResizeArray.push (values: ResizeArray a) -> (value: a) => return @storage.push values value
-func ResizeArray.truncate (values: ResizeArray a) -> (count: U32) => return @storage.truncate values count
+func GrowArray.push (values: #[+a]) -> (value: a) => @storage.push values value
+func ResizeArray.push (values: #[~a]) -> (value: a) => @storage.push values value
+func ResizeArray.truncate (values: #[~a]) -> (count: U32) => @storage.truncate values count
 // `values.copy` is independent storage with the same elements.
-func Array.copy (values: Array a): Array a => return @storage.copy values
-func GrowArray.copy (values: GrowArray a): GrowArray a => return @storage.copy values
-func ResizeArray.copy (values: ResizeArray a): ResizeArray a => return @storage.copy values
-func Array.view (values: Array a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-func GrowArray.view (values: GrowArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-func ResizeArray.view (values: ResizeArray a) -> (start: U32) -> (end: U32) => return @storage.view values start end
-func View.view (values: &[a]) -> (start: U32) -> (end: U32) => return @storage.view values start end
+func Array.copy (values: #[a]): #[a] => @storage.copy values
+func GrowArray.copy (values: #[+a]): #[+a] => @storage.copy values
+func ResizeArray.copy (values: #[~a]): #[~a] => @storage.copy values
+func Array.view (values: #[a]) -> (start: U32) -> (end: U32) => @storage.view values start end
+func GrowArray.view (values: #[+a]) -> (start: U32) -> (end: U32) => @storage.view values start end
+func ResizeArray.view (values: #[~a]) -> (start: U32) -> (end: U32) => @storage.view values start end
+func View.view (values: &[a]) -> (start: U32) -> (end: U32) => @storage.view values start end

@@ -1,20 +1,20 @@
 // Tags apply functions to the following value, nearest tag first.
-const add = func amount => return func value => return value + amount
-const twice = func value => return value * 2
+func add amount -> value => value + amount
+func twice value => value * 2
 
 @[add 1]
 @[twice]
 entry const answer: U32 = 20
 
-@[func value => return @u32.eq value 42] entry const truth: Bool = 42
+@[func value => @u32.eq value 42] entry const truth: Bool = 42
 
 // A let tag runs once when the module starts.
 @[add 1] entry let initialized: U32 = 41
 
 // The annotation describes the decorated function.
-@[func function => return func value => return function value + 1]
-entry const next: U32 -> U32 = func (value: U32) => return value
+@[func function => func value => function value + 1]
+entry func next (value: U32): U32 => value
 
 // A syntactic lambda can become a scalar after decoration.
-@[func function => return function 41]
-entry const reduced: U32 = func (value: U32) => return value + 1
+@[func function => function 41]
+entry const reduced: U32 = func (value: U32) => value + 1

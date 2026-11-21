@@ -1,13 +1,39 @@
 # Blot executable language guide
 
 Read this before writing Blot. This describes the current executable language;
-[DESIGN.md](../../DESIGN.md) records the design direction. Each `blot` code
-block below is an independent, compilable module.
+[spec.md](spec.md) records the full **Blot vNext** specification, and
+[VNEXT_ROADMAP.md](../compiler/VNEXT_ROADMAP.md) tracks the compiler pruning
+roadmap. Each `blot` code block below is an independent, compilable module.
 
 The Goose compiler emits Wasm directly. Applications use named owners, explicit
 copies and invocation-local borrows with guest ABI 8. The
 [ownership contract](../compiler/CONTRACT.md) describes how values cross calls.
-The [migration handoff](../../CONTINUE.md) tracks the remaining shared writers.
+The [migration handoff](../../CONTINUE.md) tracks current frontier metrics and
+qualification.
+
+## Blot vNext quick reference (implemented today)
+
+- **Function syntax:** single-expression `func x => expr` (implicit return) and
+  block-bodied `func x =>` indented suites with explicit `return value` /
+  `return use call`. Legacy `=> return expr` and `=> return do:` remain accepted
+  during migration.
+- **Array & ownership type symbols:**
+  - `#[T]` (fixed-length mutable array, equivalent to `Array T`),
+  - `#[+T]` (growable array, equivalent to `GrowArray T`),
+  - `#[~T]` (resizable/shrinkable array, equivalent to `ResizeArray T`),
+  - `#[n; T]` (equal-length-checked array family),
+  - `&[T]` (read-only borrowed view, equivalent to `View T`),
+  - `*T` (shared immutable handle via `freeze` / `seal`),
+  - `*(A -> B)` (frozen closure value).
+- **Scoped effect handlers:** `with Effect = { op: func arg => body }:` handles
+  an effect inline over an indented suite without separate `@effect.provider`
+  wiring.
+- **Speculative undo scopes:** `fork x:` borrows linear `x` mutably inside an
+  indented suite, logs writes, and restores `x` on exit (rejecting `Foreign`
+  effects inside `fork`).
+- **Typed compile-time introspection:** `for #field in #fields T:` and
+  `#variants T` unroll over a concrete record/sum type's fields or variants,
+  with `val.(field)` field access and `#if` compile-time conditionals.
 
 ## Commands
 
@@ -18,8 +44,8 @@ just guide                                  # this reference; no compiler build
 deno task blot guide                        # same CLI command
 deno task blot fmt examples/syntax.blot      # normalize spacing
 deno task build:compiler
-deno task blot check examples/lists.blot
-deno task blot build examples/lists.blot build/lists.wasm
+deno task blot check examples/arrays.blot
+deno task blot build examples/arrays.blot build/arrays.wasm
 ```
 
 The host loads the Wasm module and calls the `entry func`, `entry const` and
@@ -56,10 +82,13 @@ callbacks. Captured scalar arguments copy their current value. The prelude uses
 these aliases for terminal U32/F32 operations. Storage capacities and SIMD lane
 selectors retain their literal-only rules.
 
-Function bodies return explicitly: `func x => return x`, or `func x => do:` with
-`return x` inside. Every path through a function's bare `do:` body must return;
-`break value` only finishes a block. To return a block's result, write
-`func x => return do:` and finish that block with `break value`.
+Function bodies support both single-expression implicit return
+(`func x => x + 1`) and indented block bodies (`func x =>` followed by an
+indented suite ending with explicit `return x` or `return use call`). The
+earlier explicit forms `func x => return x`, `func x => do:` with `return x`,
+and `func x => return do:` with `break value` remain supported for existing
+code. Every path through a block body must return; `break value` finishes a
+`do:` block.
 
 Separate curried parameters with `->`: `func first -> second => return body`
 means `func first => return func second => return body`, and
@@ -603,13 +632,16 @@ conversion support depends on the selected backend. List syntax and constant
 evaluation remain available, but general runtime Lists are not promised by the
 owned-storage profile.
 
-Arrays have contiguous checked row storage. `Array T` fixes the extent while
-allowing element writes; `GrowArray T` permits append and `ResizeArray T` also
-permits shrinking. Named payload owners and fixed spans replace arrays of fresh
-owning child collections. Reads of inline scalar/record rows copy their values;
-owner and borrowed descriptors retain aliases. Copy payloads explicitly when
-retaining an independent version. Exact layout and lifetime support is in
-[the owned-storage profile](../compiler/SCOPED_STORAGE.md).
+Arrays have contiguous checked row storage. `#[T]` (`Array T`) fixes the extent
+while allowing element writes; `#[+T]` (`GrowArray T`) permits append, `#[~T]`
+(`ResizeArray T`) also permits shrinking, `#[n; T]` ties equal lengths across
+arrays, and `&[T]` (`View T`) is a read-only borrowed slice. Named payload
+owners and fixed spans replace arrays of fresh owning child collections. Reads
+of inline scalar/record rows copy their values; owner and borrowed descriptors
+retain aliases. Copy payloads explicitly (`values.copy`) when retaining an
+independent version. Exact layout and lifetime support is in
+[the owned-storage profile](../compiler/SCOPED_STORAGE.md) and
+[docs/language/spec.md](spec.md).
 
 Both types have ordinary prelude members `values.length` and `values.is_empty`.
 Only arrays support `values[index]`, the store `values[index] = replacement`,
@@ -1437,10 +1469,10 @@ Outer locals rebound with `:=` carry handler state between requests and after
 `break`. A captured computation can run again with fresh handler state. Calls
 through helpers use the same handler; unrelated effects remain visible. Clause
 bodies run outside the request installation, allowing forwarding to an outer
-handler or provider. Generic operation clauses name a closed instance with
-parentheses, as in `effect (Reader.ask U32) () =>`. This interface supports one
-reply per request, without an exposed continuation value. See
-[examples/requests.blot](../../examples/requests.blot).
+handler or provider. Generic operation clauses name a closed instance with parentheses, as in
+`effect (Reader.ask U32) () =>`. This interface supports one reply per request,
+without an exposed continuation value. For new code, prefer inline
+`with Effect = { ... }:` scoped handlers (see [spec.md](spec.md)).
 
 ### Effect families and scoped state
 

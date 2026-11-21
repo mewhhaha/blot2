@@ -1,5 +1,64 @@
 # Working on Blot and Gdev
 
+## Blot vNext implementation and compiler prune (21 November 2026)
+
+Blot vNext ([docs/language/spec.md](docs/language/spec.md), Revision 4) is
+implemented end to end in the Goose compiler, tree-sitter/formatter/editor
+tooling, `std/prelude.blot`, `examples/`, and across all sibling repositories
+(`pen` `b7b3d0f`, `ink` `113bfd7`, `gdev` `5eaa821`), alongside Phase 1A of the
+[compiler pruning roadmap](docs/compiler/VNEXT_ROADMAP.md):
+
+- **Language & backend surface:** implicit-return single-expression `func` and
+  block-bodied `func` with `return` / `return use`; `#[T]`, `#[+T]`, `#[~T]`,
+  `#[n; T]`, `&[T]`, `*T` (`freeze`/`seal`), and `*(A -> B)`; scoped inline
+  `with Effect = { ... }:` handlers; `fork x:` linear speculative undo scopes
+  (rejecting `Foreign` inside `fork`); `for #field in #fields T:` /
+  `#variants T` / `#if` compile-time unrolling with `val.(field)`; 2A downward
+  templated callables, FBIP sum-variant reuse, and `#[n; T]` bounds-check
+  elimination.
+- **Compiler prune & determinism fix (`71345e22`):** removed 41 retired Goose
+  modules across zero-use pre-vNext subsystems (packages/higher-rank, scoped
+  capability lifetimes/contracts, numeric proofs, usage contracts, typed code
+  staging, language tasks, retired equation/generative/dictionary/resolver/
+  cleanup modules, `cli_migrate_stores.goose`). Compiler source shrank from
+  **221 → 180 `.goose` files** (**70,962 → 62,074 LOC**), wire descriptors
+  shrank from **205 → 175**, and the optimized compiler release build dropped
+  from **~7m → 183.6 s** (`8.4 MB` binary, `3.7 MB` `blotc.gz`). Removed
+  `blot_check_effects::Row` from `FLAT_SLICES` in `write_project_packet.py`
+  (fixing uninitialized `Tail.closed` union payload bytes in cross-worker
+  interface packets) and enforced a generator-time invariant rejecting tagged
+  unions from `FLAT_SLICES`.
+- **Verified qualification (candidate `blotc-goose` SHA256 `af66ea227fff97ffaeea4356c46aac8da9552eb1be29d480b6a9bf6c2e141a2d`, `std/prelude.blot` SHA256 `6f0fa1e17aa2673905355bf5eb02370e908827d9d609a8164187821eff351ca0`):**
+  - `blot2`: `deno fmt --check`, `deno check`, `deno task test:editor` (6/6),
+    `deno task check:editor` (10/10 tree-sitter parses + 19 highlight suites),
+    `test_direct.py` (`runtime: 3373 B`, `writer: 352 B`),
+    `test_uniqueness.py` (**212/212**), `test_fixtures.py` (**189/189** with
+    zero exit/Wasm diffs from `std/prelude.blot` migration),
+    `deno task test:guest` (**1,140 passed, 0 failed, 92 ignored** in 27 s).
+  - `gdev` (`5eaa821`): `scripts/integration/build_gdev.ts` compiled **295
+    modules / 6,932 functions** in **666 ms** (**2,680,686 Wasm bytes**);
+    `scripts/integration/run_pen.py --launch --hardware` exited 0 with
+    `compiled_wasm_unchanged: true`, `complete_render: true`, and visually
+    inspected 640×480 `frame.png`
+    (`build/storage-integration/gdev-one-frame/attempt-rb2094f7/frame.png`).
+  - `ink` (`113bfd7`): `pen test-blot` passed **285/285 Blot guest checks**
+    across 74 modules in 3.1 s (`230 checks`, `51 must trap`,
+    `4 must not compile`); `ink_tools` native passed **111 passed, 2 failed**
+    (the 2 pre-existing committed-memory-cap failures below).
+  - `pen` (`b7b3d0f`): `pen test-blot --project ../pen/examples/bounce` passed
+    **7/7 checks** across 2 modules in 0.1 s.
+
+### Next compiler pruning frontier
+
+Continue [docs/compiler/VNEXT_ROADMAP.md](docs/compiler/VNEXT_ROADMAP.md):
+Batch 1B (nominal trait records replacing `eval/` evidence machinery), Batch 1C
+(retiring `List`/`@cursor`/`std/list`/`std/iter`, `@requests`, `do (monad ...)`,
+`@record.merge`, custom fixities, and remaining `=` / `lent` compatibility once
+all tests and Gdev `devtools/storage.blot` finish migrating), and Batch 1D
+(collapsing `reuse/dependency_payload.goose` and wiring per-body Wasm replay).
+
+## Earlier Gdev & backend checkpoint notes
+
 The Gdev backend experiment can now compile its baseline before learning
 which function will change. The simulation edit measured **165.6 ms** for
 full emission and **12.7 ms** to screen the checked modules, recompile one

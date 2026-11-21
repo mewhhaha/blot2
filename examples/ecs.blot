@@ -8,7 +8,7 @@ type Position is data = $Position { x: F32, y: F32 }
 type Velocity is data = $Velocity { x: F32, y: F32 }
 type Ghost is data = $Ghost { remaining: F32 }
 type Time is data = $Time { seconds: F32 }
-type Column component is data = $Column (Array (Maybe component))
+type Column component is data = $Column #[Maybe component]
 type Builder [world, scope] is data = $Builder { initial: world, scope: world -> scope }
 type Simulation [world, scope] is data = $Simulation { initial: world, scope: world -> scope }
 type State a is effect = {
@@ -16,32 +16,32 @@ type State a is effect = {
   set: a -> Unit
 }
 
-const empty = func () => return do:
-  let scope = func world => return func action => return do:
+func empty () =>
+  let scope = func world -> action =>
     use result <- action ()
-    break (world, result)
-  break $Builder { initial: (), scope }
+    return (world, result)
+  return $Builder { initial: (), scope }
 
-const insert_cell = func initial => return func builder => return do:
+func insert_cell initial -> builder =>
   let $Builder { initial: previous_initial, scope: previous_scope } = builder
-  let scope = func world => return func action => return do:
+  let scope = func world -> action =>
     let (current, previous) = world
-    use outcome <- @effect.run State.get State.set current (func () => return previous_scope previous action)
+    use outcome <- @effect.run State.get State.set current (func () => previous_scope previous action)
     let (next, (previous_next, result)) = outcome
-    break ((next, previous_next), result)
-  break $Builder { initial: (initial, previous_initial), scope }
+    return ((next, previous_next), result)
+  return $Builder { initial: (initial, previous_initial), scope }
 
-const build = func builder => return do:
+func build builder =>
   let $Builder { initial, scope } = builder
-  break $Simulation { initial, scope }
+  return $Simulation { initial, scope }
 
-const run_scoped = func simulation => return func world => return func action => return do:
+func run_scoped simulation -> world -> action =>
   let $Simulation { scope } = simulation
-  break scope world action
+  return scope world action
 
-const get = func (witness: p -> a) : a => return State.get ()
-const set = func value => return State.set value
-const get_column = func exemplar => return get (func () => return $Column #[$Some exemplar])
+func get (witness: p -> a): a => State.get ()
+func set value => State.set value
+func get_column exemplar => get (func () => $Column #[$Some exemplar])
 
 const simulation = do:
   let builder = empty ()
@@ -58,77 +58,77 @@ const simulation = do:
     $Some ($Velocity { x: 1.0, y: 1.0 }),
     $Some ($Velocity { x: 4.0, y: 2.0 }),
   ]) self
-  builder := insert_cell ($Column (array.generate 4 (func index : Maybe Ghost => return $Nothing))) self
+  builder := insert_cell ($Column (array.generate 4 (func index: Maybe Ghost => $Nothing))) self
   break build builder
 
-const move_position = func position => return func velocity => return func seconds => return
-  case position, velocity of
-    $Some ($Position { x, y }), $Some ($Velocity { x: vx, y: vy }) =>
-      $Some ($Position { x: x + vx * seconds, y: y + vy * seconds })
-    _, _ => position
+func move_position position -> velocity -> seconds => case position, velocity of
+  $Some ($Position { x, y }), $Some ($Velocity { x: vx, y: vy }) =>
+    $Some ($Position { x: x + vx * seconds, y: y + vy * seconds })
+  _, _ => position
 
-const move = func () => return do:
+func move () =>
   use stored_positions <- get_column ($Position { x: 0.0, y: 0.0 })
   use stored_velocities <- get_column ($Velocity { x: 0.0, y: 0.0 })
   use time <- get $Time
   let $Column positions = stored_positions
   let $Column velocities = stored_velocities
   let $Time { seconds } = time
-  let next = positions
+  let next = positions.copy
   for index in 0..positions.length:
-    next[index] = move_position positions[index] velocities[index] seconds
-  use set ($Column next)
+    next[index] := move_position positions[index] velocities[index] seconds
+  return use set ($Column next)
 
-const add_ghost = func () => return do:
+func add_ghost () =>
   use stored <- get_column ($Ghost { remaining: 1.0 })
   let $Column ghosts = stored
-  let next = ghosts
+  let next = ghosts.copy
   for index in 0..ghosts.length:
-    next[index] = $Some ($Ghost { remaining: 1.0 })
-  use set ($Column next)
+    next[index] := $Some ($Ghost { remaining: 1.0 })
+  return use set ($Column next)
 
-const update = func () => return do:
+func update () =>
   for system in #[move, add_ghost]:
     use system ()
+  return ()
 
-const create = func () => return do:
+func create () =>
   let $Simulation { initial } = simulation
-  break initial
+  return initial
 
-const simulate = func ticks => return func world => return do:
+func simulate ticks -> world =>
   let next = world
   for tick in 0..ticks:
     let (updated, _) = run_scoped simulation next update
     next := updated
-  break next
+  return next
 
-const checksum_scoped = func () => return do:
+func checksum_scoped () =>
   use stored <- get_column ($Position { x: 0.0, y: 0.0 })
   let $Column positions = stored
   let total = 0.0
   for position in positions:
     if let $Some ($Position { x, y }) = position:
       total := self + x + y
-  break total
+  return total
 
-const checksum = func world => return do:
+func checksum world =>
   let (_, total) = run_scoped simulation world checksum_scoped
-  break total
+  return total
 
-const count_ghosts = func world => return do:
-  let (_, count) = run_scoped simulation world (func () => return do:
+func count_ghosts world =>
+  let (_, count) = run_scoped simulation world (func () =>
     use stored <- get_column ($Ghost { remaining: 1.0 })
     let $Column ghosts = stored
     let count = 0
     for ghost in ghosts:
       if let $Some _ = ghost:
         count := self + 1
-    break count)
-  break count
+    return count)
+  return count
 
-entry const run = func (ticks: U32) : F32 => return checksum (simulate ticks (create ()))
-entry const ghost_count = func (ticks: U32) : U32 => return count_ghosts (simulate ticks (create ()))
-entry const snapshot = func () : F32 => return do:
+entry func run (ticks: U32): F32 => checksum (simulate ticks (create ()))
+entry func ghost_count (ticks: U32): U32 => count_ghosts (simulate ticks (create ()))
+entry func snapshot (): F32 =>
   let original = create ()
   let next = simulate 1 original
-  break checksum next - checksum original
+  return checksum next - checksum original

@@ -6,45 +6,38 @@ type WindowIo is data = $WindowIo { set_title: U32 -> U32 ! {Foreign} }
 type RenderIo is data = $RenderIo { submit: U32 -> U32 ! {Foreign} }
 type Io is data = $Io { window: WindowIo, render: RenderIo }
 
-const title = func window => return do:
+func title window =>
   let $WindowIo { set_title } = window
-  use status <- set_title 7
-  break status
+  return use set_title 7
 
 // Only rendering authority reaches this function, not the whole Io bundle.
-const render_frame = func render => return func frame => return do:
+func render_frame render -> frame =>
   let $RenderIo { submit } = render
-  use status <- submit frame
-  break status
+  return use submit frame
 
-const launch = func io => return do:
+func launch io =>
   let $Io { window, render } = io
   use status <- title window
   if status != 0:
-    break status
-  use rendered <- render_frame render 42
-  break rendered
+    return status
+  return use render_frame render 42
 
 // The single host callback uses disjoint scalar command ranges. The wrappers
 // grant only the specific operations needed by each guest capability record.
-entry const main = func (dispatch: U32 -> U32 ! {Foreign}) => return do:
-  let set_title = func title_id => return do:
+entry func main (dispatch: U32 -> U32 ! {Foreign}) =>
+  let set_title = func title_id =>
     if title_id >= 1000:
-      break 1
-    use status <- dispatch (1000 + title_id)
-    break status
-  let submit = func frame => return do:
+      return 1
+    return use dispatch (1000 + title_id)
+  let submit = func frame =>
     if frame >= 1000:
-      break 1
-    use status <- dispatch (2000 + frame)
-    break status
-  use status <- launch ($Io {
+      return 1
+    return use dispatch (2000 + frame)
+  return use launch ($Io {
     window: $WindowIo { set_title },
     render: $RenderIo { submit },
   })
-  break status
 
-entry const render_only = func (submit: U32 -> U32 ! {Foreign}) => return
-  render_frame ($RenderIo { submit }) 42
+entry func render_only (submit: U32 -> U32 ! {Foreign}) => render_frame ($RenderIo { submit }) 42
 
 entry const uses_host = @effect.has (@effect.of main) Foreign

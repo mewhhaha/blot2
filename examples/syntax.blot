@@ -1,5 +1,5 @@
-// Executable syntax showcase for the current compiler, not proposed grammar.
-// See DESIGN.md for language proposals. Composite values stay inside the guest.
+// Executable syntax showcase for Blot vNext.
+// See docs/language/spec.md for the vNext specification.
 
 infixl 60 `add`
 infixl 70 (><) = dot
@@ -8,75 +8,75 @@ type Vec2 is data = $Vec2 { x: F32, y: F32 }
 type Mode is data = $Running | $Paused
 type Event is data = $Tick U32 | $SetMode Mode | $Reset
 
-const add = func left => return func right => return U32.add left right
-const dot = func left => return func right => return do:
+func add left -> right => U32.add left right
+func dot left -> right =>
   let $Vec2 { x: lx, y: ly } = left
   let $Vec2 { x: rx, y: ry } = right
-  break lx * rx + ly * ry
+  return lx * rx + ly * ry
 
-const Vec2.scaled = func value => return func factor => return do:
+func Vec2.scaled value -> factor =>
   let $Vec2 { x, y } = value
-  break $Vec2 { x: x * factor, y: y * factor }
+  return $Vec2 { x: x * factor, y: y * factor }
 
 // Deferred work is an ordinary Unit callback. Booleans short-circuit directly.
-const unwrap_or_else = func candidate => return func fallback => return case candidate of
+func unwrap_or_else candidate -> fallback => case candidate of
   $Some value => value
   $Nothing => fallback ()
 
-entry const short_circuit = func () => return do:
-  let empty: Array U32 = #[]
-  break false and (empty[0] > 0)
+entry func short_circuit () =>
+  let empty: #[U32] = #[]
+  return false and (empty[0] > 0)
 
-entry const lazy_fallback = func () => return do:
-  let empty: Array U32 = #[]
-  break unwrap_or_else ($Some 42) (func () => return empty[0])
+entry func lazy_fallback () =>
+  let empty: #[U32] = #[]
+  return unwrap_or_else ($Some 42) (func () => empty[0])
 
-entry const factorial = func (value: U32) : U32 => return do:
+entry func factorial (value: U32): U32 =>
   if value <= 1:
-    break 1
-  break value * factorial (value - 1)
+    return 1
+  return value * factorial (value - 1)
 
-const choose = func first => return func enabled => return func fallback => return case first, enabled, fallback of
+func choose first -> enabled -> fallback => case first, enabled, fallback of
   $Some value, true, _ => value
   _, _, $Some value => value
   _, _, _ => 0
 
-const double_or_zero = func candidate => return do:
+func double_or_zero candidate =>
   let $Some value = candidate else:
-    break 0
-  break value * 2
+    return 0
+  return value * 2
 
-const react = func event => return func ticks => return case event of
+func react event -> ticks => case event of
   $Tick count => ticks + count
   $SetMode $Running => ticks
   $SetMode $Paused => ticks
   $Reset => 0
 
 entry const operator_example = 1 `add` 2 * 3
-entry const recursive_example = func (value: U32) => return factorial value
-entry const matching_example = func () => return choose $Nothing false ($Some (double_or_zero ($Some 21)))
-entry const event_example = func () => return react ($Tick 2) 40
+entry func recursive_example (value: U32) => factorial value
+entry func matching_example () => choose $Nothing false ($Some (double_or_zero ($Some 21)))
+entry func event_example () => react ($Tick 2) 40
 
-entry const vector_example = func () => return do:
+entry func vector_example () =>
   let position = $Vec2 { x: 3.0, y: 4.0 }
   let scaled = Vec2.scaled position 2.0
-  break position >< scaled
+  return position >< scaled
 
-entry const array_snapshot = func () => return do:
+entry func array_snapshot () =>
   let original = #[1, 2, 3]
-  let next = @storage.copy original
+  let next = original.copy
   next[1] := 20
-  break original[1] + next[1]
+  return original[1] + next[1]
 
-entry const array_store = func () => return do:
+entry func array_store () =>
   let original = #[1, 2, 3]
   let alias = original
   alias[1] = 20
-  break original[1] + alias[1]
+  return original[1] + alias[1]
 
 type Counter a is effect = { advance: a -> a }
-const local_counter = @effect.provider (Counter.advance U32) (func value => return value + 1)
+const local_counter = @effect.provider (Counter.advance U32) (func value => value + 1)
 
-entry const provider_example = func () => return do local_counter:
+entry func provider_example () => do local_counter:
   use next <- Counter.advance U32 41
   break next
