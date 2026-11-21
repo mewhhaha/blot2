@@ -98,20 +98,19 @@
      let labels_mark = s.labels.len;
      let handles_mark = s.handles.len;
 +    let instance=g.s.instances[id];
-+    let track=instance.key.kind==blot_direct_emit::InstanceKind.named && isTarget(instance.key.unit,instance.key.id);
++    let track=instance.key.kind==blot_direct_emit::InstanceKind.named;
 +    let prior=trackInstance(id,track,instance.inferring,g.s.instances.len as u32);
      let error = emitInstanceBody(g, id);
 +    restoreInstance(prior);
      blot_direct_relocations::rewind(sites_mark);
      s.code.resize(code_mark);
      s.locals.resize(locals_mark);
-@@ -600,3 +604,7 @@
+@@ -600,3 +604,6 @@
          g.module.exportItem("blot:reset", blot_direct_writer::EXPORT_function, reset);
      }
  }
 +
 +extern fn trackInstance(id:u32,track:bool,inferring:bool,prior:u32)->u32="body_enter";
-+extern fn isTarget(unit:u32,binding:u32)->bool="body_is_target";
 +extern fn restoreInstance(id:u32)="body_leave";
 --- a/function_staging.goose
 +++ b/function_staging.goose

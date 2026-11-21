@@ -1,9 +1,11 @@
+#include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 static void packet_path(char *path, size_t size, uint32_t version,
@@ -63,30 +65,55 @@ struct trace {
   uint32_t existing;
 };
 static struct trace traces[limit];
-static bool inferred[limit], replay, stage_reader, mismatch, enabled;
-static uint32_t unit, binding, active = UINT32_MAX;
+static bool inferred[limit], replay, mismatch, enabled;
+static uint32_t active = UINT32_MAX, named_count;
+static size_t event_count, event_bytes, staged_bytes;
+struct staged_bindings {
+  uint8_t *bits;
+  size_t size;
+};
+static struct staged_bindings stages[294];
 
+bool body_recording(void) { return getenv("BLOT_CONTROL") == NULL; }
 void body_enable(bool value) { enabled = value; }
-void body_target(uint32_t u, uint32_t b) {
-  unit = u;
-  binding = b;
+
+void body_stage_read(uint32_t unit, uint32_t binding) {
+  if (!enabled || replay)
+    return;
+  if (unit >= sizeof stages / sizeof stages[0])
+    abort();
+  struct staged_bindings *stage = &stages[unit];
+  size_t index = binding / 8;
+  if (index >= stage->size) {
+    size_t next = 2 * (index + 1);
+    stage->bits = realloc(stage->bits, next);
+    if (!stage->bits)
+      abort();
+    memset(stage->bits + stage->size, 0, next - stage->size);
+    staged_bytes += next - stage->size;
+    stage->size = next;
+  }
+  stage->bits[index] |= 1u << (binding % 8);
 }
-bool body_is_target(uint32_t u, uint32_t b) {
-  return unit == u && binding == b;
+bool body_staged(uint32_t unit, uint32_t binding) {
+  if (unit >= sizeof stages / sizeof stages[0])
+    abort();
+  struct staged_bindings *stage = &stages[unit];
+  return binding / 8 < stage->size &&
+         (stage->bits[binding / 8] & (1u << (binding % 8)));
 }
-void body_stage_read(uint32_t u, uint32_t b) {
-  if (enabled && body_is_target(u, b))
-    stage_reader = true;
-}
-bool body_staged(void) { return stage_reader; }
 uint32_t body_enter(uint32_t id, bool track, bool inferring,
                     uint32_t existing) {
   uint32_t prior = active;
   if (id >= limit)
     abort();
-  active = (enabled && track) ? id : UINT32_MAX;
-  if (active != UINT32_MAX && !replay)
+  active = UINT32_MAX;
+  if (enabled && track)
+    active = id;
+  if (active != UINT32_MAX && !replay) {
     traces[id].existing = existing;
+    named_count++;
+  }
   if (enabled && !replay && inferring)
     inferred[id] = true;
   return prior;
@@ -114,13 +141,77 @@ void body_lookup(uint32_t kind, uint32_t u, uint32_t id, uint32_t type,
     return;
   }
   if (trace->count == trace->capacity) {
-    trace->capacity = trace->capacity ? 2 * trace->capacity : 16;
+    size_t old = trace->capacity;
+    trace->capacity = 4;
+    if (old)
+      trace->capacity = 2 * old;
+    event_bytes += (trace->capacity - old) * sizeof key;
     trace->calls = realloc(trace->calls, trace->capacity * sizeof key);
     if (!trace->calls)
       abort();
   }
   trace->calls[trace->count++] = key;
+  event_count++;
 }
 bool body_trace_match(uint32_t id) {
   return id < limit && !mismatch && traces[id].count == traces[id].replayed;
+}
+
+// Each edit runs in a child of the same completed checkpoint. The parent
+// cannot observe mutations in an accepted, declined or failing trial.
+static bool job_line(char **line, size_t *cap) {
+  ssize_t size = getline(line, cap, stdin);
+  if (size < 0 && feof(stdin))
+    return false;
+  if (size <= 0 || (*line)[size - 1] != '\n')
+    abort();
+  (*line)[size - 1] = 0;
+  return true;
+}
+
+extern uint64_t blot_clock_ns(void);
+static uint64_t job_start;
+uint64_t body_job_elapsed(void) { return blot_clock_ns() - job_start; }
+
+bool body_next_edit(void) {
+  body_stat(23, named_count);
+  body_stat(24, event_count);
+  body_stat(25, event_bytes + staged_bytes + sizeof traces + sizeof inferred +
+                    sizeof stages);
+  fflush(stdout);
+  int ready_fd = atoi(getenv("BLOT_READY_FD"));
+  if (write(ready_fd, "!", 1) != 1 || close(ready_fd)) abort();
+  char *fields[5] = {0};
+  size_t caps[5] = {0};
+  unsigned int job = 0;
+  while (job_line(&fields[0], &caps[0])) {
+    for (int i = 1; i < 5; i++)
+      if (!job_line(&fields[i], &caps[i]))
+        abort();
+    printf("JOB %u\n", job++);
+    fflush(stdout);
+    job_start = blot_clock_ns();
+    pid_t child = fork();
+    if (child < 0)
+      abort();
+    if (!child) {
+      if (setenv("BLOT_EDIT", fields[0], 1) ||
+          setenv("BLOT_SAVE", fields[1], 1) ||
+          setenv("BLOT_EDIT_UNIT", fields[2], 1) ||
+          setenv("BLOT_EDIT_POINT", fields[3], 1))
+        abort();
+      if (strcmp(fields[4], "1") == 0 && setenv("BLOT_REFERENCE_FIRST", "1", 1))
+        abort();
+      return true;
+    }
+    int status = 0;
+    while (waitpid(child, &status, 0) < 0)
+      if (errno != EINTR)
+        abort();
+    if (!WIFEXITED(status) || WEXITSTATUS(status))
+      exit(1);
+  }
+  for (int i = 0; i < 5; i++)
+    free(fields[i]);
+  return false;
 }

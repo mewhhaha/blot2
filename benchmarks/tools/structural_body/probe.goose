@@ -19,9 +19,11 @@ extern fn packetSize(version:u32,unit:u32)->i64="body_packet_size";
 extern fn packetRead(version:u32,unit:u32,data:u8&,size:i64)="body_packet_read";
 extern fn referenceFirst()->bool="body_reference_first";
 extern fn inferred(id:u32)->bool="body_inferred";
-extern fn trackTarget(unit:u32,binding:u32)="body_target";
+extern fn recording()->bool="body_recording";
+extern fn jobElapsed()->u64="body_job_elapsed";
+extern fn nextEdit()->bool="body_next_edit";
 extern fn enable(value:bool)="body_enable";
-extern fn staged()->bool="body_staged";
+extern fn staged(unit:u32,binding:u32)->bool="body_staged";
 extern fn beginReplay()="body_begin_replay";
 extern fn sameLookups(id:u32)->bool="body_trace_match";
 extern fn stat(key:u32,value:u64)="body_stat";
@@ -72,7 +74,7 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     types.units=updated;
     var g=Generator{types,module,state,updated};
     let m .= updated[unit-1];
-    if staged() {return 6;}
+    if staged(unit,binding) {return 6;}
     beginReplay();
     let body .= m.body(binding);
     if !body {return 1;}
@@ -127,35 +129,6 @@ fn replay(types:blot_direct_types::Types&, module:blot_direct_writer::Module&, s
     return 0;
 }
 
-fn trial(old:const Core[:],updated:const Core[:],entry:u32,binding:u32,other:bool) {
-    var types=blot_direct_types::Types{units:old,..};
-    blot_direct_types::init(types);
-    var module=blot_direct_writer::Module{..};
-    var state=blot_direct_emit::State{..};
-    var initial=Generator{types,module,state,old};
-    var base:u8[>..<]=[];
-    let unit=editUnit();
-    trackTarget(unit,binding);
-    enable(true);
-    assert(blot_direct::build(initial,entry,base)==blot_direct_types::Error.none);
-    assert(!state.has_failure && state.failures.len==0);
-    save(1,base[0],base.len);
-    var fresh:u8[>..<]=[];
-    if referenceFirst() {reference(updated,entry,fresh);}
-    var image:u8[>..<]=[];
-    let start=blot_native::clock_ns();
-    var reason:u32=8;
-    if !other {reason=replay(types,module,state,updated,unit,binding,image);}
-    let elapsed=blot_native::clock_ns()-start;
-    stat(2,elapsed);stat(14,reason);
-    if !referenceFirst() {reference(updated,entry,fresh);}
-    save(3,fresh[0],fresh.len);
-    if reason==0 {
-        save(2,image[0],image.len);
-        assert(image[..]==fresh[..]);
-    }
-}
-
 fn sameUnit(a:const Core&,b:const Core&)->bool {
     if !blot_reuse_body_shape::same_check_core_Module(a,b) {return false;}
     for n,i in a.nodes {
@@ -191,33 +164,76 @@ fn sameImporter(old:const Core[:],updated:const Core[:],i:i64,edit:u32)->bool {
     return sameUnit(a,b);
 }
 
-fn main() {
-    let owner,err=blot_project_packet::initOwner();
-    let newOwner,newErr=blot_project_packet::initOwner();
-    assert(err==blot_error::Error.none && newErr==blot_error::Error.none);
-    var old:Core[293]=[default<Core>();293];
-    var updated:Core[293]=[default<Core>();293];
-    var entry:u32=0;
-    var changes:u32=0;var other=false;
-    for i in 0..units {
-        let unit=(i+1) as u32;
-        old[i]=readCore(0,owner,unit);
-        updated[i]=readCore(1,newOwner,unit);
-        for body in old[i].bodies {if body.exported {entry=unit;}}
-    }
+fn selectBinding(old:const Core[:],updated:const Core[:],unit:u32)->u32,bool {
+    var changes:u32=0;
+    var other=false;
     let start=blot_native::clock_ns();
     for i in 0..units {
         if !sameUnit(old[i],updated[i]) {
             stat(11,(i+1) as u32);
-            if i+1==editUnit() {changes++;}
-            else if !sameImporter(old[..],updated[..],i,editUnit()) {other=true;}
+            if i+1==unit {changes++;}
+            else if !sameImporter(old,updated,i,unit) {other=true;}
             else {stat(19,(i+1) as u32);}
         }
     }
-    let binding=bindingAt(old[editUnit()-1],editPoint());
-    assert(entry!=0 && changes>=1 && binding!=0);
+    let binding=bindingAt(old[unit-1],editPoint());
+    assert(changes==1 && binding!=0);
     // The fixtures insert after this marker. Both revisions must select the same binding.
-    assert(bindingAt(updated[editUnit()-1],editPoint())==binding);
+    assert(bindingAt(updated[unit-1],editPoint())==binding);
     stat(18,blot_native::clock_ns()-start);
-    trial(old[..],updated[..],entry,binding,other);
+    return binding,other;
+}
+
+fn checkpoint(old:const Core[:],entry:u32) {
+    var types=blot_direct_types::Types{units:old,..};
+    blot_direct_types::init(types);
+    var module=blot_direct_writer::Module{..};
+    var state=blot_direct_emit::State{..};
+    var initial=Generator{types,module,state,old};
+    var base:u8[>..<]=[];
+    enable(recording());
+    let setup=blot_native::clock_ns();
+    assert(blot_direct::build(initial,entry,base)==blot_direct_types::Error.none);
+    stat(26,blot_native::clock_ns()-setup);
+    assert(!state.has_failure && state.failures.len==0);
+    save(1,base[0],base.len);
+    if !nextEdit() {return;}
+
+    let unit=editUnit();
+    let decodeStart=blot_native::clock_ns();
+    let editOwner,editErr=blot_project_packet::initOwner();
+    assert(editErr==blot_error::Error.none);
+    var edited:Core[293]=[default<Core>();293];
+    for i in 0..units {edited[i]=readCore(1,editOwner,(i+1) as u32);}
+    stat(27,blot_native::clock_ns()-decodeStart);
+    let updated=edited[..];
+    let binding,other=selectBinding(old,updated,unit);
+    var fresh:u8[>..<]=[];
+    if referenceFirst() {reference(updated,entry,fresh);}
+    var image:u8[>..<]=[];
+    let start=blot_native::clock_ns();
+    var reason:u32=8;
+    if !other {reason=replay(types,module,state,updated,unit,binding,image);}
+    let elapsed=blot_native::clock_ns()-start;
+    stat(2,elapsed);stat(14,reason);
+    if reason==0 {save(2,image[0],image.len);}
+    if !referenceFirst() {
+        stat(30,jobElapsed());
+        reference(updated,entry,fresh);
+    }
+    save(3,fresh[0],fresh.len);
+    if reason==0 {assert(image[..]==fresh[..]);}
+}
+
+fn main() {
+    let owner,err=blot_project_packet::initOwner();
+    assert(err==blot_error::Error.none);
+    var old:Core[293]=[default<Core>();293];
+    var entry:u32=0;
+    for i in 0..units {
+        old[i]=readCore(0,owner,(i+1) as u32);
+        for body in old[i].bodies {if body.exported {entry=old[i].unit;}}
+    }
+    assert(entry!=0);
+    checkpoint(old[..],entry);
 }

@@ -1,13 +1,13 @@
 # Working on Blot and Gdev
 
-An isolated Gdev backend now rebuilds a first-time simulation multiplication
-in **6.9 ms** median, including its **5.0 ms** reuse check, versus **99.0 ms**
-for full emission in the same binary. Input routing and `abs` edits also match
-fresh Wasm. Rendering still requires full emission because the edit renumbers
-a later closure. The production session timing for the simulation edit remains
-**182 ms**. A production path needs declaration identities and complete
-tracking of which bodies read each declaration across edits.
-[Structural replay measurements and outstanding work](tasks/FAST_COMPILE.md#replaying-a-structural-edit)
+The Gdev backend experiment can now compile its baseline before learning
+which function will change. The simulation edit measured **165.6 ms** for
+full emission and **12.7 ms** to screen the checked modules, recompile one
+body and assemble identical Wasm. Forking, reading all 293 checked modules
+and writing the candidate took **52.3 ms**. The production session last
+measured **182 ms** end to end. Next, use the session's existing unchanged-module
+information and track declaration dependencies across edits.
+[Checkpoint timings, input identities and qualification](tasks/FAST_COMPILE.md#choosing-the-edit-after-initial-emission)
 
 On Gdev `cc4bbbf`, a running compiler rebuilds input, simulation and
 rendering edits in **201, 182 and 189 ms** median, down from **235, 206

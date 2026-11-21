@@ -1,13 +1,60 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { basename, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { gdevProject } from "../../../scripts/integration/gdev_project.ts";
 import { createZigProjectCompiler } from "../../../host/zig_project_client.ts";
 
 const work = resolve("build/structural-body");
-const game = resolve("../gdev");
+const dataset = await Deno.makeTempDir({ dir: work, prefix: "capture-" });
+const game = resolve(dataset, "gdev");
 const compiler = resolve(
   Deno.env.get("BLOT_COMPILER") ?? "compiler-goose/build/blotc-goose-pgo",
 );
+const pins = {
+  gdev: "cc4bbbf22d35d7b91acd02957a8bdce38bdda90b",
+  ink: "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+  blot2: "bdd1f6788418d0a5c2ee547cfa196d84028b7cb3",
+};
+
+async function snapshot(repo: keyof typeof pins, paths: string[]) {
+  const destination = resolve(dataset, repo);
+  await Deno.mkdir(destination);
+  const archive = new Deno.Command("git", {
+    args: ["-C", resolve("..", repo), "archive", pins[repo], "--", ...paths],
+    stdout: "piped",
+  }).spawn();
+  const extract = new Deno.Command("tar", {
+    args: ["-x", "-C", destination],
+    stdin: "piped",
+  }).spawn();
+  await archive.stdout.pipeTo(extract.stdin);
+  const [packed, unpacked] = await Promise.all([
+    archive.status,
+    extract.status,
+  ]);
+  assert(packed.success && unpacked.success, repo);
+}
+
+async function digest(file: string) {
+  const hash = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", await Deno.readFile(file)),
+  );
+  return Array.from(hash, (byte) => byte.toString(16).padStart(2, "0")).join(
+    "",
+  );
+}
+
+const build = JSON.parse(
+  await Deno.readTextFile(resolve(work, "build-identity.json")),
+);
+assert.equal(await digest(resolve(work, "capture.so")), build["capture.so"]);
+const compilerSha256 = await digest(compiler);
+await Promise.all([
+  snapshot("gdev", ["src", "pen", "devtools", "tests", "pen.json"]),
+  snapshot("ink", ["lib"]),
+  snapshot("blot2", ["std"]),
+]);
 const read = (path: string) => Deno.readTextFile(resolve(game, path));
 const simulation = "src/game/simulation.blot";
 const render = "src/game/presentation.blot";
@@ -102,7 +149,7 @@ for (const [name, base, edit, file, unit, marker] of cases) {
   }
 }
 
-const dataset = await Deno.makeTempDir({ dir: work, prefix: "capture-" });
+const packetSets: Record<string, string> = {};
 for (const [name, edits] of Object.entries(variants)) {
   const directory = resolve(dataset, name);
   await Deno.mkdir(directory, { recursive: true });
@@ -124,7 +171,7 @@ for (const [name, edits] of Object.entries(variants)) {
   for (const capture of [true, false]) {
     const cfg = await gdevProject(
       game,
-      resolve("std"),
+      resolve(dataset, "blot2/std"),
       "src/main.blot",
       capture ? wrapper : compiler,
     );
@@ -152,21 +199,27 @@ for (const [name, edits] of Object.entries(variants)) {
       await client.dispose();
     }
   }
+  const packets = createHash("sha256");
   for (let i = 1; i <= 293; i++) {
-    const file = i + "-2.bin";
-    assert((await Deno.stat(resolve(directory, file))).size > 24);
+    const bytes = await Deno.readFile(resolve(directory, i + "-2.bin"));
+    assert(bytes.length > 24);
+    packets.update(createHash("sha256").update(bytes).digest());
   }
+  packetSets[name] = packets.digest("hex");
   await Deno.remove(wrapper);
   console.log(name);
 }
-const compilerHash = new Uint8Array(
-  await crypto.subtle.digest("SHA-256", await Deno.readFile(compiler)),
-);
-const compilerSha256 = Array.from(
-  compilerHash,
-  (byte) => byte.toString(16).padStart(2, "0"),
-).join("");
-const manifest = { dataset: basename(dataset), compilerSha256, trials };
+assert.equal(await digest(compiler), compilerSha256);
+assert.equal(await digest(resolve(work, "capture.so")), build["capture.so"]);
+const manifest = {
+  dataset: basename(dataset),
+  pins,
+  packetSets,
+  captureToolSha256: await digest(fileURLToPath(import.meta.url)),
+  compilerSha256,
+  captureSha256: build["capture.so"],
+  trials,
+};
 const pending = resolve(dataset, "manifest.json");
 await Deno.writeTextFile(pending, JSON.stringify(manifest, null, 2) + "\n");
 await Deno.rename(pending, resolve(work, "capture.json"));

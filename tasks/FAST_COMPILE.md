@@ -3,6 +3,60 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Choosing the edit after initial emission
+
+The experimental Gdev baseline records lookup events while emitting all named
+instances. A Linux child process can rebuild a function chosen after that
+baseline finishes. Forking gives the child its own copy of any memory it writes.
+All four first-time edits started from the same checkpoint in each round.
+An accepted input or simulation edit still matched fresh Wasm after a rendering
+edit attempted a new closure allocation and was discarded.
+
+| First edit | Full emission from Core | Screen, replay and assemble | Fork through closing candidate file |
+| --- | ---: | ---: | ---: |
+| Scale simulation time | 165.6 ms | 12.7 ms | 52.3 ms |
+| Add an input condition | 139.3 ms | 11.0 ms | 43.3 ms |
+| Take the absolute value | 140.5 ms | 12.0 ms | 50.1 ms |
+
+Full and replay measurements use 12 counterbalanced trials per direction on
+decoded Core, the compiler's typed representation. The fork-to-file column
+uses the six replay-first trials. It includes forking, reading and decoding
+all 293 edited packets, checking for reuse, regenerating one function and
+writing the entire candidate. Packet loading and decoding alone measured
+31.8 ms for the simulation edit. The parent verifies bytes
+after the fresh reference finishes. Production edit-to-Wasm time was last
+measured at 182 ms for this edit.
+
+![First-time Gdev edits from a retained checkpoint](../benchmarks/evidence/measurements/2026-11-21-gdev-late-edit.png)
+
+The original Gdev checkpoint recorded 7,162 lookup events across
+5,394 named emission entries. The instrumentation retains a
+lookup when the instance was absent or was allocated after its caller began.
+The trace arrays reserved 972,896 bytes, in addition to the
+retained generator and Wasm image. Across 12 matched pairs, the median
+recording overhead was +6.4 ms. The 95% paired bootstrap interval spanned
+−12.7 to +17.4 ms (10,000 resamples, seed 672). These runs leave the initial
+compilation cost uncertain.
+
+The 12 rounds checked 120 baseline images, 144 full edited images and all
+72 accepted replay images against independent fresh builds. Rendering and
+the new-function and `#run` controls still declined in both directions. The
+captures came from pinned Git archives and matched all nine original Wasm
+hashes. The receipt records hashes for the compiler inputs, toolchain, probe,
+capture executable and each checked packet set.
+
+A production integration can use the session's existing `Prepared.borrowed`
+flags to skip loading and comparing unchanged modules. It still needs to
+identify every declaration affected by an edit, including bodies that refer
+to it through forwarding or staging. The edit marker picks one declaration. A
+second edit in the same module could also change other functions. This fork
+experiment exercises siblings from one baseline. Advancing the baseline through successive accepted edits
+remains unqualified.
+
+[Benchmark and reproduction](../benchmarks/tools/structural_body/README.md) ·
+[Measured medians and input identities](../benchmarks/evidence/measurements/2026-11-21-gdev-late-edit.json) ·
+[Checkpoint and edit timings](../benchmarks/evidence/measurements/2026-11-21-gdev-late-edit.raw.json.gz)
+
 ## Replaying a structural edit
 
 Adding `seconds * 0.5` to Gdev's simulation changes body 1149 from 832 to
@@ -49,9 +103,8 @@ fresh Wasm. The 72 accepted replays also matched, for 360 complete-image
 checks. Each trial used a disposable generator. Integrating with sessions
 requires a way to discard speculative mutations, stable identities for
 closures and declarations, and accounting for compile-time evaluation and
-forwarding into other bodies. The benchmark selects the changed function
-from a known source edit and records lookups for that target during baseline
-emission. A production cache must handle a previously unknown edit target.
+forwarding into other bodies. This first version recorded lookups for the known edit target during baseline
+emission. The later checkpoint above records them before the target is known.
 
 [Benchmark and reproduction](../benchmarks/tools/structural_body/README.md) ·
 [Checksums and medians](../benchmarks/evidence/measurements/2026-11-21-gdev-structural-replay.json) ·

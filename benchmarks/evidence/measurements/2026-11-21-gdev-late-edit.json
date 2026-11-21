@@ -1,0 +1,280 @@
+{
+  "rounds": 12,
+  "identity": {
+    "captureCompilerSha256": "7ecf4130c3df1c103b05723f19ebf165169a590dc44e02ffb457b33892154678",
+    "pins": {
+      "gdev": "cc4bbbf22d35d7b91acd02957a8bdce38bdda90b",
+      "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+      "blot2": "bdd1f6788418d0a5c2ee547cfa196d84028b7cb3"
+    },
+    "packetSets": {
+      "base": "bb83ce77c610d5c79cffb61bb3d4ac088980a93b42e99bb08c424a5a3251d3d7",
+      "timing": "f41ef4543ea013a1d9b1d23c9cacc57cf9c4b2e7960ff16d74510ad3293f93b9",
+      "render": "cd77a82084609c7cb1381167a87e599fdcc4774622ed9eb15a7403b61df4eda1",
+      "input": "0884ab5bdd0a1ce992d6f96291f74e92aec1d39db5bb8317892a8389839057fe",
+      "helper": "e09643d2b065fde9c1338432d2efb7dda946899ee677a3662e69f6cad53afb5f",
+      "edge-base": "6752784bfc3b399ce6287d1fb669ec5f872ac9ea60365e1f4bcc6597d7732bc4",
+      "edge-edit": "3296ed5e47c08ddbe4c902a0bcea5883b143dc7cc2ab2046dc434704affdc3ac",
+      "stage-base": "81e4a7a132a0ce95da8e1a0fdbafafc4bebc767775c6978bd3f41b3d4c9db707",
+      "stage-edit": "5a4c1959106b0bdac0afa9444cf6d303186d39ae9d621b3c4f2d30dc644ddbd4"
+    },
+    "captureToolSha256": "90b09c26f28985929aa6476a78204a4f00997e30c89e4b2c92197a3f4afe0878",
+    "probeBuild": {
+      "modules": "f33a15f6fb453a4627a65cac28ebb1e526f2fe61d8b975e661b13725fa80fb92",
+      "native": "c74c679a0067325a224ff271df03a547826487def8b263af633d4c7877b8d5ce",
+      "stdlib": "fa446ce424dd0d74b341c720f6a37dc87a0a09c7effdc2c5421feb7d50adb1a3",
+      "goose": "640138a53fc6226628c92b6b4c5ca03771b5978b0155001bff5f2a0187364774",
+      "clang": "ca0d2f7fbe94836762f36c7e73292289bc4d5e4b9b5defc320ef0856259a2855",
+      "clangVersion": "clang version 23.1.5",
+      "harness": {
+        "probe.goose": "1f026d24769090967250e1b21edfb31d73716986942038d555b73db5666a1147",
+        "capture.c": "134db4bb5c9c68ae666de5308f7a1604d260412ce42d7e796b25337ec074c9a2",
+        "io.c": "47cd97a99f35ca6bfde149f70747f87151dad4e4730a4694be2ff14be87dc0e3",
+        "instrument.patch": "ab14734252ecd8e1e21f45c5cbf3b84d9917369623130fffae1118771b103aa7"
+      },
+      "cFlags": [
+        "-std=gnu11",
+        "-D_GNU_SOURCE",
+        "-O2",
+        "-pthread"
+      ],
+      "gooseFlags": [
+        "-O2"
+      ],
+      "buildScriptSha256": "c0a215ceca1e53bb710c781b8ed933bfe8b99dcf0147be404ebb28954c6f2d08",
+      "probe": "0da89b815f225bc140ba0043f64510217f84d1a9563c129cf257d6441866f5e7",
+      "capture.so": "f71ba389d1bbc9083509af570d60bd9e667d7fc412637f17d6a612a4a434f214"
+    },
+    "host": "x86_64",
+    "runnerSha256": "3cb61181dd121c084d7e763547e372d458db740ad66329d3a247f36ec5a5979e"
+  },
+  "setup": {
+    "tracedMs": 134.43473,
+    "controlMs": 141.2419935,
+    "pairedOverheadMs": 6.355124,
+    "namedEntries": 5394,
+    "lookups": 7162,
+    "traceStorageBytes": 972896
+  },
+  "byteChecks": 336,
+  "images": {
+    "base": {
+      "bytes": 2741576,
+      "sha256": "fca784b74c5fd5bb36f0f9852683d70583a4440d560407f0bd528dfd08d5c00e"
+    },
+    "edge-base": {
+      "bytes": 2741576,
+      "sha256": "fca784b74c5fd5bb36f0f9852683d70583a4440d560407f0bd528dfd08d5c00e"
+    },
+    "edge-edit": {
+      "bytes": 2741689,
+      "sha256": "ccca855eca2112525e5a6520d859ddc1f2e31f3fd87988b65baa1e32517af0ee"
+    },
+    "helper": {
+      "bytes": 2741587,
+      "sha256": "cdbc7f0936389bbdd44ac5a2a46ee009ee624bd3752320df781b0fd99cb97b32"
+    },
+    "input": {
+      "bytes": 2741608,
+      "sha256": "c45aeb003bb10e391eee1340d34ce607d898c1192af9a24b5e59b75eda0d14f9"
+    },
+    "render": {
+      "bytes": 2741590,
+      "sha256": "531e6a8bb26a445d4b928563ce8060ad6eae0b1e83d74f223c86b9ecc724dd49"
+    },
+    "stage-base": {
+      "bytes": 2741667,
+      "sha256": "d9c3e572d44a3985ba13fbe5beccfc82adb0205c4370dff3f56c80b739d3a377"
+    },
+    "stage-edit": {
+      "bytes": 2741681,
+      "sha256": "4ed196a49b785006c22175e3650cf8c54e446394c41c9d41d125024c6d151a2a"
+    },
+    "timing": {
+      "bytes": 2741594,
+      "sha256": "6c8a29023ecc8a482dba3414c767d11c5c2d75bd7995c46bbeba4bc24fe156ac"
+    }
+  },
+  "bodyChanges": {
+    "timing": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          832,
+          850
+        ]
+      ]
+    },
+    "render": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          3554,
+          1071,
+          1085
+        ]
+      ]
+    },
+    "input": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1147,
+          949,
+          981
+        ]
+      ]
+    },
+    "helper": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          832,
+          843
+        ]
+      ]
+    },
+    "edge": {
+      "oldCount": 7028,
+      "newCount": 7029,
+      "changedAtSharedOrdinals": 5643,
+      "otherChangedSections": [
+        0,
+        3,
+        7,
+        8,
+        9
+      ]
+    },
+    "stage": {
+      "oldCount": 7029,
+      "newCount": 7029,
+      "changedAtSharedOrdinals": 2,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          857,
+          857
+        ],
+        [
+          1641,
+          29,
+          43
+        ]
+      ]
+    }
+  },
+  "median": {
+    "base to timing": {
+      "outcome": "accepted",
+      "fullMs": 165.6124565,
+      "screenAndAttemptMs": 12.6677945,
+      "screenMs": 8.8455235,
+      "forkToDecisionMs": 52.2945985,
+      "reemitAndAssembleMs": 3.413208
+    },
+    "timing to base": {
+      "outcome": "accepted",
+      "fullMs": 135.861256,
+      "screenAndAttemptMs": 11.597421,
+      "screenMs": 8.19299,
+      "forkToDecisionMs": 48.1195035,
+      "reemitAndAssembleMs": 3.062423
+    },
+    "base to render": {
+      "outcome": "layout",
+      "fullMs": 149.694974,
+      "screenAndAttemptMs": 8.6000185,
+      "screenMs": 8.2513725,
+      "forkToDecisionMs": 39.338368,
+      "reemitAndAssembleMs": 0.343581
+    },
+    "render to base": {
+      "outcome": "layout",
+      "fullMs": 140.1958285,
+      "screenAndAttemptMs": 9.9783815,
+      "screenMs": 9.54233,
+      "forkToDecisionMs": 43.768599,
+      "reemitAndAssembleMs": 0.3738035
+    },
+    "base to input": {
+      "outcome": "accepted",
+      "fullMs": 139.3468925,
+      "screenAndAttemptMs": 10.964679,
+      "screenMs": 8.037056,
+      "forkToDecisionMs": 43.2995705,
+      "reemitAndAssembleMs": 2.8392105
+    },
+    "input to base": {
+      "outcome": "accepted",
+      "fullMs": 153.2300395,
+      "screenAndAttemptMs": 12.483447,
+      "screenMs": 9.464747,
+      "forkToDecisionMs": 43.086547,
+      "reemitAndAssembleMs": 2.7975665
+    },
+    "base to helper": {
+      "outcome": "accepted",
+      "fullMs": 140.5115665,
+      "screenAndAttemptMs": 12.049476,
+      "screenMs": 8.962403,
+      "forkToDecisionMs": 50.0683145,
+      "reemitAndAssembleMs": 3.126121
+    },
+    "helper to base": {
+      "outcome": "accepted",
+      "fullMs": 132.0695915,
+      "screenAndAttemptMs": 12.5917995,
+      "screenMs": 9.2549995,
+      "forkToDecisionMs": 43.2817625,
+      "reemitAndAssembleMs": 3.165314
+    },
+    "edge-base to edge-edit": {
+      "outcome": "layout",
+      "fullMs": 134.8088055,
+      "screenAndAttemptMs": 8.9865855,
+      "screenMs": 8.6941765,
+      "forkToDecisionMs": 43.6050255,
+      "reemitAndAssembleMs": 0.3061455
+    },
+    "edge-edit to edge-base": {
+      "outcome": "lookup order",
+      "fullMs": 133.753566,
+      "screenAndAttemptMs": 9.2105885,
+      "screenMs": 8.901884,
+      "forkToDecisionMs": 40.802711,
+      "reemitAndAssembleMs": 0.27455
+    },
+    "stage-base to stage-edit": {
+      "outcome": "compile-time reader",
+      "fullMs": 131.3236305,
+      "screenAndAttemptMs": 8.160316,
+      "screenMs": 8.157857,
+      "forkToDecisionMs": 38.026752,
+      "reemitAndAssembleMs": 0.006402
+    },
+    "stage-edit to stage-base": {
+      "outcome": "compile-time reader",
+      "fullMs": 143.9562445,
+      "screenAndAttemptMs": 9.2630025,
+      "screenMs": 9.2537645,
+      "forkToDecisionMs": 38.589016,
+      "reemitAndAssembleMs": 0.00506
+    }
+  }
+}

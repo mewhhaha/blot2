@@ -1,9 +1,8 @@
 # Replaying a structural Gdev edit
 
-This Linux benchmark keeps a direct-backend generator alive, lowers a changed
-named function against the new checked modules, and assembles a complete Wasm
-image. Each trial starts from its own baseline and compares its output with a
-separate fresh Gdev build. The experiment is isolated from the project server.
+This Linux experiment retains a direct-backend generator, then measures how
+much work it takes to emit complete Wasm after a named function changes.
+The runner checks each result against a separate fresh Gdev build.
 
 From the Blot repository root, with the patched Goose toolchain and profiled
 Blot compiler already built, run
@@ -14,21 +13,36 @@ deno run -A benchmarks/tools/structural_body/capture.ts
 python3 benchmarks/tools/structural_body/run.py --rounds 12
 ```
 
-The workload uses Gdev `cc4bbbf`, Ink `77697fe`, and the 293-module Main
-graph. Set `BLOT_COMPILER` to select another capture executable. Capture writes
-source overlays to fresh compiler sessions and keeps the sibling trees intact.
-The capture library reads the completed worker queue using the matching
-compiler's native queue layout. Each capture also compiles its overlay with the
-ordinary executable and validates the complete Wasm.
+The build copies compiler sources and the Goose standard library to scratch
+storage, instruments the copy, and fingerprints the inputs and executables.
+Capture reads Git archives from the existing Blot, Gdev and Ink repositories.
+The 293-module graph uses Blot std from `bdd1f678`, Gdev `cc4bbbf` and Ink
+`77697fe`. Source overlays apply only to the captured project. Set
+`BLOT_COMPILER` to select the reference executable. The capture library
+requires its matching native worker queue layout. Each capture builds with
+and without that library and validates the resulting Wasm.
 
-The runner alternates timing order, emits results in a new temporary directory
-per trial, and checks the initial and edited images against the capture. An
-accepted trial must produce identical bytes. A rejected trial must produce
-no candidate. The runner records timings in `build/structural-body/runs.json.gz`
-and medians, compiler identity, and body differences in `summary.json`.
+The checkpoint records lookup events while emitting named instances. After
+it writes its baseline Wasm and signals readiness, the runner sends the edit
+locations. Each edit runs in a forked child of the same unmodified checkpoint.
+The runner checks the baseline, every full reference emission and every
+accepted image against independent compiler output. Each rejected child must
+leave its candidate file absent. Alternating order exercises accepted edits
+after a rejected edit.
 
-`compareNs` covers the comparison of already decoded modules and edit selection.
-`replayNs` includes repairing revision-local type mappings, checking lookup
-order, and assembling accepted images. `fullNs` times a fresh emission in the
-same instrumented binary with tracing disabled. Capture, decoding, retaining
-the initial generator, oracle comparison and file I/O are outside those timers.
+The runner writes `build/structural-body/summary.json` and `runs.json.gz`.
+The raw records contain per-checkpoint setup and per-edit timings.
+
+| Measurement | Timed work |
+| --- | --- |
+| `buildNs` | Initial direct emission and assembly, with or without lookup recording, after decoding the baseline |
+| `decodeNs` | Read and decode 293 edited Core packets in the child |
+| `compareNs` | Compare decoded modules and select the edited declaration from its source offset |
+| `replayNs` | Rebuild type mappings, check instance lookups, emit the selected body and assemble accepted Wasm |
+| `fullNs` | Full emission from decoded edited Core in the same binary with recording disabled |
+| `forkToDecisionNs` | From just before fork through writing and closing the candidate file, or through deciding to decline. Recorded when replay runs first |
+
+The runner releases results after independent byte comparison. The measurements
+exclude source loading and type checking. The trace storage counter includes
+reserved array capacity. The parent retains a full generator plus its baseline
+image in addition to those arrays.
