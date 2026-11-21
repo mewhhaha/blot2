@@ -379,6 +379,11 @@ let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
 let a_fork_expr=blot_parse_ast::tag_fork_expr;
+let a_with_stmt=blot_parse_ast::tag_with_stmt;
+let a_with_entry=blot_parse_ast::tag_with_entry;
+let a_comptime_for=blot_parse_ast::tag_comptime_for;
+let a_comptime_if=blot_parse_ast::tag_comptime_if;
+let a_comptime_project=blot_parse_ast::tag_comptime_project;
 let c_expected_token=blot_parse_ast::code_expected_token;
 let c_expected_expression=blot_parse_ast::code_expected_expression;
 let c_expected_type=blot_parse_ast::code_expected_type;
@@ -402,18 +407,54 @@ fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs:
  let name=type_identifier(p,source,tokens); var params=ScratchIdBuffer {};
  if type_atom_tag(current(p,source,tokens).tag) { params.push(type_atom(p,source,tokens)); }
  while p.failure==blot_error::Error.none&&eat(p,source,tokens,t_fat_arrow) { expect(p,source,tokens,t_kw_type); params.push(type_atom(p,source,tokens)); }
- if !old_data&&eat(p,source,tokens,t_equal) {
+ var trait_outputs=ScratchIdBuffer {};
+ if !old_data&&eat(p,source,tokens,t_l_brace) {
+  newlines(p,source,tokens);
+  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) {
+   let out_start=current(p,source,tokens).start;
+   let out_name=lower_identifier(p,source,tokens);
+   trait_outputs.push(add(p,source,tokens,a_contract_type_member,out_name,0,0,out_start));
+   if eat(p,source,tokens,t_comma) { newlines(p,source,tokens); continue; }
+   if at(p,source,tokens,t_newline) { newlines(p,source,tokens); continue; }
+   break;
+  }
+  newlines(p,source,tokens); expect(p,source,tokens,t_r_brace);
+ }
+ if !old_data&&trait_outputs.len==0&&eat(p,source,tokens,t_equal) {
   let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items);
-  let __cleanup_result_17_0: Id = add(p,source,tokens,a_type_alias_decl,name,body,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_17_0;
+  let __cleanup_result_17_0: Id = add(p,source,tokens,a_type_alias_decl,name,body,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); trait_outputs.deinit(); params.deinit(); return __cleanup_result_17_0;
  }
  var effect=false;
  if !old_data {
   expect(p,source,tokens,t_kw_is);
-  if word(p,source,tokens,"contract") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=predicate_body(p,source,tokens,current(p,source,tokens).start,true); let range=list(p,source,tokens,params.items); let __cleanup_result_19_0: Id = add(p,source,tokens,a_contract_decl,name,body.node,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return __cleanup_result_19_0; }
+  if word(p,source,tokens,"trait") {
+   advance(p,source,tokens); expect(p,source,tokens,t_equal);
+   let body_start=expect(p,source,tokens,t_l_brace).start; newlines(p,source,tokens);
+   var members=ScratchIdBuffer {};
+   for out_id in trait_outputs.items { members.push(out_id); }
+   while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) {
+    let point=current(p,source,tokens).start;
+    let field=lower_identifier(p,source,tokens);
+    expect(p,source,tokens,t_colon);
+    let ty=type_expression(p,source,tokens);
+    members.push(add(p,source,tokens,a_contract_value_member,field,ty,0,point));
+    if eat(p,source,tokens,t_comma) { newlines(p,source,tokens); continue; }
+    if at(p,source,tokens,t_newline) { newlines(p,source,tokens); continue; }
+    break;
+   }
+   newlines(p,source,tokens); expect(p,source,tokens,t_r_brace);
+   let body=list_node(p,source,tokens,a_where_clause,members.items,body_start);
+   let range=list(p,source,tokens,params.items);
+   let trait_result: Id = add(p,source,tokens,a_contract_decl,name,body,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start);
+   members.deinit(); trait_outputs.deinit(); params.deinit(); return trait_result;
+  }
+  if trait_outputs.len!=0 { let err_res=fail(p,source,tokens,c_expected_token); trait_outputs.deinit(); params.deinit(); return err_res; }
+  if word(p,source,tokens,"contract") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=predicate_body(p,source,tokens,current(p,source,tokens).start,true); let range=list(p,source,tokens,params.items); let __cleanup_result_19_0: Id = add(p,source,tokens,a_contract_decl,name,body.node,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); trait_outputs.deinit(); params.deinit(); return __cleanup_result_19_0; }
   // An opaque representation is data with one private constructor spelled like its type.
-  if word(p,source,tokens,"opaque") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items); let constructor=add(p,source,tokens,a_constructor_ref,name,body,0,start); let constructors=list_node(p,source,tokens,a_constructors,[constructor],start); is_opaque=true; let opaque_result: Id = add(p,source,tokens,a_data_decl,name,constructors,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); params.deinit(); return opaque_result; }
+  if word(p,source,tokens,"opaque") { advance(p,source,tokens); expect(p,source,tokens,t_equal); let body=type_expression(p,source,tokens); let range=list(p,source,tokens,params.items); let constructor=add(p,source,tokens,a_constructor_ref,name,body,0,start); let constructors=list_node(p,source,tokens,a_constructors,[constructor],start); is_opaque=true; let opaque_result: Id = add(p,source,tokens,a_data_decl,name,constructors,extra(p,source,tokens,[range.start,range.len,attrs.start,attrs.len]),start); trait_outputs.deinit(); params.deinit(); return opaque_result; }
   if eat(p,source,tokens,t_kw_effect) { effect=true; } else { expect(p,source,tokens,t_kw_data); }
  }
+ trait_outputs.deinit();
  expect(p,source,tokens,t_equal); var body: Id=0;
  if effect {
   if eat(p,source,tokens,t_l_brace) {
@@ -427,8 +468,18 @@ fn type_declaration(p: Parser&,source: const u8[:],tokens: const Token[:],attrs:
  } else {
   var constructors=ScratchIdBuffer {};  eat(p,source,tokens,t_pipe);
   while p.failure==blot_error::Error.none {
+   newlines(p,source,tokens);
+   var c_attrs=ScratchIdBuffer {};
+   while p.failure==blot_error::Error.none&&at(p,source,tokens,t_at) {
+    let ap=current(p,source,tokens).start; eat(p,source,tokens,t_at); expect(p,source,tokens,t_l_bracket);
+    let ab=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket);
+    c_attrs.push(add(p,source,tokens,a_attribute,ab,0,0,ap)); newlines(p,source,tokens);
+   }
    let point=expect(p,source,tokens,t_hash).start; let constructor=type_identifier(p,source,tokens); var payload: Id=0; if type_atom_at(p,source,tokens,0) { payload=type_expression(p,source,tokens); }
-   constructors.push(add(p,source,tokens,a_constructor_ref,constructor,payload,0,point)); if !eat(p,source,tokens,t_pipe) { break; }
+   var c_meta: u32=0;
+   if c_attrs.len!=0 { let cr=list(p,source,tokens,c_attrs.items); c_meta=extra(p,source,tokens,[cr.start,cr.len])+1; }
+   c_attrs.deinit();
+   constructors.push(add(p,source,tokens,a_constructor_ref,constructor,payload,c_meta,point)); if !eat(p,source,tokens,t_pipe) { break; }
   }
   body=list_node(p,source,tokens,a_constructors,constructors.items,start);
   constructors.deinit(); }
@@ -578,9 +629,29 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
  }
  if at(p,source,tokens,t_identifier)||at(p,source,tokens,t_type_identifier) { let __cleanup_result_13_0: Id = add(p,source,tokens,a_type_name,qualified(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_13_0; }
  if eat(p,source,tokens,t_l_brace) {
-  var fields=ScratchIdBuffer {};
-  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) { let point=current(p,source,tokens).start; let name=lower_identifier(p,source,tokens); var value: Id=0; if eat(p,source,tokens,t_colon) { value=type_expression(p,source,tokens); } fields.push(add(p,source,tokens,a_type_field,name,value,0,point)); if !eat(p,source,tokens,t_comma) { break; } }
-  expect(p,source,tokens,t_r_brace); let __cleanup_result_14_0: Id = list_node(p,source,tokens,a_type_record,fields.items,start); { p.depth--; } let __cleanup_result_31_0: Id = __cleanup_result_14_0; fields.deinit(); return __cleanup_result_31_0;
+  var fields=ScratchIdBuffer {}; newlines(p,source,tokens);
+  while p.failure==blot_error::Error.none&&!at(p,source,tokens,t_r_brace) {
+   let point=current(p,source,tokens).start;
+   var f_attrs=ScratchIdBuffer {};
+   while p.failure==blot_error::Error.none&&at(p,source,tokens,t_at) {
+    let ap=current(p,source,tokens).start; eat(p,source,tokens,t_at); expect(p,source,tokens,t_l_bracket);
+    let ab=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket);
+    f_attrs.push(add(p,source,tokens,a_attribute,ab,0,0,ap)); newlines(p,source,tokens);
+   }
+   let name=lower_identifier(p,source,tokens); var value: Id=0; if eat(p,source,tokens,t_colon) { value=type_expression(p,source,tokens); }
+   var def_expr: Id=0; if eat(p,source,tokens,t_equal) { def_expr=expression(p,source,tokens); }
+   var f_meta: u32=0;
+   if f_attrs.len!=0||def_expr!=0 {
+    let fr=list(p,source,tokens,f_attrs.items);
+    f_meta=extra(p,source,tokens,[fr.start,fr.len,def_expr])+1;
+   }
+   f_attrs.deinit();
+   fields.push(add(p,source,tokens,a_type_field,name,value,f_meta,point));
+   if eat(p,source,tokens,t_comma) { newlines(p,source,tokens); continue; }
+   if at(p,source,tokens,t_newline) { newlines(p,source,tokens); continue; }
+   break;
+  }
+  newlines(p,source,tokens); expect(p,source,tokens,t_r_brace); let __cleanup_result_14_0: Id = list_node(p,source,tokens,a_type_record,fields.items,start); { p.depth--; } let __cleanup_result_31_0: Id = __cleanup_result_14_0; fields.deinit(); return __cleanup_result_31_0;
   fields.deinit(); }
  let array=eat(p,source,tokens,t_l_bracket); if !array&&!eat(p,source,tokens,t_l_paren) { let __cleanup_result_15_0: Id = fail(p,source,tokens,c_expected_type); { p.depth--; } return __cleanup_result_15_0; }
  if !array&&at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_colon { let name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_colon); let annotation=type_expression(p,source,tokens); expect(p,source,tokens,t_r_paren); let __cleanup_result_16_0: Id = add(p,source,tokens,a_type_binder,name,annotation,0,start); { p.depth--; } return __cleanup_result_16_0; }
@@ -722,6 +793,11 @@ recursive fn lambda_tail(p:Parser&,source:const u8[:],tokens:const Token[:],star
    let ret_stmt=add(p,source,tokens,a_function_return_stmt,tmp_ref,0,0,ret_start);
    body=list_node(p,source,tokens,a_block,[use_stmt,ret_stmt],ret_start);
    is_suite_body=true;
+  } else if !returned&&(at(p,source,tokens,t_kw_use)||assignment_operator(p,tokens)==t_colon_equal||assignment_operator(p,tokens)==t_equal) {
+   let stmt_start=current(p,source,tokens).start;
+   let single=statement(p,source,tokens);
+   body=list_node(p,source,tokens,a_block,[single],stmt_start);
+   is_suite_body=false;
   } else {
    body=expression(p,source,tokens);
    if !returned&&p.failure==blot_error::Error.none&&p.tree.node(body).tag==a_block&&p.tree.node(body).c==0 { is_suite_body=true; }
@@ -848,14 +924,26 @@ recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],a
  } else { value=postfix(p,source,tokens); }
  while p.failure==blot_error::Error.none {
   if at(p,source,tokens,t_dot) {
-   let dot=advance(p,source,tokens); let point=current(p,source,tokens).start; let member=member_identifier(p,source,tokens);
-   value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { break; }
-   p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point});
+   let dot=advance(p,source,tokens);
+   if eat(p,source,tokens,t_l_paren) {
+    let field_var=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
+    value=add(p,source,tokens,a_comptime_project,value,field_var,0,start); if p.failure!=blot_error::Error.none { break; }
+   } else {
+    let point=current(p,source,tokens).start; let member=member_identifier(p,source,tokens);
+    value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { break; }
+    p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point});
+   }
    while p.failure==blot_error::Error.none {
     if at(p,source,tokens,t_dot)&&current(p,source,tokens).start==p.tree.span(value).end {
-     let d2=advance(p,source,tokens); let pt2=current(p,source,tokens).start; let m2=member_identifier(p,source,tokens);
-     value=add(p,source,tokens,a_field_access,value,m2,0,start); if p.failure!=blot_error::Error.none { break; }
-     p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {d2.start,d2.end},member:m2,member_point:pt2});
+     let d2=advance(p,source,tokens);
+     if eat(p,source,tokens,t_l_paren) {
+      let fv2=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
+      value=add(p,source,tokens,a_comptime_project,value,fv2,0,start); if p.failure!=blot_error::Error.none { break; }
+     } else {
+      let pt2=current(p,source,tokens).start; let m2=member_identifier(p,source,tokens);
+      value=add(p,source,tokens,a_field_access,value,m2,0,start); if p.failure!=blot_error::Error.none { break; }
+      p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {d2.start,d2.end},member:m2,member_point:pt2});
+     }
     } else if at(p,source,tokens,t_l_bracket)&&current(p,source,tokens).start==p.tree.span(value).end {
      advance(p,source,tokens); let idx=expression(p,source,tokens);
      if eat(p,source,tokens,t_dot_dot) { let lim=expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); value=collection_intrinsic(p,source,tokens,"@storage.view",[value,idx,lim],start); }
@@ -880,7 +968,15 @@ recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],a
 recursive fn postfix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  let start=current(p,source,tokens).start; var value=atom(p,source,tokens);
  while p.failure==blot_error::Error.none {
-  if at(p,source,tokens,t_dot)&&current(p,source,tokens).start==p.tree.span(value).end { let dot=advance(p,source,tokens); let point=current(p,source,tokens).start; let member=member_identifier(p,source,tokens); value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point}); }
+  if at(p,source,tokens,t_dot)&&current(p,source,tokens).start==p.tree.span(value).end {
+   let dot=advance(p,source,tokens);
+   if eat(p,source,tokens,t_l_paren) {
+    let field_var=lower_identifier(p,source,tokens); expect(p,source,tokens,t_r_paren);
+    value=add(p,source,tokens,a_comptime_project,value,field_var,0,start); if p.failure!=blot_error::Error.none { return 0; }
+   } else {
+    let point=current(p,source,tokens).start; let member=member_identifier(p,source,tokens); value=add(p,source,tokens,a_field_access,value,member,0,start); if p.failure!=blot_error::Error.none { return 0; } p.tree.operator_origins.push(blot_parse_ast::OperatorOrigin {node:value,span:Span {dot.start,dot.end},member:member,member_point:point});
+   }
+  }
   else if at(p,source,tokens,t_l_paren)&&current(p,source,tokens).start==p.tree.span(value).end { let argument=atom(p,source,tokens); value=add(p,source,tokens,a_apply,value,argument,0,start); }
   else if at(p,source,tokens,t_l_bracket)&&current(p,source,tokens).start==p.tree.span(value).end {
    advance(p,source,tokens); let index=expression(p,source,tokens);
@@ -1169,7 +1265,11 @@ recursive fn statement(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   var forwarding: u32=0; if eat(p,source,tokens,t_dollar) { forwarding=1; } let value=expression(p,source,tokens); return add(p,source,tokens,a_return_stmt,value,forwarding,0,start);
  }
  if eat(p,source,tokens,t_kw_continue) { return add(p,source,tokens,a_continue_stmt,0,0,0,start); }
- if at(p,source,tokens,t_kw_if) { return if_statement(p,source,tokens); } if at(p,source,tokens,t_kw_for) { return for_statement(p,source,tokens); }
+ if at(p,source,tokens,t_kw_if) { return if_statement(p,source,tokens); } if at(p,source,tokens,t_kw_for) { return for_statement(p,source,tokens); } if at(p,source,tokens,t_kw_with) { return with_statement(p,source,tokens); }
+ if at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#" {
+  if peek(p,tokens,1)==t_kw_for { return comptime_for_statement(p,source,tokens); }
+  if peek(p,tokens,1)==t_kw_if { return comptime_if_statement(p,source,tokens); }
+ }
  if eat(p,source,tokens,t_kw_use) {
   if (at(p,source,tokens,t_type_identifier)||at(p,source,tokens,t_kw_true)||at(p,source,tokens,t_kw_false))&&has_use_binding(p,tokens) { return identifier_syntax(p,source,tokens); }
   if at(p,source,tokens,t_identifier)&&has_use_binding(p,tokens) { let name=lower_identifier(p,source,tokens); var annotation: Id=0; if eat(p,source,tokens,t_colon) { annotation=type_expression(p,source,tokens); } expect(p,source,tokens,t_left_arrow); let value=expression(p,source,tokens); return add(p,source,tokens,a_use_stmt,name,value,annotation,start); }
@@ -1216,10 +1316,74 @@ recursive fn place(p: Parser&,source: const u8[:],tokens: const Token[:],start: 
 fn assignment_operator(p: Parser&,tokens: const Token[:]) -> blot_parse_token::Tag {
  var nesting=0; var i=p.index;
  while i<tokens.len {
-  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal||tag==t_equal { return tag; } if tag==t_newline||tag==t_dedent||tag==t_eof { return t_eof; } }
+  let tag=tokens[i].tag; if nesting==0 { if tag==t_colon_equal||tag==t_equal { return tag; } if tag==t_newline||tag==t_dedent||tag==t_eof||tag==t_comma||tag==t_r_brace||tag==t_r_paren||tag==t_r_bracket { return t_eof; } }
   if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nesting++; } else if (tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace)&&nesting!=0 { nesting--; } i++;
  }
  return t_eof;
+}
+fn with_entry_has_equal(p: Parser&,tokens: const Token[:]) -> bool {
+ var nesting=0; var i=p.index;
+ while i<tokens.len {
+  let tag=tokens[i].tag;
+  if nesting==0 {
+   if tag==t_equal { return true; }
+   if tag==t_comma||tag==t_colon||tag==t_newline||tag==t_dedent||tag==t_eof { return false; }
+  }
+  if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nesting++; }
+  else if (tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace)&&nesting!=0 { nesting--; }
+  i++;
+ }
+ return false;
+}
+recursive fn with_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let start=expect(p,source,tokens,t_kw_with).start;
+ var entries=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none {
+  let entry_start=current(p,source,tokens).start;
+  if with_entry_has_equal(p,tokens) {
+   let effect_type=type_application(p,source,tokens);
+   expect(p,source,tokens,t_equal);
+   let handler=expression(p,source,tokens);
+   entries.push(add(p,source,tokens,a_with_entry,effect_type,handler,1,entry_start));
+  } else {
+   let expr=expression(p,source,tokens);
+   entries.push(add(p,source,tokens,a_with_entry,expr,0,0,entry_start));
+  }
+  if !eat(p,source,tokens,t_comma) { break; }
+ }
+ expect(p,source,tokens,t_colon);
+ let body=suite(p,source,tokens);
+ let range=list(p,source,tokens,entries.items);
+ let result: Id = add(p,source,tokens,a_with_stmt,range.start,range.len,body,start);
+ entries.deinit();
+ return result;
+}
+recursive fn trailing_comptime_else(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let saved=p.index; newlines(p,source,tokens);
+ if !(at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#"&&peek(p,tokens,1)==t_kw_else) { p.index=saved; return 0; }
+ advance(p,source,tokens); advance(p,source,tokens); expect(p,source,tokens,t_colon); return suite(p,source,tokens);
+}
+recursive fn comptime_for_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let start=advance(p,source,tokens).start; expect(p,source,tokens,t_kw_for);
+ let name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_kw_in);
+ if !(at(p,source,tokens,t_hash)&&text(p,source,current(p,source,tokens))=="#") { return fail(p,source,tokens,c_expected_token); }
+ advance(p,source,tokens);
+ var mode: u32=0;
+ if word(p,source,tokens,"fields") { advance(p,source,tokens); mode=0; }
+ else if word(p,source,tokens,"variants") { advance(p,source,tokens); mode=1; }
+ else { return fail(p,source,tokens,c_expected_token); }
+ let target_type=type_atom(p,source,tokens);
+ expect(p,source,tokens,t_colon);
+ let body=suite(p,source,tokens);
+ return add(p,source,tokens,a_comptime_for,name,target_type,extra(p,source,tokens,[body,mode]),start);
+}
+recursive fn comptime_if_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let start=advance(p,source,tokens).start; expect(p,source,tokens,t_kw_if);
+ let condition=expression(p,source,tokens);
+ expect(p,source,tokens,t_colon);
+ let body=suite(p,source,tokens);
+ let fallback=trailing_comptime_else(p,source,tokens);
+ return add(p,source,tokens,a_comptime_if,condition,body,fallback,start);
 }
 recursive fn trailing_else(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let saved=p.index; newlines(p,source,tokens); if !eat(p,source,tokens,t_kw_else) { p.index=saved; return 0; } expect(p,source,tokens,t_colon); return suite(p,source,tokens); }
 recursive fn if_statement(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
@@ -1292,7 +1456,7 @@ fn type_atom_at(p: Parser&,source: const u8[:],tokens: const Token[:],offset: i6
  return false;
 }
 fn is_statement_tag(tag: blot_parse_ast::Tag) -> bool {
- return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_store_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_yield_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_value_decl;
+ return tag==a_let_stmt||tag==a_rebind_stmt||tag==a_store_stmt||tag==a_use_stmt||tag==a_iterator_bind||tag==a_function_return_stmt||tag==a_return_stmt||tag==a_yield_stmt||tag==a_break_stmt||tag==a_continue_stmt||tag==a_if_stmt||tag==a_if_let_stmt||tag==a_for_stmt||tag==a_range_stmt||tag==a_forever_stmt||tag==a_with_stmt||tag==a_comptime_for||tag==a_comptime_if||tag==a_value_decl;
 }
 fn pattern_tag(tag: Tag) -> bool { return tag==t_identifier||tag==t_integer||tag==t_hash||tag==t_caret||tag==t_l_paren||tag==t_l_brace||tag==t_kw_true||tag==t_kw_false; }
 fn parser_context(pool: blot_parse_symbols::Pool&,tree: Tree&,fixities: ScratchFixityBuffer&) -> Parser {

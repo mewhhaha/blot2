@@ -84,6 +84,10 @@ fn scanNode(self_: Capture&, id: u32) {
     match n.tag {
         package_pack => { self_.nodes(m.children(id)); },
         resource_release, usage_share, usage_read, fork_ => { self_.node(n.a); },
+        with_handle => { self_.nodes(m.children(id)); self_.node(n.a); },
+        comptime_for => { self_.node(n.b); },
+        comptime_if => { self_.node(n.c); self_.node(n.b); self_.node(n.a); },
+        comptime_meta => { if n.c == 0 { self_.node(n.a); } else if n.c == 8 || n.c == 9 { self_.node(n.b); } },
         package_unpack => { self_.node(m.packageOpening(id).body); self_.node(n.a); },
         contract_method => {
             self_.nodes(m.children(id)); let template = m.member_templates[n.a];

@@ -56,8 +56,21 @@ struct CheckedRange {
     base: u32 = 0,
     length_ty: TId = 0
 }
+struct ComptimeFrame {
+    binder: u32 = 0,
+    is_variants: bool = false,
+    target_ty: Ty = 0,
+    nominal_unit: u32 = 0,
+    nominal_decl: u32 = 0,
+    index: u32 = 0,
+    ctor_tag: u32 = 0,
+    name_id: u32 = 0,
+    field_ty: Ty = 0,
+}
 struct Fn {
     checked_range: CheckedRange = CheckedRange {},
+    comptime_frames: ComptimeFrame[16] = [ComptimeFrame {}; 16],
+    comptime_len: i64 = 0,
     sites_base:i64=0,
     scratch_body: u32 = 0,
     scratch_cut: ScratchCut = ScratchCut {},
@@ -90,11 +103,13 @@ struct Fn {
     // count is kept here and the stack itself is only cut when the body ends.
     handles_base: i64 = 0,
     handles_len: u32 = 0,
+    handle_cells_base: i64 = 0,
     code_base: i64 = 0,
     locals_base: i64 = 0,
     labels_base: i64 = 0,
     parameter_words: u32 = 0,
     bindings: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    with_cells: blot_support_zigmap::Map = blot_support_zigmap::Map {},
     depth: u32 = 0,
     // Set when this body allocates environment memory or receives a value
     // that may refer to it; such a body restores the stack on exit unless
@@ -317,6 +332,10 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if_value, if_stmt => { return ifNode(g, f, id); },
         block_ => { return block_(g, f, id); },
         fork_ => { return forkNode(g, f, id); },
+        with_handle => { return withHandleNode(g, f, id); },
+        comptime_for => { return comptimeForNode(g, f, id); },
+        comptime_if => { return comptimeIfNode(g, f, id); },
+        comptime_meta => { return comptimeMetaNode(g, f, id); },
         suite => {
             var last = unitVal();
             for child in m.children(id) {
@@ -368,6 +387,35 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         },
     }
 }
+fn withCellType(g: const Generator&, f: const Fn&, binding: u32) -> Ty, bool {
+    let val, present = blot_support_zigmap::get(g.s.map_pool, f.with_cells, binding);
+    return val, present && val != 0;
+}
+fn readBindingVal(g: Generator&, f: Fn&, binding: u32, id: u32) -> Val, bool, Error {
+    let bound, present = bindGet(g, f, binding);
+    if !present { return neverVal(), false, blot_direct_types::Error.none; }
+    let elem_ty, is_cell = withCellType(g, f, binding);
+    if !is_cell { return bound, true, blot_direct_types::Error.none; }
+    let loaded, error = readFlat(g, f, w(g, bound, 0), 0, elem_ty, id);
+    return loaded, true, error;
+}
+fn writeWithCell(g: Generator&, f: Fn&, cell_addr: u32, elem_ty: Ty, value: Val, id: u32) -> Error {
+    let noted = noteStore(g, f, value);
+    if noted != blot_direct_types::Error.none { return noted; }
+    let bytes, berr = g.types.flatBytes(elem_ty);
+    if berr != blot_direct_types::Error.none { return berr; }
+    if bytes == 0 { return blot_direct_types::Error.none; }
+    if g.s.has_rt && g.s.rt.has_fork {
+        gget(g, g.s.rt.fork_depth);
+        op(g, OP_if_);
+        op(g, 0x40);
+        lget(g, cell_addr);
+        i32Const(g, bytes);
+        callf(g, g.s.rt.undo_record);
+        op(g, OP_end);
+    }
+    return writeFlat(g, f, cell_addr, 0, value, id);
+}
 recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
@@ -381,27 +429,40 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         apply => { deferred = partialApply(g, f, n.b); },
         _ => {},
     }
-    if deferred && m.binding(n.a).scheme.variables.len != 0 {
+    if deferred && n.c < 2 && m.binding(n.a).scheme.variables.len != 0 {
         g.s.polymorphic.put(polyKey(f, n.a), n.b);
         return unitVal(), blot_direct_types::Error.none;
     }
     let grown, has_grown, error = linearAppend(g, f, n.b);
     if error != blot_direct_types::Error.none { return grown, error; }
-    if has_grown {
-        bindPut(g, f, n.a, grown);
-        return unitVal(), blot_direct_types::Error.none;
+    var value = grown;
+    if !has_grown {
+        // A generalized local value is computed once: its uses decide the one
+        // type it is computed at.
+        if m.binding(n.a).scheme.variables.len != 0 {
+            let typed = typeByUses(g, f, n.a, n.b);
+            if typed != blot_direct_types::Error.none { return neverVal(), typed; }
+            // Nothing reads an unused local, so its open types are Unit.
+            if uses(g, f, n.a) == 0 { defaultUnused(g, f, m.binding(n.a).ty, 0); }
+        }
+        let evaluated, eval_err = stmt(g, f, n.b);
+        if eval_err != blot_direct_types::Error.none { return evaluated, eval_err; }
+        value = evaluated;
     }
-    // A generalized local value is computed once: its uses decide the one
-    // type it is computed at.
-    if m.binding(n.a).scheme.variables.len != 0 {
-        let typed = typeByUses(g, f, n.a, n.b);
-        if typed != blot_direct_types::Error.none { return neverVal(), typed; }
-        // Nothing reads an unused local, so its open types are Unit.
-        if uses(g, f, n.a) == 0 { defaultUnused(g, f, m.binding(n.a).ty, 0); }
+    if n.c >= 2 {
+        let outer_b = n.c - 2;
+        let cell_val, has_cell = bindGet(g, f, outer_b);
+        let elem_ty, is_cell = withCellType(g, f, outer_b);
+        if has_cell && is_cell && value.ty != blot_direct_types::never {
+            refine(g, f, m.binding(n.a).ty, value.ty);
+            let werr = writeWithCell(g, f, w(g, cell_val, 0), elem_ty, value, id);
+            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            bindPut(g, f, n.a, cell_val);
+            blot_support_zigmap::put(g.s.map_pool, f.with_cells, n.a, elem_ty);
+            return unitVal(), blot_direct_types::Error.none;
+        }
     }
-    let value, error = stmt(g, f, n.b);
-    if error != blot_direct_types::Error.none { return value, error; }
-    if value.ty != blot_direct_types::never {
+    if !has_grown && value.ty != blot_direct_types::never {
         refine(g, f, m.binding(n.a).ty, value.ty);
         if isFreshBoxedRhs(g, f, m, n.b, value.ty) {
             blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, 1);
@@ -532,7 +593,8 @@ recursive fn referenceInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let ref = m.reference(id);
     if ref.unit == 0 || ref.unit == m.unit {
-        let bound, present = bindGet(g, f, ref.binding);
+        let bound, present, rerr = readBindingVal(g, f, ref.binding, id);
+        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
         if present { return bound, blot_direct_types::Error.none; }
         let closure, generalized = g.s.polymorphic.get(polyKey(f, ref.binding));
         if generalized {
@@ -681,7 +743,7 @@ recursive fn layoutFree(g: Generator&, ty: Ty, depth: i64) -> bool {
     let n = g.types.node(ty);
     match n.tag {
         never => { return false; },
-        function, array, list, cursor, grow, resize, ref, view, link => { return true; },
+        function, array, list, cursor, grow, resize, ref, view, link, cell => { return true; },
         tuple => {
             for at in 0..(n.b as i64) { if !layoutFree(g, g.types.words[n.a + at], depth + 1) { return false; } }
             return true;

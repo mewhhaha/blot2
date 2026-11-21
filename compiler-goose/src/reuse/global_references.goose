@@ -68,6 +68,35 @@ fn processNode<C>(self_:Walker<C>&,id:Id)->Error {
   blot_parse_ast::tag_request_arm=>{{ let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.push(Event.pattern_bind {n.b, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.push(Event.pattern_read {n.b, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
   blot_parse_ast::tag_product,blot_parse_ast::tag_array,blot_parse_ast::tag_record=>{{ let propagated_error = self_.children(id); if propagated_error != blot_error::Error.none { return propagated_error; } }},
   blot_parse_ast::tag_attribute=>{{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+  blot_parse_ast::tag_fork_expr=>{
+   let entries=blot_parse_ast::List {n.a,n.b, ..};
+   { let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   let count=self_.tree.list(entries).len;
+   var idx=count;
+   while idx!=0 { idx--; let entry=self_.tree.node(self_.tree.list(entries)[idx]); { let propagated_error = self_.push(Event.bind {entry.a, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } } }
+   idx=count;
+   while idx!=0 { idx--; let entry=self_.tree.node(self_.tree.list(entries)[idx]); { let propagated_error = self_.visit(entry.b); if propagated_error != blot_error::Error.none { return propagated_error; } } }
+  },
+  blot_parse_ast::tag_with_stmt=>{
+   { let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   let entries=blot_parse_ast::List {n.a,n.b, ..};
+   var idx=self_.tree.list(entries).len;
+   while idx!=0 {
+    idx--; let entry=self_.tree.node(self_.tree.list(entries)[idx]);
+    if entry.c==1 {{ let propagated_error = self_.visit(entry.b); if propagated_error != blot_error::Error.none { return propagated_error; } }}
+    else {{ let propagated_error = self_.visit(entry.a); if propagated_error != blot_error::Error.none { return propagated_error; } }}
+   }
+  },
+  blot_parse_ast::tag_comptime_for=>{
+   let body=self_.tree.extra.items[n.c];
+   { let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.visit(body); if propagated_error != blot_error::Error.none { return propagated_error; } }
+   { let propagated_error = self_.push(Event.bind {n.a, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  },
+  blot_parse_ast::tag_comptime_if=>{{ let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.c); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.push(Event.restore {self_.locals.len, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.b); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+  blot_parse_ast::tag_comptime_project=>{{ let propagated_error = self_.visit(n.a); if propagated_error != blot_error::Error.none { return propagated_error; } }},
   _=>{},
  }
  return blot_error::Error.none;
@@ -80,7 +109,12 @@ fn discover<C>(tree:const Tree&,declaration:Id,resolver:C&,self_name:u32,transit
  let result=owned_references.alloc_slice(references.len);for reference,index in references {result[index]=reference;}return result,blot_error::Error.none;
 }
 fn walk<C>(walker:Walker<C>&,declaration:Id)->Error {
- let value=walker.tree.value_decl(declaration);{ let propagated_error = walker.visit(value.body); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = walker.list(value.attributes); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ if walker.tree.node(declaration).tag==blot_parse_ast::tag_field {
+  let field=walker.tree.node(declaration);
+  if field.b!=0 { let propagated_error = walker.visit(field.b); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ } else {
+  let value=walker.tree.value_decl(declaration);{ let propagated_error = walker.visit(value.body); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = walker.list(value.attributes); if propagated_error != blot_error::Error.none { return propagated_error; } }
+ }
  while walker.work.len!=0 {
   let event=walker.work[walker.work.len-1];walker.work.resize(walker.work.len-1);if walker.transitions>=walker.limit {return blot_error::Error.type_limit;}walker.transitions++;
   match event {

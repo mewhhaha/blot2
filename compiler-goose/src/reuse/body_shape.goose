@@ -342,6 +342,7 @@ fn same_check_core_Module(a:blot_check_core::Module,b:blot_check_core::Module)->
     if !sameSlice(a.operation_values,b.operation_values) { return false; }
     if !sameSlice(a.handle_effects,b.handle_effects) { return false; }
     if !sameSlice(a.dispatch_signatures,b.dispatch_signatures) { return false; }
+    if !sameSlice(a.type_tags,b.type_tags) { return false; }
     if !same___check_core_Diagnostic(a.diagnostics,b.diagnostics) { return false; }
     if a.body_lowerings!=b.body_lowerings { return false; }
     return true;

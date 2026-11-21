@@ -6,7 +6,7 @@ import .function;
 // A body that begins at the top of the generator's stacks.
 fn newFn(g: Generator&, unit: u32, instance_id: u32) -> Fn {
     g.s.serial += 1;
-    return Fn { sites_base:blot_direct_relocations::mark(), unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
+    return Fn { sites_base:blot_direct_relocations::mark(), unit: unit, instance_id: instance_id, serial: g.s.serial, handles_base: g.s.handles.len, handle_cells_base: g.s.handle_cells_len, code_base: g.s.code.len, locals_base: g.s.locals.len, labels_base: g.s.labels.len };
 }
 
 // ----- host boundary -----------------------------------------------------
@@ -139,12 +139,14 @@ recursive fn emitInstance(g: Generator&, id: u32) -> Error {
     let locals_mark = s.locals.len;
     let labels_mark = s.labels.len;
     let handles_mark = s.handles.len;
+    let handle_cells_mark = s.handle_cells_len;
     let error = emitInstanceBody(g, id);
     blot_direct_relocations::rewind(sites_mark);
     s.code.resize(code_mark);
     s.locals.resize(locals_mark);
     s.labels.resize(labels_mark);
     s.handles.resize(handles_mark);
+    s.handle_cells_len = handle_cells_mark;
     return error;
 }
 recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
@@ -183,7 +185,13 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
     } else if key.kind == blot_direct_emit::InstanceKind.lambda {
         let info = m.closure(key.id);
         let captured = m.closureCaptures(key.id);
-        for binding, at in captured { bindPut(g, f, binding, g.s.vals[captures.start + at]); }
+        for binding, at in captured {
+            let cap_val = g.s.vals[captures.start + at];
+            bindPut(g, f, binding, cap_val);
+            if tagOf(g, cap_val.ty) == blot_direct_types::Tag.cell {
+                blot_support_zigmap::put(g.s.map_pool, f.with_cells, binding, g.types.node(cap_val.ty).a);
+            }
+        }
         bindPut(g, f, info.parameter.binding, g.s.vals[inputs.start]);
         root = info.body;
     }
@@ -279,6 +287,7 @@ fn finish(g: Generator&, function: u32, f: const Fn&) {
     g.s.locals.resize(f.locals_base);
     g.s.labels.resize(f.labels_base);
     g.s.handles.resize(f.handles_base);
+    g.s.handle_cells_len = f.handle_cells_base;
 }
 
 // Encodes the body: local declarations (in runs of one type), the marks a

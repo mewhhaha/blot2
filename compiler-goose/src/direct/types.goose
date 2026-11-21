@@ -6,6 +6,7 @@ import std;
 import check.core;
 import check.types;
 import check.storage_types;
+import reuse.principal_interface;
 import support.option;
 import direct.writer;
 import direct.map;
@@ -27,13 +28,13 @@ type U64Map = blot_direct_map::U64Map;
 // failure is not an error value here.
 enum Error { none, unsupported, diverged }
 
-enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link, provider, state_provider }
+enum Tag { unit, boolean, u32_, f32_, never, tuple, record, nominal, function, array, list, cursor, grow, resize, ref, view, link, provider, state_provider, cell }
 fn tagCode(tag: Tag) -> u32 {
     match tag {
         unit => { return 0; }, boolean => { return 1; }, u32_ => { return 2; }, f32_ => { return 3; }, never => { return 4; },
         tuple => { return 5; }, record => { return 6; }, nominal => { return 7; }, function => { return 8; }, array => { return 9; },
         list => { return 10; }, cursor => { return 11; }, grow => { return 12; }, resize => { return 13; }, ref => { return 14; },
-        view => { return 15; }, link => { return 16; }, provider => { return 17; }, state_provider => { return 18; },
+        view => { return 15; }, link => { return 16; }, provider => { return 17; }, state_provider => { return 18; }, cell => { return 19; },
     }
 }
 // The Zig spelling of each tag, for diagnostics.
@@ -42,7 +43,7 @@ fn tagName(tag: Tag) -> Text {
         unit => { return "unit"; }, boolean => { return "boolean"; }, u32_ => { return "u32"; }, f32_ => { return "f32"; }, never => { return "never"; },
         tuple => { return "tuple"; }, record => { return "record"; }, nominal => { return "nominal"; }, function => { return "function"; }, array => { return "array"; },
         list => { return "list"; }, cursor => { return "cursor"; }, grow => { return "grow"; }, resize => { return "resize"; }, ref => { return "ref"; },
-        view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; },
+        view => { return "view"; }, link => { return "link"; }, provider => { return "provider"; }, state_provider => { return "state_provider"; }, cell => { return "cell"; },
     }
 }
 // The Zig spelling of a Core type tag, for `fail(m, ty, @tagName(n.tag))`.
@@ -116,10 +117,29 @@ root struct Types {
     hole_fill: Ty = 4,
     failure_reason: Text = "",
     env_nodes: EnvNode[>..] = [],
-    // Scratch shared by the recursive walks; each use truncates to its mark.
-    scratch: u32[>..<] = [],
-    scratch_fields: Field[>..<] = [],
-    scratch_layout: ValType[>..<] = [],
+    // Scratch shared by the recursive walks; grows only, top tracked by *_len.
+    scratch: u32[>..] = [],
+    scratch_len: i64 = 0,
+    scratch_fields: Field[>..] = [],
+    scratch_fields_len: i64 = 0,
+    scratch_layout: ValType[>..] = [],
+    scratch_layout_len: i64 = 0,
+}
+
+fn pushScratch(self_: Types&, value: u32) {
+    if self_.scratch_len < self_.scratch.len { self_.scratch[self_.scratch_len] = value; }
+    else { self_.scratch.push(value); }
+    self_.scratch_len += 1;
+}
+fn pushScratchField(self_: Types&, value: Field) {
+    if self_.scratch_fields_len < self_.scratch_fields.len { self_.scratch_fields[self_.scratch_fields_len] = value; }
+    else { self_.scratch_fields.push(value); }
+    self_.scratch_fields_len += 1;
+}
+fn pushScratchLayout(self_: Types&, value: ValType) {
+    if self_.scratch_layout_len < self_.scratch_layout.len { self_.scratch_layout[self_.scratch_layout_len] = value; }
+    else { self_.scratch_layout.push(value); }
+    self_.scratch_layout_len += 1;
 }
 
 fn key64(unit_id: u32, id: u32) -> u64 { let high: u64 = unit_id; return (high << 32) | id; }
@@ -231,7 +251,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     var arity: i64 = -1;
     match tag {
         function => { arity = 2; },
-        array, list, cursor, grow, resize, ref, view, link, provider => { arity = 1; },
+        array, list, cursor, grow, resize, ref, view, link, provider, cell => { arity = 1; },
         state_provider => { arity = 3; },
         _ => {},
     }
@@ -254,7 +274,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
         record => { value = Node { tag, start, (payload.len / 2) as u32 }; },
         nominal => { value = Node { tag, start, (payload.len - 2) as u32 }; },
         function => { value = Node { tag, first, payload[payload.len - 1] }; },
-        array, list, cursor, grow, resize, ref, view, link, provider => { value = Node { tag, first, 0 }; },
+        array, list, cursor, grow, resize, ref, view, link, provider, cell => { value = Node { tag, first, 0 }; },
     }
     let id = self_.nodes.len as Ty;
     let span = Span { self_.encodings.len as u32, (payload.len + 1) as u32 };
@@ -271,6 +291,7 @@ fn intern(self_: Types&, tag: Tag, payload: const u32[:]) -> Ty, Error {
     return id, Error.none;
 }
 fn function(self_: Types&, parameter: Ty, result: Ty) -> Ty, Error { return intern(self_, Tag.function, [parameter, result]); }
+fn cell(self_: Types&, element: Ty) -> Ty, Error { return intern(self_, Tag.cell, [element]); }
 fn tuple(self_: Types&, items: const Ty[:]) -> Ty, Error {
     if items.len == 0 { return unit, Error.none; }
     return intern(self_, Tag.tuple, items);
@@ -296,10 +317,10 @@ fn record(self_: Types&, fields: Field[:]) -> Ty, Error {
         }
         fields[slot] = moved;
     }
-    let mark = self_.scratch.len;
-    for field in fields { self_.scratch.push(field.name); self_.scratch.push(field.ty); }
-    let id, error = intern(self_, Tag.record, self_.scratch[mark..]);
-    self_.scratch.resize(mark);
+    let mark = self_.scratch_len;
+    for field in fields { self_.pushScratch(field.name); self_.pushScratch(field.ty); }
+    let id, error = intern(self_, Tag.record, self_.scratch[mark..self_.scratch_len]);
+    self_.scratch_len = mark;
     return id, error;
 }
 fn findName(self_: const Types&, text: Text) -> u32, bool {
@@ -395,30 +416,30 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
         },
         product => {
             let children = m.types.list(blot_check_types::List { n.a, n.b });
-            let mark = self_.scratch.len;
+            let mark = self_.scratch_len;
             for child in children {
                 let item, error = lowerInner(self_, m, child, env, child_open, depth + 1);
-                if error != Error.none { self_.scratch.resize(mark); return 0, error; }
-                self_.scratch.push(item);
+                if error != Error.none { self_.scratch_len = mark; return 0, error; }
+                self_.pushScratch(item);
             }
-            let made, error = tuple(self_, self_.scratch[mark..]);
-            self_.scratch.resize(mark);
+            let made, error = tuple(self_, self_.scratch[mark..self_.scratch_len]);
+            self_.scratch_len = mark;
             if error != Error.none { return 0, error; }
             result = made;
         },
         record => {
-            let mark = self_.scratch_fields.len;
+            let mark = self_.scratch_fields_len;
             for index in 0..(n.b as i64) {
                 let source = m.types.recordField(n, index);
                 let text = m.fieldSpelling(source.name);
-                if !text.present { self_.scratch_fields.resize(mark); return 0, fail(self_, m, ty, "record field without a spelling"); }
+                if !text.present { self_.scratch_fields_len = mark; return 0, fail(self_, m, ty, "record field without a spelling"); }
                 let name = fieldName(self_, text.value);
                 let field_ty, error = lowerInner(self_, m, source.ty, env, child_open, depth + 1);
-                if error != Error.none { self_.scratch_fields.resize(mark); return 0, error; }
-                self_.scratch_fields.push(Field { name, field_ty });
+                if error != Error.none { self_.scratch_fields_len = mark; return 0, error; }
+                self_.pushScratchField(Field { name, field_ty });
             }
-            let made, error = record(self_, self_.scratch_fields[mark..]);
-            self_.scratch_fields.resize(mark);
+            let made, error = record(self_, self_.scratch_fields[mark..self_.scratch_fields_len]);
+            self_.scratch_fields_len = mark;
             if error != Error.none { return 0, error; }
             result = made;
         },
@@ -459,16 +480,16 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                 }
             } else {
                 if n.a == 0xffffffff { return 0, fail(self_, m, ty, "compiler-owned nominal type"); }
-                let mark = self_.scratch.len;
-                self_.scratch.push(n.a);
-                self_.scratch.push(n.b);
+                let mark = self_.scratch_len;
+                self_.pushScratch(n.a);
+                self_.pushScratch(n.b);
                 for argument in arguments {
                     let item, error = lowerInner(self_, m, argument, env, child_open, depth + 1);
-                    if error != Error.none { self_.scratch.resize(mark); return 0, error; }
-                    self_.scratch.push(item);
+                    if error != Error.none { self_.scratch_len = mark; return 0, error; }
+                    self_.pushScratch(item);
                 }
-                let made, error = intern(self_, Tag.nominal, self_.scratch[mark..]);
-                self_.scratch.resize(mark);
+                let made, error = intern(self_, Tag.nominal, self_.scratch[mark..self_.scratch_len]);
+                self_.scratch_len = mark;
                 if error != Error.none { return 0, error; }
                 result = made;
             }
@@ -501,6 +522,86 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
             if error != Error.none { return 0, error; }
             result = made;
         },
+        projection => {
+            let contract_id = blot_check_types::NominalIdentity { n.a, n.b };
+            let proj_member = m.types.projectionMember(n);
+            let raw_args = m.types.nominalArguments(n);
+            if raw_args.len > 16 { return 0, fail(self_, m, ty, "projection"); }
+            var raw_arg_ids: TId[16] = [0; 16];
+            let proj_len = raw_args.len;
+            for ai in 0..proj_len { raw_arg_ids[ai] = raw_args[ai]; }
+            var proj_args: Ty[16] = [0; 16];
+            for ai in 0..proj_len {
+                let lowered_arg, aerr = lowerInner(self_, m, raw_arg_ids[ai], env, child_open, depth + 1);
+                if aerr != Error.none { return 0, aerr; }
+                proj_args[ai] = lowered_arg;
+            }
+            var found = false;
+            var found_ty: Ty = 0;
+            let unit_count = self_.units.len;
+            for unit_idx in 0..unit_count {
+                var want_name = proj_member;
+                if self_.units[unit_idx].unit != m.unit {
+                    want_name = 0;
+                    for declared in m.contracts {
+                        if declared.identity != contract_id { continue; }
+                        for member, mi in m.contract_members[declared.members.start..declared.members.start + declared.members.len] {
+                            if member.name != proj_member { continue; }
+                            for observed in self_.units[unit_idx].contracts {
+                                if observed.identity == contract_id && mi < observed.members.len {
+                                    want_name = self_.units[unit_idx].contract_members[observed.members.start + mi].name;
+                                }
+                            }
+                        }
+                    }
+                }
+                if want_name == 0 { continue; }
+                let proof_count = self_.units[unit_idx].selected_proofs.len;
+                for proof_idx in 0..proof_count {
+                    let proof = self_.units[unit_idx].selected_proofs[proof_idx];
+                    if proof.kind != blot_reuse_principal_interface::SelectedProofKind.implementation || proof.contract != contract_id { continue; }
+                    if proof.arguments.len != proj_len { continue; }
+                    var parg_ids: TId[16] = [0; 16];
+                    for pi in 0..proj_len { parg_ids[pi] = self_.units[unit_idx].types.list(proof.arguments)[pi]; }
+                    var matches = true;
+                    for pi in 0..proj_len {
+                        var dummy_open = false;
+                        let resolved_parg, perr = lowerInner(self_, self_.units[unit_idx], parg_ids[pi], Env {}, dummy_open, depth + 1);
+                        if perr != Error.none { matches = false; break; }
+                        if resolved_parg != proj_args[pi] {
+                            let pn = self_.node(proj_args[pi]);
+                            let rn = self_.node(resolved_parg);
+                            let array_lift = (pn.tag == Tag.grow || pn.tag == Tag.resize) && rn.tag == Tag.array && pn.a == rn.a;
+                            if !array_lift { matches = false; break; }
+                        }
+                    }
+                    if !matches { continue; }
+                    var mem_root: TId = 0;
+                    var has_mem = false;
+                    let mem_start = proof.members.start as i64;
+                    let mem_end = mem_start + (proof.members.len as i64);
+                    for mi in mem_start..mem_end {
+                        let member = self_.units[unit_idx].selected_members[mi];
+                        if member.kind == blot_reuse_principal_interface::ImplementationMemberKind.type_ && member.name == want_name {
+                            mem_root = member.root;
+                            has_mem = true;
+                            break;
+                        }
+                    }
+                    if has_mem {
+                        var mem_open = false;
+                        let lowered_mem, merr = lowerInner(self_, self_.units[unit_idx], mem_root, Env {}, mem_open, depth + 1);
+                        if merr != Error.none { return 0, merr; }
+                        found_ty = lowered_mem;
+                        found = true;
+                        break;
+                    }
+                }
+                if found { break; }
+            }
+            if !found { return 0, fail(self_, m, ty, "projection"); }
+            result = found_ty;
+        },
         _ => { return 0, fail(self_, m, ty, coreTypeTagName(n.tag)); },
     }
     if child_open { open = true; } else { self_.closed.put(key, result); }
@@ -513,16 +614,16 @@ recursive fn operation(self_: Types&, m: const Module&, ty: TId, env: Env, open:
     let n = m.types.node(ty);
     if n.tag != blot_check_types::Tag.nominal { return lowerInner(self_, m, ty, env, open, depth); }
     let arguments = m.types.nominalArguments(n);
-    let mark = self_.scratch.len;
-    self_.scratch.push(n.a);
-    self_.scratch.push(n.b);
+    let mark = self_.scratch_len;
+    self_.pushScratch(n.a);
+    self_.pushScratch(n.b);
     for argument in arguments {
         let item, error = lowerInner(self_, m, argument, env, open, depth + 1);
-        if error != Error.none { self_.scratch.resize(mark); return 0, error; }
-        self_.scratch.push(item);
+        if error != Error.none { self_.scratch_len = mark; return 0, error; }
+        self_.pushScratch(item);
     }
-    let made, error = intern(self_, Tag.nominal, self_.scratch[mark..]);
-    self_.scratch.resize(mark);
+    let made, error = intern(self_, Tag.nominal, self_.scratch[mark..self_.scratch_len]);
+    self_.scratch_len = mark;
     return made, error;
 }
 // Binds the variables of `pattern` (a Core type of `m`) so that it lowers to
@@ -605,7 +706,7 @@ recursive fn concrete(self_: const Types&, ty: Ty, depth: i64) -> bool {
         never => { return false; },
         unit, boolean, u32_, f32_ => { return true; },
         function => { return concrete(self_, n.a, depth + 1) && concrete(self_, n.b, depth + 1); },
-        array, list, cursor, grow, resize, ref, view, link, provider => { return concrete(self_, n.a, depth + 1); },
+        array, list, cursor, grow, resize, ref, view, link, provider, cell => { return concrete(self_, n.a, depth + 1); },
         tuple, state_provider => {
             for at in 0..(n.b as i64) { if !concrete(self_, self_.words[n.a + at], depth + 1) { return false; } }
             return true;
@@ -638,8 +739,8 @@ fn variants(self_: Types&, ty: Ty) -> Variants, Error {
     // A hole argument (a type no use determines) leaves holes.
     var holed = false;
     for argument in self_.nominalArguments(ty) { if argument == never { holed = true; } }
-    let mark = self_.scratch.len;
-    for constructor_id in constructors { self_.scratch.push(owner.constructor(constructor_id).tag); }
+    let mark = self_.scratch_len;
+    for constructor_id in constructors { self_.pushScratch(owner.constructor(constructor_id).tag); }
     for constructor_id in constructors {
         let constructor = owner.constructor(constructor_id);
         let signature = owner.types.node(constructor.scheme.root);
@@ -651,21 +752,21 @@ fn variants(self_: Types&, ty: Ty) -> Variants, Error {
         if constructor.payload != 0 {
             if holed {
                 let lowered, error = lowerHoles(self_, owner, constructor.payload, env);
-                if error != Error.none { self_.scratch.resize(mark); return Variants {}, error; }
+                if error != Error.none { self_.scratch_len = mark; return Variants {}, error; }
                 payload = lowered;
             } else {
                 let lowered, error = lower(self_, owner, constructor.payload, env);
-                if error != Error.none { self_.scratch.resize(mark); return Variants {}, error; }
+                if error != Error.none { self_.scratch_len = mark; return Variants {}, error; }
                 payload = lowered;
             }
         }
-        self_.scratch.push(payload);
+        self_.pushScratch(payload);
     }
     let count = constructors.len;
     let value = Variants { self_.variant_tags.len as u32, self_.variant_payloads.len as u32, count as u32 };
     self_.variant_tags.append(self_.scratch[mark..mark + count]);
-    self_.variant_payloads.append(self_.scratch[mark + count..]);
-    self_.scratch.resize(mark);
+    self_.variant_payloads.append(self_.scratch[mark + count..self_.scratch_len]);
+    self_.scratch_len = mark;
     self_.variant_cache[ty] = VariantSlot { true, value };
     return value, Error.none;
 }
@@ -753,13 +854,13 @@ recursive fn flatSlot(self_: Types&, ty: Ty) -> Slot, Error {
         return Slot {}, Error.unsupported;
     }
     self_.in_layout[ty] = true;
-    let mark = self_.scratch_layout.len;
+    let mark = self_.scratch_layout_len;
     let error = flatWords(self_, ty);
     self_.in_layout[ty] = false;
-    if error != Error.none { self_.scratch_layout.resize(mark); return Slot {}, error; }
-    let owned = Slot { true, self_.layout_words.len as u32, (self_.scratch_layout.len - mark) as u32 };
-    self_.layout_words.append(self_.scratch_layout[mark..]);
-    self_.scratch_layout.resize(mark);
+    if error != Error.none { self_.scratch_layout_len = mark; return Slot {}, error; }
+    let owned = Slot { true, self_.layout_words.len as u32, (self_.scratch_layout_len - mark) as u32 };
+    self_.layout_words.append(self_.scratch_layout[mark..self_.scratch_layout_len]);
+    self_.scratch_layout_len = mark;
     if self_.recursive_[ty].present {
         self_.recursive_[ty] = owned;
         self_.layouts[ty] = Slot { true, 0, 1 };
@@ -774,8 +875,8 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
     let n = self_.node(ty);
     match n.tag {
         unit, never => {},
-        boolean, u32_ => { self_.scratch_layout.push(i32w); },
-        f32_ => { self_.scratch_layout.push(blot_direct_writer::VT_f32); },
+        boolean, u32_ => { self_.pushScratchLayout(i32w); },
+        f32_ => { self_.pushScratchLayout(blot_direct_writer::VT_f32); },
         tuple => {
             for at in 0..(n.b as i64) {
                 let item, error = flatSlot(self_, self_.words[n.a + at]);
@@ -792,7 +893,7 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
         },
         // A provider is its implementation closure; a state provider is its
         // initial state.
-        function, provider => { self_.scratch_layout.push(i32w); self_.scratch_layout.push(i32w); },
+        function, provider => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
         state_provider => {
             let item, error = flatSlot(self_, self_.words[n.a + 2]);
             if error != Error.none { return error; }
@@ -806,15 +907,15 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                 if error != Error.none { return error; }
                 pushSlot(self_, item);
             } else if cases.len > 1 {
-                self_.scratch_layout.push(i32w);
+                self_.pushScratchLayout(i32w);
                 // Each payload's layout slot, kept on the word scratch.
-                let mark = self_.scratch.len;
+                let mark = self_.scratch_len;
                 var width: i64 = 0;
                 for at in 0..(cases.len as i64) {
                     let item, error = flatSlot(self_, self_.variant_payloads[cases.payloads + at]);
-                    if error != Error.none { self_.scratch.resize(mark); return error; }
-                    self_.scratch.push(item.start);
-                    self_.scratch.push(item.len);
+                    if error != Error.none { self_.scratch_len = mark; return error; }
+                    self_.pushScratch(item.start);
+                    self_.pushScratch(item.len);
                     width = max(width, item.len as i64);
                 }
                 for position in 0..width {
@@ -830,25 +931,26 @@ recursive fn flatWords(self_: Types&, ty: Ty) -> Error {
                         }
                     }
                     if any_v128 {
-                        self_.scratch.resize(mark);
+                        self_.scratch_len = mark;
                         self_.failure_reason = "SIMD payload in a sum type";
                         return Error.unsupported;
                     }
-                    if all_f32 { self_.scratch_layout.push(blot_direct_writer::VT_f32); } else { self_.scratch_layout.push(i32w); }
+                    if all_f32 { self_.pushScratchLayout(blot_direct_writer::VT_f32); } else { self_.pushScratchLayout(i32w); }
                 }
-                self_.scratch.resize(mark);
+                self_.scratch_len = mark;
             }
         },
         // Owner handles: (slot, generation); views add (start, length),
         // element references and links add an index.
-        array, list, grow, resize => { self_.scratch_layout.push(i32w); self_.scratch_layout.push(i32w); },
-        view, cursor => { for at in 0..4 { self_.scratch_layout.push(i32w); } },
-        ref, link => { for at in 0..3 { self_.scratch_layout.push(i32w); } },
+        array, list, grow, resize => { self_.pushScratchLayout(i32w); self_.pushScratchLayout(i32w); },
+        view, cursor => { for at in 0..4 { self_.pushScratchLayout(i32w); } },
+        ref, link => { for at in 0..3 { self_.pushScratchLayout(i32w); } },
+        cell => { self_.pushScratchLayout(i32w); },
     }
     return Error.none;
 }
 fn pushSlot(self_: Types&, slot: Slot) {
-    for at in 0..(slot.len as i64) { self_.scratch_layout.push(self_.layout_words[slot.start + at]); }
+    for at in 0..(slot.len as i64) { self_.pushScratchLayout(self_.layout_words[slot.start + at]); }
 }
 
 fn isContainer(tag: Tag) -> bool {

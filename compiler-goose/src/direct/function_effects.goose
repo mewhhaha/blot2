@@ -72,11 +72,138 @@ recursive fn stateProvider(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if initial.ty == blot_direct_types::never { return initial, blot_direct_types::Error.none; }
     return Val { ty, initial.start, initial.len }, blot_direct_types::Error.none;
 }
-fn pushHandle(g: Generator&, f: Fn&, saved: u32, depth: u32) {
+fn pushHandleCells(g: Generator&, f: Fn&, saved: u32, depth: u32, cells_start: u32, cells_len: u32) {
     let at = f.handles_base + f.handles_len;
-    if at < g.s.handles.len { g.s.handles[at] = blot_direct_emit::Handle { saved, depth }; }
-    else { g.s.handles.push(blot_direct_emit::Handle { saved, depth }); }
+    if at < g.s.handles.len { g.s.handles[at] = blot_direct_emit::Handle { saved, depth, cells_start, cells_len }; }
+    else { g.s.handles.push(blot_direct_emit::Handle { saved, depth, cells_start, cells_len }); }
     f.handles_len += 1;
+}
+fn pushHandle(g: Generator&, f: Fn&, saved: u32, depth: u32) {
+    pushHandleCells(g, f, saved, depth, 0, 0);
+}
+// `with Effect = { ... }: suite`: allocates stack cells for linearly shadowed
+// outer locals, pushes provider frames, runs `suite`, and reads final cell
+// values into the post-`with` bindings.
+recursive fn withHandleNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let n = g.units[f.unit - 1].node(id);
+    let effect_context = g.runtime_().effect_context;
+    let saved = local32(g, f);
+    opIndex(g, OP_global_get, effect_context);
+    opIndex(g, OP_local_set, saved);
+    var outer_bs: u32[16] = [0; 16];
+    var after_bs: u32[16] = [0; 16];
+    var cell_locals: u32[16] = [0; 16];
+    var cell_tys: Ty[16] = [0; 16];
+    var prev_vals: Val[16] = [Val {}; 16];
+    var prev_cells: Ty[16] = [0; 16];
+    var cell_count: i64 = 0;
+    let extra_start = n.b as i64;
+    let extra_end = (n.b + n.c) as i64;
+    for ei in extra_start..extra_end {
+        let child = g.units[f.unit - 1].extra[ei];
+        let cn = g.units[f.unit - 1].node(child);
+        if cn.tag == blot_check_core::Tag.bind && cn.c == 1 && g.units[f.unit - 1].node(cn.b).tag == blot_check_core::Tag.reference {
+            if cell_count >= 16 { return neverVal(), g.fail(g.units[f.unit - 1], child, "too many shadowed locals in one with handler"); }
+            let outer_b = g.units[f.unit - 1].reference(cn.b).binding;
+            let raw_prev, raw_ok = bindGet(g, f, outer_b);
+            if !raw_ok { return neverVal(), g.fail(g.units[f.unit - 1], child, "with handler shadowed unbound local"); }
+            let prev_cell_ty, had_cell = withCellType(g, f, outer_b);
+            let outer_val, ok, rerr = readBindingVal(g, f, outer_b, child);
+            if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+            if !ok { return neverVal(), g.fail(g.units[f.unit - 1], child, "with handler shadowed unbound local"); }
+            let noted = noteStore(g, f, outer_val);
+            if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+            let bytes, berr = g.types.flatBytes(outer_val.ty);
+            if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+            let cell = allocate(g, f, bytes);
+            if bytes != 0 {
+                let werr = writeFlat(g, f, cell, 0, outer_val, child);
+                if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            }
+            let cell_ty, cty_err = g.types.cell(outer_val.ty);
+            if cty_err != blot_direct_types::Error.none { return neverVal(), cty_err; }
+            outer_bs[cell_count] = outer_b;
+            after_bs[cell_count] = cn.a;
+            cell_locals[cell_count] = cell;
+            cell_tys[cell_count] = outer_val.ty;
+            prev_vals[cell_count] = raw_prev;
+            if had_cell { prev_cells[cell_count] = prev_cell_ty; } else { prev_cells[cell_count] = 0; }
+            cell_count += 1;
+            bindPut(g, f, outer_b, valOf1(g, cell_ty, cell));
+            blot_support_zigmap::put(g.s.map_pool, f.with_cells, outer_b, outer_val.ty);
+        }
+    }
+    var prev_frame = saved;
+    for ei in extra_start..extra_end {
+        let child = g.units[f.unit - 1].extra[ei];
+        let cn = g.units[f.unit - 1].node(child);
+        if cn.tag == blot_check_core::Tag.effect_provider {
+            let prov, perr = expr(g, f, child);
+            if perr != blot_direct_types::Error.none {
+                for ci in 0..cell_count {
+                    bindPut(g, f, outer_bs[ci], prev_vals[ci]);
+                    blot_support_zigmap::put(g.s.map_pool, f.with_cells, outer_bs[ci], prev_cells[ci]);
+                }
+                return prov, perr;
+            }
+            if prov.ty == blot_direct_types::never {
+                for ci in 0..cell_count {
+                    bindPut(g, f, outer_bs[ci], prev_vals[ci]);
+                    blot_support_zigmap::put(g.s.map_pool, f.with_cells, outer_bs[ci], prev_cells[ci]);
+                }
+                return prov, blot_direct_types::Error.none;
+            }
+            let shape = g.types.node(prov.ty);
+            if shape.tag != blot_direct_types::Tag.provider {
+                for ci in 0..cell_count {
+                    bindPut(g, f, outer_bs[ci], prev_vals[ci]);
+                    blot_support_zigmap::put(g.s.map_pool, f.with_cells, outer_bs[ci], prev_cells[ci]);
+                }
+                return neverVal(), g.fail(g.units[f.unit - 1], child, "with handler provider has non-provider type");
+            }
+            pushFrame(g, f, g.operationId(shape.a), w(g, prov, 0), w(g, prov, 1), prev_frame);
+            let next_frame = local32(g, f);
+            opIndex(g, OP_global_get, effect_context);
+            opIndex(g, OP_local_set, next_frame);
+            prev_frame = next_frame;
+        }
+    }
+    for ci in 0..cell_count {
+        bindPut(g, f, outer_bs[ci], prev_vals[ci]);
+        blot_support_zigmap::put(g.s.map_pool, f.with_cells, outer_bs[ci], prev_cells[ci]);
+    }
+    let cells_mark = g.s.handle_cells_len;
+    for ci in 0..cell_count {
+        let entry = blot_direct_emit::HandleCell { cell: cell_locals[ci], outer: prev_vals[ci], ty: cell_tys[ci], outer_is_cell: prev_cells[ci] != 0 };
+        if g.s.handle_cells_len < g.s.handle_cells.len { g.s.handle_cells[g.s.handle_cells_len] = entry; }
+        else { g.s.handle_cells.push(entry); }
+        g.s.handle_cells_len += 1;
+    }
+    pushHandleCells(g, f, saved, f.depth, cells_mark as u32, cell_count as u32);
+    let inner, error = stmt(g, f, n.a);
+    if error != blot_direct_types::Error.none {
+        f.handles_len -= 1;
+        g.s.handle_cells_len = cells_mark;
+        return inner, error;
+    }
+    f.handles_len -= 1;
+    g.s.handle_cells_len = cells_mark;
+    if inner.ty == blot_direct_types::never { return inner, blot_direct_types::Error.none; }
+    opIndex(g, OP_local_get, saved);
+    opIndex(g, OP_global_set, effect_context);
+    for ci in 0..cell_count {
+        let final, ferr = readFlat(g, f, cell_locals[ci], 0, cell_tys[ci], id);
+        if ferr != blot_direct_types::Error.none { return neverVal(), ferr; }
+        if prev_cells[ci] != 0 {
+            let werr = writeWithCell(g, f, w(g, prev_vals[ci], 0), prev_cells[ci], final, id);
+            if werr != blot_direct_types::Error.none { return neverVal(), werr; }
+            bindPut(g, f, after_bs[ci], prev_vals[ci]);
+            blot_support_zigmap::put(g.s.map_pool, f.with_cells, after_bs[ci], prev_cells[ci]);
+        } else {
+            bindPut(g, f, after_bs[ci], final);
+        }
+    }
+    return inner, blot_direct_types::Error.none;
 }
 // `do provider: inner`: installs the provider's frames around `inner`. A
 // state provider's block yields (final state, inner result).
@@ -180,16 +307,35 @@ fn stateAccessor(g: Generator&, f: Fn&, kind: InstanceKind, state: Ty, id: u32) 
     opIndex(g, OP_local_set, slot);
     return slot, blot_direct_types::Error.none;
 }
-// Restores the effect context when control leaves installed providers for a
-// block at `depth` or outside.
-fn leaveHandles(g: Generator&, f: const Fn&, depth: u32) {
-    for at in 0..(f.handles_len as i64) {
+// Restores the effect context (and writes back any `with` handler cells)
+// when control leaves installed providers for a block at `depth` or outside.
+fn leaveHandles(g: Generator&, f: Fn&, depth: u32) -> Error {
+    var has_restore = false;
+    var restore_saved: u32 = 0;
+    var at = f.handles_len as i64;
+    while at != 0 {
+        at -= 1;
         let installed = g.s.handles[f.handles_base + at];
-        if installed.depth >= depth {
-            let effect_context = g.runtime_().effect_context;
-            opIndex(g, OP_local_get, installed.saved);
-            opIndex(g, OP_global_set, effect_context);
-            return;
+        if installed.depth < depth { break; }
+        for ci in 0..(installed.cells_len as i64) {
+            let hc = g.s.handle_cells[installed.cells_start + ci];
+            let final, rerr = readFlat(g, f, hc.cell, 0, hc.ty, 0);
+            if rerr != blot_direct_types::Error.none { return rerr; }
+            if hc.outer_is_cell {
+                let werr = writeWithCell(g, f, w(g, hc.outer, 0), hc.ty, final, 0);
+                if werr != blot_direct_types::Error.none { return werr; }
+            } else {
+                let cerr = copy(g, f, final, hc.outer, 0);
+                if cerr != blot_direct_types::Error.none { return cerr; }
+            }
         }
+        has_restore = true;
+        restore_saved = installed.saved;
     }
+    if has_restore {
+        let effect_context = g.runtime_().effect_context;
+        opIndex(g, OP_local_get, restore_saved);
+        opIndex(g, OP_global_set, effect_context);
+    }
+    return blot_direct_types::Error.none;
 }

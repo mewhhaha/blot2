@@ -87,6 +87,7 @@ struct Runtime {
     // Speculative `fork` state: owner slots below `fork_owner_mark` predate
     // the active `fork` and journal writes onto `undo_sp`. Zero outside `fork`.
     fork_owner_mark: u32 = 0,
+    fork_depth: u32 = 0,
     undo_sp: u32 = 0,
     open: u32 = 0,
     open_persistent: u32 = 0,
@@ -257,6 +258,7 @@ fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork:
     r.effect_context = blot_direct_writer::addGlobal(module, i32t, true, 0);
     if has_fork {
         r.fork_owner_mark = blot_direct_writer::addGlobal(module, i32t, true, 0);
+        r.fork_depth = blot_direct_writer::addGlobal(module, i32t, true, 0);
         r.undo_sp = blot_direct_writer::addGlobal(module, i32t, true, layout.undo_base);
     }
     r.open = helper(module, 3, 2);

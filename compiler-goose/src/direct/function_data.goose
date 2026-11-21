@@ -869,6 +869,39 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         target, has_target = g.dispatchTarget(m, blot_check_types::NominalIdentity { 0, 0xffffffff }, projection.field, blot_check_types::Operator.none);
     }
     if !has_target {
+        // Fallback: trait implementation method whose first head argument matches value.ty.
+        let want_spell = spelling.value;
+        var found_trait = BindingRef { 0, 0 };
+        for unit in g.units {
+            for impl_ in unit.implementations {
+                let head_list = unit.types.list(impl_.head);
+                if head_list.len == 0 { continue; }
+                var match_env = Env {};
+                g.types.match_(unit, head_list[0], value.ty, match_env);
+                let lowered, lerr = g.types.lower(unit, head_list[0], match_env);
+                if lerr != blot_direct_types::Error.none { continue; }
+                if lowered != value.ty {
+                    let pn = g.types.node(value.ty);
+                    let rn = g.types.node(lowered);
+                    let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
+                    if !array_lift { continue; }
+                }
+                for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
+                    if member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                    let msp = unit.fieldSpelling(member.name);
+                    if !msp.present || msp.value != want_spell { continue; }
+                    let cand = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
+                    if found_trait.binding != 0 && found_trait != cand { return neverVal(), g.fail(m, id, "ambiguous trait member on comptime field"); }
+                    found_trait = cand;
+                }
+            }
+        }
+        if found_trait.binding != 0 {
+            target = found_trait;
+            has_target = true;
+        }
+    }
+    if !has_target {
         g.failOpen(m, id);
         g.put("no member ");
         g.put(spelling.value);

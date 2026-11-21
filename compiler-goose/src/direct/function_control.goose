@@ -66,7 +66,15 @@ recursive fn ifNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     close(g, f);
     for merge, at in merges {
         let slot = g.s.slots[merged + at];
-        if slot.present { bindPut(g, f, merge.result, slot.value); }
+        if slot.present {
+            bindPut(g, f, merge.result, slot.value);
+            let ct1, ok1 = withCellType(g, f, merge.then_binding);
+            if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+            else {
+                let ct2, ok2 = withCellType(g, f, merge.else_binding);
+                if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+            }
+        }
     }
     if !falls { return neverVal(), blot_direct_types::Error.none; }
     if n.tag == blot_check_core::Tag.if_stmt { return unitVal(), blot_direct_types::Error.none; }
@@ -307,13 +315,299 @@ recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     lset(g, saved_undo);
     gget(g, rt.owner_top);
     gset(g, rt.fork_owner_mark);
+    gget(g, rt.fork_depth);
+    i32Const(g, 1);
+    op(g, OP_i32_add);
+    gset(g, rt.fork_depth);
     let result, error = block_(g, f, n.a);
     if error != blot_direct_types::Error.none { return result, error; }
+    gget(g, rt.fork_depth);
+    i32Const(g, 1);
+    op(g, OP_i32_sub);
+    gset(g, rt.fork_depth);
     lget(g, saved_undo);
     callf(g, rt.undo_rewind);
     lget(g, saved_mark);
     gset(g, rt.fork_owner_mark);
     return result, blot_direct_types::Error.none;
+}
+
+fn findComptimeFrame(f: const Fn&, binder: u32) -> i64 {
+    var i = f.comptime_len;
+    while i > 0 {
+        i -= 1;
+        if f.comptime_frames[i].binder == binder { return i; }
+    }
+    return -1;
+}
+
+fn recordProjVar(vars: u32[64]&, count: i64&, ty: TId) {
+    if ty == 0 || count >= 64 { return; }
+    for i in 0..count { if vars[i] == ty { return; } }
+    vars[count] = ty;
+    count += 1;
+}
+
+recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, vars: u32[64]&, count: i64&, depth: i64) {
+    if id == 0 || depth >= 128 { return; }
+    let n = m.node(id);
+    match n.tag {
+        comptime_meta => {
+            if n.c == 0 {
+                if n.b == binder && m.types.node(n.ty).tag == blot_check_types::Tag.variable {
+                    recordProjVar(vars, count, n.ty);
+                }
+                collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+            } else if n.c == 8 || n.c == 9 {
+                collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
+            }
+        },
+        comptime_for => {
+            if n.a != binder { collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1); }
+        },
+        comptime_if, if_value, if_stmt, state_provider, resource_scope => {
+            collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, n.c, binder, vars, count, depth + 1);
+        },
+        suite, block_, product, record, array, array_op, storage, task => {
+            for child in m.children(id) { collectComptimeProjectVars(m, child, binder, vars, count, depth + 1); }
+        },
+        call, contract_method, break_ => {
+            for child in m.extra[n.b..n.b + n.c] { collectComptimeProjectVars(m, child, binder, vars, count, depth + 1); }
+        },
+        with_handle => {
+            for child in m.extra[n.b..n.b + n.c] { collectComptimeProjectVars(m, child, binder, vars, count, depth + 1); }
+            collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+        },
+        bind, construct => { collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1); },
+        return_, project, result_associated, computation, effect_scope, fork_, resource_release, usage_share, usage_read => {
+            collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+        },
+        scalar, logical, apply, associated, record_merge, type_same, effect_provider, handle, proof_guard, resource_acquire, usage_borrow, staging => {
+            collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
+        },
+        pattern_bind => {
+            collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, n.c, binder, vars, count, depth + 1);
+        },
+        update => {
+            let u = m.updateInfo(id);
+            collectComptimeProjectVars(m, u.root, binder, vars, count, depth + 1);
+            for step in m.updateSelectors(id) { collectComptimeProjectVars(m, step.index, binder, vars, count, depth + 1); }
+            collectComptimeProjectVars(m, u.value, binder, vars, count, depth + 1);
+        },
+        loop_ => {
+            let info = m.loopInfo(id);
+            collectComptimeProjectVars(m, info.first, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, info.end, binder, vars, count, depth + 1);
+            collectComptimeProjectVars(m, info.body, binder, vars, count, depth + 1);
+        },
+        match_ => {
+            for inp in m.matchInputs(id) { collectComptimeProjectVars(m, inp, binder, vars, count, depth + 1); }
+            for arm in m.matchArms(id) {
+                collectComptimeProjectVars(m, arm.guard_, binder, vars, count, depth + 1);
+                collectComptimeProjectVars(m, arm.body, binder, vars, count, depth + 1);
+            }
+        },
+        closure => { collectComptimeProjectVars(m, m.closure(id).body, binder, vars, count, depth + 1); },
+        _ => {},
+    }
+}
+
+recursive fn comptimeForNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    let cstart = m.extra[n.c];
+    let clen = m.extra[n.c + 1];
+    let mode = m.extra[n.c + 2];
+    let carries = m.loop_carries[cstart..cstart + clen];
+    let target_ty, terr = lower(g, f, m.binding(n.a).ty, id);
+    if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+    let current = g.reserveVals(carries.len);
+    for carry, at in carries {
+        let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
+        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
+        if !present { return neverVal(), g.fail(m, id, "#for carry without an incoming value"); }
+        g.s.vals[current.start + at] = value;
+    }
+    var proj_vars: u32[64] = [0; 64];
+    var proj_var_len: i64 = 0;
+    if mode == 0 { collectComptimeProjectVars(m, n.b, n.a, proj_vars, proj_var_len, 0); }
+    let saved_env = f.env;
+    if mode == 0 {
+        var record_ty: Ty = 0;
+        var nom_unit: u32 = 0;
+        var nom_decl: u32 = 0;
+        var ctor_tag: u32 = 0;
+        if tagOf(g, target_ty) == blot_direct_types::Tag.record {
+            record_ty = target_ty;
+        } else if tagOf(g, target_ty) == blot_direct_types::Tag.nominal {
+            let nom_id = g.types.nominalIdentity(target_ty);
+            nom_unit = nom_id.unit;
+            nom_decl = nom_id.decl;
+            let cases, verr = g.types.variants(target_ty);
+            if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            if cases.len != 1 { return neverVal(), g.fail(m, id, "#fields requires a single-constructor data type"); }
+            ctor_tag = g.types.variant_tags[cases.tags];
+            let payload = g.types.variant_payloads[cases.payloads];
+            if payload != blot_direct_types::unit {
+                if tagOf(g, payload) != blot_direct_types::Tag.record { return neverVal(), g.fail(m, id, "#fields requires a record payload"); }
+                record_ty = payload;
+            }
+        } else {
+            return neverVal(), g.fail(m, id, "#fields requires a record or single-constructor data type");
+        }
+        var field_count: i64 = 0;
+        if record_ty != 0 { field_count = g.types.node(record_ty).b as i64; }
+        for fi in 0..field_count {
+            let fld = g.types.recordField(record_ty, fi);
+            f.env = saved_env;
+            for pi in 0..proj_var_len { g.types.envPut(f.env, f.unit, proj_vars[pi], fld.ty); }
+            for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[current.start + at]); }
+            if f.comptime_len >= 16 { f.env = saved_env; return neverVal(), g.fail(m, id, "#for nesting limit exceeded"); }
+            f.comptime_frames[f.comptime_len] = ComptimeFrame {
+                binder: n.a, is_variants: false, target_ty: target_ty,
+                nominal_unit: nom_unit, nominal_decl: nom_decl,
+                index: fi as u32, ctor_tag: ctor_tag, name_id: fld.name, field_ty: fld.ty,
+            };
+            f.comptime_len += 1;
+            let iter_val, ierr = stmt(g, f, n.b);
+            f.comptime_len -= 1;
+            if ierr != blot_direct_types::Error.none { f.env = saved_env; return iter_val, ierr; }
+            if iter_val.ty == blot_direct_types::never { f.env = saved_env; return neverVal(), blot_direct_types::Error.none; }
+            for carry, at in carries {
+                let bv, ok, berr = readBindingVal(g, f, carry.backedge, id);
+                if berr != blot_direct_types::Error.none { f.env = saved_env; return neverVal(), berr; }
+                if ok { g.s.vals[current.start + at] = bv; }
+            }
+        }
+        f.env = saved_env;
+    } else {
+        if tagOf(g, target_ty) != blot_direct_types::Tag.nominal { return neverVal(), g.fail(m, id, "#variants requires a nominal data type"); }
+        let nom_id = g.types.nominalIdentity(target_ty);
+        if !g.hasUnit(nom_id.unit) { return neverVal(), g.fail(m, id, "#variants defining unit missing"); }
+        let owner .= g.units[nom_id.unit - 1];
+        let ordinal, oerr = g.types.nominalOrdinal(owner, nom_id);
+        if oerr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+        let ctors = owner.nominalConstructors(ordinal);
+        for ctor_idx, ci in ctors {
+            let ctor = owner.constructor(ctor_idx);
+            var name_id: u32 = 0;
+            let sp = owner.fieldSpelling(ctor.name);
+            if sp.present { name_id = g.types.fieldName(sp.value); }
+            for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[current.start + at]); }
+            if f.comptime_len >= 16 { return neverVal(), g.fail(m, id, "#for nesting limit exceeded"); }
+            f.comptime_frames[f.comptime_len] = ComptimeFrame {
+                binder: n.a, is_variants: true, target_ty: target_ty,
+                nominal_unit: nom_id.unit, nominal_decl: nom_id.decl,
+                index: ci as u32, ctor_tag: ctor.tag, name_id: name_id, field_ty: 0,
+            };
+            f.comptime_len += 1;
+            let iter_val, ierr = stmt(g, f, n.b);
+            f.comptime_len -= 1;
+            if ierr != blot_direct_types::Error.none { return iter_val, ierr; }
+            if iter_val.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+            for carry, at in carries {
+                let bv, ok, berr = readBindingVal(g, f, carry.backedge, id);
+                if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+                if ok { g.s.vals[current.start + at] = bv; }
+            }
+        }
+    }
+    for carry, at in carries { bindPut(g, f, carry.outgoing, g.s.vals[current.start + at]); }
+    return unitVal(), blot_direct_types::Error.none;
+}
+
+recursive fn comptimeIfNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    var s = Stage {..};
+    let cond = evaluateStage(g, f, s, m, n.a, 0, 0);
+    let failed = s.failure;
+    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
+    blot_support_pooled_buffer::deinit(s.parts, part_runs);
+    blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
+    blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
+    if failed.len != 0 { return neverVal(), g.fail(m, n.a, failed); }
+    let taken = cond.bits != 0;
+    var branch = n.c;
+    if taken { branch = n.b; }
+    if branch != 0 {
+        let res, err = stmt(g, f, branch);
+        if err != blot_direct_types::Error.none { return res, err; }
+        if res.ty == blot_direct_types::never { return neverVal(), blot_direct_types::Error.none; }
+    }
+    for merge in m.branchMerges(id) {
+        var from_b = merge.else_binding;
+        if taken { from_b = merge.then_binding; }
+        let val, present = bindGet(g, f, from_b);
+        if present { bindPut(g, f, merge.result, val); }
+    }
+    return unitVal(), blot_direct_types::Error.none;
+}
+
+recursive fn comptimeMetaNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    if n.c == 0 {
+        let fidx = findComptimeFrame(f, n.b);
+        if fidx < 0 { return neverVal(), g.fail(m, id, "comptime field projection outside #for"); }
+        let cf = f.comptime_frames[fidx];
+        let val, err = expr(g, f, n.a);
+        if err != blot_direct_types::Error.none { return val, err; }
+        var rec = val;
+        if tagOf(g, val.ty) == blot_direct_types::Tag.nominal {
+            let cases, verr = g.types.variants(val.ty);
+            if verr != blot_direct_types::Error.none { return neverVal(), g.typeFailure(m, id); }
+            if cases.len != 1 { return neverVal(), g.fail(m, id, "val.(field) requires a single-constructor data type"); }
+            let unwrapped, uerr = unwrapVariant(g, f, val, g.types.variant_tags[cases.tags], id);
+            if uerr != blot_direct_types::Error.none { return neverVal(), uerr; }
+            rec = unwrapped;
+        }
+        let pos = g.types.findField(rec.ty, cf.name_id);
+        if pos < 0 { return neverVal(), g.fail(m, id, "comptime projected field missing"); }
+        return recordField(g, f, rec, pos, id);
+    }
+    if n.c == 1 {
+        let fidx = findComptimeFrame(f, n.a);
+        if fidx < 0 { return neverVal(), g.fail(m, id, "comptime .name outside #for"); }
+        let text = g.types.spelling(f.comptime_frames[fidx].name_id);
+        let arr_ty, terr = typeOf(g, f, id);
+        if terr != blot_direct_types::Error.none { return neverVal(), terr; }
+        var cp_count: i64 = 0;
+        var p: i64 = 0;
+        while p < text.len { let _, next = utf8Next(text, p); cp_count += 1; p = next; }
+        let vals = g.reserveVals(cp_count);
+        p = 0;
+        var idx: i64 = 0;
+        while p < text.len {
+            let cp, next = utf8Next(text, p);
+            g.s.vals[vals.start + idx] = valOf1(g, blot_direct_types::u32_, constLocal(g, f, cp));
+            idx += 1;
+            p = next;
+        }
+        return arrayFromValues(g, f, arr_ty, vals, id);
+    }
+    var s = Stage {..};
+    let v = evalComptimeMetaStage(g, f, s, m, id, 0, 0);
+    var result = neverVal();
+    var error = blot_direct_types::Error.none;
+    if s.failure.len != 0 { error = g.fail(m, id, s.failure); }
+    else {
+        let ty, lerr = typeOf(g, f, id);
+        error = lerr;
+        if error == blot_direct_types::Error.none {
+            var remaining: i64 = 65536;
+            result, error = emitStageValue(g, f, s, v, ty, id, remaining, 0);
+        }
+    }
+    blot_support_pooled_buffer::deinit(s.functions, stage_function_runs);
+    blot_support_pooled_buffer::deinit(s.parts, part_runs);
+    blot_support_pooled_buffer::deinit(s.aggregates, aggregate_runs);
+    blot_support_pooled_buffer::deinit(s.bindings, binding_runs);
+    return result, error;
 }
 // Copies `value` into a lazily allocated result slot.
 fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error {
@@ -339,11 +633,12 @@ recursive fn returnNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         if (label.target != n.b && label.kind != blot_direct_emit::LabelKind.function) || label.kind == blot_direct_emit::LabelKind.loop_ { continue; }
         let delivered = deliver(g, f, value, label.result, id);
         if delivered != blot_direct_types::Error.none { return neverVal(), delivered; }
-        leaveHandles(g, f, label.depth);
+        let left = leaveHandles(g, f, label.depth);
+        if left != blot_direct_types::Error.none { return neverVal(), left; }
         br(g, f, OP_br, label.depth);
         return neverVal(), blot_direct_types::Error.none;
     }
-    return neverVal(), g.fail(m, id, "return outside its block");
+    return neverVal(), g.fail(g.units[f.unit - 1], id, "return outside its block");
 }
 
 fn sameWords(g: const Generator&, left: Val, right: Val) -> bool {
@@ -491,7 +786,15 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     close(g, f);
     for merge, at in merges {
         let slot = g.s.slots[merged + at];
-        if slot.present { bindPut(g, f, merge.result, slot.value); }
+        if slot.present {
+            bindPut(g, f, merge.result, slot.value);
+            let ct1, ok1 = withCellType(g, f, merge.then_binding);
+            if ok1 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct1); }
+            else {
+                let ct2, ok2 = withCellType(g, f, merge.else_binding);
+                if ok2 { blot_support_zigmap::put(g.s.map_pool, f.with_cells, merge.result, ct2); }
+            }
+        }
     }
     if !falls { return neverVal(), blot_direct_types::Error.none; }
     if info.statement { return unitVal(), blot_direct_types::Error.none; }
@@ -938,7 +1241,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let carries = m.loopCarries(id);
     let incoming = g.reserveVals(carries.len);
     for carry, at in carries {
-        let value, present = bindGet(g, f, carry.incoming);
+        let value, present, rerr = readBindingVal(g, f, carry.incoming, id);
+        if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
         if !present { return neverVal(), g.fail(m, id, "loop carry without an incoming value"); }
         g.s.vals[incoming.start + at] = value;
     }
@@ -1100,7 +1404,8 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if body.ty != blot_direct_types::never {
         let backedge = g.reserveVals(carries.len);
         for carry, at in carries {
-            let value, present = bindGet(g, f, carry.backedge);
+            let value, present, rerr = readBindingVal(g, f, carry.backedge, id);
+            if rerr != blot_direct_types::Error.none { return neverVal(), rerr; }
             if !present { return neverVal(), g.fail(m, id, "loop carry without a backedge value"); }
             g.s.vals[backedge.start + at] = value;
         }
@@ -1219,21 +1524,22 @@ recursive fn ownerSlots(g: Generator&, ty: Ty, words: u32) -> bool, Error {
 recursive fn breakNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     let m .= g.units[f.unit - 1];
     let n = m.node(id);
-    let count = m.breakValues(id).len;
-    let values = g.reserveVals(count);
-    for at in 0..count {
-        let child = m.breakValues(id)[at];
-        let value, error = expr(g, f, child);
-        if error != blot_direct_types::Error.none { return value, error; }
-        g.s.vals[values.start + at] = value;
-    }
     var at = g.s.labels.len;
     while at != f.labels_base {
         at -= 1;
         let label = g.s.labels[at];
         if label.target != n.a || label.kind != blot_direct_emit::LabelKind.loop_ { continue; }
-        if values.len != label.iteration.len { return neverVal(), g.fail(m, id, "break carries the wrong number of values"); }
-        leaveHandles(g, f, label.depth);
+        let left = leaveHandles(g, f, label.depth);
+        if left != blot_direct_types::Error.none { return neverVal(), left; }
+        let count = g.units[f.unit - 1].breakValues(id).len;
+        if count != (label.iteration.len as i64) { return neverVal(), g.fail(g.units[f.unit - 1], id, "break carries the wrong number of values"); }
+        let values = g.reserveVals(count);
+        for vi in 0..count {
+            let child = g.units[f.unit - 1].breakValues(id)[vi];
+            let value, error = expr(g, f, child);
+            if error != blot_direct_types::Error.none { return value, error; }
+            g.s.vals[values.start + vi] = value;
+        }
         if n.op == blot_check_core::Op.continue_ {
             let assigned = assignCarries(g, f, values, label.iteration, label.slots, label.unchanged, label.release_owner, label.release_stack, id);
             if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }

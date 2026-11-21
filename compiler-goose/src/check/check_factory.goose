@@ -29,6 +29,7 @@ import support.native;
 import std;
 import dictionary;
 fn checkEngine(tree:const blot_parse_ast::Tree&,pool:blot_parse_symbols::Pool&,imports:const ImportedBinding[:],headers:const SourceHeader[:],catalogs:const ImportedCatalog[:],source_catalogs:const SourceCatalog[:],unit:u32,allow_imports:bool,options:ModuleOptions,source_validation:bool,execution:PrivateExecution,exhaustion:BudgetExhaustion&)->Checked,blot_error::Error {
+resetWithState();
 var owner_import_arena=ImportArena{records:[]};
 var owner_import_callees:u32[>..<]=[];
 var owner_import_variables:u32[>..<]=[];

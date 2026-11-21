@@ -310,6 +310,11 @@ let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
 let a_fork_expr=blot_parse_ast::tag_fork_expr;
+let a_with_stmt=blot_parse_ast::tag_with_stmt;
+let a_with_entry=blot_parse_ast::tag_with_entry;
+let a_comptime_for=blot_parse_ast::tag_comptime_for;
+let a_comptime_if=blot_parse_ast::tag_comptime_if;
+let a_comptime_project=blot_parse_ast::tag_comptime_project;
 recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
  if id!=0 { let tag=tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&context.source_editor_probe(id) { return; } }
  if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
@@ -391,6 +396,28 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
   for i in 0..count { let entry=tree.node(tree.list(entries)[i]); bind(self_,tree,pool,context,locals,entry.a); }
   walk(self_,tree,pool,context,locals,n.c,depth+1);
   locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
+ } else if n.tag==a_with_stmt {
+  let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
+  for i in 0..count {
+   let entry=tree.node(tree.list(entries)[i]);
+   if entry.c==1 { walk(self_,tree,pool,context,locals,entry.b,depth+1); }
+   else { walk(self_,tree,pool,context,locals,entry.a,depth+1); }
+   if stopped(self_,tree,pool,context,locals) { return; }
+  }
+  scope(self_,tree,pool,context,locals,0,n.c,depth+1);
+ } else if n.tag==a_comptime_for {
+  let body=tree.extra.items[n.c];
+  let saved=locals.len;
+  bind(self_,tree,pool,context,locals,n.a);
+  walk(self_,tree,pool,context,locals,body,depth+1);
+  locals.resize(saved);
+ } else if n.tag==a_comptime_if {
+  walk(self_,tree,pool,context,locals,n.a,depth+1);
+  scope(self_,tree,pool,context,locals,0,n.b,depth+1);
+  scope(self_,tree,pool,context,locals,0,n.c,depth+1);
+ } else if n.tag==a_comptime_project {
+  walk(self_,tree,pool,context,locals,n.a,depth+1);
+  if !local(self_,tree,pool,context,locals,n.b) { fail(self_,tree,pool,context,locals,c_unknown_value,id,tree.span(id).start,n.b); }
  } else if n.tag==a_let_stmt {
   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
 

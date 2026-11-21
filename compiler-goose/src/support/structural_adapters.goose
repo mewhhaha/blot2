@@ -844,6 +844,8 @@ fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core::SelectedUse)
 fn blot_check_core::blotStructuralHash<StructuralSink>(value:blot_check_core::SelectedUse,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core::StampView)->bool {return equalFields(left,right);}
 fn blot_check_core::blotStructuralHash<StructuralSink>(value:blot_check_core::StampView,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
+fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core::TypeTag)->bool {return equalFields(left,right);}
+fn blot_check_core::blotStructuralHash<StructuralSink>(value:blot_check_core::TypeTag,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core::Types)->bool {return equalFields(left,right);}
 fn blot_check_core::blotStructuralHash<StructuralSink>(value:blot_check_core::Types,sink:StructuralSink&) {blot_structural::hashFields(sink,value);}
 fn equal<StructuralLeft>(left:StructuralLeft,right:blot_check_core::TypesStampView)->bool {return equalFields(left,right);}

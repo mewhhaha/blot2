@@ -40,6 +40,7 @@ run_blot_check_numeric_proof_headers__Named {values:blot_check_numeric_proof_hea
 run_blot_check_capability_contracts__Term {values:blot_check_capability_contracts::Term[:]},
 run_blot_check_capability_contracts__Binding {values:blot_check_capability_contracts::Binding[:]},
 run_blot_check_core__FieldName {values:blot_check_core::FieldName[:]},
+run_blot_check_core__TypeTag {values:blot_check_core::TypeTag[:]},
 run_blot_check_core__RuntimeName {values:blot_check_core::RuntimeName[:]},
 run_blot_check_core__DeclarationDependencies {values:blot_check_core::DeclarationDependencies[:]},
 run_blot_check_core__BindingRef {values:blot_check_core::BindingRef[:]},
@@ -129,6 +130,8 @@ reusable[] var pool_blot_check_capability_contracts__Term:blot_check_capability_
 reusable[] var pool_blot_check_capability_contracts__Binding:blot_check_capability_contracts::Binding[>..]=[];
 
 reusable[] var pool_blot_check_core__FieldName:blot_check_core::FieldName[>..]=[];
+
+reusable[] var pool_blot_check_core__TypeTag:blot_check_core::TypeTag[>..]=[];
 
 reusable[] var pool_blot_check_core__RuntimeName:blot_check_core::RuntimeName[>..]=[];
 
@@ -284,6 +287,8 @@ run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contr
 run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
 
 run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
+
+run_blot_check_core__TypeTag run=>{pool_blot_check_core__TypeTag.free_slice(run.values);},
 
 run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
 
@@ -533,6 +538,20 @@ fn mutable(self_:const Owner&,values:const blot_check_core::FieldName[:])->blot_
 fn cloneValue(self_:Owner&,values:const blot_check_core::FieldName[:])->blot_check_core::FieldName[:],Error {
  let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::FieldName>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::FieldName[:]>(),error;}
  for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::FieldName[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
+}
+
+fn allocate(self_:Owner&,sample:blot_check_core::TypeTag,length:i64)->blot_check_core::TypeTag[:],Error {
+ assert(unique(self_));if length<0 {return default<blot_check_core::TypeTag[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::TypeTag[:]>(),blot_error::Error.none;}
+ let run=pool_blot_check_core__TypeTag.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__TypeTag {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__TypeTag.free_slice(run);return default<blot_check_core::TypeTag[:]>(),error;}return run,blot_error::Error.none;
+}
+fn mutable(self_:const Owner&,values:const blot_check_core::TypeTag[:])->blot_check_core::TypeTag[:] {
+ assert(unique(self_));if values.len==0 {return default<blot_check_core::TypeTag[:]>();}var next=leases[self_.lease-1].head;
+ while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__TypeTag run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__TypeTag.realloc_slice(run.values,run.values.len);}},_=>{}}}
+ abort("mutable payload view must name this private owner's exact live run");
+}
+fn cloneValue(self_:Owner&,values:const blot_check_core::TypeTag[:])->blot_check_core::TypeTag[:],Error {
+ let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::TypeTag>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::TypeTag[:]>(),error;}
+ for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::TypeTag[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
 fn allocate(self_:Owner&,sample:blot_check_core::RuntimeName,length:i64)->blot_check_core::RuntimeName[:],Error {
@@ -1477,6 +1496,8 @@ var result=default<blot_check_core::Module>();
 
 {let copied,error=cloneValue(self_,value.field_names);if error!=blot_error::Error.none {return result,error;}result.field_names=copied;}
 
+{let copied,error=cloneValue(self_,value.type_tags);if error!=blot_error::Error.none {return result,error;}result.type_tags=copied;}
+
 {let copied,error=cloneValue(self_,value.runtime_names);if error!=blot_error::Error.none {return result,error;}result.runtime_names=copied;}
 
 {let copied,error=cloneValue(self_,value.source_names);if error!=blot_error::Error.none {return result,error;}result.source_names=copied;}
@@ -1839,6 +1860,26 @@ var result=default<blot_check_core::FieldName>();
 {let copied,error=cloneValue(self_,value.symbol);if error!=blot_error::Error.none {return result,error;}result.symbol=copied;}
 
 {let copied,error=cloneValue(self_,value.spelling);if error!=blot_error::Error.none {return result,error;}result.spelling=copied;}
+
+return result,blot_error::Error.none;
+
+}
+
+fn cloneValue(self_:Owner&,value:blot_check_core::TypeTag)->blot_check_core::TypeTag,Error {
+
+var result=default<blot_check_core::TypeTag>();
+
+{let copied,error=cloneValue(self_,value.nominal);if error!=blot_error::Error.none {return result,error;}result.nominal=copied;}
+
+{let copied,error=cloneValue(self_,value.constructor_tag);if error!=blot_error::Error.none {return result,error;}result.constructor_tag=copied;}
+
+{let copied,error=cloneValue(self_,value.field_name);if error!=blot_error::Error.none {return result,error;}result.field_name=copied;}
+
+{let copied,error=cloneValue(self_,value.has_default);if error!=blot_error::Error.none {return result,error;}result.has_default=copied;}
+
+{let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return result,error;}result.value=copied;}
+
+{let copied,error=cloneValue(self_,value.ty);if error!=blot_error::Error.none {return result,error;}result.ty=copied;}
 
 return result,blot_error::Error.none;
 
@@ -2599,6 +2640,18 @@ return blot_check_core::Tag.storage,blot_error::Error.none;},
 fork_=>{
 return blot_check_core::Tag.fork_,blot_error::Error.none;},
 
+with_handle=>{
+return blot_check_core::Tag.with_handle,blot_error::Error.none;},
+
+comptime_for=>{
+return blot_check_core::Tag.comptime_for,blot_error::Error.none;},
+
+comptime_if=>{
+return blot_check_core::Tag.comptime_if,blot_error::Error.none;},
+
+comptime_meta=>{
+return blot_check_core::Tag.comptime_meta,blot_error::Error.none;},
+
 }
 
 }
@@ -3131,6 +3184,8 @@ var result=default<blot_check_core::Constructor>();
 {let copied,error=cloneValue(self_,value.nominal);if error!=blot_error::Error.none {return result,error;}result.nominal=copied;}
 
 {let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
+
+{let copied,error=cloneValue(self_,value.name);if error!=blot_error::Error.none {return result,error;}result.name=copied;}
 
 {let copied,error=cloneValue(self_,value.scheme);if error!=blot_error::Error.none {return result,error;}result.scheme=copied;}
 
@@ -4426,6 +4481,8 @@ run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_co
 
 run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
 
+run_blot_check_core__TypeTag run=>{pool_blot_check_core__TypeTag.free_slice(run.values);},
+
 run_blot_check_core__RuntimeName run=>{pool_blot_check_core__RuntimeName.free_slice(run.values);},
 
 run_blot_check_core__DeclarationDependencies run=>{pool_blot_check_core__DeclarationDependencies.free_slice(run.values);},
@@ -4644,6 +4701,16 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldNam
  }abort("partitioned payload view must name this private owner's exact live run");
 }
 fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
+
+fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::TypeTag[:]) {
+ assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
+ var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__TypeTag run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
+ var previous:u32=0;next=leases[self_.lease-1].head;
+ while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__TypeTag run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
+ if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
+ }abort("partitioned payload view must name this private owner's exact live run");
+}
+fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::TypeTag[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
 fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::RuntimeName[:]) {
  assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
@@ -5395,6 +5462,8 @@ partitionInto(self_,destination,value.capability_contracts);
 
 partitionInto(self_,destination,value.field_names);
 
+partitionInto(self_,destination,value.type_tags);
+
 partitionInto(self_,destination,value.runtime_names);
 
 partitionInto(self_,destination,value.source_names);
@@ -5716,6 +5785,22 @@ fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::FieldNam
 partitionInto(self_,destination,value.symbol);
 
 partitionInto(self_,destination,value.spelling);
+
+}
+
+fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::TypeTag) {
+
+partitionInto(self_,destination,value.nominal);
+
+partitionInto(self_,destination,value.constructor_tag);
+
+partitionInto(self_,destination,value.field_name);
+
+partitionInto(self_,destination,value.has_default);
+
+partitionInto(self_,destination,value.value);
+
+partitionInto(self_,destination,value.ty);
 
 }
 
@@ -6388,6 +6473,18 @@ storage=>{
 fork_=>{
 },
 
+with_handle=>{
+},
+
+comptime_for=>{
+},
+
+comptime_if=>{
+},
+
+comptime_meta=>{
+},
+
 }
 
 }
@@ -6868,6 +6965,8 @@ partitionInto(self_,destination,value.identity);
 partitionInto(self_,destination,value.nominal);
 
 partitionInto(self_,destination,value.tag);
+
+partitionInto(self_,destination,value.name);
 
 partitionInto(self_,destination,value.scheme);
 

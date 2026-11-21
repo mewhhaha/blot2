@@ -31,8 +31,9 @@ fn evidenceContext(g: Generator&, f: const Fn&, target: BindingRef, id: u32) -> 
     return f.evidence_context;
 }
 
-// Effectful dictionary applications need closure sequencing through binding,
-// partial application and return. Only the pure signatures use this path.
+// Effectful dictionary applications that return closures on an intermediate
+// effectful arrow need closure sequencing through binding, partial application
+// and return. Pure arrows and final-arrow closed effects use this path safely.
 fn pureContractMethod(m: const Module&, index: u32) -> bool {
     var ty = m.binding(m.member_templates[index].binding).ty;
     while true {
@@ -41,7 +42,14 @@ fn pureContractMethod(m: const Module&, index: u32) -> bool {
             forall, usage => { ty = shape.a; },
             function => {
                 let row = m.types.row(shape.c);
-                if row.tail != blot_check_effects::Tail.closed || row.labels.len != 0 { return false; }
+                if row.tail != blot_check_effects::Tail.closed { return false; }
+                if row.labels.len != 0 {
+                    var next = shape.b;
+                    while m.types.node(next).tag == blot_check_types::Tag.forall || m.types.node(next).tag == blot_check_types::Tag.usage {
+                        next = m.types.node(next).a;
+                    }
+                    if m.types.node(next).tag == blot_check_types::Tag.function { return false; }
+                }
                 ty = shape.b;
             },
             _ => { return true; },
@@ -75,7 +83,7 @@ recursive fn hasContractArgumentIdentity(g: const Generator&, ty: Ty, depth: i64
     let shape = g.types.node(ty);
     match shape.tag {
         unit, boolean, u32_, f32_ => { return true; },
-        function, provider, state_provider, never => { return false; },
+        function, provider, state_provider, cell, never => { return false; },
         array, list, cursor, grow, resize, ref, view, link => { return hasContractArgumentIdentity(g, shape.a, depth + 1); },
         tuple => {
             for child in g.types.words[shape.a..shape.a + shape.b] {
@@ -125,7 +133,13 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
         var matches = true;
         for argument, index in actual {
             let resolved, error = g.types.lower(catalog, argument, Env {});
-            if error != blot_direct_types::Error.none || resolved != parameters[index] { matches = false; break; }
+            if error != blot_direct_types::Error.none { matches = false; break; }
+            if resolved != parameters[index] {
+                let pn = g.types.node(parameters[index]);
+                let rn = g.types.node(resolved);
+                let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
+                if !array_lift { matches = false; break; }
+            }
         }
         if !matches { continue; }
         for member in catalog.selected_members[proof.members.start..proof.members.start + proof.members.len] {
@@ -133,6 +147,38 @@ fn staticContractTarget(g: Generator&, f: const Fn&, id: u32) -> BindingRef, Err
             let candidate = g.resolve(catalog, BindingRef { member.target.unit, member.target.binding });
             if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
             target = candidate;
+        }
+    }
+    if target.binding == 0 {
+        for unit in g.units {
+            let uname = memberName(m, unit, template);
+            if uname == 0 { continue; }
+            for impl_ in unit.implementations {
+                if impl_.contract != template.contract { continue; }
+                let head_list = unit.types.list(impl_.head);
+                if head_list.len != parameters.len { continue; }
+                var match_env = Env {};
+                var matches = true;
+                for head_arg, index in head_list {
+                    let want = parameters[index];
+                    g.types.match_(unit, head_arg, want, match_env);
+                    let lowered, lerr = g.types.lower(unit, head_arg, match_env);
+                    if lerr != blot_direct_types::Error.none { matches = false; break; }
+                    if lowered != want {
+                        let pn = g.types.node(want);
+                        let rn = g.types.node(lowered);
+                        let array_lift = (pn.tag == blot_direct_types::Tag.grow || pn.tag == blot_direct_types::Tag.resize) && rn.tag == blot_direct_types::Tag.array && pn.a == rn.a;
+                        if !array_lift { matches = false; break; }
+                    }
+                }
+                if !matches { continue; }
+                for member in unit.implementation_members[impl_.members.start..impl_.members.start + impl_.members.len] {
+                    if member.name != uname || member.kind != blot_reuse_principal_interface::ImplementationMemberKind.value { continue; }
+                    let candidate = g.resolve(unit, BindingRef { member.target.unit, member.target.binding });
+                    if target.binding != 0 && target != candidate { return BindingRef { 0, 0 }, g.fail(m, id, "ambiguous contract methods at this concrete type"); }
+                    target = candidate;
+                }
+            }
         }
     }
     if target.binding == 0 {
@@ -690,6 +736,15 @@ recursive fn callTarget(g: Generator&, f: Fn&, target: BindingRef, arguments: Va
             value = applied;
         }
         return value, blot_direct_types::Error.none;
+    }
+    if body && !body.is_function && tm.node(body.root).tag == blot_check_core::Tag.reference && f.forward_depth < 8 {
+        let next = g.resolve(tm, tm.reference(body.root));
+        if next != target {
+            f.forward_depth += 1;
+            let forwarded, ferr = callTarget(g, f, next, arguments, callee, result, id);
+            f.forward_depth -= 1;
+            return forwarded, ferr;
+        }
     }
     let node, has_alias = primitiveAlias(tm, target.binding);
     if has_alias { return applyPrimitive(g, f, tm.primitive(node), arguments, callee, result, target, id); }

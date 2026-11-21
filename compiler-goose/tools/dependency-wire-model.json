@@ -518,6 +518,11 @@
      "dispatch_signatures"
     ],
     [
+     "type_tags",
+     "[]check.core.TypeTag",
+     "type_tags"
+    ],
+    [
      "diagnostics",
      "[]check.core.Diagnostic",
      "diagnostics"
@@ -2281,6 +2286,26 @@
      "fork_",
      56,
      "fork_"
+    ],
+    [
+     "with_handle",
+     57,
+     "with_handle"
+    ],
+    [
+     "comptime_for",
+     58,
+     "comptime_for"
+    ],
+    [
+     "comptime_if",
+     59,
+     "comptime_if"
+    ],
+    [
+     "comptime_meta",
+     60,
+     "comptime_meta"
     ]
    ]
   },
@@ -3357,6 +3382,11 @@
      "payload",
      "u32",
      "payload"
+    ],
+    [
+     "name",
+     "u32",
+     "name"
     ]
    ],
    "unwired": []
@@ -3367,6 +3397,52 @@
    "goose": "blot_check_core::Constructor[:]",
    "children": [
     "check.core.Constructor"
+   ]
+  },
+  {
+   "name": "check.core.TypeTag",
+   "kind": "struct",
+   "goose": "blot_check_core::TypeTag",
+   "fields": [
+    [
+     "nominal",
+     "check.types.NominalIdentity",
+     "nominal"
+    ],
+    [
+     "constructor_tag",
+     "u32",
+     "constructor_tag"
+    ],
+    [
+     "field_name",
+     "u32",
+     "field_name"
+    ],
+    [
+     "has_default",
+     "bool",
+     "has_default"
+    ],
+    [
+     "value",
+     "u32",
+     "value"
+    ],
+    [
+     "ty",
+     "u32",
+     "ty"
+    ]
+   ],
+   "unwired": []
+  },
+  {
+   "name": "[]check.core.TypeTag",
+   "kind": "slice",
+   "goose": "blot_check_core::TypeTag[:]",
+   "children": [
+    "check.core.TypeTag"
    ]
   },
   {

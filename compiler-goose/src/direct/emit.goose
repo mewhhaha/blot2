@@ -146,9 +146,12 @@ struct Label {
     // per carry, nonzero when held.
     slots: Words = Words {},
 }
+// A shadowed outer local cell owned by a `with` handler: restored into `outer`
+// on early `break`/`continue`/`return` out of the `with` suite.
+struct HandleCell { cell: u32, outer: Val, ty: Ty, outer_is_cell: bool = false }
 // An installed provider: the local holding the effect context from before
 // it, and the block depth it was installed at.
-struct Handle { saved: u32, depth: u32 }
+struct Handle { saved: u32, depth: u32, cells_start: u32 = 0, cells_len: u32 = 0 }
 
 root struct State {
     instances: Instance[>..] = [],
@@ -202,6 +205,8 @@ root struct State {
     locals: ValType[>..<] = [],
     labels: Label[>..<] = [],
     handles: Handle[>..<] = [],
+    handle_cells: HandleCell[>..] = [],
+    handle_cells_len: i64 = 0,
     // Binding tables (zigmap) of every body.
     map_pool: u32[>..] = [],
     // Generalized local function values: (body serial, binding) to node.
@@ -557,7 +562,7 @@ recursive fn contentsHoldMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, list, cursor, grow, resize, ref, view, link => { result = true; },
+        function, provider, array, list, cursor, grow, resize, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = contentsHoldMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }
@@ -607,7 +612,7 @@ recursive fn holdsMemory(g: Generator&, ty: Ty) -> bool, Error {
     var result = false;
     match n.tag {
         unit, boolean, u32_, f32_, never => {},
-        function, provider, array, list, cursor, grow, resize, ref, view, link => { result = true; },
+        function, provider, array, list, cursor, grow, resize, ref, view, link, cell => { result = true; },
         state_provider => {
             let held, error = holdsMemory(g, g.types.words[n.a + 2]);
             if error != blot_direct_types::Error.none { return false, error; }

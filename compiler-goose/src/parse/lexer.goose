@@ -293,7 +293,7 @@ fn layout(source: const u8[:],result: Result&) {
     }
    }
   }
-  if current.tag==blot_parse_token::l_brace&&index>=3&&raw[index-1].tag==blot_parse_token::equal&&raw[index-2].tag==blot_parse_token::kw_effect&&raw[index-3].tag==blot_parse_token::kw_is { operations_depth=depth+1; }
+  if current.tag==blot_parse_token::l_brace&&index>=3&&raw[index-1].tag==blot_parse_token::equal&&raw[index-3].tag==blot_parse_token::kw_is&&(raw[index-2].tag==blot_parse_token::kw_effect||(raw[index-2].tag==blot_parse_token::identifier&&blot_parse_token::text(raw[index-2],source)=="trait")) { operations_depth=depth+1; }
   if open(current.tag) { depth++; } if close(current.tag) { depth--; } if depth<operations_depth { operations_depth=-1; }
   result.tokens.push(current);
  }

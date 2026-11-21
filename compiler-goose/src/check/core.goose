@@ -35,7 +35,7 @@ struct FieldName {
     symbol: u32,
     spelling: Name
 }
-enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage, fork_ }
+enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta }
 enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,
@@ -196,7 +196,16 @@ struct Constructor {
     nominal: u32,
     tag: u32,
     scheme: blot_check_types::Scheme,
-    payload: blot_check_types::Id
+    payload: blot_check_types::Id,
+    name: u32 = 0
+}
+struct TypeTag {
+    nominal: blot_check_types::NominalIdentity,
+    constructor_tag: u32 = 0,
+    field_name: u32 = 0,
+    has_default: bool = false,
+    value: Id = 0,
+    ty: blot_check_types::Id = 0
 }
 struct ProjectionVariant {
     tag: u32,
@@ -418,6 +427,7 @@ struct Module {
     operation_values: OperationValue[:] = default<OperationValue[:]>(),
     handle_effects: HandleEffects[:] = default<HandleEffects[:]>(),
     dispatch_signatures: blot_check_types::Id[:] = default<blot_check_types::Id[:]>(),
+    type_tags: TypeTag[:] = default<TypeTag[:]>(),
     diagnostics: Diagnostic[:],
     body_lowerings: i64,
     package_payloads: Id[:] = default<Id[:]>()
@@ -536,7 +546,7 @@ fn children(self_: const Module&, id: Id) -> const Id[:] {
     let value = self_.node(id);
     match value.tag {
         block_, suite, product, record, array, array_op, storage, task => { return self_.extra[value.a..value.a + value.b]; },
-        call, contract_method, break_ => { return self_.extra[value.b..value.b + value.c]; },
+        call, contract_method, break_, with_handle => { return self_.extra[value.b..value.b + value.c]; },
         package_pack => {
             for selection in self_.dictionary_selections {
                 if selection.owner == id { return self_.extra[selection.contents.start..selection.contents.start + selection.contents.len]; }
@@ -687,6 +697,10 @@ fn tagCode(value: Tag) -> u32 {
         task => { return 54; },
         storage => { return 55; },
         fork_ => { return 56; },
+        with_handle => { return 57; },
+        comptime_for => { return 58; },
+        comptime_if => { return 59; },
+        comptime_meta => { return 60; },
     }
 }
 fn tagFromCode(code: u32) -> Tag, blot_error::Error {
@@ -748,6 +762,10 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
         54 => { return Tag.task, blot_error::Error.none; },
         55 => { return Tag.storage, blot_error::Error.none; },
         56 => { return Tag.fork_, blot_error::Error.none; },
+        57 => { return Tag.with_handle, blot_error::Error.none; },
+        58 => { return Tag.comptime_for, blot_error::Error.none; },
+        59 => { return Tag.comptime_if, blot_error::Error.none; },
+        60 => { return Tag.comptime_meta, blot_error::Error.none; },
         _ => { return Tag.invalid, blot_error::Error.core_limit; },
     }
 }
@@ -1171,11 +1189,12 @@ struct StampView {
     operation_values: const OperationValue[:] = default<const OperationValue[:]>(),
     handle_effects: const HandleEffects[:] = default<const HandleEffects[:]>(),
     dispatch_signatures: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),
+    type_tags: const TypeTag[:] = default<const TypeTag[:]>(),
     diagnostics: const Diagnostic[:],
     body_lowerings: i64
 }
 fn stampView(self_: const Module&) -> StampView {
-    return StampView { self_.has_rank_contracts, self_.has_usage_contracts, self_.has_numeric_proofs, self_.proof_contracts, self_.capability_contracts, self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.request_loops, self_.request_arms, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.selected_proofs, self_.selected_members, self_.selected_edges, self_.selected_uses, self_.dictionary_selections, self_.dictionary_uses, self_.primitives, self_.loops, self_.loop_carries, self_.resolver_ops, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.diagnostics, self_.body_lowerings , ..};
+    return StampView { self_.has_rank_contracts, self_.has_usage_contracts, self_.has_numeric_proofs, self_.proof_contracts, self_.capability_contracts, self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.request_loops, self_.request_arms, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.selected_proofs, self_.selected_members, self_.selected_edges, self_.selected_uses, self_.dictionary_selections, self_.dictionary_uses, self_.primitives, self_.loops, self_.loop_carries, self_.resolver_ops, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
 }
 
 type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;
