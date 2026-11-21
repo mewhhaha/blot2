@@ -1,28 +1,28 @@
-// Text is an Array U32 of Unicode scalar values. Equality compares scalar
+// Text is a #[U32] of Unicode scalar values. Equality compares scalar
 // sequences exactly; it does not normalize Unicode.
 const empty: Text = ""
-func length (value: Text) => return value.length
-func is_empty (value: Text) => return value.length == 0
-func at index -> (value: Text) => return value[index]
-func concat (left: Text) -> (right: Text) : Text => return @array.concat left right
+func length (value: Text) => value.length
+func is_empty (value: Text) => value.length == 0
+func at index -> (value: Text) => value[index]
+func concat (left: Text) -> (right: Text) : Text => @array.concat left right
 
-func equal (left: Text) -> (right: Text) : Bool => return do:
+func equal (left: Text) -> (right: Text) : Bool =>
   if left.length != right.length:
-    break false
+    return false
   for index in 0..left.length:
     if left[index] != right[index]:
       return false
-  break true
+  return true
 
-func valid_scalar value => return
+func valid_scalar value =>
   value <= 0x10FFFF and (value < 0xD800 or value > 0xDFFF)
 // Both take the array over: a Text is its scalars, so nothing is copied.
-func from_scalars (values: own Array U32) : Maybe Text => return do:
+func from_scalars (values: own #[U32]) : Maybe Text =>
   for value in values:
-    if Bool.not (valid_scalar value):
+    if not (valid_scalar value):
       return $Nothing
-  break $Some values
-func scalars (value: own Text) => return value
+  return $Some values
+func scalars (value: own Text) => value
 
 // Unicode White_Space, excluding the zero-width space and BOM.
 func is_whitespace (value: U32): Bool => return
@@ -35,14 +35,14 @@ func is_whitespace (value: U32): Bool => return
 // Borrowed, nonempty words separated by Unicode whitespace. The input owns
 // the scalars; taking a word or copying the cursor does not copy the text.
 type Words is data = $Words { source: &[U32], index: U32 }
-func split_whitespace (source: Text): Words => return
+func split_whitespace (source: Text): Words =>
   $Words { source: &source[0..source.length], index: 0 }
-func Words.iter (cursor: Words): Words => return cursor
-func Words.next (cursor: Words): Maybe (&[U32], Words) => do:
+func Words.iter (cursor: Words): Words => cursor
+func Words.next (cursor: Words): Maybe (&[U32], Words) =>
   let source = cursor.source
   let start = cursor.index
   for index in start..source.length:
-    if Bool.not (is_whitespace source[index]):
+    if not (is_whitespace source[index]):
       break
     start := self + 1
   if start >= source.length:
@@ -57,10 +57,10 @@ func Words.next (cursor: Words): Maybe (&[U32], Words) => do:
 // Split on LF, removing a CR immediately before it. Interior empty lines
 // remain, but an empty input or a final LF does not add a line.
 type Lines is data = $Lines { source: &[U32], index: U32 }
-func lines (source: Text): Lines => return
+func lines (source: Text): Lines =>
   $Lines { source: &source[0..source.length], index: 0 }
-func Lines.iter (cursor: Lines): Lines => return cursor
-func Lines.next (cursor: Lines): Maybe (&[U32], Lines) => do:
+func Lines.iter (cursor: Lines): Lines => cursor
+func Lines.next (cursor: Lines): Maybe (&[U32], Lines) =>
   let source = cursor.source
   let start = cursor.index
   if start >= source.length:
@@ -73,7 +73,7 @@ func Lines.next (cursor: Lines): Maybe (&[U32], Lines) => do:
 
 // Accept a nonempty sequence of ASCII decimal digits, including a borrowed
 // text slice. Reject signs, whitespace, other characters and U32 overflow.
-func parse_u32 value: Maybe U32 => do:
+func parse_u32 value: Maybe U32 =>
   if value.length == 0:
     return $Nothing
   let result = 0
@@ -86,37 +86,45 @@ func parse_u32 value: Maybe U32 => do:
     result := self * 10 + digit
   return $Some result
 
-// Append into a persistent List; one conversion produces the final Array.
-type Builder = List U32
-func builder () : Builder => return []
-func push scalar -> (out: Builder) => return [...out, scalar]
-func append (value: Text) -> (out: Builder) : Builder => return do:
-  let result = out
+// Append into a growable #[+U32]; sealing produces the final Text with zero copy.
+type Builder = #[+U32]
+func builder () : Builder => #[]
+func push scalar -> (out: own Builder) : Builder =>
+  @storage.push out scalar
+  return out
+func append (value: Text) -> (out: own Builder) : Builder =>
   for scalar in value:
-    result := [...self, scalar]
-  break result
-func finish (out: Builder) : Text => return Array.from_list out
-func join (separator: Text) -> (pieces: Array Text) : Text => return do:
+    @storage.push out scalar
+  return out
+func finish (out: own Builder) : Text => seal out
+func join (separator: Text) -> (pieces: #[Text]) : Text =>
   let out = builder ()
   let first = true
   for piece in pieces:
-    if Bool.not first:
+    if not first:
       out := append separator self
     out := append piece self
     first := false
-  break finish out
+  return finish out
 
-func decimal_digits value -> collected => return
-  if value < 10 then [value + 48, ...collected]
-  else decimal_digits (value / 10) [value % 10 + 48, ...collected]
-func from_u32 (value: U32) : Text => return
-  Array.from_list (decimal_digits value [])
-func append_u32 value -> out => return append (from_u32 value) out
+func from_u32 (value: U32) : Text =>
+  if value < 10:
+    return #[value + 48]
+  let rev: #[+U32] = #[]
+  let current = value
+  for ever:
+    @storage.push rev (current % 10 + 48)
+    current := self / 10
+    if current == 0:
+      break
+  let count = rev.length
+  return @array.generate count (func i => rev[count - 1 - i])
+func append_u32 value -> (out: own Builder) : Builder => append (from_u32 value) out
 
 // Fixed decimal places (0..6), rounded half away from zero. Return Nothing
 // for NaN, infinities, excessive precision, or a scaled value outside U32.
-func from_f32_fixed (places: U32) -> (value: F32) : Maybe Text => return do:
-  if places > 6 or Bool.not (F32.is_finite value):
+func from_f32_fixed (places: U32) -> (value: F32) : Maybe Text =>
+  if places > 6 or not (F32.is_finite value):
     return $Nothing
   let factor = 1
   for ignored in 0..places:
@@ -136,24 +144,24 @@ func from_f32_fixed (places: U32) -> (value: F32) : Maybe Text => return do:
       out := push (48 + (rounded / divisor) % 10) self
       if divisor > 1:
         divisor := self / 10
-  break $Some (finish out)
+  return $Some (finish out)
 
 // Libraries and applications can provide their own Format implementations.
-type Format a is contract = { const format: a -> Text }
-impl Decimal : Format U32 = { const format = func value => return from_u32 value }
-impl Boolean : Format Bool = {
-  const format = func value => return if value then "true" else "false",
+type Format a is trait = { format: a -> Text }
+const U32.Format: Format U32 = { format: func value => from_u32 value }
+const Bool.Format: Format Bool = {
+  format: func value => if value then "true" else "false",
 }
-func format (value: a): Text where { Format a } => return Format.format value
-func format_sequence (values: Array a): Text where { Format a } => return do:
+func format (value: a): Text where { Format a } => Format.format value
+func format_sequence (values: #[a]): Text where { Format a } =>
   let out = append "[" (builder ())
   let first = true
   for value in values:
-    if Bool.not first:
+    if not first:
       out := append ", " self
     out := append (format value) self
     first := false
-  break finish (append "]" out)
-impl Sequence a : Format (Array a) where { Format a } = {
-  const format = func values => return format_sequence values,
+  return finish (append "]" out)
+const Array.Format: Format #[a] where { Format a } = {
+  format: func values => format_sequence values,
 }

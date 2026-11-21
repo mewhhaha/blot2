@@ -1,40 +1,42 @@
-// A numeric-lane codec contract. Applications choose their own stable schema
+// A numeric-lane codec trait. Applications choose their own stable schema
 // numbers and can replace these implementations with validated field codecs.
-type Codec a is contract = {
-  const encode: a -> Array U32,
-  const decode: Array U32 -> Maybe a,
+type Codec a is trait = {
+  encode: a -> #[U32],
+  decode: #[U32] -> Maybe a,
 }
-func encode (value: a): Array U32 where { Codec a } => return Codec.encode value
+func encode (value: a): #[U32] where { Codec a } => Codec.encode value
 
-impl Unsigned : Codec U32 = {
-  const encode = func value => return #[value],
-  const decode = func values => return
-    if values.length == 1 then $Some values[0] else $Nothing,
+const U32.Codec: Codec U32 = {
+  encode: func value => #[value],
+  decode: func values => if values.length == 1 then $Some values[0] else $Nothing,
 }
-impl Boolean : Codec Bool = {
-  const encode = func value => return #[if value then 1 else 0],
-  const decode = func values => return
-    if values.length != 1 then $Nothing
-    else if values[0] == 0 then $Some false
-    else if values[0] == 1 then $Some true
-    else $Nothing,
+const Bool.Codec: Codec Bool = {
+  encode: func value => #[if value then 1 else 0],
+  decode: func values =>
+    if values.length != 1:
+      return $Nothing
+    if values[0] == 0:
+      return $Some false
+    if values[0] == 1:
+      return $Some true
+    return $Nothing
 }
 
 // Each array element is length-framed so a nested codec can have any width.
-func sequence_encode (values: Array a): Array U32 where { Codec a } => return do:
-  let out: List U32 = [values.length]
+func sequence_encode (values: #[a]): #[U32] where { Codec a } =>
+  let out: #[+U32] = #[values.length]
   for value in values:
     let payload = encode value
-    out := [...self, payload.length]
+    @storage.push out payload.length
     for word in payload:
-      out := [...self, word]
-  break Array.from_list out
-func sequence_decode (words: Array U32): Maybe (Array a) where { Codec a } => return do:
+      @storage.push out word
+  return seal out
+func sequence_decode (words: #[U32]): Maybe #[a] where { Codec a } =>
   if words.length == 0:
     return $Nothing
   let count = words[0]
   let cursor = 1
-  let output: List a = []
+  let output: #[+a] = #[]
   for ignored in 0..count:
     if cursor >= words.length:
       return $Nothing
@@ -46,23 +48,23 @@ func sequence_decode (words: Array U32): Maybe (Array a) where { Codec a } => re
     let decoded: Maybe a = Codec.decode payload
     let $Some value = decoded else:
       return $Nothing
-    output := [...self, value]
+    @storage.push output value
     cursor := self + width
   if cursor != words.length:
     return $Nothing
-  break $Some (Array.from_list output)
-impl Sequence a : Codec (Array a) where { Codec a } = {
-  const encode = func values => return sequence_encode values,
-  const decode = func words => return sequence_decode words,
+  return $Some (seal output)
+const Array.Codec: Codec #[a] where { Codec a } = {
+  encode: func values => sequence_encode values,
+  decode: func words => sequence_decode words,
 }
 
 // Field framing is deliberately separate from a source declaration's order.
-func frame (field_id: U32) -> (payload: Array U32) : Array U32 => return
+func frame (field_id: U32) -> (payload: #[U32]) : #[U32] =>
   @array.concat #[field_id, payload.length] payload
-func take_field (field_id: U32) -> (words: Array U32) : Maybe (Array U32, Array U32) => return do:
+func take_field (field_id: U32) -> (words: #[U32]) : Maybe (#[U32], #[U32]) =>
   if words.length < 2 or words[0] != field_id:
     return $Nothing
   let width = words[1]
   if width > words.length - 2:
     return $Nothing
-  break $Some (@array.slice words 2 width, @array.slice words (width + 2) (words.length - width - 2))
+  return $Some (@array.slice words 2 width, @array.slice words (width + 2) (words.length - width - 2))

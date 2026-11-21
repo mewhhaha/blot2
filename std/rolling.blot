@@ -1,10 +1,10 @@
 import * as iter from "./iter"
 import * as tree from "./_summary_tree"
 
-func fold step -> initial -> (width: U32) -> values => return do:
+func fold step -> initial -> (width: U32) -> values =>
   if @u32.eq width 0:
-    break @panic "rolling requires a positive width"
-  break iter.map (iter.fold_left step initial) (iter.windows width values)
+    return panic "rolling requires a positive width"
+  return iter.map (iter.fold_left step initial) (iter.windows width values)
 
 type Monoid [i, s, f] is opaque = {
   width: U32,
@@ -13,12 +13,12 @@ type Monoid [i, s, f] is opaque = {
   identity: s,
   window: Maybe (tree.Tree s),
 }
-func monoid (combine: s -> s -> s) -> (identity: s) -> (width: U32) -> values => return do:
+func monoid (combine: s -> s -> s) -> (identity: s) -> (width: U32) -> values =>
   if @u32.eq width 0:
-    break @panic "rolling requires a positive width"
-  break $Monoid { width, cursor: values.iter, combine, identity, window: $Nothing }
-func Monoid.iter (state: Monoid [i, s, f]) => return state
-func Monoid.next (state: Monoid [i, s, f]) => return case state.window of
+    return panic "rolling requires a positive width"
+  return $Monoid { width, cursor: values.iter, combine, identity, window: $Nothing }
+func Monoid.iter (state: Monoid [i, s, f]) => state
+func Monoid.next (state: Monoid [i, s, f]) => case state.window of
   $Nothing => do:
     use result <- tree.read state.identity state.width state.cursor
     let $Some (buffer, rest) = result else:
@@ -41,12 +41,12 @@ type Group [i, s, f, g] is opaque = {
   window: Maybe (tree.Tree s),
   total: s,
 }
-func group (combine: s -> s -> s) -> (inverse: s -> s) -> (identity: s) -> (width: U32) -> values => return do:
+func group (combine: s -> s -> s) -> (inverse: s -> s) -> (identity: s) -> (width: U32) -> values =>
   if @u32.eq width 0:
-    break @panic "rolling requires a positive width"
-  break $Group { width, cursor: values.iter, combine, inverse, identity, window: $Nothing, total: identity }
-func Group.iter (state: Group [i, s, f, g]) => return state
-func Group.next (state: Group [i, s, f, g]) => return case state.window of
+    return panic "rolling requires a positive width"
+  return $Group { width, cursor: values.iter, combine, inverse, identity, window: $Nothing, total: identity }
+func Group.iter (state: Group [i, s, f, g]) => state
+func Group.next (state: Group [i, s, f, g]) => case state.window of
   $Nothing => do:
     use result <- tree.read state.identity state.width state.cursor
     let $Some (buffer, rest) = result else:
@@ -59,6 +59,6 @@ func Group.next (state: Group [i, s, f, g]) => return case state.window of
       break $Nothing
     let total = state.combine (state.combine (state.inverse (tree.first previous)) state.total) value
     let identity = state.identity
-    let unused = func left -> right => return identity
+    let unused = func left -> right => identity
     let buffer = tree.shift unused value previous
     break $Some (total, $Group { width: state.width, cursor: rest, combine: state.combine, inverse: state.inverse, identity: state.identity, window: $Some buffer, total })

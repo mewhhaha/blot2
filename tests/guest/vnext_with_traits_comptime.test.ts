@@ -8,6 +8,7 @@ Deno.test("vNext 3A: nominal traits, output types, const Type.Trait, dot-calls, 
   await compileAndRun(
     `
 type Eq a is trait = { eq: a -> a -> Bool }
+type Boxer a is trait = { wrap: a -> #[a] }
 type Mul left { right, out } is trait = { mul: left -> right -> out }
 type Collection c { item } is trait = {
   len: c -> U32,
@@ -19,6 +20,7 @@ type Vec2 is data = $Vec2 { x: U32, y: U32 }
 func Vec2.scale (v: Vec2) -> (k: U32): Vec2 => $Vec2 { x: v.x * k, y: v.y * k }
 
 const U32.Eq: Eq U32 = { eq: U32.eq }
+const U32.Boxer: Boxer U32 = { wrap: func v => #[v] }
 const U32.Mul: Mul U32 { right: U32, out: U32 } = { mul: U32.mul }
 const Vec2.Eq: Eq Vec2 = { eq: func a -> b => a.x == b.x and a.y == b.y }
 const Vec2.Mul: Mul Vec2 { right: U32, out: Vec2 } = { mul: Vec2.scale }
@@ -69,11 +71,12 @@ entry func main (): U32 =>
   let fl_grow = first_plus_len grow
   let frozen_arr: *#[U32] = freeze grow
   let eq_frozen_arr = if frozen_arr.eq frozen_arr then 1 else 0
-  return a + v2.x + v2.y + eq_vec + eq_gen + eq_dict + fl + fi + eq_shared + eq_grow + fl_grow + eq_frozen_arr
+  let boxed: #[U32] = Boxer.wrap 9
+  return a + v2.x + v2.y + eq_vec + eq_gen + eq_dict + fl + fi + eq_shared + eq_grow + fl_grow + eq_frozen_arr + boxed[0]
 `,
     (guest) => {
-      // 49 + 15 + 20 + 1 + 1 + 1 + 13 + 10 + 1 + 1 + 13 + 1 = 126
-      equal(guest.call("main", null), 126);
+      // 49 + 15 + 20 + 1 + 1 + 1 + 13 + 10 + 1 + 1 + 13 + 1 + 9 = 135
+      equal(guest.call("main", null), 135);
     },
   );
 });

@@ -11,10 +11,10 @@ Deno.test("derive renderer emits named module functions and value implementation
   assert.ok(source.includes("func Box.eq left -> right =>"));
   assert.ok(
     source.includes(
-      "func _derive_box_encode (value: (Box a)): Array U32 where",
+      "func _derive_box_encode (value: (Box a)): #[U32] where",
     ),
   );
-  assert.ok(source.includes("const eq = func left"));
+  assert.ok(source.includes("const Box.Eq: _derive_eq.Eq"));
   const frontend = await createFrontend();
   try {
     frontend.parse(source);

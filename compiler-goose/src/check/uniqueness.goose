@@ -1757,7 +1757,7 @@ fn trusted(self_: const Analyzer&, m: const Module&, binding: u32) -> bool {
     var current = binding;
     for step in 0..8 {
         if current == 0 || current >= m.bindings.len { return false; }
-        if m.bindings[current].capability_parameters.owned_results || self_.member_kind[current] == 1 { return true; }
+        if m.bindings[current].capability_parameters.owned_results || self_.member_kind[current] != 0 { return true; }
         // `const replace = array.replace` names the same function.
         if m.bindings[current].kind != blot_reuse_principal_interface::Kind.global { return false; }
         var made = m.bindings[current].initializer;

@@ -263,8 +263,8 @@ export function layout(source: string, lexer: ParserInstance) {
       }
     } else if (brokenLine) {
       const frame = frames.at(-1)!;
-      let requestClause = false;
-      if (previous.text === "=>") {
+      let arrowSuite = false;
+      if (previous.text === "=>" && token.text !== "type") {
         let first = index - 1;
         while (
           first > 0 &&
@@ -272,13 +272,12 @@ export function layout(source: string, lexer: ParserInstance) {
             source.slice(tokens[first - 1].span.end, tokens[first].span.start),
           )
         ) first--;
-        requestClause = ["effect", "complete"].includes(tokens[first].text) &&
-          !tokens.slice(first, index - 1).some((token) =>
-            ["=", "func", "=>"].includes(token.text)
-          );
+        arrowSuite = !tokens.slice(first, index - 1).some((part) =>
+          part.text === "forall" || part.text === "exists"
+        );
       }
       const suite = previous.text === ":" || previous.text === "of" ||
-        requestClause;
+        arrowSuite;
       if (suite || depth === frame.depth) {
         const width = lineIndent(token);
         if (suite) {
@@ -317,7 +316,8 @@ export function layout(source: string, lexer: ParserInstance) {
     }
     if (
       token.text === "{" && previous?.text === "=" &&
-      tokens[index - 2]?.text === "effect" &&
+      (tokens[index - 2]?.text === "effect" ||
+        tokens[index - 2]?.text === "trait") &&
       tokens[index - 3]?.text === "is"
     ) {
       effectOperationsDepth = depth + 1;

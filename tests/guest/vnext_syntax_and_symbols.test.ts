@@ -69,6 +69,13 @@ func run_counter (x: U32): U32 =>
   return do p:
     return use use_counter x
 
+func count_to (limit: U32): U32 =>
+  let i = 0
+  for ever:
+    if i >= limit:
+      return i
+    i := i + 1
+
 entry func test_add (x: U32): U32 => add x 7
 entry func test_logic (which: U32): Bool =>
   case which of
@@ -82,6 +89,7 @@ entry func test_value_case (n: U32): U32 => value_case_indented n
 entry func test_chain (start: U32): U32 => chain_ops start
 entry func test_guard (x: U32): U32 => guard_nonzero x
 entry func test_return_use (x: U32): U32 => run_counter x
+entry func test_for_ever_return (n: U32): U32 => count_to n
 `,
     (guest) => {
       equal(guest.call("test_add", 35), 42);
@@ -103,6 +111,7 @@ entry func test_return_use (x: U32): U32 => run_counter x
       equal(guest.call("test_chain", 5), 34);
       equal(guest.call("test_guard", 41), 42);
       equal(guest.call("test_return_use", 5), 15);
+      equal(guest.call("test_for_ever_return", 7), 7);
     },
   );
 });

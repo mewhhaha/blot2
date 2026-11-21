@@ -128,9 +128,26 @@ export function parserSource(
     }
     if (token.text === ".") {
       const previous = prepared.tokens[index - 1];
+      const adjacent = previous?.span.end === token.span.start;
+      let chainContinuation = false;
       if (
-        previous?.span.end !== token.span.start ||
-        !/[a-zA-Z0-9_\])}]/.test(prepared.source[token.span.start - 1] ?? "")
+        !adjacent && previous &&
+        /[\r\n]/.test(
+          prepared.source.slice(previous.span.end, token.span.start),
+        )
+      ) {
+        chainContinuation = (previous.type === "named" && (
+          previous.kind === "IDENT" || previous.kind === "TYPE_IDENT" ||
+          previous.kind === "INTEGER" || previous.kind === "FLOAT" ||
+          previous.kind === "STRING"
+        )) ||
+          ["true", "false", ")", "]", "}", "\uE002"].includes(previous.text);
+      }
+      if (
+        !chainContinuation && (
+          !adjacent ||
+          !/[a-zA-Z0-9_\])}]/.test(prepared.source[token.span.start - 1] ?? "")
+        )
       ) replace(token.span.start, token.span.end, "·");
     }
   }

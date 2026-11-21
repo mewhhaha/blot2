@@ -1,150 +1,151 @@
-func generate count -> generator => return @array.generate count generator
-func fill count -> value => return @array.fill count value
-func length values => return values.length
-func is_empty values => return values.length == 0
+func generate count -> generator => @array.generate count generator
+func fill count -> value => @array.fill count value
+func length values => values.length
+func is_empty values => values.length == 0
 
 // at and replace trap on an invalid index; get and set return Nothing instead.
-func at index -> values => return values.at index
-func replace index -> value -> values => return @array.set values index value
+func at index -> values => values.at index
+func replace index -> value -> values => @array.set values index value
 
 func get index -> values => return
   if index < values.length then $Some (values.at index) else $Nothing
-func set index -> value -> values => return Array.set values index value
+func set index -> value -> values => Array.set values index value
 
 func map transform -> values => return
-  generate values.length (func index => return transform (values.at index))
+  generate values.length (func index => transform (values.at index))
 
 // start/count, followed by the collection, like at/get/replace/set above.
-func slice start -> count -> values => return do:
+func slice start -> count -> values =>
   if start > values.length or count > values.length - start:
-    @panic "array slice out of bounds"
-  return generate count (func index => return values.at (start + index))
+    panic "array slice out of bounds"
+  return generate count (func index => values.at (start + index))
 
 // Inclusive U32 scan into one independent destination.
-func prefix_sums (values: Array U32) : Array U32 => return do:
-  let result: Array U32 = fill values.length 0
+func prefix_sums (values: #[U32]) : #[U32] =>
+  let result: #[U32] = fill values.length 0
   let total = 0
   for index in 0..values.length:
     total := self + values[index]
     result[index] := total
-  break result
+  return result
 
 // One traversal; append into an owner whose growth capability is consumed.
-func indices (keep: Array Bool) => return do:
-  let selected: GrowArray U32 = #[]
+func indices (keep: #[Bool]) =>
+  let selected: #[+U32] = #[]
   for index in 0..keep.length:
     if keep[index]:
       @storage.push selected index
-  break @storage.freeze selected
+  return seal selected
 
-func filter (predicate: a -> Bool) -> values => return do:
-  let selected: GrowArray a = #[]
+func filter (predicate: a -> Bool) -> values =>
+  let selected: #[+a] = #[]
   for index in 0..values.length:
     let value = values.at index
     if predicate value:
       @storage.push selected value
-  break @storage.freeze selected
+  return seal selected
 
-func filter_map (transform: a -> Maybe b) -> values => return do:
-  let selected: GrowArray b = #[]
+func filter_map (transform: a -> Maybe b) -> values =>
+  let selected: #[+b] = #[]
   for index in 0..values.length:
     let value = values.at index
     let candidate = transform value
     if let $Some result = candidate:
       @storage.push selected result
-  break @storage.freeze selected
+  return seal selected
 
 // Append readable elements in source order into the caller's named owner.
-func append_into (destination: GrowArray a) -> source => return do:
+func append_into (destination: #[+a]) -> source =>
   for index in 0 .. source.length:
     destination.push (source.at index)
+  return ()
 
 // Ranges name one separately owned readable payload. Validate every range and
 // the combined length before constructing an independent flat result.
 // Reader form binds the result element type without exposing private evidence.
-func flatten_read (read: U32 -> a) -> (length: U32) -> ranges => return do:
+func flatten_read (read: U32 -> a) -> (length: U32) -> ranges =>
   let total = 0
   for index in 0 .. ranges.length:
     let range = ranges.at index
     if range.start > length or range.count > length - range.start:
-      @panic "array flatten range out of bounds"
+      panic "array flatten range out of bounds"
     let next = total + range.count
     if next < total:
-      @panic "array flatten length overflow"
+      panic "array flatten length overflow"
     total := next
-  let result: GrowArray a = #[]
+  let result: #[+a] = #[]
   for index in 0 .. ranges.length:
     let range = ranges.at index
     for offset in 0 .. range.count:
       result.push (read (range.start + offset))
-  return @storage.freeze result
+  return seal result
 func flatten ranges -> payload => return
-  flatten_read (func (index: U32) => return payload.at index) payload.length ranges
+  flatten_read (func (index: U32) => payload.at index) payload.length ranges
 
-func concat left -> right : Array a => return do:
+func concat left -> right : #[a] =>
   let left_count: U32 = left.length
   let right_count: U32 = right.length
   let count: U32 = left_count + right_count
   if count < left_count:
-    @panic "array concatenation length overflow"
-  let read_left: U32 -> a = func (index: U32) : a => return left.at index
-  let read_right: U32 -> a = func (index: U32) : a => return right.at index
+    panic "array concatenation length overflow"
+  let read_left: U32 -> a = func (index: U32) : a => left.at index
+  let read_right: U32 -> a = func (index: U32) : a => right.at index
   return generate count (func (index: U32) : a => return
     if index < left_count then read_left index else read_right (index - left_count))
 
 // Explicitly copy any readable collection, including a borrowed view.
-func push (value: a) -> values : Array a => return do:
+func push (value: a) -> values : #[a] =>
   let count: U32 = values.length
   if count == 0xFFFFFFFF:
-    @panic "array append length overflow"
-  let read: U32 -> a = func (index: U32) : a => return values.at index
-  return generate (count + 1) (func (index: U32) : a => return if index == count then value else read index)
+    panic "array append length overflow"
+  let read: U32 -> a = func (index: U32) : a => values.at index
+  return generate (count + 1) (func (index: U32) : a => if index == count then value else read index)
 
 // zip stops at the end of the shorter input.
 func zip left -> right => return
-  generate (min left.length right.length) (func index => return (left.at index, right.at index))
+  generate (min left.length right.length) (func index => (left.at index, right.at index))
 
-func unzip values => return do:
-  let left = map (func pair => return do:
+func unzip values =>
+  let left = map (func pair =>
     let (left, _) = pair
-    break left) values
-  let right = map (func pair => return do:
+    return left) values
+  let right = map (func pair =>
     let (_, right) = pair
-    break right) values
-  break (left, right)
+    return right) values
+  return (left, right)
 
-func unzip3 values => return do:
-  let first = map (func triple => return do:
+func unzip3 values =>
+  let first = map (func triple =>
     let (value, _, _) = triple
-    break value) values
-  let second = map (func triple => return do:
+    return value) values
+  let second = map (func triple =>
     let (_, value, _) = triple
-    break value) values
-  let third = map (func triple => return do:
+    return value) values
+  let third = map (func triple =>
     let (_, _, value) = triple
-    break value) values
-  break (first, second, third)
+    return value) values
+  return (first, second, third)
 
-func fold_left reduce -> initial -> values => return do:
+func fold_left reduce -> initial -> values =>
   let state = initial
   for index in 0..values.length:
     let value = values.at index
     use next <- reduce state value
     state := next
-  break state
+  return state
 
-func any predicate -> values => return do:
+func any predicate -> values =>
   for index in 0..values.length:
     let value = values.at index
     use found <- predicate value
     if found:
-      break true
-  break false
+      return true
+  return false
 
-func all predicate -> values => return do:
+func all predicate -> values =>
   for index in 0..values.length:
     let value = values.at index
     use accepted <- predicate value
-    if Bool.not accepted:
-      break false
-  break true
+    if not accepted:
+      return false
+  return true

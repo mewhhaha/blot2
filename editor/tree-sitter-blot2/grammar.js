@@ -247,7 +247,7 @@ export default grammar({
     // Highlight the contextual clause without treating `where` as a global
     // keyword: `const where` and `func where =>` remain ordinary identifiers.
     where_clause: ($) => prec(4, seq("where", $.braced)),
-    contract_header: ($) => prec(4, seq("is", "contract", "=")),
+    contract_header: ($) => prec(4, seq("is", choice("contract", "trait"), "=")),
     opaque_header: ($) => prec(4, seq("is", "opaque", "=")),
     implementation_header: ($) =>
       prec(
@@ -314,7 +314,8 @@ export default grammar({
     forward_break: (_) => seq("break", alias(token(/\$[ \t]+/), "$")),
 
     constructor_marker: (_) => prec(-1, "$"),
-    staging_marker: (_) => token(prec(3, choice("#run", "#do"))),
+    staging_marker: (_) =>
+      token(prec(3, choice("#run", "#do", "#for", "#if", "#else", "#fields", "#variants"))),
     constructor_reference: ($) =>
       prec.right(
         2,
@@ -406,7 +407,7 @@ export default grammar({
       ),
     type_identifier: (_) => /[A-Z][A-Za-z0-9_]*/,
     operator: (_) =>
-      choice("and", "or", "$", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
+      choice("and", "or", "not", "$", ":=", "=>", "..", /[+\-*\/%=!<>|&^~?$]+/),
     separator: (_) => choice(":", ",", ";"),
     keyword: (_) =>
       choice(
@@ -423,6 +424,13 @@ export default grammar({
         "use",
         "rec",
         "do",
+        "fork",
+        "with",
+        "own",
+        "freeze",
+        "seal",
+        "copy",
+        "panic",
         "return",
         "yield",
         "if",

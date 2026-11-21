@@ -11,36 +11,36 @@ private type Node s is data =
   }
 type Tree s is opaque = Node s
 
-private func node_length (node: Node s) : U32 => return case node of
+private func node_length (node: Node s) : U32 => case node of
   $Empty => 0
   $Leaf _ => 1
   $Branch { length } => length
-private func node_height (node: Node s) : U32 => return case node of
+private func node_height (node: Node s) : U32 => case node of
   $Empty => 0
   $Leaf _ => 1
   $Branch { height } => height
-private func node_total identity -> (node: Node s) => return case node of
+private func node_total identity -> (node: Node s) => case node of
   $Empty => identity
   $Leaf value => value
   $Branch { total } => total
-private func nonempty_total (node: Node s) => return case node of
-  $Empty => @panic "empty summary branch"
+private func nonempty_total (node: Node s) => case node of
+  $Empty => panic "empty summary branch"
   $Leaf value => value
   $Branch { total } => total
 
-private func branch (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func branch (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s =>
   if @u32.eq (node_length left) 0:
-    break right
+    return right
   if @u32.eq (node_length right) 0:
-    break left
+    return left
   let left_length = node_length left
   let right_length = node_length right
   if U32.gt right_length (@u32.sub 4294967295 left_length):
-    break @panic "summary length overflow"
+    return panic "summary length overflow"
   let height = node_height left
   if U32.gt (node_height right) height:
     height := node_height right
-  break $Branch {
+  return $Branch {
     length: @u32.add left_length right_length,
     height: @u32.add height 1,
     total: combine (nonempty_total left) (nonempty_total right),
@@ -49,98 +49,98 @@ private func branch (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) 
   }
 
 // Joining descends the taller boundary spine, then restores AVL balance.
-private func balance (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func balance (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s =>
   if U32.gt (node_height left) (@u32.add (node_height right) 1):
     let $Branch { left: far, right: near } = left else:
-      break @panic "invalid summary height"
+      return panic "invalid summary height"
     if U32.ge (node_height far) (node_height near):
-      break branch combine far (branch combine near right)
+      return branch combine far (branch combine near right)
     let $Branch { left: middle_left, right: middle_right } = near else:
-      break @panic "invalid summary height"
-    break branch combine (branch combine far middle_left) (branch combine middle_right right)
+      return panic "invalid summary height"
+    return branch combine (branch combine far middle_left) (branch combine middle_right right)
   if U32.gt (node_height right) (@u32.add (node_height left) 1):
     let $Branch { left: near, right: far } = right else:
-      break @panic "invalid summary height"
+      return panic "invalid summary height"
     if U32.ge (node_height far) (node_height near):
-      break branch combine (branch combine left near) far
+      return branch combine (branch combine left near) far
     let $Branch { left: middle_left, right: middle_right } = near else:
-      break @panic "invalid summary height"
-    break branch combine (branch combine left middle_left) (branch combine middle_right far)
-  break branch combine left right
+      return panic "invalid summary height"
+    return branch combine (branch combine left middle_left) (branch combine middle_right far)
+  return branch combine left right
 
-private func join (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s => return do:
+private func join (combine: s -> s -> s) -> (left: Node s) -> (right: Node s) : Node s =>
   if @u32.eq (node_length left) 0:
-    break right
+    return right
   if @u32.eq (node_length right) 0:
-    break left
+    return left
   if U32.gt (node_height left) (@u32.add (node_height right) 1):
     let $Branch { left: far, right: near } = left else:
-      break @panic "invalid summary height"
-    break balance combine far (join combine near right)
+      return panic "invalid summary height"
+    return balance combine far (join combine near right)
   if U32.gt (node_height right) (@u32.add (node_height left) 1):
     let $Branch { left: near, right: far } = right else:
-      break @panic "invalid summary height"
-    break balance combine (join combine left near) far
-  break branch combine left right
+      return panic "invalid summary height"
+    return balance combine (join combine left near) far
+  return branch combine left right
 
-private func drop_first (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
-  $Empty => @panic "summary index out of bounds"
+private func drop_first (combine: s -> s -> s) -> (node: Node s) : Node s => case node of
+  $Empty => panic "summary index out of bounds"
   $Leaf _ => $Empty
   $Branch { left, right } => join combine (drop_first combine left) right
 
 // Buffer a complete first window before running any user reducer. Incomplete
 // input never computes a summary and is never polled after its first end.
-private func read_nodes (identity: s) -> (count: U32) -> (cursor: i) : Maybe (Node s, i) => return do:
+private func read_nodes (identity: s) -> (count: U32) -> (cursor: i) : Maybe (Node s, i) =>
   if @u32.eq count 0:
-    break $Some ($Empty, cursor)
+    return $Some ($Empty, cursor)
   if @u32.eq count 1:
     use step <- cursor.next
     let $Some (value, rest) = step else:
-      break $Nothing
-    break $Some ($Leaf value, rest)
+      return $Nothing
+    return $Some ($Leaf value, rest)
   let half = @u32.div count 2
   use first <- read_nodes identity half cursor
   let $Some (left, middle) = first else:
-    break $Nothing
+    return $Nothing
   use last <- read_nodes identity (@u32.sub count half) middle
   let $Some (right, rest) = last else:
-    break $Nothing
+    return $Nothing
   let height = node_height left
   if U32.gt (node_height right) height:
     height := node_height right
-  break $Some ($Branch { length: count, height: @u32.add height 1, total: identity, left, right }, rest)
+  return $Some ($Branch { length: count, height: @u32.add height 1, total: identity, left, right }, rest)
 
-private func reduced (combine: s -> s -> s) -> (node: Node s) : Node s => return case node of
+private func reduced (combine: s -> s -> s) -> (node: Node s) : Node s => case node of
   $Empty => $Empty
   $Leaf value => $Leaf value
   $Branch { left, right } => branch combine (reduced combine left) (reduced combine right)
-private func folded step -> initial -> (node: Node s) => return case node of
+private func folded step -> initial -> (node: Node s) => case node of
   $Empty => initial
   $Leaf value => step initial value
   $Branch { left, right } => do:
     use accumulated <- folded step initial left
     break folded step accumulated right
 
-func length ($Tree node) => return node_length node
-func total identity -> ($Tree node) => return node_total identity node
-func read identity -> count -> cursor => return do:
+func length ($Tree node) => node_length node
+func total identity -> ($Tree node) => node_total identity node
+func read identity -> count -> cursor =>
   use result <- read_nodes identity count cursor
   let $Some (node, rest) = result else:
-    break $Nothing
-  break $Some ($Tree node, rest)
-func reduce (combine: s -> s -> s) -> ($Tree node) => return $Tree (reduced combine node)
-func fold step -> initial -> ($Tree node) => return folded step initial node
-private func first_node (node: Node s) : s => return case node of
-  $Empty => @panic "summary index out of bounds"
+    return $Nothing
+  return $Some ($Tree node, rest)
+func reduce (combine: s -> s -> s) -> ($Tree node) => $Tree (reduced combine node)
+func fold step -> initial -> ($Tree node) => folded step initial node
+private func first_node (node: Node s) : s => case node of
+  $Empty => panic "summary index out of bounds"
   $Leaf value => value
   $Branch { left } => first_node left
-func first ($Tree node) => return first_node node
-func shift (combine: s -> s -> s) -> value -> ($Tree node) => return $Tree (join combine (drop_first combine node) ($Leaf value))
+func first ($Tree node) => first_node node
+func shift (combine: s -> s -> s) -> value -> ($Tree node) => $Tree (join combine (drop_first combine node) ($Leaf value))
 
 // Equal-height runs merge once per internal node. The forest has at most
 // 32 entries for a U32 length, and its final joins preserve source order.
 private type Forest s is data = $Done | $More (Node s, Forest s)
-func build (combine: s -> s -> s) -> values => return do:
+func build (combine: s -> s -> s) -> values =>
   let forest: Forest s = $Done
   use cursor <- values.iter
   for ever:
@@ -152,7 +152,7 @@ func build (combine: s -> s -> s) -> values => return do:
     for ever:
       let $More (previous, rest) = forest else:
         break
-      if Bool.not (@u32.eq (node_height previous) (node_height node)):
+      if not (@u32.eq (node_height previous) (node_height node)):
         break
       forest := rest
       node := branch combine previous node
@@ -163,27 +163,27 @@ func build (combine: s -> s -> s) -> values => return do:
       break
     node := join combine previous self
     forest := rest
-  break $Tree node
+  return $Tree node
 
-private func get_node (index: U32) -> (node: Node s) : s => return case node of
-  $Empty => @panic "summary index out of bounds"
+private func get_node (index: U32) -> (node: Node s) : s => case node of
+  $Empty => panic "summary index out of bounds"
   $Leaf value => value
   $Branch { left, right } => do:
     if @u32.lt index (node_length left):
       break get_node index left
     break get_node (@u32.sub index (node_length left)) right
-func get (index: U32) -> ($Tree node) => return do:
-  if Bool.not (@u32.lt index (node_length node)):
-    break @panic "summary index out of bounds"
-  break get_node index node
+func get (index: U32) -> ($Tree node) =>
+  if not (@u32.lt index (node_length node)):
+    return panic "summary index out of bounds"
+  return get_node index node
 
-private func query_node (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> (node: Node s) : s => return do:
+private func query_node (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> (node: Node s) : s =>
   if @u32.eq count 0:
-    break identity
+    return identity
   if @u32.eq start 0:
     if @u32.eq count (node_length node):
-      break nonempty_total node
-  break case node of
+      return nonempty_total node
+  return case node of
     $Empty => identity
     $Leaf value => value
     $Branch { left, right } => do:
@@ -194,23 +194,23 @@ private func query_node (combine: s -> s -> s) -> identity -> (start: U32) -> (c
       if U32.le count left_count:
         break query_node combine identity start count left
       break combine (query_node combine identity start left_count left) (query_node combine identity 0 (@u32.sub count left_count) right)
-func query (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> ($Tree node) => return do:
+func query (combine: s -> s -> s) -> identity -> (start: U32) -> (count: U32) -> ($Tree node) =>
   let size = node_length node
   if U32.gt start size:
-    break @panic "summary range out of bounds"
+    return panic "summary range out of bounds"
   if U32.gt count (@u32.sub size start):
-    break @panic "summary range out of bounds"
-  break query_node combine identity start count node
+    return panic "summary range out of bounds"
+  return query_node combine identity start count node
 
-private func set_node (combine: s -> s -> s) -> (index: U32) -> value -> (node: Node s) : Node s => return case node of
-  $Empty => @panic "summary index out of bounds"
+private func set_node (combine: s -> s -> s) -> (index: U32) -> value -> (node: Node s) : Node s => case node of
+  $Empty => panic "summary index out of bounds"
   $Leaf _ => $Leaf value
   $Branch { left, right } => do:
     if @u32.lt index (node_length left):
       break branch combine (set_node combine index value left) right
     break branch combine left (set_node combine (@u32.sub index (node_length left)) value right)
-func set (combine: s -> s -> s) -> (index: U32) -> value -> ($Tree node) => return do:
-  if Bool.not (@u32.lt index (node_length node)):
-    break @panic "summary index out of bounds"
-  break $Tree (set_node combine index value node)
-func concat (combine: s -> s -> s) -> ($Tree left) -> ($Tree right) => return $Tree (join combine left right)
+func set (combine: s -> s -> s) -> (index: U32) -> value -> ($Tree node) =>
+  if not (@u32.lt index (node_length node)):
+    return panic "summary index out of bounds"
+  return $Tree (set_node combine index value node)
+func concat (combine: s -> s -> s) -> ($Tree left) -> ($Tree right) => $Tree (join combine left right)

@@ -128,12 +128,30 @@ function typeArgument(type: string): string {
   return /^[A-Za-z_][A-Za-z_0-9]*$/.test(type) ? type : `(${type})`;
 }
 
+function unwrapArrayType(type: string): string | undefined {
+  if (type.startsWith("Array ")) return type.slice("Array ".length);
+  if (type.startsWith("#[") && type.endsWith("]")) {
+    const inner = type.slice(2, -1).trim();
+    if (inner.startsWith("+") || inner.startsWith("~")) {
+      return inner.slice(1).trim();
+    }
+    return inner;
+  }
+  return undefined;
+}
+
 function requirements(shape: DeriveShape, contract: string): string {
   const required = new Set(shape.parameters);
   for (const constructor of shape.constructors) {
     for (const field of constructor.fields) {
       let type = field.type;
-      while (type.startsWith("Array ")) type = type.slice("Array ".length);
+      for (
+        let inner = unwrapArrayType(type);
+        inner;
+        inner = unwrapArrayType(type)
+      ) {
+        type = inner;
+      }
       if (
         shape.parameters.some((name) => new RegExp(`\\b${name}\\b`).test(type))
       ) required.add(type);
@@ -149,9 +167,9 @@ function requirements(shape: DeriveShape, contract: string): string {
 }
 
 function formatField(type: string, value: string): string {
-  if (!type.startsWith("Array ")) return `_derive_text.format ${value}`;
-  const inner = type.slice("Array ".length);
-  return `_derive_text.join "" #["[", _derive_text.join ", " (@array.generate ${value}.length (func index => return ${
+  const inner = unwrapArrayType(type);
+  if (!inner) return `_derive_text.format ${value}`;
+  return `_derive_text.join "" #["[", _derive_text.join ", " (@array.generate ${value}.length (func index => ${
     formatField(inner, `${value}[index]`)
   })), "]"]`;
 }
@@ -183,46 +201,38 @@ export function deriveEqualityAndDebug(
       pattern(constructor, "r")
     } =>`;
     if (!constructor.fields.length) return [`${head} true`];
-    const lines = [`${head} do:`];
+    const lines = [head];
     constructor.fields.forEach((field, index) => {
-      if (field.type.startsWith("Array ")) {
+      if (unwrapArrayType(field.type)) {
         lines.push(
           `    if l${index}.length != r${index}.length:`,
-          `      break false`,
+          `      return false`,
           `    let same${index} = true`,
           `    for index${index} in 0..l${index}.length:`,
-          `      if Bool.not (_derive_eq.Eq.eq l${index}[index${index}] r${index}[index${index}]):`,
+          `      if not (_derive_eq.Eq.eq l${index}[index${index}] r${index}[index${index}]):`,
           `        same${index} := false`,
-          `    if Bool.not same${index}:`,
-          `      break false`,
+          `    if not same${index}:`,
+          `      return false`,
         );
       } else {
         lines.push(
-          `    if Bool.not (_derive_eq.Eq.eq l${index} r${index}):`,
-          `      break false`,
+          `    if not (_derive_eq.Eq.eq l${index} r${index}):`,
+          `      return false`,
         );
       }
     });
-    lines.push(`    break true`);
+    lines.push(`    return true`);
     return lines;
   });
   const eq = [
-    `func ${shape.name}.eq left -> right => return case left, right of`,
+    `func ${shape.name}.eq left -> right => case left, right of`,
     ...eqArms,
     `  _, _ => false`,
   ].join("\n");
-  const parameter = shape.parameters.length === 0
-    ? ""
-    : shape.parameters.length === 1
-    ? ` ${shape.parameters[0]}`
-    : ` [${shape.parameters.join(", ")}]`;
   const requirement = requirements(shape, "_derive_text.Format");
-  const equality =
-    `impl ${shape.name}DerivedEquality${parameter} : _derive_eq.Eq ${
-      typeHead(shape)
-    }${
-      requirements(shape, "_derive_eq.Eq")
-    } = { const eq = func left => return func right => return ${shape.name}.eq left right }`;
+  const equality = `const ${shape.name}.Eq: _derive_eq.Eq ${typeHead(shape)}${
+    requirements(shape, "_derive_eq.Eq")
+  } = { eq: func left -> right => ${shape.name}.eq left right }`;
   const formatArms = shape.constructors.map((constructor) => {
     const labels = constructor.fields.flatMap((field, index) => [
       JSON.stringify(`${index === 0 ? "(" : ", "}${field.name}=`),
@@ -235,10 +245,10 @@ export function deriveEqualityAndDebug(
     }]`;
   });
   const format = [
-    `impl ${shape.name}DerivedFormat${parameter} : _derive_text.Format ${
+    `const ${shape.name}.Format: _derive_text.Format ${
       typeHead(shape)
     }${requirement} = {`,
-    `  const format = func value => return case value of`,
+    `  format: func value => case value of`,
     ...formatArms,
     `}`,
   ].join("\n");
@@ -362,7 +372,7 @@ export function deriveCodec(
   const encodeName = `_derive_${shape.name.toLowerCase()}_encode`;
   const encodeArms = plans.flatMap(
     ({ constructor, variant, fields, fixed }) => {
-      const lines = [`  ${pattern(constructor, "v")} => do:`];
+      const lines = [`  ${pattern(constructor, "v")} =>`];
       if (fixed) {
         const words: (string | number)[] = [
           schema.version,
@@ -372,19 +382,19 @@ export function deriveCodec(
         for (const f of fields) {
           words.push(f.id, 1, `${f.scalar!.encode} v${f.index}`);
         }
-        lines.push(`    break #[${words.join(", ")}]`);
+        lines.push(`    return #[${words.join(", ")}]`);
         return lines;
       }
       for (const field of fields) {
-        if (field.type.startsWith("Array ")) {
+        if (unwrapArrayType(field.type)) {
           lines.push(
-            `    let collected${field.index}: List U32 = [v${field.index}.length]`,
+            `    let collected${field.index}: #[+U32] = #[v${field.index}.length]`,
             `    for item${field.index} in v${field.index}:`,
             `      let item_words${field.index} = _derive_codec.encode item${field.index}`,
-            `      collected${field.index} := [...self, item_words${field.index}.length]`,
+            `      @storage.push collected${field.index} item_words${field.index}.length`,
             `      for word${field.index} in item_words${field.index}:`,
-            `        collected${field.index} := [...self, word${field.index}]`,
-            `    let payload${field.index} = Array.from_list collected${field.index}`,
+            `        @storage.push collected${field.index} word${field.index}`,
+            `    let payload${field.index} = seal collected${field.index}`,
           );
         } else {lines.push(
             `    let payload${field.index} = _derive_codec.encode v${field.index}`,
@@ -413,21 +423,16 @@ export function deriveCodec(
           lines.push(`    cursor := self + 2 + payload${f.index}.length`);
         }
       });
-      lines.push("    break out");
+      lines.push("    return out");
       return lines;
     },
   );
-  const parameter = shape.parameters.length === 0
-    ? ""
-    : shape.parameters.length === 1
-    ? ` ${shape.parameters[0]}`
-    : ` [${shape.parameters.join(", ")}]`;
   const requirement = requirements(shape, "_derive_codec.Codec");
   let encodeParameter = "value";
   let encodeResult = "";
   if (shape.parameters.length) {
     encodeParameter = `(value: ${typeHead(shape)})`;
-    encodeResult = `: Array U32${requirement}`;
+    encodeResult = `: #[U32]${requirement}`;
   }
   const decodeArms = plans.flatMap(
     ({ constructor, variant, fields, fixed }) => {
@@ -469,8 +474,8 @@ export function deriveCodec(
           `      let payload${position} = @array.slice words cursor width${position}`,
           `      cursor := self + width${position}`,
         );
-        if (field.type.startsWith("Array ")) {
-          const element = field.type.slice("Array ".length);
+        const element = unwrapArrayType(field.type);
+        if (element) {
           lines.push(
             `      if payload${position}.length == 0:`,
             "        return $Nothing",
@@ -478,9 +483,7 @@ export function deriveCodec(
             `      if element_count${field.index} > payload${position}.length - 1:`,
             "        return $Nothing",
             `      let cursor${field.index} = 1`,
-            `      let elements${field.index}: List ${
-              typeArgument(element)
-            } = []`,
+            `      let elements${field.index}: #[+${element}] = #[]`,
             `      for ignored${field.index} in 0..element_count${field.index}:`,
             `        if cursor${field.index} >= payload${position}.length:`,
             "          return $Nothing",
@@ -494,11 +497,11 @@ export function deriveCodec(
             } = _derive_codec.Codec.decode item_words${field.index}`,
             `        let $Some item${field.index} = item_decoded${field.index} else:`,
             "          return $Nothing",
-            `        elements${field.index} := [...self, item${field.index}]`,
+            `        @storage.push elements${field.index} item${field.index}`,
             `        cursor${field.index} := self + element_width${field.index}`,
             `      if cursor${field.index} != payload${position}.length:`,
             "        return $Nothing",
-            `      let value${field.index} = Array.from_list elements${field.index}`,
+            `      let value${field.index} = seal elements${field.index}`,
           );
         } else {lines.push(
             `      let decoded${field.index}: Maybe ${
@@ -531,19 +534,19 @@ export function deriveCodec(
     },
   );
   return [
-    `func ${encodeName} ${encodeParameter}${encodeResult} => return case value of`,
+    `func ${encodeName} ${encodeParameter}${encodeResult} => case value of`,
     ...encodeArms,
-    `impl ${shape.name}DerivedCodec${parameter} : _derive_codec.Codec ${
+    `const ${shape.name}.Codec: _derive_codec.Codec ${
       typeHead(shape)
     }${requirement} = {`,
-    `  const encode = func value => return ${encodeName} value,`,
-    "  const decode = func words => return do:",
+    `  encode: func value => ${encodeName} value,`,
+    "  decode: func words =>",
     `    if words.length < 3 or words[0] != ${schema.version}:`,
     "      return $Nothing",
     "    let tag = words[1]",
     "    let count = words[2]",
     ...decodeArms,
-    "    break $Nothing",
+    "    return $Nothing",
     "}",
     "",
   ].join("\n");

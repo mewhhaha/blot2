@@ -18,18 +18,18 @@
 ((type_header . (private_modifier) @keyword.storage.modifier) @_private_type
   (#match? @_private_type "^private[ \t]+(type|data)"))
 (where_clause "where" @keyword.control)
-(contract_header "contract" @keyword.storage.type)
+(contract_header ["contract" "trait"] @keyword.storage.type)
 (opaque_header "opaque" @keyword.storage.type)
 (implementation_header "impl" @keyword.storage.type)
 (implementation_header (private_modifier) @keyword.storage.modifier)
 ["infixl" "infixr" "infix" "prefix"] @keyword.directive
-"rec" @keyword.storage.modifier
+["rec" "own"] @keyword.storage.modifier
 ["if" "then" "else" "case" "of"] @keyword.control.conditional
 ["for" "in" "continue"] @keyword.control.repeat
 (ever_loop "ever" @keyword.control.repeat)
-["return" "break" "yield"] @keyword.control.return
+["return" "break" "yield" "panic"] @keyword.control.return
 (request_complete_header "complete" @keyword.control)
-["do" "test"] @keyword.control
+["do" "fork" "with" "freeze" "seal" "copy" "test"] @keyword.control
 
 (self) @variable.builtin
 (intrinsic) @function.builtin

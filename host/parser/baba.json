@@ -764,6 +764,60 @@
         "boundary": {
           "kind": "root"
         }
+      },
+      {
+        "rule": "type_symbol_array",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comptime_access",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "fork_statement",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "with_statement",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "with_entry",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comptime_for",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comptime_if",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "comptime_else",
+        "boundary": {
+          "kind": "root"
+        }
+      },
+      {
+        "rule": "contract_trait_or_predicate",
+        "boundary": {
+          "kind": "root"
+        }
       }
     ],
     "semantics": {
