@@ -1,48 +1,71 @@
-# Blot design direction
+# Blot Design Direction
 
-The [language guide](docs/language/guide.md), the compiler's recorded
-references and guest tests, and `std/` describe the executable language. This document records the intent behind the
-current work; [CONTINUE.md](CONTINUE.md) records what has actually been
-qualified.
+Blot is a pure, value-semantic, data-oriented language that compiles directly to
+WebAssembly through a single handwritten compiler in Goose
+([compiler-goose/](compiler-goose/README.md)). Deno hosts the CLI, project
+client, formatter, and Wasm runtime adapter.
 
-Blot compiles to WebAssembly through one handwritten compiler, written in
-Goose. Semantic
-checking, compile-time evaluation and Wasm emission belong there. The Deno and
-Tree-sitter parsers serve source tools and editor highlighting.
+The authoritative target language is [docs/language/spec.md](docs/language/spec.md).
+[docs/language/guide.md](docs/language/guide.md) documents what the current
+compiler executes during migration, [CONTINUE.md](CONTINUE.md) records the
+latest qualified runtime checkpoints, and
+[docs/compiler/VNEXT_ROADMAP.md](docs/compiler/VNEXT_ROADMAP.md) tracks the
+compiler pruning and vNext implementation plan.
 
-The language combines inferred types and effect rows, ordinary generic
-functions, pattern matching, nominal types, statically selected associated
-operations and compile-time evaluation. Runtime values retain their snapshot
-meaning across rebinding. Mutation is explicit in named storage; borrowing and
-copying expose its lifetime and cost.
+## Core Philosophy
 
-Primitive `and`/`or` short-circuit; ordinary Unit callbacks express other
-deferred work. Memoized `~` parameters/types are retired. Immutable `List T`
-remains a build/concat/traverse collection;
-[packed sequences](docs/compiler/PACKED_SEQUENCES.md) are the next
-representation pilot. Arrays retain indexed mutation.
+1. **Pure shadowing (`let` / `:=` + `self`) + static linearity.** Every value is
+   logically immutable. `let` always binds new names; `:=` evolves existing
+   bindings, disjoint record paths, and loop/branch carries while reusing linear
+   memory in place—including typestate transitions (`seal`, `freeze`) and
+   same-shape sum-type reuse (FBIP).
+2. **Intrinsics are symbols; user types are names.**
+   - Arrays encode length-stability and bounds-check guarantees directly in
+     symbols: `#[T]` (fixed), `#[+T]` (grow-only; indices never invalidate),
+     `#[~T]` (resizable), and `#[n; T]` (linked lengths across fields and
+     parameters). Borrowed read-only `#[T]` accepts all array modes.
+   - Frozen/shared values use `*T` (`O(1)` `freeze`, freely aliasable; explicit
+     `copy` to obtain a linear editable clone; zero refcount overhead on linear
+     code).
+3. **No borrow-checker lifetimes, no hidden `O(n)` copies.**
+   Read borrows are lexical. Ownership transfers explicitly with `own`. When
+   timelines diverge, code explicitly picks `copy` (eager `O(n)`), `freeze`
+   (`O(1)` immutable `*T`), or `fork x:` (`O(edits)` inner lexical shadowing via
+   scratch undo log).
+4. **Curried `a -> b -> c` with 2A/2B callables.**
+   Saturated calls emit direct Wasm calls. Downward partial applications and
+   capturing lambdas are templated at zero cost and cannot escape. Storable
+   `A -> B` values are 4-byte capture-free function pointers; storable capturing
+   closures use `*(A -> B)` via `freeze` and capture only inline or `*T` values.
+5. **Simple, visible effects and zero-macro metaprogramming.**
+   - `use x <- call` / `use call` / `return use call` keep pure regions visually
+     distinct and reorderable. Templated downward callbacks eliminate open
+     effect-row variables (`! {| e}`). Scoped `with` handlers may capture locals,
+     forward `Foreign`, and linearly shadow outer locals—replacing built-in
+     `State`.
+   - Traits are compile-time nominal records (`type X is trait`, `const T.Trait`,
+     no `impl`, no runtime dictionaries).
+   - `#run expr` evaluates pure compile-time values and declared build inputs;
+     body-only typed `#for` / `#if` over `#fields t` and `#variants t` replaces
+     untyped `#quote` and hand-written codecs while keeping module interfaces
+     100% parseable.
 
-The target memory model uses named owners, invocation-local borrows, inline
-scalar/record layouts and explicit copies. Host and worker boundaries exchange
-copied packets. Keep small values simple and remove representation work before
-adding optimizer machinery. The older counted backend remains live until
-[task 120](tasks/120-retire-counted-storage-and-language-tasks.md) completes.
+## Performance & Compiler Targets
 
-Compilation and edit-to-running-game latency are primary product requirements.
-Prefer shared semantic shapes and bounded analysis over repeatedly expanding
-physical values. Any optimization must preserve checked authority, effect order,
-trap behavior, numerical bits and real application budgets.
+Compilation and edit-to-running-game latency are primary product requirements:
 
-Ordinary `#run` functions can read declared build inputs, build lookup tables
-and return a function that closes over the resulting data. The public
-declaration supplies the name. Reflection and quotation-based code generation
-remain open. Binary operators select an implementation on the left operand.
-The export-signature experiment checks written public contracts while letting
-private helpers infer.
-Language tasks are retired from the target model; isolated host workers remain.
+- **Sub-second fresh builds**, **<100ms retained edits**, and **1–2 MB** Gdev
+  Wasm, scaling toward **50k–1M LOC/s**.
+- **Delete complexity before optimizing.** Pruning retired academic features
+  (packages, numeric proofs, usage contracts, capability lifetimes, typed
+  staging, row polymorphism, escaping closure environments, `List`, `=`, `lent`,
+  and the legacy counted backend) shrinks `compiler-goose/` from ~71k LOC toward
+  ~22–28k LOC and makes module interfaces parse-only.
+- **One meaning per program.** Every optimization must preserve wrapping integer
+  arithmetic, IEEE 754 float bits, trap order, effect order, and real
+  application budgets.
 
-The earlier proposal catalogue is available in the
-[pinned design history](https://github.com/mewhhaha/blot2/blob/541ff890f1df53b5fe8572bd7f2bc41230f2fddb/DESIGN.md).
-Its alternative spellings and unsettled choices do not override the current
-language guide or ownership contract. Active requirements remain in
-[PLAN.md](PLAN.md) and [the rewrite tasks](tasks/STORAGE_REWRITE.md).
+Historical proposals remain pinned in Git history (`541ff890`). Active compiler
+pruning and rollout phases live in
+[docs/compiler/VNEXT_ROADMAP.md](docs/compiler/VNEXT_ROADMAP.md) and
+[PLAN.md](PLAN.md).
