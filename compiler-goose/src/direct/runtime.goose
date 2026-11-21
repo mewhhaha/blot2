@@ -17,6 +17,8 @@ let entry_generation: u32 = 12;
 let frozen_flag: u32 = 0x80000000;
 let heap_flag: u32 = 0x40000000;
 let capacity_mask: u32 = 0x3fffffff;
+// Speculative fork undo journal budget (2 MiB, allocated only when a module uses `fork`).
+let undo_bytes: u32 = 2097152;
 
 // Defaults: 65536 owners, 4 MiB persistent, 8 MiB stack, 32 MiB heap, 2 MiB transport.
 struct Budgets {
@@ -38,16 +40,21 @@ struct Layout {
     heap_end: u32 = 0,
     transport_base: u32 = 0,
     transport_end: u32 = 0,
+    undo_base: u32 = 0,
+    undo_end: u32 = 0,
     total: u32 = 0
 }
 // `Layout.init` in the Zig source.
-fn init(budgets: Budgets) -> Layout {
+fn init(budgets: Budgets) -> Layout { return initWithFork(budgets, false); }
+fn initWithFork(budgets: Budgets, has_fork: bool) -> Layout {
     let owner_table: u32 = 1024;
     let persistent_base = owner_table + budgets.owners * entry_bytes;
     let stack_base = persistent_base + budgets.persistent;
     let heap_base = stack_base + budgets.stack;
     let transport_base = heap_base + budgets.heap;
-    let total = transport_base + budgets.transport;
+    let transport_end = transport_base + budgets.transport;
+    var undo_end = transport_end;
+    if has_fork { undo_end = transport_end + undo_bytes; }
     return Layout {
         owner_capacity: budgets.owners,
         persistent_base: persistent_base,
@@ -57,14 +64,17 @@ fn init(budgets: Budgets) -> Layout {
         heap_base: heap_base,
         heap_end: transport_base,
         transport_base: transport_base,
-        transport_end: total,
-        total: total,
+        transport_end: transport_end,
+        undo_base: transport_end,
+        undo_end: undo_end,
+        total: undo_end,
         ..
     };
 }
 
 struct Runtime {
     layout: Layout,
+    has_fork: bool = false,
     owner_top: u32 = 0,
     persistent_bottom: u32 = 0,
     stack_pointer: u32 = 0,
@@ -74,6 +84,10 @@ struct Runtime {
     // The installed providers: the newest frame of
     // {operation id, closure slot, closure environment, previous frame}.
     effect_context: u32 = 0,
+    // Speculative `fork` state: owner slots below `fork_owner_mark` predate
+    // the active `fork` and journal writes onto `undo_sp`. Zero outside `fork`.
+    fork_owner_mark: u32 = 0,
+    undo_sp: u32 = 0,
     open: u32 = 0,
     open_persistent: u32 = 0,
     release: u32 = 0,
@@ -92,7 +106,9 @@ struct Runtime {
     persist: u32 = 0,
     allocate: u32 = 0,
     reset: u32 = 0,
-    packet_length: u32 = 0
+    packet_length: u32 = 0,
+    undo_record: u32 = 0,
+    undo_rewind: u32 = 0
 }
 
 // A helper body under construction. Every local is an i32, so `locals` counts
@@ -226,9 +242,12 @@ fn emitOpen(module: blot_direct_writer::Module&, r: const Runtime&, function: u3
 // Emits the globals and helpers. Call before any other function is added
 // only if imports are already declared (imports precede functions).
 fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
-    let layout = init(budgets);
+    return emitWithFork(module, budgets, false);
+}
+fn emitWithFork(module: blot_direct_writer::Module&, budgets: Budgets, has_fork: bool) -> Runtime {
+    let layout = initWithFork(budgets, has_fork);
     let i32t = blot_direct_writer::VT_i32;
-    var r = Runtime { layout: layout, .. };
+    var r = Runtime { layout: layout, has_fork: has_fork, .. };
     r.owner_top = blot_direct_writer::addGlobal(module, i32t, true, 1);
     r.persistent_bottom = blot_direct_writer::addGlobal(module, i32t, true, layout.owner_capacity);
     r.stack_pointer = blot_direct_writer::addGlobal(module, i32t, true, layout.stack_base);
@@ -236,6 +255,10 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
     r.persistent_top = blot_direct_writer::addGlobal(module, i32t, true, layout.persistent_base);
     r.transport_top = blot_direct_writer::addGlobal(module, i32t, true, layout.transport_base);
     r.effect_context = blot_direct_writer::addGlobal(module, i32t, true, 0);
+    if has_fork {
+        r.fork_owner_mark = blot_direct_writer::addGlobal(module, i32t, true, 0);
+        r.undo_sp = blot_direct_writer::addGlobal(module, i32t, true, layout.undo_base);
+    }
     r.open = helper(module, 3, 2);
     r.open_persistent = helper(module, 3, 2);
     r.release = helper(module, 1, 0);
@@ -255,6 +278,10 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
     r.allocate = helper(module, 1, 1);
     r.reset = helper(module, 1, 1);
     r.packet_length = helper(module, 1, 1);
+    if has_fork {
+        r.undo_record = helper(module, 2, 0);
+        r.undo_rewind = helper(module, 1, 0);
+    }
     let ot = layout.owner_table;
     emitOpen(module, r, r.open, false);
     emitOpen(module, r, r.open_persistent, true);
@@ -466,6 +493,16 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         k(h, frozen_flag);
         op(h, blot_direct_writer::OP_i32_and);
         trapIf(h);
+        if has_fork {
+            get(h, 0);
+            gget(h, r.fork_owner_mark);
+            op(h, blot_direct_writer::OP_i32_lt_u);
+            open(h, blot_direct_writer::OP_if_);
+            get(h, entry);
+            k(h, 12);
+            call(h, r.undo_record);
+            op(h, blot_direct_writer::OP_end);
+        }
         get(h, entry);
         load(h, entry_length);
         tee(h, length);
@@ -506,6 +543,12 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         get(h, capacity);
         k(h, heap_flag);
         op(h, blot_direct_writer::OP_i32_and);
+        if has_fork {
+            get(h, 0);
+            gget(h, r.fork_owner_mark);
+            op(h, blot_direct_writer::OP_i32_ge_u);
+            op(h, blot_direct_writer::OP_i32_and);
+        }
         open(h, blot_direct_writer::OP_if_);
         get(h, entry);
         load(h, entry_base);
@@ -554,6 +597,18 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         tee(h, length);
         op(h, blot_direct_writer::OP_i32_eqz);
         trapIf(h);
+        if has_fork {
+            get(h, 0);
+            gget(h, r.fork_owner_mark);
+            op(h, blot_direct_writer::OP_i32_lt_u);
+            open(h, blot_direct_writer::OP_if_);
+            get(h, entry);
+            k(h, entry_length);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 4);
+            call(h, r.undo_record);
+            op(h, blot_direct_writer::OP_end);
+        }
         get(h, entry);
         get(h, length);
         k(h, 1);
@@ -585,6 +640,18 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         load(h, entry_length);
         op(h, blot_direct_writer::OP_i32_gt_u);
         trapIf(h);
+        if has_fork {
+            get(h, 0);
+            gget(h, r.fork_owner_mark);
+            op(h, blot_direct_writer::OP_i32_lt_u);
+            open(h, blot_direct_writer::OP_if_);
+            get(h, entry);
+            k(h, entry_length);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 4);
+            call(h, r.undo_record);
+            op(h, blot_direct_writer::OP_end);
+        }
         get(h, entry);
         get(h, 2);
         store(h, entry_length);
@@ -598,6 +665,18 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         get(h, 1);
         call(h, r.check);
         tee(h, entry);
+        if has_fork {
+            get(h, 0);
+            gget(h, r.fork_owner_mark);
+            op(h, blot_direct_writer::OP_i32_lt_u);
+            open(h, blot_direct_writer::OP_if_);
+            get(h, entry);
+            k(h, entry_capacity);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 4);
+            call(h, r.undo_record);
+            op(h, blot_direct_writer::OP_end);
+        }
         get(h, entry);
         load(h, entry_capacity);
         k(h, frozen_flag);
@@ -788,6 +867,97 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
         get(h, length);
         finish(h, module, r.packet_length);
     }
+    if has_fork {
+        // undo_record(addr, bytes): save [addr..addr+bytes] onto the undo journal.
+        {
+            var h = H { parameters: 2, locals: 2, .. };
+            let aligned = temp(h);
+            let sp = temp(h);
+            let next = temp(h);
+            get(h, 1);
+            k(h, 3);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 0xfffffffc);
+            op(h, blot_direct_writer::OP_i32_and);
+            set(h, aligned);
+            gget(h, r.undo_sp);
+            tee(h, sp);
+            get(h, aligned);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 8);
+            op(h, blot_direct_writer::OP_i32_add);
+            tee(h, next);
+            k(h, layout.undo_end);
+            op(h, blot_direct_writer::OP_i32_gt_u);
+            get(h, next);
+            get(h, sp);
+            op(h, blot_direct_writer::OP_i32_lt_u);
+            op(h, blot_direct_writer::OP_i32_or);
+            trapIf(h);
+            get(h, sp);
+            get(h, 0);
+            get(h, 1);
+            memoryCopy(h);
+            get(h, sp);
+            get(h, aligned);
+            op(h, blot_direct_writer::OP_i32_add);
+            get(h, 0);
+            store(h, 0);
+            get(h, sp);
+            get(h, aligned);
+            op(h, blot_direct_writer::OP_i32_add);
+            get(h, 1);
+            store(h, 4);
+            get(h, next);
+            gset(h, r.undo_sp);
+            finish(h, module, r.undo_record);
+        }
+        // undo_rewind(saved_sp): LIFO restore every journaled slice down to saved_sp.
+        {
+            var h = H { parameters: 1, locals: 1, .. };
+            let sp = temp(h);
+            let bytes = temp(h);
+            let addr = temp(h);
+            let src = temp(h);
+            open(h, blot_direct_writer::OP_block);
+            open(h, blot_direct_writer::OP_loop);
+            gget(h, r.undo_sp);
+            tee(h, sp);
+            get(h, 0);
+            op(h, blot_direct_writer::OP_i32_le_u);
+            idx(h, blot_direct_writer::OP_br_if, 1);
+            get(h, sp);
+            k(h, 4);
+            op(h, blot_direct_writer::OP_i32_sub);
+            load(h, 0);
+            set(h, bytes);
+            get(h, sp);
+            k(h, 8);
+            op(h, blot_direct_writer::OP_i32_sub);
+            load(h, 0);
+            set(h, addr);
+            get(h, sp);
+            k(h, 8);
+            op(h, blot_direct_writer::OP_i32_sub);
+            get(h, bytes);
+            k(h, 3);
+            op(h, blot_direct_writer::OP_i32_add);
+            k(h, 0xfffffffc);
+            op(h, blot_direct_writer::OP_i32_and);
+            op(h, blot_direct_writer::OP_i32_sub);
+            set(h, src);
+            get(h, addr);
+            get(h, src);
+            get(h, bytes);
+            memoryCopy(h);
+            get(h, src);
+            gset(h, r.undo_sp);
+            idx(h, blot_direct_writer::OP_br, 0);
+            op(h, blot_direct_writer::OP_end);
+            op(h, blot_direct_writer::OP_end);
+            finish(h, module, r.undo_rewind);
+        }
+    }
     module.has_memory = true;
     module.memory_pages = (layout.total + 0xffff) / 0x10000;
     // Helper names for traces, in the order of the struct's fields.
@@ -810,5 +980,9 @@ fn emit(module: blot_direct_writer::Module&, budgets: Budgets) -> Runtime {
     blot_direct_writer::setName(module, r.allocate, "runtime.allocate");
     blot_direct_writer::setName(module, r.reset, "runtime.reset");
     blot_direct_writer::setName(module, r.packet_length, "runtime.packet_length");
+    if has_fork {
+        blot_direct_writer::setName(module, r.undo_record, "runtime.undo_record");
+        blot_direct_writer::setName(module, r.undo_rewind, "runtime.undo_rewind");
+    }
     return r;
 }

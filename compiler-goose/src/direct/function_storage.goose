@@ -248,9 +248,27 @@ fn lengthOf(g: Generator&, f: const Fn&, container: Val, id: u32) -> u32, Error 
     lset(g, length);
     return length, blot_direct_types::Error.none;
 }
+// When the module uses `fork`, journals `[address + offset .. + bytes]`
+// before mutating an owner opened before the active `fork`.
+fn recordBeforeWrite(g: Generator&, f: Fn&, slot_local: u32, address: u32, offset: u32, bytes: u32) {
+    let rt = g.runtime_();
+    if !rt.has_fork || bytes == 0 { return; }
+    lget(g, slot_local);
+    gget(g, rt.fork_owner_mark);
+    op(g, OP_i32_lt_u);
+    let opened = open(g, f, OP_if_);
+    lget(g, address);
+    if offset != 0 {
+        i32Const(g, offset);
+        op(g, OP_i32_add);
+    }
+    i32Const(g, bytes);
+    callf(g, rt.undo_record);
+    close(g, f);
+}
 // The checked address of element `index` (a local) of a container or view;
 // views check their own range first.
-fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) -> u32, Error {
+fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0) -> u32, Error {
     let address_function = g.runtime_().address;
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return 0, error; }
@@ -267,6 +285,23 @@ fn elementAddress(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) ->
         op(g, OP_i32_add);
         lset(g, address);
         return address, blot_direct_types::Error.none;
+    }
+    if range.length_ty != 0 && index == range.index && container_core_ty != 0 &&
+        tagOf(g, container.ty) == blot_direct_types::Tag.array {
+        let m .= g.units[f.unit - 1];
+        if sameSizedLength(m, range.length_ty, coreSizedLength(m, container_core_ty)) {
+            let step, error = stride(g, f, element, id);
+            if error != blot_direct_types::Error.none { return 0, error; }
+            let base = baseOf(g, f, container);
+            let address = local32(g, f);
+            lget(g, base);
+            lget(g, index);
+            i32Const(g, step);
+            op(g, OP_i32_mul);
+            op(g, OP_i32_add);
+            lset(g, address);
+            return address, blot_direct_types::Error.none;
+        }
     }
     var position = index;
     if tagOf(g, container.ty) == blot_direct_types::Tag.view {
@@ -301,8 +336,8 @@ fn scalarLocal(g: Generator&, f: const Fn&, value: Val, id: u32) -> u32, Error {
     if value.len != 1 { return 0, g.fail(g.units[f.unit - 1], id, "expected a scalar"); }
     return w(g, value, 0), blot_direct_types::Error.none;
 }
-fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32) -> Val, Error {
-    let address, error = elementAddress(g, f, container, index, id);
+fn readElement(g: Generator&, f: Fn&, container: Val, index: u32, id: u32, container_core_ty: TId = 0) -> Val, Error {
+    let address, error = elementAddress(g, f, container, index, id, container_core_ty);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
     let element, error = elementOf(g, f, container.ty, id);
     if error != blot_direct_types::Error.none { return neverVal(), error; }
@@ -387,7 +422,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return position, error; }
             let index, error = scalarLocal(g, f, position, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            return readElement(g, f, container, index, id);
+            return readElement(g, f, container, index, id, m.typeOf(children[0]));
         },
         identity, convert => {
             let value, error = expr(g, f, children[0]);
@@ -622,6 +657,7 @@ recursive fn arrayOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if operation == blot_backend_collection_ops::Op.simd_load { return loadAt(g, f, address, 0, lane_ty, id); }
             let lanes_value, error = expr(g, f, children[2]);
             if error != blot_direct_types::Error.none { return lanes_value, error; }
+            recordBeforeWrite(g, f, w(g, container, 0), address, 0, 16);
             storeAt(g, f, address, 0, lanes_value);
             return container, blot_direct_types::Error.none;
         },
@@ -818,7 +854,7 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             if error != blot_direct_types::Error.none { return position, error; }
             let index, error = scalarLocal(g, f, position, id);
             if error != blot_direct_types::Error.none { return neverVal(), error; }
-            return readElement(g, f, container, index, id);
+            return readElement(g, f, container, index, id, m.typeOf(children[0]));
         },
         push => {
             let container, error = expr(g, f, children[0]);
@@ -837,6 +873,11 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             lset(g, address);
             let noted = noteStore(g, f, value);
             if noted != blot_direct_types::Error.none { return neverVal(), noted; }
+            if g.runtime_().has_fork {
+                let bytes, berr = flatBytes(g, f, value.ty, id);
+                if berr != blot_direct_types::Error.none { return neverVal(), berr; }
+                recordBeforeWrite(g, f, w(g, container, 0), address, 0, bytes);
+            }
             let written = writeFlat(g, f, address, 0, value, id);
             if written != blot_direct_types::Error.none { return neverVal(), written; }
             return unitVal(), blot_direct_types::Error.none;

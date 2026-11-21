@@ -1598,11 +1598,11 @@
      "syntax_nodes": 2339,
      "type_nodes": 5656,
      "type_versions": 900,
-     "wasm_bytes": 3764
+     "wasm_bytes": 3728
     }
    ],
-   "wasm_bytes": 3764,
-   "wasm_sha256": "699c40f58e3fb24b1ea1737cd0bdf09955f565efcf17d678ff1b329883f58cda"
+   "wasm_bytes": 3728,
+   "wasm_sha256": "61182bbd0c70f67739c95e62aa9563e9befc069d339a145ffb10a37d8edc70e4"
   },
   "direct/branch_appends.blot": {
    "exit": 0,

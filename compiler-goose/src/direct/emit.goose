@@ -529,9 +529,17 @@ fn indexPut(g: Generator&, key: InstanceKey, id: u32) {
     g.s.index_nodes.push(IndexNode { key, id, head });
     g.s.instance_index.put(hashed, g.s.index_nodes.len as u32);
 }
+fn unitsHaveFork(units: const Module[:]) -> bool {
+    for m in units {
+        for node in m.nodes {
+            if node.tag == blot_check_core::Tag.fork_ { return true; }
+        }
+    }
+    return false;
+}
 fn runtime_(g: Generator&) -> const Runtime& {
     if !g.s.has_rt {
-        g.s.rt = blot_direct_runtime::emit(g.module, blot_direct_runtime::Budgets {});
+        g.s.rt = blot_direct_runtime::emitWithFork(g.module, blot_direct_runtime::Budgets {}, unitsHaveFork(g.units));
         g.s.has_rt = true;
     }
     return g.s.rt;

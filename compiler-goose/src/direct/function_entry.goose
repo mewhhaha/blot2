@@ -229,7 +229,21 @@ recursive fn emitInstanceBody(g: Generator&, id: u32) -> Error {
             value = made;
         },
         state_set => {
-            let written = writeFlat(g, f, 0, 0, g.s.vals[inputs.start], root);
+            let arg = g.s.vals[inputs.start];
+            let rt = g.runtime_();
+            if rt.has_fork {
+                let bytes, berr = flatBytes(g, f, arg.ty, root);
+                if berr != blot_direct_types::Error.none { return berr; }
+                if bytes != 0 {
+                    gget(g, rt.fork_owner_mark);
+                    let opened = open(g, f, OP_if_);
+                    lget(g, 0);
+                    i32Const(g, bytes);
+                    callf(g, rt.undo_record);
+                    close(g, f);
+                }
+            }
+            let written = writeFlat(g, f, 0, 0, arg, root);
             if written != blot_direct_types::Error.none { return written; }
             value = unitVal();
         },
@@ -371,16 +385,23 @@ fn hostImport(g: Generator&, first: Abi, second: Abi) -> u32 {
 
 // Recovers temporaries and providers a trapped earlier call left behind.
 fn resetEntry(g: Generator&) {
-    let release = g.runtime_().release;
-    let stack_base = g.runtime_().layout.stack_base;
-    let stack_pointer = g.runtime_().stack_pointer;
-    let effect_context = g.runtime_().effect_context;
+    let rt = g.runtime_();
+    let release = rt.release;
+    let stack_base = rt.layout.stack_base;
+    let stack_pointer = rt.stack_pointer;
+    let effect_context = rt.effect_context;
     i32Const(g, 1);
     callf(g, release);
     i32Const(g, stack_base);
     gset(g, stack_pointer);
     i32Const(g, 0);
     gset(g, effect_context);
+    if rt.has_fork {
+        i32Const(g, 0);
+        gset(g, rt.fork_owner_mark);
+        i32Const(g, rt.layout.undo_base);
+        gset(g, rt.undo_sp);
+    }
 }
 fn releaseEntry(g: Generator&) {
     let release = g.runtime_().release;

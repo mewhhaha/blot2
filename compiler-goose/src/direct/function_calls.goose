@@ -449,6 +449,11 @@ recursive fn linearAppend(g: Generator&, f: Fn&, id: u32) -> Val, bool, Error {
     lset(g, address);
     let noted = noteStore(g, f, value);
     if noted != blot_direct_types::Error.none { return neverVal(), false, noted; }
+    if g.runtime_().has_fork {
+        let bytes, berr = flatBytes(g, f, value.ty, id);
+        if berr != blot_direct_types::Error.none { return neverVal(), false, berr; }
+        recordBeforeWrite(g, f, w(g, list, 0), address, 0, bytes);
+    }
     let written = writeFlat(g, f, address, 0, value, id);
     if written != blot_direct_types::Error.none { return neverVal(), false, written; }
     return list, true, blot_direct_types::Error.none;

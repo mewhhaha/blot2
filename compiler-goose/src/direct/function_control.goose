@@ -295,6 +295,26 @@ recursive fn block_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     if last.ty != blot_direct_types::never && m.typeOf(id) == blot_check_types::unit { return unitVal(), blot_direct_types::Error.none; }
     return neverVal(), blot_direct_types::Error.none;
 }
+recursive fn forkNode(g: Generator&, f: Fn&, id: u32) -> Val, Error {
+    let m .= g.units[f.unit - 1];
+    let n = m.node(id);
+    let rt = g.runtime_();
+    let saved_mark = local32(g, f);
+    let saved_undo = local32(g, f);
+    gget(g, rt.fork_owner_mark);
+    lset(g, saved_mark);
+    gget(g, rt.undo_sp);
+    lset(g, saved_undo);
+    gget(g, rt.owner_top);
+    gset(g, rt.fork_owner_mark);
+    let result, error = block_(g, f, n.a);
+    if error != blot_direct_types::Error.none { return result, error; }
+    lget(g, saved_undo);
+    callf(g, rt.undo_rewind);
+    lget(g, saved_mark);
+    gset(g, rt.fork_owner_mark);
+    return result, blot_direct_types::Error.none;
+}
 // Copies `value` into a lazily allocated result slot.
 fn deliver(g: Generator&, f: const Fn&, value: Val, slot: u32, id: u32) -> Error {
     if value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
@@ -347,6 +367,19 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     var falls = false;
     let done = open(g, f, OP_block);
     let arms = m.matchArms(id);
+    var fbip_block: u32 = 0;
+    var fbip_ty: Ty = 0;
+    if !info.statement && inputs.len == 1 && !g.runtime_().has_fork {
+        let matched_binding = localRef(m, inputs[0]);
+        if matched_binding != 0 && isUniqueBoxed(g, f, matched_binding) && uses(g, f, matched_binding) == 1 && !bindingCaptured(m, matched_binding) {
+            let input_val = g.s.vals[values.start];
+            let boxed, berr = isBoxed(g, f, input_val.ty, id);
+            if berr == blot_direct_types::Error.none && boxed && input_val.len == 1 {
+                fbip_block = w(g, input_val, 0);
+                fbip_ty = input_val.ty;
+            }
+        }
+    }
     for arm, arm_index in arms {
         let rows = m.armRows(arm);
         let next = open(g, f, OP_block);
@@ -416,7 +449,21 @@ recursive fn match_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             op(g, OP_i32_eqz);
             br(g, f, OP_br_if, next);
         }
+        let prev_reuse_node = f.reuse_node;
+        let prev_reuse_block = f.reuse_block;
+        let prev_reuse_ty = f.reuse_ty;
+        if fbip_block != 0 {
+            let target_construct = tailConstruct(m, arm.body);
+            if target_construct != 0 {
+                f.reuse_node = target_construct;
+                f.reuse_block = fbip_block;
+                f.reuse_ty = fbip_ty;
+            }
+        }
         let body, error = stmt(g, f, arm.body);
+        f.reuse_node = prev_reuse_node;
+        f.reuse_block = prev_reuse_block;
+        f.reuse_ty = prev_reuse_ty;
         if error != blot_direct_types::Error.none { return body, error; }
         if body.ty != blot_direct_types::never {
             falls = true;
@@ -793,6 +840,65 @@ fn lengthReceiver(m: const Module&, id: u32) -> u32 {
     return localRef(m, args[0]);
 }
 
+fn coreSizedLength(m: const Module&, ty: TId) -> TId {
+    if ty == 0 || ty >= m.types.nodes.len { return 0; }
+    var cursor = ty;
+    for step in 0..8 {
+        let n = m.types.node(cursor);
+        if n.tag == blot_check_types::Tag.usage { cursor = n.a; continue; }
+        let inner = blot_check_storage_types::sharedInner(m.types, cursor);
+        if inner.present { cursor = inner.value; continue; }
+        break;
+    }
+    let info = blot_check_storage_types::info(m.types, cursor);
+    if !info.present || info.value.kind != blot_check_storage_types::sized_array { return 0; }
+    let len = blot_check_storage_types::lengthOf(m.types, cursor);
+    if !len.present { return 0; }
+    return len.value;
+}
+fn sameSizedLength(m: const Module&, a: TId, b: TId) -> bool {
+    if a == 0 || b == 0 { return false; }
+    if a == b { return true; }
+    let na = m.types.node(a);
+    let nb = m.types.node(b);
+    if na.tag == blot_check_types::Tag.nominal && nb.tag == blot_check_types::Tag.nominal &&
+        blot_check_storage_types::isLengthLiteral(na.a, na.b) &&
+        blot_check_storage_types::isLengthLiteral(nb.a, nb.b) {
+        return na.b == nb.b;
+    }
+    return false;
+}
+fn rangeSizedLength(g: Generator&, f: Fn&, info: blot_check_core::LoopInfo) -> TId {
+    let m .= g.units[f.unit - 1];
+    if info.first == 0 || info.end == 0 { return 0; }
+    let first_node = m.node(info.first);
+    if first_node.tag != blot_check_core::Tag.constant || first_node.a != 0 { return 0; }
+    let n = m.node(info.end);
+    var receiver: u32 = 0;
+    if n.tag == blot_check_core::Tag.project {
+        receiver = n.a;
+        let owner = localRef(m, receiver);
+        if owner == 0 { return 0; }
+        let handle, found = bindGet(g, f, owner);
+        if !found || tagOf(g, handle.ty) != blot_direct_types::Tag.array { return 0; }
+        let identity, present = g.receiverIdentity(handle.ty);
+        if !present { return 0; }
+        let target, exists = g.dispatchTarget(m, identity, m.projection(n.b).field, blot_check_types::Operator.none);
+        if !exists || !g.hasUnit(target.unit) { return 0; }
+        let unit .= g.units[target.unit - 1];
+        let body .= unit.body(target.binding);
+        if !body || !body.is_function { return 0; }
+        let params = unit.bodyParameters(body);
+        if params.len != 1 || lengthReceiver(unit, scratchReturned(unit, body.root)) != params[0].binding { return 0; }
+    } else {
+        if lengthReceiver(m, info.end) == 0 { return 0; }
+        let args = m.children(info.end);
+        if args.len != 1 { return 0; }
+        receiver = args[0];
+    }
+    return coreSizedLength(m, m.typeOf(receiver));
+}
+
 fn scanOwner(g: Generator&, f: Fn&, id: u32, info: blot_check_core::LoopInfo) -> Val {
     let m .= g.units[f.unit - 1];
     if info.pattern == 0 { return neverVal(); }
@@ -862,7 +968,12 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     let assigned = assignCarries(g, f, incoming, iteration, slots, 0xffffffff, 0, 0, id);
     if assigned != blot_direct_types::Error.none { return neverVal(), assigned; }
-    for carry, at in carries { bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]); }
+    for carry, at in carries {
+        bindPut(g, f, carry.iteration, g.s.vals[iteration.start + at]);
+        if isUniqueBoxed(g, f, carry.incoming) && uses(g, f, carry.incoming) == 0 && !bindingCaptured(m, carry.incoming) {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, carry.iteration, 1);
+        }
+    }
     var has_index = false;
     var index: u32 = 0;
     var end = neverVal();
@@ -904,6 +1015,7 @@ recursive fn loop_(g: Generator&, f: Fn&, id: u32) -> Val, Error {
                 let copied = copy(g, f, last, end, id);
                 if copied != blot_direct_types::Error.none { return neverVal(), copied; }
             }
+            range.length_ty = rangeSizedLength(g, f, info);
         },
         array => {
             let container, error = expr(g, f, info.first);

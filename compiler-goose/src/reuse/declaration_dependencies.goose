@@ -83,7 +83,7 @@ fn scanNode(self_: Capture&, id: u32) {
     if low < m.erased_declaration_references.len && m.erased_declaration_references[low].node == id { self_.reference(m.erased_declaration_references[low].target, id); }
     match n.tag {
         package_pack => { self_.nodes(m.children(id)); },
-        resource_release, usage_share, usage_read => { self_.node(n.a); },
+        resource_release, usage_share, usage_read, fork_ => { self_.node(n.a); },
         package_unpack => { self_.node(m.packageOpening(id).body); self_.node(n.a); },
         contract_method => {
             self_.nodes(m.children(id)); let template = m.member_templates[n.a];

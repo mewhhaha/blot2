@@ -418,6 +418,7 @@ recursive fn evaluateStage(g: Generator&, s: Stage&, m: const Module&, id: u32, 
             return result;
         },
         panic => { return stopStage(s, "#run trapped"); },
+        fork_ => { return stopStage(s, "#run does not support fork"); },
         _ => { return stopStage(s, "#run requires a supported closed expression"); },
     }
 }

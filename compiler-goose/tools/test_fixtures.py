@@ -19,6 +19,11 @@ bytes and function counts of exported programs. The audit compared the same
 sources before and after the change: it added the hook, its optional ABI
 section and any required signature without changing existing function bodies.
 
+Blot vNext Checkpoint 2 (21 November 2026) re-recorded `direct/boxed_records.blot`
+(3764 -> 3728 Wasm bytes): provably unique boxed records/sums reuse their block
+in place on single-use updates (FBIP), eliminating one `newBlock` + `memoryCopy`
+in `nested` while preserving aliasing safety in `fields`.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

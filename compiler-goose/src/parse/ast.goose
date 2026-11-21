@@ -106,6 +106,7 @@ let tag_package_unpack: Tag = 90;
 let tag_type_code: Tag = 91;
 let tag_type_descriptor: Tag = 92;
 let tag_task_region: Tag = 93;
+let tag_fork_expr: Tag = 94;
 type BinderSort = u32;
 let bindersort_type_: BinderSort = 0;
 let bindersort_row: BinderSort = 1;

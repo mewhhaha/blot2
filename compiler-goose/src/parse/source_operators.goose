@@ -309,6 +309,7 @@ let a_package_unpack=blot_parse_ast::tag_package_unpack;
 let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
+let a_fork_expr=blot_parse_ast::tag_fork_expr;
 recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,context: C&,locals: ScratchIdBuffer&,id: Id,depth: i64) {
  if id!=0 { let tag=tree.node(id).tag; if (tag==a_name||tag==a_constructor_ref||tag==a_intrinsic)&&context.source_editor_probe(id) { return; } }
  if id==0||stopped(self_,tree,pool,context,locals) { return; } if depth>=1024 { fail(self_,tree,pool,context,locals,c_nesting_limit,id,tree.span(id).start,0); return; }
@@ -383,6 +384,13 @@ recursive fn walk<C>(self_: Validator&,tree: const Tree&,pool: const Pool&,conte
   locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
  } else if n.tag==a_block {
   let saved=locals.len; suite(self_,tree,pool,context,locals,id,depth+1); locals.resize(saved); walk(self_,tree,pool,context,locals,n.c,depth+1);
+ } else if n.tag==a_fork_expr {
+  let entries=blot_parse_ast::List {n.a,n.b}; let count=tree.list(entries).len;
+  for i in 0..count { let entry=tree.node(tree.list(entries)[i]); walk(self_,tree,pool,context,locals,entry.b,depth+1); if stopped(self_,tree,pool,context,locals) { return; } }
+  let saved=locals.len; let saved_loops=self_.loops; let saved_replies=self_.replies; self_.loops=0; self_.replies=false;
+  for i in 0..count { let entry=tree.node(tree.list(entries)[i]); bind(self_,tree,pool,context,locals,entry.a); }
+  walk(self_,tree,pool,context,locals,n.c,depth+1);
+  locals.resize(saved); self_.loops=saved_loops; self_.replies=saved_replies;
  } else if n.tag==a_let_stmt {
   let binding=tree.binding(id); let scope,err=context.source_binding_start(id); self_.failure=err; if err!=blot_error::Error.none { return; }
 

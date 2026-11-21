@@ -56,7 +56,7 @@ fn edge(self_: const Graph&,vertex: i64,slot: i64) -> blot_support::Option<i64> 
             bind,construct => { if slot == 0 { return self_.to(Kind.node,v.b); } },
             package_unpack => { if slot == 0 { return self_.to(Kind.node,v.a); } if slot == 1 { return self_.to(Kind.node,m.extra[v.c]); } },
             package_pack => { let children=m.children(id as u32); if slot < children.len { return self_.to(Kind.node,children[slot]); } },
-            resource_release,usage_share,usage_read,return_,project,result_associated,computation,effect_scope => { if slot == 0 { return self_.to(Kind.node,v.a); } },
+            resource_release,usage_share,usage_read,return_,project,result_associated,computation,effect_scope,fork_ => { if slot == 0 { return self_.to(Kind.node,v.a); } },
             closure => { if slot == 0 { return self_.to(Kind.closure,v.a); } }, match_ => { if slot == 0 { return self_.to(Kind.match_,v.a); } },
             pattern_bind => { if slot == 0 { return self_.to(Kind.pattern,v.a); } if slot == 1 { return self_.to(Kind.node,v.b); } if slot == 2 { return self_.to(Kind.node,v.c); } },
             update => { if slot == 0 { return self_.to(Kind.update,v.a); } }, loop_ => { if slot == 0 { return self_.to(Kind.loop_,v.a); } }, request_loop => { if slot == 0 { return self_.to(Kind.request_loop,v.a); } }, resolver_op => { if slot == 0 { return self_.to(Kind.resolver,v.a); } }, operation_value => { if slot == 0 { return self_.to(Kind.operation_value,v.a); } },

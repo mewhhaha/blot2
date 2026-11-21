@@ -25,7 +25,7 @@ recursive fn appendChildren<W>(work:W&,module:const Module&,id:u32,callables:boo
 recursive fn visitChildren<W,A,B,F,G>(work: W&,first:A&,second:B&,module: const Module&,id: u32,callables: bool) -> Error {
  let n=module.node(id); let tag=n.tag;
  if callables&&tag==blot_check_core::Tag.apply&&module.node(n.a).tag==blot_check_core::Tag.closure { let err=F(work,first,second,module.closure(n.a).body); if err!=blot_error::Error.none { return err; } }
- if tag==blot_check_core::Tag.resource_release||tag==blot_check_core::Tag.usage_share||tag==blot_check_core::Tag.usage_read||tag==blot_check_core::Tag.package_pack { return F(work,first,second,n.a); }
+ if tag==blot_check_core::Tag.resource_release||tag==blot_check_core::Tag.usage_share||tag==blot_check_core::Tag.usage_read||tag==blot_check_core::Tag.package_pack||tag==blot_check_core::Tag.fork_ { return F(work,first,second,n.a); }
  if tag==blot_check_core::Tag.package_unpack { return G(work,first,second,[n.a,module.packageOpening(id).body]); }
  if tag==blot_check_core::Tag.staging||tag==blot_check_core::Tag.scalar||tag==blot_check_core::Tag.associated||tag==blot_check_core::Tag.logical||tag==blot_check_core::Tag.record_merge||tag==blot_check_core::Tag.type_same||tag==blot_check_core::Tag.apply||tag==blot_check_core::Tag.effect_provider||tag==blot_check_core::Tag.handle||tag==blot_check_core::Tag.proof_guard||tag==blot_check_core::Tag.resource_acquire||tag==blot_check_core::Tag.usage_borrow { return G(work,first,second,[n.a,n.b]); }
  if tag==blot_check_core::Tag.resource_scope||tag==blot_check_core::Tag.if_value||tag==blot_check_core::Tag.if_stmt||tag==blot_check_core::Tag.state_provider { return G(work,first,second,[n.a,n.b,n.c]); }

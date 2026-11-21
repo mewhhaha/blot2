@@ -1680,6 +1680,7 @@ recursive fn collectAnnotationNames(self_:Engine&,id:u32,depth:i64)->blot_error:
     blot_parse_ast::tag_use_stmt,blot_parse_ast::tag_iterator_bind=>{for child in [node.c,node.b] {let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
     blot_parse_ast::tag_product,blot_parse_ast::tag_array,blot_parse_ast::tag_record,blot_parse_ast::tag_type_product,blot_parse_ast::tag_type_array,blot_parse_ast::tag_type_record=>{let syntax_source_4=id;let syntax_count_4=self_.tree.children(syntax_source_4).len;for syntax_index_4 in 0..syntax_count_4 {let child=self_.tree.children(syntax_source_4)[syntax_index_4];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
     blot_parse_ast::tag_block=>{let err=self_.collectAnnotationNames(node.c,depth+1);if err!=blot_error::Error.none {return err;}let syntax_source_5=id;let syntax_count_5=self_.tree.children(syntax_source_5).len;for syntax_index_5 in 0..syntax_count_5 {let child=self_.tree.children(syntax_source_5)[syntax_index_5];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
+    blot_parse_ast::tag_fork_expr=>{let err=self_.collectAnnotationNames(node.c,depth+1);if err!=blot_error::Error.none {return err;}},
     blot_parse_ast::tag_infix_chain=>{let err=self_.collectAnnotationNames(node.a,depth+1);if err!=blot_error::Error.none {return err;}let syntax_source_6=blot_parse_ast::List{node.b,node.c, ..};let syntax_count_6=self_.tree.list(syntax_source_6).len;for syntax_index_6 in 0..syntax_count_6 {let child=self_.tree.list(syntax_source_6)[syntax_index_6];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
     blot_parse_ast::tag_if_let_stmt,blot_parse_ast::tag_for_stmt=>{let err=self_.collectAnnotationNames(node.b,depth+1);if err!=blot_error::Error.none {return err;}let metadata=checkedAstRange(self_.tree,node.c,self_.tree.extra.items.len);let ast_span_2=checkedAstSubspan(self_.tree,metadata,0,2);for ast_index_2 in 0..(ast_span_2.len as i64) {let child=self_.tree.list(ast_span_2)[ast_index_2];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
     blot_parse_ast::tag_case_expr,blot_parse_ast::tag_request_case=>{let inputs=checkedAstRange(self_.tree,node.a,node.a+2);let syntax_source_7=blot_parse_ast::List{self_.tree.list(inputs)[0],self_.tree.list(inputs)[1], ..};let syntax_count_7=self_.tree.list(syntax_source_7).len;for syntax_index_7 in 0..syntax_count_7 {let child=self_.tree.list(syntax_source_7)[syntax_index_7];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}let syntax_source_8=blot_parse_ast::List{node.b,node.c, ..};let syntax_count_8=self_.tree.list(syntax_source_8).len;for syntax_index_8 in 0..syntax_count_8 {let child=self_.tree.list(syntax_source_8)[syntax_index_8];let err=self_.collectAnnotationNames(child,depth+1);if err!=blot_error::Error.none {return err;}}},
@@ -3037,6 +3038,9 @@ recursive fn ordinaryApplication(self_:Engine&,id:u32,leaf:u32)->u32,blot_error:
     let concurrent=qualified.tag==blot_check_types::Tag.usage && qualified.b==blot_parse_ast::usagekind_concurrent;
     if qualified.tag==blot_check_types::Tag.usage && (qualified.b==blot_parse_ast::usagekind_once || qualified.b==blot_parse_ast::usagekind_many || cleanup || concurrent) {
         function_ty=qualified.a;
+    } else {
+        let shared_fn=blot_check_storage_types::sharedInner(self_.types,qualified_id);
+        if shared_fn.present {function_ty=shared_fn.value;}
     }
     // A repeat can hit a store limit if the first read built temporary
     // nodes or rows. Projected calls also charge each visit to their budget.
@@ -3083,6 +3087,97 @@ recursive fn blockExpressionBody(self_:Engine&,id:u32,node:blot_parse_ast::Node,
  if resolver_type!=0 {let root,err=self_.types.resolve(resolver_type,0);if err!=blot_error::Error.none {return 0,err;}let tag=self_.types.node(root).tag;if tag!=blot_check_types::Tag.variable && tag!=blot_check_types::Tag.resolver {let err=self_.diagnostic(Code.invalid_provider,node.c);if err!=blot_error::Error.none {return 0,err;}}let binding,err=self_.addBinding(Binding{name:0,declaration:id,owner:id,kind:blot_reuse_principal_interface::Kind.local,ty:resolver_type,scheme:blot_check_types::Scheme{root:resolver_type, ..}, ..});if err!=blot_error::Error.none {return 0,err;}self_.resolver_scope=ResolverScope{block_:id,resolver:binding,owner_type:resolver_type,result:result, ..};if self_.resolver_blocks.len>=0xffffffff {return 0,blot_error::Error.type_limit;}self_.resolver_blocks.push(ResolverBlock{node:id,resolver:binding,result:result,body_effects:self_.ambient, ..});block_index=self_.resolver_blocks.len as u32;self_.resolver_block_ids[id]=block_index;let err=self_.resolverShape(id,result);if err!=blot_error::Error.none {return 0,err;}}
  self_.return_target=result;self_.owner=id;let flow,err=self_.suite(id);if err!=blot_error::Error.none {return 0,err;}var carried:i64=0;if arm.present {let versions=armVersions(arm.value);let enclosing=self_.env[..versions.len];for entry,index in enclosing {versions[index]=self_.latestSuccessor(entry.binding);}var carrying=false;for entry,index in enclosing {if versions[index]!=entry.binding {carrying=true;break;}}self_.arm_capture.value.carrying=carrying;carried=versions.len;if carrying && self_.arm_nested_return!=0 {let err=self_.diagnostic(Code.case_arm_return,self_.arm_nested_return);if err!=blot_error::Error.none {return 0,err;}}}if nested {let err=self_.deadRebindings(scope,first_binding,carried);if err!=blot_error::Error.none {return 0,err;}}if !flow.exits {if block_index==0 {let err=self_.constrain(result,blot_check_types::unit,id);if err!=blot_error::Error.none {return 0,err;}}else {let op,err=self_.resolverMethod(id,ResolverKind.pure,blot_check_types::unit,self_.resolver_scope.result,0,false);if err!=blot_error::Error.none {return 0,err;}self_.resolver_blocks[block_index-1].fallthrough=op;}}if flow.exits && flow.breaks && !flow.returns {return blot_check_types::never,blot_error::Error.none;}return result,blot_error::Error.none;
 }
+recursive fn forkExpression(self_:Engine&,id:u32)->u32,blot_error::Error {
+ let node=self_.tree.node(id);
+ let entries=blot_parse_ast::List{node.a,node.b, ..};
+ let count=self_.tree.list(entries).len;
+ let saved_env=self_.env.len;
+ let saved_owner=self_.owner;
+ let saved_return_target=self_.return_target;
+ let saved_function_body=self_.function_body;
+ let saved_exit_allowed=self_.function_exit_allowed;
+ let saved_exit_target=self_.function_exit_target;
+ let saved_result_expected=self_.function_result_expected;
+ let saved_ambient=self_.ambient;
+ let saved_resolver=self_.resolver_scope;
+ let saved_requests=self_.request_scope;
+ let saved_loops=global_loop_runs.alloc_slice(self_.loop_stack.len);
+ for loop_,index in self_.loop_stack {saved_loops[index]=canonicalLoop(loop_);}
+ self_.loop_stack.clear();
+ var err=blot_error::Error.none;
+ for index in 0..count {
+  let entry_id=self_.tree.list(entries)[index];
+  let entry=self_.tree.node(entry_id);
+  let found=self_.lookup(entry.a);
+  if !found.present {
+   err=self_.diagnostic(Code.unknown_rebinding,entry.b);
+   if err!=blot_error::Error.none {break;}
+  } else {
+   let outer=found.value;
+   self_.resolved[entry.b]=outer;
+   let outer_ty=self_.bindings[outer].ty;
+   self_.expr_types[entry.b]=outer_ty;
+   let inner,add_err=self_.addBinding(Binding{name:entry.a,declaration:entry_id,owner:id,kind:blot_reuse_principal_interface::Kind.local,ty:outer_ty,scheme:blot_check_types::Scheme{root:outer_ty, ..}, ..});
+   if add_err!=blot_error::Error.none {err=add_err;break;}
+   self_.resolved[entry_id]=inner;
+   self_.expr_types[entry_id]=outer_ty;
+   self_.env.push(Entry{entry.a,inner, ..});
+  }
+ }
+ var result:u32=blot_check_types::unit;
+ var fork_ambient:u32=0;
+ if err==blot_error::Error.none {
+  let fresh_row,row_err=self_.types.freshEffects();
+  if row_err!=blot_error::Error.none {err=row_err;} else {fork_ambient=fresh_row;}
+ }
+ if err==blot_error::Error.none {
+  self_.ambient=fork_ambient;
+  self_.owner=id;
+  self_.function_body=node.c;
+  self_.return_target=0;
+  self_.function_exit_allowed=true;
+  self_.function_exit_target=0;
+  self_.function_result_expected=0;
+  self_.resolver_scope=ResolverScope{..};
+  self_.request_scope=RequestScope{..};
+  let flow,suite_err=self_.suite(node.c);
+  if suite_err!=blot_error::Error.none {err=suite_err;}
+  else if self_.function_exit_target!=0 {
+   if !flow.exits {err=self_.diagnostic(Code.function_return_required,id);}
+   result=self_.function_exit_target;
+  } else if flow.exits {
+   result=blot_check_types::never;
+  }
+ }
+ if err==blot_error::Error.none {
+  let resolved_row,rerr=self_.types.resolveEffects(fork_ambient,0);
+  if rerr!=blot_error::Error.none {err=rerr;}
+  else {
+   let labels=self_.types.rowLabels(resolved_row);
+   var has_foreign=false;
+   for label in labels {if label==blot_check_types::foreign_operation {has_foreign=true;break;}}
+   if has_foreign {
+    err=self_.diagnostic(Code.sealed_effect,id);
+   } else {
+    err=self_.constrainEffects(fork_ambient,saved_ambient,id);
+   }
+  }
+ }
+ self_.env.resize(saved_env);
+ self_.owner=saved_owner;
+ self_.return_target=saved_return_target;
+ self_.function_body=saved_function_body;
+ self_.function_exit_allowed=saved_exit_allowed;
+ self_.function_exit_target=saved_exit_target;
+ self_.function_result_expected=saved_result_expected;
+ self_.ambient=saved_ambient;
+ self_.resolver_scope=saved_resolver;
+ self_.request_scope=saved_requests;
+ self_.loop_stack.clear();
+ for loop_ in saved_loops {self_.loop_stack.push(canonicalLoop(loop_));}
+ if saved_loops.len!=0 {global_loop_runs.free_slice(saved_loops);}
+ return result,err;
+}
 recursive fn expression(self_:Engine&,id:u32)->u32,blot_error::Error {if id==0 {return blot_check_types::unit,blot_error::Error.none;}if self_.depth==1024 {let err=self_.diagnostic(Code.nesting_limit,id);return blot_check_types::absent,err;}self_.depth+=1;let value,error=expressionValue(self_,id,self_.tree.node(id));self_.depth-=1;if error!=blot_error::Error.none {return 0,error;}return self_.finishExpression(id,value),blot_error::Error.none;}
 recursive fn expressionValue(self_:Engine&,id:u32,node:blot_parse_ast::Node)->u32,blot_error::Error {match node.tag {
  blot_parse_ast::tag_unit=>{return blot_check_types::unit,blot_error::Error.none;},blot_parse_ast::tag_boolean=>{return blot_check_types::boolean,blot_error::Error.none;},blot_parse_ast::tag_integer=>{return blot_check_types::u32_type,blot_error::Error.none;},blot_parse_ast::tag_float=>{return blot_check_types::f32_type,blot_error::Error.none;},blot_parse_ast::tag_string=>{return self_.types.sequence(blot_check_types::Tag.array,blot_check_types::u32_type);},blot_parse_ast::tag_group=>{return self_.expression(node.a);},blot_parse_ast::tag_name=>{return self_.nameExpression(id);},blot_parse_ast::tag_task_region=>{return self_.taskRegionExpression(id);},blot_parse_ast::tag_selector=>{return self_.selectorFunction(id);},blot_parse_ast::tag_field_access=>{return self_.fieldExpression(id);},blot_parse_ast::tag_constructor_ref=>{return self_.constructorExpression(id);},blot_parse_ast::tag_type_witness=>{return self_.witnessExpression(id);},blot_parse_ast::tag_record=>{return self_.recordValue(id);},blot_parse_ast::tag_index_access=>{return self_.indexExpression(id);},blot_parse_ast::tag_array=>{return self_.arrayExpression(id);},blot_parse_ast::tag_package_pack=>{return self_.checkPackagePack(id);},blot_parse_ast::tag_package_unpack=>{return self_.checkPackageUnpack(id);},blot_parse_ast::tag_intrinsic=>{let value,err=self_.intrinsic(id,node.a);if err!=blot_error::Error.none {return 0,err;}return self_.types.openCovariant(value);},blot_parse_ast::tag_lambda=>{return self_.lambdaExpression(id);},blot_parse_ast::tag_apply=>{
@@ -3096,7 +3191,7 @@ recursive fn expressionValue(self_:Engine&,id:u32,node:blot_parse_ast::Node)->u3
   return result,self_.constrain(result,blot_check_types::u32_type,id);
  }
  return result,blot_error::Error.none;
-},blot_parse_ast::tag_product=>{return self_.productExpression(id);},blot_parse_ast::tag_unary=>{return self_.unaryExpression(id);},blot_parse_ast::tag_binary=>{return self_.binary(id);},blot_parse_ast::tag_case_expr=>{return self_.caseExpression(id);},blot_parse_ast::tag_request_case=>{return self_.diagnosticFresh(Code.request_case_scope,id);},blot_parse_ast::tag_if_expr=>{return self_.conditionalExpression(id);},blot_parse_ast::tag_block=>{return self_.blockExpression(id);},_=>{return self_.diagnosticFresh(Code.unsupported,id);},}}
+},blot_parse_ast::tag_product=>{return self_.productExpression(id);},blot_parse_ast::tag_unary=>{return self_.unaryExpression(id);},blot_parse_ast::tag_binary=>{return self_.binary(id);},blot_parse_ast::tag_case_expr=>{return self_.caseExpression(id);},blot_parse_ast::tag_request_case=>{return self_.diagnosticFresh(Code.request_case_scope,id);},blot_parse_ast::tag_if_expr=>{return self_.conditionalExpression(id);},blot_parse_ast::tag_block=>{return self_.blockExpression(id);},blot_parse_ast::tag_fork_expr=>{return self_.forkExpression(id);},_=>{return self_.diagnosticFresh(Code.unsupported,id);},}}
 fn finishExpression(self_:Engine&,id:u32,value:u32)->u32 {self_.expr_types[id]=value;return value;}
 recursive fn taggedExpression(self_:Engine&,attributes:blot_parse_ast::List,body:u32,depth:i64)->u32,blot_error::Error {if depth>=1024 {return 0,blot_error::Error.type_limit;}if (attributes.len as i64)==0 {if self_.current!=0 && self_.bindings[self_.current].kind==blot_reuse_principal_interface::Kind.global {let declaration=self_.tree.value_decl(self_.bindings[self_.current].declaration);if declaration.body==body && declaration.annotation!=0 {let written=self_.tree.node(declaration.annotation);var contextual=false;if self_.expr_types[declaration.annotation]!=0 {let quantified,err=self_.types.containsQuantifier(self_.expr_types[declaration.annotation]);if err!=blot_error::Error.none {return 0,err;}contextual=quantified;if !contextual {let nominal,err=blot_check_usage_check::containsNominal(self_.types,self_.nominals,self_.expr_types[declaration.annotation]);if err!=blot_error::Error.none {return 0,err;}contextual=nominal;}}if contextual || self_.proofContract(self_.current)!=null || blot_check_storage_types::isArray(self_.types,self_.types.head(self_.expr_types[declaration.annotation],0)) || written.tag==blot_parse_ast::tag_type_usage || (written.tag==blot_parse_ast::tag_type_function && self_.tree.node(written.a).tag==blot_parse_ast::tag_type_binder) {return self_.contextualLambda(body,self_.expr_types[declaration.annotation]);}}}return self_.expression(body);}let attribute=self_.tree.list(attributes)[0];let function_ty,err=self_.expression(self_.tree.node(attribute).a);if err!=blot_error::Error.none {return 0,err;}let argument,err=self_.taggedExpression(checkedAstSubspan(self_.tree,attributes,1,(attributes.len as i64)),body,depth+1);if err!=blot_error::Error.none {return 0,err;}let result,err=self_.types.fresh();if err!=blot_error::Error.none {return 0,err;}let invocation,err=self_.invocation(argument,result);if err!=blot_error::Error.none {return 0,err;}let err=self_.constrain(function_ty,invocation,attribute);if err!=blot_error::Error.none {return 0,err;}self_.expr_types[attribute]=result;
  if self_.current!=0 && self_.bindings[self_.current].kind==blot_reuse_principal_interface::Kind.global {

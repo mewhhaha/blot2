@@ -53,13 +53,19 @@ struct CheckedRange {
     slot: u32 = 0xffffffff,
     generation: u32 = 0,
     index: u32 = 0,
-    base: u32 = 0
+    base: u32 = 0,
+    length_ty: TId = 0
 }
 struct Fn {
     checked_range: CheckedRange = CheckedRange {},
     sites_base:i64=0,
     scratch_body: u32 = 0,
     scratch_cut: ScratchCut = ScratchCut {},
+    // Uniquely-owned boxed bindings eligible for FBIP same-shape reuse.
+    unique_boxed: blot_support_zigmap::Map = blot_support_zigmap::Map {},
+    reuse_node: u32 = 0,
+    reuse_block: u32 = 0,
+    reuse_ty: Ty = 0,
     // The module of this body, as `g.units[unit - 1]`.
     unit: u32,
     // The instance's type variables, refined as emission learns the concrete
@@ -310,6 +316,7 @@ recursive fn exprInner(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         associated => { return associated(g, f, id); },
         if_value, if_stmt => { return ifNode(g, f, id); },
         block_ => { return block_(g, f, id); },
+        fork_ => { return forkNode(g, f, id); },
         suite => {
             var last = unitVal();
             for child in m.children(id) {
@@ -394,10 +401,84 @@ recursive fn bind(g: Generator&, f: Fn&, id: u32) -> Val, Error {
     }
     let value, error = stmt(g, f, n.b);
     if error != blot_direct_types::Error.none { return value, error; }
-    if value.ty != blot_direct_types::never { refine(g, f, m.binding(n.a).ty, value.ty); }
+    if value.ty != blot_direct_types::never {
+        refine(g, f, m.binding(n.a).ty, value.ty);
+        if isFreshBoxedRhs(g, f, m, n.b, value.ty) {
+            blot_support_zigmap::put(g.s.map_pool, f.unique_boxed, n.a, 1);
+        }
+    }
     bindPut(g, f, n.a, value);
     if value.ty == blot_direct_types::never { return value, blot_direct_types::Error.none; }
     return unitVal(), blot_direct_types::Error.none;
+}
+fn bindingCaptured(m: const Module&, binding: u32) -> bool {
+    for closure in m.closures {
+        for captured in m.extra[closure.captures.start..closure.captures.start + closure.captures.len] {
+            if captured == binding { return true; }
+        }
+    }
+    return false;
+}
+fn isUniqueBoxed(g: const Generator&, f: const Fn&, binding: u32) -> bool {
+    let val, present = blot_support_zigmap::get(g.s.map_pool, f.unique_boxed, binding);
+    return present && val != 0;
+}
+fn isFreshBoxedRhs(g: Generator&, f: const Fn&, m: const Module&, id: u32, ty: Ty) -> bool {
+    if id == 0 { return false; }
+    let boxed, error = g.types.boxed(ty);
+    if error != blot_direct_types::Error.none || !boxed { return false; }
+    let n = m.node(id);
+    match n.tag {
+        construct, record, record_merge, update => { return true; },
+        reference => {
+            let local_id = localRef(m, id);
+            return local_id != 0 && isUniqueBoxed(g, f, local_id) && uses(g, f, local_id) == 1 && !bindingCaptured(m, local_id);
+        },
+        if_value => {
+            return isFreshBoxedNode(m, n.b, 0) && isFreshBoxedNode(m, n.c, 0);
+        },
+        match_ => {
+            for arm in m.matchArms(id) {
+                if !isFreshBoxedNode(m, arm.body, 0) { return false; }
+            }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+recursive fn isFreshBoxedNode(m: const Module&, id: u32, depth: i64) -> bool {
+    if id == 0 || depth > 16 { return false; }
+    let n = m.node(id);
+    match n.tag {
+        construct, record, record_merge, update => { return true; },
+        suite => {
+            let items = m.children(id);
+            if items.len == 0 { return false; }
+            return isFreshBoxedNode(m, items[items.len - 1], depth + 1);
+        },
+        if_value => { return isFreshBoxedNode(m, n.b, depth + 1) && isFreshBoxedNode(m, n.c, depth + 1); },
+        match_ => {
+            for arm in m.matchArms(id) { if !isFreshBoxedNode(m, arm.body, depth + 1) { return false; } }
+            return true;
+        },
+        _ => { return false; },
+    }
+}
+fn tailConstruct(m: const Module&, id: u32) -> u32 {
+    var cursor = id;
+    for step in 0..8 {
+        if cursor == 0 { return 0; }
+        let n = m.node(cursor);
+        if n.tag == blot_check_core::Tag.construct { return cursor; }
+        if n.tag == blot_check_core::Tag.suite {
+            let items = m.children(cursor);
+            if items.len == 0 { return 0; }
+            cursor = items[items.len - 1];
+            continue;
+        }
+        return 0;
+    }
+    return 0;
 }
 
 fn constant(g: Generator&, f: Fn&, id: u32, bits: u32, literal:bool=false) -> Val, Error {

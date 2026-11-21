@@ -2596,6 +2596,9 @@ return blot_check_core::Tag.task,blot_error::Error.none;},
 storage=>{
 return blot_check_core::Tag.storage,blot_error::Error.none;},
 
+fork_=>{
+return blot_check_core::Tag.fork_,blot_error::Error.none;},
+
 }
 
 }
@@ -6380,6 +6383,9 @@ task=>{
 },
 
 storage=>{
+},
+
+fork_=>{
 },
 
 }

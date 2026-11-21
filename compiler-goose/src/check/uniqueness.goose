@@ -228,6 +228,10 @@ root struct Analyzer {
     reader_state: u8[>..] = [],
     reader_arity: u8[>..] = [],
     identity_ids: dictionary<u64, u32> = dictionary<u64, u32> {},
+    in_fork: u32 = 0,
+    fork_taint: u32[>..] = [],
+    block_taint: dictionary<u32, u32> = dictionary<u32, u32> {},
+    non_freezable: bool[>..] = [],
     members: dictionary<u64, u32> = dictionary<u64, u32> {},
     lends_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
     calls_cache: dictionary<u32, u8> = dictionary<u32, u8> {},
@@ -285,7 +289,7 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
         if member.target.unit != 0 && member.target.unit != module.unit { continue; }
         if member.target.binding != 0 && member.target.binding < analyzer.member_kind.len { analyzer.member_kind[member.target.binding] = 2; }
     }
-    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.killer.push(0); analyzer.loan_holds.push(0); analyzer.loan_ended.push(false); analyzer.ever_read.push(false); analyzer.kills.push(0); analyzer.blame.push(0); analyzer.flows.push(false); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); }
+    for at in 0..module.bindings.len { analyzer.facts.push(none); analyzer.touch.push(0); analyzer.killer.push(0); analyzer.loan_holds.push(0); analyzer.loan_ended.push(false); analyzer.ever_read.push(false); analyzer.kills.push(0); analyzer.blame.push(0); analyzer.flows.push(false); analyzer.born.push(0); analyzer.home.push(0); analyzer.stamp.push(0); analyzer.changed_slot.push(-1); analyzer.fork_taint.push(0); analyzer.non_freezable.push(false); }
     for at in 0..module.nodes.len { analyzer.last_read.push(false); }
     for merge in module.merges {
         if merge.then_binding < analyzer.flows.len { analyzer.flows[merge.then_binding] = true; }
@@ -297,6 +301,7 @@ fn check(module: const Module&, out: blot_check_core::Diagnostic[>..<]&) {
     }
     for body, index in module.bodies {
         if index == 0 || body.root == 0 { continue; }
+        analyzer.in_fork = 0;
         // An `own` parameter arrives unique all the way down: every call
         // names this function and gives up an argument that was.
         let own = module.bindings[body.binding].capability_parameters.own;
@@ -903,8 +908,6 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
     if blot_check_storage_types::identity(n.a, n.b).present {
         let kind = blot_check_storage_types::identity(n.a, n.b).value;
         if kind == blot_check_storage_types::shared {
-            if want != 2 { return false; }
-            for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
             return false;
         }
         if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize || kind == blot_check_storage_types::sized_array || kind == blot_check_storage_types::sized_grow || kind == blot_check_storage_types::sized_resize {
@@ -1142,6 +1145,7 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { exits: exits, .. };
     }
     if tag == blot_check_core::Tag.block_ { return block_(self_, m, id); }
+    if tag == blot_check_core::Tag.fork_ { return forkNode(self_, m, id); }
     if tag == blot_check_core::Tag.bind {
         let value = m.node(n.b);
         if value.tag == blot_check_core::Tag.update && !m.updateInfo(n.b).store { return update(self_, m, n.b, n.a); }
@@ -1165,11 +1169,17 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if found && target.binding == result.origin && target.len != 0 { symbol = target.fields[0]; }
             borrow(self_, n.a, result.origin, symbol);
             if !self_.ever_read[n.a] && self_.loan_holds[n.a] != 0 { self_.loan_ended[n.a] = true; }
+            if self_.in_fork != 0 { setForkTaint(self_, n.a, nodeTaint(self_, m, n.b, 0)); }
+            if closureNonFreezable(self_, m, n.b) { setNonFreezable(self_, n.a, true); }
             return Value { exits: result.exits, .. };
         }
         let fact = taken(self_, m, n.b, result);
         define(self_, n.a, fact);
-        if local(self_, n.a) { self_.blame[n.a] = n.b; }
+        if local(self_, n.a) {
+            self_.blame[n.a] = n.b;
+            if self_.in_fork != 0 { setForkTaint(self_, n.a, nodeTaint(self_, m, n.b, 0)); }
+            if closureNonFreezable(self_, m, n.b) { setNonFreezable(self_, n.a, true); }
+        }
         return Value { exits: result.exits, .. };
     }
     if tag == blot_check_core::Tag.update { return update(self_, m, id, 0); }
@@ -1214,6 +1224,14 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             fact = taken(self_, m, n.a, result);
         }
         if leaves && n.a != 0 && !result.exits && resultChecked(self_, m, n.b, m.typeOf(n.a)) && !ownedAs(self_, m, fact, m.typeOf(n.a), 0) { reject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned); }
+        if self_.in_fork != 0 && n.a != 0 && !result.exits {
+            let taint = nodeTaint(self_, m, n.a, 0);
+            if leaves && taint >= self_.in_fork && (holds(self_, m, m.typeOf(n.a)) || blot_check_storage_types::isShared(m.types, m.typeOf(n.a))) {
+                reject(self_, m, culprit(self_, m, n.a), blot_check_core::Code.result_not_owned);
+            } else if taint != 0 {
+                markBlockTaint(self_, n.b, taint);
+            }
+        }
         if leaves { return Value { exits: true, .. }; }
         var at = self_.blocks.len;
         while at != 0 {
@@ -1233,6 +1251,10 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         // are each their name's alone.
         let whole = visit(self_, m, n.b);
         if taken(self_, m, n.b, whole) == deep { ownPattern(self_, m, n.a, 0); }
+        if self_.in_fork != 0 {
+            let taint = nodeTaint(self_, m, n.b, 0);
+            if taint != 0 { taintPattern(self_, m, n.a, taint, 0); }
+        }
         if n.c != 0 {
             let mark = self_.trail.len;
             self_.tentative += 1;
@@ -2478,6 +2500,7 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
             if selectors.len == 0 { for projection in m.updatePath(id) { leaf = field(self_, leaf, m.projection(projection).field); } }
         }
         define(self_, info.self_binding, leaf);
+        if self_.in_fork != 0 { setForkTaint(self_, info.self_binding, nodeTaint(self_, m, info.root, 0)); }
     }
     let value = visit(self_, m, info.value);
     let replacement = taken(self_, m, info.value, value);
@@ -2510,10 +2533,11 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
         if self_.fields.len > mark { first = self_.fields[mark]; }
         self_.fields.resize(mark);
         define(self_, successor, replaced);
+        if self_.in_fork != 0 && local(self_, successor) { setForkTaint(self_, successor, maxU32(nodeTaint(self_, m, info.root, 0), nodeTaint(self_, m, info.value, 0))); }
         moveLoans(self_, root.origin, successor, first);
         return Value { exits: value.exits, .. };
     }
-    if !accepts(self_, m, old, selectors) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
+    if !accepts(self_, m, old, selectors) || (self_.in_fork != 0 && local(self_, root.origin) && self_.function_roots.len != 0 && self_.home[root.origin] != self_.function_roots[self_.function_roots.len - 1]) { reject(self_, m, id, blot_check_core::Code.aliased_update); }
     for step in selectors {
         if step.kind == blot_check_core::UpdateKind.index { break; }
         self_.fields.push(m.projection(step.projection).field);
@@ -2524,6 +2548,7 @@ recursive fn update(self_: Analyzer&, m: const Module&, id: u32, successor: u32)
     if self_.fields.len > mark { through = self_.fields[mark]; }
     self_.fields.resize(mark);
     define(self_, successor, next);
+    if self_.in_fork != 0 && local(self_, successor) { setForkTaint(self_, successor, maxU32(nodeTaint(self_, m, info.root, 0), nodeTaint(self_, m, info.value, 0))); }
     moveLoans(self_, root.origin, successor, through);
     return Value { exits: value.exits, .. };
 }
@@ -2682,9 +2707,16 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { fact: deep, exits: container.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.share {
-            // `freeze x`: takes over a linear value in O(1) and produces `*T`.
+            // `freeze x`: takes over a linear value in O(1) and produces `*T`,
+            // or freezes a closure/partial application into `*(A -> B)` (2B)
+            // provided all captures are inline or `*T` (no linear/borrowed captures).
             let child = children[0];
             let input_ty = m.typeOf(child);
+            if m.types.node(input_ty).tag == blot_check_types::Tag.function {
+                let container = visit(self_, m, child);
+                if closureNonFreezable(self_, m, child) { reject(self_, m, child, blot_check_core::Code.own_function_value); }
+                return Value { fact: none, exits: container.exits, .. };
+            }
             if blot_check_storage_types::isShared(m.types, input_ty) || !holds(self_, m, input_ty) {
                 let container = visit(self_, m, child);
                 return Value { fact: none, exits: container.exits, .. };
@@ -2874,6 +2906,10 @@ recursive fn loop_(self_: Analyzer&, m: const Module&, id: u32) -> Value {
     for carry, at in carries {
         let met = meet(self_, self_.loop_facts[assumed + at], self_.loop_facts[outgoing + at]);
         define(self_, carry.outgoing, met);
+        if self_.in_fork != 0 {
+            let ct = maxU32(getForkTaint(self_, carry.incoming), getForkTaint(self_, carry.backedge));
+            if ct != 0 { setForkTaint(self_, carry.outgoing, maxU32(getForkTaint(self_, carry.outgoing), ct)); }
+        }
         if aliasing && carry.outgoing < m.bindings.len {
             let ty = m.bindings[carry.outgoing].ty;
             if holds(self_, m, ty) && !ownedAs(self_, m, met, ty, 0) { kept = true; }
@@ -2897,7 +2933,13 @@ recursive fn loopPass(self_: Analyzer&, m: const Module&, id: u32, carries: cons
     for at in 0..count * 2 { self_.carried.push(top); }
     self_.loops.push(LoopFrame { id: id, start: start, len: count });
     // Defined inside the frame: each iteration has its own version.
-    for carry, at in carries { define(self_, carry.iteration, self_.loop_facts[assumed + at]); }
+    for carry, at in carries {
+        define(self_, carry.iteration, self_.loop_facts[assumed + at]);
+        if self_.in_fork != 0 {
+            let ct = maxU32(getForkTaint(self_, carry.incoming), getForkTaint(self_, carry.backedge));
+            if ct != 0 { setForkTaint(self_, carry.iteration, maxU32(getForkTaint(self_, carry.iteration), ct)); }
+        }
+    }
     let body = visit(self_, m, info.body);
     self_.loops.resize(self_.loops.len - 1);
     for carry, at in carries {
@@ -2931,6 +2973,13 @@ recursive fn breakNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             if value.origin != 0 { fact = none; }
         }
         if !found || position >= frame.len { continue; }
+        if self_.in_fork != 0 && n.op != blot_check_core::Op.continue_ {
+            let taint = nodeTaint(self_, m, child, 0);
+            if taint != 0 {
+                let loop_carries = m.loopCarries(n.a);
+                if position < loop_carries.len { setForkTaint(self_, loop_carries[position].outgoing, maxU32(getForkTaint(self_, loop_carries[position].outgoing), taint)); }
+            }
+        }
         var slot = frame.start + position;
         if n.op != blot_check_core::Op.continue_ { slot += frame.len; }
         let met = meet(self_, self_.carried[slot], fact);
@@ -3008,6 +3057,10 @@ fn finish(self_: Analyzer&, join: Join&) -> Value {
         var fact = self_.merged[join.merged_start + index];
         if fact == top { fact = none; }
         define(self_, merge.result, fact);
+        if self_.in_fork != 0 {
+            let mt = maxU32(getForkTaint(self_, merge.then_binding), getForkTaint(self_, merge.else_binding));
+            if mt != 0 { setForkTaint(self_, merge.result, mt); }
+        }
     }
     var release = self_.changed.len;
     while release > join.changed_start {
@@ -3019,4 +3072,238 @@ fn finish(self_: Analyzer&, join: Join&) -> Value {
     var value = join.value;
     if value == top { value = none; }
     return Value { fact: value, exits: join.exits, .. };
+}
+
+// ---- Speculative fork & 2B frozen closures -----------------------------
+
+fn maxU32(a: u32, b: u32) -> u32 { if a >= b { return a; } return b; }
+fn setForkTaint(self_: Analyzer&, binding: u32, taint: u32) {
+    if local(self_, binding) { self_.fork_taint[binding] = taint; }
+}
+fn getForkTaint(self_: const Analyzer&, binding: u32) -> u32 {
+    if !local(self_, binding) { return 0; }
+    return self_.fork_taint[binding];
+}
+fn markBlockTaint(self_: Analyzer&, block_id: u32, taint: u32) {
+    if taint == 0 { return; }
+    let prev .= self_.block_taint.get(block_id);
+    var merged = taint;
+    if prev { let old: u32 = prev; merged = maxU32(old, taint); }
+    self_.block_taint.insert(block_id, merged);
+}
+fn setNonFreezable(self_: Analyzer&, binding: u32, value: bool) {
+    if local(self_, binding) { self_.non_freezable[binding] = value; }
+}
+fn isNonFreezable(self_: const Analyzer&, binding: u32) -> bool {
+    return local(self_, binding) && self_.non_freezable[binding];
+}
+recursive fn taintPattern(self_: Analyzer&, m: const Module&, pattern: u32, taint: u32, depth: i64) {
+    if pattern == 0 || pattern >= m.patterns.len || depth > 64 { return; }
+    let shape = m.pattern(pattern);
+    if shape.tag == blot_check_core::PatternTag.bind { setForkTaint(self_, shape.a, maxU32(getForkTaint(self_, shape.a), taint)); return; }
+    if shape.tag == blot_check_core::PatternTag.product { for child in m.patternChildren(pattern) { taintPattern(self_, m, child, taint, depth + 1); } return; }
+    if shape.tag == blot_check_core::PatternTag.constructor || shape.tag == blot_check_core::PatternTag.record_payload { taintPattern(self_, m, shape.b, taint, depth + 1); }
+}
+// Maximum fork depth whose shadowed storage `id` may alias (0 = untainted).
+recursive fn nodeTaint(self_: Analyzer&, m: const Module&, id: u32, depth: i64) -> u32 {
+    if id == 0 || id >= m.nodes.len || depth > 32 { return 0; }
+    let n = m.node(id);
+    if !holds(self_, m, n.ty) && !blot_check_storage_types::isShared(m.types, n.ty) { return 0; }
+    if n.tag == blot_check_core::Tag.reference {
+        let target = m.reference(id);
+        if target.unit != 0 && target.unit != m.unit { return 0; }
+        return getForkTaint(self_, target.binding);
+    }
+    if n.tag == blot_check_core::Tag.project {
+        let _, is_copy = memberCopy(self_, m, id);
+        if is_copy && !elementHolds(self_, m, n.ty) { return 0; }
+        return nodeTaint(self_, m, n.a, depth + 1);
+    }
+    if n.tag == blot_check_core::Tag.storage {
+        let children = m.children(id);
+        if children.len == 0 { return 0; }
+        let op, unknown = blot_check_storage_ops::opFromCode(n.c);
+        if unknown == blot_error::Error.none && op == blot_check_storage_ops::Op.copy {
+            if !blot_check_storage_types::arrayElement(m.types, n.ty).present || !elementHolds(self_, m, n.ty) { return 0; }
+        }
+        return nodeTaint(self_, m, children[0], depth + 1);
+    }
+    if n.tag == blot_check_core::Tag.array_op {
+        let op = m.arrayOperation(id);
+        let children = m.children(id);
+        if op == blot_backend_collection_ops::Op.slice || op == blot_backend_collection_ops::Op.concat || op == blot_backend_collection_ops::Op.set || op == blot_backend_collection_ops::Op.convert || op == blot_backend_collection_ops::Op.prepend || op == blot_backend_collection_ops::Op.append || op == blot_backend_collection_ops::Op.flatten {
+            if !elementHolds(self_, m, n.ty) { return 0; }
+        }
+        var best: u32 = 0;
+        for child in children { best = maxU32(best, nodeTaint(self_, m, child, depth + 1)); }
+        return best;
+    }
+    if n.tag == blot_check_core::Tag.call {
+        var best: u32 = 0;
+        for child in m.call(id).arguments { best = maxU32(best, nodeTaint(self_, m, child, depth + 1)); }
+        return best;
+    }
+    if n.tag == blot_check_core::Tag.apply || n.tag == blot_check_core::Tag.record_merge {
+        return maxU32(nodeTaint(self_, m, n.a, depth + 1), nodeTaint(self_, m, n.b, depth + 1));
+    }
+    if n.tag == blot_check_core::Tag.construct { return nodeTaint(self_, m, n.b, depth + 1); }
+    if n.tag == blot_check_core::Tag.product || n.tag == blot_check_core::Tag.record || n.tag == blot_check_core::Tag.array {
+        var best: u32 = 0;
+        for child in m.children(id) { best = maxU32(best, nodeTaint(self_, m, child, depth + 1)); }
+        return best;
+    }
+    if n.tag == blot_check_core::Tag.if_value {
+        return maxU32(nodeTaint(self_, m, n.b, depth + 1), nodeTaint(self_, m, n.c, depth + 1));
+    }
+    if n.tag == blot_check_core::Tag.match_ {
+        var best: u32 = 0;
+        for case_ in m.matchArms(id) { best = maxU32(best, nodeTaint(self_, m, case_.body, depth + 1)); }
+        return best;
+    }
+    if n.tag == blot_check_core::Tag.update {
+        let info = m.updateInfo(id);
+        return maxU32(nodeTaint(self_, m, info.root, depth + 1), nodeTaint(self_, m, info.value, depth + 1));
+    }
+    if n.tag == blot_check_core::Tag.block_ || n.tag == blot_check_core::Tag.fork_ {
+        var key = id;
+        if n.tag == blot_check_core::Tag.fork_ { key = n.a; }
+        let found .= self_.block_taint.get(key);
+        if found { let v: u32 = found; return v; }
+        return 0;
+    }
+    if n.tag == blot_check_core::Tag.closure {
+        var best: u32 = 0;
+        for captured in m.closureCaptures(id) { best = maxU32(best, getForkTaint(self_, captured)); }
+        return best;
+    }
+    return 0;
+}
+// Whether function expression `id` captures linear/borrowed storage or an
+// unfrozen callable and therefore cannot be frozen into `*(A -> B)` (2B).
+recursive fn closureNonFreezable(self_: Analyzer&, m: const Module&, id: u32) -> bool {
+    if id == 0 || id >= m.nodes.len { return false; }
+    let n = m.node(id);
+    if n.tag == blot_check_core::Tag.closure {
+        for binding in m.closureCaptures(id) {
+            if binding == 0 || binding >= m.bindings.len { continue; }
+            let cap_ty = m.bindings[binding].ty;
+            if holds(self_, m, cap_ty) || openType(m, cap_ty, 0) { return true; }
+        }
+        return false;
+    }
+    if n.tag == blot_check_core::Tag.call {
+        if m.call(id).own != 0 { return true; }
+        for arg in m.call(id).arguments {
+            let arg_ty = m.typeOf(arg);
+            if holds(self_, m, arg_ty) || openType(m, arg_ty, 0) { return true; }
+        }
+        return false;
+    }
+    if n.tag == blot_check_core::Tag.apply {
+        let arg_ty = m.typeOf(n.b);
+        if holds(self_, m, arg_ty) || openType(m, arg_ty, 0) { return true; }
+        return closureNonFreezable(self_, m, n.a);
+    }
+    if n.tag == blot_check_core::Tag.reference {
+        let target = m.reference(id);
+        if (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding) {
+            if isNonFreezable(self_, target.binding) { return true; }
+            let b = m.bindings[target.binding];
+            if b.kind == blot_reuse_principal_interface::Kind.parameter && !blot_check_storage_types::isShared(m.types, b.ty) && m.types.node(b.ty).tag == blot_check_types::Tag.function { return true; }
+            return false;
+        }
+        let named = calleeBinding(self_, m, id);
+        if named != 0 && m.bindings[named].capability_parameters.own != 0 { return true; }
+        return false;
+    }
+    if n.tag == blot_check_core::Tag.project {
+        if m.dispatchSignature(id) != 0 {
+            let recv_ty = m.typeOf(n.a);
+            if holds(self_, m, recv_ty) || openType(m, recv_ty, 0) { return true; }
+        }
+        return false;
+    }
+    if n.tag == blot_check_core::Tag.operation_value { return true; }
+    if n.tag == blot_check_core::Tag.if_value {
+        return closureNonFreezable(self_, m, n.b) || closureNonFreezable(self_, m, n.c);
+    }
+    if n.tag == blot_check_core::Tag.match_ {
+        for case_ in m.matchArms(id) { if closureNonFreezable(self_, m, case_.body) { return true; } }
+        return false;
+    }
+    return false;
+}
+recursive fn forkNode(self_: Analyzer&, m: const Module&, id: u32) -> Value {
+    let n = m.node(id);
+    let block_id = n.a;
+    let entry_count = n.b as i64;
+    let children = m.children(block_id);
+    // Verify each forked outer variable is live and uniquely owned (not aliased).
+    for at in 0..entry_count {
+        let bind_node = m.node(children[at]);
+        let outer_ref = bind_node.b;
+        let target = m.reference(outer_ref);
+        let is_local = (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding);
+        if is_local { read(self_, target.binding, outer_ref); }
+        if !self_.dry {
+            if is_local && self_.facts[target.binding] == spent {
+                reject(self_, m, outer_ref, blot_check_core::Code.spent_value);
+            } else if holds(self_, m, m.typeOf(outer_ref)) {
+                if !is_local || !ownedAs(self_, m, self_.facts[target.binding], m.typeOf(outer_ref), 0) {
+                    reject(self_, m, outer_ref, blot_check_core::Code.aliased_update);
+                }
+            }
+        }
+    }
+    let mark = self_.trail.len;
+    let loan_mark = self_.loans.len;
+    let outer_owned = self_.owned_result;
+    let outer_exempt = self_.exempt_root;
+    let outer_keeps = self_.keeps_root;
+    let outer_mark = self_.statement_mark;
+    let outer_loops = self_.statement_loops;
+    let outer_roots = self_.statement_roots;
+    let outer_tentative = self_.statement_tentative;
+    self_.owned_result = block_id;
+    self_.exempt_root = 0;
+    self_.keeps_root = 0;
+    self_.in_fork += 1;
+    let depth_level = self_.in_fork;
+    self_.function_roots.push(block_id);
+    self_.blocks.push(BlockFrame { id: block_id, .. });
+    for at in 0..entry_count {
+        let bind_node = m.node(children[at]);
+        let inner = bind_node.a;
+        define(self_, inner, deep);
+        setForkTaint(self_, inner, depth_level);
+    }
+    for at in entry_count..children.len {
+        let child = children[at];
+        self_.statement_mark = loan_mark;
+        self_.statement_loops = self_.loops.len;
+        self_.statement_roots = self_.function_roots.len;
+        self_.statement_tentative = self_.tentative;
+        let discarded = m.node(child).tag == blot_check_core::Tag.call || m.node(child).tag == blot_check_core::Tag.apply;
+        let ends = self_.briefs.len;
+        if discarded { self_.brief_node = child; }
+        let _ = visit(self_, m, child);
+        self_.brief_node = 0;
+        if discarded { endBriefs(self_, ends); }
+        giveBackLoans(self_, loan_mark, false);
+    }
+    giveBackLoans(self_, loan_mark, true);
+    self_.blocks.resize(self_.blocks.len - 1);
+    self_.function_roots.resize(self_.function_roots.len - 1);
+    self_.in_fork -= 1;
+    self_.owned_result = outer_owned;
+    self_.exempt_root = outer_exempt;
+    self_.keeps_root = outer_keeps;
+    self_.statement_mark = outer_mark;
+    self_.statement_loops = outer_loops;
+    self_.statement_roots = outer_roots;
+    self_.statement_tentative = outer_tentative;
+    undo(self_, mark);
+    var fact: Fact = none;
+    if holds(self_, m, n.ty) { fact = deep; }
+    return Value { fact: fact, .. };
 }

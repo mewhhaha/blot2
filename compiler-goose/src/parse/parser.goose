@@ -378,6 +378,7 @@ let a_package_unpack=blot_parse_ast::tag_package_unpack;
 let a_type_code=blot_parse_ast::tag_type_code;
 let a_type_descriptor=blot_parse_ast::tag_type_descriptor;
 let a_task_region=blot_parse_ast::tag_task_region;
+let a_fork_expr=blot_parse_ast::tag_fork_expr;
 let c_expected_token=blot_parse_ast::code_expected_token;
 let c_expected_expression=blot_parse_ast::code_expected_expression;
 let c_expected_type=blot_parse_ast::code_expected_type;
@@ -633,8 +634,38 @@ recursive fn effect_row_body(p: Parser&,source: const u8[:],tokens: const Token[
  var tail: Id=0; if eat(p,source,tokens,t_pipe) { let t=current(p,source,tokens); let name=lower_identifier(p,source,tokens); tail=add(p,source,tokens,a_type_name,name,0,0,t.start); }
  expect(p,source,tokens,t_r_brace); let range=list(p,source,tokens,labels.items); let __cleanup_result_37_0: Id = add(p,source,tokens,a_effect_row,range.start,range.len,tail,start); labels.deinit(); return __cleanup_result_37_0;
  labels.deinit(); }
+fn fork_ahead(p: Parser&,source: const u8[:],tokens: const Token[:]) -> bool {
+ if !at(p,source,tokens,t_identifier)||!word(p,source,tokens,"fork") { return false; }
+ var scan=p.index+1;
+ if scan>=tokens.len||tokens[scan].tag!=t_identifier { return false; }
+ scan++;
+ while scan<tokens.len&&tokens[scan].tag==t_comma {
+  scan++;
+  if scan>=tokens.len||tokens[scan].tag!=t_identifier { return false; }
+  scan++;
+ }
+ return scan<tokens.len&&tokens[scan].tag==t_colon;
+}
+recursive fn fork_expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
+ let start=advance(p,source,tokens).start;
+ var entries=ScratchIdBuffer {};
+ while p.failure==blot_error::Error.none {
+  let pt=current(p,source,tokens).start;
+  let sym=lower_identifier(p,source,tokens);
+  let outer=add(p,source,tokens,a_name,sym,0,0,pt);
+  entries.push(add(p,source,tokens,a_field,sym,outer,0,pt));
+  if !eat(p,source,tokens,t_comma) { break; }
+ }
+ expect(p,source,tokens,t_colon);
+ let body=suite(p,source,tokens);
+ let range=list(p,source,tokens,entries.items);
+ let result: Id = add(p,source,tokens,a_fork_expr,range.start,range.len,body,start);
+ entries.deinit();
+ return result;
+}
 recursive fn expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if !enter(p,source,tokens) { return 0; }
+ if fork_ahead(p,source,tokens) { let __cleanup_result_fork_0: Id = fork_expression(p,source,tokens); { p.depth--; } return __cleanup_result_fork_0; }
  if at(p,source,tokens,t_identifier)&&word(p,source,tokens,"pack")&&peek(p,tokens,1)==t_l_bracket { let __cleanup_result_26_0: Id = package_pack(p,source,tokens); { p.depth--; } return __cleanup_result_26_0; }
  if at(p,source,tokens,t_identifier)&&word(p,source,tokens,"unpack")&&package_opening_ahead(p,tokens) { let __cleanup_result_27_0: Id = package_unpack(p,source,tokens); { p.depth--; } return __cleanup_result_27_0; }
  if at(p,source,tokens,t_kw_func) { let __cleanup_result_28_0: Id = lambda(p,source,tokens); { p.depth--; } return __cleanup_result_28_0; } if at(p,source,tokens,t_kw_do) { let __cleanup_result_29_0: Id = do_block(p,source,tokens); { p.depth--; } return __cleanup_result_29_0; } if at(p,source,tokens,t_kw_if) { let __cleanup_result_30_0: Id = if_expression(p,source,tokens); { p.depth--; } return __cleanup_result_30_0; } if at(p,source,tokens,t_kw_case) { let __cleanup_result_31_0: Id = case_expression(p,source,tokens); { p.depth--; } return __cleanup_result_31_0; } let __cleanup_result_32_0: Id = infix(p,source,tokens); { p.depth--; } return __cleanup_result_32_0;

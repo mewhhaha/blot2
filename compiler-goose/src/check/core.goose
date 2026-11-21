@@ -35,7 +35,7 @@ struct FieldName {
     symbol: u32,
     spelling: Name
 }
-enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage }
+enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage, fork_ }
 enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,
@@ -686,6 +686,7 @@ fn tagCode(value: Tag) -> u32 {
         resource_release => { return 53; },
         task => { return 54; },
         storage => { return 55; },
+        fork_ => { return 56; },
     }
 }
 fn tagFromCode(code: u32) -> Tag, blot_error::Error {
@@ -746,6 +747,7 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
         53 => { return Tag.resource_release, blot_error::Error.none; },
         54 => { return Tag.task, blot_error::Error.none; },
         55 => { return Tag.storage, blot_error::Error.none; },
+        56 => { return Tag.fork_, blot_error::Error.none; },
         _ => { return Tag.invalid, blot_error::Error.core_limit; },
     }
 }
