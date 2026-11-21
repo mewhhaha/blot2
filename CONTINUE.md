@@ -1,9 +1,18 @@
 # Working on Blot and Gdev
 
+An isolated Gdev backend now rebuilds a first-time simulation multiplication
+in **6.9 ms** median, including its **5.0 ms** reuse check, versus **99.0 ms**
+for full emission in the same binary. Input routing and `abs` edits also match
+fresh Wasm. Rendering still requires full emission because the edit renumbers
+a later closure. The production session timing for the simulation edit remains
+**182 ms**. A production path needs declaration identities and complete
+tracking of which bodies read each declaration across edits.
+[Structural replay measurements and outstanding work](tasks/FAST_COMPILE.md#replaying-a-structural-edit)
+
 On Gdev `cc4bbbf`, a running compiler rebuilds input, simulation and
 rendering edits in **201, 182 and 189 ms** median, down from **235, 206
 and 207 ms**. Fresh Main took **702 → 697 ms** across 32 pairs, within
-timing uncertainty. The next target is the backend on a structural edit.
+timing uncertainty. The structural replay experiment above isolates backend time.
 Adding a multiplication to one simulation call cost **117 ms** in the backend,
 and just **one of 7,028** emitted function bodies changed. Both GPU captures,
 the replay and both reference renderers matched.

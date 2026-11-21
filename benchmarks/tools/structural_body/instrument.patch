@@ -1,0 +1,147 @@
+--- a/types.goose
++++ b/types.goose
+@@ -114,7 +114,8 @@
+     holes: bool = false,
+     // What an unbound variable lowers to while `holes` is set.
+     hole_fill: Ty = 4,
+-    failure_reason: Text = "",
++    failure_reason: u8[256] = [0; 256],
++    failure_len: i64 = 0,
+     env_nodes: EnvNode[>..] = [],
+     // Scratch shared by the recursive walks; each use truncates to its mark.
+     scratch: u32[>..<] = [],
+@@ -330,10 +331,17 @@
+     return -1;
+ }
+
++// The probe retains Types after the Core revision that supplied diagnostic text.
++fn copyReason(self_: Types&, reason: Text) {
++    assert(reason.len <= self_.failure_reason.len);
++    for byte, i in reason { self_.failure_reason[i] = byte; }
++    self_.failure_len = reason.len;
++}
++
+ fn fail(self_: Types&, m: const Module&, ty: TId, reason: Text) -> Error {
+     self_.has_failure = true;
+     self_.failure = VarKey { m.unit, ty };
+-    self_.failure_reason = reason;
++    copyReason(self_, reason);
+     return Error.unsupported;
+ }
+
+@@ -598,7 +606,7 @@
+ fn variants(self_: Types&, ty: Ty) -> Variants, Error {
+     if self_.variant_cache[ty].present { return self_.variant_cache[ty].value, Error.none; }
+     if self_.node(ty).tag != Tag.nominal {
+-        self_.failure_reason = "constructor of a non-nominal type";
++        copyReason(self_, "constructor of a non-nominal type");
+         return Variants {}, Error.unsupported;
+     }
+     let identity = self_.nominalIdentity(ty);
+@@ -721,7 +729,7 @@
+             if !self_.recursive_[ty].present { self_.recursive_[ty] = Slot { true, 0, 0 }; }
+             return Slot { true, 0, 1 }, Error.none;
+         }
+-        self_.failure_reason = "recursive data type needs an indirection";
++        copyReason(self_, "recursive data type needs an indirection");
+         return Slot {}, Error.unsupported;
+     }
+     self_.in_layout[ty] = true;
+@@ -803,7 +811,7 @@
+                     }
+                     if any_v128 {
+                         self_.scratch.resize(mark);
+-                        self_.failure_reason = "SIMD payload in a sum type";
++                        copyReason(self_, "SIMD payload in a sum type");
+                         return Error.unsupported;
+                     }
+                     if all_f32 { self_.scratch_layout.push(blot_direct_writer::VT_f32); } else { self_.scratch_layout.push(i32w); }
+--- a/emit.goose
++++ b/emit.goose
+@@ -327,7 +327,7 @@
+ fn typeFailure(g: Generator&, m: const Module&, id: u32) -> Error {
+     failOpen(g, m, id);
+     put(g, "unsupported type (");
+-    put(g, g.types.failure_reason);
++    put(g, g.types.failure_reason[..g.types.failure_len]);
+     put(g, ") at a ");
+     if id != 0 && id < m.nodes.len { put(g, nodeTagName(m.node(id).tag)); } else { put(g, "declaration"); }
+     return failClose(g);
+@@ -512,9 +512,13 @@
+     var at = head;
+     while at != 0 {
+         let entry = g.s.index_nodes[at - 1];
+-        if sameKey(entry.key, key) { return entry.value, true; }
++        if sameKey(entry.key, key) {
++            trace(key, entry.value);
++            return entry.value, true;
++        }
+         at = entry.next;
+     }
++    trace(key, 4294967295);
+     return 0, false;
+ }
+ // Zig's instance_index.put: the key maps to `id` from now on.
+@@ -1021,3 +1025,8 @@
+     }
+     return blot_direct_types::Error.none;
+ }
++
++fn trace(key: InstanceKey, found: u32) {
++    traceLookup(kindCode(key.kind), key.unit, key.id, key.ty, key.parent, key.evidence_context, found);
++}
++extern fn traceLookup(kind:u32,unit:u32,id:u32,ty:u32,parent:u32,evidence:u32,found:u32)="body_lookup";
+--- a/function_entry.goose
++++ b/function_entry.goose
+@@ -139,7 +139,11 @@
+     let locals_mark = s.locals.len;
+     let labels_mark = s.labels.len;
+     let handles_mark = s.handles.len;
++    let instance=g.s.instances[id];
++    let track=instance.key.kind==blot_direct_emit::InstanceKind.named && isTarget(instance.key.unit,instance.key.id);
++    let prior=trackInstance(id,track,instance.inferring,g.s.instances.len as u32);
+     let error = emitInstanceBody(g, id);
++    restoreInstance(prior);
+     blot_direct_relocations::rewind(sites_mark);
+     s.code.resize(code_mark);
+     s.locals.resize(locals_mark);
+@@ -600,3 +604,7 @@
+         g.module.exportItem("blot:reset", blot_direct_writer::EXPORT_function, reset);
+     }
+ }
++
++extern fn trackInstance(id:u32,track:bool,inferring:bool,prior:u32)->u32="body_enter";
++extern fn isTarget(unit:u32,binding:u32)->bool="body_is_target";
++extern fn restoreInstance(id:u32)="body_leave";
+--- a/function_staging.goose
++++ b/function_staging.goose
+@@ -132,6 +132,7 @@
+     var root: u32 = 0;
+     var parameter: u32 = 0;
+     if fun.named {
++        stageRead(fun.unit,fun.target);
+         let body .= owner.body(fun.target);
+         if !body || !body.is_function || body.runtime || body.parameters.len != 1 { return stopStage(s, "#run needs a unary compile-time callback"); }
+         root = body.root;
+@@ -171,6 +172,7 @@
+         }
+         return callback;
+     }
++    stageRead(target.unit, target.binding);
+     blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+     let alias, primitive = primitiveAlias(owner, target.binding);
+     if primitive {
+@@ -243,6 +245,7 @@
+                 }
+                 return stopStage(s, "#run depends on a runtime binding");
+             }
++            stageRead(target.unit, target.binding);
+             blot_backend_native_assets::stageDefinition(g.build_inputs, target.unit, target.binding);
+             let body .= owner.body(target.binding);
+             var root = binding.initializer;
+@@ -545,3 +548,5 @@
+     }
+     return Val {ty, start, (g.s.words.len as u32) - start}, blot_direct_types::Error.none;
+ }
++
++extern fn stageRead(unit:u32,binding:u32)="body_stage_read";

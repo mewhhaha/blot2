@@ -3,6 +3,60 @@
 The long-term goal is one million source lines per second. The Gdev milestone
 measures a fresh process from project session open to receipt of complete Wasm.
 
+## Replaying a structural edit
+
+Adding `seconds * 0.5` to Gdev's simulation changes body 1149 from 832 to
+850 bytes. The other 7,027 function bodies and every other section are
+identical. Recompiling that one function in a retained backend produced the
+same complete 2,741,594-byte Wasm as an independent fresh build.
+
+| First edit on Gdev Main | Full backend | Check and replay | Revert via replay |
+| --- | ---: | ---: | ---: |
+| Scale simulation time | 99.0 ms | 6.9 ms | 6.9 ms |
+| Add an input condition | 100.1 ms | 6.8 ms | 6.9 ms |
+| Take the absolute value of elapsed time | 98.8 ms | 6.9 ms | 6.9 ms |
+
+![Median backend time for three first-time Gdev edits](../benchmarks/evidence/measurements/2026-11-21-gdev-structural-replay.png)
+
+Twelve counterbalanced trials per direction started with decoded checked
+modules. The full and replay paths used the same instrumented standalone
+binary. The replay medians include screening all 293 modules (about 5 ms)
+and assembling the complete image. Initial compilation, capture and decoding
+are outside the timings. The production session last measured 182 ms from the
+simulation edit to receipt of Wasm.
+
+The first prototype reused stale type mappings. All eight edit and revert
+trials either declined or produced different Wasm. In one case it replaced
+an 850-byte function with a 16-byte trap. The current probe rebuilds the
+edited declaration's type environment from its concrete instance type,
+resets caches indexed by revision-local Core IDs, and checks both recorded
+diagnostics and the order in which emission requested new instances.
+
+Three cases show the limits of reusing a single body.
+
+- Scaling a rendering parameter renumbers a later closure's Core node from
+  343 to 345. The emitter requests a new instance even though fresh Wasm
+  changes just body 3554. The experiment falls back in both directions.
+- Making a previously unused helper reachable adds one function. The fresh
+  result differs at 5,643 shared ordinals and in five other section types.
+  Adding it trips the layout check. Removing it trips the lookup-order check.
+- Changing a helper called through `#run` and at runtime changes both the
+  caller and the helper with the same function count. The recorded
+  compile-time read forces full emission in both directions.
+
+All 144 trials compared their baseline and full emissions with independent
+fresh Wasm. The 72 accepted replays also matched, for 360 complete-image
+checks. Each trial used a disposable generator. Integrating with sessions
+requires a way to discard speculative mutations, stable identities for
+closures and declarations, and accounting for compile-time evaluation and
+forwarding into other bodies. The benchmark selects the changed function
+from a known source edit and records lookups for that target during baseline
+emission. A production cache must handle a previously unknown edit target.
+
+[Benchmark and reproduction](../benchmarks/tools/structural_body/README.md) ·
+[Checksums and medians](../benchmarks/evidence/measurements/2026-11-21-gdev-structural-replay.json) ·
+[Paired trial timings](../benchmarks/evidence/measurements/2026-11-21-gdev-structural-replay.raw.json.gz)
+
 ## Checking game stages independently
 
 Gdev `cc4bbbf` gives input, fixed-step simulation and presentation their own

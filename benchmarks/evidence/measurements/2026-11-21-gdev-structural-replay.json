@@ -1,0 +1,222 @@
+{
+  "rounds": 12,
+  "identity": {
+    "compilerSha256": "7ecf4130c3df1c103b05723f19ebf165169a590dc44e02ffb457b33892154678",
+    "probeSha256": "d19af0df84f1dc38baf287c4dcee95ebee4bd7120abe9ab9149505c480a0dc86",
+    "compilerSourceTree": "923a7b5b74c69682e54c45d30550511421dc239b",
+    "stdTree": "b9c16d8c372300e6b3b438cdaa3b7e9285db1544",
+    "gdev": "cc4bbbf22d35d7b91acd02957a8bdce38bdda90b",
+    "ink": "77697fef9dda8caf06f5a7c92141372fa1e99cde",
+    "host": "x86_64",
+    "clang": "clang version 23.1.5"
+  },
+  "byteChecks": 360,
+  "images": {
+    "base": {
+      "bytes": 2741576,
+      "sha256": "fca784b74c5fd5bb36f0f9852683d70583a4440d560407f0bd528dfd08d5c00e"
+    },
+    "edge-base": {
+      "bytes": 2741576,
+      "sha256": "fca784b74c5fd5bb36f0f9852683d70583a4440d560407f0bd528dfd08d5c00e"
+    },
+    "edge-edit": {
+      "bytes": 2741689,
+      "sha256": "ccca855eca2112525e5a6520d859ddc1f2e31f3fd87988b65baa1e32517af0ee"
+    },
+    "helper": {
+      "bytes": 2741587,
+      "sha256": "cdbc7f0936389bbdd44ac5a2a46ee009ee624bd3752320df781b0fd99cb97b32"
+    },
+    "input": {
+      "bytes": 2741608,
+      "sha256": "c45aeb003bb10e391eee1340d34ce607d898c1192af9a24b5e59b75eda0d14f9"
+    },
+    "render": {
+      "bytes": 2741590,
+      "sha256": "531e6a8bb26a445d4b928563ce8060ad6eae0b1e83d74f223c86b9ecc724dd49"
+    },
+    "stage-base": {
+      "bytes": 2741667,
+      "sha256": "d9c3e572d44a3985ba13fbe5beccfc82adb0205c4370dff3f56c80b739d3a377"
+    },
+    "stage-edit": {
+      "bytes": 2741681,
+      "sha256": "4ed196a49b785006c22175e3650cf8c54e446394c41c9d41d125024c6d151a2a"
+    },
+    "timing": {
+      "bytes": 2741594,
+      "sha256": "6c8a29023ecc8a482dba3414c767d11c5c2d75bd7995c46bbeba4bc24fe156ac"
+    }
+  },
+  "bodyChanges": {
+    "timing": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          832,
+          850
+        ]
+      ]
+    },
+    "render": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          3554,
+          1071,
+          1085
+        ]
+      ]
+    },
+    "input": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1147,
+          949,
+          981
+        ]
+      ]
+    },
+    "helper": {
+      "oldCount": 7028,
+      "newCount": 7028,
+      "changedAtSharedOrdinals": 1,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          832,
+          843
+        ]
+      ]
+    },
+    "edge": {
+      "oldCount": 7028,
+      "newCount": 7029,
+      "changedAtSharedOrdinals": 5643,
+      "otherChangedSections": [
+        0,
+        3,
+        7,
+        8,
+        9
+      ]
+    },
+    "stage": {
+      "oldCount": 7029,
+      "newCount": 7029,
+      "changedAtSharedOrdinals": 2,
+      "otherChangedSections": [],
+      "bodySizes": [
+        [
+          1149,
+          857,
+          857
+        ],
+        [
+          1641,
+          29,
+          43
+        ]
+      ]
+    }
+  },
+  "median": {
+    "base to timing": {
+      "outcome": "accepted",
+      "fullMs": 99.025265,
+      "screenAndAttemptMs": 6.8811845,
+      "screenMs": 5.002453,
+      "reemitAndAssembleMs": 1.8813675
+    },
+    "timing to base": {
+      "outcome": "accepted",
+      "fullMs": 99.385821,
+      "screenAndAttemptMs": 6.8576695,
+      "screenMs": 4.9588465,
+      "reemitAndAssembleMs": 1.892737
+    },
+    "base to render": {
+      "outcome": "layout",
+      "fullMs": 98.4464985,
+      "screenAndAttemptMs": 5.1520675,
+      "screenMs": 4.983796,
+      "reemitAndAssembleMs": 0.168584
+    },
+    "render to base": {
+      "outcome": "layout",
+      "fullMs": 98.633045,
+      "screenAndAttemptMs": 5.2891665,
+      "screenMs": 5.116701,
+      "reemitAndAssembleMs": 0.166415
+    },
+    "base to input": {
+      "outcome": "accepted",
+      "fullMs": 100.101222,
+      "screenAndAttemptMs": 6.8281845,
+      "screenMs": 4.9567985,
+      "reemitAndAssembleMs": 1.8774925
+    },
+    "input to base": {
+      "outcome": "accepted",
+      "fullMs": 99.645046,
+      "screenAndAttemptMs": 6.8786975,
+      "screenMs": 4.992465,
+      "reemitAndAssembleMs": 1.8637985
+    },
+    "base to helper": {
+      "outcome": "accepted",
+      "fullMs": 98.8091085,
+      "screenAndAttemptMs": 6.9383365,
+      "screenMs": 4.986462,
+      "reemitAndAssembleMs": 1.885441
+    },
+    "helper to base": {
+      "outcome": "accepted",
+      "fullMs": 99.084141,
+      "screenAndAttemptMs": 6.9286825,
+      "screenMs": 4.9883905,
+      "reemitAndAssembleMs": 1.901651
+    },
+    "edge-base to edge-edit": {
+      "outcome": "layout",
+      "fullMs": 98.518663,
+      "screenAndAttemptMs": 5.16514,
+      "screenMs": 5.018438,
+      "reemitAndAssembleMs": 0.150634
+    },
+    "edge-edit to edge-base": {
+      "outcome": "lookup order",
+      "fullMs": 98.582254,
+      "screenAndAttemptMs": 5.169567,
+      "screenMs": 5.0211615,
+      "reemitAndAssembleMs": 0.14807
+    },
+    "stage-base to stage-edit": {
+      "outcome": "compile-time reader",
+      "fullMs": 98.6108615,
+      "screenAndAttemptMs": 5.008287,
+      "screenMs": 5.0080615,
+      "reemitAndAssembleMs": 0.0001855
+    },
+    "stage-edit to stage-base": {
+      "outcome": "compile-time reader",
+      "fullMs": 98.2973555,
+      "screenAndAttemptMs": 4.9978385,
+      "screenMs": 4.9976235,
+      "reemitAndAssembleMs": 0.0001755
+    }
+  }
+}
