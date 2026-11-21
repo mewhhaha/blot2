@@ -17,18 +17,14 @@ Deno.test("return exits the function while break value finishes the nearest do",
   );
 });
 
-Deno.test("return works in inferred and once closures", async () => {
+Deno.test("return works in inferred closures", async () => {
   await compileAndRun(
     `const identity = func value => return do:
   return value
-const make_once = func () : once (Unit -> U32) => return func () => return do:
-  return 7
 entry const generic = func () => return identity 9
-entry const one_shot = func () => return (make_once ()) ()
 `,
     (guest) => {
       equal(guest.call("generic", null), 9);
-      equal(guest.call("one_shot", null), 7);
     },
   );
 });

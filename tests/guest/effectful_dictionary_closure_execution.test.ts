@@ -1,31 +1,9 @@
-import { compileAndRun, compileExpectedFailure } from "./compile_helpers.ts";
+import { compileExpectedFailure } from "./compile_helpers.ts";
 import { deepStrictEqual as equal, match, ok } from "node:assert/strict";
 import { instantiateGuest } from "../../host/guest.ts";
 import { createZigProjectCompiler } from "../../host/zig_project_client.ts";
-import {
-  checkGuest,
-  program,
-  variant,
-} from "./effectful_dictionary_closure_helpers.ts";
 
-for (const helper of ["func value => return Render.show value", "Render.show"]) {
-  for (const asynchronous of [false, true]) {
-    // Pending the traits redesign (tasks/LANGUAGE_COHERENCE.md C).
-    Deno.test.ignore(`effectful ${helper} preserves the first application before returned closure calls (${asynchronous})`, async () => {
-      await compileAndRun(variant(helper), async (guest) => {
-        await checkGuest(guest, asynchronous);
-      }, { prelude: "none", asynchronous });
-    });
-  }
-}
-
-Deno.test("effectful dictionary closure rows cannot be erased or moved into callback parameters", async () => {
-  await compileExpectedFailure(
-    program.replace("(U32 -> U32) ! {Read}", "(U32 -> U32) ! {}"),
-    "effect_mismatch",
-    undefined,
-    { prelude: "none" },
-  );
+Deno.test("effectful callback rows cannot be erased when passed to pure callback parameters", async () => {
   await compileExpectedFailure(
     `effect Read: Unit -> U32
 const consume: (Unit -> U32 ! {}) -> U32 = func callback => return callback ()

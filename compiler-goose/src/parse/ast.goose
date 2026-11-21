@@ -312,7 +312,7 @@ struct TreeState {
 reusable var tree_states: TreeState[>..]=[];
 var next_tree_generation: u64=1;
 struct Tree {
-    owner_id: u64=0, lease: u32=0, generation: u64=0, has_typed_staging: bool=false, has_numeric_proofs: bool=false,
+    owner_id: u64=0, lease: u32=0, generation: u64=0, has_typed_staging: bool=false,
     nodes: NodeBuffer& =inactive_NodeBuffer,
     spans: SpanBuffer& =inactive_SpanBuffer,
     extra: WordBuffer& =inactive_WordBuffer,
@@ -328,9 +328,9 @@ struct Tree {
 fn valid(self_: const Tree&) -> bool { return self_.lease!=0 && self_.owner_id!=0 && self_.lease-1<tree_states.len && tree_states[self_.lease-1].owner_id==self_.owner_id && tree_states[self_.lease-1].generation==self_.generation; }
 // Reattach a live pooled header without copying or retaining syntax storage.
 fn canonical(self_:const Tree&)->Tree {
- if self_.lease==0 {assert(self_.owner_id==0 && self_.generation==0);assert(self_.nodes .== inactive_NodeBuffer && self_.spans .== inactive_SpanBuffer && self_.extra .== inactive_WordBuffer && self_.roots .== inactive_WordBuffer && self_.runtime_names .== inactive_NameBuffer && self_.constant_names .== inactive_NameBuffer && self_.declaration_traits .== inactive_TraitsBuffer && self_.declaration_nodes .== inactive_DeclarationBuffer && self_.diagnostics .== inactive_DiagnosticBuffer && self_.operator_origins .== inactive_OperatorBuffer && self_.type_conversion_origins .== inactive_ConversionBuffer);return Tree{has_typed_staging:self_.has_typed_staging,has_numeric_proofs:self_.has_numeric_proofs,..};}
+ if self_.lease==0 {assert(self_.owner_id==0 && self_.generation==0);assert(self_.nodes .== inactive_NodeBuffer && self_.spans .== inactive_SpanBuffer && self_.extra .== inactive_WordBuffer && self_.roots .== inactive_WordBuffer && self_.runtime_names .== inactive_NameBuffer && self_.constant_names .== inactive_NameBuffer && self_.declaration_traits .== inactive_TraitsBuffer && self_.declaration_nodes .== inactive_DeclarationBuffer && self_.diagnostics .== inactive_DiagnosticBuffer && self_.operator_origins .== inactive_OperatorBuffer && self_.type_conversion_origins .== inactive_ConversionBuffer);return Tree{has_typed_staging:self_.has_typed_staging,..};}
  assert(valid(self_));let state:TreeState& =tree_states[self_.lease-1];assert(self_.nodes .== state.nodes && self_.spans .== state.spans && self_.extra .== state.extra && self_.roots .== state.roots && self_.runtime_names .== state.runtime_names && self_.constant_names .== state.constant_names && self_.declaration_traits .== state.declaration_traits && self_.declaration_nodes .== state.declaration_nodes && self_.diagnostics .== state.diagnostics && self_.operator_origins .== state.operator_origins && self_.type_conversion_origins .== state.type_conversion_origins);
- return Tree{owner_id:self_.owner_id,lease:self_.lease,generation:self_.generation,has_typed_staging:self_.has_typed_staging,has_numeric_proofs:self_.has_numeric_proofs,nodes:state.nodes,spans:state.spans,extra:state.extra,roots:state.roots,runtime_names:state.runtime_names,constant_names:state.constant_names,declaration_traits:state.declaration_traits,declaration_nodes:state.declaration_nodes,diagnostics:state.diagnostics,operator_origins:state.operator_origins,type_conversion_origins:state.type_conversion_origins};
+ return Tree{owner_id:self_.owner_id,lease:self_.lease,generation:self_.generation,has_typed_staging:self_.has_typed_staging,nodes:state.nodes,spans:state.spans,extra:state.extra,roots:state.roots,runtime_names:state.runtime_names,constant_names:state.constant_names,declaration_traits:state.declaration_traits,declaration_nodes:state.declaration_nodes,diagnostics:state.diagnostics,operator_origins:state.operator_origins,type_conversion_origins:state.type_conversion_origins};
 }
 fn initPooled() -> Tree,TreeError {
     if next_tree_generation==0xffffffffffffffff || tree_states.len>=0xffffffff { return Tree {..},blot_error::Error.out_of_memory; }
@@ -371,7 +371,6 @@ fn copyParsed(self_:Tree&,previous:const Tree&)->TreeError {
     self_.operator_origins.append(previous.operator_origins.items);
     self_.type_conversion_origins.append(previous.type_conversion_origins.items);
     self_.has_typed_staging=previous.has_typed_staging;
-    self_.has_numeric_proofs=previous.has_numeric_proofs;
     return self_.failure();
 }
 fn failure(self_: const Tree&) -> TreeError {

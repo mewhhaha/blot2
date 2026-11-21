@@ -52,18 +52,6 @@ for field, raw_type in members('check/check.goose', 'Checked'):
         expression = 'blot_check_types::checkedView(value.types)'
     elif field == 'parameter_patterns':
         expression = 'blot_check_parameter_patterns::checkedView(value.parameter_patterns)'
-    elif field in ['proof_bodies', 'capability_contracts']:
-        file, name, prefix = ('check/numeric_proof_bodies.goose', 'Owned', 'body_')
-        if field == 'capability_contracts':
-            file, name, prefix = ('check/capability_contracts.goose', 'Collection', 'cap_')
-        nested = []
-        for child, child_type in members(file, name):
-            child_type = qualify(child_type, file)
-            if '[:]' not in child_type:
-                raise ValueError((field, child, child_type))
-            nested.append(child + ':' + checked_run(child_type, field + '.' + child, prefix + child))
-        typename = raw_type
-        expression = typename + '{' + ','.join(nested) + '}'
     elif field == 'editor':
         expression = 'editor'
     elif field not in ['owner', 'initializer_rejected', 'body_elaborations', 'imported_schemes', 'counters', 'unit']:

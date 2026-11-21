@@ -3,14 +3,10 @@
 namespace blot_reuse_dependency_payload;
 import backend.collection_ops;
 import backend.opaque_storage;
-import check.capability_contracts;
 import check.capability_flow;
 import check.core;
 import check.effects;
 import check.frozen_types;
-import check.numeric_proof_contracts;
-import check.numeric_proof_headers;
-import check.numeric_proof_terms;
 import check.parameter_patterns;
 import check.types;
 import parse.ast;
@@ -33,12 +29,6 @@ run_header_digest {values:HeaderDigest[:]},
 run_header_owner {values:Owner[:]},
 run_bool {values:bool[:]},
 run_u32 {values:u32[:]},
-run_blot_check_numeric_proof_terms__Kind {values:blot_check_numeric_proof_terms::Kind[:]},
-run_blot_check_numeric_proof_terms__Term {values:blot_check_numeric_proof_terms::Term[:]},
-run_blot_check_numeric_proof_contracts__Requirement {values:blot_check_numeric_proof_contracts::Requirement[:]},
-run_blot_check_numeric_proof_headers__Named {values:blot_check_numeric_proof_headers::Named[:]},
-run_blot_check_capability_contracts__Term {values:blot_check_capability_contracts::Term[:]},
-run_blot_check_capability_contracts__Binding {values:blot_check_capability_contracts::Binding[:]},
 run_blot_check_core__FieldName {values:blot_check_core::FieldName[:]},
 run_blot_check_core__TypeTag {values:blot_check_core::TypeTag[:]},
 run_blot_check_core__RuntimeName {values:blot_check_core::RuntimeName[:]},
@@ -51,7 +41,6 @@ run_blot_check_core__RequestArm {values:blot_check_core::RequestArm[:]},
 run_blot_check_types__Node {values:blot_check_types::Node[:]},
 run_blot_check_effects__Row {values:blot_check_effects::Row[:]},
 run_blot_check_types__Operation {values:blot_check_types::Operation[:]},
-run_blot_check_types__QuantifierGoals {values:blot_check_types::QuantifierGoals[:]},
 run_blot_check_types__Obligation {values:blot_check_types::Obligation[:]},
 run_blot_check_core__Node {values:blot_check_core::Node[:]},
 run_blot_parse_ast__Span {values:blot_parse_ast::Span[:]},
@@ -83,8 +72,6 @@ run_blot_reuse_principal_interface__ImplementationMember {values:blot_reuse_prin
 run_blot_reuse_principal_interface__MemberTemplate {values:blot_reuse_principal_interface::MemberTemplate[:]},
 run_blot_reuse_principal_interface__SelectedProof {values:blot_reuse_principal_interface::SelectedProof[:]},
 run_blot_check_core__SelectedUse {values:blot_check_core::SelectedUse[:]},
-run_blot_check_core__DictionarySelection {values:blot_check_core::DictionarySelection[:]},
-run_blot_check_core__DictionaryUse {values:blot_check_core::DictionaryUse[:]},
 run_blot_check_core__Primitive {values:blot_check_core::Primitive[:]},
 run_blot_check_core__LoopInfo {values:blot_check_core::LoopInfo[:]},
 run_blot_check_core__LoopCarry {values:blot_check_core::LoopCarry[:]},
@@ -117,17 +104,11 @@ reusable var leases:Lease[>..]=[];
 
 reusable[] var pool_u32:u32[>..]=[];
 
-reusable[] var pool_blot_check_numeric_proof_terms__Kind:blot_check_numeric_proof_terms::Kind[>..]=[];
 
-reusable[] var pool_blot_check_numeric_proof_terms__Term:blot_check_numeric_proof_terms::Term[>..]=[];
 
-reusable[] var pool_blot_check_numeric_proof_contracts__Requirement:blot_check_numeric_proof_contracts::Requirement[>..]=[];
 
-reusable[] var pool_blot_check_numeric_proof_headers__Named:blot_check_numeric_proof_headers::Named[>..]=[];
 
-reusable[] var pool_blot_check_capability_contracts__Term:blot_check_capability_contracts::Term[>..]=[];
 
-reusable[] var pool_blot_check_capability_contracts__Binding:blot_check_capability_contracts::Binding[>..]=[];
 
 reusable[] var pool_blot_check_core__FieldName:blot_check_core::FieldName[>..]=[];
 
@@ -153,7 +134,6 @@ reusable[] var pool_blot_check_effects__Row:blot_check_effects::Row[>..]=[];
 
 reusable[] var pool_blot_check_types__Operation:blot_check_types::Operation[>..]=[];
 
-reusable[] var pool_blot_check_types__QuantifierGoals:blot_check_types::QuantifierGoals[>..]=[];
 
 reusable[] var pool_blot_check_types__Obligation:blot_check_types::Obligation[>..]=[];
 
@@ -217,9 +197,7 @@ reusable[] var pool_blot_reuse_principal_interface__SelectedProof:blot_reuse_pri
 
 reusable[] var pool_blot_check_core__SelectedUse:blot_check_core::SelectedUse[>..]=[];
 
-reusable[] var pool_blot_check_core__DictionarySelection:blot_check_core::DictionarySelection[>..]=[];
 
-reusable[] var pool_blot_check_core__DictionaryUse:blot_check_core::DictionaryUse[>..]=[];
 
 reusable[] var pool_blot_check_core__Primitive:blot_check_core::Primitive[>..]=[];
 
@@ -274,17 +252,11 @@ run_bool run=>{pool_bool.free_slice(run.values);},
 
 run_u32 run=>{pool_u32.free_slice(run.values);},
 
-run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
 
-run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
 
-run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
 
-run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
 
-run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
 
-run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
 
 run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
 
@@ -310,7 +282,6 @@ run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.va
 
 run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
 
-run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
 
 run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
 
@@ -374,9 +345,7 @@ run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principa
 
 run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
 
-run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
 
-run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
 
 run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
 
@@ -442,89 +411,11 @@ fn cloneValue(self_:Owner&,values:const u32[:])->u32[:],Error {
  for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<u32[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self_:Owner&,sample:blot_check_numeric_proof_terms::Kind,length:i64)->blot_check_numeric_proof_terms::Kind[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_terms::Kind[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_terms::Kind[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_numeric_proof_terms__Kind.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_terms__Kind {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_terms__Kind.free_slice(run);return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_terms::Kind[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_terms__Kind.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_terms::Kind[:])->blot_check_numeric_proof_terms::Kind[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_terms::Kind>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Kind[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_numeric_proof_terms::Term,length:i64)->blot_check_numeric_proof_terms::Term[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_terms::Term[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_terms::Term[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_numeric_proof_terms__Term.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_terms__Term {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_terms__Term.free_slice(run);return default<blot_check_numeric_proof_terms::Term[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_terms::Term[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Term run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_terms__Term.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_terms::Term>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Term[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_terms::Term[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_numeric_proof_contracts::Requirement,length:i64)->blot_check_numeric_proof_contracts::Requirement[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_numeric_proof_contracts__Requirement.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_contracts__Requirement {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run);return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_contracts::Requirement[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_contracts__Requirement.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:])->blot_check_numeric_proof_contracts::Requirement[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_contracts::Requirement>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_contracts::Requirement[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_numeric_proof_headers::Named,length:i64)->blot_check_numeric_proof_headers::Named[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_numeric_proof_headers::Named[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_numeric_proof_headers::Named[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_numeric_proof_headers__Named.alloc_slice(length);let error=remember(self_,Run.run_blot_check_numeric_proof_headers__Named {run, ..});if error!=blot_error::Error.none {pool_blot_check_numeric_proof_headers__Named.free_slice(run);return default<blot_check_numeric_proof_headers::Named[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_numeric_proof_headers::Named[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_headers__Named run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_numeric_proof_headers__Named.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_numeric_proof_headers::Named[:])->blot_check_numeric_proof_headers::Named[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_numeric_proof_headers::Named>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_headers::Named[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_numeric_proof_headers::Named[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_capability_contracts::Term,length:i64)->blot_check_capability_contracts::Term[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_capability_contracts::Term[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_capability_contracts::Term[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_capability_contracts__Term.alloc_slice(length);let error=remember(self_,Run.run_blot_check_capability_contracts__Term {run, ..});if error!=blot_error::Error.none {pool_blot_check_capability_contracts__Term.free_slice(run);return default<blot_check_capability_contracts::Term[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_capability_contracts::Term[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Term run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_capability_contracts__Term.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_capability_contracts::Term>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Term[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Term[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_capability_contracts::Binding,length:i64)->blot_check_capability_contracts::Binding[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_capability_contracts::Binding[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_capability_contracts::Binding[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_capability_contracts__Binding.alloc_slice(length);let error=remember(self_,Run.run_blot_check_capability_contracts__Binding {run, ..});if error!=blot_error::Error.none {pool_blot_check_capability_contracts__Binding.free_slice(run);return default<blot_check_capability_contracts::Binding[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_capability_contracts::Binding[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_capability_contracts__Binding.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_capability_contracts::Binding>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Binding[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_capability_contracts::Binding[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
 fn allocate(self_:Owner&,sample:blot_check_core::FieldName,length:i64)->blot_check_core::FieldName[:],Error {
  assert(unique(self_));if length<0 {return default<blot_check_core::FieldName[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::FieldName[:]>(),blot_error::Error.none;}
@@ -694,19 +585,6 @@ fn cloneValue(self_:Owner&,values:const blot_check_types::Operation[:])->blot_ch
  for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::Operation[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self_:Owner&,sample:blot_check_types::QuantifierGoals,length:i64)->blot_check_types::QuantifierGoals[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_types::QuantifierGoals[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::QuantifierGoals[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_types__QuantifierGoals.alloc_slice(length);let error=remember(self_,Run.run_blot_check_types__QuantifierGoals {run, ..});if error!=blot_error::Error.none {pool_blot_check_types__QuantifierGoals.free_slice(run);return default<blot_check_types::QuantifierGoals[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_types::QuantifierGoals[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__QuantifierGoals run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_types__QuantifierGoals.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_types::QuantifierGoals[:])->blot_check_types::QuantifierGoals[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_types::QuantifierGoals>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_types::QuantifierGoals[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_types::QuantifierGoals[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
 fn allocate(self_:Owner&,sample:blot_check_types::Obligation,length:i64)->blot_check_types::Obligation[:],Error {
  assert(unique(self_));if length<0 {return default<blot_check_types::Obligation[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_types::Obligation[:]>(),blot_error::Error.none;}
@@ -1142,33 +1020,7 @@ fn cloneValue(self_:Owner&,values:const blot_check_core::SelectedUse[:])->blot_c
  for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::SelectedUse[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
 }
 
-fn allocate(self_:Owner&,sample:blot_check_core::DictionarySelection,length:i64)->blot_check_core::DictionarySelection[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_core::DictionarySelection[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DictionarySelection[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_core__DictionarySelection.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DictionarySelection {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DictionarySelection.free_slice(run);return default<blot_check_core::DictionarySelection[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_core::DictionarySelection[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionarySelection run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DictionarySelection.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_core::DictionarySelection[:])->blot_check_core::DictionarySelection[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DictionarySelection>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DictionarySelection[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DictionarySelection[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
-fn allocate(self_:Owner&,sample:blot_check_core::DictionaryUse,length:i64)->blot_check_core::DictionaryUse[:],Error {
- assert(unique(self_));if length<0 {return default<blot_check_core::DictionaryUse[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::DictionaryUse[:]>(),blot_error::Error.none;}
- let run=pool_blot_check_core__DictionaryUse.alloc_slice(length);let error=remember(self_,Run.run_blot_check_core__DictionaryUse {run, ..});if error!=blot_error::Error.none {pool_blot_check_core__DictionaryUse.free_slice(run);return default<blot_check_core::DictionaryUse[:]>(),error;}return run,blot_error::Error.none;
-}
-fn mutable(self_:const Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:] {
- assert(unique(self_));if values.len==0 {return default<blot_check_core::DictionaryUse[:]>();}var next=leases[self_.lease-1].head;
- while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionaryUse run=>{if blot_support::same_slice_identity(run.values,values) {return pool_blot_check_core__DictionaryUse.realloc_slice(run.values,run.values.len);}},_=>{}}}
- abort("mutable payload view must name this private owner's exact live run");
-}
-fn cloneValue(self_:Owner&,values:const blot_check_core::DictionaryUse[:])->blot_check_core::DictionaryUse[:],Error {
- let result,error=blot_reuse_dependency_payload::alloc<blot_check_core::DictionaryUse>(self_,values.len);if error!=blot_error::Error.none {return default<blot_check_core::DictionaryUse[:]>(),error;}
- for value,index in values {let copied,error=cloneValue(self_,value);if error!=blot_error::Error.none {return default<blot_check_core::DictionaryUse[:]>(),error;}result[index]=copied;}return result,blot_error::Error.none;
-}
 
 fn allocate(self_:Owner&,sample:blot_check_core::Primitive,length:i64)->blot_check_core::Primitive[:],Error {
  assert(unique(self_));if length<0 {return default<blot_check_core::Primitive[:]>(),blot_error::Error.invalid_artifact;}if length==0 {return default<blot_check_core::Primitive[:]>(),blot_error::Error.none;}
@@ -1474,7 +1326,6 @@ fn cloneValue(self_:Owner&,value:u8)->u8,Error {return value,blot_error::Error.n
 
 fn cloneValue(self_:Owner&,value:u8[32])->u8[32],Error {var result=default<u8[32]>();for item,index in value {let copied,error=cloneValue(self_,item);if error!=blot_error::Error.none {return result,error;}result[index]=copied;}return result,blot_error::Error.none;}
 
-fn cloneValue(self_:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>)->blot_support::Option<blot_check_numeric_proof_terms::Proposition>,Error {if !value.present {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),blot_error::Error.none;}let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return blot_support::none<blot_check_numeric_proof_terms::Proposition>(),error;}return blot_support::some(copied),blot_error::Error.none;}
 
 fn cloneValue(self_:Owner&,value:blot_support::Option<blot_parse_ast::Span>)->blot_support::Option<blot_parse_ast::Span>,Error {if !value.present {return blot_support::none<blot_parse_ast::Span>(),blot_error::Error.none;}let copied,error=cloneValue(self_,value.value);if error!=blot_error::Error.none {return blot_support::none<blot_parse_ast::Span>(),error;}return blot_support::some(copied),blot_error::Error.none;}
 
@@ -1484,15 +1335,10 @@ fn cloneValue(self_:Owner&,value:blot_check_core::Module)->blot_check_core::Modu
 
 var result=default<blot_check_core::Module>();
 
-{let copied,error=cloneValue(self_,value.has_rank_contracts);if error!=blot_error::Error.none {return result,error;}result.has_rank_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.has_usage_contracts);if error!=blot_error::Error.none {return result,error;}result.has_usage_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.has_numeric_proofs);if error!=blot_error::Error.none {return result,error;}result.has_numeric_proofs=copied;}
 
-{let copied,error=cloneValue(self_,value.proof_contracts);if error!=blot_error::Error.none {return result,error;}result.proof_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.capability_contracts);if error!=blot_error::Error.none {return result,error;}result.capability_contracts=copied;}
 
 {let copied,error=cloneValue(self_,value.field_names);if error!=blot_error::Error.none {return result,error;}result.field_names=copied;}
 
@@ -1588,9 +1434,7 @@ var result=default<blot_check_core::Module>();
 
 {let copied,error=cloneValue(self_,value.selected_uses);if error!=blot_error::Error.none {return result,error;}result.selected_uses=copied;}
 
-{let copied,error=cloneValue(self_,value.dictionary_selections);if error!=blot_error::Error.none {return result,error;}result.dictionary_selections=copied;}
 
-{let copied,error=cloneValue(self_,value.dictionary_uses);if error!=blot_error::Error.none {return result,error;}result.dictionary_uses=copied;}
 
 {let copied,error=cloneValue(self_,value.primitives);if error!=blot_error::Error.none {return result,error;}result.primitives=copied;}
 
@@ -1611,247 +1455,23 @@ var result=default<blot_check_core::Module>();
 {let copied,error=cloneValue(self_,value.body_lowerings);if error!=blot_error::Error.none {return result,error;}result.body_lowerings=copied;}
 
 result.owner_id=blot_native::fresh_owner_id();
-var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}
-if packages {let run,error=blot_reuse_dependency_payload::alloc<u32>(self_,result.nodes.len);if error!=blot_error::Error.none {return result,error;}for node,index in result.nodes {run[index]=node.a;}result.package_payloads=run;}
 
 
 return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named,Error {
 
-var result=default<blot_check_numeric_proof_headers::Named>();
 
-{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
 
-{let copied,error=cloneValue(self_,value.header);if error!=blot_error::Error.none {return result,error;}result.header=copied;}
 
-return result,blot_error::Error.none;
 
-}
 
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned,Error {
 
-var result=default<blot_check_numeric_proof_headers::Owned>();
 
-{let copied,error=cloneValue(self_,value.arity);if error!=blot_error::Error.none {return result,error;}result.arity=copied;}
 
-{let copied,error=cloneValue(self_,value.value_slots);if error!=blot_error::Error.none {return result,error;}result.value_slots=copied;}
 
-{let copied,error=cloneValue(self_,value.proof_slots);if error!=blot_error::Error.none {return result,error;}result.proof_slots=copied;}
 
-{let copied,error=cloneValue(self_,value.values);if error!=blot_error::Error.none {return result,error;}result.values=copied;}
-
-{let copied,error=cloneValue(self_,value.operands);if error!=blot_error::Error.none {return result,error;}result.operands=copied;}
-
-{let copied,error=cloneValue(self_,value.requirements);if error!=blot_error::Error.none {return result,error;}result.requirements=copied;}
-
-{let copied,error=cloneValue(self_,value.result);if error!=blot_error::Error.none {return result,error;}result.result=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Kind)->blot_check_numeric_proof_terms::Kind,Error {
-
-match value {
-
-unsigned32=>{
-return blot_check_numeric_proof_terms::Kind.unsigned32,blot_error::Error.none;},
-
-array=>{
-return blot_check_numeric_proof_terms::Kind.array,blot_error::Error.none;},
-
-list=>{
-return blot_check_numeric_proof_terms::Kind.list,blot_error::Error.none;},
-
-}
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Term)->blot_check_numeric_proof_terms::Term,Error {
-
-var result=default<blot_check_numeric_proof_terms::Term>();
-
-{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
-
-{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
-
-{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
-
-{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Tag)->blot_check_numeric_proof_terms::Tag,Error {
-
-match value {
-
-literal=>{
-return blot_check_numeric_proof_terms::Tag.literal,blot_error::Error.none;},
-
-formal=>{
-return blot_check_numeric_proof_terms::Tag.formal,blot_error::Error.none;},
-
-capture=>{
-return blot_check_numeric_proof_terms::Tag.capture,blot_error::Error.none;},
-
-version=>{
-return blot_check_numeric_proof_terms::Tag.version,blot_error::Error.none;},
-
-length=>{
-return blot_check_numeric_proof_terms::Tag.length,blot_error::Error.none;},
-
-complement=>{
-return blot_check_numeric_proof_terms::Tag.complement,blot_error::Error.none;},
-
-}
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_contracts::Requirement)->blot_check_numeric_proof_contracts::Requirement,Error {
-
-var result=default<blot_check_numeric_proof_contracts::Requirement>();
-
-{let copied,error=cloneValue(self_,value.before);if error!=blot_error::Error.none {return result,error;}result.before=copied;}
-
-{let copied,error=cloneValue(self_,value.proposition);if error!=blot_error::Error.none {return result,error;}result.proposition=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Proposition)->blot_check_numeric_proof_terms::Proposition,Error {
-
-var result=default<blot_check_numeric_proof_terms::Proposition>();
-
-{let copied,error=cloneValue(self_,value.relation);if error!=blot_error::Error.none {return result,error;}result.relation=copied;}
-
-{let copied,error=cloneValue(self_,value.left);if error!=blot_error::Error.none {return result,error;}result.left=copied;}
-
-{let copied,error=cloneValue(self_,value.right);if error!=blot_error::Error.none {return result,error;}result.right=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_numeric_proof_terms::Relation)->blot_check_numeric_proof_terms::Relation,Error {
-
-match value {
-
-eq=>{
-return blot_check_numeric_proof_terms::Relation.eq,blot_error::Error.none;},
-
-lt=>{
-return blot_check_numeric_proof_terms::Relation.lt,blot_error::Error.none;},
-
-le=>{
-return blot_check_numeric_proof_terms::Relation.le,blot_error::Error.none;},
-
-add_fits=>{
-return blot_check_numeric_proof_terms::Relation.add_fits,blot_error::Error.none;},
-
-sub_fits=>{
-return blot_check_numeric_proof_terms::Relation.sub_fits,blot_error::Error.none;},
-
-index=>{
-return blot_check_numeric_proof_terms::Relation.index,blot_error::Error.none;},
-
-}
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Collection)->blot_check_capability_contracts::Collection,Error {
-
-var result=default<blot_check_capability_contracts::Collection>();
-
-{let copied,error=cloneValue(self_,value.nodes);if error!=blot_error::Error.none {return result,error;}result.nodes=copied;}
-
-{let copied,error=cloneValue(self_,value.words);if error!=blot_error::Error.none {return result,error;}result.words=copied;}
-
-{let copied,error=cloneValue(self_,value.bindings);if error!=blot_error::Error.none {return result,error;}result.bindings=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Term)->blot_check_capability_contracts::Term,Error {
-
-var result=default<blot_check_capability_contracts::Term>();
-
-{let copied,error=cloneValue(self_,value.tag);if error!=blot_error::Error.none {return result,error;}result.tag=copied;}
-
-{let copied,error=cloneValue(self_,value.a);if error!=blot_error::Error.none {return result,error;}result.a=copied;}
-
-{let copied,error=cloneValue(self_,value.b);if error!=blot_error::Error.none {return result,error;}result.b=copied;}
-
-{let copied,error=cloneValue(self_,value.c);if error!=blot_error::Error.none {return result,error;}result.c=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Tag)->blot_check_capability_contracts::Tag,Error {
-
-match value {
-
-empty=>{
-return blot_check_capability_contracts::Tag.empty,blot_error::Error.none;},
-
-unknown=>{
-return blot_check_capability_contracts::Tag.unknown,blot_error::Error.none;},
-
-parameter=>{
-return blot_check_capability_contracts::Tag.parameter,blot_error::Error.none;},
-
-authority=>{
-return blot_check_capability_contracts::Tag.authority,blot_error::Error.none;},
-
-captures=>{
-return blot_check_capability_contracts::Tag.captures,blot_error::Error.none;},
-
-product=>{
-return blot_check_capability_contracts::Tag.product,blot_error::Error.none;},
-
-record=>{
-return blot_check_capability_contracts::Tag.record,blot_error::Error.none;},
-
-wrapped=>{
-return blot_check_capability_contracts::Tag.wrapped,blot_error::Error.none;},
-
-join=>{
-return blot_check_capability_contracts::Tag.join,blot_error::Error.none;},
-
-project=>{
-return blot_check_capability_contracts::Tag.project,blot_error::Error.none;},
-
-elements=>{
-return blot_check_capability_contracts::Tag.elements,blot_error::Error.none;},
-
-argument=>{
-return blot_check_capability_contracts::Tag.argument,blot_error::Error.none;},
-
-callable=>{
-return blot_check_capability_contracts::Tag.callable,blot_error::Error.none;},
-
-}
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_capability_contracts::Binding)->blot_check_capability_contracts::Binding,Error {
-
-var result=default<blot_check_capability_contracts::Binding>();
-
-{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
-
-{let copied,error=cloneValue(self_,value.root);if error!=blot_error::Error.none {return result,error;}result.root=copied;}
-
-return result,blot_error::Error.none;
-
-}
 
 fn cloneValue(self_:Owner&,value:blot_check_core::FieldName)->blot_check_core::FieldName,Error {
 
@@ -2086,9 +1706,7 @@ var result=default<blot_check_core::Types>();
 
 {let copied,error=cloneValue(self_,value.operations);if error!=blot_error::Error.none {return result,error;}result.operations=copied;}
 
-{let copied,error=cloneValue(self_,value.quantifier_goals);if error!=blot_error::Error.none {return result,error;}result.quantifier_goals=copied;}
 
-{let copied,error=cloneValue(self_,value.quantifier_obligations);if error!=blot_error::Error.none {return result,error;}result.quantifier_obligations=copied;}
 
 result.owner_id=blot_native::fresh_owner_id();
 
@@ -2309,17 +1927,6 @@ return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self_:Owner&,value:blot_check_types::QuantifierGoals)->blot_check_types::QuantifierGoals,Error {
-
-var result=default<blot_check_types::QuantifierGoals>();
-
-{let copied,error=cloneValue(self_,value.owner);if error!=blot_error::Error.none {return result,error;}result.owner=copied;}
-
-{let copied,error=cloneValue(self_,value.goals);if error!=blot_error::Error.none {return result,error;}result.goals=copied;}
-
-return result,blot_error::Error.none;
-
-}
 
 fn cloneValue(self_:Owner&,value:blot_check_types::Obligation)->blot_check_types::Obligation,Error {
 
@@ -2806,7 +2413,6 @@ fn cloneValue(self_:Owner&,value:blot_check_core::Binding)->blot_check_core::Bin
 
 var result=default<blot_check_core::Binding>();
 
-{let copied,error=cloneValue(self_,value.capability_flow);if error!=blot_error::Error.none {return result,error;}result.capability_flow=copied;}
 
 {let copied,error=cloneValue(self_,value.capability_parameters);if error!=blot_error::Error.none {return result,error;}result.capability_parameters=copied;}
 
@@ -2836,60 +2442,15 @@ return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self_:Owner&,value:blot_check_capability_flow::Contract)->blot_check_capability_flow::Contract,Error {
-
-match value {
-
-unknown=>{
-return blot_check_capability_flow::Contract.unknown,blot_error::Error.none;},
-
-identity=>{
-return blot_check_capability_flow::Contract.identity,blot_error::Error.none;},
-
-invoke_unit=>{
-return blot_check_capability_flow::Contract.invoke_unit,blot_error::Error.none;},
-
-member_unit=>{
-return blot_check_capability_flow::Contract.member_unit,blot_error::Error.none;},
-
-invoke_with_capability=>{
-return blot_check_capability_flow::Contract.invoke_with_capability,blot_error::Error.none;},
-
-member_first_unit=>{
-return blot_check_capability_flow::Contract.member_first_unit,blot_error::Error.none;},
-
-member_second_unit=>{
-return blot_check_capability_flow::Contract.member_second_unit,blot_error::Error.none;},
-
-input_shape=>{
-return blot_check_capability_flow::Contract.input_shape,blot_error::Error.none;},
-
-consume_task=>{
-return blot_check_capability_flow::Contract.consume_task,blot_error::Error.none;},
-
-scope_task=>{
-return blot_check_capability_flow::Contract.scope_task,blot_error::Error.none;},
-
-spawn_task=>{
-return blot_check_capability_flow::Contract.spawn_task,blot_error::Error.none;},
-
-}
-
-}
 
 fn cloneValue(self_:Owner&,value:blot_check_capability_flow::Parameters)->blot_check_capability_flow::Parameters,Error {
 
 var result=default<blot_check_capability_flow::Parameters>();
 
-{let copied,error=cloneValue(self_,value.kind);if error!=blot_error::Error.none {return result,error;}result.kind=copied;}
 
-{let copied,error=cloneValue(self_,value.mask);if error!=blot_error::Error.none {return result,error;}result.mask=copied;}
 
-{let copied,error=cloneValue(self_,value.inputs);if error!=blot_error::Error.none {return result,error;}result.inputs=copied;}
 
-{let copied,error=cloneValue(self_,value.invocation_arguments);if error!=blot_error::Error.none {return result,error;}result.invocation_arguments=copied;}
 
-{let copied,error=cloneValue(self_,value.invocation_count);if error!=blot_error::Error.none {return result,error;}result.invocation_count=copied;}
 
 result.own=value.own;
 result.own_count=value.own_count;
@@ -2899,34 +2460,6 @@ return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self_:Owner&,value:blot_check_capability_flow::ParameterResult)->blot_check_capability_flow::ParameterResult,Error {
-
-match value {
-
-product=>{
-return blot_check_capability_flow::ParameterResult.product,blot_error::Error.none;},
-
-invoke_unit=>{
-return blot_check_capability_flow::ParameterResult.invoke_unit,blot_error::Error.none;},
-
-invalid=>{
-return blot_check_capability_flow::ParameterResult.invalid,blot_error::Error.none;},
-
-member_closure_unit=>{
-return blot_check_capability_flow::ParameterResult.member_closure_unit,blot_error::Error.none;},
-
-captured_unit=>{
-return blot_check_capability_flow::ParameterResult.captured_unit,blot_error::Error.none;},
-
-invoke_input=>{
-return blot_check_capability_flow::ParameterResult.invoke_input,blot_error::Error.none;},
-
-invoke_inputs=>{
-return blot_check_capability_flow::ParameterResult.invoke_inputs,blot_error::Error.none;},
-
-}
-
-}
 
 fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Kind)->blot_reuse_principal_interface::Kind,Error {
 
@@ -3614,81 +3147,9 @@ return result,blot_error::Error.none;
 
 }
 
-fn cloneValue(self_:Owner&,value:blot_check_core::DictionarySelection)->blot_check_core::DictionarySelection,Error {
 
-var result=default<blot_check_core::DictionarySelection>();
 
-{let copied,error=cloneValue(self_,value.owner);if error!=blot_error::Error.none {return result,error;}result.owner=copied;}
 
-{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
-
-{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
-
-{let copied,error=cloneValue(self_,value.proof);if error!=blot_error::Error.none {return result,error;}result.proof=copied;}
-
-{let copied,error=cloneValue(self_,value.members);if error!=blot_error::Error.none {return result,error;}result.members=copied;}
-
-{let copied,error=cloneValue(self_,value.contents);if error!=blot_error::Error.none {return result,error;}result.contents=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryProof)->blot_check_core::DictionaryProof,Error {
-
-match value {
-
-selected payload=>{
-let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
-return blot_check_core::DictionaryProof.selected {value:value, ..},blot_error::Error.none;},
-
-given payload=>{
-let value,error_value=cloneValue(self_,payload.value);if error_value!=blot_error::Error.none {return default<blot_check_core::DictionaryProof>(),error_value;}
-return blot_check_core::DictionaryProof.given {value:value, ..},blot_error::Error.none;},
-
-}
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryGiven)->blot_check_core::DictionaryGiven,Error {
-
-var result=default<blot_check_core::DictionaryGiven>();
-
-{let copied,error=cloneValue(self_,value.opening);if error!=blot_error::Error.none {return result,error;}result.opening=copied;}
-
-{let copied,error=cloneValue(self_,value.introduction);if error!=blot_error::Error.none {return result,error;}result.introduction=copied;}
-
-{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
-
-{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
-
-{let copied,error=cloneValue(self_,value.arguments);if error!=blot_error::Error.none {return result,error;}result.arguments=copied;}
-
-return result,blot_error::Error.none;
-
-}
-
-fn cloneValue(self_:Owner&,value:blot_check_core::DictionaryUse)->blot_check_core::DictionaryUse,Error {
-
-var result=default<blot_check_core::DictionaryUse>();
-
-{let copied,error=cloneValue(self_,value.node);if error!=blot_error::Error.none {return result,error;}result.node=copied;}
-
-{let copied,error=cloneValue(self_,value.binding);if error!=blot_error::Error.none {return result,error;}result.binding=copied;}
-
-{let copied,error=cloneValue(self_,value.opening);if error!=blot_error::Error.none {return result,error;}result.opening=copied;}
-
-{let copied,error=cloneValue(self_,value.introduction);if error!=blot_error::Error.none {return result,error;}result.introduction=copied;}
-
-{let copied,error=cloneValue(self_,value.quantifier);if error!=blot_error::Error.none {return result,error;}result.quantifier=copied;}
-
-{let copied,error=cloneValue(self_,value.goal);if error!=blot_error::Error.none {return result,error;}result.goal=copied;}
-
-{let copied,error=cloneValue(self_,value.member);if error!=blot_error::Error.none {return result,error;}result.member=copied;}
-
-return result,blot_error::Error.none;
-
-}
 
 fn cloneValue(self_:Owner&,value:blot_check_core::Primitive)->blot_check_core::Primitive,Error {
 
@@ -3983,15 +3444,10 @@ fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Interface)->blo
 
 var result=default<blot_reuse_principal_interface::Interface>();
 
-{let copied,error=cloneValue(self_,value.has_rank_contracts);if error!=blot_error::Error.none {return result,error;}result.has_rank_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.has_usage_contracts);if error!=blot_error::Error.none {return result,error;}result.has_usage_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.has_numeric_proofs);if error!=blot_error::Error.none {return result,error;}result.has_numeric_proofs=copied;}
 
-{let copied,error=cloneValue(self_,value.proof_contracts);if error!=blot_error::Error.none {return result,error;}result.proof_contracts=copied;}
 
-{let copied,error=cloneValue(self_,value.capability_contracts);if error!=blot_error::Error.none {return result,error;}result.capability_contracts=copied;}
 
 {let copied,error=cloneValue(self_,value.unit);if error!=blot_error::Error.none {return result,error;}result.unit=copied;}
 
@@ -4055,9 +3511,7 @@ var result=default<blot_check_frozen_types::Graph>();
 
 {let copied,error=cloneValue(self_,value.row_variable_count);if error!=blot_error::Error.none {return result,error;}result.row_variable_count=copied;}
 
-{let copied,error=cloneValue(self_,value.quantifier_goals);if error!=blot_error::Error.none {return result,error;}result.quantifier_goals=copied;}
 
-{let copied,error=cloneValue(self_,value.quantifier_obligations);if error!=blot_error::Error.none {return result,error;}result.quantifier_obligations=copied;}
 
 return result,blot_error::Error.none;
 
@@ -4113,7 +3567,6 @@ fn cloneValue(self_:Owner&,value:blot_reuse_principal_interface::Binding)->blot_
 
 var result=default<blot_reuse_principal_interface::Binding>();
 
-{let copied,error=cloneValue(self_,value.capability_flow);if error!=blot_error::Error.none {return result,error;}result.capability_flow=copied;}
 
 {let copied,error=cloneValue(self_,value.capability_parameters);if error!=blot_error::Error.none {return result,error;}result.capability_parameters=copied;}
 
@@ -4467,17 +3920,11 @@ run_bool run=>{pool_bool.free_slice(run.values);},
 
 run_u32 run=>{pool_u32.free_slice(run.values);},
 
-run_blot_check_numeric_proof_terms__Kind run=>{pool_blot_check_numeric_proof_terms__Kind.free_slice(run.values);},
 
-run_blot_check_numeric_proof_terms__Term run=>{pool_blot_check_numeric_proof_terms__Term.free_slice(run.values);},
 
-run_blot_check_numeric_proof_contracts__Requirement run=>{pool_blot_check_numeric_proof_contracts__Requirement.free_slice(run.values);},
 
-run_blot_check_numeric_proof_headers__Named run=>{pool_blot_check_numeric_proof_headers__Named.free_slice(run.values);},
 
-run_blot_check_capability_contracts__Term run=>{pool_blot_check_capability_contracts__Term.free_slice(run.values);},
 
-run_blot_check_capability_contracts__Binding run=>{pool_blot_check_capability_contracts__Binding.free_slice(run.values);},
 
 run_blot_check_core__FieldName run=>{pool_blot_check_core__FieldName.free_slice(run.values);},
 
@@ -4503,7 +3950,6 @@ run_blot_check_effects__Row run=>{pool_blot_check_effects__Row.free_slice(run.va
 
 run_blot_check_types__Operation run=>{pool_blot_check_types__Operation.free_slice(run.values);},
 
-run_blot_check_types__QuantifierGoals run=>{pool_blot_check_types__QuantifierGoals.free_slice(run.values);},
 
 run_blot_check_types__Obligation run=>{pool_blot_check_types__Obligation.free_slice(run.values);},
 
@@ -4567,9 +4013,7 @@ run_blot_reuse_principal_interface__SelectedProof run=>{pool_blot_reuse_principa
 
 run_blot_check_core__SelectedUse run=>{pool_blot_check_core__SelectedUse.free_slice(run.values);},
 
-run_blot_check_core__DictionarySelection run=>{pool_blot_check_core__DictionarySelection.free_slice(run.values);},
 
-run_blot_check_core__DictionaryUse run=>{pool_blot_check_core__DictionaryUse.free_slice(run.values);},
 
 run_blot_check_core__Primitive run=>{pool_blot_check_core__Primitive.free_slice(run.values);},
 
@@ -4625,71 +4069,11 @@ fn detach(self_:Owner&,destination:Owner&,values:const u32[:]) {
 }
 fn partitionInto(self_:Owner&,destination:Owner&,values:const u32[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Kind run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Kind[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_terms__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_terms__Term run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_terms::Term[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_contracts__Requirement run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_contracts::Requirement[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_numeric_proof_headers__Named run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_numeric_proof_headers__Named run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_numeric_proof_headers::Named[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Term run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Term run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Term[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_capability_contracts__Binding run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_capability_contracts__Binding run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_capability_contracts::Binding[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
 fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::FieldName[:]) {
  assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
@@ -4822,16 +4206,6 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Operati
 }
 fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::Operation[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_types__QuantifierGoals run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_types__QuantifierGoals run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_types::QuantifierGoals[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
 fn detach(self_:Owner&,destination:Owner&,values:const blot_check_types::Obligation[:]) {
  assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
@@ -5174,27 +4548,7 @@ fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Selected
 }
 fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::SelectedUse[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionarySelection run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionarySelection run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionarySelection[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
-fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {
- assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
- // An alias already transferred to this module keeps the same one owner.
- var next=leases[destination.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_blot_check_core__DictionaryUse run=>{if blot_support::same_slice_identity(run.values,values) {return;}},_=>{}}}
- var previous:u32=0;next=leases[self_.lease-1].head;
- while next!=0 {let current=next;let link=links[current-1];next=link.next;var found=false;match link.value {run_blot_check_core__DictionaryUse run=>{found=blot_support::same_slice_identity(run.values,values);},_=>{}}
- if found {if previous==0 {leases[self_.lease-1].head=next;}else {links[previous-1].next=next;}links[current-1].next=leases[destination.lease-1].head;leases[destination.lease-1].head=current;return;}previous=current;
- }abort("partitioned payload view must name this private owner's exact live run");
-}
-fn partitionInto(self_:Owner&,destination:Owner&,values:const blot_check_core::DictionaryUse[:]) {self_.detach(destination,values);for value in values {partitionInto(self_,destination,value);}}
 
 fn detach(self_:Owner&,destination:Owner&,values:const blot_check_core::Primitive[:]) {
  assert(unique(self_)&&unique(destination)&&self_.lease!=destination.lease);if values.len==0 {return;}
@@ -5440,25 +4794,18 @@ fn partitionInto(self_:Owner&,destination:Owner&,value:u8) {}
 
 fn partitionInto(self_:Owner&,destination:Owner&,values:u8[32]) {for value in values {partitionInto(self_,destination,value);}}
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_check_numeric_proof_terms::Proposition>) {if value.present {partitionInto(self_,destination,value.value);}}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_parse_ast::Span>) {if value.present {partitionInto(self_,destination,value.value);}}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_support::Option<blot_reuse_principal_interface::ExternalTarget>) {if value.present {partitionInto(self_,destination,value.value);}}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Module) {
-partitionInto(self_,destination,value.package_payloads);
 
 
-partitionInto(self_,destination,value.has_rank_contracts);
 
-partitionInto(self_,destination,value.has_usage_contracts);
 
-partitionInto(self_,destination,value.has_numeric_proofs);
 
-partitionInto(self_,destination,value.proof_contracts);
 
-partitionInto(self_,destination,value.capability_contracts);
 
 partitionInto(self_,destination,value.field_names);
 
@@ -5554,9 +4901,7 @@ partitionInto(self_,destination,value.selected_edges);
 
 partitionInto(self_,destination,value.selected_uses);
 
-partitionInto(self_,destination,value.dictionary_selections);
 
-partitionInto(self_,destination,value.dictionary_uses);
 
 partitionInto(self_,destination,value.primitives);
 
@@ -5578,207 +4923,17 @@ partitionInto(self_,destination,value.body_lowerings);
 
 }
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Named) {
 
-partitionInto(self_,destination,value.binding);
 
-partitionInto(self_,destination,value.header);
 
-}
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_headers::Owned) {
 
-partitionInto(self_,destination,value.arity);
 
-partitionInto(self_,destination,value.value_slots);
 
-partitionInto(self_,destination,value.proof_slots);
 
-partitionInto(self_,destination,value.values);
 
-partitionInto(self_,destination,value.operands);
 
-partitionInto(self_,destination,value.requirements);
 
-partitionInto(self_,destination,value.result);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Kind) {
-
-match value {
-
-unsigned32=>{
-},
-
-array=>{
-},
-
-list=>{
-},
-
-}
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Term) {
-
-partitionInto(self_,destination,value.tag);
-
-partitionInto(self_,destination,value.kind);
-
-partitionInto(self_,destination,value.a);
-
-partitionInto(self_,destination,value.b);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Tag) {
-
-match value {
-
-literal=>{
-},
-
-formal=>{
-},
-
-capture=>{
-},
-
-version=>{
-},
-
-length=>{
-},
-
-complement=>{
-},
-
-}
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_contracts::Requirement) {
-
-partitionInto(self_,destination,value.before);
-
-partitionInto(self_,destination,value.proposition);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Proposition) {
-
-partitionInto(self_,destination,value.relation);
-
-partitionInto(self_,destination,value.left);
-
-partitionInto(self_,destination,value.right);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_numeric_proof_terms::Relation) {
-
-match value {
-
-eq=>{
-},
-
-lt=>{
-},
-
-le=>{
-},
-
-add_fits=>{
-},
-
-sub_fits=>{
-},
-
-index=>{
-},
-
-}
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Collection) {
-
-partitionInto(self_,destination,value.nodes);
-
-partitionInto(self_,destination,value.words);
-
-partitionInto(self_,destination,value.bindings);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Term) {
-
-partitionInto(self_,destination,value.tag);
-
-partitionInto(self_,destination,value.a);
-
-partitionInto(self_,destination,value.b);
-
-partitionInto(self_,destination,value.c);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Tag) {
-
-match value {
-
-empty=>{
-},
-
-unknown=>{
-},
-
-parameter=>{
-},
-
-authority=>{
-},
-
-captures=>{
-},
-
-product=>{
-},
-
-record=>{
-},
-
-wrapped=>{
-},
-
-join=>{
-},
-
-project=>{
-},
-
-elements=>{
-},
-
-argument=>{
-},
-
-callable=>{
-},
-
-}
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_contracts::Binding) {
-
-partitionInto(self_,destination,value.binding);
-
-partitionInto(self_,destination,value.root);
-
-}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::FieldName) {
 
@@ -5967,9 +5122,7 @@ partitionInto(self_,destination,value.effects);
 
 partitionInto(self_,destination,value.operations);
 
-partitionInto(self_,destination,value.quantifier_goals);
 
-partitionInto(self_,destination,value.quantifier_obligations);
 
 }
 
@@ -6158,13 +5311,6 @@ partitionInto(self_,destination,value.len);
 
 }
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::QuantifierGoals) {
-
-partitionInto(self_,destination,value.owner);
-
-partitionInto(self_,destination,value.goals);
-
-}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_types::Obligation) {
 
@@ -6637,7 +5783,6 @@ not_=>{
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Binding) {
 
-partitionInto(self_,destination,value.capability_flow);
 
 partitionInto(self_,destination,value.capability_parameters);
 
@@ -6665,89 +5810,16 @@ partitionInto(self_,destination,value.span);
 
 }
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::Contract) {
-
-match value {
-
-unknown=>{
-},
-
-identity=>{
-},
-
-invoke_unit=>{
-},
-
-member_unit=>{
-},
-
-invoke_with_capability=>{
-},
-
-member_first_unit=>{
-},
-
-member_second_unit=>{
-},
-
-input_shape=>{
-},
-
-consume_task=>{
-},
-
-scope_task=>{
-},
-
-spawn_task=>{
-},
-
-}
-
-}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::Parameters) {
 
-partitionInto(self_,destination,value.kind);
 
-partitionInto(self_,destination,value.mask);
 
-partitionInto(self_,destination,value.inputs);
 
-partitionInto(self_,destination,value.invocation_arguments);
 
-partitionInto(self_,destination,value.invocation_count);
 
 }
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_capability_flow::ParameterResult) {
-
-match value {
-
-product=>{
-},
-
-invoke_unit=>{
-},
-
-invalid=>{
-},
-
-member_closure_unit=>{
-},
-
-captured_unit=>{
-},
-
-invoke_input=>{
-},
-
-invoke_inputs=>{
-},
-
-}
-
-}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Kind) {
 
@@ -7321,69 +6393,9 @@ partitionInto(self_,destination,value.proof);
 
 }
 
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionarySelection) {
 
-partitionInto(self_,destination,value.owner);
 
-partitionInto(self_,destination,value.quantifier);
 
-partitionInto(self_,destination,value.goal);
-
-partitionInto(self_,destination,value.proof);
-
-partitionInto(self_,destination,value.members);
-
-partitionInto(self_,destination,value.contents);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryProof) {
-
-match value {
-
-selected payload=>{
-partitionInto(self_,destination,payload.value);
-},
-
-given payload=>{
-partitionInto(self_,destination,payload.value);
-},
-
-}
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryGiven) {
-
-partitionInto(self_,destination,value.opening);
-
-partitionInto(self_,destination,value.introduction);
-
-partitionInto(self_,destination,value.quantifier);
-
-partitionInto(self_,destination,value.goal);
-
-partitionInto(self_,destination,value.arguments);
-
-}
-
-fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::DictionaryUse) {
-
-partitionInto(self_,destination,value.node);
-
-partitionInto(self_,destination,value.binding);
-
-partitionInto(self_,destination,value.opening);
-
-partitionInto(self_,destination,value.introduction);
-
-partitionInto(self_,destination,value.quantifier);
-
-partitionInto(self_,destination,value.goal);
-
-partitionInto(self_,destination,value.member);
-
-}
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_check_core::Primitive) {
 
@@ -7648,15 +6660,10 @@ kept_value=>{
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Interface) {
 
-partitionInto(self_,destination,value.has_rank_contracts);
 
-partitionInto(self_,destination,value.has_usage_contracts);
 
-partitionInto(self_,destination,value.has_numeric_proofs);
 
-partitionInto(self_,destination,value.proof_contracts);
 
-partitionInto(self_,destination,value.capability_contracts);
 
 partitionInto(self_,destination,value.unit);
 
@@ -7716,9 +6723,7 @@ partitionInto(self_,destination,value.operations);
 
 partitionInto(self_,destination,value.row_variable_count);
 
-partitionInto(self_,destination,value.quantifier_goals);
 
-partitionInto(self_,destination,value.quantifier_obligations);
 
 }
 
@@ -7762,7 +6767,6 @@ record=>{
 
 fn partitionInto(self_:Owner&,destination:Owner&,value:blot_reuse_principal_interface::Binding) {
 
-partitionInto(self_,destination,value.capability_flow);
 
 partitionInto(self_,destination,value.capability_parameters);
 
@@ -8061,8 +7065,4 @@ fn allocate(self_:Owner&,sample:bool,length:i64)->bool[:],Error {assert(unique(s
 fn mutable(self_:const Owner&,values:const bool[:])->bool[:] {assert(unique(self_));if values.len==0 {return default<bool[:]>();}var next=leases[self_.lease-1].head;while next!=0 {let link=links[next-1];next=link.next;match link.value {run_bool run=>{if blot_support::same_slice_identity(run.values,values) {return pool_bool.realloc_slice(run.values,run.values.len);}},_=>{}}}abort("private header view must name this unique journal");}
 
 // Proof headers already copied into this owner retain their exact registered runs.
-fn canonicalProofHeader(self_:const Owner&,value:blot_check_numeric_proof_headers::Owned)->blot_check_numeric_proof_headers::Owned {
- return blot_check_numeric_proof_headers::Owned{arity:value.arity,value_slots:self_.mutable(value.value_slots),proof_slots:self_.mutable(value.proof_slots),values:self_.mutable(value.values),operands:self_.mutable(value.operands),requirements:self_.mutable(value.requirements),result:value.result};
-}
 fn copyElement<T>(self_:Owner&,value:T)->T {return value;}
-fn copyElement(self_:Owner&,value:blot_check_numeric_proof_headers::Named)->blot_check_numeric_proof_headers::Named {return blot_check_numeric_proof_headers::Named{value.binding,self_.canonicalProofHeader(value.header)};}

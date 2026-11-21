@@ -3,8 +3,6 @@ namespace blot_reuse_principal_interface;
 import check.types;
 import check.frozen_types;
 import check.capability_flow;
-import check.capability_contracts;
-import check.numeric_proof_headers;
 import parse.ast;
 import backend.opaque_storage;
 import support.option;
@@ -40,7 +38,6 @@ struct EffectFamily {
 }
 struct EffectTemplate { identity: Identity, family: u32, name: u32, parameter: Id, result: Id }
 struct Binding {
-    capability_flow: blot_check_capability_flow::Contract = blot_check_capability_flow::Contract.unknown,
     capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {..},
     private: bool = false, name: u32, kind: Kind, named_function: bool,
     ty: Id, scheme: blot_check_types::Scheme, external: blot_support::Option<ExternalTarget>,
@@ -78,9 +75,6 @@ struct SelectedProof {
     implementation: Identity, contract: Identity, arguments: List, members: List, prerequisites: List,
 }
 struct Interface {
-    has_rank_contracts: bool = false, has_usage_contracts: bool = false,
-    has_numeric_proofs: bool = false, proof_contracts: const blot_check_numeric_proof_headers::Named[:],
-    capability_contracts: blot_check_capability_contracts::Collection,
     unit: u32, graph: blot_check_frozen_types::Graph, patterns: blot_check_frozen_types::PatternGraph,
     bindings: const Binding[:], obligations: const blot_check_types::Obligation[:],
     obligation_spans: const blot_parse_ast::Span[:], nominals: const Nominal[:],

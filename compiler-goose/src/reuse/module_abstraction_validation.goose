@@ -6,7 +6,6 @@ import check.core;
 import check.types;
 import check.frozen_types;
 import check.frozen_core_validation;
-import check.capability_contracts;
 import reuse.principal_interface;
 import reuse.frozen_dependency;
 import reuse.module_visibility;
@@ -95,7 +94,7 @@ fn requirement(scan: Scan&, owner: const Interface&, predicate: blot_check_types
     return blot_error::Error.none;
 }
 fn coreGraph(module: const Module&) -> blot_check_frozen_types::Graph {
-    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, row_variable_count: module.types.effects.variable_count, quantifier_goals: module.types.quantifier_goals, quantifier_obligations: module.types.quantifier_obligations, .. };
+    return blot_check_frozen_types::Graph { nodes: module.types.nodes, extra: module.types.extra, rows: module.types.effects.rows, labels: module.types.effects.labels, operations: module.types.operations, row_variable_count: module.types.effects.variable_count, .. };
 }
 fn storageContracts(owner: const Interface&, implementation: const Module&) -> Error {
     var entries: blot_backend_opaque_storage::AuthorityEntry[>..] = [];
@@ -151,15 +150,7 @@ fn storageContractsResolved(owner: const Interface&, implementation: const Modul
         { let propagated_error = require(binding.private == private.private); if propagated_error != blot_error::Error.none { return propagated_error; } }
         if binding.ty != 0 { { let propagated_error = require(binding.scheme.generative.len == private.scheme.generative.len); if propagated_error != blot_error::Error.none { return propagated_error; } } }
         if binding.ty != 0 && !binding.external.present {
-            { let propagated_error = require(binding.capability_flow == private.capability_flow && binding.capability_parameters == private.capability_parameters); if propagated_error != blot_error::Error.none { return propagated_error; } }
-            let public = owner.capability_contracts.header(index as u32, binding.capability_parameters.arity() as u32);
-            let private = implementation.capability_contracts.header(index as u32, implementation.bindings[index].capability_parameters.arity() as u32);
-            { let propagated_error = require(public.present == private.present); if propagated_error != blot_error::Error.none { return propagated_error; } }
-            if public.present {
-                { let propagated_error = require(public.value.arity == private.value.arity); if propagated_error != blot_error::Error.none { return propagated_error; } }
-                let same, error = blot_check_capability_contracts::equivalent(public.value.view(), public.value.root, private.value.view(), private.value.root);
-                if error != blot_error::Error.none { return blot_error::Error.invalid_artifact; } { let propagated_error = require(same); if propagated_error != blot_error::Error.none { return propagated_error; } }
-            }
+            { let propagated_error = require(binding.capability_parameters == private.capability_parameters); if propagated_error != blot_error::Error.none { return propagated_error; } }
         }
     }
     { let propagated_error = require(owner.nominals.len == implementation.nominals.len); if propagated_error != blot_error::Error.none { return propagated_error; } }

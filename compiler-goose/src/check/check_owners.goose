@@ -1,10 +1,5 @@
 // Concrete retained checker output ownership. No borrowed factory tables escape.
 namespace blot_check_check;
-import check.capability_contracts;
-import check.generative_schemes;
-import check.numeric_proof_bodies;
-import check.numeric_proof_contracts;
-import check.numeric_proof_terms;
 import check.types;
 import parse.ast;
 import reuse.principal_interface;
@@ -16,22 +11,8 @@ import .check;
 import .check_packet_owner;
 import .checked_views;
 struct CheckedOwner {lease:u32=0,generation:u64=0}
-struct CheckedHeaderLease {
-value_slots:u32[:]=default<u32[:]>(),
-proof_slots:u32[:]=default<u32[:]>(),
-values:blot_check_numeric_proof_terms::Kind[:]=default<blot_check_numeric_proof_terms::Kind[:]>(),
-operands:blot_check_numeric_proof_terms::Term[:]=default<blot_check_numeric_proof_terms::Term[:]>(),
-requirements:blot_check_numeric_proof_contracts::Requirement[:]=default<blot_check_numeric_proof_contracts::Requirement[:]>(),
-parameters:u32[:]=default<u32[:]>(),
-}
-struct CheckedOwnerState {generation:u64=0,live:bool=false,headers:CheckedHeaderLease[:]=default<CheckedHeaderLease[:]>(),
+struct CheckedOwnerState {generation:u64=0,live:bool=false,
 function_exit_lambdas:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
-usage_loans:UsageLoan[:]=default<UsageLoan[:]>(),
-proof_contracts:ProofContract[:]=default<ProofContract[:]>(),
-rank_implementations:RankImplementation[:]=default<RankImplementation[:]>(),
-generative_bindings:blot_check_generative_schemes::Binder[:]=default<blot_check_generative_schemes::Binder[:]>(),
-dictionary_selections:DictionarySelection[:]=default<DictionarySelection[:]>(),
-dictionary_uses:DictionaryUse[:]=default<DictionaryUse[:]>(),
 iterator_bodies:blot_parse_ast::Id[:]=default<blot_parse_ast::Id[:]>(),
 computations:Computation[:]=default<Computation[:]>(),
 request_loops:RequestLoop[:]=default<RequestLoop[:]>(),
@@ -39,8 +20,6 @@ request_arms:RequestArm[:]=default<RequestArm[:]>(),
 request_controls:RequestControl[:]=default<RequestControl[:]>(),
 reflections:Reflection[:]=default<Reflection[:]>(),
 tag_origins:TagOrigin[:]=default<TagOrigin[:]>(),
-effect_scopes:EffectScope[:]=default<EffectScope[:]>(),
-effect_scope_ids:u32[:]=default<u32[:]>(),
 effect_runners:EffectRunner[:]=default<EffectRunner[:]>(),
 effect_runner_ids:u32[:]=default<u32[:]>(),
 provider_blocks:ProviderBlock[:]=default<ProviderBlock[:]>(),
@@ -95,25 +74,10 @@ loop_ranges:blot_check_types::List[:]=default<blot_check_types::List[:]>(),
 loop_exits:LoopExit[:]=default<LoopExit[:]>(),
 statement_arms:StatementArm[:]=default<StatementArm[:]>(),
 declarations:SourceDeclaration[:]=default<SourceDeclaration[:]>(),
-cap_nodes:blot_check_capability_contracts::Term[:]=default<blot_check_capability_contracts::Term[:]>(),
-cap_words:u32[:]=default<u32[:]>(),
-cap_bindings:blot_check_capability_contracts::Binding[:]=default<blot_check_capability_contracts::Binding[:]>(),
-body_debits:blot_check_numeric_proof_bodies::Debit[:]=default<blot_check_numeric_proof_bodies::Debit[:]>(),
-body_operands:blot_check_numeric_proof_terms::Term[:]=default<blot_check_numeric_proof_terms::Term[:]>(),
-body_introductions:blot_check_numeric_proof_bodies::Introduction[:]=default<blot_check_numeric_proof_bodies::Introduction[:]>(),
-body_parameters:blot_check_numeric_proof_bodies::Parameter[:]=default<blot_check_numeric_proof_bodies::Parameter[:]>(),
-body_uses:blot_check_numeric_proof_bodies::Use[:]=default<blot_check_numeric_proof_bodies::Use[:]>(),
 editor_names:EditorName[:]=default<EditorName[:]>(),
 }
 reusable var checked_owners:CheckedOwnerState[>..]=[];
-reusable[] var checked_headers:CheckedHeaderLease[>..];
 reusable[] var checked_function_exit_lambdas:blot_parse_ast::Id[>..];
-reusable[] var checked_usage_loans:UsageLoan[>..];
-reusable[] var checked_proof_contracts:ProofContract[>..];
-reusable[] var checked_rank_implementations:RankImplementation[>..];
-reusable[] var checked_generative_bindings:blot_check_generative_schemes::Binder[>..];
-reusable[] var checked_dictionary_selections:DictionarySelection[>..];
-reusable[] var checked_dictionary_uses:DictionaryUse[>..];
 reusable[] var checked_iterator_bodies:blot_parse_ast::Id[>..];
 reusable[] var checked_computations:Computation[>..];
 reusable[] var checked_request_loops:RequestLoop[>..];
@@ -121,8 +85,6 @@ reusable[] var checked_request_arms:RequestArm[>..];
 reusable[] var checked_request_controls:RequestControl[>..];
 reusable[] var checked_reflections:Reflection[>..];
 reusable[] var checked_tag_origins:TagOrigin[>..];
-reusable[] var checked_effect_scopes:EffectScope[>..];
-reusable[] var checked_effect_scope_ids:u32[>..];
 reusable[] var checked_effect_runners:EffectRunner[>..];
 reusable[] var checked_effect_runner_ids:u32[>..];
 reusable[] var checked_provider_blocks:ProviderBlock[>..];
@@ -177,31 +139,11 @@ reusable[] var checked_loop_ranges:blot_check_types::List[>..];
 reusable[] var checked_loop_exits:LoopExit[>..];
 reusable[] var checked_statement_arms:StatementArm[>..];
 reusable[] var checked_declarations:SourceDeclaration[>..];
-reusable[] var checked_cap_nodes:blot_check_capability_contracts::Term[>..];
-reusable[] var checked_cap_words:u32[>..];
-reusable[] var checked_cap_bindings:blot_check_capability_contracts::Binding[>..];
-reusable[] var checked_body_debits:blot_check_numeric_proof_bodies::Debit[>..];
-reusable[] var checked_body_operands:blot_check_numeric_proof_terms::Term[>..];
-reusable[] var checked_body_introductions:blot_check_numeric_proof_bodies::Introduction[>..];
-reusable[] var checked_body_parameters:blot_check_numeric_proof_bodies::Parameter[>..];
-reusable[] var checked_body_uses:blot_check_numeric_proof_bodies::Use[>..];
 reusable[] var checked_editor_names:EditorName[>..];
-reusable[] var checked_header_value_slots:u32[>..];
-reusable[] var checked_header_proof_slots:u32[>..];
-reusable[] var checked_header_values:blot_check_numeric_proof_terms::Kind[>..];
-reusable[] var checked_header_operands:blot_check_numeric_proof_terms::Term[>..];
-reusable[] var checked_header_requirements:blot_check_numeric_proof_contracts::Requirement[>..];
-reusable[] var checked_header_parameters:u32[>..];
 fn valid(self_:CheckedOwner)->bool {return self_.lease!=0 && self_.lease-1<checked_owners.len && checked_owners[self_.lease-1].live && checked_owners[self_.lease-1].generation==self_.generation;}
 fn checkedOwnerState(self_:CheckedOwner)->CheckedOwnerState& {assert(self_.valid());return checked_owners[self_.lease-1];}
 fn newCheckedOwner()->CheckedOwner,blot_error::Error {if checked_owners.len>=0xffffffff {return CheckedOwner{..},blot_error::Error.out_of_memory;}let generation=blot_native::fresh_owner_id();let index=checked_owners.alloc_index(CheckedOwnerState{generation:generation,live:true, ..});return CheckedOwner{(index+1) as u32,generation, ..},blot_error::Error.none;}
 fn ownChecked_function_exit_lambdas(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.function_exit_lambdas.len==0);let result=checked_function_exit_lambdas.alloc_slice(values.len);for value,index in values {result[index]=value;}state.function_exit_lambdas=result;return result;}
-fn ownChecked_usage_loans(owner:CheckedOwner,values:const UsageLoan[:])->UsageLoan[:] {let state .= checkedOwnerState(owner);assert(state.usage_loans.len==0);let result=checked_usage_loans.alloc_slice(values.len);for value,index in values {result[index]=value;}state.usage_loans=result;return result;}
-fn ownChecked_proof_contracts(owner:CheckedOwner,values:const ProofContract[:])->ProofContract[:] {let state .= checkedOwnerState(owner);assert(state.proof_contracts.len==0);let result=checked_proof_contracts.alloc_slice(values.len);state.proof_contracts=result;ownCheckedHeaders(owner,values,result);return result;}
-fn ownChecked_rank_implementations(owner:CheckedOwner,values:const RankImplementation[:])->RankImplementation[:] {let state .= checkedOwnerState(owner);assert(state.rank_implementations.len==0);let result=checked_rank_implementations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.rank_implementations=result;return result;}
-fn ownChecked_generative_bindings(owner:CheckedOwner,values:const blot_check_generative_schemes::Binder[:])->blot_check_generative_schemes::Binder[:] {let state .= checkedOwnerState(owner);assert(state.generative_bindings.len==0);let result=checked_generative_bindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.generative_bindings=result;return result;}
-fn ownChecked_dictionary_selections(owner:CheckedOwner,values:const DictionarySelection[:])->DictionarySelection[:] {let state .= checkedOwnerState(owner);assert(state.dictionary_selections.len==0);let result=checked_dictionary_selections.alloc_slice(values.len);for value,index in values {result[index]=value;}state.dictionary_selections=result;return result;}
-fn ownChecked_dictionary_uses(owner:CheckedOwner,values:const DictionaryUse[:])->DictionaryUse[:] {let state .= checkedOwnerState(owner);assert(state.dictionary_uses.len==0);let result=checked_dictionary_uses.alloc_slice(values.len);for value,index in values {result[index]=value;}state.dictionary_uses=result;return result;}
 fn ownChecked_iterator_bodies(owner:CheckedOwner,values:const blot_parse_ast::Id[:])->blot_parse_ast::Id[:] {let state .= checkedOwnerState(owner);assert(state.iterator_bodies.len==0);let result=checked_iterator_bodies.alloc_slice(values.len);for value,index in values {result[index]=value;}state.iterator_bodies=result;return result;}
 fn ownChecked_computations(owner:CheckedOwner,values:const Computation[:])->Computation[:] {let state .= checkedOwnerState(owner);assert(state.computations.len==0);let result=checked_computations.alloc_slice(values.len);for value,index in values {result[index]=value;}state.computations=result;return result;}
 fn ownChecked_request_loops(owner:CheckedOwner,values:const RequestLoop[:])->RequestLoop[:] {let state .= checkedOwnerState(owner);assert(state.request_loops.len==0);let result=checked_request_loops.alloc_slice(values.len);for value,index in values {result[index]=value;}state.request_loops=result;return result;}
@@ -209,8 +151,6 @@ fn ownChecked_request_arms(owner:CheckedOwner,values:const RequestArm[:])->Reque
 fn ownChecked_request_controls(owner:CheckedOwner,values:const RequestControl[:])->RequestControl[:] {let state .= checkedOwnerState(owner);assert(state.request_controls.len==0);let result=checked_request_controls.alloc_slice(values.len);for value,index in values {result[index]=value;}state.request_controls=result;return result;}
 fn ownChecked_reflections(owner:CheckedOwner,values:const Reflection[:])->Reflection[:] {let state .= checkedOwnerState(owner);assert(state.reflections.len==0);let result=checked_reflections.alloc_slice(values.len);for value,index in values {result[index]=value;}state.reflections=result;return result;}
 fn ownChecked_tag_origins(owner:CheckedOwner,values:const TagOrigin[:])->TagOrigin[:] {let state .= checkedOwnerState(owner);assert(state.tag_origins.len==0);let result=checked_tag_origins.alloc_slice(values.len);for value,index in values {result[index]=value;}state.tag_origins=result;return result;}
-fn ownChecked_effect_scopes(owner:CheckedOwner,values:const EffectScope[:])->EffectScope[:] {let state .= checkedOwnerState(owner);assert(state.effect_scopes.len==0);let result=checked_effect_scopes.alloc_slice(values.len);for value,index in values {result[index]=value;}state.effect_scopes=result;return result;}
-fn ownChecked_effect_scope_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.effect_scope_ids.len==0);let result=checked_effect_scope_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.effect_scope_ids=result;return result;}
 fn ownChecked_effect_runners(owner:CheckedOwner,values:const EffectRunner[:])->EffectRunner[:] {let state .= checkedOwnerState(owner);assert(state.effect_runners.len==0);let result=checked_effect_runners.alloc_slice(values.len);for value,index in values {result[index]=value;}state.effect_runners=result;return result;}
 fn ownChecked_effect_runner_ids(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.effect_runner_ids.len==0);let result=checked_effect_runner_ids.alloc_slice(values.len);for value,index in values {result[index]=value;}state.effect_runner_ids=result;return result;}
 fn ownChecked_provider_blocks(owner:CheckedOwner,values:const ProviderBlock[:])->ProviderBlock[:] {let state .= checkedOwnerState(owner);assert(state.provider_blocks.len==0);let result=checked_provider_blocks.alloc_slice(values.len);for value,index in values {result[index]=value;}state.provider_blocks=result;return result;}
@@ -277,32 +217,8 @@ fn ownChecked_loop_carries(owner:CheckedOwner,values:const LoopCarry[:])->LoopCa
 fn ownChecked_loop_ranges(owner:CheckedOwner,values:const blot_check_types::List[:])->blot_check_types::List[:] {let state .= checkedOwnerState(owner);assert(state.loop_ranges.len==0);let result=checked_loop_ranges.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_ranges=result;return result;}
 fn ownChecked_loop_exits(owner:CheckedOwner,values:const LoopExit[:])->LoopExit[:] {let state .= checkedOwnerState(owner);assert(state.loop_exits.len==0);let result=checked_loop_exits.alloc_slice(values.len);for value,index in values {result[index]=value;}state.loop_exits=result;return result;}
 fn ownChecked_statement_arms(owner:CheckedOwner,values:const StatementArm[:])->StatementArm[:] {let state .= checkedOwnerState(owner);assert(state.statement_arms.len==0);let result=checked_statement_arms.alloc_slice(values.len);for value,index in values {result[index]=value;}state.statement_arms=result;return result;}
-fn ownChecked_declarations(owner:CheckedOwner,values:const SourceDeclaration[:])->SourceDeclaration[:] {let state .= checkedOwnerState(owner);assert(state.declarations.len==0);let result=checked_declarations.alloc_slice(values.len);for value,index in values {result[index]=SourceDeclaration{capability_flow:value.capability_flow,capability_parameters:value.capability_parameters,private:value.private,name:value.name,declaration:value.declaration,kind:value.kind,named_function:value.named_function,external:value.external};}state.declarations=result;return ownedSourceDeclarations(owner);}
-fn ownChecked_cap_nodes(owner:CheckedOwner,values:const blot_check_capability_contracts::Term[:])->blot_check_capability_contracts::Term[:] {let state .= checkedOwnerState(owner);assert(state.cap_nodes.len==0);let result=checked_cap_nodes.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_nodes=result;return result;}
-fn ownChecked_cap_words(owner:CheckedOwner,values:const u32[:])->u32[:] {let state .= checkedOwnerState(owner);assert(state.cap_words.len==0);let result=checked_cap_words.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_words=result;return result;}
-fn ownChecked_cap_bindings(owner:CheckedOwner,values:const blot_check_capability_contracts::Binding[:])->blot_check_capability_contracts::Binding[:] {let state .= checkedOwnerState(owner);assert(state.cap_bindings.len==0);let result=checked_cap_bindings.alloc_slice(values.len);for value,index in values {result[index]=value;}state.cap_bindings=result;return result;}
-fn ownChecked_body_debits(owner:CheckedOwner,values:const blot_check_numeric_proof_bodies::Debit[:])->blot_check_numeric_proof_bodies::Debit[:] {let state .= checkedOwnerState(owner);assert(state.body_debits.len==0);let result=checked_body_debits.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_debits=result;return result;}
-fn ownChecked_body_operands(owner:CheckedOwner,values:const blot_check_numeric_proof_terms::Term[:])->blot_check_numeric_proof_terms::Term[:] {let state .= checkedOwnerState(owner);assert(state.body_operands.len==0);let result=checked_body_operands.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_operands=result;return result;}
-fn ownChecked_body_introductions(owner:CheckedOwner,values:const blot_check_numeric_proof_bodies::Introduction[:])->blot_check_numeric_proof_bodies::Introduction[:] {let state .= checkedOwnerState(owner);assert(state.body_introductions.len==0);let result=checked_body_introductions.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_introductions=result;return result;}
-fn ownChecked_body_parameters(owner:CheckedOwner,values:const blot_check_numeric_proof_bodies::Parameter[:])->blot_check_numeric_proof_bodies::Parameter[:] {let state .= checkedOwnerState(owner);assert(state.body_parameters.len==0);let result=checked_body_parameters.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_parameters=result;return result;}
-fn ownChecked_body_uses(owner:CheckedOwner,values:const blot_check_numeric_proof_bodies::Use[:])->blot_check_numeric_proof_bodies::Use[:] {let state .= checkedOwnerState(owner);assert(state.body_uses.len==0);let result=checked_body_uses.alloc_slice(values.len);for value,index in values {result[index]=value;}state.body_uses=result;return result;}
+fn ownChecked_declarations(owner:CheckedOwner,values:const SourceDeclaration[:])->SourceDeclaration[:] {let state .= checkedOwnerState(owner);assert(state.declarations.len==0);let result=checked_declarations.alloc_slice(values.len);for value,index in values {result[index]=SourceDeclaration{capability_parameters:value.capability_parameters,private:value.private,name:value.name,declaration:value.declaration,kind:value.kind,named_function:value.named_function,external:value.external};}state.declarations=result;return ownedSourceDeclarations(owner);}
 fn ownChecked_editor_names(owner:CheckedOwner,values:const EditorName[:])->EditorName[:] {let state .= checkedOwnerState(owner);assert(state.editor_names.len==0);let result=checked_editor_names.alloc_slice(values.len);for value,index in values {result[index]=value;}state.editor_names=result;return result;}
-fn releaseCheckedHeader(header:CheckedHeaderLease&) {
-if header.value_slots.len!=0 {checked_header_value_slots.free_slice(header.value_slots);header.value_slots=default<u32[:]>();}
-if header.proof_slots.len!=0 {checked_header_proof_slots.free_slice(header.proof_slots);header.proof_slots=default<u32[:]>();}
-if header.values.len!=0 {checked_header_values.free_slice(header.values);header.values=default<blot_check_numeric_proof_terms::Kind[:]>();}
-if header.operands.len!=0 {checked_header_operands.free_slice(header.operands);header.operands=default<blot_check_numeric_proof_terms::Term[:]>();}
-if header.requirements.len!=0 {checked_header_requirements.free_slice(header.requirements);header.requirements=default<blot_check_numeric_proof_contracts::Requirement[:]>();}
-if header.parameters.len!=0 {checked_header_parameters.free_slice(header.parameters);header.parameters=default<u32[:]>();}
-}
-fn ownCheckedHeaders(owner:CheckedOwner,source:const ProofContract[:],contracts:ProofContract[:]) {let state .= checkedOwnerState(owner);state.headers=checked_headers.alloc_slice(source.len);for contract,index in source {var lease=CheckedHeaderLease{..};
-let value_slots=checked_header_value_slots.alloc_slice(contract.header.value_slots.len);for value,slot in contract.header.value_slots {value_slots[slot]=value;}lease.value_slots=value_slots;
-let proof_slots=checked_header_proof_slots.alloc_slice(contract.header.proof_slots.len);for value,slot in contract.header.proof_slots {proof_slots[slot]=value;}lease.proof_slots=proof_slots;
-let values=checked_header_values.alloc_slice(contract.header.values.len);for value,slot in contract.header.values {values[slot]=value;}lease.values=values;
-let operands=checked_header_operands.alloc_slice(contract.header.operands.len);for value,slot in contract.header.operands {operands[slot]=value;}lease.operands=operands;
-let requirements=checked_header_requirements.alloc_slice(contract.header.requirements.len);for value,slot in contract.header.requirements {requirements[slot]=value;}lease.requirements=requirements;
-let parameters=checked_header_parameters.alloc_slice(contract.parameters.len);for value,slot in contract.parameters {parameters[slot]=value;}lease.parameters=parameters;
-state.headers[index]=lease;contracts[index]=ProofContract{binding:contract.binding,header:blot_check_numeric_proof_headers::Owned{arity:contract.header.arity,value_slots:value_slots,proof_slots:proof_slots,values:values,operands:operands,requirements:requirements,result:contract.header.result,..},parameters:parameters,..};}}
 // Publication recovers only the exact arrays registered by this Checked owner.
 fn ownedSourceDeclarations(owner:CheckedOwner)->SourceDeclaration[:] {let state .= checkedOwnerState(owner);let values=checked_declarations.realloc_slice(state.declarations,state.declarations.len);assert(blot_support::same_slice_identity(values,state.declarations));return values;}
 fn sourceValidationPatterns(store:blot_check_parameter_patterns::Store)->blot_check_parameter_patterns::Store {if store.lease==0 {assert(store.generation==0);return blot_check_parameter_patterns::Store{..};}return blot_check_parameter_patterns::checkedView(store);}
@@ -351,12 +267,6 @@ fn ownedSourceValidation(checked:const Checked&,declarations:const SourceDeclara
 }
 fn releaseCheckedBodies(owner:CheckedOwner) {let state .= checkedOwnerState(owner);
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
-if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=default<UsageLoan[:]>();}
-if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=default<ProofContract[:]>();}
-if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=default<RankImplementation[:]>();}
-if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=default<blot_check_generative_schemes::Binder[:]>();}
-if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=default<DictionarySelection[:]>();}
-if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=default<DictionaryUse[:]>();}
 if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
 if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
 if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
@@ -364,8 +274,6 @@ if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms
 if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
 if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
 if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
-if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=default<EffectScope[:]>();}
-if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=default<u32[:]>();}
 if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
 if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=default<u32[:]>();}
 if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=default<ProviderBlock[:]>();}
@@ -401,25 +309,10 @@ if state.loop_carries.len!=0 {checked_loop_carries.free_slice(state.loop_carries
 if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);state.loop_ranges=default<blot_check_types::List[:]>();}
 if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}
 if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=default<StatementArm[:]>();}
-if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=default<blot_check_capability_contracts::Term[:]>();}
-if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=default<u32[:]>();}
-if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=default<blot_check_capability_contracts::Binding[:]>();}
-if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=default<blot_check_numeric_proof_bodies::Debit[:]>();}
-if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=default<blot_check_numeric_proof_terms::Term[:]>();}
-if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=default<blot_check_numeric_proof_bodies::Introduction[:]>();}
-if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=default<blot_check_numeric_proof_bodies::Parameter[:]>();}
-if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=default<blot_check_numeric_proof_bodies::Use[:]>();}
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=default<EditorName[:]>();}
-for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=default<CheckedHeaderLease[:]>();}
 }
 fn deinit(self_:CheckedOwner&) {if self_.lease==0 {return;}assert(self_.valid());let state .= checkedOwnerState(self_);
 if state.function_exit_lambdas.len!=0 {checked_function_exit_lambdas.free_slice(state.function_exit_lambdas);state.function_exit_lambdas=default<blot_parse_ast::Id[:]>();}
-if state.usage_loans.len!=0 {checked_usage_loans.free_slice(state.usage_loans);state.usage_loans=default<UsageLoan[:]>();}
-if state.proof_contracts.len!=0 {checked_proof_contracts.free_slice(state.proof_contracts);state.proof_contracts=default<ProofContract[:]>();}
-if state.rank_implementations.len!=0 {checked_rank_implementations.free_slice(state.rank_implementations);state.rank_implementations=default<RankImplementation[:]>();}
-if state.generative_bindings.len!=0 {checked_generative_bindings.free_slice(state.generative_bindings);state.generative_bindings=default<blot_check_generative_schemes::Binder[:]>();}
-if state.dictionary_selections.len!=0 {checked_dictionary_selections.free_slice(state.dictionary_selections);state.dictionary_selections=default<DictionarySelection[:]>();}
-if state.dictionary_uses.len!=0 {checked_dictionary_uses.free_slice(state.dictionary_uses);state.dictionary_uses=default<DictionaryUse[:]>();}
 if state.iterator_bodies.len!=0 {checked_iterator_bodies.free_slice(state.iterator_bodies);state.iterator_bodies=default<blot_parse_ast::Id[:]>();}
 if state.computations.len!=0 {checked_computations.free_slice(state.computations);state.computations=default<Computation[:]>();}
 if state.request_loops.len!=0 {checked_request_loops.free_slice(state.request_loops);state.request_loops=default<RequestLoop[:]>();}
@@ -427,8 +320,6 @@ if state.request_arms.len!=0 {checked_request_arms.free_slice(state.request_arms
 if state.request_controls.len!=0 {checked_request_controls.free_slice(state.request_controls);state.request_controls=default<RequestControl[:]>();}
 if state.reflections.len!=0 {checked_reflections.free_slice(state.reflections);state.reflections=default<Reflection[:]>();}
 if state.tag_origins.len!=0 {checked_tag_origins.free_slice(state.tag_origins);state.tag_origins=default<TagOrigin[:]>();}
-if state.effect_scopes.len!=0 {checked_effect_scopes.free_slice(state.effect_scopes);state.effect_scopes=default<EffectScope[:]>();}
-if state.effect_scope_ids.len!=0 {checked_effect_scope_ids.free_slice(state.effect_scope_ids);state.effect_scope_ids=default<u32[:]>();}
 if state.effect_runners.len!=0 {checked_effect_runners.free_slice(state.effect_runners);state.effect_runners=default<EffectRunner[:]>();}
 if state.effect_runner_ids.len!=0 {checked_effect_runner_ids.free_slice(state.effect_runner_ids);state.effect_runner_ids=default<u32[:]>();}
 if state.provider_blocks.len!=0 {checked_provider_blocks.free_slice(state.provider_blocks);state.provider_blocks=default<ProviderBlock[:]>();}
@@ -483,15 +374,7 @@ if state.loop_ranges.len!=0 {checked_loop_ranges.free_slice(state.loop_ranges);s
 if state.loop_exits.len!=0 {checked_loop_exits.free_slice(state.loop_exits);state.loop_exits=default<LoopExit[:]>();}
 if state.statement_arms.len!=0 {checked_statement_arms.free_slice(state.statement_arms);state.statement_arms=default<StatementArm[:]>();}
 if state.declarations.len!=0 {checked_declarations.free_slice(state.declarations);state.declarations=default<SourceDeclaration[:]>();}
-if state.cap_nodes.len!=0 {checked_cap_nodes.free_slice(state.cap_nodes);state.cap_nodes=default<blot_check_capability_contracts::Term[:]>();}
-if state.cap_words.len!=0 {checked_cap_words.free_slice(state.cap_words);state.cap_words=default<u32[:]>();}
-if state.cap_bindings.len!=0 {checked_cap_bindings.free_slice(state.cap_bindings);state.cap_bindings=default<blot_check_capability_contracts::Binding[:]>();}
-if state.body_debits.len!=0 {checked_body_debits.free_slice(state.body_debits);state.body_debits=default<blot_check_numeric_proof_bodies::Debit[:]>();}
-if state.body_operands.len!=0 {checked_body_operands.free_slice(state.body_operands);state.body_operands=default<blot_check_numeric_proof_terms::Term[:]>();}
-if state.body_introductions.len!=0 {checked_body_introductions.free_slice(state.body_introductions);state.body_introductions=default<blot_check_numeric_proof_bodies::Introduction[:]>();}
-if state.body_parameters.len!=0 {checked_body_parameters.free_slice(state.body_parameters);state.body_parameters=default<blot_check_numeric_proof_bodies::Parameter[:]>();}
-if state.body_uses.len!=0 {checked_body_uses.free_slice(state.body_uses);state.body_uses=default<blot_check_numeric_proof_bodies::Use[:]>();}
 if state.editor_names.len!=0 {checked_editor_names.free_slice(state.editor_names);state.editor_names=default<EditorName[:]>();}
-for &header in state.headers {releaseCheckedHeader(header);}if state.headers.len!=0 {checked_headers.free_slice(state.headers);state.headers=default<CheckedHeaderLease[:]>();}let index=self_.lease-1;state.live=false;checked_owners.free(index);self_=CheckedOwner{..};}
+let index=self_.lease-1;state.live=false;checked_owners.free(index);self_=CheckedOwner{..};}
 fn deinit(self_:Checked&) {if !self_.owner.valid() {return;}deinitDiagnosticPayloads(self_.diagnostics);if self_.editor.present && self_.editor.value.context.present {self_.editor.value.context.value.deinit();}self_.types.deinit();self_.parameter_patterns.deinit();releaseCheckedPacket(self_.owner);self_.owner.deinit();self_=default<Checked>();}
 fn deinit(self_:SourceValidation&) {if !self_.owner.valid() {return;}deinitDiagnosticPayloads(self_.diagnostics);self_.types.deinit();self_.parameter_patterns.deinit();self_.owner.deinit();self_=default<SourceValidation>();}

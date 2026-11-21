@@ -53,7 +53,6 @@ fn encode(source: const u8[:], seed: const Pool&, fixities: const blot_parse_par
     writer.write_u32((local.entries.len-seed.entries.len) as u32);
     var flags:u8=0;
     if tree.has_typed_staging {flags|=1;}
-    if tree.has_numeric_proofs {flags|=2;}
     writer.write_u8(flags);
     write_tree(tree,packet);
     for entry in local.entries.items[seed.entries.len..] {
@@ -180,7 +179,6 @@ fn decode(packet: const u8[:], symbols: Pool&, tree: Tree&,recorded:blot_parse_p
     }
     if recorded {recorded.append(names[..]);}
     parsed.has_typed_staging=(flags&1)!=0;
-    parsed.has_numeric_proofs=(flags&2)!=0;
     tree.deinit();
     tree=blot_parse_ast::canonical(parsed);
     return true;

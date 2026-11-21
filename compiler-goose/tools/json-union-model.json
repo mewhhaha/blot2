@@ -6,16 +6,6 @@
   "Callees": {
    "frozen": "*const PI.Interface",
    "live": "*const Checked"
-  },
-  "DictionaryProof": {
-   "given": "DictionaryGiven",
-   "selected": "u32"
-  }
- },
- "check/core": {
-  "DictionaryProof": {
-   "given": "DictionaryGiven",
-   "selected": "u32"
   }
  },
  "check/effects": {
@@ -35,26 +25,9 @@
    "store": "*const T.Store"
   }
  },
- "check/numeric_proof_core": {
-  "Fact": {
-   "order": "terms.Proposition",
-   "unequal": "contracts.Unequal"
-  },
-  "SummaryInputs": {
-   "captures": "[]const Entry",
-   "locals": "struct { entries: []const Entry, parent: *const SummaryInputs }",
-   "parameters": "struct { bindings: []const core.Parameter, values: []const Value }"
-  }
- },
  "check/scalar_ops": {
   "Folded": {
    "value": "u32"
-  }
- },
- "check/task_core": {
-  "SpawnApplication": {
-   "full": "struct { group: C.Id, action: C.Id, carrier: C.Id = 0 }",
-   "partial": "C.Id"
   }
  },
  "reuse/dependency_closure": {

@@ -17,7 +17,6 @@ type Tag = blot_check_types::Tag;
 type IdBuffer=blot_support_pooled_buffer::Buffer<Id>;
 type FieldBuffer=blot_support_pooled_buffer::Buffer<blot_check_types::Field>;
 reusable[] var import_ids:Id[>..];
-reusable[] var import_goals:blot_check_types::Obligation[>..];
 reusable[] var import_fields:blot_check_types::Field[>..];
 fn push(values:IdBuffer&,value:Id)->Error {return blot_support_pooled_buffer::push(values,value,import_ids);}
 fn deinit(values:IdBuffer&) {blot_support_pooled_buffer::deinit(values,import_ids);}
@@ -117,26 +116,6 @@ recursive fn copyRowBody(self_:Copier&,source_row:blot_check_effects::Id,row:blo
     }
     let result, error = self_.destination.effects.row(labels.items, tail); if error != blot_error::Error.none { return 0, blot_check_types::effectError(error); } self_.rows.insert(source_row, result); return result, blot_error::Error.none;
 }
-recursive fn quantifier(self_:Copier&,node:blot_check_types::Node,depth:i64,id:Id)->Id,Error {
- var binders=IdBuffer{..};let result,error=quantifierBody(self_,node,depth,id,binders);deinit(binders);return result,error;
-}
-recursive fn quantifierBody(self_:Copier&,node:blot_check_types::Node,depth:i64,id:Id,binders:IdBuffer&)->Id,Error {
-    for original in self_.source.list(List { node.b, node.c , ..}) { let leaf = self_.source.node(original); if leaf.tag != blot_check_types::Tag.bound { return 0, blot_error::Error.type_limit; }
-        var binder: Id = 0; { let scalar_lookup_6 .= self_.mapping.get(original); if scalar_lookup_6 {let optional_binding_52:u32=scalar_lookup_6; let known .= optional_binding_52; binder = known;  } else { let fresh, error = self_.destination.boundType(leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } binder = fresh; } } self_.mapping.insert(original, binder); let error=push(binders,binder);if error!=blot_error::Error.none {return 0,error;}
-    }
-    let body, error = copy(self_, node.a, depth + 1); if error != blot_error::Error.none { return 0, error; } let original=self_.source.quantifierGoals(id);let goals=import_goals.alloc_slice(original.len);for goal,index in original {goals[index]=goal;}
- let result,error=quantifierGoalsBody(self_,node,depth,body,binders.items,goals);import_goals.free_slice(goals);return result,error;
-}
-recursive fn quantifierGoalsBody(self_:Copier&,node:blot_check_types::Node,depth:i64,body:Id,binders:const Id[:],goals:blot_check_types::Obligation[:])->Id,Error {
-    for &goal in goals { let ty, error = copy(self_, goal.ty, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.ty = ty; let other, error = copy(self_, goal.other, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.other = other; let result, error = copy(self_, goal.result, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.result = result; let signature, error = copy(self_, goal.signature, depth + 1); if error != blot_error::Error.none { return 0, error; } goal.signature = signature; goal.source = 0;
-        if self_.private_namespace != 0 {
-            if goal.qualification_span.present { let origin = goal.qualification_span.value; if goal.qualification_unit != 0 || origin.start == 0 || origin.start > self_.private_qualifications.len || origin.end != 0 { return 0, blot_error::Error.type_limit; } goal.qualification_span = blot_support::some(self_.private_qualifications[origin.start - 1]); goal.qualification_unit = self_.private_unit; }
-            if goal.name != 0 { if !self_.has_field_mapping { return 0, blot_error::Error.type_limit; } goal.name = self_.field_mapping[goal.name - 1]; }
-            if goal.kind == blot_check_types::ObligationKind.contract { { let optional_binding_51 .= self_.nominal_mapping; if optional_binding_51 { let mapping .= optional_binding_51; { let optional_binding_50 .= mapping.get(goal.identity); if optional_binding_50 { let identity .= optional_binding_50; goal.identity = identity;  } else { return 0, blot_error::Error.type_limit; } }  } else { return 0, blot_error::Error.type_limit; } } }
-            if goal.kind == blot_check_types::ObligationKind.effect_operation { { let optional_binding_49 .= self_.operation_mapping; if optional_binding_49 { let mapping .= optional_binding_49; { let optional_binding_48 .= mapping.get(goal.identity); if optional_binding_48 { let identity .= optional_binding_48; goal.identity = identity;  } else { return 0, blot_error::Error.type_limit; } }  } else { return 0, blot_error::Error.type_limit; } } }
-        }
-    } return self_.destination.quantifiedWithGoals(node.tag, body, binders, goals);
-}
 recursive fn nominal(self_:Copier&,node:blot_check_types::Node,depth:i64)->Id,Error {
  var args=IdBuffer{..};let result,error=nominalBody(self_,node,depth,args);deinit(args);return result,error;
 }
@@ -160,7 +139,7 @@ recursive fn copyDepth(self_: Copier&, source_id: Id, depth: i64) -> Id, Error {
     match node.tag {
         bound => { if self_.private_namespace == 0 { return 0, blot_error::Error.type_limit; } let value, error = self_.destination.boundType(node.a, node.b); result = value; failure = error; },
         rigid => { let scope, error = copyScope(self_, node.a); if error != blot_error::Error.none { return 0, error; } let value, error = self_.destination.rigid(scope, node.b, node.c); result = value; failure = error; },
-        forall, existential => { let value, error = quantifier(self_, node, depth, id); result = value; failure = error; },
+        forall, existential => { return 0, blot_error::Error.type_limit; },
         instance_version => { let value, error = copyVersion(self_, node); result = value; failure = error; },
         instance_selection => {let original=self_.source.nominalArguments(node);if original.len!=2 && original.len!=3 {return 0,blot_error::Error.type_limit;}
             var choices=IdBuffer{..};let value,error=copySelectionBody(self_,node,depth,original,choices);deinit(choices);result=value;failure=error;

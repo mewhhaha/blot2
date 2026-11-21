@@ -79,7 +79,7 @@ fn valueImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check
  }return blot_check_check::ImportedBinding{ target:target, interface:interface, origin:origin, .. },blot_error::Error.none;
 }
 fn headerImport(self_:const Engine&,target:ExternalTarget,origin:u32)->blot_check_check::SourceHeader {
- assert(self_.source_validation);let module=self_.catalogModule(target.unit);assert(module.present);let declaration=module.value.declaration(target.binding);return blot_check_check::SourceHeader{ capability_flow:declaration.capability_flow, capability_parameters:declaration.capability_parameters, target:target, named_function:declaration.named_function, origin:origin, .. };
+ assert(self_.source_validation);let module=self_.catalogModule(target.unit);assert(module.present);let declaration=module.value.declaration(target.binding);return blot_check_check::SourceHeader{ capability_parameters:declaration.capability_parameters, target:target, named_function:declaration.named_function, origin:origin, .. };
 }
 fn initCompiledCatalogs(self_:Engine&)->Error {
  self_.compiled_catalogs=compiled_catalog_runs.alloc_slice(self_.source.compiled_modules.len);for &value in self_.compiled_catalogs {value=CompiledCatalog{..};}

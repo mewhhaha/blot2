@@ -175,8 +175,6 @@ fn collect(self_: Frontier&, store: blot_check_types::Store&, roots: const blot_
             scoped => { local = [node.a, node.c, 0]; local_count = 1; if node.b == 0 { local_count = 2; } },
             forall, existential => {
                 if len == stack.len { self_.overflow = true; return blot_error::Error.none; } stack[len] = node.a; len += 1;
-                let selected, error = store.resolve(root, 0); if error != blot_error::Error.none { return error; }
-                for goal in store.quantifierGoals(selected) { for child in [goal.ty, goal.other, goal.result, goal.signature] { if child != 0 { if len == stack.len { self_.overflow = true; return blot_error::Error.none; } stack[len] = child; len += 1; } } }
             },
             array, list, cursor, resolver, provider => { local[0] = node.a; local_count = 1; },
             product, nominal, projection, instance_selection => {},

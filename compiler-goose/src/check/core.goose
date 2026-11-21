@@ -2,12 +2,9 @@
 namespace blot_check_core;
 import backend.collection_ops;
 import backend.opaque_storage;
-import check.capability_contracts;
 import check.capability_flow;
 import check.check_packet_owner;
 import check.effects;
-import check.numeric_proof_headers;
-import check.quantifier_goals;
 import check.types;
 import parse.ast;
 import reuse.principal_interface;
@@ -60,7 +57,6 @@ struct Parameter {
     inferred: bool = false
 }
 struct Binding {
-    capability_flow: blot_check_check::CapabilityFlow = blot_check_capability_flow::Contract.unknown,
     capability_parameters: blot_check_capability_flow::Parameters = blot_check_capability_flow::Parameters {..},
     private: bool = false,
     initializer: Id = 0,
@@ -109,31 +105,6 @@ struct CallInfo {
     callee_type: blot_check_types::Id,
     // Bit i: the callee takes over its parameter i (`own`).
     own: u32 = 0
-}
-struct DictionaryUse {
-    node: Id,
-    binding: BindingId,
-    opening: BindingId,
-    introduction: Id = 0,
-    quantifier: blot_check_types::Id,
-    goal: u32,
-    member: u32
-}
-struct DictionaryGiven {
-    opening: BindingId,
-    introduction: Id = 0,
-    quantifier: blot_check_types::Id,
-    goal: u32,
-    arguments: blot_check_types::List
-}
-enum DictionaryProof { selected { value: u32 }, given { value: DictionaryGiven } }
-struct DictionarySelection {
-    owner: Id,
-    quantifier: blot_check_types::Id,
-    goal: u32,
-    proof: DictionaryProof,
-    members: List = List {..},
-    contents: List = List {..}
 }
 struct Call {
     target: BindingRef,
@@ -361,17 +332,10 @@ struct Types {
     extra: const blot_check_types::Id[:],
     effects: EffectRows = EffectRows {..},
     operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
-    quantifier_goals: const blot_check_types::QuantifierGoals[:] = default<const blot_check_types::QuantifierGoals[:]>(),
-    quantifier_obligations: const blot_check_types::Obligation[:] = default<const blot_check_types::Obligation[:]>()
 }
 fn emptyTypes()->Types {return Types{nodes:default<const blot_check_types::Node[:]>(),extra:default<const blot_check_types::Id[:]>(), ..};}
 struct Module {
     owner_id: u64 = 0,
-    has_rank_contracts: bool = false,
-    has_usage_contracts: bool = false,
-    has_numeric_proofs: bool = false,
-    proof_contracts: ProofContract[:] = default<ProofContract[:]>(),
-    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {..},
     field_names: FieldName[:] = default<FieldName[:]>(),
     runtime_names: RuntimeName[:] = default<RuntimeName[:]>(),
     source_names: RuntimeName[:] = default<RuntimeName[:]>(),
@@ -418,8 +382,6 @@ struct Module {
     selected_members: ImplementationMember[:] = default<ImplementationMember[:]>(),
     selected_edges: u32[:] = default<u32[:]>(),
     selected_uses: SelectedUse[:] = default<SelectedUse[:]>(),
-    dictionary_selections: DictionarySelection[:] = default<DictionarySelection[:]>(),
-    dictionary_uses: DictionaryUse[:] = default<DictionaryUse[:]>(),
     primitives: Primitive[:] = default<Primitive[:]>(),
     loops: LoopInfo[:] = default<LoopInfo[:]>(),
     loop_carries: LoopCarry[:] = default<LoopCarry[:]>(),
@@ -429,15 +391,13 @@ struct Module {
     dispatch_signatures: blot_check_types::Id[:] = default<blot_check_types::Id[:]>(),
     type_tags: TypeTag[:] = default<TypeTag[:]>(),
     diagnostics: Diagnostic[:],
-    body_lowerings: i64,
-    package_payloads: Id[:] = default<Id[:]>()
+    body_lowerings: i64
 }
 type Id = u32;
 type BindingId = u32;
 type BodyId = u32;
 type PatternId = u32;
 type Span = blot_parse_ast::Span;
-type ProofContract = blot_check_numeric_proof_headers::Named;
 type ArrayOp = blot_backend_collection_ops::Op;
 type ContractMember = blot_reuse_principal_interface::ContractMember;
 type Implementation = blot_reuse_principal_interface::Implementation;
@@ -465,9 +425,6 @@ fn node(self_: const EffectRows&, id: blot_check_effects::Id) -> blot_check_effe
     return self_.rows[id];
 }
 fn list(self_: const EffectRows&, span: blot_check_effects::List) -> const blot_check_effects::Label[:] { return self_.labels[span.start..span.start + span.len]; }
-fn quantifierGoals(self_: const Types&, owner: blot_check_types::Id) -> const blot_check_types::Obligation[:] {
-    return blot_check_quantifier_goals::get(self_.quantifier_goals, self_.quantifier_obligations, owner);
-}
 fn node(self_: const Types&, id: blot_check_types::Id) -> blot_check_types::Node { return self_.nodes[id]; }
 fn withoutForall(self_: const Types&, id: blot_check_types::Id) -> blot_check_types::Id, blot_error::Error {
     var current = id; var depth: i64 = 0;
@@ -547,44 +504,12 @@ fn children(self_: const Module&, id: Id) -> const Id[:] {
     match value.tag {
         block_, suite, product, record, array, array_op, storage, task => { return self_.extra[value.a..value.a + value.b]; },
         call, contract_method, break_, with_handle => { return self_.extra[value.b..value.b + value.c]; },
-        package_pack => {
-            for selection in self_.dictionary_selections {
-                if selection.owner == id { return self_.extra[selection.contents.start..selection.contents.start + selection.contents.len]; }
-            }
-            assert(id < self_.package_payloads.len && self_.package_payloads[id] == value.a);
-            return self_.package_payloads[id..id + 1];
-        },
         _ => { return self_.extra[..0]; },
     }
 }
 fn call(self_: const Module&, id: Id) -> Call {
     let value = self_.node(id); assert(value.tag == Tag.call); let target = self_.calls[value.a];
     return Call { target.target, target.callee_type, self_.children(id), target.own, ..};
-}
-fn dictionaryOffset(self_: const Module&, quantifier: blot_check_types::Id, wanted_goal: u32, wanted_member: u32) -> i64, blot_error::Error {
-    let goals = self_.types.quantifierGoals(quantifier);
-    if wanted_goal >= goals.len { return 0, blot_error::Error.core_limit; }
-    var offset: i64 = 1;
-    for goal, ordinal in goals {
-        if goal.kind != blot_check_types::ObligationKind.contract {
-            if ordinal == wanted_goal { return 0, blot_error::Error.core_limit; }
-            continue;
-        }
-        var contract_index: i64 = -1;
-        for candidate, index in self_.contracts {
-            if candidate.identity.unit == goal.identity.unit && candidate.identity.decl == goal.identity.decl { contract_index = index; break; }
-        }
-        if contract_index < 0 { return 0, blot_error::Error.core_limit; }
-        let contract = self_.contracts[contract_index];
-        for member, member_ordinal in self_.contract_members[contract.members.start..contract.members.start + contract.members.len] {
-            if ordinal == wanted_goal && member_ordinal == wanted_member {
-                if member.kind != blot_reuse_principal_interface::ContractMemberKind.value { return 0, blot_error::Error.core_limit; }
-                return offset, blot_error::Error.none;
-            }
-            if member.kind == blot_reuse_principal_interface::ContractMemberKind.value { offset += 1; }
-        }
-    }
-    return 0, blot_error::Error.core_limit;
 }
 fn reference(self_: const Module&, id: Id) -> BindingRef { assert(self_.node(id).tag == Tag.reference); return self_.references[self_.node(id).a]; }
 fn binding(self_: const Module&, id: BindingId) -> Binding { return self_.bindings[id]; }
@@ -1015,7 +940,6 @@ fn codeFromCode(code: u32) -> Code, blot_error::Error {
 }
 
 fn deinit(self_: Module&) {
-    self_.proof_contracts = default<blot_check_core::ProofContract[:]>();
     self_.field_names = default<blot_check_core::FieldName[:]>();
     self_.runtime_names = default<blot_check_core::RuntimeName[:]>();
     self_.source_names = default<blot_check_core::RuntimeName[:]>();
@@ -1060,8 +984,6 @@ fn deinit(self_: Module&) {
     self_.selected_members = default<blot_check_core::ImplementationMember[:]>();
     self_.selected_edges = default<u32[:]>();
     self_.selected_uses = default<blot_check_core::SelectedUse[:]>();
-    self_.dictionary_selections = default<blot_check_core::DictionarySelection[:]>();
-    self_.dictionary_uses = default<blot_check_core::DictionaryUse[:]>();
     self_.primitives = default<blot_check_core::Primitive[:]>();
     self_.loops = default<blot_check_core::LoopInfo[:]>();
     self_.loop_carries = default<blot_check_core::LoopCarry[:]>();
@@ -1070,9 +992,8 @@ fn deinit(self_: Module&) {
     self_.handle_effects = default<blot_check_core::HandleEffects[:]>();
     self_.dispatch_signatures = default<blot_check_types::Id[:]>();
     self_.diagnostics = default<blot_check_core::Diagnostic[:]>();
-    self_.package_payloads = default<blot_check_core::Id[:]>();
     self_.types.nodes = default<const blot_check_types::Node[:]>(); self_.types.extra = default<const blot_check_types::Id[:]>(); self_.types.effects.rows = default<const blot_check_effects::Row[:]>(); self_.types.effects.labels = default<const blot_check_effects::Label[:]>();
-    self_.types.operations = default<const blot_check_types::Operation[:]>(); self_.types.quantifier_goals = default<const blot_check_types::QuantifierGoals[:]>(); self_.types.quantifier_obligations = default<const blot_check_types::Obligation[:]>();
+    self_.types.operations = default<const blot_check_types::Operation[:]>();
     self_.owner_id = 0; self_.types.owner_id = 0;
 }
 
@@ -1103,37 +1024,18 @@ fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::LoopKind,sink:
 
 fn blot_structural::equal(left: blot_check_core::Code, right: blot_check_core::Code) -> bool { return left == right; }
 fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::Code,sink: S&) { blot_structural::hash(sink, blot_check_core::codeCode(value) as! u8); }
-fn blot_structural::equal(left: blot_check_core::DictionaryProof, right: blot_check_core::DictionaryProof) -> bool {
-    match left {
-        selected l => { match right { selected r => { return l.value == r.value; }, _ => { return false; }, } },
-        given l => { match right { given r => { return blot_structural::equal(l.value, r.value); }, _ => { return false; }, } },
-    }
-}
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::DictionaryProof,sink: S&) {
-    match value {
-        selected v => { blot_structural::hash(sink, 0 as u8); blot_structural::hash(sink, v.value); },
-        given v => { blot_structural::hash(sink, 1 as u8); blot_structural::hash(sink, v.value); },
-    }
-}
 
 struct TypesStampView {
     nodes: const blot_check_types::Node[:],
     extra: const blot_check_types::Id[:],
     effects: EffectRows = EffectRows {..},
     operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
-    quantifier_goals: const blot_check_types::QuantifierGoals[:] = default<const blot_check_types::QuantifierGoals[:]>(),
-    quantifier_obligations: const blot_check_types::Obligation[:] = default<const blot_check_types::Obligation[:]>()
 }
 fn typesStampView(self_: const Types&) -> TypesStampView {
-    return TypesStampView { self_.nodes, self_.extra, self_.effects, self_.operations, self_.quantifier_goals, self_.quantifier_obligations , ..};
+    return TypesStampView { self_.nodes, self_.extra, self_.effects, self_.operations , ..};
 }
 
 struct StampView {
-    has_rank_contracts: bool = false,
-    has_usage_contracts: bool = false,
-    has_numeric_proofs: bool = false,
-    proof_contracts: const ProofContract[:] = default<const ProofContract[:]>(),
-    capability_contracts: blot_check_capability_contracts::Collection = blot_check_capability_contracts::Collection {..},
     field_names: const FieldName[:] = default<const FieldName[:]>(),
     runtime_names: const RuntimeName[:] = default<const RuntimeName[:]>(),
     source_names: const RuntimeName[:] = default<const RuntimeName[:]>(),
@@ -1180,8 +1082,6 @@ struct StampView {
     selected_members: const ImplementationMember[:] = default<const ImplementationMember[:]>(),
     selected_edges: const u32[:] = default<const u32[:]>(),
     selected_uses: const SelectedUse[:] = default<const SelectedUse[:]>(),
-    dictionary_selections: const DictionarySelection[:] = default<const DictionarySelection[:]>(),
-    dictionary_uses: const DictionaryUse[:] = default<const DictionaryUse[:]>(),
     primitives: const Primitive[:] = default<const Primitive[:]>(),
     loops: const LoopInfo[:] = default<const LoopInfo[:]>(),
     loop_carries: const LoopCarry[:] = default<const LoopCarry[:]>(),
@@ -1194,7 +1094,7 @@ struct StampView {
     body_lowerings: i64
 }
 fn stampView(self_: const Module&) -> StampView {
-    return StampView { self_.has_rank_contracts, self_.has_usage_contracts, self_.has_numeric_proofs, self_.proof_contracts, self_.capability_contracts, self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.request_loops, self_.request_arms, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.selected_proofs, self_.selected_members, self_.selected_edges, self_.selected_uses, self_.dictionary_selections, self_.dictionary_uses, self_.primitives, self_.loops, self_.loop_carries, self_.resolver_ops, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
+    return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.request_loops, self_.request_arms, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.selected_proofs, self_.selected_members, self_.selected_edges, self_.selected_uses, self_.primitives, self_.loops, self_.loop_carries, self_.resolver_ops, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
 }
 
 type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;

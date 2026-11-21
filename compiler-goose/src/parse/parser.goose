@@ -7,7 +7,6 @@ import .lexer;
 import .symbols;
 import support.error;
 import support.pooled_buffer;
-import check.numeric_proof_names;
 import check.typed_staging_names;
 type Id= u32;
 type Tag=blot_parse_token::Tag;
@@ -610,23 +609,6 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
   if view { element=type_expression(p,source,tokens); expect(p,source,tokens,t_r_bracket); } else { element=type_atom(p,source,tokens); }
   let __cleanup_result_5_0: Id = add(p,source,tokens,a_type_apply,name,element,0,start); { p.depth--; } return __cleanup_result_5_0;
  }
- if word(p,source,tokens,"code")&&peek(p,tokens,1)==t_l_bracket {
-  advance(p,source,tokens); expect(p,source,tokens,t_l_bracket); let result=type_expression(p,source,tokens); expect(p,source,tokens,t_comma); if !word(p,source,tokens,"row") { let __cleanup_result_6_0: Id = fail(p,source,tokens,c_expected_type); { p.depth--; } return __cleanup_result_6_0; }
-  let row_start=advance(p,source,tokens).start; var row: Id=0;
-  if at(p,source,tokens,t_l_brace) { row=effect_row_body(p,source,tokens,row_start); } else { let tail_start=current(p,source,tokens).start; let tail=add(p,source,tokens,a_type_name,lower_identifier(p,source,tokens),0,0,tail_start); row=add(p,source,tokens,a_effect_row,0,0,tail,row_start); }
-  expect(p,source,tokens,t_r_bracket); p.tree.has_typed_staging=true; let __cleanup_result_7_0: Id = add(p,source,tokens,a_type_code,result,row,0,start); { p.depth--; } return __cleanup_result_7_0;
- }
- if word(p,source,tokens,"descriptor")&&type_atom_tag(peek(p,tokens,1)) { advance(p,source,tokens); p.tree.has_typed_staging=true; let ty=type_atom(p,source,tokens); let __cleanup_result_8_0: Id = add(p,source,tokens,a_type_descriptor,ty,0,0,start); { p.depth--; } return __cleanup_result_8_0; }
- if at(p,source,tokens,t_intrinsic) {
-  let head=advance(p,source,tokens); let proof,known=blot_check_numeric_proof_terms::type_name(text(p,source,head)); if !known { let __cleanup_result_9_0: Id = fail(p,source,tokens,c_expected_type); { p.depth--; } return __cleanup_result_9_0; }
-  p.tree.has_numeric_proofs=true; var value=add(p,source,tokens,a_type_name,intern(p,source,tokens,text(p,source,head)),0,0,start);
-  for i in 0..2 { let operand=proof_operand(p,source,tokens); value=add(p,source,tokens,a_type_apply,value,operand,0,start); } let __cleanup_result_10_0: Id = value; { p.depth--; } return __cleanup_result_10_0;
- }
- if at(p,source,tokens,t_identifier)&&peek(p,tokens,1)==t_l_bracket&&(word(p,source,tokens,"forall")||word(p,source,tokens,"exists")) { let __cleanup_result_11_0: Id = quantified_type(p,source,tokens); { p.depth--; } return __cleanup_result_11_0; }
- if at(p,source,tokens,t_identifier)&&type_atom_tag(peek(p,tokens,1)) {
-  let kinds: (const u8[:])[8]=["unique","shared","borrow","borrow_mut","once","many","cleanup","concurrent"];
-  for kind,index in kinds { if word(p,source,tokens,kind) { advance(p,source,tokens); var region: Symbol=0; if index==2||index==3 { region=lower_identifier(p,source,tokens); } let ty=type_atom(p,source,tokens); let __cleanup_result_12_0: Id = add(p,source,tokens,a_type_usage,index as u32,ty,region,start); { p.depth--; } return __cleanup_result_12_0; } }
- }
  if at(p,source,tokens,t_identifier)||at(p,source,tokens,t_type_identifier) { let __cleanup_result_13_0: Id = add(p,source,tokens,a_type_name,qualified(p,source,tokens),0,0,start); { p.depth--; } return __cleanup_result_13_0; }
  if eat(p,source,tokens,t_l_brace) {
   var fields=ScratchIdBuffer {}; newlines(p,source,tokens);
@@ -661,43 +643,6 @@ recursive fn type_atom(p: Parser&,source: const u8[:],tokens: const Token[:]) ->
  if !array&&!tuple&&values.len==1 { p.tree.type_conversion_origins.push(blot_parse_ast::TypeConversionOrigin {values.items[0],start}); let __cleanup_result_18_0: Id = values.items[0]; { p.depth--; } let __cleanup_result_33_0: Id = __cleanup_result_18_0; values.deinit(); return __cleanup_result_33_0; }
  var tag=a_type_product; if array { tag=a_type_array; } let __cleanup_result_19_0: Id = list_node(p,source,tokens,tag,values.items,start); { p.depth--; } let __cleanup_result_34_0: Id = __cleanup_result_19_0; values.deinit(); return __cleanup_result_34_0;
  { p.depth--; }  values.deinit(); }
-recursive fn proof_operand(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- if !enter(p,source,tokens) { return 0; }  let t=current(p,source,tokens);
- if eat(p,source,tokens,t_l_paren) { let value=proof_operand(p,source,tokens); expect(p,source,tokens,t_r_paren); if p.failure==blot_error::Error.none { p.tree.type_conversion_origins.push(blot_parse_ast::TypeConversionOrigin {value,t.start}); } let __cleanup_result_20_0: Id = value; { p.depth--; } return __cleanup_result_20_0; }
- if eat(p,source,tokens,t_integer) { let __cleanup_result_21_0: Id = integer_literal(p,source,tokens,t,a_integer); { p.depth--; } return __cleanup_result_21_0; }
- if at(p,source,tokens,t_identifier) { let __cleanup_result_22_0: Id = add(p,source,tokens,a_type_name,lower_identifier(p,source,tokens),0,0,t.start); { p.depth--; } return __cleanup_result_22_0; }
- if eat(p,source,tokens,t_intrinsic) { let name=text(p,source,t); if name!="@array.length"&&name!="@list.length" { let __cleanup_result_23_0: Id = fail(p,source,tokens,c_expected_type); { p.depth--; } return __cleanup_result_23_0; } let head=add(p,source,tokens,a_type_name,intern(p,source,tokens,name),0,0,t.start); let arg=proof_operand(p,source,tokens); let __cleanup_result_24_0: Id = add(p,source,tokens,a_type_apply,head,arg,0,t.start); { p.depth--; } return __cleanup_result_24_0; }
- let __cleanup_result_25_0: Id = fail(p,source,tokens,c_expected_type); { p.depth--; } return __cleanup_result_25_0;
- { p.depth--; } }
-fn quantified_binders(p: Parser&,source: const u8[:],tokens: const Token[:]) -> List {
- expect(p,source,tokens,t_l_bracket); var binders=ScratchIdBuffer {};
- while p.failure==blot_error::Error.none { let start=current(p,source,tokens).start; var sort: u32=0; if word(p,source,tokens,"row")||word(p,source,tokens,"region") { sort=2; if word(p,source,tokens,"row") { sort=1; } advance(p,source,tokens); } let name=lower_identifier(p,source,tokens); binders.push(add(p,source,tokens,a_quantified_binder,name,sort,0,start)); if !eat(p,source,tokens,t_comma) { break; } }
- expect(p,source,tokens,t_r_bracket); let __cleanup_result_35_0: List = list(p,source,tokens,binders.items); binders.deinit(); return __cleanup_result_35_0;
- binders.deinit(); }
-recursive fn quantified_type(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=current(p,source,tokens).start; var tag=a_type_forall; if word(p,source,tokens,"exists") { tag=a_type_exists; } advance(p,source,tokens); let binders=quantified_binders(p,source,tokens); var where=Where {};
- if at(p,source,tokens,t_kw_where)||(at(p,source,tokens,t_identifier)&&word(p,source,tokens,"where")) { let point=advance(p,source,tokens).start; where=predicate_body(p,source,tokens,point,false); }
- expect(p,source,tokens,t_fat_arrow); let body=type_expression(p,source,tokens); return add(p,source,tokens,tag,binders.start,binders.len,extra(p,source,tokens,[body,where.node]),start);
-}
-recursive fn package_pack(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=advance(p,source,tokens).start; expect(p,source,tokens,t_l_bracket); var witnesses=ScratchIdBuffer {};
- while p.failure==blot_error::Error.none { witnesses.push(type_expression(p,source,tokens)); if !eat(p,source,tokens,t_comma) { break; } }
- expect(p,source,tokens,t_r_bracket); let value=expression(p,source,tokens); expect(p,source,tokens,t_kw_as); let annotation=type_expression(p,source,tokens); let range=list(p,source,tokens,witnesses.items); let __cleanup_result_36_0: Id = add(p,source,tokens,a_package_pack,range.start,range.len,extra(p,source,tokens,[value,annotation]),start); witnesses.deinit(); return __cleanup_result_36_0;
- witnesses.deinit(); }
-fn package_opening_ahead(p: Parser&,tokens: const Token[:]) -> bool {
- var nested=0; var index=p.index+1;
- while index<tokens.len {
-  let tag=tokens[index].tag;
-  if tag==t_kw_as&&nested==0 { return true; }
-  if tag==t_l_paren||tag==t_l_bracket||tag==t_l_brace { nested++; }
-  else if tag==t_r_paren||tag==t_r_bracket||tag==t_r_brace { if nested==0 { return false; } nested--; }
-  else if nested==0&&(tag==t_newline||tag==t_eof||tag==t_fat_arrow||tag==t_equal) { return false; } index++;
- }
- return false;
-}
-recursive fn package_unpack(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
- let start=advance(p,source,tokens).start; let package=expression(p,source,tokens); expect(p,source,tokens,t_kw_as); let binders=quantified_binders(p,source,tokens); let name=lower_identifier(p,source,tokens); expect(p,source,tokens,t_kw_in); let body=expression(p,source,tokens); return add(p,source,tokens,a_package_unpack,package,binders.start,extra(p,source,tokens,[binders.len,name,body]),start);
-}
 recursive fn effect_row(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id { let start=expect(p,source,tokens,t_bang).start; return effect_row_body(p,source,tokens,start); }
 recursive fn effect_row_body(p: Parser&,source: const u8[:],tokens: const Token[:],start: u32) -> Id {
  expect(p,source,tokens,t_l_brace); var labels=ScratchIdBuffer {};
@@ -737,8 +682,6 @@ recursive fn fork_expression(p: Parser&,source: const u8[:],tokens: const Token[
 recursive fn expression(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if !enter(p,source,tokens) { return 0; }
  if fork_ahead(p,source,tokens) { let __cleanup_result_fork_0: Id = fork_expression(p,source,tokens); { p.depth--; } return __cleanup_result_fork_0; }
- if at(p,source,tokens,t_identifier)&&word(p,source,tokens,"pack")&&peek(p,tokens,1)==t_l_bracket { let __cleanup_result_26_0: Id = package_pack(p,source,tokens); { p.depth--; } return __cleanup_result_26_0; }
- if at(p,source,tokens,t_identifier)&&word(p,source,tokens,"unpack")&&package_opening_ahead(p,tokens) { let __cleanup_result_27_0: Id = package_unpack(p,source,tokens); { p.depth--; } return __cleanup_result_27_0; }
  if at(p,source,tokens,t_kw_func) { let __cleanup_result_28_0: Id = lambda(p,source,tokens); { p.depth--; } return __cleanup_result_28_0; } if at(p,source,tokens,t_kw_do) { let __cleanup_result_29_0: Id = do_block(p,source,tokens); { p.depth--; } return __cleanup_result_29_0; } if at(p,source,tokens,t_kw_if) { let __cleanup_result_30_0: Id = if_expression(p,source,tokens); { p.depth--; } return __cleanup_result_30_0; } if at(p,source,tokens,t_kw_case) { let __cleanup_result_31_0: Id = case_expression(p,source,tokens); { p.depth--; } return __cleanup_result_31_0; } let __cleanup_result_32_0: Id = infix(p,source,tokens); { p.depth--; } return __cleanup_result_32_0;
  { p.depth--; } }
 recursive fn function_declaration(p:Parser&,source:const u8[:],tokens:const Token[:],attributes:List,start:u32,modifier:Symbol,flags:u32)->Id {
@@ -901,20 +844,9 @@ recursive fn prefix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id
   if node.tag!=a_name&&node.tag!=a_field_access { return fail(p,source,tokens,c_expected_expression); }
   return collection_intrinsic(p,source,tokens,"@storage.ref",[operand],t.start);
  }
- if t.tag==t_star&&peek(p,tokens,1)==t_l_paren { advance(p,source,tokens); let grouped=atom(p,source,tokens); if p.failure!=blot_error::Error.none { return 0; } let call=p.tree.node(grouped); if call.tag!=a_group||p.tree.node(call.a).tag!=a_apply { return fail(p,source,tokens,c_task_spark_call); } return spark_call(p,source,tokens,call.a,t.start); }
  if t.tag==t_symbol||t.tag==t_star||t.tag==t_caret { advance(p,source,tokens); let op=intern(p,source,tokens,text(p,source,t)); let arg=application(p,source,tokens,true); return add(p,source,tokens,a_unary,op,arg,0,t.start); }
  return application(p,source,tokens,true);
 }
-fn spark_call(p: Parser&,source: const u8[:],tokens: const Token[:],call: Id,start: u32) -> Id {
- var operands=ScratchIdBuffer {};  var callee=call;
- while p.tree.node(callee).tag==a_apply { let node=p.tree.node(callee); operands.push(node.b); callee=node.a; }
- var statements=ScratchIdBuffer {};  var invocation=callee;
- if p.tree.node(callee).tag!=a_name&&p.tree.node(callee).tag!=a_intrinsic { let name=collection_name(p,source,tokens,start); statements.push(collection_binding(p,source,tokens,name,callee,start)); invocation=add(p,source,tokens,a_name,name,0,0,start); }
- var index=operands.len;
- while index!=0 { index--; let name=collection_name(p,source,tokens,start); statements.push(collection_binding(p,source,tokens,name,operands.items[index],start)); let arg=add(p,source,tokens,a_name,name,0,0,start); invocation=add(p,source,tokens,a_apply,invocation,arg,0,start); }
- let parameter=add(p,source,tokens,a_parameter,0,0,extra(p,source,tokens,[1,0,0,0]),start); let thunk=add(p,source,tokens,a_lambda,parameter,invocation,0,start); let group=add(p,source,tokens,a_task_region,0,0,0,start);
- let spawn=collection_intrinsic(p,source,tokens,"@task.spawn",[group,thunk],start); statements.push(add(p,source,tokens,a_return_stmt,spawn,0,0,start)); let __cleanup_result_52_0: Id = list_node(p,source,tokens,a_block,statements.items,start); statements.deinit(); operands.deinit(); return __cleanup_result_52_0;
- statements.deinit(); operands.deinit(); }
 recursive fn application(p: Parser&,source: const u8[:],tokens: const Token[:],allow_witness: bool) -> Id {
  let start=current(p,source,tokens).start; var value: Id=0;
  if at(p,source,tokens,t_identifier)&&text(p,source,current(p,source,tokens))=="own"&&atom_tag(peek(p,tokens,1)) {
@@ -988,20 +920,6 @@ recursive fn postfix(p: Parser&,source: const u8[:],tokens: const Token[:]) -> I
 }
 recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
  if !enter(p,source,tokens) { return 0; }  let t=current(p,source,tokens); let start=t.start;
- if t.tag==t_pipe {
-  advance(p,source,tokens); var nesting=0; var end=p.index;
-  while end<tokens.len {
-   let candidate=tokens[end].tag;
-   if candidate==t_l_paren||candidate==t_l_bracket||candidate==t_l_brace { nesting++; }
-   else if candidate==t_r_paren||candidate==t_r_bracket||candidate==t_r_brace { if nesting==0 { let __cleanup_result_33_0: Id = fail(p,source,tokens,c_expected_token); { p.depth--; } return __cleanup_result_33_0; } nesting--; }
-   else if candidate==t_pipe&&nesting==0 { break; }
-   else if (candidate==t_newline||candidate==t_eof)&&nesting==0 { let __cleanup_result_34_0: Id = fail(p,source,tokens,c_expected_token); { p.depth--; } return __cleanup_result_34_0; } end++;
-  }
-  if end>=tokens.len||end==p.index { let __cleanup_result_35_0: Id = fail(p,source,tokens,c_expected_expression); { p.depth--; } return __cleanup_result_35_0; }
-  let previous=p.expression_end; p.expression_end=end; if previous<end { p.expression_end=previous; }
-  let receiver=expression(p,source,tokens); p.expression_end=previous; if p.failure!=blot_error::Error.none { let __cleanup_result_36_0: Id = 0; { p.depth--; } return __cleanup_result_36_0; }
-  if p.index!=end { let __cleanup_result_37_0: Id = fail(p,source,tokens,c_expected_token); { p.depth--; } return __cleanup_result_37_0; } expect(p,source,tokens,t_pipe); let __cleanup_result_38_0: Id = collection_intrinsic(p,source,tokens,"@task.receive",[receiver],start); { p.depth--; } return __cleanup_result_38_0;
- }
  if t.tag==t_kw_true||t.tag==t_kw_false { advance(p,source,tokens); var value: u32=0; if t.tag==t_kw_true { value=1; } let __cleanup_result_39_0: Id = add(p,source,tokens,a_boolean,value,0,0,start); { p.depth--; } return __cleanup_result_39_0; }
  if t.tag==t_integer { advance(p,source,tokens); let __cleanup_result_40_0: Id = integer_literal(p,source,tokens,t,a_integer); { p.depth--; } return __cleanup_result_40_0; }
  if t.tag==t_float {
@@ -1016,7 +934,6 @@ recursive fn atom(p: Parser&,source: const u8[:],tokens: const Token[:]) -> Id {
   if text(p,source,t)=="@spark" { let result=spark_expression(p,source,tokens,start); p.depth--; return result; }
   if text(p,source,t)=="@spawn" { let result=spawn_expression(p,source,tokens,start); p.depth--; return result; }
   let staging,has_staging=blot_check_typed_staging::lookup(text(p,source,t)); if has_staging { p.tree.has_typed_staging=true; }
-  let proof,has_proof=blot_check_numeric_proof_terms::constructor(text(p,source,t)); if has_proof { p.tree.has_numeric_proofs=true; }
   let __cleanup_result_46_0: Id = add(p,source,tokens,a_intrinsic,intern(p,source,tokens,text(p,source,t)),0,0,start); { p.depth--; } return __cleanup_result_46_0;
  }
  if t.tag==t_identifier&&peek(p,tokens,1)!=t_dot {

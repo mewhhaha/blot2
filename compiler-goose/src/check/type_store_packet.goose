@@ -61,8 +61,6 @@ fn viewPacketStore(store: const blot_check_types::Store&) -> Snapshot, Error {
         store_versions: store.versions.items,
         store_operations: store.operations.items,
         store_operation_links: store.operation_links.items,
-        store_quantifier_goals: store.quantifier_goals.items,
-        store_quantifier_obligations: store.quantifier_obligations.items,
         store_closed_row_index: store.closed_row_index.items,
         store_closed_operation_index: store.closed_operation_index.items,
         store_variable_views: store.variable_views.slots,
@@ -85,8 +83,6 @@ fn restorePacketStore(snapshot: const Snapshot&, store: blot_check_types::Store&
     let error = store.versions.restore(snapshot.store_versions); if error != blot_error::Error.none { return error; }
     let error = store.operations.restore(snapshot.store_operations); if error != blot_error::Error.none { return error; }
     let error = store.operation_links.restore(snapshot.store_operation_links); if error != blot_error::Error.none { return error; }
-    let error = store.quantifier_goals.restore(snapshot.store_quantifier_goals); if error != blot_error::Error.none { return error; }
-    let error = store.quantifier_obligations.restore(snapshot.store_quantifier_obligations); if error != blot_error::Error.none { return error; }
     let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != blot_error::Error.none { return error; }
     let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != blot_error::Error.none { return error; }
     let error = store.variable_views.restore(snapshot.store_variable_views, snapshot.state.store_variable_views_count); if error != blot_error::Error.none { return error; }

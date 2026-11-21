@@ -1,11 +1,7 @@
 // Dense owned types with chronological, non-collapsing substitution history.
 namespace blot_check_types;
 import check.effects;
-import check.quantifier_goals;
-import check.rank_equal;
-import check.rank_walk;
 import check.type_store_packet;
-import check.usage_check;
 import parse.ast;
 import reuse.composite_resolution_cache;
 import reuse.epoch_resolution_cache;
@@ -44,7 +40,6 @@ struct Scheme { root: Id = absent, variables: List = List {..}, row_variables: L
 struct ClosedCovariant { root: Id, closed_rows: List }
 enum Operator { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right }
 enum ObligationKind { arithmetic, ordered, equality, integer, field, writable_field, dispatch, result_dispatch, monad_factory, resolver_dispatch, resolver_shape, effect_operation, effect_handler, receiver, update, type_rep, effect_rep, type_head, collection, record_merge, callee_use, type_eq, contract, task_receive }
-struct QuantifierGoals { owner: Id, goals: List }
 struct Obligation {
     ty: Id, kind: ObligationKind, source: u32, name: u32 = 0, result: Id = 0,
     other: Id = 0, signature: Id = 0, operator: Operator = Operator.none,
@@ -54,7 +49,7 @@ struct Obligation {
 }
 struct Version { variable: u32, replacement: Id, position: Cursor, previous: u32, next: u32 = none }
 struct Variable { first: u32 = none, last: u32 = none, region: bool = false, row_effect: blot_check_effects::Id = none, principal: Id = absent }
-struct Mark { nodes: i64, extra: i64, variables: i64, versions: i64, operations: i64, quantifier_goals: i64 = 0, quantifier_obligations: i64 = 0, effects: blot_check_effects::Mark }
+struct Mark { nodes: i64, extra: i64, variables: i64, versions: i64, operations: i64, effects: blot_check_effects::Mark }
 struct ProjectionResolution { root: Id, at: Cursor, depth: u32 }
 struct OperationKey { identity: NominalIdentity, instance: NominalIdentity, arity: u32, shape: u64 }
 struct OperationChain { first: blot_check_effects::Label, last: blot_check_effects::Label }
@@ -70,8 +65,6 @@ variables:Table_variables& =inactive_variables,
 versions:Table_versions& =inactive_versions,
 operations:Table_operations& =inactive_operations,
 operation_links:Table_operation_links& =inactive_operation_links,
-quantifier_goals:Table_quantifier_goals& =inactive_quantifier_goals,
-quantifier_obligations:Table_quantifier_obligations& =inactive_quantifier_obligations,
 occurs_seen:Table_occurs_seen& =inactive_occurs_seen,
 closed_row_index:Table_closed_row_index& =inactive_closed_row_index,
 closed_operation_index:Table_closed_operation_index& =inactive_closed_operation_index,
@@ -279,85 +272,10 @@ fn rigidScope(self_: Store&) -> u32, Error {
     let scope = self_.next_rigid_scope; self_.next_rigid_scope += 1; return scope, blot_error::Error.none;
 }
 fn rigid(self_: Store&, scope: u32, ordinal: u32, sort: u32) -> Id, Error { self_.has_rank_types = true; return add(self_, Node { tag: Tag.rigid, a: scope, b: ordinal, c: sort , ..}); }
-fn quantifierGoals(self_: const Store&, owner: Id) -> const Obligation[:] { return blot_check_quantifier_goals::get(self_.quantifier_goals.items, self_.quantifier_obligations.items, owner); }
-fn quantified(self_: Store&, tag: Tag, body: Id, binders: const Id[:]) -> Id, Error { return quantifiedWithGoals(self_, tag, body, binders, []); }
-fn quantifiedWithGoals(self_: Store&, tag: Tag, body: Id, binders: const Id[:], goals: const Obligation[:]) -> Id, Error {
-    assert(tag == Tag.forall || tag == Tag.existential);
-    if binders.len == 0 || binders.len > 4096 { return 0, blot_error::Error.type_limit; }
-    for binder, ordinal in binders {
-        if binder >= self_.nodes.len { return 0, blot_error::Error.type_mismatch; }
-        let leaf = node(self_, binder);
-        if leaf.tag != Tag.bound || leaf.a != ordinal || leaf.b > 2 || leaf.c != 0 { return 0, blot_error::Error.type_mismatch; }
-    }
-    self_.has_rank_types = true;
-    var owned_goals: Obligation[>..] = []; owned_goals.append(goals);
-    for goal in owned_goals { for child in [goal.ty, goal.other, goal.result, goal.signature] { if child >= self_.nodes.len { return 0, blot_error::Error.type_mismatch; } } }
-    let point = mark(self_);
-    let span, se = saveList(self_, binders); if se != blot_error::Error.none { rollback(self_, point); return 0, se; }
-    let owner, oe = add(self_, Node { tag: tag, a: body, b: span.start, c: span.len , ..}); if oe != blot_error::Error.none { rollback(self_, point); return 0, oe; }
-    if owned_goals.len != 0 {
-        let stored, error = saveQuantifierGoals(self_, owned_goals); if error != blot_error::Error.none { rollback(self_, point); return 0, error; }
-        self_.quantifier_goals.push(QuantifierGoals { owner, stored , ..});if self_.quantifier_goals.failure!=blot_error::Error.none {return 0,self_.quantifier_goals.failure;}
-    }
-    return owner, blot_error::Error.none;
-}
-fn bindRankAnnotation(self_: Store&, slot: Id, required: Id) -> Error {
-    let root, error = resolve(self_, slot, 0); if error != blot_error::Error.none { return error; }
-    if node(self_, root).tag != Tag.variable { return unify(self_, root, required); }
-    var quantified_root = required;
-    if node(self_, quantified_root).tag == Tag.usage { quantified_root = node(self_, quantified_root).a; }
-    if node(self_, quantified_root).tag != Tag.forall { return blot_error::Error.type_mismatch; }
-    let recursive_, recursion_error = occurs(self_, node(self_, root).a, required); if recursion_error != blot_error::Error.none { return recursion_error; }
-    if recursive_ { return blot_error::Error.infinite_type; }
-    return appendVersion(self_, root, required);
-}
-recursive fn reownQuantified(self_:Store&,tag:Tag,body:Id,binders:const Id[:],goals:Obligation[:])->Id,Error {let replacements=substitution_ids.alloc_slice(binders.len);let result,error=reownQuantifiedValues(self_,tag,body,binders,goals,replacements);substitution_ids.free_slice(replacements);return result,error;}
-recursive fn reownQuantifiedValues(self_: Store&, tag: Tag, body: Id, binders: const Id[:], goals: Obligation[:], replacements:Id[:]) -> Id, Error {
-    for binder,index in binders { let leaf = node(self_, binder); let replacement, error = boundType(self_, leaf.a, leaf.b); if error != blot_error::Error.none { return 0, error; } replacements[index]=replacement; }
-    let owned_body, be = substitute(self_, body, binders, replacements); if be != blot_error::Error.none { return 0, be; }
-    for &goal in goals { let replaced, error = substituteGoal(self_, goal, binders, replacements); if error != blot_error::Error.none { return 0, error; } goal = replaced; }
-    return quantifiedWithGoals(self_, tag, owned_body, replacements, goals);
-}
-fn saveQuantifierGoals(self_: Store&, goals: const Obligation[:]) -> List, Error {
-    if goals.len > 4096 || goals.len > none - self_.quantifier_obligations.len { return List {..}, blot_error::Error.type_limit; }
-    let start = self_.quantifier_obligations.len as u32; self_.quantifier_obligations.append(goals);if self_.quantifier_obligations.failure!=blot_error::Error.none {return default<List>(),self_.quantifier_obligations.failure;} return List { start, goals.len as u32 , ..}, blot_error::Error.none;
-}
-recursive fn substituteGoal(self_: Store&, goal: Obligation, old: const Id[:], fresh_ids: const Id[:]) -> Obligation, Error {
-    var result = goal;
-    if goal.ty != 0 { let value, error = substitute(self_, goal.ty, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.ty = value; }
-    if goal.other != 0 { let value, error = substitute(self_, goal.other, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.other = value; }
-    if goal.result != 0 { let value, error = substitute(self_, goal.result, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.result = value; }
-    if goal.signature != 0 { let value, error = substitute(self_, goal.signature, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.signature = value; }
-    if goal.identity.unit == 0 && goal.identity.decl != 0 { let value, error = substitute(self_, goal.identity.decl, old, fresh_ids); if error != blot_error::Error.none { return default<Obligation>(), error; } result.identity.decl = value; }
-    return result, blot_error::Error.none;
-}
-struct RankInstance { body: Id, scope: u32 = 0, goals: List = List {..} }
-fn instantiateRank(self_: Store&, root: Id, skolemize: bool) -> RankInstance, Error {
-    let resolved, error = resolve(self_, root, 0); if error != blot_error::Error.none { return default<RankInstance>(), error; }
-    let value = node(self_, resolved);
-    if value.tag != Tag.forall && value.tag != Tag.existential { return default<RankInstance>(), blot_error::Error.type_mismatch; }
-    var binders: Id[>..] = []; binders.append(list(self_, List { value.b, value.c , ..}));
-    var replacements: Id[>..] = []; var scope: u32 = 0;
-    if skolemize { let id, error = rigidScope(self_); if error != blot_error::Error.none { return default<RankInstance>(), error; } scope = id; }
-    for binder in binders {
-        let leaf = node(self_, binder); if leaf.tag != Tag.bound || leaf.b > 2 { return default<RankInstance>(), blot_error::Error.type_mismatch; }
-        var id: Id = 0; var error = blot_error::Error.none;
-        if skolemize { let result, failure = rigid(self_, scope, leaf.a, leaf.b); id = result; error = failure; }
-        else if leaf.b == 1 { let result, failure = freshRowType(self_); id = result; error = failure; }
-        else if leaf.b == 2 { let result, failure = freshRegion(self_); id = result; error = failure; }
-        else { let result, failure = fresh(self_); id = result; error = failure; }
-        if error != blot_error::Error.none { return default<RankInstance>(), error; } replacements.push(id);
-    }
-    var source_goals: Obligation[>..] = []; source_goals.append(quantifierGoals(self_, resolved));
-    for &goal in source_goals { let replaced, error = substituteGoal(self_, goal, binders, replacements); if error != blot_error::Error.none { return default<RankInstance>(), error; } goal = replaced; }
-    let goals, ge = saveQuantifierGoals(self_, source_goals); if ge != blot_error::Error.none { return default<RankInstance>(), ge; }
-    let body, be = substitute(self_, value.a, binders, replacements); if be != blot_error::Error.none { return default<RankInstance>(), be; }
-    return RankInstance { body, scope, goals , ..}, blot_error::Error.none;
-}
-fn containsQuantifier(self_: Store&, root: Id) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::quantified(self_, root); }
-fn containsRigidRow(self_: Store&, root: blot_check_effects::Id, scope: u32) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::containsRow(self_, root, scope); }
-fn containsRigid(self_: Store&, root: Id, scope: u32) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::contains(self_, root, scope, false); }
-fn freeBound(self_: Store&, root: Id) -> bool, Error { if !self_.has_rank_types { return false, blot_error::Error.none; } return blot_check_rank_walk::contains(self_, root, 0, true); }
+fn containsQuantifier(self_: Store&, root: Id) -> bool, Error { return false, blot_error::Error.none; }
+fn containsRigidRow(self_: Store&, root: blot_check_effects::Id, scope: u32) -> bool, Error { return false, blot_error::Error.none; }
+fn containsRigid(self_: Store&, root: Id, scope: u32) -> bool, Error { return false, blot_error::Error.none; }
+fn freeBound(self_: Store&, root: Id) -> bool, Error { return false, blot_error::Error.none; }
 fn increment(value: u64&) { if value != 0xffffffffffffffff { value += 1; } }
 // The principal view exists for the whole lifetime of its binder. Only
 // historical views need the (variable, cursor) dictionary.
@@ -404,7 +322,6 @@ fn regionIdentity(self_: const Store&, root: Id) -> bool {
 }
 fn usage(self_: Store&, payload: Id, kind: UsageKind, region: Id) -> Id, Error {
     if payload == absent || payload >= self_.nodes.len || node(self_, head(self_, payload, 0)).tag == Tag.erased_proof { return 0, blot_error::Error.type_mismatch; }
-    if kind == blot_parse_ast::usagekind_shared { let affine, error = blot_check_usage_check::affine(self_, payload); if error != blot_error::Error.none { return 0, error; } if affine { return 0, blot_error::Error.type_mismatch; } }
     let loan = kind == blot_parse_ast::usagekind_borrow || kind == blot_parse_ast::usagekind_borrow_mut;
     if loan != (region != 0) || (loan && !regionIdentity(self_, region)) { return 0, blot_error::Error.type_mismatch; }
     self_.has_usage_types = true; return add(self_, Node { tag: Tag.usage, a: payload, b: kind as u32, c: region , ..});
@@ -507,7 +424,7 @@ fn mergeRecords(self_: Store&, left: Id, right: Id) -> blot_support::Option<Id>,
     let result, error = record(self_, fields); return blot_support::Option<Id> { error == blot_error::Error.none, result , ..}, error;
 }
 fn cursor(self_: const Store&) -> Cursor { return self_.effects.next_position; }
-fn mark(self_: const Store&) -> Mark { return Mark { self_.nodes.len, self_.extra.len, self_.variables.len, self_.versions.len, self_.operations.len, self_.quantifier_goals.len, self_.quantifier_obligations.len, self_.effects.mark() , ..}; }
+fn mark(self_: const Store&) -> Mark { return Mark { self_.nodes.len, self_.extra.len, self_.variables.len, self_.versions.len, self_.operations.len, self_.effects.mark() , ..}; }
 fn rollback(self_: Store&, point: Mark) {
     var discarded: Id[>..] = [];
     for slot in self_.associated_equations.slots { if slot.tag != 0 && (slot.key >= point.nodes || slot.val >= point.nodes) { discarded.push(slot.key); } }
@@ -520,7 +437,6 @@ fn rollback(self_: Store&, point: Mark) {
     for value in self_.nodes.items[point.nodes..] { if value.tag == Tag.variable && value.b != 0 { self_.variable_views.remove(((value.a as u64) << 32) | value.b); } }
     self_.nodes.pop_n(self_.nodes.len - point.nodes); self_.extra.pop_n(self_.extra.len - point.extra); self_.variables.pop_n(self_.variables.len - point.variables);
     unlinkOperations(self_, point.operations); self_.operations.pop_n(self_.operations.len - point.operations);
-    self_.quantifier_goals.pop_n(self_.quantifier_goals.len - point.quantifier_goals); self_.quantifier_obligations.pop_n(self_.quantifier_obligations.len - point.quantifier_obligations);
     self_.effects.rollback(point.effects); self_.closed_effect_physical_epoch = self_.effects.physical_epoch;
 }
 fn appendVersion(self_: Store&, variable: Id, replacement_id: Id) -> Error {
@@ -911,13 +827,7 @@ recursive fn resolveFunctionChild(self_: Store&, child: Id, at: Cursor, depth: i
 }
 recursive fn resolveSelected(self_: Store&, id: Id, value: Node, position: Cursor, depth: i64) -> Id, Error {
     match value.tag {
-        forall, existential => {
-            let binders=resolution_binders.alloc_slice(value.c);
-            {let original_binders=list(self_,List {value.b,value.c});for binder,index in original_binders {binders[index]=binder;}}
-            let result,error=resolveQuantified(self_,id,value,position,depth,binders);
-            resolution_binders.free_slice(binders);
-            return result,error;
-        },
+        forall, existential => { return id, blot_error::Error.none; },
         usage => {
             let payload, pe = resolveDepth(self_, value.a, position, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
             var region = value.c; if region != 0 { let next, error = resolveDepth(self_, region, position, depth + 1); if error != blot_error::Error.none { return 0, error; } region = next; }
@@ -1039,7 +949,7 @@ fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
             product => { pending.append(list(self_, List { value.a, value.b , ..})); },
             usage => { pending.push(value.a); if value.c != 0 { pending.push(value.c); } },
             scoped => { pending.push(value.a); if value.b == 0 { pending.push(value.c); } },
-            forall, existential => { pending.push(value.a); for goal in quantifierGoals(self_, id) { for child in [goal.ty, goal.other, goal.result, goal.signature] { if child != 0 { pending.push(child); } } } },
+            forall, existential => { pending.push(value.a); },
             array, list, cursor, resolver, provider => { pending.push(value.a); },
             state_provider => { pending.append([value.a, value.b, value.c]); },
             record => { for i in value.b { pending.push(recordField(self_, value, i).ty); } },
@@ -1050,7 +960,6 @@ fn occurs(self_: Store&, variable: u32, root: Id) -> bool, Error {
     return false, blot_error::Error.none;
 }
 fn snapshotResolutionIds(values:const Id[:])->Id[:] {let result=resolution_arguments.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
-fn snapshotResolutionGoals(values:const Obligation[:])->Obligation[:] {let result=resolution_goals.alloc_slice(values.len);for value,index in values {result[index]=value;}return result;}
 recursive fn unifyEffects(self_: Store&, left: blot_check_effects::Id, right: blot_check_effects::Id) -> Error {
     let point = mark(self_); let error = unifyEffectsInner(self_, left, right); if error != blot_error::Error.none { rollback(self_, point); } return error;
 }
@@ -1316,7 +1225,7 @@ fn equalGraphWalk(self_: Store&, left: Id, right: Id, symbolic: bool) -> bool, E
             bound, absent => { return false, blot_error::Error.none; },
             rigid => { if !symbolic || a.a != b.a || a.b != b.b || a.c != b.c { return false, blot_error::Error.none; } },
             usage => { if a.b != b.b || (a.c == 0) != (b.c == 0) { return false, blot_error::Error.none; } pending.push(Pair { a.a, b.a , ..}); if a.c != 0 { pending.push(Pair { a.c, b.c , ..}); } },
-            forall, existential => { let same, error = blot_check_rank_equal::equal(self_, pair.a, pair.b, symbolic); if error != blot_error::Error.none || !same { return same, error; } },
+            forall, existential => { return false, blot_error::Error.none; },
             variable => { if !symbolic || a.a != b.a || a.b != b.b { return false, blot_error::Error.none; } },
             function, provider => {
                 let ar = self_.effects.node(a.c); let br = self_.effects.node(b.c);
@@ -1427,11 +1336,7 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
             usage => { if an.b != bn.b || (an.c == 0) != (bn.c == 0) { return mismatch(self_, reporter, a, b); } let pending_failure_0=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_0!=blot_error::Error.none {return pending_failure_0;} if an.c != 0 { let pending_failure_1=pushUnification(pending,Pair { an.c, bn.c , ..});if pending_failure_1!=blot_error::Error.none {return pending_failure_1;} } },
             bound => { return mismatch(self_, reporter, a, b); },
             rigid, instance_version => { if an.a != bn.a || an.b != bn.b || an.c != bn.c { return mismatch(self_, reporter, a, b); } },
-            forall, existential => {
-                if an.c != bn.c { return mismatch(self_, reporter, a, b); }
-                let old=snapshotResolutionIds(list(self_,List{bn.b,bn.c,..}));let fresh_ids=snapshotResolutionIds(list(self_,List{an.b,an.c,..}));
-                let error=unifyQuantifiedBinders(self_,a,b,an,bn,reporter,pending,old,fresh_ids);resolution_arguments.free_slice(fresh_ids);resolution_arguments.free_slice(old);if error!=blot_error::Error.none {return error;}
-            },
+            forall, existential => { return mismatch(self_, reporter, a, b); },
             function => { let pending_failure_2=appendUnification(pending,[Pair { an.c, bn.c, true , ..}, Pair { an.b, bn.b , ..}, Pair { an.a, bn.a , ..}]);if pending_failure_2!=blot_error::Error.none {return pending_failure_2;} },
             product => { if an.b != bn.b { return mismatch(self_, reporter, a, b); } var i = an.b; while i != 0 { i -= 1; let pending_failure_3=pushUnification(pending,Pair { self_.extra.items[an.a + i], self_.extra.items[bn.a + i] , ..});if pending_failure_3!=blot_error::Error.none {return pending_failure_3;} } },
             array, list, cursor, resolver => { let pending_failure_4=pushUnification(pending,Pair { an.a, bn.a , ..});if pending_failure_4!=blot_error::Error.none {return pending_failure_4;} },
@@ -1463,22 +1368,6 @@ recursive fn unifyWalk<R>(self_: Store&, left: Id, right: Id, reporter:R, associ
     }
     return blot_error::Error.none;
 }
-recursive fn unifyQuantifiedBinders<R>(self_:Store&,a:Id,b:Id,an:Node,bn:Node,reporter:R,pending:UnificationPending&,old:const Id[:],fresh_ids:const Id[:])->Error {
-                for left_, i in old { if node(self_, left_).b != node(self_, fresh_ids[i]).b { return mismatch(self_, reporter, a, b); } }
- let left_goals=snapshotResolutionGoals(quantifierGoals(self_,a));let right_goals=snapshotResolutionGoals(quantifierGoals(self_,b));
- let error=unifyQuantifiedGoals(self_,a,b,an,bn,reporter,pending,old,fresh_ids,left_goals,right_goals);resolution_goals.free_slice(right_goals);resolution_goals.free_slice(left_goals);return error;
-}
-recursive fn unifyQuantifiedGoals<R>(self_:Store&,a:Id,b:Id,an:Node,bn:Node,reporter:R,pending:UnificationPending&,old:const Id[:],fresh_ids:const Id[:],left_goals:const Obligation[:],right_goals:const Obligation[:])->Error {
-                if left_goals.len != right_goals.len { return mismatch(self_, reporter, a, b); }
-                for left_goal, i in left_goals {
-                    let right_goal = right_goals[i]; if !blot_check_quantifier_goals::sameHead(left_goal, right_goal) { return mismatch(self_, reporter, a, b); }
-                    let replaced, error = substituteGoal(self_, right_goal, old, fresh_ids); if error != blot_error::Error.none { return error; }
-                    let first = [left_goal.ty, left_goal.other, left_goal.result, left_goal.signature]; let second = [replaced.ty, replaced.other, replaced.result, replaced.signature];
-                    for left_child, j in first { let right_child = second[j]; if (left_child == 0) != (right_child == 0) { return mismatch(self_, reporter, a, b); } if left_child != 0 { let pending_failure_0=pushUnification(pending,Pair { left_child, right_child , ..});if pending_failure_0!=blot_error::Error.none {return pending_failure_0;} } }
-                }
-                let body, error = substitute(self_, bn.a, old, fresh_ids); if error != blot_error::Error.none { return error; } let pending_failure_1=pushUnification(pending,Pair { an.a, body , ..});if pending_failure_1!=blot_error::Error.none {return pending_failure_1;}
- return blot_error::Error.none;
-}
 recursive fn unifyProjectionArguments<R>(self_:Store&,a:Id,b:Id,reporter:R,aa:const Id[:],bb:const Id[:])->Error {
                 if aa.len != bb.len { return mismatch(self_, reporter, a, b); }
                 for left_arg, i in aa {
@@ -1496,7 +1385,7 @@ fn appendChildren(self_: const Store&, pending: Id[>..<]&, id: Id, scoped_identi
         function => { pending.append([value.a, value.b]); }, product => { pending.append(list(self_, List { value.a, value.b , ..})); },
         usage => { pending.push(value.a); if value.c != 0 { pending.push(value.c); } },
         scoped => { pending.push(value.a); if scoped_identity && value.b == 0 { pending.push(value.c); } },
-        forall, existential => { pending.push(value.a); for goal in quantifierGoals(self_, id) { for child in [goal.ty, goal.other, goal.result, goal.signature] { if child != 0 { pending.push(child); } } } },
+        forall, existential => { pending.push(value.a); },
         array, list, cursor, resolver, provider => { pending.push(value.a); }, state_provider => { pending.append([value.a, value.b, value.c]); },
         record => { for i in value.b { pending.push(recordField(self_, value, i).ty); } },
         nominal, projection, instance_selection => { pending.append(nominalArguments(self_, value)); }, _ => {},
@@ -1687,10 +1576,7 @@ recursive fn substituteDepth<L,R>(self_: Store&, root: Id, old:const Id[:],fresh
 recursive fn substituteNode<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&, copied:Map_associated_equations&, depth: i64) -> Id, Error {
     if depth >= 1024 { return 0, blot_error::Error.type_limit; } let value = node(self_, root);
     match value.tag {
-        forall, existential => {
-            let source_binders=list(self_,List{value.b,value.c,..});let binders=resolution_binders.alloc_slice(source_binders.len);for binder,index in source_binders {binders[index]=binder;}
-            let result,error=substituteQuantified(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,binders);resolution_binders.free_slice(binders);return result,error;
-        },
+        forall, existential => { return 0, blot_error::Error.type_mismatch; },
         usage => {
             let payload, pe = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if pe != blot_error::Error.none { return 0, pe; }
             var region: Id = 0; if value.c != 0 { let next, error = substituteDepth(self_, value.c, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } region = next; }
@@ -1740,22 +1626,6 @@ recursive fn substituteNode<L,R>(self_: Store&, root: Id, old:const Id[:],fresh_
         },
         _ => { return root, blot_error::Error.none; },
     }
-}
-recursive fn substituteQuantified<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,binders:const Id[:])->Id,Error {
-            let body, be = substituteDepth(self_, value.a, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if be != blot_error::Error.none { return 0, be; }
-            let source_goals=quantifierGoals(self_,root);let goals=resolution_goals.alloc_slice(source_goals.len);for goal,index in source_goals {goals[index]=goal;}
- let result,error=substituteQuantifiedGoals(self_,root,value,old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied,depth,binders,body,goals);resolution_goals.free_slice(goals);return result,error;
-}
-recursive fn substituteQuantifiedGoals<L,R>(self_:Store&,root:Id,value:Node,old:const Id[:],fresh_ids:const Id[:],old_rows:const u32[:],fresh_rows:const blot_check_effects::Id[:],leaves:const L&,row_leaves:const R&,copied:Map_associated_equations&,depth:i64,binders:const Id[:],body:Id,goals:Obligation[:])->Id,Error {
- var changed = body != value.a;
-            for &goal in goals {
-                if goal.ty != 0 { let next, error = substituteDepth(self_, goal.ty, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.ty; goal.ty = next; }
-                if goal.other != 0 { let next, error = substituteDepth(self_, goal.other, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.other; goal.other = next; }
-                if goal.result != 0 { let next, error = substituteDepth(self_, goal.result, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.result; goal.result = next; }
-                if goal.signature != 0 { let next, error = substituteDepth(self_, goal.signature, old,fresh_ids,old_rows,fresh_rows,leaves,row_leaves,copied, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || next != goal.signature; goal.signature = next; }
-            }
-            if !changed { return root, blot_error::Error.none; } return reownQuantified(self_, value.tag, body, binders, goals);
-
 }
 reusable[] var substitution_ids:Id[>..];
 reusable[] var substitution_fields:Field[>..];
@@ -2124,8 +1994,6 @@ variables:Table_variables=Table_variables{..},
 versions:Table_versions=Table_versions{..},
 operations:Table_operations=Table_operations{..},
 operation_links:Table_operation_links=Table_operation_links{..},
-quantifier_goals:Table_quantifier_goals=Table_quantifier_goals{..},
-quantifier_obligations:Table_quantifier_obligations=Table_quantifier_obligations{..},
 occurs_seen:Table_occurs_seen=Table_occurs_seen{..},
 closed_row_index:Table_closed_row_index=Table_closed_row_index{..},
 closed_operation_index:Table_closed_operation_index=Table_closed_operation_index{..},
@@ -2174,8 +2042,6 @@ var inactive_variables=Table_variables{..};
 var inactive_versions=Table_versions{..};
 var inactive_operations=Table_operations{..};
 var inactive_operation_links=Table_operation_links{..};
-var inactive_quantifier_goals=Table_quantifier_goals{..};
-var inactive_quantifier_obligations=Table_quantifier_obligations{..};
 var inactive_occurs_seen=Table_occurs_seen{..};
 var inactive_closed_row_index=Table_closed_row_index{..};
 var inactive_closed_operation_index=Table_closed_operation_index{..};
@@ -2303,34 +2169,6 @@ fn clear(self_:Table_operation_links&) {self_.items=self_.storage[..0];self_.len
 fn deinit(self_:Table_operation_links&) {blot_support_pooled_buffer::deinit(self_,pool_Table_operation_links);self_.len=0;self_.failure=blot_error::Error.none;}
 fn index_of(self_:const Table_operation_links&,value:const OperationLink&)->i64 {return self_.items.index_of(value);}
 fn restore(self_:Table_operation_links&,values:const OperationLink[:])->Error {self_.clear();self_.append(values);return self_.failure;}
-
-struct Table_quantifier_goals {storage:QuantifierGoals[:]=default<QuantifierGoals[:]>(),items:QuantifierGoals[:]=default<QuantifierGoals[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
-reusable[] var pool_Table_quantifier_goals:QuantifierGoals[>..];
-fn ensure(self_:Table_quantifier_goals&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_quantifier_goals);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_quantifier_goals&,value:QuantifierGoals) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_quantifier_goals);self_.len=self_.items.len;}
-fn append(self_:Table_quantifier_goals&,values:const QuantifierGoals[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_quantifier_goals);self_.len=self_.items.len;}
-fn resize(self_:Table_quantifier_goals&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_quantifier_goals&,length:i64,value:QuantifierGoals) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
-fn pop(self_:Table_quantifier_goals&)->QuantifierGoals {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
-fn pop_n(self_:Table_quantifier_goals&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_quantifier_goals&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_quantifier_goals&) {blot_support_pooled_buffer::deinit(self_,pool_Table_quantifier_goals);self_.len=0;self_.failure=blot_error::Error.none;}
-fn index_of(self_:const Table_quantifier_goals&,value:const QuantifierGoals&)->i64 {return self_.items.index_of(value);}
-fn restore(self_:Table_quantifier_goals&,values:const QuantifierGoals[:])->Error {self_.clear();self_.append(values);return self_.failure;}
-
-struct Table_quantifier_obligations {storage:Obligation[:]=default<Obligation[:]>(),items:Obligation[:]=default<Obligation[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
-reusable[] var pool_Table_quantifier_obligations:Obligation[>..];
-fn ensure(self_:Table_quantifier_obligations&,minimum:i64)->Error {if self_.failure!=blot_error::Error.none {return self_.failure;}let error=blot_support_pooled_buffer::ensure(self_,minimum,pool_Table_quantifier_obligations);if error!=blot_error::Error.none {self_.failure=error;}return error;}
-fn push(self_:Table_quantifier_obligations&,value:Obligation) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::push(self_,value,pool_Table_quantifier_obligations);self_.len=self_.items.len;}
-fn append(self_:Table_quantifier_obligations&,values:const Obligation[:]) {if self_.failure!=blot_error::Error.none {return;}self_.failure=blot_support_pooled_buffer::append(self_,values,pool_Table_quantifier_obligations);self_.len=self_.items.len;}
-fn resize(self_:Table_quantifier_obligations&,length:i64) {blot_support_pooled_buffer::resize(self_,length);self_.len=length;}
-fn resize(self_:Table_quantifier_obligations&,length:i64,value:Obligation) {if length<=self_.len {self_.resize(length);return;}let error=self_.ensure(length);if error!=blot_error::Error.none {return;}for index in self_.len..length {self_.storage[index]=value;}self_.items=self_.storage[..length];self_.len=length;}
-fn pop(self_:Table_quantifier_obligations&)->Obligation {assert(self_.len!=0);let value=self_.items[self_.len-1];self_.resize(self_.len-1);return value;}
-fn pop_n(self_:Table_quantifier_obligations&,count:i64) {assert(count>=0 && count<=self_.len);self_.resize(self_.len-count);}
-fn clear(self_:Table_quantifier_obligations&) {self_.items=self_.storage[..0];self_.len=0;self_.failure=blot_error::Error.none;}
-fn deinit(self_:Table_quantifier_obligations&) {blot_support_pooled_buffer::deinit(self_,pool_Table_quantifier_obligations);self_.len=0;self_.failure=blot_error::Error.none;}
-fn index_of(self_:const Table_quantifier_obligations&,value:const Obligation&)->i64 {return self_.items.index_of(value);}
-fn restore(self_:Table_quantifier_obligations&,values:const Obligation[:])->Error {self_.clear();self_.append(values);return self_.failure;}
 
 struct Table_occurs_seen {storage:u32[:]=default<u32[:]>(),items:u32[:]=default<u32[:]>(),len:i64=0,failure:Error=blot_error::Error.none}
 reusable[] var pool_Table_occurs_seen:u32[>..];
@@ -2559,12 +2397,12 @@ fn canonical(lease:u32,generation:u64)->const Store& {
  assert(state.live && state.generation==generation);
  return state.canonical;
 }
-fn registeredView(lease:u32,generation:u64)->Store {assert(lease!=0 && lease-1<owner_states.len);let at=lease-1;assert(owner_states[at].live && owner_states[at].generation==generation);return Store{lease:lease,owner_generation:generation,nodes:owner_states[at].nodes,extra:owner_states[at].extra,variables:owner_states[at].variables,versions:owner_states[at].versions,operations:owner_states[at].operations,operation_links:owner_states[at].operation_links,quantifier_goals:owner_states[at].quantifier_goals,quantifier_obligations:owner_states[at].quantifier_obligations,occurs_seen:owner_states[at].occurs_seen,closed_row_index:owner_states[at].closed_row_index,closed_operation_index:owner_states[at].closed_operation_index,variable_views:owner_states[at].variable_views,associated_equations:owner_states[at].associated_equations,projection_resolutions:owner_states[at].projection_resolutions,operation_chains:owner_states[at].operation_chains,effects:owner_states[at].effects,resolved:owner_states[at].resolved,composites:owner_states[at].composites,owner_id:owner_states[at].owner_id,use_closed_rows:owner_states[at].use_closed_rows,closed_rows:owner_states[at].closed_rows,use_operation_rows:owner_states[at].use_operation_rows,operation_rows:owner_states[at].operation_rows,has_usage_types:owner_states[at].has_usage_types,has_rank_types:owner_states[at].has_rank_types,next_rigid_scope:owner_states[at].next_rigid_scope,use_closed_graphs:owner_states[at].use_closed_graphs,has_proof_kinds:owner_states[at].has_proof_kinds,has_projections:owner_states[at].has_projections,projection_limit:owner_states[at].projection_limit,projection_steps:owner_states[at].projection_steps,resolution_depth_limit:owner_states[at].resolution_depth_limit,projection_exhausted:owner_states[at].projection_exhausted,projection_resolution_types:owner_states[at].projection_resolution_types,projection_resolution_rows:owner_states[at].projection_resolution_rows,projection_resolution_limit:owner_states[at].projection_resolution_limit,closed_generation:owner_states[at].closed_generation,closed_effect_physical_epoch:owner_states[at].closed_effect_physical_epoch,mutation_epoch:owner_states[at].mutation_epoch,occurs_steps:owner_states[at].occurs_steps,normalization:owner_states[at].normalization,resolution_steps:owner_states[at].resolution_steps,occurs_generation:owner_states[at].occurs_generation,use_resolution_cache:owner_states[at].use_resolution_cache,use_composite_cache:owner_states[at].use_composite_cache,composite_min_growth:owner_states[at].composite_min_growth,use_operation_shapes:owner_states[at].use_operation_shapes,operation_shape_generation:owner_states[at].operation_shape_generation,operation_shape_enabled:owner_states[at].operation_shape_enabled, ..};}
-fn checkedView(store:const Store&)->Store {let canonical:const blot_check_types::Store& =blot_check_types::canonical(store.lease,store.owner_generation);assert(store.nodes .== canonical.nodes);assert(store.extra .== canonical.extra);assert(store.variables .== canonical.variables);assert(store.versions .== canonical.versions);assert(store.operations .== canonical.operations);assert(store.operation_links .== canonical.operation_links);assert(store.quantifier_goals .== canonical.quantifier_goals);assert(store.quantifier_obligations .== canonical.quantifier_obligations);assert(store.occurs_seen .== canonical.occurs_seen);assert(store.closed_row_index .== canonical.closed_row_index);assert(store.closed_operation_index .== canonical.closed_operation_index);assert(store.variable_views .== canonical.variable_views);assert(store.associated_equations .== canonical.associated_equations);assert(store.projection_resolutions .== canonical.projection_resolutions);assert(store.operation_chains .== canonical.operation_chains);assert(store.effects .== canonical.effects);assert(store.resolved .== canonical.resolved);assert(store.composites .== canonical.composites);assert(store.owner_id .== canonical.owner_id);assert(store.use_closed_rows .== canonical.use_closed_rows);assert(store.closed_rows .== canonical.closed_rows);assert(store.use_operation_rows .== canonical.use_operation_rows);assert(store.operation_rows .== canonical.operation_rows);assert(store.has_usage_types .== canonical.has_usage_types);assert(store.has_rank_types .== canonical.has_rank_types);assert(store.next_rigid_scope .== canonical.next_rigid_scope);assert(store.use_closed_graphs .== canonical.use_closed_graphs);assert(store.has_proof_kinds .== canonical.has_proof_kinds);assert(store.has_projections .== canonical.has_projections);assert(store.projection_limit .== canonical.projection_limit);assert(store.projection_steps .== canonical.projection_steps);assert(store.resolution_depth_limit .== canonical.resolution_depth_limit);assert(store.projection_exhausted .== canonical.projection_exhausted);assert(store.projection_resolution_types .== canonical.projection_resolution_types);assert(store.projection_resolution_rows .== canonical.projection_resolution_rows);assert(store.projection_resolution_limit .== canonical.projection_resolution_limit);assert(store.closed_generation .== canonical.closed_generation);assert(store.closed_effect_physical_epoch .== canonical.closed_effect_physical_epoch);assert(store.mutation_epoch .== canonical.mutation_epoch);assert(store.occurs_steps .== canonical.occurs_steps);assert(store.normalization .== canonical.normalization);assert(store.resolution_steps .== canonical.resolution_steps);assert(store.occurs_generation .== canonical.occurs_generation);assert(store.use_resolution_cache .== canonical.use_resolution_cache);assert(store.use_composite_cache .== canonical.use_composite_cache);assert(store.composite_min_growth .== canonical.composite_min_growth);assert(store.use_operation_shapes .== canonical.use_operation_shapes);assert(store.operation_shape_generation .== canonical.operation_shape_generation);assert(store.operation_shape_enabled .== canonical.operation_shape_enabled);return registeredView(store.lease,store.owner_generation);}
+fn registeredView(lease:u32,generation:u64)->Store {assert(lease!=0 && lease-1<owner_states.len);let at=lease-1;assert(owner_states[at].live && owner_states[at].generation==generation);return Store{lease:lease,owner_generation:generation,nodes:owner_states[at].nodes,extra:owner_states[at].extra,variables:owner_states[at].variables,versions:owner_states[at].versions,operations:owner_states[at].operations,operation_links:owner_states[at].operation_links,occurs_seen:owner_states[at].occurs_seen,closed_row_index:owner_states[at].closed_row_index,closed_operation_index:owner_states[at].closed_operation_index,variable_views:owner_states[at].variable_views,associated_equations:owner_states[at].associated_equations,projection_resolutions:owner_states[at].projection_resolutions,operation_chains:owner_states[at].operation_chains,effects:owner_states[at].effects,resolved:owner_states[at].resolved,composites:owner_states[at].composites,owner_id:owner_states[at].owner_id,use_closed_rows:owner_states[at].use_closed_rows,closed_rows:owner_states[at].closed_rows,use_operation_rows:owner_states[at].use_operation_rows,operation_rows:owner_states[at].operation_rows,has_usage_types:owner_states[at].has_usage_types,has_rank_types:owner_states[at].has_rank_types,next_rigid_scope:owner_states[at].next_rigid_scope,use_closed_graphs:owner_states[at].use_closed_graphs,has_proof_kinds:owner_states[at].has_proof_kinds,has_projections:owner_states[at].has_projections,projection_limit:owner_states[at].projection_limit,projection_steps:owner_states[at].projection_steps,resolution_depth_limit:owner_states[at].resolution_depth_limit,projection_exhausted:owner_states[at].projection_exhausted,projection_resolution_types:owner_states[at].projection_resolution_types,projection_resolution_rows:owner_states[at].projection_resolution_rows,projection_resolution_limit:owner_states[at].projection_resolution_limit,closed_generation:owner_states[at].closed_generation,closed_effect_physical_epoch:owner_states[at].closed_effect_physical_epoch,mutation_epoch:owner_states[at].mutation_epoch,occurs_steps:owner_states[at].occurs_steps,normalization:owner_states[at].normalization,resolution_steps:owner_states[at].resolution_steps,occurs_generation:owner_states[at].occurs_generation,use_resolution_cache:owner_states[at].use_resolution_cache,use_composite_cache:owner_states[at].use_composite_cache,composite_min_growth:owner_states[at].composite_min_growth,use_operation_shapes:owner_states[at].use_operation_shapes,operation_shape_generation:owner_states[at].operation_shape_generation,operation_shape_enabled:owner_states[at].operation_shape_enabled, ..};}
+fn checkedView(store:const Store&)->Store {let canonical:const blot_check_types::Store& =blot_check_types::canonical(store.lease,store.owner_generation);assert(store.nodes .== canonical.nodes);assert(store.extra .== canonical.extra);assert(store.variables .== canonical.variables);assert(store.versions .== canonical.versions);assert(store.operations .== canonical.operations);assert(store.operation_links .== canonical.operation_links);assert(store.occurs_seen .== canonical.occurs_seen);assert(store.closed_row_index .== canonical.closed_row_index);assert(store.closed_operation_index .== canonical.closed_operation_index);assert(store.variable_views .== canonical.variable_views);assert(store.associated_equations .== canonical.associated_equations);assert(store.projection_resolutions .== canonical.projection_resolutions);assert(store.operation_chains .== canonical.operation_chains);assert(store.effects .== canonical.effects);assert(store.resolved .== canonical.resolved);assert(store.composites .== canonical.composites);assert(store.owner_id .== canonical.owner_id);assert(store.use_closed_rows .== canonical.use_closed_rows);assert(store.closed_rows .== canonical.closed_rows);assert(store.use_operation_rows .== canonical.use_operation_rows);assert(store.operation_rows .== canonical.operation_rows);assert(store.has_usage_types .== canonical.has_usage_types);assert(store.has_rank_types .== canonical.has_rank_types);assert(store.next_rigid_scope .== canonical.next_rigid_scope);assert(store.use_closed_graphs .== canonical.use_closed_graphs);assert(store.has_proof_kinds .== canonical.has_proof_kinds);assert(store.has_projections .== canonical.has_projections);assert(store.projection_limit .== canonical.projection_limit);assert(store.projection_steps .== canonical.projection_steps);assert(store.resolution_depth_limit .== canonical.resolution_depth_limit);assert(store.projection_exhausted .== canonical.projection_exhausted);assert(store.projection_resolution_types .== canonical.projection_resolution_types);assert(store.projection_resolution_rows .== canonical.projection_resolution_rows);assert(store.projection_resolution_limit .== canonical.projection_resolution_limit);assert(store.closed_generation .== canonical.closed_generation);assert(store.closed_effect_physical_epoch .== canonical.closed_effect_physical_epoch);assert(store.mutation_epoch .== canonical.mutation_epoch);assert(store.occurs_steps .== canonical.occurs_steps);assert(store.normalization .== canonical.normalization);assert(store.resolution_steps .== canonical.resolution_steps);assert(store.occurs_generation .== canonical.occurs_generation);assert(store.use_resolution_cache .== canonical.use_resolution_cache);assert(store.use_composite_cache .== canonical.use_composite_cache);assert(store.composite_min_growth .== canonical.composite_min_growth);assert(store.use_operation_shapes .== canonical.use_operation_shapes);assert(store.operation_shape_generation .== canonical.operation_shape_generation);assert(store.operation_shape_enabled .== canonical.operation_shape_enabled);return registeredView(store.lease,store.owner_generation);}
 fn initPooled(options:Options=Options{..})->Store,Error {if next_owner_generation==0xffffffffffffffff || owner_states.len>=0xffffffff {return Store{..},blot_error::Error.out_of_memory;}let generation=next_owner_generation;next_owner_generation+=1;let index=owner_states.alloc_index(OwnerState{generation:generation,live:true, ..});let state:OwnerState& =owner_states[index];state.canonical=registeredView((index+1) as u32,generation);var self_=state.canonical;self_.owner_id=blot_native::fresh_owner_id();self_.use_closed_graphs=options.closed_graphs;self_.use_resolution_cache=options.resolution_cache;self_.use_composite_cache=options.composite_cache && options.closed_graphs;self_.composite_min_growth=options.composite_min_growth;let effects,error=blot_check_effects::initPooled(blot_check_effects::Options{resolution_cache:options.resolution_cache, ..});if error!=blot_error::Error.none {self_.deinit();return Store{..},effectError(error);}self_.effects=effects;let resolved,error=blot_reuse_epoch_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.resolved=resolved;let composites,error=blot_reuse_composite_resolution_cache::initPooled();if error!=blot_error::Error.none {self_.deinit();return Store{..},error;}self_.composites=composites;self_.nodes.append([Node{Tag.absent, ..},Node{Tag.unit, ..},Node{Tag.boolean, ..},Node{Tag.unsigned32, ..},Node{Tag.floating32, ..},Node{Tag.never, ..}]);self_.operations.append([Operation{NominalIdentity{0,0}, ..},Operation{NominalIdentity{0,1}, ..}]);if self_.nodes.failure!=blot_error::Error.none || self_.operations.failure!=blot_error::Error.none {var error=self_.nodes.failure;if error==blot_error::Error.none {error=self_.operations.failure;}self_.deinit();return Store{..},error;}return self_,blot_error::Error.none;}
 fn init()->Store,Error {return initPooled();}
 fn initWithOptions(options:Options)->Store,Error {return initPooled(options);}
-fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes.deinit();self_.extra.deinit();self_.variables.deinit();self_.versions.deinit();self_.operations.deinit();self_.operation_links.deinit();self_.quantifier_goals.deinit();self_.quantifier_obligations.deinit();self_.occurs_seen.deinit();self_.closed_row_index.deinit();self_.closed_operation_index.deinit();self_.variable_views.deinit();self_.associated_equations.deinit();self_.projection_resolutions.deinit();self_.operation_chains.deinit();self_.effects.deinit();self_.resolved.deinit();self_.composites.deinit();let index=self_.lease-1;owner_states[index].live=false;owner_states.free(index);self_=Store{..};}
+fn deinit(self_:Store&) {if self_.lease==0 {return;}assert(valid(self_));self_.nodes.deinit();self_.extra.deinit();self_.variables.deinit();self_.versions.deinit();self_.operations.deinit();self_.operation_links.deinit();self_.occurs_seen.deinit();self_.closed_row_index.deinit();self_.closed_operation_index.deinit();self_.variable_views.deinit();self_.associated_equations.deinit();self_.projection_resolutions.deinit();self_.operation_chains.deinit();self_.effects.deinit();self_.resolved.deinit();self_.composites.deinit();let index=self_.lease-1;owner_states[index].live=false;owner_states.free(index);self_=Store{..};}
 fn withStore<C,F>(context:C&)->Error {let initialized,error=initPooled();if error!=blot_error::Error.none {return error;}var store=initialized;let result=F(context,store);store.deinit();return result;}
 fn withStoreValue<C,R,F>(context:C&)->R,Error {let initialized,error=initPooled();if error!=blot_error::Error.none {return default<R>(),error;}var store=initialized;let result,failure=F(context,store);store.deinit();return result,failure;}
 
@@ -2597,25 +2435,5 @@ task_receive=>{return "task_receive";},
 
 fn hash(value:u32)->u64 { return ::hash(value); }
 fn hash(value:u64)->u64 { return ::hash(value); }
-
-reusable[] var resolution_binders:Id[>..];
-reusable[] var resolution_goals:Obligation[>..];
-recursive fn resolveQuantified(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,binders:const Id[:])->Id,Error {
- let body,error=resolveDepth(self_,value.a,position,depth+1);if error!=blot_error::Error.none {return 0,error;}
- let count=quantifierGoals(self_,id).len;let goals=resolution_goals.alloc_slice(count);
- {let original=quantifierGoals(self_,id);for goal,index in original {goals[index]=goal;}}
- let result,failure=resolveQuantifiedGoals(self_,id,value,position,depth,binders,body,goals);
- resolution_goals.free_slice(goals);return result,failure;
-}
-recursive fn resolveQuantifiedGoals(self_:Store&,id:Id,value:Node,position:Cursor,depth:i64,binders:const Id[:],body:Id,goals:Obligation[:])->Id,Error {
-            var changed = body != value.a;
-            for &goal in goals {
-                if goal.ty != 0 { let child, error = resolveDepth(self_, goal.ty, position, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || child != goal.ty; goal.ty = child; }
-                if goal.other != 0 { let child, error = resolveDepth(self_, goal.other, position, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || child != goal.other; goal.other = child; }
-                if goal.result != 0 { let child, error = resolveDepth(self_, goal.result, position, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || child != goal.result; goal.result = child; }
-                if goal.signature != 0 { let child, error = resolveDepth(self_, goal.signature, position, depth + 1); if error != blot_error::Error.none { return 0, error; } changed = changed || child != goal.signature; goal.signature = child; }
-            }
-            if !changed { return id, blot_error::Error.none; } return reownQuantified(self_, value.tag, body, binders, goals);
-}
 
 fn hash(key:NominalIdentity)->u64 {return ::hash_combine(::hash(key.unit),::hash(key.decl));}

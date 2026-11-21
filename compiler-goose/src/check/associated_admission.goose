@@ -2,8 +2,6 @@
 namespace blot_check_associated_admission;
 import check.core;
 import check.frozen_types;
-import check.numeric_proof_headers;
-import check.rank_portable;
 import check.types;
 import reuse.frozen_dependency;
 import reuse.principal_interface;
@@ -62,9 +60,9 @@ fn interfaceWithBudget(owner: const blot_reuse_principal_interface::Interface&, 
     for member, index in owner.contract_members { if !claimed[index] && (member.name != 0 || member.root != 0) { return blot_error::Error.invalid_artifact; } } return blot_error::Error.none;
 }
 fn typesView(graph: const blot_check_frozen_types::Graph&) -> Types {
-    return Types { owner_id: blot_native::fresh_owner_id(), nodes: graph.nodes, extra: graph.extra, effects: blot_check_core::EffectRows { graph.rows, graph.labels, graph.row_variable_count , ..}, operations: graph.operations, quantifier_goals: graph.quantifier_goals, quantifier_obligations: graph.quantifier_obligations , ..};
+    return Types { owner_id: blot_native::fresh_owner_id(), nodes: graph.nodes, extra: graph.extra, effects: blot_check_core::EffectRows { graph.rows, graph.labels, graph.row_variable_count , ..}, operations: graph.operations , ..};
 }
-fn graphView(types: const Types&) -> blot_check_frozen_types::Graph { return blot_check_frozen_types::Graph { types.nodes, types.extra, types.effects.rows, types.effects.labels, types.operations, types.effects.variable_count, types.quantifier_goals, types.quantifier_obligations , ..}; }
+fn graphView(types: const Types&) -> blot_check_frozen_types::Graph { return blot_check_frozen_types::Graph { types.nodes, types.extra, types.effects.rows, types.effects.labels, types.operations, types.effects.variable_count , ..}; }
 fn sameRoot(left: Copier&, right: Copier&, l: Id, r: Id, remaining: i64&) -> Error {
     let first, error = left.ty(l, 0); if error != blot_error::Error.none { return convert(error); } let second, error = right.ty(r, 0); if error != blot_error::Error.none { return convert(error); }
     left.destination.has_projections = true; left.destination.projection_limit = left.destination.projection_steps + remaining; let before = left.destination.projection_steps;
@@ -124,13 +122,6 @@ fn contractIndex<C>(contracts:const C[:],identity:blot_check_types::NominalIdent
 }
 fn publicCore(principal: const blot_reuse_principal_interface::Interface&, executable: const blot_check_core::Module&) -> Error { var remaining: i64 = 1000000; return publicCoreWithBudget(principal, executable, remaining); }
 fn publicCoreWithBudget(principal: const blot_reuse_principal_interface::Interface&, executable: const blot_check_core::Module&, remaining: i64&) -> Error {
-    let error = blot_check_rank_portable::publicCore(principal, executable); if error != blot_error::Error.none { return error; }
-    for binding, index in principal.bindings { let private = executable.bindings[index].scheme; if binding.ty == 0 || (binding.scheme.generative.len == 0 && private.generative.len == 0) { continue; } let public = binding.scheme;
-        if public.generative.len != private.generative.len || public.variables.len != private.variables.len || public.row_variables.len != private.row_variables.len { return blot_error::Error.invalid_artifact; }
-        let source = typesView(principal.graph); var context = GenerativeComparison { source, executable.types, public, private, remaining , ..}; let error = blot_check_types::withStore<GenerativeComparison>(context,generativeStore); if error != blot_error::Error.none { return convert(error); }
-    }
-    for value in principal.proof_contracts { let error = charge(remaining); if error != blot_error::Error.none { return error; } { let optional_binding_63 .= blot_check_numeric_proof_headers::find(executable.proof_contracts, value.binding); if optional_binding_63 { let original .= optional_binding_63; if !blot_check_numeric_proof_headers::equal(value.header, original) { return blot_error::Error.invalid_artifact; }  } else { return blot_error::Error.invalid_artifact; } } }
-    for binding, id in principal.bindings { if binding.ty == 0 { continue; } if blot_check_numeric_proof_headers::find(executable.proof_contracts, id as u32) != null && blot_check_numeric_proof_headers::find(principal.proof_contracts, id as u32) == null { return blot_error::Error.invalid_artifact; } }
     if principal.contract_members.len == 0 && executable.contract_members.len == 0 { return blot_error::Error.none; } let first = typesView(principal.graph);
     for contract in principal.contracts { if contract.private || contract.members.len == 0 { continue; } let original_index=contractIndex(executable.contracts,contract.identity,false);if original_index<0 {return blot_error::Error.invalid_artifact;}let original .=executable.contracts[original_index]; let error = equivalent(first, executable.types, contract, original, principal.contract_members[contract.members.start..contract.members.start + contract.members.len], executable.contract_members[original.members.start..original.members.start + original.members.len], principal.contract_predicates[contract.predicates.start..contract.predicates.start + contract.predicates.len], executable.obligations[original.predicates.start..original.predicates.start + original.predicates.len], remaining); if error != blot_error::Error.none { return error; }
     } return blot_error::Error.none;

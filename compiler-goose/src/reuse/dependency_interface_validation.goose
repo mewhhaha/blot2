@@ -7,12 +7,7 @@ import check.types;
 import check.effects;
 import check.frozen_types;
 import check.parameter_patterns;
-import check.quantifier_goals;
-import check.capability_flow;
-import check.numeric_proof_terms;
-import check.numeric_proof_core;
 import check.associated_admission;
-import check.rank_portable;
 import eval.implementation_admission;
 import backend.opaque_storage;
 import support.error;
@@ -52,33 +47,21 @@ fn scheme(owner:const Interface&,value:blot_check_types::Scheme)->Error {
 fn predicateTypes(owner:const Interface&,value:blot_check_types::Obligation)->Error {{ let propagated_error = ty(owner,value.ty); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = ty(owner,value.other); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = ty(owner,value.result); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = ty(owner,value.signature); if propagated_error != blot_error::Error.none { return propagated_error; } }return blot_error::Error.none;}
 fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
  for value in owner.obligations {{ let propagated_error = callee(owner,value,true,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}
- for value in owner.contract_predicates {{ let propagated_error = callee(owner,value,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}for value in owner.implementation_predicates {{ let propagated_error = callee(owner,value,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}for value in owner.graph.quantifier_obligations {{ let propagated_error = callee(owner,value,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}
+ for value in owner.contract_predicates {{ let propagated_error = callee(owner,value,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}for value in owner.implementation_predicates {{ let propagated_error = callee(owner,value,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}
  for proof in owner.selected_proofs {{ let propagated_error = callee(owner,proof.predicate,false,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}
- { let propagated_error = require(owner.has_numeric_proofs||owner.proof_contracts.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }
- for value in owner.proof_contracts {{ let propagated_error = require(value.binding!=0&&value.binding<owner.bindings.len); if propagated_error != blot_error::Error.none { return propagated_error; } }}
- if owner.capability_contracts.validate(owner.bindings.len,symbol_count)!=blot_error::Error.none {return blot_error::Error.invalid_artifact;}
- for entry in owner.capability_contracts.bindings {
-  let binding=owner.bindings[entry.binding];{ let propagated_error = require(binding.capability_parameters.present()&&binding.kind==blot_reuse_principal_interface::Kind.global); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  let header=owner.capability_contracts.header(entry.binding,binding.capability_parameters.arity() as u32);assert(header.present);
-  if header.value.view().validate(header.value.root,header.value.arity,true)!=blot_error::Error.none {return blot_error::Error.invalid_artifact;}
- }
  { let propagated_error = require(owner.unit!=0&&owner.unit<=unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(owner.graph.nodes.len>=6&&owner.graph.rows.len!=0&&owner.graph.operations.len>=2); if propagated_error != blot_error::Error.none { return propagated_error; } }
- { let propagated_error = blot_check_quantifier_goals::validate(owner.graph.nodes,owner.graph.quantifier_goals,owner.graph.quantifier_obligations); if propagated_error != blot_error::Error.none { return propagated_error; } }
  let prefix:Tag[6]=[blot_check_types::Tag.absent,blot_check_types::Tag.unit,blot_check_types::Tag.boolean,blot_check_types::Tag.unsigned32,blot_check_types::Tag.floating32,blot_check_types::Tag.never];
  for tag,index in prefix {let node=owner.graph.nodes[index];{ let propagated_error = require(node.tag==tag&&node.a==0&&node.b==0&&node.c==0); if propagated_error != blot_error::Error.none { return propagated_error; } }}
  for node in owner.graph.nodes {
   match node.tag {
-   bound=>{if node.b==0 {{ let propagated_error = require(owner.has_rank_contracts&&node.a<128&&node.c==0); if propagated_error != blot_error::Error.none { return propagated_error; } }}else if node.c==0 {{ let propagated_error = require(owner.has_rank_contracts&&node.a<128&&(node.b==1||(owner.has_usage_contracts&&node.b==2))); if propagated_error != blot_error::Error.none { return propagated_error; } }}else {{ let propagated_error = require(owner.has_usage_contracts&&node.a==0&&node.b==2&&node.c<owner.bindings.len); if propagated_error != blot_error::Error.none { return propagated_error; } }}},
-   forall,existential=>{{ let propagated_error = require(owner.has_rank_contracts); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.a); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.b,node.c, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }},
-   rigid=>{return blot_error::Error.invalid_artifact;},
+   bound,forall,existential,rigid,erased_proof=>{return blot_error::Error.invalid_artifact;},
    instance_version=>{{ let propagated_error = units(node.a,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(node.a!=0&&node.b!=0&&node.b<0x04000000&&node.c<16); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    instance_selection=>{
     { let propagated_error = units(node.a,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(node.a!=0&&node.b!=0&&node.c<owner.graph.extra.len&&owner.graph.extra[node.c]==3); if propagated_error != blot_error::Error.none { return propagated_error; } }
     { let propagated_error = require(node.c!=0xffffffff); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = typeList(owner,List {node.c+1,3, ..}); if propagated_error != blot_error::Error.none { return propagated_error; } }let children=owner.graph.extra[node.c+1..node.c+4];
     { let propagated_error = require(owner.graph.nodes[children[0]].tag==blot_check_types::Tag.scoped&&owner.graph.nodes[children[1]].tag==blot_check_types::Tag.scoped&&owner.graph.nodes[children[2]].tag==blot_check_types::Tag.instance_version); if propagated_error != blot_error::Error.none { return propagated_error; } }
    },
-   usage=>{{ let propagated_error = ty(owner,node.a); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require((owner.has_usage_contracts&&node.b<=6)||(node.b==8&&node.c==0)); if propagated_error != blot_error::Error.none { return propagated_error; } }if node.c!=0 {{ let propagated_error = ty(owner,node.c); if propagated_error != blot_error::Error.none { return propagated_error; } }}},
-   erased_proof=>{{ let propagated_error = require(owner.has_numeric_proofs&&node.a==0&&node.b==0&&node.c==0); if propagated_error != blot_error::Error.none { return propagated_error; } }},
+   usage=>{{ let propagated_error = ty(owner,node.a); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(node.b==8&&node.c==0); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    scoped=>{{ let propagated_error = ty(owner,node.a); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = ty(owner,node.c); if propagated_error != blot_error::Error.none { return propagated_error; } }let region=owner.graph.nodes[node.c];{ let propagated_error = require(node.b==0&&(region.tag==blot_check_types::Tag.variable||region.tag==blot_check_types::Tag.instance_selection||(region.tag==blot_check_types::Tag.bound&&region.b==2))&&owner.graph.nodes[node.a].tag==blot_check_types::Tag.nominal); if propagated_error != blot_error::Error.none { return propagated_error; } }},
    absent,unit,boolean,unsigned32,floating32,never=>{},
    variable=>{{ let propagated_error = require(node.b==0&&node.c==0); if propagated_error != blot_error::Error.none { return propagated_error; } }},
@@ -130,13 +113,8 @@ fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
   }
  }
  for binding in owner.bindings {
-  { let propagated_error = require(binding.name<symbol_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(blot_check_capability_flow::contractCode(binding.capability_flow)<=blot_check_capability_flow::contractCode(blot_check_capability_flow::Contract.spawn_task)); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  { let propagated_error = ty(owner,binding.ty); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = scheme(owner,binding.scheme); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(binding.capability_parameters.valid()); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  if binding.capability_flow==blot_check_capability_flow::Contract.input_shape {{ let propagated_error = require(binding.capability_parameters.kind==blot_check_capability_flow::ParameterResult.product&&binding.capability_parameters.arity()!=0&&binding.scheme.generative.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }}
-  if binding.capability_flow!=blot_check_capability_flow::Contract.unknown||binding.capability_parameters.present() {
-   { let propagated_error = require(!binding.external.present&&(binding.named_function||binding.capability_flow==blot_check_capability_flow::Contract.consume_task||binding.capability_flow==blot_check_capability_flow::Contract.spawn_task)); if propagated_error != blot_error::Error.none { return propagated_error; } }
-   { let propagated_error = require(binding.scheme.root!=0); if propagated_error != blot_error::Error.none { return propagated_error; } }var root=binding.scheme.root;if owner.graph.nodes[root].tag==blot_check_types::Tag.forall {{ let propagated_error = require(owner.has_rank_contracts); if propagated_error != blot_error::Error.none { return propagated_error; } }root=owner.graph.nodes[root].a;}{ let propagated_error = require(owner.graph.nodes[root].tag==blot_check_types::Tag.function); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  }
+  { let propagated_error = require(binding.name<symbol_count); if propagated_error != blot_error::Error.none { return propagated_error; } }
+  { let propagated_error = ty(owner,binding.ty); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = scheme(owner,binding.scheme); if propagated_error != blot_error::Error.none { return propagated_error; } }
   if binding.external.present {{ let propagated_error = target(owner,binding.external.value,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(binding.external.value.binding!=0); if propagated_error != blot_error::Error.none { return propagated_error; } }}
  }
  { let propagated_error = require(owner.obligations.len==owner.obligation_spans.len); if propagated_error != blot_error::Error.none { return propagated_error; } }
@@ -145,7 +123,7 @@ fn validate(owner:const Interface&,symbol_count:i64,unit_count:i64)->Error {
   { let propagated_error = require(obligation.source==0&&obligation.name<symbol_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = identity(obligation.identity,symbol_count,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = units(obligation.qualification_unit,unit_count); if propagated_error != blot_error::Error.none { return propagated_error; } }
  }
  for nominal in owner.nominals {
-  { let propagated_error = require(!nominal.affine||nominal.has_usage); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(!nominal.closed_storage||!nominal.has_usage); if propagated_error != blot_error::Error.none { return propagated_error; } }if nominal.has_usage {{ let propagated_error = require(owner.has_usage_contracts); if propagated_error != blot_error::Error.none { return propagated_error; } }}
+  { let propagated_error = require(!nominal.affine&&!nominal.has_usage); if propagated_error != blot_error::Error.none { return propagated_error; } }
   if nominal.identity.unit!=0&&nominal.identity.unit!=0xffffffff {{ let propagated_error = require(nominal.is_opaque==(nominal.identity.decl&blot_check_types::opaque_name_bit!=0)); if propagated_error != blot_error::Error.none { return propagated_error; } }}
   if nominal.is_opaque {{ let propagated_error = require(nominal.alias==0&&nominal.constructors.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(nominal.storage.kind!=blot_backend_opaque_storage::Kind.parameter||nominal.storage.parameter<nominal.parameters.len); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(nominal.identity.decl&blot_check_types::opaque_name_bit!=0); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require((nominal.identity.decl&~blot_check_types::opaque_name_bit)<symbol_count); if propagated_error != blot_error::Error.none { return propagated_error; } }}
   { let propagated_error = ty(owner,nominal.alias); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = namesList(owner,nominal.alias_rows,owner.graph.row_variable_count); if propagated_error != blot_error::Error.none { return propagated_error; } }if nominal.alias!=0 {{ let propagated_error = require(nominal.constructors.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }}
@@ -217,8 +195,7 @@ fn child(self_:GraphEdges,key:i64,index:i64)->blot_support::Option<i64> {
    function=>{if index==0 {return edge(n.a);}if index==1 {return edge(n.b);}if index==2 {return edge(self_.rowStart()+n.c);}return absentEdge();},
    forall,existential=>{
     if index==0 {return edge(n.a);}if index-1<n.c {return edge(g.extra[n.b+index-1]);}
-    let goals=blot_check_quantifier_goals::get(g.quantifier_goals,g.quantifier_obligations,key as u32);let slot=index-1-n.c;
-    if slot/4>=goals.len {return absentEdge();}let goal=goals[slot/4];let children:u32[4]=[goal.ty,goal.other,goal.result,goal.signature];return edge(children[slot%4]);
+    return absentEdge();
    },
    product=>{if index<n.b {return edge(g.extra[n.a+index]);}return absentEdge();},
    record=>{if index<n.b {return edge(g.extra[n.a+index*2+1]);}return absentEdge();},
@@ -246,18 +223,6 @@ fn child(self_:GraphEdges,key:i64,index:i64)->blot_support::Option<i64> {
 struct Frame {key:i64=0,next:i64=0}
 fn validateGraph(owner:const Interface&)->Error {var remaining:i64=1000000;return validateGraphWithBudget(owner,remaining);}
 fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
- if owner.has_numeric_proofs {{ let propagated_error = blot_check_numeric_proof_core::dataTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.graph.nodes); if propagated_error != blot_error::Error.none { return propagated_error; } }}
- { let propagated_error = require(owner.has_numeric_proofs||owner.proof_contracts.len==0); if propagated_error != blot_error::Error.none { return propagated_error; } }
- // All growing owners below stay outside the recursive proof/checker cycles.
- var terms:blot_check_numeric_proof_terms::Term[>..]=[];var term_index = blot_check_numeric_proof_terms::TermIndex {..};
- var proof_budget=blot_check_numeric_proof_terms::init(terms,term_index);proof_budget.limits.visits=min(remaining,proof_budget.limits.visits);
- var proof_bindings:dictionary<u32,bool> =dictionary<u32,bool> {};
- for value in owner.proof_contracts {
-  { let propagated_error = require(value.binding!=0&&value.binding<owner.bindings.len); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = require(!proof_bindings.contains(value.binding)); if propagated_error != blot_error::Error.none { return propagated_error; } }proof_bindings.insert(value.binding,true);
-  let signature_error=value.header.signature().validateInto(proof_budget);if signature_error==blot_error::Error.out_of_memory {return signature_error;}if signature_error!=blot_error::Error.none {return blot_error::Error.invalid_artifact;}
-  { let propagated_error = blot_check_numeric_proof_core::signatureTypes(blot_check_frozen_types::Source.frozen {owner.graph, ..},owner.bindings[value.binding].ty,value.header); if propagated_error != blot_error::Error.none { return propagated_error; } }
- }
- remaining-=min(remaining,proof_budget.visits);terms.clear();proof_budget.deinit();
  { let propagated_error = blot_check_associated_admission::interfaceWithBudget(owner,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }let source=blot_check_associated_admission::typesView(owner.graph);
  { let propagated_error = blot_eval_implementation_admission::scopes(source,owner,owner.implementation_predicates,remaining); if propagated_error != blot_error::Error.none { return propagated_error; } }
  var symbol_limit:i64=0;
@@ -277,5 +242,5 @@ fn validateGraphWithBudget(owner:const Interface&,remaining:i64&)->Error {
    colors[child]=1;frames[depth]=Frame {key:child, ..};depth++;
   }
  }
- return blot_check_rank_portable::interface(owner);
+ return blot_error::Error.none;
 }

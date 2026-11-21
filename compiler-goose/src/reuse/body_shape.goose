@@ -3,32 +3,6 @@ namespace blot_reuse_body_shape;
 import check.core;
 import support.option;
 fn sameSlice<T>(a:const T[:],b:const T[:])->bool { return a==b; }
-fn same_check_numeric_proof_headers_Owned(a:blot_check_numeric_proof_headers::Owned,b:blot_check_numeric_proof_headers::Owned)->bool {
-    if a.arity!=b.arity { return false; }
-    if !sameSlice(a.value_slots,b.value_slots) { return false; }
-    if !sameSlice(a.proof_slots,b.proof_slots) { return false; }
-    if !sameSlice(a.values,b.values) { return false; }
-    if !sameSlice(a.operands,b.operands) { return false; }
-    if !sameSlice(a.requirements,b.requirements) { return false; }
-    if a.result!=b.result { return false; }
-    return true;
-}
-fn same_check_numeric_proof_headers_Named(a:blot_check_numeric_proof_headers::Named,b:blot_check_numeric_proof_headers::Named)->bool {
-    if a.binding!=b.binding { return false; }
-    if !same_check_numeric_proof_headers_Owned(a.header,b.header) { return false; }
-    return true;
-}
-fn same___check_numeric_proof_headers_Named(a:blot_check_numeric_proof_headers::Named[:],b:blot_check_numeric_proof_headers::Named[:])->bool {
-    if a.len!=b.len { return false; }
-    for i in 0..a.len { if !same_check_numeric_proof_headers_Named(a[i],b[i]) { return false; } }
-    return true;
-}
-fn same_check_capability_contracts_Collection(a:blot_check_capability_contracts::Collection,b:blot_check_capability_contracts::Collection)->bool {
-    if !sameSlice(a.nodes,b.nodes) { return false; }
-    if !sameSlice(a.words,b.words) { return false; }
-    if !sameSlice(a.bindings,b.bindings) { return false; }
-    return true;
-}
 fn same_check_core_RuntimeName(a:blot_check_core::RuntimeName,b:blot_check_core::RuntimeName)->bool {
     if a.binding!=b.binding { return false; }
     return true;
@@ -56,39 +30,11 @@ fn same_check_core_EffectRows(a:blot_check_core::EffectRows,b:blot_check_core::E
     if a.variable_count!=b.variable_count { return false; }
     return true;
 }
-fn same_parse_ast_Span(a:blot_parse_ast::Span,b:blot_parse_ast::Span)->bool {
-    return true;
-}
-fn same__parse_ast_Span(a:blot_support::Option<blot_parse_ast::Span>,b:blot_support::Option<blot_parse_ast::Span>)->bool {
-    return a.present==b.present && (!a.present || same_parse_ast_Span(a.value,b.value));
-}
-fn same_check_types_Obligation(a:blot_check_types::Obligation,b:blot_check_types::Obligation)->bool {
-    if a.ty!=b.ty { return false; }
-    if a.kind!=b.kind { return false; }
-    if a.source!=b.source { return false; }
-    if a.name!=b.name { return false; }
-    if a.result!=b.result { return false; }
-    if a.other!=b.other { return false; }
-    if a.signature!=b.signature { return false; }
-    if a.operator!=b.operator { return false; }
-    if a.identity!=b.identity { return false; }
-    if a.explicit!=b.explicit { return false; }
-    if !same__parse_ast_Span(a.qualification_span,b.qualification_span) { return false; }
-    if a.qualification_unit!=b.qualification_unit { return false; }
-    return true;
-}
-fn same___check_types_Obligation(a:blot_check_types::Obligation[:],b:blot_check_types::Obligation[:])->bool {
-    if a.len!=b.len { return false; }
-    for i in 0..a.len { if !same_check_types_Obligation(a[i],b[i]) { return false; } }
-    return true;
-}
 fn same_check_core_Types(a:blot_check_core::Types,b:blot_check_core::Types)->bool {
     if !same___check_types_Node(a.nodes,b.nodes) { return false; }
     if !sameSlice(a.extra,b.extra) { return false; }
     if !same_check_core_EffectRows(a.effects,b.effects) { return false; }
     if !sameSlice(a.operations,b.operations) { return false; }
-    if !sameSlice(a.quantifier_goals,b.quantifier_goals) { return false; }
-    if !same___check_types_Obligation(a.quantifier_obligations,b.quantifier_obligations) { return false; }
     return true;
 }
 fn same_check_core_Node(a:blot_check_core::Node,b:blot_check_core::Node)->bool {
@@ -105,13 +51,15 @@ fn same___check_core_Node(a:blot_check_core::Node[:],b:blot_check_core::Node[:])
     for i in 0..a.len { if !same_check_core_Node(a[i],b[i]) { return false; } }
     return true;
 }
+fn same_parse_ast_Span(a:blot_parse_ast::Span,b:blot_parse_ast::Span)->bool {
+    return true;
+}
 fn same___parse_ast_Span(a:blot_parse_ast::Span[:],b:blot_parse_ast::Span[:])->bool {
     if a.len!=b.len { return false; }
     for i in 0..a.len { if !same_parse_ast_Span(a[i],b[i]) { return false; } }
     return true;
 }
 fn same_check_core_Binding(a:blot_check_core::Binding,b:blot_check_core::Binding)->bool {
-    if a.capability_flow!=b.capability_flow { return false; }
     if a.capability_parameters!=b.capability_parameters { return false; }
     if a.private!=b.private { return false; }
     if a.initializer!=b.initializer { return false; }
@@ -161,6 +109,9 @@ fn same___check_core_Parameter(a:blot_check_core::Parameter[:],b:blot_check_core
     if a.len!=b.len { return false; }
     for i in 0..a.len { if !same_check_core_Parameter(a[i],b[i]) { return false; } }
     return true;
+}
+fn same__parse_ast_Span(a:blot_support::Option<blot_parse_ast::Span>,b:blot_support::Option<blot_parse_ast::Span>)->bool {
+    return a.present==b.present && (!a.present || same_parse_ast_Span(a.value,b.value));
 }
 fn same_check_core_Obligation(a:blot_check_core::Obligation,b:blot_check_core::Obligation)->bool {
     if a.ty!=b.ty { return false; }
@@ -258,6 +209,21 @@ fn same___reuse_principal_interface_Implementation(a:blot_reuse_principal_interf
     for i in 0..a.len { if !same_reuse_principal_interface_Implementation(a[i],b[i]) { return false; } }
     return true;
 }
+fn same_check_types_Obligation(a:blot_check_types::Obligation,b:blot_check_types::Obligation)->bool {
+    if a.ty!=b.ty { return false; }
+    if a.kind!=b.kind { return false; }
+    if a.source!=b.source { return false; }
+    if a.name!=b.name { return false; }
+    if a.result!=b.result { return false; }
+    if a.other!=b.other { return false; }
+    if a.signature!=b.signature { return false; }
+    if a.operator!=b.operator { return false; }
+    if a.identity!=b.identity { return false; }
+    if a.explicit!=b.explicit { return false; }
+    if !same__parse_ast_Span(a.qualification_span,b.qualification_span) { return false; }
+    if a.qualification_unit!=b.qualification_unit { return false; }
+    return true;
+}
 fn same_reuse_principal_interface_SelectedProof(a:blot_reuse_principal_interface::SelectedProof,b:blot_reuse_principal_interface::SelectedProof)->bool {
     if a.predicate_target!=b.predicate_target { return false; }
     if a.context!=b.context { return false; }
@@ -286,11 +252,6 @@ fn same___check_core_Diagnostic(a:blot_check_core::Diagnostic[:],b:blot_check_co
     return true;
 }
 fn same_check_core_Module(a:blot_check_core::Module,b:blot_check_core::Module)->bool {
-    if a.has_rank_contracts!=b.has_rank_contracts { return false; }
-    if a.has_usage_contracts!=b.has_usage_contracts { return false; }
-    if a.has_numeric_proofs!=b.has_numeric_proofs { return false; }
-    if !same___check_numeric_proof_headers_Named(a.proof_contracts,b.proof_contracts) { return false; }
-    if !same_check_capability_contracts_Collection(a.capability_contracts,b.capability_contracts) { return false; }
     if !sameSlice(a.field_names,b.field_names) { return false; }
     if !same___check_core_RuntimeName(a.runtime_names,b.runtime_names) { return false; }
     if !same___check_core_RuntimeName(a.source_names,b.source_names) { return false; }
@@ -333,8 +294,6 @@ fn same_check_core_Module(a:blot_check_core::Module,b:blot_check_core::Module)->
     if !sameSlice(a.selected_members,b.selected_members) { return false; }
     if !sameSlice(a.selected_edges,b.selected_edges) { return false; }
     if !sameSlice(a.selected_uses,b.selected_uses) { return false; }
-    if !sameSlice(a.dictionary_selections,b.dictionary_selections) { return false; }
-    if !sameSlice(a.dictionary_uses,b.dictionary_uses) { return false; }
     if !sameSlice(a.primitives,b.primitives) { return false; }
     if !sameSlice(a.loops,b.loops) { return false; }
     if !sameSlice(a.loop_carries,b.loop_carries) { return false; }

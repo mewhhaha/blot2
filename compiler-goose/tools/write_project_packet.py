@@ -151,13 +151,12 @@ for t,n in sorted(ARRAYS):
  code.append(f'fn put(self:Writer&,value:{t}[{n}]) {{for item in value {{put(self,item);}}}}')
  code.append(f'fn get(self:Reader&,value:{t}[{n}]&) {{for &item in value {{get(self,item);}}}}')
 # Core private IDs/derived child lane do not cross the process protocol.
-for t,skip in [('blot_check_core::Module',{'owner_id','package_payloads'}),('blot_check_core::Types',{'owner_id'}),('blot_check_frozen_types::Graph',{'owner_id'}),('blot_check_type_store_snapshot::Snapshot',{'lease_index','generation'}),('blot_check_type_store_snapshot::State',{'store_owner_id'})]:
+for t,skip in [('blot_check_core::Module',{'owner_id'}),('blot_check_core::Types',{'owner_id'}),('blot_check_frozen_types::Graph',{'owner_id'}),('blot_check_type_store_snapshot::Snapshot',{'lease_index','generation'}),('blot_check_type_store_snapshot::State',{'store_owner_id'})]:
  if t not in SEEN:continue
  data=D[t][2];owner=D[t][3]
  code.append('fn put(self:Writer&,value:'+t+') {if !self.enter() {return;}'+''.join(('putOptional' if ty.endswith('?') else 'put')+'(self,value.'+f+');' for f,ty in data if f not in skip)+'self.depth--;}')
  trailer=''
- if t=='blot_check_core::Module':trailer='value.owner_id=blot_native::fresh_owner_id();let lanes,error=allocate(self.owner,value.nodes.len,default<u32>());if error!=Error.none {self.failure=error;}else {for node,index in value.nodes {lanes[index]=0;if node.tag==blot_check_core::Tag.package_pack {lanes[index]=node.a;}}value.package_payloads=lanes;}'
- elif t in ('blot_check_core::Types','blot_check_frozen_types::Graph') and any(f=='owner_id' for f,ty in data):trailer='value.owner_id=blot_native::fresh_owner_id();'
+ if t in ('blot_check_core::Module','blot_check_core::Types','blot_check_frozen_types::Graph') and any(f=='owner_id' for f,ty in data):trailer='value.owner_id=blot_native::fresh_owner_id();'
  code.append('fn get(self:Reader&,value:'+t+'&) {if !self.enter() {return;}'+''.join('get(self,value.'+f+');' for f,ty in data if f not in skip)+trailer+'self.depth--;}')
 # Explicit nominal heads avoid ties between the generic record, slice and
 # optional helpers. Reader/writer inference keeps unused codecs uninstantiated.
@@ -179,6 +178,9 @@ for t in sorted(STRUCTS):
 code=[line.replace('fn put(self:Writer&','fn put<PacketWriter>(self:PacketWriter&').replace('fn get(self:Reader&','fn get<PacketReader>(self:PacketReader&') for line in code]
 # Contiguous tables selected by profiling copied worker packets. Goose checks
 # that their records have a flat representation and verifies the decoded image.
+# Never include structs that transitively contain a tagged union (an enum with
+# payload variants): payloadless variants leave inactive union bytes
+# uninitialized, making raw flat images non-deterministic across processes.
 FLAT_SLICES = (
     'blot_check_core::Associated',
     'blot_check_core::Binding',
@@ -194,7 +196,6 @@ FLAT_SLICES = (
     'blot_check_core::Obligation',
     'blot_check_core::Parameter',
     'blot_check_core::Projection',
-    'blot_check_effects::Row',
     'blot_check_parameter_patterns::Node',
     'blot_check_types::Node',
     'blot_check_types::Obligation',
@@ -206,8 +207,24 @@ FLAT_SLICES = (
     'u32',
     'u8',
 )
+def has_tagged_union(t, ns='blot_project_packet'):
+ t = resolve(t, ns)
+ if t.startswith('blot_support::Option<'):
+  return has_tagged_union(t[len('blot_support::Option<'):-1], ns)
+ m = re.fullmatch(r'(.+)\[\d+\]', t)
+ if m:
+  return has_tagged_union(m[1], ns)
+ if t not in D:
+  return False
+ kind, params, data, owner = D[t]
+ if kind == 'enum':
+  return any(fs for _, fs in data)
+ if kind == 'struct':
+  return any(has_tagged_union(ty, owner) for _, ty in data)
+ return False
 for t in FLAT_SLICES:
  assert t in SLICES, t
+ assert not has_tagged_union(t), f'FLAT_SLICES type {t} contains a tagged union with uninitialized inactive bytes'
  code.append(f'fn put(receiver:Writer&,value:const {t}[:]) {{putFlat(receiver,value);}}')
  code.append(f'fn get(receiver:Reader&,value:{t}[:]& ) {{getFlat(receiver,value);}}')
 syntax_types=PRIM|{name.split('::')[-1] for name in D}
@@ -222,7 +239,7 @@ for t in sorted(SLICES):
  owner.append('fn allocate<PacketOwner>(self:PacketOwner&,length:i64,witness:'+t+')->'+t+'[:],Error {if !self.valid()||length<0||length>element_limit {return default<'+t+'[:]>(),Error.invalid_artifact;}if length==0 {return default<'+t+'[:]>(),Error.none;}if links.len>=0xfffffffe {return default<'+t+'[:]>(),Error.out_of_memory;}let run=pool_'+ident(t)+'.alloc_slice(length);let state:Lease& =leases[self.slot-1];let at=links.alloc_index(Link{Run.run_'+ident(t)+'{run},state.head});state.head=(at+1) as u32;return run,Error.none;}')
 # Only Checked's retained packet slices need public header observation.
 observe_types=set()
-for key in ['blot_check_check::Checked','blot_check_check::EditorCapture','blot_check_numeric_proof_bodies::Owned','blot_check_capability_contracts::Collection']:
+for key in ['blot_check_check::Checked','blot_check_check::EditorCapture']:
  for field,ty in D[key][2]:
   ty=resolve(ty,D[key][3])
   if ty.endswith('[:]'):observe_types.add(resolve(ty[:-3],D[key][3]))

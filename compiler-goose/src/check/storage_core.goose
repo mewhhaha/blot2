@@ -1,7 +1,7 @@
 // Shape evidence exposes every operand; emission separately proves lifetimes.
 namespace blot_check_storage_core;
 import check.core;
-import check.rank_equal;
+import check.effects;
 import check.storage_ops;
 import check.storage_types;
 import check.types;
@@ -9,6 +9,75 @@ import support.error;
 import support.option;
 
 import std;
+recursive fn equalStorageType(types: const blot_check_core::Types&, left: blot_check_types::Id, right: blot_check_types::Id, remaining: i64&, depth: i64) -> bool, blot_error::Error {
+    if remaining == 0 || depth >= 128 { return false, blot_error::Error.type_limit; }
+    remaining -= 1;
+    if left == right { return true, blot_error::Error.none; }
+    let a = types.node(left);
+    let b = types.node(right);
+    if a.tag != b.tag { return false, blot_error::Error.none; }
+    match a.tag {
+        unit, boolean, unsigned32, floating32, never => { return true, blot_error::Error.none; },
+        variable => { return a.a == b.a, blot_error::Error.none; },
+        array, list, cursor, resolver => { return equalStorageType(types, a.a, b.a, remaining, depth + 1); },
+        usage => {
+            if a.b != b.b || a.c != b.c { return false, blot_error::Error.none; }
+            return equalStorageType(types, a.a, b.a, remaining, depth + 1);
+        },
+        function => {
+            if a.c != b.c {
+                let ra = types.row(a.c); let rb = types.row(b.c);
+                if ra.tail != rb.tail { return false, blot_error::Error.none; }
+                let la = types.rowLabels(a.c); let lb = types.rowLabels(b.c);
+                if la.len != lb.len { return false, blot_error::Error.none; }
+                for x, i in la { if x != lb[i] { return false, blot_error::Error.none; } }
+            }
+            let same_a, err_a = equalStorageType(types, a.a, b.a, remaining, depth + 1);
+            if err_a != blot_error::Error.none || !same_a { return same_a, err_a; }
+            return equalStorageType(types, a.b, b.b, remaining, depth + 1);
+        },
+        product => {
+            if a.b != b.b { return false, blot_error::Error.none; }
+            let xs = types.list(blot_check_types::List { a.a, a.b , ..});
+            let ys = types.list(blot_check_types::List { b.a, b.b , ..});
+            for x, i in xs {
+                let same, err = equalStorageType(types, x, ys[i], remaining, depth + 1);
+                if err != blot_error::Error.none || !same { return same, err; }
+            }
+            return true, blot_error::Error.none;
+        },
+        record => {
+            if a.b != b.b { return false, blot_error::Error.none; }
+            for i in 0..a.b {
+                let fa = types.recordField(a, i);
+                var found = false;
+                for j in 0..b.b {
+                    let fb = types.recordField(b, j);
+                    if fa.name == fb.name {
+                        let same, err = equalStorageType(types, fa.ty, fb.ty, remaining, depth + 1);
+                        if err != blot_error::Error.none || !same { return same, err; }
+                        found = true; break;
+                    }
+                }
+                if !found { return false, blot_error::Error.none; }
+            }
+            return true, blot_error::Error.none;
+        },
+        nominal, projection => {
+            if a.a != b.a || a.b != b.b { return false, blot_error::Error.none; }
+            if a.tag == blot_check_types::Tag.projection && types.projectionMember(a) != types.projectionMember(b) { return false, blot_error::Error.none; }
+            let xs = types.nominalArguments(a);
+            let ys = types.nominalArguments(b);
+            if xs.len != ys.len { return false, blot_error::Error.none; }
+            for x, i in xs {
+                let same, err = equalStorageType(types, x, ys[i], remaining, depth + 1);
+                if err != blot_error::Error.none || !same { return same, err; }
+            }
+            return true, blot_error::Error.none;
+        },
+        _ => { return a.a == b.a && a.b == b.b && a.c == b.c, blot_error::Error.none; },
+    }
+}
 struct Pair { expected: blot_check_types::Id, actual: blot_check_types::Id }
 struct Contract { pairs: Pair[4] = [default<Pair>(); 4], len: i64 = 0 }
 fn same(self_: Contract&, expected: blot_check_types::Id, actual: blot_check_types::Id) { self_.pairs[self_.len] = Pair { expected, actual , ..}; self_.len += 1; }
@@ -86,11 +155,11 @@ fn validate(m: const blot_check_core::Module&) -> blot_error::Error {
     for node, index in m.nodes {
         if node.tag == blot_check_core::Tag.storage {
             let evidence, error = contract(m, index as u32); if error != blot_error::Error.none { return error; }
-            for pair in evidence.pairs[..evidence.len] { if pair.actual == blot_check_types::never { continue; } let same, error = blot_check_rank_equal::equalWithBudget(m.types, pair.expected, pair.actual, true, remaining); if error != blot_error::Error.none || !same { return blot_error::Error.invalid_artifact; } }
+            for pair in evidence.pairs[..evidence.len] { if pair.actual == blot_check_types::never { continue; } let same, error = equalStorageType(m.types, pair.expected, pair.actual, remaining, 0); if error != blot_error::Error.none || !same { return blot_error::Error.invalid_artifact; } }
         } else if node.tag == blot_check_core::Tag.array {
             let shape = m.types.node(node.ty); var element = blot_check_storage_types::arrayElement(m.types, node.ty);
             if shape.tag == blot_check_types::Tag.list { element = blot_support::Option<blot_check_types::Id> { true, shape.a , ..}; } if !element.present { return blot_error::Error.invalid_artifact; }
-            for child in m.children(index as u32) { if m.typeOf(child) == blot_check_types::never { continue; } let same, error = blot_check_rank_equal::equalWithBudget(m.types, element.value, m.typeOf(child), true, remaining); if error != blot_error::Error.none || !same { return blot_error::Error.invalid_artifact; } }
+            for child in m.children(index as u32) { if m.typeOf(child) == blot_check_types::never { continue; } let same, error = equalStorageType(m.types, element.value, m.typeOf(child), remaining, 0); if error != blot_error::Error.none || !same { return blot_error::Error.invalid_artifact; } }
         }
     }
     return blot_error::Error.none;

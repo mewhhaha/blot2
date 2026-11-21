@@ -8,7 +8,6 @@ ROOT = Path(__file__).resolve().parents[1] / 'src'
 SCHEMAS = [
     ('check/frozen_types', 'Graph'),
     ('check/frozen_types', 'PatternGraph'),
-    ('check/capability_contracts', 'Collection'),
     ('check/core', 'EffectRows'),
     ('check/core', 'Types'),
     ('check/core', 'Module'),

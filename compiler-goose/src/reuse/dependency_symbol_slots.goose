@@ -3,16 +3,15 @@ namespace blot_reuse_dependency_symbol_slots;
 import check.core;
 import check.types;
 import check.parameter_patterns;
-import check.capability_contracts;
 import reuse.frozen_dependency;
 import support.error;
 type Error = blot_error::Error;
 type List = blot_check_types::List;
 type Tag = blot_check_types::Tag;
-struct Slots { interface_types: u8[:], patterns: u8[:], core_types: u8[:], interface_capabilities: u8[:], core_capabilities: u8[:] }
+struct Slots { interface_types: u8[:], patterns: u8[:], core_types: u8[:] }
 reusable[] var owned_roles: u8[>..] = [];
 fn deinit(self_: Slots&) {
-    release(self_.interface_types); release(self_.patterns); release(self_.core_types); release(self_.interface_capabilities); release(self_.core_capabilities);
+    release(self_.interface_types); release(self_.patterns); release(self_.core_types);
     self_ = default<Slots>();
 }
 fn release(values: u8[:]) { if values.len != 0 { owned_roles.free_slice(values); } }
@@ -75,25 +74,9 @@ fn coreRoles(slots: u8[:], ir: const blot_check_core::Module&) -> Error {
     for value in ir.operation_values { { let propagated_error = list(slots, value.arguments, 2); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     return blot_error::Error.none;
 }
-fn capabilityRoles(roles: u8[:], owner: blot_check_capability_contracts::Collection) -> Error {
-    for &role in roles { role = 0; }
-    for node in owner.nodes {
-        match node.tag {
-            captures, product, join => { { let propagated_error = mark(roles, node.a, node.b, 2); if propagated_error != blot_error::Error.none { return propagated_error; } } },
-            record => {
-                if node.b % 2 != 0 { return blot_error::Error.invalid_artifact; }
-                for index in 0..node.b / 2 {
-                    if index * 2 + 1 > 0xffffffff - node.a { return blot_error::Error.invalid_artifact; }
-                    { let propagated_error = mark(roles, node.a + (index * 2) as u32, 1, 1); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = mark(roles, node.a + (index * 2 + 1) as u32, 1, 2); if propagated_error != blot_error::Error.none { return propagated_error; } }
-                }
-            }, _ => {},
-        }
-    }
-    return blot_error::Error.none;
-}
 fn collect(owner: const blot_reuse_frozen_dependency::Module&) -> Slots, Error {
     let iface .= owner.interface; let ir .= owner.core;
-    var slots = Slots { owned_roles.alloc_slice(iface.graph.extra.len), owned_roles.alloc_slice(iface.patterns.extra.len), owned_roles.alloc_slice(ir.types.extra.len), owned_roles.alloc_slice(iface.capability_contracts.words.len), owned_roles.alloc_slice(ir.capability_contracts.words.len) , ..};
+    var slots = Slots { owned_roles.alloc_slice(iface.graph.extra.len), owned_roles.alloc_slice(iface.patterns.extra.len), owned_roles.alloc_slice(ir.types.extra.len) , ..};
     for &slot in slots.interface_types { slot = 0; } for &slot in slots.patterns { slot = 0; } for &slot in slots.core_types { slot = 0; }
     let error = collectInto(owner, slots);
     if error != blot_error::Error.none { slots.deinit(); return default<Slots>(), error; }
@@ -129,7 +112,7 @@ fn collectInto(owner: const blot_reuse_frozen_dependency::Module&, slots: Slots&
             },
         }
     }
-    { let propagated_error = coreRoles(slots.core_types, owner.core); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = capabilityRoles(slots.interface_capabilities, iface.capability_contracts); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = capabilityRoles(slots.core_capabilities, owner.core.capability_contracts); if propagated_error != blot_error::Error.none { return propagated_error; } }
+    { let propagated_error = coreRoles(slots.core_types, owner.core); if propagated_error != blot_error::Error.none { return propagated_error; } }
     return blot_error::Error.none;
 }
 fn rewrite(extra: u32[:], slots: const u8[:], symbols: const u32[:]) {

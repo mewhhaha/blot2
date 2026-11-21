@@ -70,8 +70,6 @@ struct Snapshot { state: State, lease_index: u32 = 0, generation: u64 = 0,
     store_versions: const blot_check_types::Version[:] = default<const blot_check_types::Version[:]>(),
     store_operations: const blot_check_types::Operation[:] = default<const blot_check_types::Operation[:]>(),
     store_operation_links: const blot_check_types::OperationLink[:] = default<const blot_check_types::OperationLink[:]>(),
-    store_quantifier_goals: const blot_check_types::QuantifierGoals[:] = default<const blot_check_types::QuantifierGoals[:]>(),
-    store_quantifier_obligations: const blot_check_types::Obligation[:] = default<const blot_check_types::Obligation[:]>(),
     store_occurs_seen: const u32[:] = default<const u32[:]>(),
     store_closed_row_index: const blot_check_types::RowCertificate[:] = default<const blot_check_types::RowCertificate[:]>(),
     store_closed_operation_index: const blot_check_types::RowCertificate[:] = default<const blot_check_types::RowCertificate[:]>(),
@@ -94,8 +92,6 @@ struct Lease { live: bool = false, generation: u64 = 0,
     store_versions: Range = Range {..},
     store_operations: Range = Range {..},
     store_operation_links: Range = Range {..},
-    store_quantifier_goals: Range = Range {..},
-    store_quantifier_obligations: Range = Range {..},
     store_occurs_seen: Range = Range {..},
     store_closed_row_index: Range = Range {..},
     store_closed_operation_index: Range = Range {..},
@@ -119,8 +115,6 @@ reusable[] var pool_store_variables: blot_check_types::Variable[>..] = [];
 reusable[] var pool_store_versions: blot_check_types::Version[>..] = [];
 reusable[] var pool_store_operations: blot_check_types::Operation[>..] = [];
 reusable[] var pool_store_operation_links: blot_check_types::OperationLink[>..] = [];
-reusable[] var pool_store_quantifier_goals: blot_check_types::QuantifierGoals[>..] = [];
-reusable[] var pool_store_quantifier_obligations: blot_check_types::Obligation[>..] = [];
 reusable[] var pool_store_occurs_seen: u32[>..] = [];
 reusable[] var pool_store_closed_row_index: blot_check_types::RowCertificate[>..] = [];
 reusable[] var pool_store_closed_operation_index: blot_check_types::RowCertificate[>..] = [];
@@ -212,30 +206,6 @@ fn canonicalSnapshot(source: Snapshot) -> Snapshot {
             let owned = pool_store_operation_links[range.start..range.start + range.len];
             assert(blot_support::same_slice_identity(source.store_operation_links, owned));
             result.store_operation_links = owned;
-        }
-    }
-    {
-        let range = lease.store_quantifier_goals;
-        assert(range.start >= 0 && range.start <= pool_store_quantifier_goals.len);
-        assert(range.len >= 0 && range.len <= pool_store_quantifier_goals.len - range.start);
-        if range.len == 0 {
-            assert(source.store_quantifier_goals.len == 0);
-        } else {
-            let owned = pool_store_quantifier_goals[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_quantifier_goals, owned));
-            result.store_quantifier_goals = owned;
-        }
-    }
-    {
-        let range = lease.store_quantifier_obligations;
-        assert(range.start >= 0 && range.start <= pool_store_quantifier_obligations.len);
-        assert(range.len >= 0 && range.len <= pool_store_quantifier_obligations.len - range.start);
-        if range.len == 0 {
-            assert(source.store_quantifier_obligations.len == 0);
-        } else {
-            let owned = pool_store_quantifier_obligations[range.start..range.start + range.len];
-            assert(blot_support::same_slice_identity(source.store_quantifier_obligations, owned));
-            result.store_quantifier_obligations = owned;
         }
     }
     {
@@ -499,18 +469,6 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
         let first: const blot_check_types::OperationLink&  = run[0];
         lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
     }
-    if store.quantifier_goals.len != 0 {
-        let run = pool_store_quantifier_goals.alloc_slice(store.quantifier_goals.len);
-        for value, index in store.quantifier_goals.items { run[index] = value; }
-        let first: const blot_check_types::QuantifierGoals&  = run[0];
-        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len , ..}; result.store_quantifier_goals = run;
-    }
-    if store.quantifier_obligations.len != 0 {
-        let run = pool_store_quantifier_obligations.alloc_slice(store.quantifier_obligations.len);
-        for value, index in store.quantifier_obligations.items { run[index] = value; }
-        let first: const blot_check_types::Obligation&  = run[0];
-        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len , ..}; result.store_quantifier_obligations = run;
-    }
     if store.occurs_seen.len != 0 {
         let run = pool_store_occurs_seen.alloc_slice(store.occurs_seen.len);
         for value, index in store.occurs_seen.items { run[index] = value; }
@@ -602,8 +560,6 @@ fn suspendStore(store: blot_check_types::Store&) -> Snapshot, Error {
     store.versions.clear();
     store.operations.clear();
     store.operation_links.clear();
-    store.quantifier_goals.clear();
-    store.quantifier_obligations.clear();
     store.occurs_seen.clear();
     store.closed_row_index.clear();
     store.closed_operation_index.clear();
@@ -635,8 +591,6 @@ fn restoreStore(snapshot: Snapshot&, store: blot_check_types::Store&) -> Error {
     let error = store.versions.restore(snapshot.store_versions); if error != blot_error::Error.none { return error; }
     let error = store.operations.restore(snapshot.store_operations); if error != blot_error::Error.none { return error; }
     let error = store.operation_links.restore(snapshot.store_operation_links); if error != blot_error::Error.none { return error; }
-    let error = store.quantifier_goals.restore(snapshot.store_quantifier_goals); if error != blot_error::Error.none { return error; }
-    let error = store.quantifier_obligations.restore(snapshot.store_quantifier_obligations); if error != blot_error::Error.none { return error; }
     let error = store.occurs_seen.restore(snapshot.store_occurs_seen); if error != blot_error::Error.none { return error; }
     let error = store.closed_row_index.restore(snapshot.store_closed_row_index); if error != blot_error::Error.none { return error; }
     let error = store.closed_operation_index.restore(snapshot.store_closed_operation_index); if error != blot_error::Error.none { return error; }
@@ -707,8 +661,6 @@ fn deinit(snapshot: Snapshot&) -> Error {
     if lease.store_versions.len != 0 { pool_store_versions.free_slice(pool_store_versions[lease.store_versions.start..lease.store_versions.start + lease.store_versions.len]); }
     if lease.store_operations.len != 0 { pool_store_operations.free_slice(pool_store_operations[lease.store_operations.start..lease.store_operations.start + lease.store_operations.len]); }
     if lease.store_operation_links.len != 0 { pool_store_operation_links.free_slice(pool_store_operation_links[lease.store_operation_links.start..lease.store_operation_links.start + lease.store_operation_links.len]); }
-    if lease.store_quantifier_goals.len != 0 { pool_store_quantifier_goals.free_slice(pool_store_quantifier_goals[lease.store_quantifier_goals.start..lease.store_quantifier_goals.start + lease.store_quantifier_goals.len]); }
-    if lease.store_quantifier_obligations.len != 0 { pool_store_quantifier_obligations.free_slice(pool_store_quantifier_obligations[lease.store_quantifier_obligations.start..lease.store_quantifier_obligations.start + lease.store_quantifier_obligations.len]); }
     if lease.store_occurs_seen.len != 0 { pool_store_occurs_seen.free_slice(pool_store_occurs_seen[lease.store_occurs_seen.start..lease.store_occurs_seen.start + lease.store_occurs_seen.len]); }
     if lease.store_closed_row_index.len != 0 { pool_store_closed_row_index.free_slice(pool_store_closed_row_index[lease.store_closed_row_index.start..lease.store_closed_row_index.start + lease.store_closed_row_index.len]); }
     if lease.store_closed_operation_index.len != 0 { pool_store_closed_operation_index.free_slice(pool_store_closed_operation_index[lease.store_closed_operation_index.start..lease.store_closed_operation_index.start + lease.store_closed_operation_index.len]); }
@@ -730,8 +682,6 @@ fn deinit(snapshot: Snapshot&) -> Error {
     snapshot.store_versions = default<const blot_check_types::Version[:]>();
     snapshot.store_operations = default<const blot_check_types::Operation[:]>();
     snapshot.store_operation_links = default<const blot_check_types::OperationLink[:]>();
-    snapshot.store_quantifier_goals = default<const blot_check_types::QuantifierGoals[:]>();
-    snapshot.store_quantifier_obligations = default<const blot_check_types::Obligation[:]>();
     snapshot.store_occurs_seen = default<const u32[:]>();
     snapshot.store_closed_row_index = default<const blot_check_types::RowCertificate[:]>();
     snapshot.store_closed_operation_index = default<const blot_check_types::RowCertificate[:]>();
@@ -788,18 +738,6 @@ fn cloneSnapshot(source: const Snapshot&) -> Snapshot, Error {
         for value, index in source.store_operation_links { run[index] = value; }
         let first: const blot_check_types::OperationLink&  = run[0];
         lease.store_operation_links = Range { pool_store_operation_links.index_of(first), run.len , ..}; result.store_operation_links = run;
-    }
-    if source.store_quantifier_goals.len != 0 {
-        let run = pool_store_quantifier_goals.alloc_slice(source.store_quantifier_goals.len);
-        for value, index in source.store_quantifier_goals { run[index] = value; }
-        let first: const blot_check_types::QuantifierGoals&  = run[0];
-        lease.store_quantifier_goals = Range { pool_store_quantifier_goals.index_of(first), run.len , ..}; result.store_quantifier_goals = run;
-    }
-    if source.store_quantifier_obligations.len != 0 {
-        let run = pool_store_quantifier_obligations.alloc_slice(source.store_quantifier_obligations.len);
-        for value, index in source.store_quantifier_obligations { run[index] = value; }
-        let first: const blot_check_types::Obligation&  = run[0];
-        lease.store_quantifier_obligations = Range { pool_store_quantifier_obligations.index_of(first), run.len , ..}; result.store_quantifier_obligations = run;
     }
     if source.store_occurs_seen.len != 0 {
         let run = pool_store_occurs_seen.alloc_slice(source.store_occurs_seen.len);
@@ -902,10 +840,6 @@ fn snapshotOwnedBytes(snapshot: const Snapshot&) -> i64 {
     total += snapshot.store_operations.len * 24;
     if snapshot.store_operation_links.len > (9223372036854775807 - total) / 16 { return 9223372036854775807; }
     total += snapshot.store_operation_links.len * 16;
-    if snapshot.store_quantifier_goals.len > (9223372036854775807 - total) / 12 { return 9223372036854775807; }
-    total += snapshot.store_quantifier_goals.len * 12;
-    if snapshot.store_quantifier_obligations.len > (9223372036854775807 - total) / 48 { return 9223372036854775807; }
-    total += snapshot.store_quantifier_obligations.len * 48;
     if snapshot.store_occurs_seen.len > (9223372036854775807 - total) / 4 { return 9223372036854775807; }
     total += snapshot.store_occurs_seen.len * 4;
     if snapshot.store_closed_row_index.len > (9223372036854775807 - total) / 4 { return 9223372036854775807; }

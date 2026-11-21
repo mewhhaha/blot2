@@ -1,5898 +1,5050 @@
 {
- "note": "The wire format of dependency bundles: every type on the wire, in the order the codecs are emitted. Recorded from the Zig compiler's declarations on 15 November 2026, when it was removed; it is now edited by hand. tools/write_dependency_codecs.py reads it.",
- "roots": [
-  "reuse.dependency_format.Key",
-  "reuse.frozen_dependency.FrozenDependency",
-  "reuse.frozen_dependency.Module",
-  "reuse.principal_interface.Interface",
-  "check.core.Module",
-  "u8",
-  "u16",
-  "u32",
-  "u64",
-  "i8",
-  "i16",
-  "i32",
-  "i64",
-  "bool",
-  "f32",
-  "f64",
-  "[32]u8"
- ],
- "descriptors": [
-  {
-   "name": "reuse.dependency_format.Key",
-   "kind": "struct",
-   "goose": "blot_reuse_dependency_format::Key",
-   "fields": [
-    [
-     "compiler",
-     "[32]u8",
-     "compiler"
-    ],
-    [
-     "settings",
-     "[32]u8",
-     "settings"
-    ],
-    [
-     "source",
-     "[32]u8",
-     "source"
-    ],
-    [
-     "dependencies",
-     "[32]u8",
-     "dependencies"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "u8",
-   "kind": "primitive",
-   "goose": "u8",
-   "primitive": "u8"
-  },
-  {
-   "name": "[32]u8",
-   "kind": "array",
-   "goose": "u8[32]",
-   "children": [
-    "u8"
-   ],
-   "count": 32
-  },
-  {
-   "name": "reuse.frozen_dependency.FrozenDependency",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::FrozenDependency",
-   "fields": [
-    [
-     "symbols",
-     "[]reuse.frozen_dependency.Symbol",
-     "symbols"
-    ],
-    [
-     "modules",
-     "[]reuse.frozen_dependency.Module",
-     "modules"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.frozen_dependency.Symbol",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::Symbol",
-   "fields": [
-    [
-     "text",
-     "[]u8",
-     "text"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]u8",
-   "kind": "slice",
-   "goose": "u8[:]",
-   "children": [
-    "u8"
-   ]
-  },
-  {
-   "name": "[]reuse.frozen_dependency.Symbol",
-   "kind": "slice",
-   "goose": "blot_reuse_frozen_dependency::Symbol[:]",
-   "children": [
-    "reuse.frozen_dependency.Symbol"
-   ]
-  },
-  {
-   "name": "reuse.frozen_dependency.Module",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::Module",
-   "fields": [
-    [
-     "identity",
-     "reuse.frozen_dependency.Identity",
-     "identity"
-    ],
-    [
-     "imports",
-     "[]u32",
-     "imports"
-    ],
-    [
-     "implicit_prelude",
-     "bool",
-     "implicit_prelude"
-    ],
-    [
-     "source_imports",
-     "[]reuse.frozen_dependency.ImportResolution",
-     "source_imports"
-    ],
-    [
-     "core",
-     "check.core.Module",
-     "core"
-    ],
-    [
-     "interface",
-     "reuse.principal_interface.Interface",
-     "interface"
-    ],
-    [
-     "exports",
-     "[]reuse.frozen_dependency.Export",
-     "exports"
-    ],
-    [
-     "fixities",
-     "[]reuse.frozen_dependency.Fixity",
-     "fixities"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.frozen_dependency.Identity",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::Identity",
-   "fields": [
-    [
-     "normalized_path",
-     "[]u8",
-     "normalized_path"
-    ],
-    [
-     "source_digest",
-     "[32]u8",
-     "source_digest"
-    ],
-    [
-     "source_bytes",
-     "u32",
-     "source_bytes"
-    ],
-    [
-     "prelude",
-     "bool",
-     "prelude"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "u32",
-   "kind": "primitive",
-   "goose": "u32",
-   "primitive": "u32"
-  },
-  {
-   "name": "bool",
-   "kind": "primitive",
-   "goose": "bool",
-   "primitive": "bool"
-  },
-  {
-   "name": "[]u32",
-   "kind": "slice",
-   "goose": "u32[:]",
-   "children": [
-    "u32"
-   ]
-  },
-  {
-   "name": "reuse.frozen_dependency.ImportResolution",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::ImportResolution",
-   "fields": [
-    [
-     "path",
-     "[]u8",
-     "path"
-    ],
-    [
-     "target",
-     "u32",
-     "target"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.frozen_dependency.ImportResolution",
-   "kind": "slice",
-   "goose": "blot_reuse_frozen_dependency::ImportResolution[:]",
-   "children": [
-    "reuse.frozen_dependency.ImportResolution"
-   ]
-  },
-  {
-   "name": "check.core.Module",
-   "kind": "struct",
-   "goose": "blot_check_core::Module",
-   "fields": [
-    [
-     "has_rank_contracts",
-     "bool",
-     "has_rank_contracts"
-    ],
-    [
-     "has_usage_contracts",
-     "bool",
-     "has_usage_contracts"
-    ],
-    [
-     "has_numeric_proofs",
-     "bool",
-     "has_numeric_proofs"
-    ],
-    [
-     "proof_contracts",
-     "[]check.numeric_proof_headers.Named",
-     "proof_contracts"
-    ],
-    [
-     "capability_contracts",
-     "check.capability_contracts.Collection",
-     "capability_contracts"
-    ],
-    [
-     "field_names",
-     "[]check.core.FieldName",
-     "field_names"
-    ],
-    [
-     "runtime_names",
-     "[]check.core.RuntimeName",
-     "runtime_names"
-    ],
-    [
-     "source_names",
-     "[]check.core.RuntimeName",
-     "source_names"
-    ],
-    [
-     "request_loops",
-     "[]check.core.RequestLoopInfo",
-     "request_loops"
-    ],
-    [
-     "request_arms",
-     "[]check.core.RequestArm",
-     "request_arms"
-    ],
-    [
-     "tag_calls",
-     "[]u32",
-     "tag_calls"
-    ],
-    [
-     "unit",
-     "u32",
-     "unit"
-    ],
-    [
-     "types",
-     "check.core.Types",
-     "types"
-    ],
-    [
-     "nodes",
-     "[]check.core.Node",
-     "nodes"
-    ],
-    [
-     "spans",
-     "[]parse.ast.Span",
-     "spans"
-    ],
-    [
-     "extra",
-     "[]u32",
-     "extra"
-    ],
-    [
-     "bindings",
-     "[]check.core.Binding",
-     "bindings"
-    ],
-    [
-     "bodies",
-     "[]check.core.Body",
-     "bodies"
-    ],
-    [
-     "parameters",
-     "[]check.core.Parameter",
-     "parameters"
-    ],
-    [
-     "references",
-     "[]check.core.BindingRef",
-     "references"
-    ],
-    [
-     "calls",
-     "[]check.core.CallInfo",
-     "calls"
-    ],
-    [
-     "merges",
-     "[]check.core.Merge",
-     "merges"
-    ],
-    [
-     "merge_ranges",
-     "[]check.core.List",
-     "merge_ranges"
-    ],
-    [
-     "names",
-     "[]u8",
-     "names"
-    ],
-    [
-     "obligations",
-     "[]check.core.Obligation",
-     "obligations"
-    ],
-    [
-     "nominals",
-     "[]check.core.Nominal",
-     "nominals"
-    ],
-    [
-     "operation_names",
-     "[]check.core.OperationName",
-     "operation_names"
-    ],
-    [
-     "constructors",
-     "[]check.core.Constructor",
-     "constructors"
-    ],
-    [
-     "projections",
-     "[]check.core.Projection",
-     "projections"
-    ],
-    [
-     "projection_variants",
-     "[]check.core.ProjectionVariant",
-     "projection_variants"
-    ],
-    [
-     "patterns",
-     "[]check.core.Pattern",
-     "patterns"
-    ],
-    [
-     "pattern_rows",
-     "[]check.core.PatternRow",
-     "pattern_rows"
-    ],
-    [
-     "match_arms",
-     "[]check.core.MatchArm",
-     "match_arms"
-    ],
-    [
-     "matches",
-     "[]check.core.MatchInfo",
-     "matches"
-    ],
-    [
-     "updates",
-     "[]check.core.UpdateInfo",
-     "updates"
-    ],
-    [
-     "update_steps",
-     "[]check.core.UpdateStep",
-     "update_steps"
-    ],
-    [
-     "closures",
-     "[]check.core.ClosureInfo",
-     "closures"
-    ],
-    [
-     "associated",
-     "[]check.core.Associated",
-     "associated"
-    ],
-    [
-     "contracts",
-     "[]check.core.Contract",
-     "contracts"
-    ],
-    [
-     "contract_members",
-     "[]reuse.principal_interface.ContractMember",
-     "contract_members"
-    ],
-    [
-     "implementations",
-     "[]reuse.principal_interface.Implementation",
-     "implementations"
-    ],
-    [
-     "implementation_members",
-     "[]reuse.principal_interface.ImplementationMember",
-     "implementation_members"
-    ],
-    [
-     "member_templates",
-     "[]reuse.principal_interface.MemberTemplate",
-     "member_templates"
-    ],
-    [
-     "selected_proofs",
-     "[]reuse.principal_interface.SelectedProof",
-     "selected_proofs"
-    ],
-    [
-     "selected_members",
-     "[]reuse.principal_interface.ImplementationMember",
-     "selected_members"
-    ],
-    [
-     "selected_edges",
-     "[]u32",
-     "selected_edges"
-    ],
-    [
-     "selected_uses",
-     "[]check.core.SelectedUse",
-     "selected_uses"
-    ],
-    [
-     "dictionary_selections",
-     "[]check.core.DictionarySelection",
-     "dictionary_selections"
-    ],
-    [
-     "dictionary_uses",
-     "[]check.core.DictionaryUse",
-     "dictionary_uses"
-    ],
-    [
-     "primitives",
-     "[]check.core.Primitive",
-     "primitives"
-    ],
-    [
-     "loops",
-     "[]check.core.LoopInfo",
-     "loops"
-    ],
-    [
-     "loop_carries",
-     "[]check.core.LoopCarry",
-     "loop_carries"
-    ],
-    [
-     "resolver_ops",
-     "[]check.core.ResolverInfo",
-     "resolver_ops"
-    ],
-    [
-     "operation_values",
-     "[]check.core.OperationValue",
-     "operation_values"
-    ],
-    [
-     "handle_effects",
-     "[]check.core.HandleEffects",
-     "handle_effects"
-    ],
-    [
-     "dispatch_signatures",
-     "[]u32",
-     "dispatch_signatures"
-    ],
-    [
-     "type_tags",
-     "[]check.core.TypeTag",
-     "type_tags"
-    ],
-    [
-     "diagnostics",
-     "[]check.core.Diagnostic",
-     "diagnostics"
-    ],
-    [
-     "body_lowerings",
-     "usize",
-     "body_lowerings"
-    ]
-   ],
-   "unwired": [
-    "owner_id",
-    "declaration_dependencies",
-    "dependency_references",
-    "dependency_members",
-    "erased_declaration_references",
-    "package_payloads"
-   ]
-  },
-  {
-   "name": "check.numeric_proof_headers.Named",
-   "kind": "struct",
-   "goose": "blot_check_numeric_proof_headers::Named",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "header",
-     "check.numeric_proof_headers.Owned",
-     "header"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.numeric_proof_headers.Owned",
-   "kind": "struct",
-   "goose": "blot_check_numeric_proof_headers::Owned",
-   "fields": [
-    [
-     "arity",
-     "u32",
-     "arity"
-    ],
-    [
-     "value_slots",
-     "[]const u32",
-     "value_slots"
-    ],
-    [
-     "proof_slots",
-     "[]const u32",
-     "proof_slots"
-    ],
-    [
-     "values",
-     "[]const check.numeric_proof_terms.Kind",
-     "values"
-    ],
-    [
-     "operands",
-     "[]const check.numeric_proof_terms.Term",
-     "operands"
-    ],
-    [
-     "requirements",
-     "[]const check.numeric_proof_contracts.Requirement",
-     "requirements"
-    ],
-    [
-     "result",
-     "?check.numeric_proof_terms.Proposition",
-     "result"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]const u32",
-   "kind": "slice",
-   "goose": "u32[:]",
-   "children": [
-    "u32"
-   ]
-  },
-  {
-   "name": "check.numeric_proof_terms.Kind",
-   "kind": "enum",
-   "goose": "blot_check_numeric_proof_terms::Kind",
-   "variants": [
-    [
-     "u32",
-     0,
-     "unsigned32"
-    ],
-    [
-     "array",
-     1,
-     "array"
-    ],
-    [
-     "list",
-     2,
-     "list"
-    ]
-   ]
-  },
-  {
-   "name": "[]const check.numeric_proof_terms.Kind",
-   "kind": "slice",
-   "goose": "blot_check_numeric_proof_terms::Kind[:]",
-   "children": [
-    "check.numeric_proof_terms.Kind"
-   ]
-  },
-  {
-   "name": "check.numeric_proof_terms.Term",
-   "kind": "struct",
-   "goose": "blot_check_numeric_proof_terms::Term",
-   "fields": [
-    [
-     "tag",
-     "check.numeric_proof_terms.Tag",
-     "tag"
-    ],
-    [
-     "kind",
-     "check.numeric_proof_terms.Kind",
-     "kind"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.numeric_proof_terms.Tag",
-   "kind": "enum",
-   "goose": "blot_check_numeric_proof_terms::Tag",
-   "variants": [
-    [
-     "literal",
-     0,
-     "literal"
-    ],
-    [
-     "formal",
-     1,
-     "formal"
-    ],
-    [
-     "capture",
-     2,
-     "capture"
-    ],
-    [
-     "version",
-     3,
-     "version"
-    ],
-    [
-     "length",
-     4,
-     "length"
-    ],
-    [
-     "complement",
-     5,
-     "complement"
-    ]
-   ]
-  },
-  {
-   "name": "[]const check.numeric_proof_terms.Term",
-   "kind": "slice",
-   "goose": "blot_check_numeric_proof_terms::Term[:]",
-   "children": [
-    "check.numeric_proof_terms.Term"
-   ]
-  },
-  {
-   "name": "check.numeric_proof_contracts.Requirement",
-   "kind": "struct",
-   "goose": "blot_check_numeric_proof_contracts::Requirement",
-   "fields": [
-    [
-     "before",
-     "u32",
-     "before"
-    ],
-    [
-     "proposition",
-     "check.numeric_proof_terms.Proposition",
-     "proposition"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.numeric_proof_terms.Proposition",
-   "kind": "struct",
-   "goose": "blot_check_numeric_proof_terms::Proposition",
-   "fields": [
-    [
-     "relation",
-     "check.numeric_proof_terms.Relation",
-     "relation"
-    ],
-    [
-     "left",
-     "u32",
-     "left"
-    ],
-    [
-     "right",
-     "u32",
-     "right"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.numeric_proof_terms.Relation",
-   "kind": "enum",
-   "goose": "blot_check_numeric_proof_terms::Relation",
-   "variants": [
-    [
-     "eq",
-     0,
-     "eq"
-    ],
-    [
-     "lt",
-     1,
-     "lt"
-    ],
-    [
-     "le",
-     2,
-     "le"
-    ],
-    [
-     "add_fits",
-     3,
-     "add_fits"
-    ],
-    [
-     "sub_fits",
-     4,
-     "sub_fits"
-    ],
-    [
-     "index",
-     5,
-     "index"
-    ]
-   ]
-  },
-  {
-   "name": "[]const check.numeric_proof_contracts.Requirement",
-   "kind": "slice",
-   "goose": "blot_check_numeric_proof_contracts::Requirement[:]",
-   "children": [
-    "check.numeric_proof_contracts.Requirement"
-   ]
-  },
-  {
-   "name": "?check.numeric_proof_terms.Proposition",
-   "kind": "optional",
-   "goose": "blot_support::Option<blot_check_numeric_proof_terms::Proposition>",
-   "children": [
-    "check.numeric_proof_terms.Proposition"
-   ]
-  },
-  {
-   "name": "[]check.numeric_proof_headers.Named",
-   "kind": "slice",
-   "goose": "blot_check_numeric_proof_headers::Named[:]",
-   "children": [
-    "check.numeric_proof_headers.Named"
-   ]
-  },
-  {
-   "name": "check.capability_contracts.Collection",
-   "kind": "struct",
-   "goose": "blot_check_capability_contracts::Collection",
-   "fields": [
-    [
-     "nodes",
-     "[]check.capability_contracts.Term",
-     "nodes"
-    ],
-    [
-     "words",
-     "[]u32",
-     "words"
-    ],
-    [
-     "bindings",
-     "[]check.capability_contracts.Binding",
-     "bindings"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.capability_contracts.Term",
-   "kind": "struct",
-   "goose": "blot_check_capability_contracts::Term",
-   "fields": [
-    [
-     "tag",
-     "check.capability_contracts.Tag",
-     "tag"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ],
-    [
-     "c",
-     "u32",
-     "c"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.capability_contracts.Tag",
-   "kind": "enum",
-   "goose": "blot_check_capability_contracts::Tag",
-   "variants": [
-    [
-     "empty",
-     0,
-     "empty"
-    ],
-    [
-     "unknown",
-     1,
-     "unknown"
-    ],
-    [
-     "parameter",
-     2,
-     "parameter"
-    ],
-    [
-     "authority",
-     3,
-     "authority"
-    ],
-    [
-     "captures",
-     4,
-     "captures"
-    ],
-    [
-     "product",
-     5,
-     "product"
-    ],
-    [
-     "record",
-     6,
-     "record"
-    ],
-    [
-     "wrapped",
-     7,
-     "wrapped"
-    ],
-    [
-     "join",
-     8,
-     "join"
-    ],
-    [
-     "project",
-     9,
-     "project"
-    ],
-    [
-     "elements",
-     10,
-     "elements"
-    ],
-    [
-     "argument",
-     11,
-     "argument"
-    ],
-    [
-     "callable",
-     12,
-     "callable"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.capability_contracts.Term",
-   "kind": "slice",
-   "goose": "blot_check_capability_contracts::Term[:]",
-   "children": [
-    "check.capability_contracts.Term"
-   ]
-  },
-  {
-   "name": "check.capability_contracts.Binding",
-   "kind": "struct",
-   "goose": "blot_check_capability_contracts::Binding",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "root",
-     "u32",
-     "root"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.capability_contracts.Binding",
-   "kind": "slice",
-   "goose": "blot_check_capability_contracts::Binding[:]",
-   "children": [
-    "check.capability_contracts.Binding"
-   ]
-  },
-  {
-   "name": "check.core.FieldName",
-   "kind": "struct",
-   "goose": "blot_check_core::FieldName",
-   "fields": [
-    [
-     "symbol",
-     "u32",
-     "symbol"
-    ],
-    [
-     "spelling",
-     "check.core.Name",
-     "spelling"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.Name",
-   "kind": "struct",
-   "goose": "blot_check_core::Name",
-   "fields": [
-    [
-     "start",
-     "u32",
-     "start"
-    ],
-    [
-     "len",
-     "u32",
-     "len"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.FieldName",
-   "kind": "slice",
-   "goose": "blot_check_core::FieldName[:]",
-   "children": [
-    "check.core.FieldName"
-   ]
-  },
-  {
-   "name": "check.core.RuntimeName",
-   "kind": "struct",
-   "goose": "blot_check_core::RuntimeName",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "point",
-     "u32",
-     "point"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.RuntimeName",
-   "kind": "slice",
-   "goose": "blot_check_core::RuntimeName[:]",
-   "children": [
-    "check.core.RuntimeName"
-   ]
-  },
-  {
-   "name": "check.core.RequestLoopInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::RequestLoopInfo",
-   "fields": [
-    [
-     "computation",
-     "u32",
-     "computation"
-    ],
-    [
-     "action_type",
-     "u32",
-     "action_type"
-    ],
-    [
-     "value_type",
-     "u32",
-     "value_type"
-    ],
-    [
-     "result_type",
-     "u32",
-     "result_type"
-    ],
-    [
-     "state_type",
-     "u32",
-     "state_type"
-    ],
-    [
-     "arms",
-     "check.core.List",
-     "arms"
-    ],
-    [
-     "completion_pattern",
-     "u32",
-     "completion_pattern"
-    ],
-    [
-     "completion_body",
-     "u32",
-     "completion_body"
-    ],
-    [
-     "completion_state_bindings",
-     "check.core.List",
-     "completion_state_bindings"
-    ],
-    [
-     "carries",
-     "check.core.List",
-     "carries"
-    ],
-    [
-     "return_target",
-     "u32",
-     "return_target"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.List",
-   "kind": "struct",
-   "goose": "blot_check_core::List",
-   "fields": [
-    [
-     "start",
-     "u32",
-     "start"
-    ],
-    [
-     "len",
-     "u32",
-     "len"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.RequestLoopInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::RequestLoopInfo[:]",
-   "children": [
-    "check.core.RequestLoopInfo"
-   ]
-  },
-  {
-   "name": "check.core.RequestArm",
-   "kind": "struct",
-   "goose": "blot_check_core::RequestArm",
-   "fields": [
-    [
-     "operation",
-     "u32",
-     "operation"
-    ],
-    [
-     "callback",
-     "u32",
-     "callback"
-    ],
-    [
-     "selector",
-     "u32",
-     "selector"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.RequestArm",
-   "kind": "slice",
-   "goose": "blot_check_core::RequestArm[:]",
-   "children": [
-    "check.core.RequestArm"
-   ]
-  },
-  {
-   "name": "check.core.Types",
-   "kind": "struct",
-   "goose": "blot_check_core::Types",
-   "fields": [
-    [
-     "nodes",
-     "[]check.types.Node",
-     "nodes"
-    ],
-    [
-     "extra",
-     "[]u32",
-     "extra"
-    ],
-    [
-     "effects",
-     "check.core.EffectRows",
-     "effects"
-    ],
-    [
-     "operations",
-     "[]check.types.Operation",
-     "operations"
-    ],
-    [
-     "quantifier_goals",
-     "[]check.types.QuantifierGoals",
-     "quantifier_goals"
-    ],
-    [
-     "quantifier_obligations",
-     "[]check.types.Obligation",
-     "quantifier_obligations"
-    ]
-   ],
-   "unwired": [
-    "owner_id"
-   ]
-  },
-  {
-   "name": "check.types.Node",
-   "kind": "struct",
-   "goose": "blot_check_types::Node",
-   "fields": [
-    [
-     "tag",
-     "check.types.Tag",
-     "tag"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ],
-    [
-     "c",
-     "u32",
-     "c"
-    ]
-   ],
-   "unwired": [
-    "closed_height",
-    "closed_generation"
-   ]
-  },
-  {
-   "name": "check.types.Tag",
-   "kind": "enum",
-   "goose": "blot_check_types::Tag",
-   "variants": [
-    [
-     "absent",
-     0,
-     "absent"
-    ],
-    [
-     "unit",
-     1,
-     "unit"
-    ],
-    [
-     "boolean",
-     2,
-     "boolean"
-    ],
-    [
-     "u32",
-     3,
-     "unsigned32"
-    ],
-    [
-     "f32",
-     4,
-     "floating32"
-    ],
-    [
-     "never",
-     5,
-     "never"
-    ],
-    [
-     "variable",
-     6,
-     "variable"
-    ],
-    [
-     "function",
-     7,
-     "function"
-    ],
-    [
-     "product",
-     8,
-     "product"
-    ],
-    [
-     "record",
-     9,
-     "record"
-    ],
-    [
-     "nominal",
-     10,
-     "nominal"
-    ],
-    [
-     "array",
-     11,
-     "array"
-    ],
-    [
-     "list",
-     12,
-     "list"
-    ],
-    [
-     "cursor",
-     13,
-     "cursor"
-    ],
-    [
-     "type_constructor",
-     14,
-     "type_constructor"
-    ],
-    [
-     "resolver",
-     15,
-     "resolver"
-    ],
-    [
-     "provider",
-     16,
-     "provider"
-    ],
-    [
-     "state_provider",
-     17,
-     "state_provider"
-    ],
-    [
-     "projection",
-     18,
-     "projection"
-    ],
-    [
-     "scoped",
-     19,
-     "scoped"
-    ],
-    [
-     "instance_selection",
-     20,
-     "instance_selection"
-    ],
-    [
-     "erased_proof",
-     21,
-     "erased_proof"
-    ],
-    [
-     "forall",
-     22,
-     "forall"
-    ],
-    [
-     "existential",
-     23,
-     "existential"
-    ],
-    [
-     "bound",
-     24,
-     "bound"
-    ],
-    [
-     "rigid",
-     25,
-     "rigid"
-    ],
-    [
-     "usage",
-     26,
-     "usage"
-    ],
-    [
-     "instance_version",
-     27,
-     "instance_version"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.types.Node",
-   "kind": "slice",
-   "goose": "blot_check_types::Node[:]",
-   "children": [
-    "check.types.Node"
-   ]
-  },
-  {
-   "name": "check.core.EffectRows",
-   "kind": "struct",
-   "goose": "blot_check_core::EffectRows",
-   "fields": [
-    [
-     "rows",
-     "[]check.effects.Row",
-     "rows"
-    ],
-    [
-     "labels",
-     "[]u32",
-     "labels"
-    ],
-    [
-     "variable_count",
-     "u32",
-     "variable_count"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.effects.Row",
-   "kind": "struct",
-   "goose": "blot_check_effects::Row",
-   "fields": [
-    [
-     "labels",
-     "check.effects.List",
-     "labels"
-    ],
-    [
-     "tail",
-     "check.effects.Tail",
-     "tail"
-    ],
-    [
-     "cursor",
-     "u32",
-     "cursor"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.effects.List",
-   "kind": "struct",
-   "goose": "blot_check_effects::List",
-   "fields": [
-    [
-     "start",
-     "u32",
-     "start"
-    ],
-    [
-     "len",
-     "u32",
-     "len"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.effects.Tail",
-   "kind": "union",
-   "goose": "blot_check_effects::Tail",
-   "variants": [
-    [
-     "closed",
-     0,
-     "closed",
-     "void",
-     []
-    ],
-    [
-     "variable",
-     1,
-     "variable",
-     "u32",
-     [
-      [
-       "value",
-       "u32"
+  "note": "The wire format of dependency bundles: every type on the wire, in the order the codecs are emitted. Recorded from the Zig compiler's declarations on 15 November 2026, when it was removed; it is now edited by hand. tools/write_dependency_codecs.py reads it.",
+  "roots": [
+    "reuse.dependency_format.Key",
+    "reuse.frozen_dependency.FrozenDependency",
+    "reuse.frozen_dependency.Module",
+    "reuse.principal_interface.Interface",
+    "check.core.Module",
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "bool",
+    "f32",
+    "f64",
+    "[32]u8"
+  ],
+  "descriptors": [
+    {
+      "name": "reuse.dependency_format.Key",
+      "kind": "struct",
+      "goose": "blot_reuse_dependency_format::Key",
+      "fields": [
+        [
+          "compiler",
+          "[32]u8",
+          "compiler"
+        ],
+        [
+          "settings",
+          "[32]u8",
+          "settings"
+        ],
+        [
+          "source",
+          "[32]u8",
+          "source"
+        ],
+        [
+          "dependencies",
+          "[32]u8",
+          "dependencies"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "u8",
+      "kind": "primitive",
+      "goose": "u8",
+      "primitive": "u8"
+    },
+    {
+      "name": "[32]u8",
+      "kind": "array",
+      "goose": "u8[32]",
+      "children": [
+        "u8"
+      ],
+      "count": 32
+    },
+    {
+      "name": "reuse.frozen_dependency.FrozenDependency",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::FrozenDependency",
+      "fields": [
+        [
+          "symbols",
+          "[]reuse.frozen_dependency.Symbol",
+          "symbols"
+        ],
+        [
+          "modules",
+          "[]reuse.frozen_dependency.Module",
+          "modules"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.frozen_dependency.Symbol",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::Symbol",
+      "fields": [
+        [
+          "text",
+          "[]u8",
+          "text"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]u8",
+      "kind": "slice",
+      "goose": "u8[:]",
+      "children": [
+        "u8"
       ]
-     ]
-    ],
-    [
-     "parameter",
-     2,
-     "parameter",
-     "u32",
-     [
-      [
-       "value",
-       "u32"
+    },
+    {
+      "name": "[]reuse.frozen_dependency.Symbol",
+      "kind": "slice",
+      "goose": "blot_reuse_frozen_dependency::Symbol[:]",
+      "children": [
+        "reuse.frozen_dependency.Symbol"
       ]
-     ]
-    ],
-    [
-     "formal",
-     3,
-     "formal",
-     "u32",
-     [
-      [
-       "value",
-       "u32"
+    },
+    {
+      "name": "reuse.frozen_dependency.Module",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::Module",
+      "fields": [
+        [
+          "identity",
+          "reuse.frozen_dependency.Identity",
+          "identity"
+        ],
+        [
+          "imports",
+          "[]u32",
+          "imports"
+        ],
+        [
+          "implicit_prelude",
+          "bool",
+          "implicit_prelude"
+        ],
+        [
+          "source_imports",
+          "[]reuse.frozen_dependency.ImportResolution",
+          "source_imports"
+        ],
+        [
+          "core",
+          "check.core.Module",
+          "core"
+        ],
+        [
+          "interface",
+          "reuse.principal_interface.Interface",
+          "interface"
+        ],
+        [
+          "exports",
+          "[]reuse.frozen_dependency.Export",
+          "exports"
+        ],
+        [
+          "fixities",
+          "[]reuse.frozen_dependency.Fixity",
+          "fixities"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.frozen_dependency.Identity",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::Identity",
+      "fields": [
+        [
+          "normalized_path",
+          "[]u8",
+          "normalized_path"
+        ],
+        [
+          "source_digest",
+          "[32]u8",
+          "source_digest"
+        ],
+        [
+          "source_bytes",
+          "u32",
+          "source_bytes"
+        ],
+        [
+          "prelude",
+          "bool",
+          "prelude"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "u32",
+      "kind": "primitive",
+      "goose": "u32",
+      "primitive": "u32"
+    },
+    {
+      "name": "bool",
+      "kind": "primitive",
+      "goose": "bool",
+      "primitive": "bool"
+    },
+    {
+      "name": "[]u32",
+      "kind": "slice",
+      "goose": "u32[:]",
+      "children": [
+        "u32"
       ]
-     ]
-    ]
-   ],
-   "tag": "@typeInfo(check.effects.Tail).@\"union\".tag_type.?"
-  },
-  {
-   "name": "@typeInfo(check.effects.Tail).@\"union\".tag_type.?",
-   "kind": "union_tag",
-   "goose": "u32",
-   "variants": [
-    [
-     "closed",
-     0,
-     "closed"
-    ],
-    [
-     "variable",
-     1,
-     "variable"
-    ],
-    [
-     "parameter",
-     2,
-     "parameter"
-    ],
-    [
-     "formal",
-     3,
-     "formal"
-    ]
-   ]
-  },
-  {
-   "name": "void",
-   "kind": "primitive",
-   "goose": "Void",
-   "primitive": "void"
-  },
-  {
-   "name": "[]check.effects.Row",
-   "kind": "slice",
-   "goose": "blot_check_effects::Row[:]",
-   "children": [
-    "check.effects.Row"
-   ]
-  },
-  {
-   "name": "check.types.Operation",
-   "kind": "struct",
-   "goose": "blot_check_types::Operation",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "arguments",
-     "check.types.List",
-     "arguments"
-    ],
-    [
-     "instance",
-     "check.types.NominalIdentity",
-     "instance"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.types.NominalIdentity",
-   "kind": "struct",
-   "goose": "blot_check_types::NominalIdentity",
-   "fields": [
-    [
-     "unit",
-     "u32",
-     "unit"
-    ],
-    [
-     "decl",
-     "u32",
-     "decl"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.types.List",
-   "kind": "struct",
-   "goose": "blot_check_types::List",
-   "fields": [
-    [
-     "start",
-     "u32",
-     "start"
-    ],
-    [
-     "len",
-     "u32",
-     "len"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.types.Operation",
-   "kind": "slice",
-   "goose": "blot_check_types::Operation[:]",
-   "children": [
-    "check.types.Operation"
-   ]
-  },
-  {
-   "name": "check.types.QuantifierGoals",
-   "kind": "struct",
-   "goose": "blot_check_types::QuantifierGoals",
-   "fields": [
-    [
-     "owner",
-     "u32",
-     "owner"
-    ],
-    [
-     "goals",
-     "check.types.List",
-     "goals"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.types.QuantifierGoals",
-   "kind": "slice",
-   "goose": "blot_check_types::QuantifierGoals[:]",
-   "children": [
-    "check.types.QuantifierGoals"
-   ]
-  },
-  {
-   "name": "check.types.Obligation",
-   "kind": "struct",
-   "goose": "blot_check_types::Obligation",
-   "fields": [
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "kind",
-     "check.types.ObligationKind",
-     "kind"
-    ],
-    [
-     "source",
-     "u32",
-     "source"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "result",
-     "u32",
-     "result"
-    ],
-    [
-     "other",
-     "u32",
-     "other"
-    ],
-    [
-     "signature",
-     "u32",
-     "signature"
-    ],
-    [
-     "operator",
-     "check.types.Operator",
-     "operator"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "explicit",
-     "bool",
-     "explicit"
-    ],
-    [
-     "qualification_span",
-     "?parse.ast.Span",
-     "qualification_span"
-    ],
-    [
-     "qualification_unit",
-     "u32",
-     "qualification_unit"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.types.ObligationKind",
-   "kind": "enum",
-   "goose": "blot_check_types::ObligationKind",
-   "variants": [
-    [
-     "arithmetic",
-     0,
-     "arithmetic"
-    ],
-    [
-     "ordered",
-     1,
-     "ordered"
-    ],
-    [
-     "equality",
-     2,
-     "equality"
-    ],
-    [
-     "integer",
-     3,
-     "integer"
-    ],
-    [
-     "field",
-     4,
-     "field"
-    ],
-    [
-     "writable_field",
-     5,
-     "writable_field"
-    ],
-    [
-     "dispatch",
-     6,
-     "dispatch"
-    ],
-    [
-     "result_dispatch",
-     7,
-     "result_dispatch"
-    ],
-    [
-     "monad_factory",
-     8,
-     "monad_factory"
-    ],
-    [
-     "resolver_dispatch",
-     9,
-     "resolver_dispatch"
-    ],
-    [
-     "resolver_shape",
-     10,
-     "resolver_shape"
-    ],
-    [
-     "effect_operation",
-     11,
-     "effect_operation"
-    ],
-    [
-     "effect_handler",
-     12,
-     "effect_handler"
-    ],
-    [
-     "receiver",
-     13,
-     "receiver"
-    ],
-    [
-     "update",
-     14,
-     "update"
-    ],
-    [
-     "type_rep",
-     15,
-     "type_rep"
-    ],
-    [
-     "effect_rep",
-     16,
-     "effect_rep"
-    ],
-    [
-     "type_head",
-     17,
-     "type_head"
-    ],
-    [
-     "collection",
-     18,
-     "collection"
-    ],
-    [
-     "record_merge",
-     19,
-     "record_merge"
-    ],
-    [
-     "callee_use",
-     20,
-     "callee_use"
-    ],
-    [
-     "type_eq",
-     21,
-     "type_eq"
-    ],
-    [
-     "contract",
-     22,
-     "contract"
-    ],
-    [
-     "task_receive",
-     23,
-     "task_receive"
-    ]
-   ]
-  },
-  {
-   "name": "check.types.Operator",
-   "kind": "enum",
-   "goose": "blot_check_types::Operator",
-   "variants": [
-    [
-     "none",
-     0,
-     "none"
-    ],
-    [
-     "add",
-     1,
-     "add"
-    ],
-    [
-     "sub",
-     2,
-     "sub"
-    ],
-    [
-     "mul",
-     3,
-     "mul"
-    ],
-    [
-     "div",
-     4,
-     "div"
-    ],
-    [
-     "rem",
-     5,
-     "rem"
-    ],
-    [
-     "equal",
-     6,
-     "equal"
-    ],
-    [
-     "not_equal",
-     7,
-     "not_equal"
-    ],
-    [
-     "less",
-     8,
-     "less"
-    ],
-    [
-     "less_equal",
-     9,
-     "less_equal"
-    ],
-    [
-     "greater",
-     10,
-     "greater"
-    ],
-    [
-     "greater_equal",
-     11,
-     "greater_equal"
-    ],
-    [
-     "bit_and",
-     12,
-     "bit_and"
-    ],
-    [
-     "bit_or",
-     13,
-     "bit_or"
-    ],
-    [
-     "bit_xor",
-     14,
-     "bit_xor"
-    ],
-    [
-     "shift_left",
-     15,
-     "shift_left"
-    ],
-    [
-     "shift_right",
-     16,
-     "shift_right"
-    ]
-   ]
-  },
-  {
-   "name": "parse.ast.Span",
-   "kind": "struct",
-   "goose": "blot_parse_ast::Span",
-   "fields": [
-    [
-     "start",
-     "u32",
-     "start"
-    ],
-    [
-     "end",
-     "u32",
-     "end"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "?parse.ast.Span",
-   "kind": "optional",
-   "goose": "blot_support::Option<blot_parse_ast::Span>",
-   "children": [
-    "parse.ast.Span"
-   ]
-  },
-  {
-   "name": "[]check.types.Obligation",
-   "kind": "slice",
-   "goose": "blot_check_types::Obligation[:]",
-   "children": [
-    "check.types.Obligation"
-   ]
-  },
-  {
-   "name": "check.core.Node",
-   "kind": "struct",
-   "goose": "blot_check_core::Node",
-   "fields": [
-    [
-     "tag",
-     "check.core.Tag",
-     "tag"
-    ],
-    [
-     "op",
-     "check.core.Op",
-     "op"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ],
-    [
-     "c",
-     "u32",
-     "c"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.Tag",
-   "kind": "enum",
-   "goose": "blot_check_core::Tag",
-   "variants": [
-    [
-     "invalid",
-     0,
-     "invalid"
-    ],
-    [
-     "constant",
-     1,
-     "constant"
-    ],
-    [
-     "reference",
-     2,
-     "reference"
-    ],
-    [
-     "scalar",
-     3,
-     "scalar"
-    ],
-    [
-     "logical",
-     4,
-     "logical"
-    ],
-    [
-     "call",
-     5,
-     "call"
-    ],
-    [
-     "if_value",
-     6,
-     "if_value"
-    ],
-    [
-     "block",
-     7,
-     "block_"
-    ],
-    [
-     "suite",
-     8,
-     "suite"
-    ],
-    [
-     "bind",
-     9,
-     "bind"
-    ],
-    [
-     "return_",
-     10,
-     "return_"
-    ],
-    [
-     "if_stmt",
-     11,
-     "if_stmt"
-    ],
-    [
-     "product",
-     12,
-     "product"
-    ],
-    [
-     "record",
-     13,
-     "record"
-    ],
-    [
-     "construct",
-     14,
-     "construct"
-    ],
-    [
-     "project",
-     15,
-     "project"
-    ],
-    [
-     "match",
-     16,
-     "match_"
-    ],
-    [
-     "pattern_bind",
-     17,
-     "pattern_bind"
-    ],
-    [
-     "update",
-     18,
-     "update"
-    ],
-    [
-     "array",
-     19,
-     "array"
-    ],
-    [
-     "array_op",
-     20,
-     "array_op"
-    ],
-    [
-     "closure",
-     21,
-     "closure"
-    ],
-    [
-     "apply",
-     22,
-     "apply"
-    ],
-    [
-     "constructor_function",
-     23,
-     "constructor_function"
-    ],
-    [
-     "associated",
-     24,
-     "associated"
-    ],
-    [
-     "primitive_function",
-     25,
-     "primitive_function"
-    ],
-    [
-     "panic",
-     26,
-     "panic"
-    ],
-    [
-     "loop",
-     27,
-     "loop_"
-    ],
-    [
-     "break_",
-     28,
-     "break_"
-    ],
-    [
-     "type_same",
-     29,
-     "type_same"
-    ],
-    [
-     "result_associated",
-     30,
-     "result_associated"
-    ],
-    [
-     "type_constructor",
-     31,
-     "type_constructor"
-    ],
-    [
-     "resolver_op",
-     32,
-     "resolver_op"
-    ],
-    [
-     "operation_value",
-     33,
-     "operation_value"
-    ],
-    [
-     "effect_provider",
-     34,
-     "effect_provider"
-    ],
-    [
-     "state_provider",
-     35,
-     "state_provider"
-    ],
-    [
-     "handle",
-     36,
-     "handle"
-    ],
-    [
-     "effect_reflection",
-     37,
-     "effect_reflection"
-    ],
-    [
-     "computation",
-     38,
-     "computation"
-    ],
-    [
-     "request_loop",
-     39,
-     "request_loop"
-    ],
-    [
-     "request_decision",
-     40,
-     "request_decision"
-    ],
-    [
-     "record_merge",
-     41,
-     "record_merge"
-    ],
-    [
-     "contract_method",
-     42,
-     "contract_method"
-    ],
-    [
-     "effect_scope",
-     43,
-     "effect_scope"
-    ],
-    [
-     "proof_guard",
-     44,
-     "proof_guard"
-    ],
-    [
-     "package_pack",
-     45,
-     "package_pack"
-    ],
-    [
-     "package_unpack",
-     46,
-     "package_unpack"
-    ],
-    [
-     "staging",
-     47,
-     "staging"
-    ],
-    [
-     "usage_borrow",
-     48,
-     "usage_borrow"
-    ],
-    [
-     "usage_read",
-     49,
-     "usage_read"
-    ],
-    [
-     "resource_scope",
-     50,
-     "resource_scope"
-    ],
-    [
-     "usage_share",
-     51,
-     "usage_share"
-    ],
-    [
-     "resource_acquire",
-     52,
-     "resource_acquire"
-    ],
-    [
-     "resource_release",
-     53,
-     "resource_release"
-    ],
-    [
-     "task",
-     54,
-     "task"
-    ],
-    [
-     "storage",
-     55,
-     "storage"
-    ],
-    [
-     "fork_",
-     56,
-     "fork_"
-    ],
-    [
-     "with_handle",
-     57,
-     "with_handle"
-    ],
-    [
-     "comptime_for",
-     58,
-     "comptime_for"
-    ],
-    [
-     "comptime_if",
-     59,
-     "comptime_if"
-    ],
-    [
-     "comptime_meta",
-     60,
-     "comptime_meta"
-    ]
-   ]
-  },
-  {
-   "name": "check.core.Op",
-   "kind": "enum",
-   "goose": "blot_check_core::Op",
-   "variants": [
-    [
-     "none",
-     0,
-     "none"
-    ],
-    [
-     "add",
-     1,
-     "add"
-    ],
-    [
-     "sub",
-     2,
-     "sub"
-    ],
-    [
-     "mul",
-     3,
-     "mul"
-    ],
-    [
-     "div",
-     4,
-     "div"
-    ],
-    [
-     "rem",
-     5,
-     "rem"
-    ],
-    [
-     "equal",
-     6,
-     "equal"
-    ],
-    [
-     "not_equal",
-     7,
-     "not_equal"
-    ],
-    [
-     "less",
-     8,
-     "less"
-    ],
-    [
-     "less_equal",
-     9,
-     "less_equal"
-    ],
-    [
-     "greater",
-     10,
-     "greater"
-    ],
-    [
-     "greater_equal",
-     11,
-     "greater_equal"
-    ],
-    [
-     "bit_and",
-     12,
-     "bit_and"
-    ],
-    [
-     "bit_or",
-     13,
-     "bit_or"
-    ],
-    [
-     "bit_xor",
-     14,
-     "bit_xor"
-    ],
-    [
-     "shift_left",
-     15,
-     "shift_left"
-    ],
-    [
-     "shift_right",
-     16,
-     "shift_right"
-    ],
-    [
-     "and_",
-     17,
-     "and_"
-    ],
-    [
-     "or_",
-     18,
-     "or_"
-    ],
-    [
-     "neg",
-     19,
-     "neg"
-    ],
-    [
-     "abs",
-     20,
-     "abs"
-    ],
-    [
-     "ceil",
-     21,
-     "ceil"
-    ],
-    [
-     "floor",
-     22,
-     "floor"
-    ],
-    [
-     "trunc",
-     23,
-     "trunc"
-    ],
-    [
-     "sqrt",
-     24,
-     "sqrt"
-    ],
-    [
-     "convert_u32_f32",
-     25,
-     "convert_u32_f32"
-    ],
-    [
-     "convert_f32_u32",
-     26,
-     "convert_f32_u32"
-    ],
-    [
-     "shift_right_signed",
-     27,
-     "shift_right_signed"
-    ],
-    [
-     "min",
-     28,
-     "min"
-    ],
-    [
-     "max",
-     29,
-     "max"
-    ],
-    [
-     "bit_not",
-     30,
-     "bit_not"
-    ],
-    [
-     "bit_andnot",
-     31,
-     "bit_andnot"
-    ],
-    [
-     "any_true",
-     32,
-     "any_true"
-    ],
-    [
-     "all_true",
-     33,
-     "all_true"
-    ],
-    [
-     "select",
-     34,
-     "select"
-    ],
-    [
-     "shuffle",
-     35,
-     "shuffle"
-    ],
-    [
-     "swizzle",
-     36,
-     "swizzle"
-    ],
-    [
-     "broadcast",
-     37,
-     "broadcast"
-    ],
-    [
-     "bits",
-     38,
-     "bits"
-    ],
-    [
-     "from_bits",
-     39,
-     "from_bits"
-    ],
-    [
-     "relaxed_madd",
-     40,
-     "relaxed_madd"
-    ],
-    [
-     "relaxed_nmadd",
-     41,
-     "relaxed_nmadd"
-    ],
-    [
-     "convert_i32_f32",
-     42,
-     "convert_i32_f32"
-    ],
-    [
-     "convert_f32_i32",
-     43,
-     "convert_f32_i32"
-    ],
-    [
-     "continue_",
-     44,
-     "continue_"
-    ],
-    [
-     "not_",
-     45,
-     "not_"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.Node",
-   "kind": "slice",
-   "goose": "blot_check_core::Node[:]",
-   "children": [
-    "check.core.Node"
-   ]
-  },
-  {
-   "name": "[]parse.ast.Span",
-   "kind": "slice",
-   "goose": "blot_parse_ast::Span[:]",
-   "children": [
-    "parse.ast.Span"
-   ]
-  },
-  {
-   "name": "check.core.Binding",
-   "kind": "struct",
-   "goose": "blot_check_core::Binding",
-   "fields": [
-    [
-     "capability_flow",
-     "check.capability_flow.Contract",
-     "capability_flow"
-    ],
-    [
-     "capability_parameters",
-     "check.capability_flow.Parameters",
-     "capability_parameters"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "initializer",
-     "u32",
-     "initializer"
-    ],
-    [
-     "kind",
-     "reuse.principal_interface.Kind",
-     "kind"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "scheme",
-     "check.types.Scheme",
-     "scheme"
-    ],
-    [
-     "public_variables",
-     "check.types.List",
-     "public_variables"
-    ],
-    [
-     "public_rows",
-     "check.types.List",
-     "public_rows"
-    ],
-    [
-     "has_explicit",
-     "bool",
-     "has_explicit"
-    ],
-    [
-     "body_id",
-     "u32",
-     "body_id"
-    ],
-    [
-     "target",
-     "check.core.BindingRef",
-     "target"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.capability_flow.Contract",
-   "kind": "enum",
-   "goose": "blot_check_capability_flow::Contract",
-   "variants": [
-    [
-     "unknown",
-     0,
-     "unknown"
-    ],
-    [
-     "identity",
-     1,
-     "identity"
-    ],
-    [
-     "invoke_unit",
-     2,
-     "invoke_unit"
-    ],
-    [
-     "member_unit",
-     3,
-     "member_unit"
-    ],
-    [
-     "invoke_with_capability",
-     4,
-     "invoke_with_capability"
-    ],
-    [
-     "member_first_unit",
-     5,
-     "member_first_unit"
-    ],
-    [
-     "member_second_unit",
-     6,
-     "member_second_unit"
-    ],
-    [
-     "input_shape",
-     7,
-     "input_shape"
-    ],
-    [
-     "consume_task",
-     8,
-     "consume_task"
-    ],
-    [
-     "scope_task",
-     9,
-     "scope_task"
-    ],
-    [
-     "spawn_task",
-     10,
-     "spawn_task"
-    ]
-   ]
-  },
-  {
-   "name": "check.capability_flow.Parameters",
-   "kind": "struct",
-   "goose": "blot_check_capability_flow::Parameters",
-   "fields": [
-    [
-     "kind",
-     "check.capability_flow.ParameterResult",
-     "kind"
-    ],
-    [
-     "mask",
-     "u16",
-     "mask"
-    ],
-    [
-     "inputs",
-     "u8",
-     "inputs"
-    ],
-    [
-     "invocation_arguments",
-     "u64",
-     "invocation_arguments"
-    ],
-    [
-     "invocation_count",
-     "u8",
-     "invocation_count"
-    ],
-    [
-     "own",
-     "u32",
-     "own"
-    ],
-    [
-     "own_count",
-     "u8",
-     "own_count"
-    ],
-    [
-     "owned_results",
-     "bool",
-     "owned_results"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.capability_flow.ParameterResult",
-   "kind": "enum",
-   "goose": "blot_check_capability_flow::ParameterResult",
-   "variants": [
-    [
-     "product",
-     0,
-     "product"
-    ],
-    [
-     "invoke_unit",
-     1,
-     "invoke_unit"
-    ],
-    [
-     "invalid",
-     2,
-     "invalid"
-    ],
-    [
-     "member_closure_unit",
-     3,
-     "member_closure_unit"
-    ],
-    [
-     "captured_unit",
-     4,
-     "captured_unit"
-    ],
-    [
-     "invoke_input",
-     5,
-     "invoke_input"
-    ],
-    [
-     "invoke_inputs",
-     6,
-     "invoke_inputs"
-    ]
-   ]
-  },
-  {
-   "name": "u16",
-   "kind": "primitive",
-   "goose": "u16",
-   "primitive": "u16"
-  },
-  {
-   "name": "u64",
-   "kind": "primitive",
-   "goose": "u64",
-   "primitive": "u64"
-  },
-  {
-   "name": "reuse.principal_interface.Kind",
-   "kind": "enum",
-   "goose": "blot_reuse_principal_interface::Kind",
-   "variants": [
-    [
-     "global",
-     0,
-     "global"
-    ],
-    [
-     "local",
-     1,
-     "local"
-    ],
-    [
-     "parameter",
-     2,
-     "parameter"
-    ],
-    [
-     "external",
-     3,
-     "external"
-    ]
-   ]
-  },
-  {
-   "name": "check.types.Scheme",
-   "kind": "struct",
-   "goose": "blot_check_types::Scheme",
-   "fields": [
-    [
-     "root",
-     "u32",
-     "root"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "row_variables",
-     "check.types.List",
-     "row_variables"
-    ],
-    [
-     "closed_rows",
-     "check.types.List",
-     "closed_rows"
-    ],
-    [
-     "obligations",
-     "check.types.List",
-     "obligations"
-    ],
-    [
-     "generative",
-     "check.types.List",
-     "generative"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.BindingRef",
-   "kind": "struct",
-   "goose": "blot_check_core::BindingRef",
-   "fields": [
-    [
-     "unit",
-     "u32",
-     "unit"
-    ],
-    [
-     "binding",
-     "u32",
-     "binding"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Binding",
-   "kind": "slice",
-   "goose": "blot_check_core::Binding[:]",
-   "children": [
-    "check.core.Binding"
-   ]
-  },
-  {
-   "name": "check.core.Body",
-   "kind": "struct",
-   "goose": "blot_check_core::Body",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "root",
-     "u32",
-     "root"
-    ],
-    [
-     "parameters",
-     "check.core.List",
-     "parameters"
-    ],
-    [
-     "scheme",
-     "check.types.Scheme",
-     "scheme"
-    ],
-    [
-     "closed_rows",
-     "check.types.List",
-     "closed_rows"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ],
-    [
-     "declaration_name",
-     "check.core.Name",
-     "declaration_name"
-    ],
-    [
-     "export_name",
-     "check.core.Name",
-     "export_name"
-    ],
-    [
-     "exported",
-     "bool",
-     "exported"
-    ],
-    [
-     "runtime",
-     "bool",
-     "runtime"
-    ],
-    [
-     "is_function",
-     "bool",
-     "is_function"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Body",
-   "kind": "slice",
-   "goose": "blot_check_core::Body[:]",
-   "children": [
-    "check.core.Body"
-   ]
-  },
-  {
-   "name": "check.core.Parameter",
-   "kind": "struct",
-   "goose": "blot_check_core::Parameter",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ],
-    [
-     "inferred",
-     "bool",
-     "inferred"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Parameter",
-   "kind": "slice",
-   "goose": "blot_check_core::Parameter[:]",
-   "children": [
-    "check.core.Parameter"
-   ]
-  },
-  {
-   "name": "[]check.core.BindingRef",
-   "kind": "slice",
-   "goose": "blot_check_core::BindingRef[:]",
-   "children": [
-    "check.core.BindingRef"
-   ]
-  },
-  {
-   "name": "check.core.CallInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::CallInfo",
-   "fields": [
-    [
-     "target",
-     "check.core.BindingRef",
-     "target"
-    ],
-    [
-     "callee_type",
-     "u32",
-     "callee_type"
-    ],
-    [
-     "own",
-     "u32",
-     "own"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.CallInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::CallInfo[:]",
-   "children": [
-    "check.core.CallInfo"
-   ]
-  },
-  {
-   "name": "check.core.Merge",
-   "kind": "struct",
-   "goose": "blot_check_core::Merge",
-   "fields": [
-    [
-     "node",
-     "u32",
-     "node"
-    ],
-    [
-     "result",
-     "u32",
-     "result"
-    ],
-    [
-     "then_binding",
-     "u32",
-     "then_binding"
-    ],
-    [
-     "else_binding",
-     "u32",
-     "else_binding"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Merge",
-   "kind": "slice",
-   "goose": "blot_check_core::Merge[:]",
-   "children": [
-    "check.core.Merge"
-   ]
-  },
-  {
-   "name": "[]check.core.List",
-   "kind": "slice",
-   "goose": "blot_check_core::List[:]",
-   "children": [
-    "check.core.List"
-   ]
-  },
-  {
-   "name": "check.core.Obligation",
-   "kind": "struct",
-   "goose": "blot_check_core::Obligation",
-   "fields": [
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "kind",
-     "check.types.ObligationKind",
-     "kind"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "result",
-     "u32",
-     "result"
-    ],
-    [
-     "other",
-     "u32",
-     "other"
-    ],
-    [
-     "signature",
-     "u32",
-     "signature"
-    ],
-    [
-     "operator",
-     "check.types.Operator",
-     "operator"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "explicit",
-     "bool",
-     "explicit"
-    ],
-    [
-     "qualification_span",
-     "?parse.ast.Span",
-     "qualification_span"
-    ],
-    [
-     "qualification_unit",
-     "u32",
-     "qualification_unit"
-    ],
-    [
-     "diagnostic_name",
-     "check.core.Name",
-     "diagnostic_name"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Obligation",
-   "kind": "slice",
-   "goose": "blot_check_core::Obligation[:]",
-   "children": [
-    "check.core.Obligation"
-   ]
-  },
-  {
-   "name": "check.core.Nominal",
-   "kind": "struct",
-   "goose": "blot_check_core::Nominal",
-   "fields": [
-    [
-     "affine",
-     "bool",
-     "affine"
-    ],
-    [
-     "has_usage",
-     "bool",
-     "has_usage"
-    ],
-    [
-     "closed_storage",
-     "bool",
-     "closed_storage"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "is_opaque",
-     "bool",
-     "is_opaque"
-    ],
-    [
-     "storage",
-     "check.opaque_storage.Storage",
-     "storage"
-    ],
-    [
-     "diagnostic_name",
-     "check.core.Name",
-     "diagnostic_name"
-    ],
-    [
-     "diagnostic_origin",
-     "check.core.Name",
-     "diagnostic_origin"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "constructors",
-     "check.core.List",
-     "constructors"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.opaque_storage.Storage",
-   "kind": "struct",
-   "goose": "blot_backend_opaque_storage::Storage",
-   "fields": [
-    [
-     "kind",
-     "check.opaque_storage.Storage.kind",
-     "kind"
-    ],
-    [
-     "parameter",
-     "u32",
-     "parameter"
-    ],
-    [
-     "selector",
-     "u32",
-     "selector"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.opaque_storage.Storage.kind",
-   "kind": "enum",
-   "goose": "blot_backend_opaque_storage::Kind",
-   "variants": [
-    [
-     "unknown",
-     0,
-     "unknown"
-    ],
-    [
-     "unit",
-     1,
-     "unit"
-    ],
-    [
-     "boolean",
-     2,
-     "boolean"
-    ],
-    [
-     "u32",
-     3,
-     "unsigned32"
-    ],
-    [
-     "f32",
-     4,
-     "floating32"
-    ],
-    [
-     "reference",
-     5,
-     "reference"
-    ],
-    [
-     "parameter",
-     6,
-     "parameter"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.Nominal",
-   "kind": "slice",
-   "goose": "blot_check_core::Nominal[:]",
-   "children": [
-    "check.core.Nominal"
-   ]
-  },
-  {
-   "name": "check.core.OperationName",
-   "kind": "struct",
-   "goose": "blot_check_core::OperationName",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "diagnostic_name",
-     "check.core.Name",
-     "diagnostic_name"
-    ],
-    [
-     "diagnostic_origin",
-     "check.core.Name",
-     "diagnostic_origin"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "parameter",
-     "u32",
-     "parameter"
-    ],
-    [
-     "result",
-     "u32",
-     "result"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.OperationName",
-   "kind": "slice",
-   "goose": "blot_check_core::OperationName[:]",
-   "children": [
-    "check.core.OperationName"
-   ]
-  },
-  {
-   "name": "check.core.Constructor",
-   "kind": "struct",
-   "goose": "blot_check_core::Constructor",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "nominal",
-     "u32",
-     "nominal"
-    ],
-    [
-     "tag",
-     "u32",
-     "tag"
-    ],
-    [
-     "scheme",
-     "check.types.Scheme",
-     "scheme"
-    ],
-    [
-     "payload",
-     "u32",
-     "payload"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Constructor",
-   "kind": "slice",
-   "goose": "blot_check_core::Constructor[:]",
-   "children": [
-    "check.core.Constructor"
-   ]
-  },
-  {
-   "name": "check.core.TypeTag",
-   "kind": "struct",
-   "goose": "blot_check_core::TypeTag",
-   "fields": [
-    [
-     "nominal",
-     "check.types.NominalIdentity",
-     "nominal"
-    ],
-    [
-     "constructor_tag",
-     "u32",
-     "constructor_tag"
-    ],
-    [
-     "field_name",
-     "u32",
-     "field_name"
-    ],
-    [
-     "has_default",
-     "bool",
-     "has_default"
-    ],
-    [
-     "value",
-     "u32",
-     "value"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.TypeTag",
-   "kind": "slice",
-   "goose": "blot_check_core::TypeTag[:]",
-   "children": [
-    "check.core.TypeTag"
-   ]
-  },
-  {
-   "name": "check.core.Projection",
-   "kind": "struct",
-   "goose": "blot_check_core::Projection",
-   "fields": [
-    [
-     "nominal",
-     "check.types.NominalIdentity",
-     "nominal"
-    ],
-    [
-     "field",
-     "u32",
-     "field"
-    ],
-    [
-     "source_type",
-     "u32",
-     "source_type"
-    ],
-    [
-     "result_type",
-     "u32",
-     "result_type"
-    ],
-    [
-     "variants",
-     "check.core.List",
-     "variants"
-    ],
-    [
-     "diagnostic_point",
-     "u32",
-     "diagnostic_point"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Projection",
-   "kind": "slice",
-   "goose": "blot_check_core::Projection[:]",
-   "children": [
-    "check.core.Projection"
-   ]
-  },
-  {
-   "name": "check.core.ProjectionVariant",
-   "kind": "struct",
-   "goose": "blot_check_core::ProjectionVariant",
-   "fields": [
-    [
-     "tag",
-     "u32",
-     "tag"
-    ],
-    [
-     "field",
-     "u32",
-     "field"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.ProjectionVariant",
-   "kind": "slice",
-   "goose": "blot_check_core::ProjectionVariant[:]",
-   "children": [
-    "check.core.ProjectionVariant"
-   ]
-  },
-  {
-   "name": "check.core.Pattern",
-   "kind": "struct",
-   "goose": "blot_check_core::Pattern",
-   "fields": [
-    [
-     "tag",
-     "check.core.PatternTag",
-     "tag"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ],
-    [
-     "c",
-     "u32",
-     "c"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.PatternTag",
-   "kind": "enum",
-   "goose": "blot_check_core::PatternTag",
-   "variants": [
-    [
-     "invalid",
-     0,
-     "invalid"
-    ],
-    [
-     "wildcard",
-     1,
-     "wildcard"
-    ],
-    [
-     "bind",
-     2,
-     "bind"
-    ],
-    [
-     "constant",
-     3,
-     "constant"
-    ],
-    [
-     "value",
-     4,
-     "value"
-    ],
-    [
-     "product",
-     5,
-     "product"
-    ],
-    [
-     "constructor",
-     6,
-     "constructor"
-    ],
-    [
-     "record_payload",
-     7,
-     "record_payload"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.Pattern",
-   "kind": "slice",
-   "goose": "blot_check_core::Pattern[:]",
-   "children": [
-    "check.core.Pattern"
-   ]
-  },
-  {
-   "name": "check.core.PatternRow",
-   "kind": "struct",
-   "goose": "blot_check_core::PatternRow",
-   "fields": [
-    [
-     "patterns",
-     "check.core.List",
-     "patterns"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.PatternRow",
-   "kind": "slice",
-   "goose": "blot_check_core::PatternRow[:]",
-   "children": [
-    "check.core.PatternRow"
-   ]
-  },
-  {
-   "name": "check.core.MatchArm",
-   "kind": "struct",
-   "goose": "blot_check_core::MatchArm",
-   "fields": [
-    [
-     "rows",
-     "check.core.List",
-     "rows"
-    ],
-    [
-     "guard",
-     "u32",
-     "guard_"
-    ],
-    [
-     "body",
-     "u32",
-     "body"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.MatchArm",
-   "kind": "slice",
-   "goose": "blot_check_core::MatchArm[:]",
-   "children": [
-    "check.core.MatchArm"
-   ]
-  },
-  {
-   "name": "check.core.MatchInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::MatchInfo",
-   "fields": [
-    [
-     "inputs",
-     "check.core.List",
-     "inputs"
-    ],
-    [
-     "arms",
-     "check.core.List",
-     "arms"
-    ],
-    [
-     "statement",
-     "bool",
-     "statement"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.MatchInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::MatchInfo[:]",
-   "children": [
-    "check.core.MatchInfo"
-   ]
-  },
-  {
-   "name": "check.core.UpdateInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::UpdateInfo",
-   "fields": [
-    [
-     "root",
-     "u32",
-     "root"
-    ],
-    [
-     "path",
-     "check.core.List",
-     "path"
-    ],
-    [
-     "value",
-     "u32",
-     "value"
-    ],
-    [
-     "self_binding",
-     "u32",
-     "self_binding"
-    ],
-    [
-     "selectors",
-     "check.core.List",
-     "selectors"
-    ],
-    [
-     "store",
-     "bool",
-     "store"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.UpdateInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::UpdateInfo[:]",
-   "children": [
-    "check.core.UpdateInfo"
-   ]
-  },
-  {
-   "name": "check.core.UpdateStep",
-   "kind": "struct",
-   "goose": "blot_check_core::UpdateStep",
-   "fields": [
-    [
-     "kind",
-     "check.core.UpdateKind",
-     "kind"
-    ],
-    [
-     "projection",
-     "u32",
-     "projection"
-    ],
-    [
-     "index",
-     "u32",
-     "index"
-    ],
-    [
-     "source_type",
-     "u32",
-     "source_type"
-    ],
-    [
-     "result_type",
-     "u32",
-     "result_type"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.UpdateKind",
-   "kind": "enum",
-   "goose": "blot_check_core::UpdateKind",
-   "variants": [
-    [
-     "field",
-     0,
-     "field"
-    ],
-    [
-     "index",
-     1,
-     "index"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.UpdateStep",
-   "kind": "slice",
-   "goose": "blot_check_core::UpdateStep[:]",
-   "children": [
-    "check.core.UpdateStep"
-   ]
-  },
-  {
-   "name": "check.core.ClosureInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::ClosureInfo",
-   "fields": [
-    [
-     "qualifier",
-     "u32",
-     "qualifier"
-    ],
-    [
-     "body",
-     "u32",
-     "body"
-    ],
-    [
-     "parameter",
-     "check.core.Parameter",
-     "parameter"
-    ],
-    [
-     "captures",
-     "check.core.List",
-     "captures"
-    ],
-    [
-     "function_type",
-     "u32",
-     "function_type"
-    ],
-    [
-     "closed_rows",
-     "check.types.List",
-     "closed_rows"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.ClosureInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::ClosureInfo[:]",
-   "children": [
-    "check.core.ClosureInfo"
-   ]
-  },
-  {
-   "name": "check.core.Associated",
-   "kind": "struct",
-   "goose": "blot_check_core::Associated",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "member",
-     "u32",
-     "member"
-    ],
-    [
-     "operator",
-     "check.types.Operator",
-     "operator"
-    ],
-    [
-     "target",
-     "check.core.BindingRef",
-     "target"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Associated",
-   "kind": "slice",
-   "goose": "blot_check_core::Associated[:]",
-   "children": [
-    "check.core.Associated"
-   ]
-  },
-  {
-   "name": "check.core.Contract",
-   "kind": "struct",
-   "goose": "blot_check_core::Contract",
-   "fields": [
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "row_variables",
-     "check.types.List",
-     "row_variables"
-    ],
-    [
-     "predicates",
-     "check.types.List",
-     "predicates"
-    ],
-    [
-     "members",
-     "check.types.List",
-     "members"
-    ],
-    [
-     "requires_implementation",
-     "bool",
-     "requires_implementation"
-    ],
-    [
-     "row_parameter_names",
-     "check.types.List",
-     "row_parameter_names"
-    ],
-    [
-     "row_parameters",
-     "check.types.List",
-     "row_parameters"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.Contract",
-   "kind": "slice",
-   "goose": "blot_check_core::Contract[:]",
-   "children": [
-    "check.core.Contract"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.ContractMember",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::ContractMember",
-   "fields": [
-    [
-     "contract",
-     "check.types.NominalIdentity",
-     "contract"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "kind",
-     "reuse.principal_interface.ContractMember.kind",
-     "kind"
-    ],
-    [
-     "root",
-     "u32",
-     "root"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.principal_interface.ContractMember.kind",
-   "kind": "enum",
-   "goose": "blot_reuse_principal_interface::ContractMemberKind",
-   "variants": [
-    [
-     "defined_type",
-     0,
-     "defined_type"
-    ],
-    [
-     "abstract_type",
-     1,
-     "abstract_type"
-    ],
-    [
-     "value",
-     2,
-     "value"
-    ]
-   ]
-  },
-  {
-   "name": "[]reuse.principal_interface.ContractMember",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::ContractMember[:]",
-   "children": [
-    "reuse.principal_interface.ContractMember"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Implementation",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Implementation",
-   "fields": [
-    [
-     "origin_span",
-     "?parse.ast.Span",
-     "origin_span"
-    ],
-    [
-     "declaration",
-     "u32",
-     "declaration"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "contract",
-     "check.types.NominalIdentity",
-     "contract"
-    ],
-    [
-     "head",
-     "check.types.List",
-     "head"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "parameter_names",
-     "check.types.List",
-     "parameter_names"
-    ],
-    [
-     "row_variables",
-     "check.types.List",
-     "row_variables"
-    ],
-    [
-     "row_parameter_names",
-     "check.types.List",
-     "row_parameter_names"
-    ],
-    [
-     "row_parameters",
-     "check.types.List",
-     "row_parameters"
-    ],
-    [
-     "predicates",
-     "check.types.List",
-     "predicates"
-    ],
-    [
-     "members",
-     "check.types.List",
-     "members"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.Implementation",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Implementation[:]",
-   "children": [
-    "reuse.principal_interface.Implementation"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.ImplementationMember",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::ImplementationMember",
-   "fields": [
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "kind",
-     "reuse.principal_interface.ImplementationMember.kind",
-     "kind"
-    ],
-    [
-     "root",
-     "u32",
-     "root"
-    ],
-    [
-     "target",
-     "reuse.principal_interface.ExternalTarget",
-     "target"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.principal_interface.ImplementationMember.kind",
-   "kind": "enum",
-   "goose": "blot_reuse_principal_interface::ImplementationMemberKind",
-   "variants": [
-    [
-     "type_",
-     0,
-     "type_"
-    ],
-    [
-     "value",
-     1,
-     "value"
-    ]
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.ExternalTarget",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::ExternalTarget",
-   "fields": [
-    [
-     "unit",
-     "u32",
-     "unit"
-    ],
-    [
-     "binding",
-     "u32",
-     "binding"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.ImplementationMember",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::ImplementationMember[:]",
-   "children": [
-    "reuse.principal_interface.ImplementationMember"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.MemberTemplate",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::MemberTemplate",
-   "fields": [
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "contract",
-     "check.types.NominalIdentity",
-     "contract"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "arguments",
-     "check.types.List",
-     "arguments"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.MemberTemplate",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::MemberTemplate[:]",
-   "children": [
-    "reuse.principal_interface.MemberTemplate"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.SelectedProof",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::SelectedProof",
-   "fields": [
-    [
-     "predicate_target",
-     "reuse.principal_interface.ExternalTarget",
-     "predicate_target"
-    ],
-    [
-     "context",
-     "u32",
-     "context"
-    ],
-    [
-     "kind",
-     "reuse.principal_interface.SelectedProof.kind",
-     "kind"
-    ],
-    [
-     "predicate",
-     "check.types.Obligation",
-     "predicate"
-    ],
-    [
-     "implementation",
-     "check.types.NominalIdentity",
-     "implementation"
-    ],
-    [
-     "contract",
-     "check.types.NominalIdentity",
-     "contract"
-    ],
-    [
-     "arguments",
-     "check.types.List",
-     "arguments"
-    ],
-    [
-     "members",
-     "check.types.List",
-     "members"
-    ],
-    [
-     "prerequisites",
-     "check.types.List",
-     "prerequisites"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.principal_interface.SelectedProof.kind",
-   "kind": "enum",
-   "goose": "blot_reuse_principal_interface::SelectedProofKind",
-   "variants": [
-    [
-     "implementation",
-     0,
-     "implementation"
-    ],
-    [
-     "predicate",
-     1,
-     "predicate"
-    ]
-   ]
-  },
-  {
-   "name": "[]reuse.principal_interface.SelectedProof",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::SelectedProof[:]",
-   "children": [
-    "reuse.principal_interface.SelectedProof"
-   ]
-  },
-  {
-   "name": "check.core.SelectedUse",
-   "kind": "struct",
-   "goose": "blot_check_core::SelectedUse",
-   "fields": [
-    [
-     "node",
-     "u32",
-     "node"
-    ],
-    [
-     "proof",
-     "u32",
-     "proof"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.SelectedUse",
-   "kind": "slice",
-   "goose": "blot_check_core::SelectedUse[:]",
-   "children": [
-    "check.core.SelectedUse"
-   ]
-  },
-  {
-   "name": "check.core.DictionarySelection",
-   "kind": "struct",
-   "goose": "blot_check_core::DictionarySelection",
-   "fields": [
-    [
-     "owner",
-     "u32",
-     "owner"
-    ],
-    [
-     "quantifier",
-     "u32",
-     "quantifier"
-    ],
-    [
-     "goal",
-     "u32",
-     "goal"
-    ],
-    [
-     "proof",
-     "check.core.DictionaryProof",
-     "proof"
-    ],
-    [
-     "members",
-     "check.core.List",
-     "members"
-    ],
-    [
-     "contents",
-     "check.core.List",
-     "contents"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.DictionaryProof",
-   "kind": "union",
-   "goose": "blot_check_core::DictionaryProof",
-   "variants": [
-    [
-     "selected",
-     0,
-     "selected",
-     "u32",
-     [
-      [
-       "value",
-       "u32"
+    },
+    {
+      "name": "reuse.frozen_dependency.ImportResolution",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::ImportResolution",
+      "fields": [
+        [
+          "path",
+          "[]u8",
+          "path"
+        ],
+        [
+          "target",
+          "u32",
+          "target"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.frozen_dependency.ImportResolution",
+      "kind": "slice",
+      "goose": "blot_reuse_frozen_dependency::ImportResolution[:]",
+      "children": [
+        "reuse.frozen_dependency.ImportResolution"
       ]
-     ]
-    ],
-    [
-     "given",
-     1,
-     "given",
-     "check.core.DictionaryGiven",
-     [
-      [
-       "value",
-       "DictionaryGiven"
+    },
+    {
+      "name": "check.core.Module",
+      "kind": "struct",
+      "goose": "blot_check_core::Module",
+      "fields": [
+        [
+          "field_names",
+          "[]check.core.FieldName",
+          "field_names"
+        ],
+        [
+          "runtime_names",
+          "[]check.core.RuntimeName",
+          "runtime_names"
+        ],
+        [
+          "source_names",
+          "[]check.core.RuntimeName",
+          "source_names"
+        ],
+        [
+          "request_loops",
+          "[]check.core.RequestLoopInfo",
+          "request_loops"
+        ],
+        [
+          "request_arms",
+          "[]check.core.RequestArm",
+          "request_arms"
+        ],
+        [
+          "tag_calls",
+          "[]u32",
+          "tag_calls"
+        ],
+        [
+          "unit",
+          "u32",
+          "unit"
+        ],
+        [
+          "types",
+          "check.core.Types",
+          "types"
+        ],
+        [
+          "nodes",
+          "[]check.core.Node",
+          "nodes"
+        ],
+        [
+          "spans",
+          "[]parse.ast.Span",
+          "spans"
+        ],
+        [
+          "extra",
+          "[]u32",
+          "extra"
+        ],
+        [
+          "bindings",
+          "[]check.core.Binding",
+          "bindings"
+        ],
+        [
+          "bodies",
+          "[]check.core.Body",
+          "bodies"
+        ],
+        [
+          "parameters",
+          "[]check.core.Parameter",
+          "parameters"
+        ],
+        [
+          "references",
+          "[]check.core.BindingRef",
+          "references"
+        ],
+        [
+          "calls",
+          "[]check.core.CallInfo",
+          "calls"
+        ],
+        [
+          "merges",
+          "[]check.core.Merge",
+          "merges"
+        ],
+        [
+          "merge_ranges",
+          "[]check.core.List",
+          "merge_ranges"
+        ],
+        [
+          "names",
+          "[]u8",
+          "names"
+        ],
+        [
+          "obligations",
+          "[]check.core.Obligation",
+          "obligations"
+        ],
+        [
+          "nominals",
+          "[]check.core.Nominal",
+          "nominals"
+        ],
+        [
+          "operation_names",
+          "[]check.core.OperationName",
+          "operation_names"
+        ],
+        [
+          "constructors",
+          "[]check.core.Constructor",
+          "constructors"
+        ],
+        [
+          "projections",
+          "[]check.core.Projection",
+          "projections"
+        ],
+        [
+          "projection_variants",
+          "[]check.core.ProjectionVariant",
+          "projection_variants"
+        ],
+        [
+          "patterns",
+          "[]check.core.Pattern",
+          "patterns"
+        ],
+        [
+          "pattern_rows",
+          "[]check.core.PatternRow",
+          "pattern_rows"
+        ],
+        [
+          "match_arms",
+          "[]check.core.MatchArm",
+          "match_arms"
+        ],
+        [
+          "matches",
+          "[]check.core.MatchInfo",
+          "matches"
+        ],
+        [
+          "updates",
+          "[]check.core.UpdateInfo",
+          "updates"
+        ],
+        [
+          "update_steps",
+          "[]check.core.UpdateStep",
+          "update_steps"
+        ],
+        [
+          "closures",
+          "[]check.core.ClosureInfo",
+          "closures"
+        ],
+        [
+          "associated",
+          "[]check.core.Associated",
+          "associated"
+        ],
+        [
+          "contracts",
+          "[]check.core.Contract",
+          "contracts"
+        ],
+        [
+          "contract_members",
+          "[]reuse.principal_interface.ContractMember",
+          "contract_members"
+        ],
+        [
+          "implementations",
+          "[]reuse.principal_interface.Implementation",
+          "implementations"
+        ],
+        [
+          "implementation_members",
+          "[]reuse.principal_interface.ImplementationMember",
+          "implementation_members"
+        ],
+        [
+          "member_templates",
+          "[]reuse.principal_interface.MemberTemplate",
+          "member_templates"
+        ],
+        [
+          "selected_proofs",
+          "[]reuse.principal_interface.SelectedProof",
+          "selected_proofs"
+        ],
+        [
+          "selected_members",
+          "[]reuse.principal_interface.ImplementationMember",
+          "selected_members"
+        ],
+        [
+          "selected_edges",
+          "[]u32",
+          "selected_edges"
+        ],
+        [
+          "selected_uses",
+          "[]check.core.SelectedUse",
+          "selected_uses"
+        ],
+        [
+          "primitives",
+          "[]check.core.Primitive",
+          "primitives"
+        ],
+        [
+          "loops",
+          "[]check.core.LoopInfo",
+          "loops"
+        ],
+        [
+          "loop_carries",
+          "[]check.core.LoopCarry",
+          "loop_carries"
+        ],
+        [
+          "resolver_ops",
+          "[]check.core.ResolverInfo",
+          "resolver_ops"
+        ],
+        [
+          "operation_values",
+          "[]check.core.OperationValue",
+          "operation_values"
+        ],
+        [
+          "handle_effects",
+          "[]check.core.HandleEffects",
+          "handle_effects"
+        ],
+        [
+          "dispatch_signatures",
+          "[]u32",
+          "dispatch_signatures"
+        ],
+        [
+          "type_tags",
+          "[]check.core.TypeTag",
+          "type_tags"
+        ],
+        [
+          "diagnostics",
+          "[]check.core.Diagnostic",
+          "diagnostics"
+        ],
+        [
+          "body_lowerings",
+          "usize",
+          "body_lowerings"
+        ]
+      ],
+      "unwired": [
+        "owner_id",
+        "declaration_dependencies",
+        "dependency_references",
+        "dependency_members",
+        "erased_declaration_references"
       ]
-     ]
-    ]
-   ],
-   "tag": "@typeInfo(check.core.DictionaryProof).@\"union\".tag_type.?"
-  },
-  {
-   "name": "@typeInfo(check.core.DictionaryProof).@\"union\".tag_type.?",
-   "kind": "union_tag",
-   "goose": "u32",
-   "variants": [
-    [
-     "selected",
-     0,
-     "selected"
-    ],
-    [
-     "given",
-     1,
-     "given"
-    ]
-   ]
-  },
-  {
-   "name": "check.core.DictionaryGiven",
-   "kind": "struct",
-   "goose": "blot_check_core::DictionaryGiven",
-   "fields": [
-    [
-     "opening",
-     "u32",
-     "opening"
-    ],
-    [
-     "introduction",
-     "u32",
-     "introduction"
-    ],
-    [
-     "quantifier",
-     "u32",
-     "quantifier"
-    ],
-    [
-     "goal",
-     "u32",
-     "goal"
-    ],
-    [
-     "arguments",
-     "check.types.List",
-     "arguments"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.DictionarySelection",
-   "kind": "slice",
-   "goose": "blot_check_core::DictionarySelection[:]",
-   "children": [
-    "check.core.DictionarySelection"
-   ]
-  },
-  {
-   "name": "check.core.DictionaryUse",
-   "kind": "struct",
-   "goose": "blot_check_core::DictionaryUse",
-   "fields": [
-    [
-     "node",
-     "u32",
-     "node"
-    ],
-    [
-     "binding",
-     "u32",
-     "binding"
-    ],
-    [
-     "opening",
-     "u32",
-     "opening"
-    ],
-    [
-     "introduction",
-     "u32",
-     "introduction"
-    ],
-    [
-     "quantifier",
-     "u32",
-     "quantifier"
-    ],
-    [
-     "goal",
-     "u32",
-     "goal"
-    ],
-    [
-     "member",
-     "u32",
-     "member"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.DictionaryUse",
-   "kind": "slice",
-   "goose": "blot_check_core::DictionaryUse[:]",
-   "children": [
-    "check.core.DictionaryUse"
-   ]
-  },
-  {
-   "name": "check.core.Primitive",
-   "kind": "struct",
-   "goose": "blot_check_core::Primitive",
-   "fields": [
-    [
-     "kind",
-     "check.core.PrimitiveKind",
-     "kind"
-    ],
-    [
-     "op",
-     "check.core.Op",
-     "op"
-    ],
-    [
-     "array_op",
-     "check.collection_ops.Op",
-     "array_op"
-    ],
-    [
-     "arity",
-     "u8",
-     "arity"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.PrimitiveKind",
-   "kind": "enum",
-   "goose": "blot_check_core::PrimitiveKind",
-   "variants": [
-    [
-     "scalar",
-     0,
-     "scalar"
-    ],
-    [
-     "array",
-     1,
-     "array"
-    ]
-   ]
-  },
-  {
-   "name": "check.collection_ops.Op",
-   "kind": "enum",
-   "goose": "blot_backend_collection_ops::Op",
-   "variants": [
-    [
-     "length",
-     0,
-     "length"
-    ],
-    [
-     "get",
-     1,
-     "get"
-    ],
-    [
-     "set",
-     2,
-     "set"
-    ],
-    [
-     "fill",
-     3,
-     "fill"
-    ],
-    [
-     "generate",
-     4,
-     "generate"
-    ],
-    [
-     "append",
-     5,
-     "append"
-    ],
-    [
-     "prepend",
-     6,
-     "prepend"
-    ],
-    [
-     "identity",
-     7,
-     "identity"
-    ],
-    [
-     "convert",
-     8,
-     "convert"
-    ],
-    [
-     "cursor",
-     9,
-     "cursor"
-    ],
-    [
-     "cursor_has",
-     10,
-     "cursor_has"
-    ],
-    [
-     "cursor_value",
-     11,
-     "cursor_value"
-    ],
-    [
-     "cursor_advance",
-     12,
-     "cursor_advance"
-    ],
-    [
-     "concat",
-     13,
-     "concat"
-    ],
-    [
-     "slice",
-     14,
-     "slice"
-    ],
-    [
-     "simd_load",
-     15,
-     "simd_load"
-    ],
-    [
-     "simd_store",
-     16,
-     "simd_store"
-    ],
-    [
-     "flatten",
-     17,
-     "flatten"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.Primitive",
-   "kind": "slice",
-   "goose": "blot_check_core::Primitive[:]",
-   "children": [
-    "check.core.Primitive"
-   ]
-  },
-  {
-   "name": "check.core.LoopInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::LoopInfo",
-   "fields": [
-    [
-     "kind",
-     "check.core.LoopKind",
-     "kind"
-    ],
-    [
-     "first",
-     "u32",
-     "first"
-    ],
-    [
-     "end",
-     "u32",
-     "end"
-    ],
-    [
-     "pattern",
-     "u32",
-     "pattern"
-    ],
-    [
-     "body",
-     "u32",
-     "body"
-    ],
-    [
-     "carries",
-     "check.core.List",
-     "carries"
-    ],
-    [
-     "can_exit",
-     "bool",
-     "can_exit"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.LoopKind",
-   "kind": "enum",
-   "goose": "blot_check_core::LoopKind",
-   "variants": [
-    [
-     "forever",
-     0,
-     "forever"
-    ],
-    [
-     "range",
-     1,
-     "range"
-    ],
-    [
-     "array",
-     2,
-     "array"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.LoopInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::LoopInfo[:]",
-   "children": [
-    "check.core.LoopInfo"
-   ]
-  },
-  {
-   "name": "check.core.LoopCarry",
-   "kind": "struct",
-   "goose": "blot_check_core::LoopCarry",
-   "fields": [
-    [
-     "incoming",
-     "u32",
-     "incoming"
-    ],
-    [
-     "iteration",
-     "u32",
-     "iteration"
-    ],
-    [
-     "backedge",
-     "u32",
-     "backedge"
-    ],
-    [
-     "outgoing",
-     "u32",
-     "outgoing"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.LoopCarry",
-   "kind": "slice",
-   "goose": "blot_check_core::LoopCarry[:]",
-   "children": [
-    "check.core.LoopCarry"
-   ]
-  },
-  {
-   "name": "check.core.ResolverInfo",
-   "kind": "struct",
-   "goose": "blot_check_core::ResolverInfo",
-   "fields": [
-    [
-     "operation",
-     "check.core.ResolverOperation",
-     "operation"
-    ],
-    [
-     "resolver",
-     "u32",
-     "resolver"
-    ],
-    [
-     "arguments",
-     "check.core.List",
-     "arguments"
-    ],
-    [
-     "member",
-     "u32",
-     "member"
-    ],
-    [
-     "method",
-     "check.core.BindingRef",
-     "method"
-    ],
-    [
-     "method_type",
-     "u32",
-     "method_type"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.ResolverOperation",
-   "kind": "enum",
-   "goose": "blot_check_core::ResolverOperation",
-   "variants": [
-    [
-     "monad",
-     0,
-     "monad"
-    ],
-    [
-     "pure",
-     1,
-     "pure"
-    ],
-    [
-     "bind",
-     2,
-     "bind"
-    ],
-    [
-     "forward",
-     3,
-     "forward"
-    ],
-    [
-     "iterate",
-     4,
-     "iterate"
-    ],
-    [
-     "run",
-     5,
-     "run"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.ResolverInfo",
-   "kind": "slice",
-   "goose": "blot_check_core::ResolverInfo[:]",
-   "children": [
-    "check.core.ResolverInfo"
-   ]
-  },
-  {
-   "name": "check.core.OperationValue",
-   "kind": "struct",
-   "goose": "blot_check_core::OperationValue",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "arguments",
-     "check.types.List",
-     "arguments"
-    ],
-    [
-     "signature",
-     "u32",
-     "signature"
-    ],
-    [
-     "witness",
-     "u32",
-     "witness"
-    ],
-    [
-     "witness_result",
-     "u32",
-     "witness_result"
-    ],
-    [
-     "instance",
-     "check.types.NominalIdentity",
-     "instance"
-    ],
-    [
-     "capability",
-     "u32",
-     "capability"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.OperationValue",
-   "kind": "slice",
-   "goose": "blot_check_core::OperationValue[:]",
-   "children": [
-    "check.core.OperationValue"
-   ]
-  },
-  {
-   "name": "check.core.HandleEffects",
-   "kind": "struct",
-   "goose": "blot_check_core::HandleEffects",
-   "fields": [
-    [
-     "node",
-     "u32",
-     "node"
-    ],
-    [
-     "first",
-     "u32",
-     "first"
-    ],
-    [
-     "second",
-     "u32",
-     "second"
-    ],
-    [
-     "extended",
-     "u32",
-     "extended"
-    ],
-    [
-     "residual",
-     "u32",
-     "residual"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]check.core.HandleEffects",
-   "kind": "slice",
-   "goose": "blot_check_core::HandleEffects[:]",
-   "children": [
-    "check.core.HandleEffects"
-   ]
-  },
-  {
-   "name": "check.core.Diagnostic",
-   "kind": "struct",
-   "goose": "blot_check_core::Diagnostic",
-   "fields": [
-    [
-     "code",
-     "check.core.Code",
-     "code"
-    ],
-    [
-     "span",
-     "parse.ast.Span",
-     "span"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.core.Code",
-   "kind": "enum",
-   "goose": "blot_check_core::Code",
-   "variants": [
-    [
-     "unchecked",
-     0,
-     "unchecked"
-    ],
-    [
-     "unsupported",
-     1,
-     "unsupported"
-    ],
-    [
-     "unresolved_binding",
-     2,
-     "unresolved_binding"
-    ],
-    [
-     "invalid_call",
-     3,
-     "invalid_call"
-    ],
-    [
-     "complexity",
-     4,
-     "complexity"
-    ],
-    [
-     "aliased_update",
-     5,
-     "aliased_update"
-    ],
-    [
-     "spent_value",
-     6,
-     "spent_value"
-    ],
-    [
-     "own_argument",
-     7,
-     "own_argument"
-    ],
-    [
-     "own_function_value",
-     8,
-     "own_function_value"
-    ],
-    [
-     "result_not_owned",
-     9,
-     "result_not_owned"
-    ],
-    [
-     "lent_result_value",
-     10,
-     "lent_result_value"
-    ],
-    [
-     "kept_value",
-     11,
-     "kept_value"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.core.Diagnostic",
-   "kind": "slice",
-   "goose": "blot_check_core::Diagnostic[:]",
-   "children": [
-    "check.core.Diagnostic"
-   ]
-  },
-  {
-   "name": "usize",
-   "kind": "primitive",
-   "goose": "i64",
-   "primitive": "usize"
-  },
-  {
-   "name": "reuse.principal_interface.Interface",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Interface",
-   "fields": [
-    [
-     "has_rank_contracts",
-     "bool",
-     "has_rank_contracts"
-    ],
-    [
-     "has_usage_contracts",
-     "bool",
-     "has_usage_contracts"
-    ],
-    [
-     "has_numeric_proofs",
-     "bool",
-     "has_numeric_proofs"
-    ],
-    [
-     "proof_contracts",
-     "[]check.numeric_proof_headers.Named",
-     "proof_contracts"
-    ],
-    [
-     "capability_contracts",
-     "check.capability_contracts.Collection",
-     "capability_contracts"
-    ],
-    [
-     "unit",
-     "u32",
-     "unit"
-    ],
-    [
-     "graph",
-     "check.frozen_types.Graph",
-     "graph"
-    ],
-    [
-     "patterns",
-     "check.frozen_types.PatternGraph",
-     "patterns"
-    ],
-    [
-     "bindings",
-     "[]reuse.principal_interface.Binding",
-     "bindings"
-    ],
-    [
-     "obligations",
-     "[]check.types.Obligation",
-     "obligations"
-    ],
-    [
-     "obligation_spans",
-     "[]parse.ast.Span",
-     "obligation_spans"
-    ],
-    [
-     "nominals",
-     "[]reuse.principal_interface.Nominal",
-     "nominals"
-    ],
-    [
-     "constructors",
-     "[]reuse.principal_interface.Constructor",
-     "constructors"
-    ],
-    [
-     "effect_families",
-     "[]reuse.principal_interface.EffectFamily",
-     "effect_families"
-    ],
-    [
-     "effect_templates",
-     "[]reuse.principal_interface.EffectTemplate",
-     "effect_templates"
-    ],
-    [
-     "associated",
-     "[]reuse.principal_interface.Associated",
-     "associated"
-    ],
-    [
-     "contracts",
-     "[]reuse.principal_interface.Contract",
-     "contracts"
-    ],
-    [
-     "contract_predicates",
-     "[]check.types.Obligation",
-     "contract_predicates"
-    ],
-    [
-     "contract_members",
-     "[]reuse.principal_interface.ContractMember",
-     "contract_members"
-    ],
-    [
-     "implementations",
-     "[]reuse.principal_interface.Implementation",
-     "implementations"
-    ],
-    [
-     "implementation_predicates",
-     "[]check.types.Obligation",
-     "implementation_predicates"
-    ],
-    [
-     "implementation_members",
-     "[]reuse.principal_interface.ImplementationMember",
-     "implementation_members"
-    ],
-    [
-     "member_templates",
-     "[]reuse.principal_interface.MemberTemplate",
-     "member_templates"
-    ],
-    [
-     "selected_proofs",
-     "[]reuse.principal_interface.SelectedProof",
-     "selected_proofs"
-    ],
-    [
-     "selected_members",
-     "[]reuse.principal_interface.ImplementationMember",
-     "selected_members"
-    ],
-    [
-     "selected_edges",
-     "[]u32",
-     "selected_edges"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.frozen_types.Graph",
-   "kind": "struct",
-   "goose": "blot_check_frozen_types::Graph",
-   "fields": [
-    [
-     "nodes",
-     "[]check.types.Node",
-     "nodes"
-    ],
-    [
-     "extra",
-     "[]u32",
-     "extra"
-    ],
-    [
-     "rows",
-     "[]check.effects.Row",
-     "rows"
-    ],
-    [
-     "labels",
-     "[]u32",
-     "labels"
-    ],
-    [
-     "operations",
-     "[]check.types.Operation",
-     "operations"
-    ],
-    [
-     "row_variable_count",
-     "u32",
-     "row_variable_count"
-    ],
-    [
-     "quantifier_goals",
-     "[]check.types.QuantifierGoals",
-     "quantifier_goals"
-    ],
-    [
-     "quantifier_obligations",
-     "[]check.types.Obligation",
-     "quantifier_obligations"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.frozen_types.PatternGraph",
-   "kind": "struct",
-   "goose": "blot_check_frozen_types::PatternGraph",
-   "fields": [
-    [
-     "nodes",
-     "[]check.parameter_patterns.Node",
-     "nodes"
-    ],
-    [
-     "extra",
-     "[]u32",
-     "extra"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.parameter_patterns.Node",
-   "kind": "struct",
-   "goose": "blot_check_parameter_patterns::Node",
-   "fields": [
-    [
-     "kind",
-     "check.parameter_patterns.Kind",
-     "kind"
-    ],
-    [
-     "a",
-     "u32",
-     "a"
-    ],
-    [
-     "b",
-     "u32",
-     "b"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "check.parameter_patterns.Kind",
-   "kind": "enum",
-   "goose": "blot_check_parameter_patterns::Kind",
-   "variants": [
-    [
-     "binding",
-     0,
-     "binding"
-    ],
-    [
-     "tuple",
-     1,
-     "tuple"
-    ],
-    [
-     "array",
-     2,
-     "array"
-    ],
-    [
-     "record",
-     3,
-     "record"
-    ]
-   ]
-  },
-  {
-   "name": "[]check.parameter_patterns.Node",
-   "kind": "slice",
-   "goose": "blot_check_parameter_patterns::Node[:]",
-   "children": [
-    "check.parameter_patterns.Node"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Binding",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Binding",
-   "fields": [
-    [
-     "capability_flow",
-     "check.capability_flow.Contract",
-     "capability_flow"
-    ],
-    [
-     "capability_parameters",
-     "check.capability_flow.Parameters",
-     "capability_parameters"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "kind",
-     "reuse.principal_interface.Kind",
-     "kind"
-    ],
-    [
-     "named_function",
-     "bool",
-     "named_function"
-    ],
-    [
-     "ty",
-     "u32",
-     "ty"
-    ],
-    [
-     "scheme",
-     "check.types.Scheme",
-     "scheme"
-    ],
-    [
-     "external",
-     "?reuse.principal_interface.ExternalTarget",
-     "external"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "?reuse.principal_interface.ExternalTarget",
-   "kind": "optional",
-   "goose": "blot_support::Option<blot_reuse_principal_interface::ExternalTarget>",
-   "children": [
-    "reuse.principal_interface.ExternalTarget"
-   ]
-  },
-  {
-   "name": "[]reuse.principal_interface.Binding",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Binding[:]",
-   "children": [
-    "reuse.principal_interface.Binding"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Nominal",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Nominal",
-   "fields": [
-    [
-     "affine",
-     "bool",
-     "affine"
-    ],
-    [
-     "has_usage",
-     "bool",
-     "has_usage"
-    ],
-    [
-     "closed_storage",
-     "bool",
-     "closed_storage"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "is_opaque",
-     "bool",
-     "is_opaque"
-    ],
-    [
-     "storage",
-     "check.opaque_storage.Storage",
-     "storage"
-    ],
-    [
-     "declaration",
-     "u32",
-     "declaration"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "patterns",
-     "check.types.List",
-     "patterns"
-    ],
-    [
-     "parameter_names",
-     "check.types.List",
-     "parameter_names"
-    ],
-    [
-     "constructors",
-     "check.types.List",
-     "constructors"
-    ],
-    [
-     "alias",
-     "u32",
-     "alias"
-    ],
-    [
-     "alias_rows",
-     "check.types.List",
-     "alias_rows"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.Nominal",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Nominal[:]",
-   "children": [
-    "reuse.principal_interface.Nominal"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Constructor",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Constructor",
-   "fields": [
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "nominal",
-     "u32",
-     "nominal"
-    ],
-    [
-     "tag",
-     "u32",
-     "tag"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "scheme",
-     "check.types.Scheme",
-     "scheme"
-    ],
-    [
-     "payload",
-     "u32",
-     "payload"
-    ],
-    [
-     "declared_record",
-     "bool",
-     "declared_record"
-    ]
-   ],
-   "unwired": [
-    "deferred_result"
-   ]
-  },
-  {
-   "name": "[]reuse.principal_interface.Constructor",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Constructor[:]",
-   "children": [
-    "reuse.principal_interface.Constructor"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.EffectFamily",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::EffectFamily",
-   "fields": [
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "callable",
-     "bool",
-     "callable"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "patterns",
-     "check.types.List",
-     "patterns"
-    ],
-    [
-     "parameter_names",
-     "check.types.List",
-     "parameter_names"
-    ],
-    [
-     "operations",
-     "check.types.List",
-     "operations"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.EffectFamily",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::EffectFamily[:]",
-   "children": [
-    "reuse.principal_interface.EffectFamily"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.EffectTemplate",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::EffectTemplate",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "family",
-     "u32",
-     "family"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "parameter",
-     "u32",
-     "parameter"
-    ],
-    [
-     "result",
-     "u32",
-     "result"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.EffectTemplate",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::EffectTemplate[:]",
-   "children": [
-    "reuse.principal_interface.EffectTemplate"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Associated",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Associated",
-   "fields": [
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "member",
-     "u32",
-     "member"
-    ],
-    [
-     "operator",
-     "check.types.Operator",
-     "operator"
-    ],
-    [
-     "binding",
-     "u32",
-     "binding"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.Associated",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Associated[:]",
-   "children": [
-    "reuse.principal_interface.Associated"
-   ]
-  },
-  {
-   "name": "reuse.principal_interface.Contract",
-   "kind": "struct",
-   "goose": "blot_reuse_principal_interface::Contract",
-   "fields": [
-    [
-     "declaration",
-     "u32",
-     "declaration"
-    ],
-    [
-     "private",
-     "bool",
-     "private"
-    ],
-    [
-     "identity",
-     "check.types.NominalIdentity",
-     "identity"
-    ],
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "parameters",
-     "check.types.List",
-     "parameters"
-    ],
-    [
-     "variables",
-     "check.types.List",
-     "variables"
-    ],
-    [
-     "patterns",
-     "check.types.List",
-     "patterns"
-    ],
-    [
-     "parameter_names",
-     "check.types.List",
-     "parameter_names"
-    ],
-    [
-     "row_variables",
-     "check.types.List",
-     "row_variables"
-    ],
-    [
-     "row_parameter_names",
-     "check.types.List",
-     "row_parameter_names"
-    ],
-    [
-     "row_parameters",
-     "check.types.List",
-     "row_parameters"
-    ],
-    [
-     "predicates",
-     "check.types.List",
-     "predicates"
-    ],
-    [
-     "members",
-     "check.types.List",
-     "members"
-    ],
-    [
-     "requires_implementation",
-     "bool",
-     "requires_implementation"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.principal_interface.Contract",
-   "kind": "slice",
-   "goose": "blot_reuse_principal_interface::Contract[:]",
-   "children": [
-    "reuse.principal_interface.Contract"
-   ]
-  },
-  {
-   "name": "reuse.frozen_dependency.Export",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::Export",
-   "fields": [
-    [
-     "name",
-     "u32",
-     "name"
-    ],
-    [
-     "target",
-     "reuse.principal_interface.ExternalTarget",
-     "target"
-    ],
-    [
-     "kind",
-     "reuse.frozen_dependency.Export.kind",
-     "kind"
-    ],
-    [
-     "catalog",
-     "u32",
-     "catalog"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "reuse.frozen_dependency.Export.kind",
-   "kind": "enum",
-   "goose": "blot_reuse_frozen_dependency::ExportKind",
-   "variants": [
-    [
-     "value",
-     0,
-     "value"
-    ],
-    [
-     "nominal",
-     1,
-     "nominal"
-    ],
-    [
-     "constructor",
-     2,
-     "constructor"
-    ],
-    [
-     "effect_family",
-     3,
-     "effect_family"
-    ],
-    [
-     "contract",
-     4,
-     "contract"
-    ],
-    [
-     "implementation",
-     5,
-     "implementation"
-    ]
-   ]
-  },
-  {
-   "name": "[]reuse.frozen_dependency.Export",
-   "kind": "slice",
-   "goose": "blot_reuse_frozen_dependency::Export[:]",
-   "children": [
-    "reuse.frozen_dependency.Export"
-   ]
-  },
-  {
-   "name": "reuse.frozen_dependency.Fixity",
-   "kind": "struct",
-   "goose": "blot_reuse_frozen_dependency::Fixity",
-   "fields": [
-    [
-     "operator",
-     "u32",
-     "operator"
-    ],
-    [
-     "target",
-     "u32",
-     "target"
-    ],
-    [
-     "precedence",
-     "u32",
-     "precedence"
-    ],
-    [
-     "association",
-     "u32",
-     "association"
-    ],
-    [
-     "named",
-     "bool",
-     "named"
-    ],
-    [
-     "producer",
-     "reuse.principal_interface.ExternalTarget",
-     "producer"
-    ]
-   ],
-   "unwired": []
-  },
-  {
-   "name": "[]reuse.frozen_dependency.Fixity",
-   "kind": "slice",
-   "goose": "blot_reuse_frozen_dependency::Fixity[:]",
-   "children": [
-    "reuse.frozen_dependency.Fixity"
-   ]
-  },
-  {
-   "name": "[]reuse.frozen_dependency.Module",
-   "kind": "slice",
-   "goose": "blot_reuse_frozen_dependency::Module[:]",
-   "children": [
-    "reuse.frozen_dependency.Module"
-   ]
-  },
-  {
-   "name": "i8",
-   "kind": "primitive",
-   "goose": "i8",
-   "primitive": "i8"
-  },
-  {
-   "name": "i16",
-   "kind": "primitive",
-   "goose": "i16",
-   "primitive": "i16"
-  },
-  {
-   "name": "i32",
-   "kind": "primitive",
-   "goose": "i32",
-   "primitive": "i32"
-  },
-  {
-   "name": "i64",
-   "kind": "primitive",
-   "goose": "i64",
-   "primitive": "i64"
-  },
-  {
-   "name": "f32",
-   "kind": "primitive",
-   "goose": "f32",
-   "primitive": "f32"
-  },
-  {
-   "name": "f64",
-   "kind": "primitive",
-   "goose": "f64",
-   "primitive": "f64"
-  }
- ]
+    },
+    {
+      "name": "[]const u32",
+      "kind": "slice",
+      "goose": "u32[:]",
+      "children": [
+        "u32"
+      ]
+    },
+    {
+      "name": "check.core.FieldName",
+      "kind": "struct",
+      "goose": "blot_check_core::FieldName",
+      "fields": [
+        [
+          "symbol",
+          "u32",
+          "symbol"
+        ],
+        [
+          "spelling",
+          "check.core.Name",
+          "spelling"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.Name",
+      "kind": "struct",
+      "goose": "blot_check_core::Name",
+      "fields": [
+        [
+          "start",
+          "u32",
+          "start"
+        ],
+        [
+          "len",
+          "u32",
+          "len"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.FieldName",
+      "kind": "slice",
+      "goose": "blot_check_core::FieldName[:]",
+      "children": [
+        "check.core.FieldName"
+      ]
+    },
+    {
+      "name": "check.core.RuntimeName",
+      "kind": "struct",
+      "goose": "blot_check_core::RuntimeName",
+      "fields": [
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "point",
+          "u32",
+          "point"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.RuntimeName",
+      "kind": "slice",
+      "goose": "blot_check_core::RuntimeName[:]",
+      "children": [
+        "check.core.RuntimeName"
+      ]
+    },
+    {
+      "name": "check.core.RequestLoopInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::RequestLoopInfo",
+      "fields": [
+        [
+          "computation",
+          "u32",
+          "computation"
+        ],
+        [
+          "action_type",
+          "u32",
+          "action_type"
+        ],
+        [
+          "value_type",
+          "u32",
+          "value_type"
+        ],
+        [
+          "result_type",
+          "u32",
+          "result_type"
+        ],
+        [
+          "state_type",
+          "u32",
+          "state_type"
+        ],
+        [
+          "arms",
+          "check.core.List",
+          "arms"
+        ],
+        [
+          "completion_pattern",
+          "u32",
+          "completion_pattern"
+        ],
+        [
+          "completion_body",
+          "u32",
+          "completion_body"
+        ],
+        [
+          "completion_state_bindings",
+          "check.core.List",
+          "completion_state_bindings"
+        ],
+        [
+          "carries",
+          "check.core.List",
+          "carries"
+        ],
+        [
+          "return_target",
+          "u32",
+          "return_target"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.List",
+      "kind": "struct",
+      "goose": "blot_check_core::List",
+      "fields": [
+        [
+          "start",
+          "u32",
+          "start"
+        ],
+        [
+          "len",
+          "u32",
+          "len"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.RequestLoopInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::RequestLoopInfo[:]",
+      "children": [
+        "check.core.RequestLoopInfo"
+      ]
+    },
+    {
+      "name": "check.core.RequestArm",
+      "kind": "struct",
+      "goose": "blot_check_core::RequestArm",
+      "fields": [
+        [
+          "operation",
+          "u32",
+          "operation"
+        ],
+        [
+          "callback",
+          "u32",
+          "callback"
+        ],
+        [
+          "selector",
+          "u32",
+          "selector"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.RequestArm",
+      "kind": "slice",
+      "goose": "blot_check_core::RequestArm[:]",
+      "children": [
+        "check.core.RequestArm"
+      ]
+    },
+    {
+      "name": "check.core.Types",
+      "kind": "struct",
+      "goose": "blot_check_core::Types",
+      "fields": [
+        [
+          "nodes",
+          "[]check.types.Node",
+          "nodes"
+        ],
+        [
+          "extra",
+          "[]u32",
+          "extra"
+        ],
+        [
+          "effects",
+          "check.core.EffectRows",
+          "effects"
+        ],
+        [
+          "operations",
+          "[]check.types.Operation",
+          "operations"
+        ]
+      ],
+      "unwired": [
+        "owner_id"
+      ]
+    },
+    {
+      "name": "check.types.Node",
+      "kind": "struct",
+      "goose": "blot_check_types::Node",
+      "fields": [
+        [
+          "tag",
+          "check.types.Tag",
+          "tag"
+        ],
+        [
+          "a",
+          "u32",
+          "a"
+        ],
+        [
+          "b",
+          "u32",
+          "b"
+        ],
+        [
+          "c",
+          "u32",
+          "c"
+        ]
+      ],
+      "unwired": [
+        "closed_height",
+        "closed_generation"
+      ]
+    },
+    {
+      "name": "check.types.Tag",
+      "kind": "enum",
+      "goose": "blot_check_types::Tag",
+      "variants": [
+        [
+          "absent",
+          0,
+          "absent"
+        ],
+        [
+          "unit",
+          1,
+          "unit"
+        ],
+        [
+          "boolean",
+          2,
+          "boolean"
+        ],
+        [
+          "u32",
+          3,
+          "unsigned32"
+        ],
+        [
+          "f32",
+          4,
+          "floating32"
+        ],
+        [
+          "never",
+          5,
+          "never"
+        ],
+        [
+          "variable",
+          6,
+          "variable"
+        ],
+        [
+          "function",
+          7,
+          "function"
+        ],
+        [
+          "product",
+          8,
+          "product"
+        ],
+        [
+          "record",
+          9,
+          "record"
+        ],
+        [
+          "nominal",
+          10,
+          "nominal"
+        ],
+        [
+          "array",
+          11,
+          "array"
+        ],
+        [
+          "list",
+          12,
+          "list"
+        ],
+        [
+          "cursor",
+          13,
+          "cursor"
+        ],
+        [
+          "type_constructor",
+          14,
+          "type_constructor"
+        ],
+        [
+          "resolver",
+          15,
+          "resolver"
+        ],
+        [
+          "provider",
+          16,
+          "provider"
+        ],
+        [
+          "state_provider",
+          17,
+          "state_provider"
+        ],
+        [
+          "projection",
+          18,
+          "projection"
+        ],
+        [
+          "scoped",
+          19,
+          "scoped"
+        ],
+        [
+          "instance_selection",
+          20,
+          "instance_selection"
+        ],
+        [
+          "erased_proof",
+          21,
+          "erased_proof"
+        ],
+        [
+          "forall",
+          22,
+          "forall"
+        ],
+        [
+          "existential",
+          23,
+          "existential"
+        ],
+        [
+          "bound",
+          24,
+          "bound"
+        ],
+        [
+          "rigid",
+          25,
+          "rigid"
+        ],
+        [
+          "usage",
+          26,
+          "usage"
+        ],
+        [
+          "instance_version",
+          27,
+          "instance_version"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.types.Node",
+      "kind": "slice",
+      "goose": "blot_check_types::Node[:]",
+      "children": [
+        "check.types.Node"
+      ]
+    },
+    {
+      "name": "check.core.EffectRows",
+      "kind": "struct",
+      "goose": "blot_check_core::EffectRows",
+      "fields": [
+        [
+          "rows",
+          "[]check.effects.Row",
+          "rows"
+        ],
+        [
+          "labels",
+          "[]u32",
+          "labels"
+        ],
+        [
+          "variable_count",
+          "u32",
+          "variable_count"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.effects.Row",
+      "kind": "struct",
+      "goose": "blot_check_effects::Row",
+      "fields": [
+        [
+          "labels",
+          "check.effects.List",
+          "labels"
+        ],
+        [
+          "tail",
+          "check.effects.Tail",
+          "tail"
+        ],
+        [
+          "cursor",
+          "u32",
+          "cursor"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.effects.List",
+      "kind": "struct",
+      "goose": "blot_check_effects::List",
+      "fields": [
+        [
+          "start",
+          "u32",
+          "start"
+        ],
+        [
+          "len",
+          "u32",
+          "len"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.effects.Tail",
+      "kind": "union",
+      "goose": "blot_check_effects::Tail",
+      "variants": [
+        [
+          "closed",
+          0,
+          "closed",
+          "void",
+          []
+        ],
+        [
+          "variable",
+          1,
+          "variable",
+          "u32",
+          [
+            [
+              "value",
+              "u32"
+            ]
+          ]
+        ],
+        [
+          "parameter",
+          2,
+          "parameter",
+          "u32",
+          [
+            [
+              "value",
+              "u32"
+            ]
+          ]
+        ],
+        [
+          "formal",
+          3,
+          "formal",
+          "u32",
+          [
+            [
+              "value",
+              "u32"
+            ]
+          ]
+        ]
+      ],
+      "tag": "@typeInfo(check.effects.Tail).@\"union\".tag_type.?"
+    },
+    {
+      "name": "@typeInfo(check.effects.Tail).@\"union\".tag_type.?",
+      "kind": "union_tag",
+      "goose": "u32",
+      "variants": [
+        [
+          "closed",
+          0,
+          "closed"
+        ],
+        [
+          "variable",
+          1,
+          "variable"
+        ],
+        [
+          "parameter",
+          2,
+          "parameter"
+        ],
+        [
+          "formal",
+          3,
+          "formal"
+        ]
+      ]
+    },
+    {
+      "name": "void",
+      "kind": "primitive",
+      "goose": "Void",
+      "primitive": "void"
+    },
+    {
+      "name": "[]check.effects.Row",
+      "kind": "slice",
+      "goose": "blot_check_effects::Row[:]",
+      "children": [
+        "check.effects.Row"
+      ]
+    },
+    {
+      "name": "check.types.Operation",
+      "kind": "struct",
+      "goose": "blot_check_types::Operation",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "arguments",
+          "check.types.List",
+          "arguments"
+        ],
+        [
+          "instance",
+          "check.types.NominalIdentity",
+          "instance"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.types.NominalIdentity",
+      "kind": "struct",
+      "goose": "blot_check_types::NominalIdentity",
+      "fields": [
+        [
+          "unit",
+          "u32",
+          "unit"
+        ],
+        [
+          "decl",
+          "u32",
+          "decl"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.types.List",
+      "kind": "struct",
+      "goose": "blot_check_types::List",
+      "fields": [
+        [
+          "start",
+          "u32",
+          "start"
+        ],
+        [
+          "len",
+          "u32",
+          "len"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.types.Operation",
+      "kind": "slice",
+      "goose": "blot_check_types::Operation[:]",
+      "children": [
+        "check.types.Operation"
+      ]
+    },
+    {
+      "name": "check.types.Obligation",
+      "kind": "struct",
+      "goose": "blot_check_types::Obligation",
+      "fields": [
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "kind",
+          "check.types.ObligationKind",
+          "kind"
+        ],
+        [
+          "source",
+          "u32",
+          "source"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "result",
+          "u32",
+          "result"
+        ],
+        [
+          "other",
+          "u32",
+          "other"
+        ],
+        [
+          "signature",
+          "u32",
+          "signature"
+        ],
+        [
+          "operator",
+          "check.types.Operator",
+          "operator"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "explicit",
+          "bool",
+          "explicit"
+        ],
+        [
+          "qualification_span",
+          "?parse.ast.Span",
+          "qualification_span"
+        ],
+        [
+          "qualification_unit",
+          "u32",
+          "qualification_unit"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.types.ObligationKind",
+      "kind": "enum",
+      "goose": "blot_check_types::ObligationKind",
+      "variants": [
+        [
+          "arithmetic",
+          0,
+          "arithmetic"
+        ],
+        [
+          "ordered",
+          1,
+          "ordered"
+        ],
+        [
+          "equality",
+          2,
+          "equality"
+        ],
+        [
+          "integer",
+          3,
+          "integer"
+        ],
+        [
+          "field",
+          4,
+          "field"
+        ],
+        [
+          "writable_field",
+          5,
+          "writable_field"
+        ],
+        [
+          "dispatch",
+          6,
+          "dispatch"
+        ],
+        [
+          "result_dispatch",
+          7,
+          "result_dispatch"
+        ],
+        [
+          "monad_factory",
+          8,
+          "monad_factory"
+        ],
+        [
+          "resolver_dispatch",
+          9,
+          "resolver_dispatch"
+        ],
+        [
+          "resolver_shape",
+          10,
+          "resolver_shape"
+        ],
+        [
+          "effect_operation",
+          11,
+          "effect_operation"
+        ],
+        [
+          "effect_handler",
+          12,
+          "effect_handler"
+        ],
+        [
+          "receiver",
+          13,
+          "receiver"
+        ],
+        [
+          "update",
+          14,
+          "update"
+        ],
+        [
+          "type_rep",
+          15,
+          "type_rep"
+        ],
+        [
+          "effect_rep",
+          16,
+          "effect_rep"
+        ],
+        [
+          "type_head",
+          17,
+          "type_head"
+        ],
+        [
+          "collection",
+          18,
+          "collection"
+        ],
+        [
+          "record_merge",
+          19,
+          "record_merge"
+        ],
+        [
+          "callee_use",
+          20,
+          "callee_use"
+        ],
+        [
+          "type_eq",
+          21,
+          "type_eq"
+        ],
+        [
+          "contract",
+          22,
+          "contract"
+        ],
+        [
+          "task_receive",
+          23,
+          "task_receive"
+        ]
+      ]
+    },
+    {
+      "name": "check.types.Operator",
+      "kind": "enum",
+      "goose": "blot_check_types::Operator",
+      "variants": [
+        [
+          "none",
+          0,
+          "none"
+        ],
+        [
+          "add",
+          1,
+          "add"
+        ],
+        [
+          "sub",
+          2,
+          "sub"
+        ],
+        [
+          "mul",
+          3,
+          "mul"
+        ],
+        [
+          "div",
+          4,
+          "div"
+        ],
+        [
+          "rem",
+          5,
+          "rem"
+        ],
+        [
+          "equal",
+          6,
+          "equal"
+        ],
+        [
+          "not_equal",
+          7,
+          "not_equal"
+        ],
+        [
+          "less",
+          8,
+          "less"
+        ],
+        [
+          "less_equal",
+          9,
+          "less_equal"
+        ],
+        [
+          "greater",
+          10,
+          "greater"
+        ],
+        [
+          "greater_equal",
+          11,
+          "greater_equal"
+        ],
+        [
+          "bit_and",
+          12,
+          "bit_and"
+        ],
+        [
+          "bit_or",
+          13,
+          "bit_or"
+        ],
+        [
+          "bit_xor",
+          14,
+          "bit_xor"
+        ],
+        [
+          "shift_left",
+          15,
+          "shift_left"
+        ],
+        [
+          "shift_right",
+          16,
+          "shift_right"
+        ]
+      ]
+    },
+    {
+      "name": "parse.ast.Span",
+      "kind": "struct",
+      "goose": "blot_parse_ast::Span",
+      "fields": [
+        [
+          "start",
+          "u32",
+          "start"
+        ],
+        [
+          "end",
+          "u32",
+          "end"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "?parse.ast.Span",
+      "kind": "optional",
+      "goose": "blot_support::Option<blot_parse_ast::Span>",
+      "children": [
+        "parse.ast.Span"
+      ]
+    },
+    {
+      "name": "[]check.types.Obligation",
+      "kind": "slice",
+      "goose": "blot_check_types::Obligation[:]",
+      "children": [
+        "check.types.Obligation"
+      ]
+    },
+    {
+      "name": "check.core.Node",
+      "kind": "struct",
+      "goose": "blot_check_core::Node",
+      "fields": [
+        [
+          "tag",
+          "check.core.Tag",
+          "tag"
+        ],
+        [
+          "op",
+          "check.core.Op",
+          "op"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "a",
+          "u32",
+          "a"
+        ],
+        [
+          "b",
+          "u32",
+          "b"
+        ],
+        [
+          "c",
+          "u32",
+          "c"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.Tag",
+      "kind": "enum",
+      "goose": "blot_check_core::Tag",
+      "variants": [
+        [
+          "invalid",
+          0,
+          "invalid"
+        ],
+        [
+          "constant",
+          1,
+          "constant"
+        ],
+        [
+          "reference",
+          2,
+          "reference"
+        ],
+        [
+          "scalar",
+          3,
+          "scalar"
+        ],
+        [
+          "logical",
+          4,
+          "logical"
+        ],
+        [
+          "call",
+          5,
+          "call"
+        ],
+        [
+          "if_value",
+          6,
+          "if_value"
+        ],
+        [
+          "block",
+          7,
+          "block_"
+        ],
+        [
+          "suite",
+          8,
+          "suite"
+        ],
+        [
+          "bind",
+          9,
+          "bind"
+        ],
+        [
+          "return_",
+          10,
+          "return_"
+        ],
+        [
+          "if_stmt",
+          11,
+          "if_stmt"
+        ],
+        [
+          "product",
+          12,
+          "product"
+        ],
+        [
+          "record",
+          13,
+          "record"
+        ],
+        [
+          "construct",
+          14,
+          "construct"
+        ],
+        [
+          "project",
+          15,
+          "project"
+        ],
+        [
+          "match",
+          16,
+          "match_"
+        ],
+        [
+          "pattern_bind",
+          17,
+          "pattern_bind"
+        ],
+        [
+          "update",
+          18,
+          "update"
+        ],
+        [
+          "array",
+          19,
+          "array"
+        ],
+        [
+          "array_op",
+          20,
+          "array_op"
+        ],
+        [
+          "closure",
+          21,
+          "closure"
+        ],
+        [
+          "apply",
+          22,
+          "apply"
+        ],
+        [
+          "constructor_function",
+          23,
+          "constructor_function"
+        ],
+        [
+          "associated",
+          24,
+          "associated"
+        ],
+        [
+          "primitive_function",
+          25,
+          "primitive_function"
+        ],
+        [
+          "panic",
+          26,
+          "panic"
+        ],
+        [
+          "loop",
+          27,
+          "loop_"
+        ],
+        [
+          "break_",
+          28,
+          "break_"
+        ],
+        [
+          "type_same",
+          29,
+          "type_same"
+        ],
+        [
+          "result_associated",
+          30,
+          "result_associated"
+        ],
+        [
+          "type_constructor",
+          31,
+          "type_constructor"
+        ],
+        [
+          "resolver_op",
+          32,
+          "resolver_op"
+        ],
+        [
+          "operation_value",
+          33,
+          "operation_value"
+        ],
+        [
+          "effect_provider",
+          34,
+          "effect_provider"
+        ],
+        [
+          "state_provider",
+          35,
+          "state_provider"
+        ],
+        [
+          "handle",
+          36,
+          "handle"
+        ],
+        [
+          "effect_reflection",
+          37,
+          "effect_reflection"
+        ],
+        [
+          "computation",
+          38,
+          "computation"
+        ],
+        [
+          "request_loop",
+          39,
+          "request_loop"
+        ],
+        [
+          "request_decision",
+          40,
+          "request_decision"
+        ],
+        [
+          "record_merge",
+          41,
+          "record_merge"
+        ],
+        [
+          "contract_method",
+          42,
+          "contract_method"
+        ],
+        [
+          "effect_scope",
+          43,
+          "effect_scope"
+        ],
+        [
+          "proof_guard",
+          44,
+          "proof_guard"
+        ],
+        [
+          "package_pack",
+          45,
+          "package_pack"
+        ],
+        [
+          "package_unpack",
+          46,
+          "package_unpack"
+        ],
+        [
+          "staging",
+          47,
+          "staging"
+        ],
+        [
+          "usage_borrow",
+          48,
+          "usage_borrow"
+        ],
+        [
+          "usage_read",
+          49,
+          "usage_read"
+        ],
+        [
+          "resource_scope",
+          50,
+          "resource_scope"
+        ],
+        [
+          "usage_share",
+          51,
+          "usage_share"
+        ],
+        [
+          "resource_acquire",
+          52,
+          "resource_acquire"
+        ],
+        [
+          "resource_release",
+          53,
+          "resource_release"
+        ],
+        [
+          "task",
+          54,
+          "task"
+        ],
+        [
+          "storage",
+          55,
+          "storage"
+        ],
+        [
+          "fork_",
+          56,
+          "fork_"
+        ],
+        [
+          "with_handle",
+          57,
+          "with_handle"
+        ],
+        [
+          "comptime_for",
+          58,
+          "comptime_for"
+        ],
+        [
+          "comptime_if",
+          59,
+          "comptime_if"
+        ],
+        [
+          "comptime_meta",
+          60,
+          "comptime_meta"
+        ]
+      ]
+    },
+    {
+      "name": "check.core.Op",
+      "kind": "enum",
+      "goose": "blot_check_core::Op",
+      "variants": [
+        [
+          "none",
+          0,
+          "none"
+        ],
+        [
+          "add",
+          1,
+          "add"
+        ],
+        [
+          "sub",
+          2,
+          "sub"
+        ],
+        [
+          "mul",
+          3,
+          "mul"
+        ],
+        [
+          "div",
+          4,
+          "div"
+        ],
+        [
+          "rem",
+          5,
+          "rem"
+        ],
+        [
+          "equal",
+          6,
+          "equal"
+        ],
+        [
+          "not_equal",
+          7,
+          "not_equal"
+        ],
+        [
+          "less",
+          8,
+          "less"
+        ],
+        [
+          "less_equal",
+          9,
+          "less_equal"
+        ],
+        [
+          "greater",
+          10,
+          "greater"
+        ],
+        [
+          "greater_equal",
+          11,
+          "greater_equal"
+        ],
+        [
+          "bit_and",
+          12,
+          "bit_and"
+        ],
+        [
+          "bit_or",
+          13,
+          "bit_or"
+        ],
+        [
+          "bit_xor",
+          14,
+          "bit_xor"
+        ],
+        [
+          "shift_left",
+          15,
+          "shift_left"
+        ],
+        [
+          "shift_right",
+          16,
+          "shift_right"
+        ],
+        [
+          "and_",
+          17,
+          "and_"
+        ],
+        [
+          "or_",
+          18,
+          "or_"
+        ],
+        [
+          "neg",
+          19,
+          "neg"
+        ],
+        [
+          "abs",
+          20,
+          "abs"
+        ],
+        [
+          "ceil",
+          21,
+          "ceil"
+        ],
+        [
+          "floor",
+          22,
+          "floor"
+        ],
+        [
+          "trunc",
+          23,
+          "trunc"
+        ],
+        [
+          "sqrt",
+          24,
+          "sqrt"
+        ],
+        [
+          "convert_u32_f32",
+          25,
+          "convert_u32_f32"
+        ],
+        [
+          "convert_f32_u32",
+          26,
+          "convert_f32_u32"
+        ],
+        [
+          "shift_right_signed",
+          27,
+          "shift_right_signed"
+        ],
+        [
+          "min",
+          28,
+          "min"
+        ],
+        [
+          "max",
+          29,
+          "max"
+        ],
+        [
+          "bit_not",
+          30,
+          "bit_not"
+        ],
+        [
+          "bit_andnot",
+          31,
+          "bit_andnot"
+        ],
+        [
+          "any_true",
+          32,
+          "any_true"
+        ],
+        [
+          "all_true",
+          33,
+          "all_true"
+        ],
+        [
+          "select",
+          34,
+          "select"
+        ],
+        [
+          "shuffle",
+          35,
+          "shuffle"
+        ],
+        [
+          "swizzle",
+          36,
+          "swizzle"
+        ],
+        [
+          "broadcast",
+          37,
+          "broadcast"
+        ],
+        [
+          "bits",
+          38,
+          "bits"
+        ],
+        [
+          "from_bits",
+          39,
+          "from_bits"
+        ],
+        [
+          "relaxed_madd",
+          40,
+          "relaxed_madd"
+        ],
+        [
+          "relaxed_nmadd",
+          41,
+          "relaxed_nmadd"
+        ],
+        [
+          "convert_i32_f32",
+          42,
+          "convert_i32_f32"
+        ],
+        [
+          "convert_f32_i32",
+          43,
+          "convert_f32_i32"
+        ],
+        [
+          "continue_",
+          44,
+          "continue_"
+        ],
+        [
+          "not_",
+          45,
+          "not_"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.Node",
+      "kind": "slice",
+      "goose": "blot_check_core::Node[:]",
+      "children": [
+        "check.core.Node"
+      ]
+    },
+    {
+      "name": "[]parse.ast.Span",
+      "kind": "slice",
+      "goose": "blot_parse_ast::Span[:]",
+      "children": [
+        "parse.ast.Span"
+      ]
+    },
+    {
+      "name": "check.core.Binding",
+      "kind": "struct",
+      "goose": "blot_check_core::Binding",
+      "fields": [
+        [
+          "capability_parameters",
+          "check.capability_flow.Parameters",
+          "capability_parameters"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "initializer",
+          "u32",
+          "initializer"
+        ],
+        [
+          "kind",
+          "reuse.principal_interface.Kind",
+          "kind"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "scheme",
+          "check.types.Scheme",
+          "scheme"
+        ],
+        [
+          "public_variables",
+          "check.types.List",
+          "public_variables"
+        ],
+        [
+          "public_rows",
+          "check.types.List",
+          "public_rows"
+        ],
+        [
+          "has_explicit",
+          "bool",
+          "has_explicit"
+        ],
+        [
+          "body_id",
+          "u32",
+          "body_id"
+        ],
+        [
+          "target",
+          "check.core.BindingRef",
+          "target"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.capability_flow.Parameters",
+      "kind": "struct",
+      "goose": "blot_check_capability_flow::Parameters",
+      "fields": [
+        [
+          "own",
+          "u32",
+          "own"
+        ],
+        [
+          "own_count",
+          "u8",
+          "own_count"
+        ],
+        [
+          "owned_results",
+          "bool",
+          "owned_results"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "u16",
+      "kind": "primitive",
+      "goose": "u16",
+      "primitive": "u16"
+    },
+    {
+      "name": "u64",
+      "kind": "primitive",
+      "goose": "u64",
+      "primitive": "u64"
+    },
+    {
+      "name": "reuse.principal_interface.Kind",
+      "kind": "enum",
+      "goose": "blot_reuse_principal_interface::Kind",
+      "variants": [
+        [
+          "global",
+          0,
+          "global"
+        ],
+        [
+          "local",
+          1,
+          "local"
+        ],
+        [
+          "parameter",
+          2,
+          "parameter"
+        ],
+        [
+          "external",
+          3,
+          "external"
+        ]
+      ]
+    },
+    {
+      "name": "check.types.Scheme",
+      "kind": "struct",
+      "goose": "blot_check_types::Scheme",
+      "fields": [
+        [
+          "root",
+          "u32",
+          "root"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "row_variables",
+          "check.types.List",
+          "row_variables"
+        ],
+        [
+          "closed_rows",
+          "check.types.List",
+          "closed_rows"
+        ],
+        [
+          "obligations",
+          "check.types.List",
+          "obligations"
+        ],
+        [
+          "generative",
+          "check.types.List",
+          "generative"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.BindingRef",
+      "kind": "struct",
+      "goose": "blot_check_core::BindingRef",
+      "fields": [
+        [
+          "unit",
+          "u32",
+          "unit"
+        ],
+        [
+          "binding",
+          "u32",
+          "binding"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Binding",
+      "kind": "slice",
+      "goose": "blot_check_core::Binding[:]",
+      "children": [
+        "check.core.Binding"
+      ]
+    },
+    {
+      "name": "check.core.Body",
+      "kind": "struct",
+      "goose": "blot_check_core::Body",
+      "fields": [
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "root",
+          "u32",
+          "root"
+        ],
+        [
+          "parameters",
+          "check.core.List",
+          "parameters"
+        ],
+        [
+          "scheme",
+          "check.types.Scheme",
+          "scheme"
+        ],
+        [
+          "closed_rows",
+          "check.types.List",
+          "closed_rows"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ],
+        [
+          "declaration_name",
+          "check.core.Name",
+          "declaration_name"
+        ],
+        [
+          "export_name",
+          "check.core.Name",
+          "export_name"
+        ],
+        [
+          "exported",
+          "bool",
+          "exported"
+        ],
+        [
+          "runtime",
+          "bool",
+          "runtime"
+        ],
+        [
+          "is_function",
+          "bool",
+          "is_function"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Body",
+      "kind": "slice",
+      "goose": "blot_check_core::Body[:]",
+      "children": [
+        "check.core.Body"
+      ]
+    },
+    {
+      "name": "check.core.Parameter",
+      "kind": "struct",
+      "goose": "blot_check_core::Parameter",
+      "fields": [
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ],
+        [
+          "inferred",
+          "bool",
+          "inferred"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Parameter",
+      "kind": "slice",
+      "goose": "blot_check_core::Parameter[:]",
+      "children": [
+        "check.core.Parameter"
+      ]
+    },
+    {
+      "name": "[]check.core.BindingRef",
+      "kind": "slice",
+      "goose": "blot_check_core::BindingRef[:]",
+      "children": [
+        "check.core.BindingRef"
+      ]
+    },
+    {
+      "name": "check.core.CallInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::CallInfo",
+      "fields": [
+        [
+          "target",
+          "check.core.BindingRef",
+          "target"
+        ],
+        [
+          "callee_type",
+          "u32",
+          "callee_type"
+        ],
+        [
+          "own",
+          "u32",
+          "own"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.CallInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::CallInfo[:]",
+      "children": [
+        "check.core.CallInfo"
+      ]
+    },
+    {
+      "name": "check.core.Merge",
+      "kind": "struct",
+      "goose": "blot_check_core::Merge",
+      "fields": [
+        [
+          "node",
+          "u32",
+          "node"
+        ],
+        [
+          "result",
+          "u32",
+          "result"
+        ],
+        [
+          "then_binding",
+          "u32",
+          "then_binding"
+        ],
+        [
+          "else_binding",
+          "u32",
+          "else_binding"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Merge",
+      "kind": "slice",
+      "goose": "blot_check_core::Merge[:]",
+      "children": [
+        "check.core.Merge"
+      ]
+    },
+    {
+      "name": "[]check.core.List",
+      "kind": "slice",
+      "goose": "blot_check_core::List[:]",
+      "children": [
+        "check.core.List"
+      ]
+    },
+    {
+      "name": "check.core.Obligation",
+      "kind": "struct",
+      "goose": "blot_check_core::Obligation",
+      "fields": [
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "kind",
+          "check.types.ObligationKind",
+          "kind"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "result",
+          "u32",
+          "result"
+        ],
+        [
+          "other",
+          "u32",
+          "other"
+        ],
+        [
+          "signature",
+          "u32",
+          "signature"
+        ],
+        [
+          "operator",
+          "check.types.Operator",
+          "operator"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "explicit",
+          "bool",
+          "explicit"
+        ],
+        [
+          "qualification_span",
+          "?parse.ast.Span",
+          "qualification_span"
+        ],
+        [
+          "qualification_unit",
+          "u32",
+          "qualification_unit"
+        ],
+        [
+          "diagnostic_name",
+          "check.core.Name",
+          "diagnostic_name"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Obligation",
+      "kind": "slice",
+      "goose": "blot_check_core::Obligation[:]",
+      "children": [
+        "check.core.Obligation"
+      ]
+    },
+    {
+      "name": "check.core.Nominal",
+      "kind": "struct",
+      "goose": "blot_check_core::Nominal",
+      "fields": [
+        [
+          "affine",
+          "bool",
+          "affine"
+        ],
+        [
+          "has_usage",
+          "bool",
+          "has_usage"
+        ],
+        [
+          "closed_storage",
+          "bool",
+          "closed_storage"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "is_opaque",
+          "bool",
+          "is_opaque"
+        ],
+        [
+          "storage",
+          "check.opaque_storage.Storage",
+          "storage"
+        ],
+        [
+          "diagnostic_name",
+          "check.core.Name",
+          "diagnostic_name"
+        ],
+        [
+          "diagnostic_origin",
+          "check.core.Name",
+          "diagnostic_origin"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "constructors",
+          "check.core.List",
+          "constructors"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.opaque_storage.Storage",
+      "kind": "struct",
+      "goose": "blot_backend_opaque_storage::Storage",
+      "fields": [
+        [
+          "kind",
+          "check.opaque_storage.Storage.kind",
+          "kind"
+        ],
+        [
+          "parameter",
+          "u32",
+          "parameter"
+        ],
+        [
+          "selector",
+          "u32",
+          "selector"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.opaque_storage.Storage.kind",
+      "kind": "enum",
+      "goose": "blot_backend_opaque_storage::Kind",
+      "variants": [
+        [
+          "unknown",
+          0,
+          "unknown"
+        ],
+        [
+          "unit",
+          1,
+          "unit"
+        ],
+        [
+          "boolean",
+          2,
+          "boolean"
+        ],
+        [
+          "u32",
+          3,
+          "unsigned32"
+        ],
+        [
+          "f32",
+          4,
+          "floating32"
+        ],
+        [
+          "reference",
+          5,
+          "reference"
+        ],
+        [
+          "parameter",
+          6,
+          "parameter"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.Nominal",
+      "kind": "slice",
+      "goose": "blot_check_core::Nominal[:]",
+      "children": [
+        "check.core.Nominal"
+      ]
+    },
+    {
+      "name": "check.core.OperationName",
+      "kind": "struct",
+      "goose": "blot_check_core::OperationName",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "diagnostic_name",
+          "check.core.Name",
+          "diagnostic_name"
+        ],
+        [
+          "diagnostic_origin",
+          "check.core.Name",
+          "diagnostic_origin"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "parameter",
+          "u32",
+          "parameter"
+        ],
+        [
+          "result",
+          "u32",
+          "result"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.OperationName",
+      "kind": "slice",
+      "goose": "blot_check_core::OperationName[:]",
+      "children": [
+        "check.core.OperationName"
+      ]
+    },
+    {
+      "name": "check.core.Constructor",
+      "kind": "struct",
+      "goose": "blot_check_core::Constructor",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "nominal",
+          "u32",
+          "nominal"
+        ],
+        [
+          "tag",
+          "u32",
+          "tag"
+        ],
+        [
+          "scheme",
+          "check.types.Scheme",
+          "scheme"
+        ],
+        [
+          "payload",
+          "u32",
+          "payload"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Constructor",
+      "kind": "slice",
+      "goose": "blot_check_core::Constructor[:]",
+      "children": [
+        "check.core.Constructor"
+      ]
+    },
+    {
+      "name": "check.core.TypeTag",
+      "kind": "struct",
+      "goose": "blot_check_core::TypeTag",
+      "fields": [
+        [
+          "nominal",
+          "check.types.NominalIdentity",
+          "nominal"
+        ],
+        [
+          "constructor_tag",
+          "u32",
+          "constructor_tag"
+        ],
+        [
+          "field_name",
+          "u32",
+          "field_name"
+        ],
+        [
+          "has_default",
+          "bool",
+          "has_default"
+        ],
+        [
+          "value",
+          "u32",
+          "value"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.TypeTag",
+      "kind": "slice",
+      "goose": "blot_check_core::TypeTag[:]",
+      "children": [
+        "check.core.TypeTag"
+      ]
+    },
+    {
+      "name": "check.core.Projection",
+      "kind": "struct",
+      "goose": "blot_check_core::Projection",
+      "fields": [
+        [
+          "nominal",
+          "check.types.NominalIdentity",
+          "nominal"
+        ],
+        [
+          "field",
+          "u32",
+          "field"
+        ],
+        [
+          "source_type",
+          "u32",
+          "source_type"
+        ],
+        [
+          "result_type",
+          "u32",
+          "result_type"
+        ],
+        [
+          "variants",
+          "check.core.List",
+          "variants"
+        ],
+        [
+          "diagnostic_point",
+          "u32",
+          "diagnostic_point"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Projection",
+      "kind": "slice",
+      "goose": "blot_check_core::Projection[:]",
+      "children": [
+        "check.core.Projection"
+      ]
+    },
+    {
+      "name": "check.core.ProjectionVariant",
+      "kind": "struct",
+      "goose": "blot_check_core::ProjectionVariant",
+      "fields": [
+        [
+          "tag",
+          "u32",
+          "tag"
+        ],
+        [
+          "field",
+          "u32",
+          "field"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.ProjectionVariant",
+      "kind": "slice",
+      "goose": "blot_check_core::ProjectionVariant[:]",
+      "children": [
+        "check.core.ProjectionVariant"
+      ]
+    },
+    {
+      "name": "check.core.Pattern",
+      "kind": "struct",
+      "goose": "blot_check_core::Pattern",
+      "fields": [
+        [
+          "tag",
+          "check.core.PatternTag",
+          "tag"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "a",
+          "u32",
+          "a"
+        ],
+        [
+          "b",
+          "u32",
+          "b"
+        ],
+        [
+          "c",
+          "u32",
+          "c"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.PatternTag",
+      "kind": "enum",
+      "goose": "blot_check_core::PatternTag",
+      "variants": [
+        [
+          "invalid",
+          0,
+          "invalid"
+        ],
+        [
+          "wildcard",
+          1,
+          "wildcard"
+        ],
+        [
+          "bind",
+          2,
+          "bind"
+        ],
+        [
+          "constant",
+          3,
+          "constant"
+        ],
+        [
+          "value",
+          4,
+          "value"
+        ],
+        [
+          "product",
+          5,
+          "product"
+        ],
+        [
+          "constructor",
+          6,
+          "constructor"
+        ],
+        [
+          "record_payload",
+          7,
+          "record_payload"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.Pattern",
+      "kind": "slice",
+      "goose": "blot_check_core::Pattern[:]",
+      "children": [
+        "check.core.Pattern"
+      ]
+    },
+    {
+      "name": "check.core.PatternRow",
+      "kind": "struct",
+      "goose": "blot_check_core::PatternRow",
+      "fields": [
+        [
+          "patterns",
+          "check.core.List",
+          "patterns"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.PatternRow",
+      "kind": "slice",
+      "goose": "blot_check_core::PatternRow[:]",
+      "children": [
+        "check.core.PatternRow"
+      ]
+    },
+    {
+      "name": "check.core.MatchArm",
+      "kind": "struct",
+      "goose": "blot_check_core::MatchArm",
+      "fields": [
+        [
+          "rows",
+          "check.core.List",
+          "rows"
+        ],
+        [
+          "guard",
+          "u32",
+          "guard_"
+        ],
+        [
+          "body",
+          "u32",
+          "body"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.MatchArm",
+      "kind": "slice",
+      "goose": "blot_check_core::MatchArm[:]",
+      "children": [
+        "check.core.MatchArm"
+      ]
+    },
+    {
+      "name": "check.core.MatchInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::MatchInfo",
+      "fields": [
+        [
+          "inputs",
+          "check.core.List",
+          "inputs"
+        ],
+        [
+          "arms",
+          "check.core.List",
+          "arms"
+        ],
+        [
+          "statement",
+          "bool",
+          "statement"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.MatchInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::MatchInfo[:]",
+      "children": [
+        "check.core.MatchInfo"
+      ]
+    },
+    {
+      "name": "check.core.UpdateInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::UpdateInfo",
+      "fields": [
+        [
+          "root",
+          "u32",
+          "root"
+        ],
+        [
+          "path",
+          "check.core.List",
+          "path"
+        ],
+        [
+          "value",
+          "u32",
+          "value"
+        ],
+        [
+          "self_binding",
+          "u32",
+          "self_binding"
+        ],
+        [
+          "selectors",
+          "check.core.List",
+          "selectors"
+        ],
+        [
+          "store",
+          "bool",
+          "store"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.UpdateInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::UpdateInfo[:]",
+      "children": [
+        "check.core.UpdateInfo"
+      ]
+    },
+    {
+      "name": "check.core.UpdateStep",
+      "kind": "struct",
+      "goose": "blot_check_core::UpdateStep",
+      "fields": [
+        [
+          "kind",
+          "check.core.UpdateKind",
+          "kind"
+        ],
+        [
+          "projection",
+          "u32",
+          "projection"
+        ],
+        [
+          "index",
+          "u32",
+          "index"
+        ],
+        [
+          "source_type",
+          "u32",
+          "source_type"
+        ],
+        [
+          "result_type",
+          "u32",
+          "result_type"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.UpdateKind",
+      "kind": "enum",
+      "goose": "blot_check_core::UpdateKind",
+      "variants": [
+        [
+          "field",
+          0,
+          "field"
+        ],
+        [
+          "index",
+          1,
+          "index"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.UpdateStep",
+      "kind": "slice",
+      "goose": "blot_check_core::UpdateStep[:]",
+      "children": [
+        "check.core.UpdateStep"
+      ]
+    },
+    {
+      "name": "check.core.ClosureInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::ClosureInfo",
+      "fields": [
+        [
+          "qualifier",
+          "u32",
+          "qualifier"
+        ],
+        [
+          "body",
+          "u32",
+          "body"
+        ],
+        [
+          "parameter",
+          "check.core.Parameter",
+          "parameter"
+        ],
+        [
+          "captures",
+          "check.core.List",
+          "captures"
+        ],
+        [
+          "function_type",
+          "u32",
+          "function_type"
+        ],
+        [
+          "closed_rows",
+          "check.types.List",
+          "closed_rows"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.ClosureInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::ClosureInfo[:]",
+      "children": [
+        "check.core.ClosureInfo"
+      ]
+    },
+    {
+      "name": "check.core.Associated",
+      "kind": "struct",
+      "goose": "blot_check_core::Associated",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "member",
+          "u32",
+          "member"
+        ],
+        [
+          "operator",
+          "check.types.Operator",
+          "operator"
+        ],
+        [
+          "target",
+          "check.core.BindingRef",
+          "target"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Associated",
+      "kind": "slice",
+      "goose": "blot_check_core::Associated[:]",
+      "children": [
+        "check.core.Associated"
+      ]
+    },
+    {
+      "name": "check.core.Contract",
+      "kind": "struct",
+      "goose": "blot_check_core::Contract",
+      "fields": [
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "row_variables",
+          "check.types.List",
+          "row_variables"
+        ],
+        [
+          "predicates",
+          "check.types.List",
+          "predicates"
+        ],
+        [
+          "members",
+          "check.types.List",
+          "members"
+        ],
+        [
+          "requires_implementation",
+          "bool",
+          "requires_implementation"
+        ],
+        [
+          "row_parameter_names",
+          "check.types.List",
+          "row_parameter_names"
+        ],
+        [
+          "row_parameters",
+          "check.types.List",
+          "row_parameters"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.Contract",
+      "kind": "slice",
+      "goose": "blot_check_core::Contract[:]",
+      "children": [
+        "check.core.Contract"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.ContractMember",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::ContractMember",
+      "fields": [
+        [
+          "contract",
+          "check.types.NominalIdentity",
+          "contract"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "kind",
+          "reuse.principal_interface.ContractMember.kind",
+          "kind"
+        ],
+        [
+          "root",
+          "u32",
+          "root"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.principal_interface.ContractMember.kind",
+      "kind": "enum",
+      "goose": "blot_reuse_principal_interface::ContractMemberKind",
+      "variants": [
+        [
+          "defined_type",
+          0,
+          "defined_type"
+        ],
+        [
+          "abstract_type",
+          1,
+          "abstract_type"
+        ],
+        [
+          "value",
+          2,
+          "value"
+        ]
+      ]
+    },
+    {
+      "name": "[]reuse.principal_interface.ContractMember",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::ContractMember[:]",
+      "children": [
+        "reuse.principal_interface.ContractMember"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Implementation",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Implementation",
+      "fields": [
+        [
+          "origin_span",
+          "?parse.ast.Span",
+          "origin_span"
+        ],
+        [
+          "declaration",
+          "u32",
+          "declaration"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "contract",
+          "check.types.NominalIdentity",
+          "contract"
+        ],
+        [
+          "head",
+          "check.types.List",
+          "head"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "parameter_names",
+          "check.types.List",
+          "parameter_names"
+        ],
+        [
+          "row_variables",
+          "check.types.List",
+          "row_variables"
+        ],
+        [
+          "row_parameter_names",
+          "check.types.List",
+          "row_parameter_names"
+        ],
+        [
+          "row_parameters",
+          "check.types.List",
+          "row_parameters"
+        ],
+        [
+          "predicates",
+          "check.types.List",
+          "predicates"
+        ],
+        [
+          "members",
+          "check.types.List",
+          "members"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.Implementation",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Implementation[:]",
+      "children": [
+        "reuse.principal_interface.Implementation"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.ImplementationMember",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::ImplementationMember",
+      "fields": [
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "kind",
+          "reuse.principal_interface.ImplementationMember.kind",
+          "kind"
+        ],
+        [
+          "root",
+          "u32",
+          "root"
+        ],
+        [
+          "target",
+          "reuse.principal_interface.ExternalTarget",
+          "target"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.principal_interface.ImplementationMember.kind",
+      "kind": "enum",
+      "goose": "blot_reuse_principal_interface::ImplementationMemberKind",
+      "variants": [
+        [
+          "type_",
+          0,
+          "type_"
+        ],
+        [
+          "value",
+          1,
+          "value"
+        ]
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.ExternalTarget",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::ExternalTarget",
+      "fields": [
+        [
+          "unit",
+          "u32",
+          "unit"
+        ],
+        [
+          "binding",
+          "u32",
+          "binding"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.ImplementationMember",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::ImplementationMember[:]",
+      "children": [
+        "reuse.principal_interface.ImplementationMember"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.MemberTemplate",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::MemberTemplate",
+      "fields": [
+        [
+          "binding",
+          "u32",
+          "binding"
+        ],
+        [
+          "contract",
+          "check.types.NominalIdentity",
+          "contract"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "arguments",
+          "check.types.List",
+          "arguments"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.MemberTemplate",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::MemberTemplate[:]",
+      "children": [
+        "reuse.principal_interface.MemberTemplate"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.SelectedProof",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::SelectedProof",
+      "fields": [
+        [
+          "predicate_target",
+          "reuse.principal_interface.ExternalTarget",
+          "predicate_target"
+        ],
+        [
+          "context",
+          "u32",
+          "context"
+        ],
+        [
+          "kind",
+          "reuse.principal_interface.SelectedProof.kind",
+          "kind"
+        ],
+        [
+          "predicate",
+          "check.types.Obligation",
+          "predicate"
+        ],
+        [
+          "implementation",
+          "check.types.NominalIdentity",
+          "implementation"
+        ],
+        [
+          "contract",
+          "check.types.NominalIdentity",
+          "contract"
+        ],
+        [
+          "arguments",
+          "check.types.List",
+          "arguments"
+        ],
+        [
+          "members",
+          "check.types.List",
+          "members"
+        ],
+        [
+          "prerequisites",
+          "check.types.List",
+          "prerequisites"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.principal_interface.SelectedProof.kind",
+      "kind": "enum",
+      "goose": "blot_reuse_principal_interface::SelectedProofKind",
+      "variants": [
+        [
+          "implementation",
+          0,
+          "implementation"
+        ],
+        [
+          "predicate",
+          1,
+          "predicate"
+        ]
+      ]
+    },
+    {
+      "name": "[]reuse.principal_interface.SelectedProof",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::SelectedProof[:]",
+      "children": [
+        "reuse.principal_interface.SelectedProof"
+      ]
+    },
+    {
+      "name": "check.core.SelectedUse",
+      "kind": "struct",
+      "goose": "blot_check_core::SelectedUse",
+      "fields": [
+        [
+          "node",
+          "u32",
+          "node"
+        ],
+        [
+          "proof",
+          "u32",
+          "proof"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.SelectedUse",
+      "kind": "slice",
+      "goose": "blot_check_core::SelectedUse[:]",
+      "children": [
+        "check.core.SelectedUse"
+      ]
+    },
+    {
+      "name": "check.core.Primitive",
+      "kind": "struct",
+      "goose": "blot_check_core::Primitive",
+      "fields": [
+        [
+          "kind",
+          "check.core.PrimitiveKind",
+          "kind"
+        ],
+        [
+          "op",
+          "check.core.Op",
+          "op"
+        ],
+        [
+          "array_op",
+          "check.collection_ops.Op",
+          "array_op"
+        ],
+        [
+          "arity",
+          "u8",
+          "arity"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.PrimitiveKind",
+      "kind": "enum",
+      "goose": "blot_check_core::PrimitiveKind",
+      "variants": [
+        [
+          "scalar",
+          0,
+          "scalar"
+        ],
+        [
+          "array",
+          1,
+          "array"
+        ]
+      ]
+    },
+    {
+      "name": "check.collection_ops.Op",
+      "kind": "enum",
+      "goose": "blot_backend_collection_ops::Op",
+      "variants": [
+        [
+          "length",
+          0,
+          "length"
+        ],
+        [
+          "get",
+          1,
+          "get"
+        ],
+        [
+          "set",
+          2,
+          "set"
+        ],
+        [
+          "fill",
+          3,
+          "fill"
+        ],
+        [
+          "generate",
+          4,
+          "generate"
+        ],
+        [
+          "append",
+          5,
+          "append"
+        ],
+        [
+          "prepend",
+          6,
+          "prepend"
+        ],
+        [
+          "identity",
+          7,
+          "identity"
+        ],
+        [
+          "convert",
+          8,
+          "convert"
+        ],
+        [
+          "cursor",
+          9,
+          "cursor"
+        ],
+        [
+          "cursor_has",
+          10,
+          "cursor_has"
+        ],
+        [
+          "cursor_value",
+          11,
+          "cursor_value"
+        ],
+        [
+          "cursor_advance",
+          12,
+          "cursor_advance"
+        ],
+        [
+          "concat",
+          13,
+          "concat"
+        ],
+        [
+          "slice",
+          14,
+          "slice"
+        ],
+        [
+          "simd_load",
+          15,
+          "simd_load"
+        ],
+        [
+          "simd_store",
+          16,
+          "simd_store"
+        ],
+        [
+          "flatten",
+          17,
+          "flatten"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.Primitive",
+      "kind": "slice",
+      "goose": "blot_check_core::Primitive[:]",
+      "children": [
+        "check.core.Primitive"
+      ]
+    },
+    {
+      "name": "check.core.LoopInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::LoopInfo",
+      "fields": [
+        [
+          "kind",
+          "check.core.LoopKind",
+          "kind"
+        ],
+        [
+          "first",
+          "u32",
+          "first"
+        ],
+        [
+          "end",
+          "u32",
+          "end"
+        ],
+        [
+          "pattern",
+          "u32",
+          "pattern"
+        ],
+        [
+          "body",
+          "u32",
+          "body"
+        ],
+        [
+          "carries",
+          "check.core.List",
+          "carries"
+        ],
+        [
+          "can_exit",
+          "bool",
+          "can_exit"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.LoopKind",
+      "kind": "enum",
+      "goose": "blot_check_core::LoopKind",
+      "variants": [
+        [
+          "forever",
+          0,
+          "forever"
+        ],
+        [
+          "range",
+          1,
+          "range"
+        ],
+        [
+          "array",
+          2,
+          "array"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.LoopInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::LoopInfo[:]",
+      "children": [
+        "check.core.LoopInfo"
+      ]
+    },
+    {
+      "name": "check.core.LoopCarry",
+      "kind": "struct",
+      "goose": "blot_check_core::LoopCarry",
+      "fields": [
+        [
+          "incoming",
+          "u32",
+          "incoming"
+        ],
+        [
+          "iteration",
+          "u32",
+          "iteration"
+        ],
+        [
+          "backedge",
+          "u32",
+          "backedge"
+        ],
+        [
+          "outgoing",
+          "u32",
+          "outgoing"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.LoopCarry",
+      "kind": "slice",
+      "goose": "blot_check_core::LoopCarry[:]",
+      "children": [
+        "check.core.LoopCarry"
+      ]
+    },
+    {
+      "name": "check.core.ResolverInfo",
+      "kind": "struct",
+      "goose": "blot_check_core::ResolverInfo",
+      "fields": [
+        [
+          "operation",
+          "check.core.ResolverOperation",
+          "operation"
+        ],
+        [
+          "resolver",
+          "u32",
+          "resolver"
+        ],
+        [
+          "arguments",
+          "check.core.List",
+          "arguments"
+        ],
+        [
+          "member",
+          "u32",
+          "member"
+        ],
+        [
+          "method",
+          "check.core.BindingRef",
+          "method"
+        ],
+        [
+          "method_type",
+          "u32",
+          "method_type"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.ResolverOperation",
+      "kind": "enum",
+      "goose": "blot_check_core::ResolverOperation",
+      "variants": [
+        [
+          "monad",
+          0,
+          "monad"
+        ],
+        [
+          "pure",
+          1,
+          "pure"
+        ],
+        [
+          "bind",
+          2,
+          "bind"
+        ],
+        [
+          "forward",
+          3,
+          "forward"
+        ],
+        [
+          "iterate",
+          4,
+          "iterate"
+        ],
+        [
+          "run",
+          5,
+          "run"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.ResolverInfo",
+      "kind": "slice",
+      "goose": "blot_check_core::ResolverInfo[:]",
+      "children": [
+        "check.core.ResolverInfo"
+      ]
+    },
+    {
+      "name": "check.core.OperationValue",
+      "kind": "struct",
+      "goose": "blot_check_core::OperationValue",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "arguments",
+          "check.types.List",
+          "arguments"
+        ],
+        [
+          "signature",
+          "u32",
+          "signature"
+        ],
+        [
+          "witness",
+          "u32",
+          "witness"
+        ],
+        [
+          "witness_result",
+          "u32",
+          "witness_result"
+        ],
+        [
+          "instance",
+          "check.types.NominalIdentity",
+          "instance"
+        ],
+        [
+          "capability",
+          "u32",
+          "capability"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.OperationValue",
+      "kind": "slice",
+      "goose": "blot_check_core::OperationValue[:]",
+      "children": [
+        "check.core.OperationValue"
+      ]
+    },
+    {
+      "name": "check.core.HandleEffects",
+      "kind": "struct",
+      "goose": "blot_check_core::HandleEffects",
+      "fields": [
+        [
+          "node",
+          "u32",
+          "node"
+        ],
+        [
+          "first",
+          "u32",
+          "first"
+        ],
+        [
+          "second",
+          "u32",
+          "second"
+        ],
+        [
+          "extended",
+          "u32",
+          "extended"
+        ],
+        [
+          "residual",
+          "u32",
+          "residual"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]check.core.HandleEffects",
+      "kind": "slice",
+      "goose": "blot_check_core::HandleEffects[:]",
+      "children": [
+        "check.core.HandleEffects"
+      ]
+    },
+    {
+      "name": "check.core.Diagnostic",
+      "kind": "struct",
+      "goose": "blot_check_core::Diagnostic",
+      "fields": [
+        [
+          "code",
+          "check.core.Code",
+          "code"
+        ],
+        [
+          "span",
+          "parse.ast.Span",
+          "span"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.core.Code",
+      "kind": "enum",
+      "goose": "blot_check_core::Code",
+      "variants": [
+        [
+          "unchecked",
+          0,
+          "unchecked"
+        ],
+        [
+          "unsupported",
+          1,
+          "unsupported"
+        ],
+        [
+          "unresolved_binding",
+          2,
+          "unresolved_binding"
+        ],
+        [
+          "invalid_call",
+          3,
+          "invalid_call"
+        ],
+        [
+          "complexity",
+          4,
+          "complexity"
+        ],
+        [
+          "aliased_update",
+          5,
+          "aliased_update"
+        ],
+        [
+          "spent_value",
+          6,
+          "spent_value"
+        ],
+        [
+          "own_argument",
+          7,
+          "own_argument"
+        ],
+        [
+          "own_function_value",
+          8,
+          "own_function_value"
+        ],
+        [
+          "result_not_owned",
+          9,
+          "result_not_owned"
+        ],
+        [
+          "lent_result_value",
+          10,
+          "lent_result_value"
+        ],
+        [
+          "kept_value",
+          11,
+          "kept_value"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.core.Diagnostic",
+      "kind": "slice",
+      "goose": "blot_check_core::Diagnostic[:]",
+      "children": [
+        "check.core.Diagnostic"
+      ]
+    },
+    {
+      "name": "usize",
+      "kind": "primitive",
+      "goose": "i64",
+      "primitive": "usize"
+    },
+    {
+      "name": "reuse.principal_interface.Interface",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Interface",
+      "fields": [
+        [
+          "unit",
+          "u32",
+          "unit"
+        ],
+        [
+          "graph",
+          "check.frozen_types.Graph",
+          "graph"
+        ],
+        [
+          "patterns",
+          "check.frozen_types.PatternGraph",
+          "patterns"
+        ],
+        [
+          "bindings",
+          "[]reuse.principal_interface.Binding",
+          "bindings"
+        ],
+        [
+          "obligations",
+          "[]check.types.Obligation",
+          "obligations"
+        ],
+        [
+          "obligation_spans",
+          "[]parse.ast.Span",
+          "obligation_spans"
+        ],
+        [
+          "nominals",
+          "[]reuse.principal_interface.Nominal",
+          "nominals"
+        ],
+        [
+          "constructors",
+          "[]reuse.principal_interface.Constructor",
+          "constructors"
+        ],
+        [
+          "effect_families",
+          "[]reuse.principal_interface.EffectFamily",
+          "effect_families"
+        ],
+        [
+          "effect_templates",
+          "[]reuse.principal_interface.EffectTemplate",
+          "effect_templates"
+        ],
+        [
+          "associated",
+          "[]reuse.principal_interface.Associated",
+          "associated"
+        ],
+        [
+          "contracts",
+          "[]reuse.principal_interface.Contract",
+          "contracts"
+        ],
+        [
+          "contract_predicates",
+          "[]check.types.Obligation",
+          "contract_predicates"
+        ],
+        [
+          "contract_members",
+          "[]reuse.principal_interface.ContractMember",
+          "contract_members"
+        ],
+        [
+          "implementations",
+          "[]reuse.principal_interface.Implementation",
+          "implementations"
+        ],
+        [
+          "implementation_predicates",
+          "[]check.types.Obligation",
+          "implementation_predicates"
+        ],
+        [
+          "implementation_members",
+          "[]reuse.principal_interface.ImplementationMember",
+          "implementation_members"
+        ],
+        [
+          "member_templates",
+          "[]reuse.principal_interface.MemberTemplate",
+          "member_templates"
+        ],
+        [
+          "selected_proofs",
+          "[]reuse.principal_interface.SelectedProof",
+          "selected_proofs"
+        ],
+        [
+          "selected_members",
+          "[]reuse.principal_interface.ImplementationMember",
+          "selected_members"
+        ],
+        [
+          "selected_edges",
+          "[]u32",
+          "selected_edges"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.frozen_types.Graph",
+      "kind": "struct",
+      "goose": "blot_check_frozen_types::Graph",
+      "fields": [
+        [
+          "nodes",
+          "[]check.types.Node",
+          "nodes"
+        ],
+        [
+          "extra",
+          "[]u32",
+          "extra"
+        ],
+        [
+          "rows",
+          "[]check.effects.Row",
+          "rows"
+        ],
+        [
+          "labels",
+          "[]u32",
+          "labels"
+        ],
+        [
+          "operations",
+          "[]check.types.Operation",
+          "operations"
+        ],
+        [
+          "row_variable_count",
+          "u32",
+          "row_variable_count"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.frozen_types.PatternGraph",
+      "kind": "struct",
+      "goose": "blot_check_frozen_types::PatternGraph",
+      "fields": [
+        [
+          "nodes",
+          "[]check.parameter_patterns.Node",
+          "nodes"
+        ],
+        [
+          "extra",
+          "[]u32",
+          "extra"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.parameter_patterns.Node",
+      "kind": "struct",
+      "goose": "blot_check_parameter_patterns::Node",
+      "fields": [
+        [
+          "kind",
+          "check.parameter_patterns.Kind",
+          "kind"
+        ],
+        [
+          "a",
+          "u32",
+          "a"
+        ],
+        [
+          "b",
+          "u32",
+          "b"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "check.parameter_patterns.Kind",
+      "kind": "enum",
+      "goose": "blot_check_parameter_patterns::Kind",
+      "variants": [
+        [
+          "binding",
+          0,
+          "binding"
+        ],
+        [
+          "tuple",
+          1,
+          "tuple"
+        ],
+        [
+          "array",
+          2,
+          "array"
+        ],
+        [
+          "record",
+          3,
+          "record"
+        ]
+      ]
+    },
+    {
+      "name": "[]check.parameter_patterns.Node",
+      "kind": "slice",
+      "goose": "blot_check_parameter_patterns::Node[:]",
+      "children": [
+        "check.parameter_patterns.Node"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Binding",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Binding",
+      "fields": [
+        [
+          "capability_parameters",
+          "check.capability_flow.Parameters",
+          "capability_parameters"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "kind",
+          "reuse.principal_interface.Kind",
+          "kind"
+        ],
+        [
+          "named_function",
+          "bool",
+          "named_function"
+        ],
+        [
+          "ty",
+          "u32",
+          "ty"
+        ],
+        [
+          "scheme",
+          "check.types.Scheme",
+          "scheme"
+        ],
+        [
+          "external",
+          "?reuse.principal_interface.ExternalTarget",
+          "external"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "?reuse.principal_interface.ExternalTarget",
+      "kind": "optional",
+      "goose": "blot_support::Option<blot_reuse_principal_interface::ExternalTarget>",
+      "children": [
+        "reuse.principal_interface.ExternalTarget"
+      ]
+    },
+    {
+      "name": "[]reuse.principal_interface.Binding",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Binding[:]",
+      "children": [
+        "reuse.principal_interface.Binding"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Nominal",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Nominal",
+      "fields": [
+        [
+          "affine",
+          "bool",
+          "affine"
+        ],
+        [
+          "has_usage",
+          "bool",
+          "has_usage"
+        ],
+        [
+          "closed_storage",
+          "bool",
+          "closed_storage"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "is_opaque",
+          "bool",
+          "is_opaque"
+        ],
+        [
+          "storage",
+          "check.opaque_storage.Storage",
+          "storage"
+        ],
+        [
+          "declaration",
+          "u32",
+          "declaration"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "patterns",
+          "check.types.List",
+          "patterns"
+        ],
+        [
+          "parameter_names",
+          "check.types.List",
+          "parameter_names"
+        ],
+        [
+          "constructors",
+          "check.types.List",
+          "constructors"
+        ],
+        [
+          "alias",
+          "u32",
+          "alias"
+        ],
+        [
+          "alias_rows",
+          "check.types.List",
+          "alias_rows"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.Nominal",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Nominal[:]",
+      "children": [
+        "reuse.principal_interface.Nominal"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Constructor",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Constructor",
+      "fields": [
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "nominal",
+          "u32",
+          "nominal"
+        ],
+        [
+          "tag",
+          "u32",
+          "tag"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "scheme",
+          "check.types.Scheme",
+          "scheme"
+        ],
+        [
+          "payload",
+          "u32",
+          "payload"
+        ],
+        [
+          "declared_record",
+          "bool",
+          "declared_record"
+        ]
+      ],
+      "unwired": [
+        "deferred_result"
+      ]
+    },
+    {
+      "name": "[]reuse.principal_interface.Constructor",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Constructor[:]",
+      "children": [
+        "reuse.principal_interface.Constructor"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.EffectFamily",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::EffectFamily",
+      "fields": [
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "callable",
+          "bool",
+          "callable"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "patterns",
+          "check.types.List",
+          "patterns"
+        ],
+        [
+          "parameter_names",
+          "check.types.List",
+          "parameter_names"
+        ],
+        [
+          "operations",
+          "check.types.List",
+          "operations"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.EffectFamily",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::EffectFamily[:]",
+      "children": [
+        "reuse.principal_interface.EffectFamily"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.EffectTemplate",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::EffectTemplate",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "family",
+          "u32",
+          "family"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "parameter",
+          "u32",
+          "parameter"
+        ],
+        [
+          "result",
+          "u32",
+          "result"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.EffectTemplate",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::EffectTemplate[:]",
+      "children": [
+        "reuse.principal_interface.EffectTemplate"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Associated",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Associated",
+      "fields": [
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "member",
+          "u32",
+          "member"
+        ],
+        [
+          "operator",
+          "check.types.Operator",
+          "operator"
+        ],
+        [
+          "binding",
+          "u32",
+          "binding"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.Associated",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Associated[:]",
+      "children": [
+        "reuse.principal_interface.Associated"
+      ]
+    },
+    {
+      "name": "reuse.principal_interface.Contract",
+      "kind": "struct",
+      "goose": "blot_reuse_principal_interface::Contract",
+      "fields": [
+        [
+          "declaration",
+          "u32",
+          "declaration"
+        ],
+        [
+          "private",
+          "bool",
+          "private"
+        ],
+        [
+          "identity",
+          "check.types.NominalIdentity",
+          "identity"
+        ],
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "parameters",
+          "check.types.List",
+          "parameters"
+        ],
+        [
+          "variables",
+          "check.types.List",
+          "variables"
+        ],
+        [
+          "patterns",
+          "check.types.List",
+          "patterns"
+        ],
+        [
+          "parameter_names",
+          "check.types.List",
+          "parameter_names"
+        ],
+        [
+          "row_variables",
+          "check.types.List",
+          "row_variables"
+        ],
+        [
+          "row_parameter_names",
+          "check.types.List",
+          "row_parameter_names"
+        ],
+        [
+          "row_parameters",
+          "check.types.List",
+          "row_parameters"
+        ],
+        [
+          "predicates",
+          "check.types.List",
+          "predicates"
+        ],
+        [
+          "members",
+          "check.types.List",
+          "members"
+        ],
+        [
+          "requires_implementation",
+          "bool",
+          "requires_implementation"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.principal_interface.Contract",
+      "kind": "slice",
+      "goose": "blot_reuse_principal_interface::Contract[:]",
+      "children": [
+        "reuse.principal_interface.Contract"
+      ]
+    },
+    {
+      "name": "reuse.frozen_dependency.Export",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::Export",
+      "fields": [
+        [
+          "name",
+          "u32",
+          "name"
+        ],
+        [
+          "target",
+          "reuse.principal_interface.ExternalTarget",
+          "target"
+        ],
+        [
+          "kind",
+          "reuse.frozen_dependency.Export.kind",
+          "kind"
+        ],
+        [
+          "catalog",
+          "u32",
+          "catalog"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "reuse.frozen_dependency.Export.kind",
+      "kind": "enum",
+      "goose": "blot_reuse_frozen_dependency::ExportKind",
+      "variants": [
+        [
+          "value",
+          0,
+          "value"
+        ],
+        [
+          "nominal",
+          1,
+          "nominal"
+        ],
+        [
+          "constructor",
+          2,
+          "constructor"
+        ],
+        [
+          "effect_family",
+          3,
+          "effect_family"
+        ],
+        [
+          "contract",
+          4,
+          "contract"
+        ],
+        [
+          "implementation",
+          5,
+          "implementation"
+        ]
+      ]
+    },
+    {
+      "name": "[]reuse.frozen_dependency.Export",
+      "kind": "slice",
+      "goose": "blot_reuse_frozen_dependency::Export[:]",
+      "children": [
+        "reuse.frozen_dependency.Export"
+      ]
+    },
+    {
+      "name": "reuse.frozen_dependency.Fixity",
+      "kind": "struct",
+      "goose": "blot_reuse_frozen_dependency::Fixity",
+      "fields": [
+        [
+          "operator",
+          "u32",
+          "operator"
+        ],
+        [
+          "target",
+          "u32",
+          "target"
+        ],
+        [
+          "precedence",
+          "u32",
+          "precedence"
+        ],
+        [
+          "association",
+          "u32",
+          "association"
+        ],
+        [
+          "named",
+          "bool",
+          "named"
+        ],
+        [
+          "producer",
+          "reuse.principal_interface.ExternalTarget",
+          "producer"
+        ]
+      ],
+      "unwired": []
+    },
+    {
+      "name": "[]reuse.frozen_dependency.Fixity",
+      "kind": "slice",
+      "goose": "blot_reuse_frozen_dependency::Fixity[:]",
+      "children": [
+        "reuse.frozen_dependency.Fixity"
+      ]
+    },
+    {
+      "name": "[]reuse.frozen_dependency.Module",
+      "kind": "slice",
+      "goose": "blot_reuse_frozen_dependency::Module[:]",
+      "children": [
+        "reuse.frozen_dependency.Module"
+      ]
+    },
+    {
+      "name": "i8",
+      "kind": "primitive",
+      "goose": "i8",
+      "primitive": "i8"
+    },
+    {
+      "name": "i16",
+      "kind": "primitive",
+      "goose": "i16",
+      "primitive": "i16"
+    },
+    {
+      "name": "i32",
+      "kind": "primitive",
+      "goose": "i32",
+      "primitive": "i32"
+    },
+    {
+      "name": "i64",
+      "kind": "primitive",
+      "goose": "i64",
+      "primitive": "i64"
+    },
+    {
+      "name": "f32",
+      "kind": "primitive",
+      "goose": "f32",
+      "primitive": "f32"
+    },
+    {
+      "name": "f64",
+      "kind": "primitive",
+      "goose": "f64",
+      "primitive": "f64"
+    }
+  ]
 }

@@ -214,10 +214,8 @@ fn sameInitializerShape(old:const Unit&,new_:const Unit&)->bool {
 }
 
 fn needsLiveValues(tree:const Tree&,symbols:const blot_parse_symbols::Pool&)->bool {
- if tree.has_numeric_proofs {return true;}
  if !tree.has_typed_staging {return false;}
  for node in tree.nodes.items {
-  if node.tag==blot_parse_ast::tag_type_code || node.tag==blot_parse_ast::tag_type_descriptor {return true;}
   if node.tag!=blot_parse_ast::tag_intrinsic {continue;}
   let operation,staged=blot_check_typed_staging::lookup(symbols.get(node.a));
   if staged && operation!=blot_check_typed_staging::Op.evaluate {return true;}

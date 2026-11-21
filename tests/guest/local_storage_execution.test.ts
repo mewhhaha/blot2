@@ -128,18 +128,6 @@ entry const run = func (seed: U32) => return do:
 });
 
 Deno.test("local storage promotion preserves runtime captures traps and eager host order", async () => {
-  await compileExpectedFailure(
-    definitions + `
-type Phantom value is data = $Phantom
-entry const run = func () => return do:
-  let stored: Box (Phantom (unique U32)) = box $Phantom
-  break ()
-`,
-    "multiplicity_unknown",
-    undefined,
-    { prelude: "none" },
-  );
-
   await compileAndRun(
     definitions + `
 entry const run = func (seed: U32) => return do:

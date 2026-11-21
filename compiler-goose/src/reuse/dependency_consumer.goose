@@ -14,7 +14,6 @@ import check.types;
 import check.core;
 import check.core_builder;
 import check.frozen_types;
-import check.numeric_proof_headers;
 import reuse.frozen_dependency;
 import reuse.principal_interface;
 import reuse.dependency_payload;

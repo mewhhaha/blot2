@@ -8,7 +8,6 @@ import reuse.principal_interface;
 import reuse.dependency_symbol_slots;
 import check.types;
 import check.core;
-import check.capability_contracts;
 import check.source_sort;
 import support.error;
 type Error=blot_error::Error;
@@ -33,7 +32,6 @@ fn typeUnits<M>(nodes:blot_check_types::Node[:],map:M) {
   _=>{},
  }}
 }
-fn capabilityNodes<M>(nodes:blot_check_capability_contracts::Term[:],map:M) {for &node in nodes {if node.tag==blot_check_capability_contracts::Tag.project&&node.c==blot_check_capability_contracts::projectionCode(blot_check_capability_contracts::Projection.field) {node.b=map.symbol(node.b);}}}
 fn implementations<T,M>(storage:Owner&,owner:T&,map:M) {
  for &value in storage.mutable(owner.implementations) {identity(map,value.identity);identity(map,value.contract);value.name=map.symbol(value.name);}
  for &value in storage.mutable(owner.implementation_members) {value.name=map.symbol(value.name);target(map,value.target);}
@@ -44,8 +42,7 @@ fn implementations<T,M>(storage:Owner&,owner:T&,map:M) {
 fn predicate<M,P>(map:M,value:P&) {value.name=map.symbol(value.name);identity(map,value.identity);value.qualification_unit=map.unit(value.qualification_unit);}
 fn interfaceUnits(storage:Owner&,owner:Interface&,units:const u32[:])->Error {var rejected=false;interfaceWith(storage,owner,Retained {units,rejected, ..});if rejected {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}
 fn interfaceWith<M>(storage:Owner&,owner:Interface&,map:M) {
- capabilityNodes(storage.mutable(owner.capability_contracts.nodes),map);implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.graph.nodes),map);
- for &goal in storage.mutable(owner.graph.quantifier_obligations) {predicate(map,goal);}
+ implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.graph.nodes),map);
  for &operation in storage.mutable(owner.graph.operations) {identity(map,operation.identity);operation.instance.unit=map.unit(operation.instance.unit);}
  for &binding in storage.mutable(owner.bindings) {binding.name=map.symbol(binding.name);if binding.external.present {target(map,binding.external.value);}}
  for &obligation in storage.mutable(owner.obligations) {predicate(map,obligation);}
@@ -66,8 +63,7 @@ fn module(storage:Owner&,owner:Module&,names:const u32[:],units:const u32[:]) {
 }
 fn moduleUnits(storage:Owner&,owner:Module&,units:const u32[:])->Error {var rejected=false;moduleWith(storage,owner,Retained {units,rejected, ..});if rejected {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}
 fn moduleWith<M>(storage:Owner&,owner:Module&,map:M) {
- capabilityNodes(storage.mutable(owner.capability_contracts.nodes),map);implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.types.nodes),map);
- for &goal in storage.mutable(owner.types.quantifier_obligations) {predicate(map,goal);}
+ implementations(storage,owner,map);owner.unit=map.unit(owner.unit);typeUnits(storage.mutable(owner.types.nodes),map);
  for &operation in storage.mutable(owner.types.operations) {identity(map,operation.identity);operation.instance.unit=map.unit(operation.instance.unit);}
  for &node in storage.mutable(owner.nodes) {if node.tag==blot_check_core::Tag.associated {node.c=map.symbol(node.c);}else if node.tag==blot_check_core::Tag.result_associated {node.b=map.symbol(node.b);}}
  for &value in storage.mutable(owner.bindings) {target(map,value.target);}for &value in storage.mutable(owner.references) {target(map,value);}for &value in storage.mutable(owner.dependency_references) {target(map,value);}for &value in storage.mutable(owner.erased_declaration_references) {target(map,value.target);}
@@ -90,8 +86,6 @@ fn prepare(value:const blot_reuse_frozen_dependency::FrozenDependency&,pool:cons
  for &owner in value.modules {
   let entry,error=blot_reuse_dependency_symbol_slots::collect(owner);if error!=blot_error::Error.none {return error;}roles.push(entry);
   { let propagated_error = checkWords(owner.interface.graph.extra,entry.interface_types,names.len); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = checkWords(owner.interface.patterns.extra,entry.patterns,names.len); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = checkWords(owner.core.types.extra,entry.core_types,names.len); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  { let propagated_error = checkWords(owner.interface.capability_contracts.words,entry.interface_capabilities,names.len); if propagated_error != blot_error::Error.none { return propagated_error; } }{ let propagated_error = checkWords(owner.core.capability_contracts.words,entry.core_capabilities,names.len); if propagated_error != blot_error::Error.none { return propagated_error; } }
-  for collection in [owner.interface.capability_contracts,owner.core.capability_contracts] {for node in collection.nodes {if node.tag==blot_check_capability_contracts::Tag.project&&node.c==blot_check_capability_contracts::projectionCode(blot_check_capability_contracts::Projection.field)&&node.b>=names.len {return blot_error::Error.invalid_artifact;}}}
  }
  return blot_error::Error.none;
 }
@@ -104,7 +98,6 @@ fn relink(storage:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency&,p
  let previous=copy(pool);pool=candidate;candidate=previous;let map=Dictionary {names,units, ..};
  for &owner,index in value.modules {
   let entry=roles[index];blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.graph.extra),entry.interface_types,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.patterns.extra),entry.patterns,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.core.types.extra),entry.core_types,names);
-  blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.capability_contracts.words),entry.interface_capabilities,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.core.capability_contracts.words),entry.core_capabilities,names);
   interfaceWith(storage,owner.interface,map);module(storage,owner.core,names,units);
   for &dependency in owner.imports {dependency=map.unit(dependency);}for &request in owner.source_imports {request.target=map.unit(request.target);}
   for &exported in owner.exports {exported.name=map.symbol(exported.name);target(map,exported.target);}for &fixity in owner.fixities {fixity.operator=map.symbol(fixity.operator);fixity.target=map.symbol(fixity.target);target(map,fixity.producer);}

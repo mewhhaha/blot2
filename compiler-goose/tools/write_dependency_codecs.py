@@ -114,8 +114,6 @@ imports={'support.error','support.option','support.native','support.blake3','reu
 for d in ORDER:
  for namespace in re.findall(r'\b(blot_\w+)::',actual(d)):
   if namespace in GF:imports.add(GF[namespace])
-# Two files share the numeric proof term namespace; the terms live in the second.
-if 'check.numeric_proof_names' in imports:imports.add('check.numeric_proof_terms')
 # The port's spelling: qualified errors, varint_, unqualified match patterns.
 SYNTAX_TYPES={'bool','u8','u16','u32','u64','i8','i16','i32','i64','f32','f64'}
 for path in GOOSE.rglob('*.goose'):SYNTAX_TYPES.update(re.findall(r'\b(?:struct|enum|type)\s+(\w+)',path.read_text()))
@@ -160,9 +158,7 @@ for d in ORDER:
  elif kind=='union_tag':lines.append('return writer.varint(value as u64);')
  elif kind=='struct':
   for field,child,target in d['fields']:
-   if d['name']=='check.capability_flow.Parameters' and field in ('invocation_arguments','invocation_count'):
-    lines.append(f'if value.kind==blot_check_capability_flow::ParameterResult.invoke_inputs {{let error=write_{proc(child)}(writer,value.{target},level+1);if error!=Error.none {{return error;}}}}')
-   else:lines.append(f'block {{let error=write_{proc(child)}(writer,value.{target},level+1);if error!=Error.none {{return error;}}}}')
+   lines.append(f'block {{let error=write_{proc(child)}(writer,value.{target},level+1);if error!=Error.none {{return error;}}}}')
   lines.append('return Error.none;')
  elif kind=='array':
   child=d['children'][0];lines.append(f'for item in value {{let error=write_{proc(child)}(writer,item,level+1);if error!=Error.none {{return error;}}}}return Error.none;')
@@ -212,12 +208,8 @@ for d in ORDER:
   lines.append(f'var result=default<{t}>();')
   for field,child,target in d['fields']:
    code=step(d,f'read_{proc(child)}(reader,level+1)','result.'+target)
-   if d['name']=='check.capability_flow.Parameters' and field in ('invocation_arguments','invocation_count'):code='if result.kind==blot_check_capability_flow::ParameterResult.invoke_inputs {'+code+'}'
    lines.append(code)
-  if d['name']=='check.capability_flow.Parameters':lines.append('if !result.valid() {'+error_return(d,'Error.invalid_artifact')+'}')
   if t in G and G[t][0]=='struct' and 'owner_id' in dict(G[t][1]):lines.append('result.owner_id=blot_native::fresh_owner_id();')
-  if d['name']=='check.core.Module':
-   lines.append('var packages=false;for node in result.nodes {if node.tag==blot_check_core::Tag.package_pack {packages=true;break;}}if packages && result.nodes.len!=0 {let lane,error=allocateDecoded<u32>(reader.owner,result.nodes.len);if error!=Error.none {'+error_return(d)+'}for node,index in result.nodes {lane[index]=node.a;}result.package_payloads=lane;}')
   lines.append('return result,Error.none;')
  elif kind=='array':
   child=d['children'][0];lines.append(f'var result=default<{t}>();for index in 0..{d["count"]} '+step(d,f'read_{proc(child)}(reader,level+1)','result[index]')+'return result,Error.none;')
@@ -293,7 +285,6 @@ for d in ORDER:
  t=actual(d);name=proc(d);kind=d['kind'];release_lines.append(f'fn release_{name}(owner:Owner&,value:{t}) {{')
  if kind=='struct':
   for field,child,target in d['fields']:release_lines.append(f'release_{proc(child)}(owner,value.{target});')
-  if d['name']=='check.core.Module':release_lines.append('owner.releaseSlice(value.package_payloads);')
  elif kind=='slice':
   child=d['children'][0]
   if child['kind'] not in ('primitive','enum','union_tag'):release_lines.append(f'for item in value {{release_{proc(child)}(owner,item);}}')

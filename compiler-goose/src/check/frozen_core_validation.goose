@@ -1,6 +1,5 @@
 // Immutable decoded-Core validation. It never resolves or repairs source types.
 namespace blot_check_frozen_core_validation;
-import check.capability_flow;
 
 import check.check_packet_owner;
 import check.core;
@@ -24,13 +23,12 @@ struct Context {
     source_length: blot_support::Option<u32>, forbidden_owner: blot_support::Option<u32>,
 }
 struct Batch { context: Context, spawn_contracts: bool }
-fn moduleHasSpawnContracts(module: const Module&) -> bool { for binding in module.bindings { if binding.capability_flow == blot_check_capability_flow::Contract.spawn_task { return true; } } return false; }
+fn moduleHasSpawnContracts(module: const Module&) -> bool { return false; }
 fn withBatch<C,F>(context: Context, state: C) {
-    var spawn = false; for owner in context.units { if moduleHasSpawnContracts(owner.value) { spawn = true; break; } }
-    let batch = Batch { context, spawn , ..}; return F(state, batch);
+    let batch = Batch { context, false , ..}; return F(state, batch);
 }
 fn units(self_: const Batch&) -> const ModuleRef[:] { return self_.context.units; }
-fn hasSpawnContracts(self_: const Batch&, module: const Module&) -> bool { return self_.spawn_contracts || moduleHasSpawnContracts(module); }
+fn hasSpawnContracts(self_: const Batch&, module: const Module&) -> bool { return false; }
 fn validateWithBudget(self_: const Batch&, module: const Module&, source_length: blot_support::Option<u32>, remaining: i64&) -> Error {
     var context = self_.context; context.source_length = source_length; return validateBatchWithBudget(module, context, remaining, self_);
 }
@@ -39,12 +37,7 @@ fn ownerBounds(module: const Module&) -> OwnerBounds { return OwnerBounds { modu
 fn reusableModules(modules: const ModuleRef[:], caller: bool) -> bool {
     for ref in modules {
         let module .= ref.value;
-        if module.has_usage_contracts || module.has_rank_contracts || module.capability_contracts.bindings.len != 0 || (caller && module.has_numeric_proofs) { return false; }
         for node in module.nodes { if node.tag == blot_check_core::Tag.staging || node.tag == blot_check_core::Tag.effect_scope { return false; } }
-        for binding in module.bindings {
-            let flow = binding.capability_flow;
-            if binding.scheme.generative.len != 0 || binding.capability_parameters.invokes() || flow == blot_check_capability_flow::Contract.input_shape || flow == blot_check_capability_flow::Contract.consume_task || flow == blot_check_capability_flow::Contract.scope_task || flow == blot_check_capability_flow::Contract.spawn_task { return false; }
-        }
         for node in module.types.nodes { if node.tag == blot_check_types::Tag.existential || node.tag == blot_check_types::Tag.forall || node.tag == blot_check_types::Tag.instance_version || node.tag == blot_check_types::Tag.scoped { return false; } }
     } return true;
 }
