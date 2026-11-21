@@ -424,19 +424,39 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
         },
         nominal => {
             let arguments = m.types.nominalArguments(n);
+            if blot_check_storage_types::isLengthLiteral(n.a, n.b) {
+                result = unit;
+            } else {
             let kind = blot_check_storage_types::identity(n.a, n.b);
             if kind.present {
-                if arguments.len != 1 { return 0, fail(self_, m, ty, "storage type arity"); }
-                let element, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
-                if error != Error.none { return 0, error; }
-                var tag = Tag.link;
-                if kind.value == blot_check_storage_types::grow { tag = Tag.grow; }
-                else if kind.value == blot_check_storage_types::resize { tag = Tag.resize; }
-                else if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
-                else if kind.value == blot_check_storage_types::view { tag = Tag.view; }
-                let made, error = intern(self_, tag, [element]);
-                if error != Error.none { return 0, error; }
-                result = made;
+                if kind.value == blot_check_storage_types::shared {
+                    if arguments.len != 1 { return 0, fail(self_, m, ty, "storage type arity"); }
+                    let inner, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
+                    if error != Error.none { return 0, error; }
+                    result = inner;
+                } else if blot_check_storage_types::isSized(kind.value) {
+                    if arguments.len != 2 { return 0, fail(self_, m, ty, "storage type arity"); }
+                    let element, error = lowerInner(self_, m, arguments[1], env, child_open, depth + 1);
+                    if error != Error.none { return 0, error; }
+                    var tag = Tag.array;
+                    if kind.value == blot_check_storage_types::sized_grow { tag = Tag.grow; }
+                    else if kind.value == blot_check_storage_types::sized_resize { tag = Tag.resize; }
+                    let made, error = intern(self_, tag, [element]);
+                    if error != Error.none { return 0, error; }
+                    result = made;
+                } else {
+                    if arguments.len != 1 { return 0, fail(self_, m, ty, "storage type arity"); }
+                    let element, error = lowerInner(self_, m, arguments[0], env, child_open, depth + 1);
+                    if error != Error.none { return 0, error; }
+                    var tag = Tag.link;
+                    if kind.value == blot_check_storage_types::grow { tag = Tag.grow; }
+                    else if kind.value == blot_check_storage_types::resize { tag = Tag.resize; }
+                    else if kind.value == blot_check_storage_types::ref { tag = Tag.ref; }
+                    else if kind.value == blot_check_storage_types::view { tag = Tag.view; }
+                    let made, error = intern(self_, tag, [element]);
+                    if error != Error.none { return 0, error; }
+                    result = made;
+                }
             } else {
                 if n.a == 0xffffffff { return 0, fail(self_, m, ty, "compiler-owned nominal type"); }
                 let mark = self_.scratch.len;
@@ -451,6 +471,7 @@ recursive fn lowerInner(self_: Types&, m: const Module&, ty: TId, env: Env, open
                 self_.scratch.resize(mark);
                 if error != Error.none { return 0, error; }
                 result = made;
+            }
             }
         },
         provider => {
@@ -545,8 +566,15 @@ recursive fn matchInner(self_: Types&, m: const Module&, pattern: TId, actual: T
         },
         nominal => {
             let arguments = m.types.nominalArguments(n);
-            if blot_check_storage_types::identity(n.a, n.b).present {
-                if arguments.len == 1 && isContainer(have.tag) { matchInner(self_, m, arguments[0], have.a, env, depth + 1); }
+            let skind = blot_check_storage_types::identity(n.a, n.b);
+            if skind.present {
+                if skind.value == blot_check_storage_types::shared && arguments.len == 1 {
+                    matchInner(self_, m, arguments[0], actual, env, depth + 1);
+                } else if blot_check_storage_types::isSized(skind.value) && arguments.len == 2 {
+                    if isContainer(have.tag) { matchInner(self_, m, arguments[1], have.a, env, depth + 1); }
+                } else if arguments.len == 1 && isContainer(have.tag) {
+                    matchInner(self_, m, arguments[0], have.a, env, depth + 1);
+                }
             } else if have.tag == Tag.nominal {
                 let identity = self_.nominalIdentity(actual);
                 if identity.unit != n.a || identity.decl != n.b { return; }

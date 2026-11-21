@@ -233,7 +233,7 @@ fn scan(source: const u8[:],result: Result&) {
   if c=='(' { kind=blot_parse_token::l_paren; } else if c==')' { kind=blot_parse_token::r_paren; }
   else if c=='[' { kind=blot_parse_token::l_bracket; } else if c==']' { kind=blot_parse_token::r_bracket; }
   else if c=='{' { kind=blot_parse_token::l_brace; } else if c=='}' { kind=blot_parse_token::r_brace; }
-  else if c==',' { kind=blot_parse_token::comma; } else if c=='#' { kind=blot_parse_token::hash; }
+  else if c==',' { kind=blot_parse_token::comma; } else if c==';' { kind=blot_parse_token::semicolon; } else if c=='#' { kind=blot_parse_token::hash; }
   else if c=='@' { kind=blot_parse_token::at; } else if c=='`' { kind=blot_parse_token::backtick; }
   else if c==':' { kind=blot_parse_token::colon; if at<source.len&&source[at]=='=' { at++; kind=blot_parse_token::colon_equal; } }
   else if c=='.' { kind=blot_parse_token::dot; if at<source.len&&source[at]=='.' { at++; kind=blot_parse_token::dot_dot; if at<source.len&&source[at]=='.' { at++; kind=blot_parse_token::ellipsis; } } }
@@ -267,13 +267,19 @@ fn layout(source: const u8[:],result: Result&) {
   } else if broken&&depth==operations_depth {
    if previous.tag!=blot_parse_token::colon&&previous.tag!=blot_parse_token::arrow { emit(result.tokens,blot_parse_token::newline,current.start,current.start); }
   } else if broken {
-   let frame=frames[frames.len-1]; var request_clause=false;
-   if previous.tag==blot_parse_token::fat_arrow {
+   let frame=frames[frames.len-1]; var arrow_suite=false;
+   if previous.tag==blot_parse_token::fat_arrow && current.tag!=blot_parse_token::kw_type {
     var first=index-1; while first>0&&!broken_line(source,raw[first-1],raw[first]) { first--; }
-    request_clause=raw[first].tag==blot_parse_token::kw_effect||raw[first].tag==blot_parse_token::kw_complete;
-    for part in raw[first..index-1] { if part.tag==blot_parse_token::equal||part.tag==blot_parse_token::kw_func||part.tag==blot_parse_token::fat_arrow { request_clause=false; } }
+    var is_quantifier=false;
+    for part in raw[first..index-1] {
+     if part.tag==blot_parse_token::identifier {
+      let spelling=blot_parse_token::text(part,source);
+      if spelling=="forall"||spelling=="exists" { is_quantifier=true; break; }
+     }
+    }
+    arrow_suite=!is_quantifier;
    }
-   let suite=previous.tag==blot_parse_token::colon||previous.tag==blot_parse_token::kw_of||request_clause;
+   let suite=previous.tag==blot_parse_token::colon||previous.tag==blot_parse_token::kw_of||arrow_suite;
    if suite||depth==frame.depth {
     let width=indentation(source,starts,current.start); if width.tab { diagnose(result,layout_tab,width.start,current.start); return; }
     if suite {
@@ -324,7 +330,12 @@ fn contextual(source: const u8[:],result: Result&) {
   }
   if tag==blot_parse_token::dot {
    let adjacent=index!=0&&result.tokens[index-1].end==current.start; var before: u8=0; if current.start!=0 { before=source[current.start-1]; }
-   if !adjacent||!(type_ident(before)||before==']'||before==')'||before=='}') { result.tokens[index].tag=blot_parse_token::selector; }
+   var chain_continuation=false;
+   if !adjacent && index!=0 && broken_line(source,result.tokens[index-1],current) {
+    let prev=result.tokens[index-1].tag;
+    chain_continuation=prev==blot_parse_token::identifier||prev==blot_parse_token::type_identifier||prev==blot_parse_token::integer||prev==blot_parse_token::float||prev==blot_parse_token::string||prev==blot_parse_token::kw_true||prev==blot_parse_token::kw_false||prev==blot_parse_token::r_paren||prev==blot_parse_token::r_bracket||prev==blot_parse_token::r_brace||prev==blot_parse_token::dedent;
+   }
+   if !chain_continuation && (!adjacent||!(type_ident(before)||before==']'||before==')'||before=='}')) { result.tokens[index].tag=blot_parse_token::selector; }
   }
  }
 }

@@ -111,6 +111,7 @@ fn stageScalar(s: Stage&, op: blot_check_core::Op, left: StageValue, right: Stag
     if op == blot_check_core::Op.from_bits { return StageValue {a, blot_check_types::f32_type, 0}; }
     if op == blot_check_core::Op.convert_u32_f32 { return StageValue {blot_native::f32_bits(a as f32), blot_check_types::f32_type, 0}; }
     if op == blot_check_core::Op.neg { let _, bits = blot_check_scalar_ops::foldU32(blot_check_core::Op.sub, 0, a); return StageValue {bits, left.ty, 0}; }
+    if op == blot_check_core::Op.not_ { var bits: u32 = 0; if a == 0 { bits = 1; } return StageValue {bits, left.ty, 0}; }
     if op == blot_check_core::Op.abs { return left; }
     if (op == blot_check_core::Op.div || op == blot_check_core::Op.rem) && b == 0 { return stopStage(s, "#run trapped on integer division by zero"); }
     let folded, bits = blot_check_scalar_ops::foldU32(op, a, b);

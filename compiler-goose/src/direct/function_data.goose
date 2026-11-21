@@ -816,7 +816,10 @@ recursive fn project(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         g.put(blot_direct_types::tagName(g.types.node(value.ty).tag));
         return neverVal(), g.failClose();
     }
-    let target, has_target = g.dispatchTarget(m, identity, projection.field, blot_check_types::Operator.none);
+    var target, has_target = g.dispatchTarget(m, identity, projection.field, blot_check_types::Operator.none);
+    if !has_target && (tagOf(g, value.ty) == blot_direct_types::Tag.grow || tagOf(g, value.ty) == blot_direct_types::Tag.resize) {
+        target, has_target = g.dispatchTarget(m, blot_check_types::NominalIdentity { 0, 0xffffffff }, projection.field, blot_check_types::Operator.none);
+    }
     if !has_target {
         g.failOpen(m, id);
         g.put("no member ");

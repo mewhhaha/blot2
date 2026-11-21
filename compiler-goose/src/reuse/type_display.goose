@@ -115,9 +115,29 @@ recursive fn render<C>(context: C&, bytes: u8[>..<]&, ty: u32, depth: i64, budge
             { let propagated_error = text(context, bytes, " }"); if propagated_error != blot_error::Error.none { return propagated_error; } }
         },
         nominal, type_constructor => {
+            if blot_check_storage_types::isLengthLiteral(node.a, node.b) {
+                return number(context, bytes, blot_check_storage_types::lengthLiteralValue(node.b));
+            }
+            let storage = blot_check_storage_types::identity(node.a, node.b);
+            if storage.present && node.tag == blot_check_types::Tag.nominal {
+                let args = context.types.nominalArguments(node);
+                if storage.value == blot_check_storage_types::shared && args.len == 1 {
+                    { let propagated_error = text(context, bytes, "*"); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    return render(context, bytes, args[0], depth + 1, budget, stable);
+                }
+                if blot_check_storage_types::isSized(storage.value) && args.len == 2 {
+                    var prefix: const u8[:] = "#[";
+                    if storage.value == blot_check_storage_types::sized_grow { prefix = "#[+"; }
+                    else if storage.value == blot_check_storage_types::sized_resize { prefix = "#[~"; }
+                    { let propagated_error = text(context, bytes, prefix); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    { let propagated_error = render(context, bytes, args[0], depth + 1, budget, stable); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    { let propagated_error = text(context, bytes, "; "); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    { let propagated_error = render(context, bytes, args[1], depth + 1, budget, stable); if propagated_error != blot_error::Error.none { return propagated_error; } }
+                    return text(context, bytes, "]");
+                }
+            }
             var name: u32 = 0;
             for nominal in context.nominals { if nominal.identity.unit == node.a && nominal.identity.decl == node.b { name = nominal.name; break; } }
-            let storage = blot_check_storage_types::identity(node.a, node.b);
             if storage.present { { let propagated_error = text(context, bytes, blot_check_storage_types::name(storage.value)); if propagated_error != blot_error::Error.none { return propagated_error; } } }
             else if name == 0 { { let propagated_error = text(context, bytes, "Type"); if propagated_error != blot_error::Error.none { return propagated_error; } } }
             else { { let propagated_error = text(context, bytes, context.pool.get(name)); if propagated_error != blot_error::Error.none { return propagated_error; } } }

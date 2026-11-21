@@ -43,7 +43,7 @@ struct Primitive {
     array_op: ArrayOp = blot_backend_collection_ops::Op.length,
     arity: u8
 }
-enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_ }
+enum Op { none, add, sub, mul, div, rem, equal, not_equal, less, less_equal, greater, greater_equal, bit_and, bit_or, bit_xor, shift_left, shift_right, and_, or_, neg, abs, ceil, floor, trunc, sqrt, convert_u32_f32, convert_f32_u32, shift_right_signed, min, max, bit_not, bit_andnot, any_true, all_true, select, shuffle, swizzle, broadcast, bits, from_bits, relaxed_madd, relaxed_nmadd, convert_i32_f32, convert_f32_i32, continue_, not_ }
 // bind: a = the name's binding, b = its value, c = 1 when `:=` rebinds it.
 struct Node {
     tag: Tag,
@@ -797,6 +797,7 @@ fn opCode(value: Op) -> u32 {
         convert_i32_f32 => { return 42; },
         convert_f32_i32 => { return 43; },
         continue_ => { return 44; },
+        not_ => { return 45; },
     }
 }
 fn opFromCode(code: u32) -> Op, blot_error::Error {
@@ -846,6 +847,7 @@ fn opFromCode(code: u32) -> Op, blot_error::Error {
         42 => { return Op.convert_i32_f32, blot_error::Error.none; },
         43 => { return Op.convert_f32_i32, blot_error::Error.none; },
         44 => { return Op.continue_, blot_error::Error.none; },
+        45 => { return Op.not_, blot_error::Error.none; },
         _ => { return Op.none, blot_error::Error.core_limit; },
     }
 }

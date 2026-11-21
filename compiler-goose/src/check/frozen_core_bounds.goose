@@ -349,7 +349,7 @@ fn scalarArity(op: blot_check_core::Op) -> u8,Error {
         none => { return 0,blot_error::Error.invalid_artifact; },
         neg,abs,ceil,floor,trunc,sqrt,
         convert_u32_f32,convert_f32_u32,convert_i32_f32,convert_f32_i32,
-        bit_not,any_true,all_true,bits,from_bits => { return 1,blot_error::Error.none; },
+        bit_not,not_,any_true,all_true,bits,from_bits => { return 1,blot_error::Error.none; },
         _ => { return 2,blot_error::Error.none; },
     }
 }

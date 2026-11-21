@@ -877,10 +877,17 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
             callf(g, g.runtime_().freeze);
             return Val { ty, container.start, container.len }, blot_direct_types::Error.none;
         },
+        share => {
+            let value, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return value, error; }
+            let froze = freezeValue(g, f, value, id, 0);
+            if froze != blot_direct_types::Error.none { return neverVal(), froze; }
+            return Val { ty, value.start, value.len }, blot_direct_types::Error.none;
+        },
         copy => {
-            let container, error = expr(g, f, children[0]);
-            if error != blot_direct_types::Error.none { return container, error; }
-            return copyContainer(g, f, container, ty, id);
+            let value, error = expr(g, f, children[0]);
+            if error != blot_direct_types::Error.none { return value, error; }
+            return deepCopyValue(g, f, value, ty, id, 0);
         },
         view => {
             let container, error = expr(g, f, children[0]);
@@ -962,4 +969,224 @@ recursive fn storageOp(g: Generator&, f: Fn&, id: u32) -> Val, Error {
         // `write` to a store).
         _ => { abort("storage operation without a direct lowering"); },
     }
+}
+
+recursive fn holdsGrowable(g: Generator&, ty: Ty, depth: i64) -> bool {
+    if depth > 32 { return false; }
+    let n = g.types.node(ty);
+    match n.tag {
+        grow, resize => { return true; },
+        tuple => {
+            for at in 0..(n.b as i64) { if holdsGrowable(g, g.types.words[n.a + at], depth + 1) { return true; } }
+            return false;
+        },
+        record => {
+            for index in 0..(n.b as i64) { if holdsGrowable(g, g.types.recordField(ty, index).ty, depth + 1) { return true; } }
+            return false;
+        },
+        nominal => {
+            let cases, error = g.types.variants(ty);
+            if error != blot_direct_types::Error.none { return false; }
+            for at in 0..(cases.len as i64) {
+                let payload = g.types.variant_payloads[cases.payloads + at];
+                if payload != ty && holdsGrowable(g, payload, depth + 1) { return true; }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+
+recursive fn freezeValue(g: Generator&, f: Fn&, value: Val, id: u32, depth: i64) -> Error {
+    if depth > 32 || value.ty == blot_direct_types::never { return blot_direct_types::Error.none; }
+    let tag = tagOf(g, value.ty);
+    if tag == blot_direct_types::Tag.grow || tag == blot_direct_types::Tag.resize {
+        lget(g, w(g, value, 0));
+        lget(g, w(g, value, 1));
+        callf(g, g.runtime_().freeze);
+        return blot_direct_types::Error.none;
+    }
+    if !holdsGrowable(g, value.ty, 0) { return blot_direct_types::Error.none; }
+    if tag == blot_direct_types::Tag.record {
+        let count = g.types.node(value.ty).b as i64;
+        for index in 0..count {
+            let field_ty = g.types.recordField(value.ty, index).ty;
+            if !holdsGrowable(g, field_ty, 0) { continue; }
+            let field, error = recordField(g, f, value, index, id);
+            if error != blot_direct_types::Error.none { return error; }
+            let err = freezeValue(g, f, field, id, depth + 1);
+            if err != blot_direct_types::Error.none { return err; }
+        }
+        return blot_direct_types::Error.none;
+    }
+    if tag == blot_direct_types::Tag.tuple {
+        let n = g.types.node(value.ty);
+        for index in 0..(n.b as i64) {
+            let item_ty = g.types.words[n.a + index];
+            if !holdsGrowable(g, item_ty, 0) { continue; }
+            let item, error = tupleItem(g, f, value, index, id);
+            if error != blot_direct_types::Error.none { return error; }
+            let err = freezeValue(g, f, item, id, depth + 1);
+            if err != blot_direct_types::Error.none { return err; }
+        }
+        return blot_direct_types::Error.none;
+    }
+    if tag == blot_direct_types::Tag.nominal {
+        let cases, error = g.types.variants(value.ty);
+        if error != blot_direct_types::Error.none { return g.typeFailure(g.units[f.unit - 1], id); }
+        if cases.len == 1 {
+            let unwrapped, error = unwrapVariant(g, f, value, g.types.variant_tags[cases.tags], id);
+            if error != blot_direct_types::Error.none { return error; }
+            return freezeValue(g, f, unwrapped, id, depth + 1);
+        }
+    }
+    return blot_direct_types::Error.none;
+}
+
+recursive fn holdsContainer(g: Generator&, ty: Ty, depth: i64) -> bool {
+    if depth > 32 { return false; }
+    let n = g.types.node(ty);
+    match n.tag {
+        array, grow, resize => { return true; },
+        tuple => {
+            for at in 0..(n.b as i64) { if holdsContainer(g, g.types.words[n.a + at], depth + 1) { return true; } }
+            return false;
+        },
+        record => {
+            for index in 0..(n.b as i64) { if holdsContainer(g, g.types.recordField(ty, index).ty, depth + 1) { return true; } }
+            return false;
+        },
+        nominal => {
+            let cases, error = g.types.variants(ty);
+            if error != blot_direct_types::Error.none { return false; }
+            for at in 0..(cases.len as i64) {
+                let payload = g.types.variant_payloads[cases.payloads + at];
+                if payload != ty && holdsContainer(g, payload, depth + 1) { return true; }
+            }
+            return false;
+        },
+        _ => { return false; },
+    }
+}
+
+recursive fn deepCopyValue(g: Generator&, f: Fn&, value: Val, ty: Ty, id: u32, depth: i64) -> Val, Error {
+    if depth > 32 || value.ty == blot_direct_types::never { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
+    let tag = tagOf(g, ty);
+    if tag == blot_direct_types::Tag.array || tag == blot_direct_types::Tag.grow || tag == blot_direct_types::Tag.resize {
+        return copyContainer(g, f, value, ty, id);
+    }
+    if !holdsContainer(g, ty, 0) { return Val { ty, value.start, value.len }, blot_direct_types::Error.none; }
+    if tag == blot_direct_types::Tag.record {
+        let count = g.types.node(ty).b as i64;
+        let boxed, error = isBoxed(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        var memory_block: u32 = 0;
+        if boxed {
+            let made, error = newBlock(g, f, ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            memory_block = made;
+        }
+        let s .= g.s;
+        let mark = s.scratch.len;
+        for index in 0..count {
+            let field_ty = g.types.recordField(ty, index).ty;
+            let field, error = recordField(g, f, value, index, id);
+            if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+            let copied, error = deepCopyValue(g, f, field, field_ty, id, depth + 1);
+            if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+            if boxed {
+                let offset, error = fieldOffset(g, f, ty, index, id);
+                if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+                let written = writeFlat(g, f, memory_block, offset, copied, id);
+                if written != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), written; }
+            } else {
+                for at in 0..(copied.len as i64) { s.scratch.push(g.s.words[copied.start + at]); }
+            }
+        }
+        if boxed { s.scratch.resize(mark); return valOf1(g, ty, memory_block), blot_direct_types::Error.none; }
+        let start = g.s.words.len as u32;
+        let words_count = (s.scratch.len - mark) as u32;
+        for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
+        s.scratch.resize(mark);
+        return Val { ty, start, words_count }, blot_direct_types::Error.none;
+    }
+    if tag == blot_direct_types::Tag.tuple {
+        let n = g.types.node(ty);
+        let boxed, error = isBoxed(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        var memory_block: u32 = 0;
+        if boxed {
+            let made, error = newBlock(g, f, ty, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            memory_block = made;
+        }
+        let s .= g.s;
+        let mark = s.scratch.len;
+        for index in 0..(n.b as i64) {
+            let item_ty = g.types.words[n.a + index];
+            let item, error = tupleItem(g, f, value, index, id);
+            if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+            let copied, error = deepCopyValue(g, f, item, item_ty, id, depth + 1);
+            if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+            if boxed {
+                let offset, error = itemOffset(g, f, ty, index, id);
+                if error != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), error; }
+                let written = writeFlat(g, f, memory_block, offset, copied, id);
+                if written != blot_direct_types::Error.none { s.scratch.resize(mark); return neverVal(), written; }
+            } else {
+                for at in 0..(copied.len as i64) { s.scratch.push(g.s.words[copied.start + at]); }
+            }
+        }
+        if boxed { s.scratch.resize(mark); return valOf1(g, ty, memory_block), blot_direct_types::Error.none; }
+        let start = g.s.words.len as u32;
+        let words_count = (s.scratch.len - mark) as u32;
+        for at in mark..s.scratch.len { let word = s.scratch[at]; g.s.words.push(word); }
+        s.scratch.resize(mark);
+        return Val { ty, start, words_count }, blot_direct_types::Error.none;
+    }
+    if tag == blot_direct_types::Tag.nominal {
+        let cases, error = g.types.variants(ty);
+        if error != blot_direct_types::Error.none { return neverVal(), g.typeFailure(g.units[f.unit - 1], id); }
+        if cases.len == 1 {
+            let vtag = g.types.variant_tags[cases.tags];
+            let payload_ty = g.types.variant_payloads[cases.payloads];
+            let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            return wrapVariant(g, f, ty, vtag, copied, id);
+        }
+        let result, error = fresh(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return result, error; }
+        let vtag_local = local32(g, f);
+        lget(g, w(g, value, 0));
+        let boxed, error = isBoxed(g, f, ty, id);
+        if error != blot_direct_types::Error.none { return neverVal(), error; }
+        if boxed { memoryOp(g, OP_i32_load, 0); }
+        lset(g, vtag_local);
+        let exit = open(g, f, OP_block);
+        for pos in 0..(cases.len as i64) {
+            let vtag = g.types.variant_tags[cases.tags + pos];
+            let payload_ty = g.types.variant_payloads[cases.payloads + pos];
+            let next = open(g, f, OP_block);
+            lget(g, vtag_local);
+            i32Const(g, vtag);
+            op(g, OP_i32_ne);
+            br(g, f, OP_br_if, next);
+            let unwrapped, error = unwrapVariant(g, f, value, vtag, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let copied, error = deepCopyValue(g, f, unwrapped, payload_ty, id, depth + 1);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let wrapped, error = wrapVariant(g, f, ty, vtag, copied, id);
+            if error != blot_direct_types::Error.none { return neverVal(), error; }
+            let stored = copy(g, f, wrapped, result, id);
+            if stored != blot_direct_types::Error.none { return neverVal(), stored; }
+            br(g, f, OP_br, exit);
+            close(g, f);
+        }
+        op(g, OP_unreachable_);
+        close(g, f);
+        return result, blot_direct_types::Error.none;
+    }
+    return Val { ty, value.start, value.len }, blot_direct_types::Error.none;
 }

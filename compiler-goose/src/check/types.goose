@@ -167,11 +167,12 @@ fn receiverIdentity(value: Node) -> blot_support::Option<NominalIdentity> {
 fn isReflectionIdentity(unit_: u32, decl: u32) -> bool { return unit_ == none && (decl == 3 || decl == 4); }
 fn compilerNominalArity(identity: NominalIdentity) -> blot_support::Option<u32> {
     if identity.unit != none { return blot_support::Option<u32> { false, 0 , ..}; }
+    if identity.decl >= 0x10000000 && identity.decl < 0x80000000 { return blot_support::Option<u32> { true, 0 , ..}; }
     match identity.decl {
         3, 4, 16 => { return blot_support::Option<u32> { true, 0 , ..}; },
-        5, 9, 20, 21, 22, 23, 24 => { return blot_support::Option<u32> { true, 1 , ..}; },
+        5, 9, 20, 21, 22, 23, 24, 25 => { return blot_support::Option<u32> { true, 1 , ..}; },
         6 => { return blot_support::Option<u32> { true, 3 , ..}; },
-        8, 17, 18 => { return blot_support::Option<u32> { true, 2 , ..}; },
+        8, 17, 18, 26, 27, 28 => { return blot_support::Option<u32> { true, 2 , ..}; },
         _ => { return blot_support::Option<u32> { false, 0 , ..}; },
     }
 }

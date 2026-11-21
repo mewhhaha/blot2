@@ -413,6 +413,7 @@ fn scalarOp(g: Generator&, f: const Fn&, op_: Op, operand: Ty, id: u32) -> Error
             op(g, OP_i32_xor);
             return blot_direct_types::Error.none;
         },
+        not_ => { code = OP_i32_eqz; },
         _ => {
             g.failOpen(m, id);
             g.put("scalar operation ");

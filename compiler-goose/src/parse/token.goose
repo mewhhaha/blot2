@@ -74,6 +74,10 @@ let private_where: Tag = 68;
 let newline: Tag = 69;
 let indent: Tag = 70;
 let dedent: Tag = 71;
+let kw_not: Tag = 72;
+let kw_with: Tag = 73;
+let kw_fork: Tag = 74;
+let semicolon: Tag = 75;
 
 struct Token { tag: Tag, start: u32, end: u32 }
 fn text(value: Token, source: const u8[:]) -> const u8[:] { return source[value.start..value.end]; }
@@ -112,5 +116,7 @@ fn keyword(value: const u8[:]) -> Tag {
     if value == "false" { return kw_false; }
     if value == "and" { return kw_and; }
     if value == "or" { return kw_or; }
+    if value == "not" { return kw_not; }
+    if value == "with" { return kw_with; }
     return identifier;
 }

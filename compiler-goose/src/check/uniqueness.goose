@@ -783,7 +783,13 @@ recursive fn holdsInNode(self_: Analyzer&, m: const Module&, ty: u32, variables:
         return false;
     }
     if n.tag != blot_check_types::Tag.nominal { return true; }
-    if blot_check_storage_types::identity(n.a, n.b).present || n.a == 0xffffffff { return true; }
+    if blot_check_storage_types::isLengthLiteral(n.a, n.b) { return false; }
+    let storage_kind = blot_check_storage_types::identity(n.a, n.b);
+    if storage_kind.present {
+        if storage_kind.value == blot_check_storage_types::shared { return false; }
+        return true;
+    }
+    if n.a == 0xffffffff { return true; }
     let index, found = nominalIndex(self_, m, n.a, n.b);
     if !found { return true; }
     let nominal = m.nominal(index);
@@ -893,9 +899,15 @@ recursive fn partsInNode(self_: Analyzer&, m: const Module&, ty: u32, want: u8, 
     if n.tag != blot_check_types::Tag.nominal { return want == 1; }
     // A GrowArray and a ResizeArray own their storage as an array does. A
     // view, a reference and a link borrow.
+    if blot_check_storage_types::isLengthLiteral(n.a, n.b) { return false; }
     if blot_check_storage_types::identity(n.a, n.b).present {
         let kind = blot_check_storage_types::identity(n.a, n.b).value;
-        if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize {
+        if kind == blot_check_storage_types::shared {
+            if want != 2 { return false; }
+            for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
+            return false;
+        }
+        if kind == blot_check_storage_types::grow || kind == blot_check_storage_types::resize || kind == blot_check_storage_types::sized_array || kind == blot_check_storage_types::sized_grow || kind == blot_check_storage_types::sized_resize {
             if want == 0 { return true; }
             for argument in m.types.nominalArguments(n) { if partsInMemo(self_, m, argument, want, variables, arguments, depth + 1, memo) { return true; } }
             return false;
@@ -2660,10 +2672,58 @@ recursive fn storageOp(self_: Analyzer&, m: const Module&, id: u32) -> Value {
             return Value { exits: container.exits || value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.copy {
+            let input_ty = m.typeOf(children[0]);
             let container = visit(self_, m, children[0]);
-            if elementHolds(self_, m, n.ty) { escape(self_, container); }
-            let fact = freshContainer(self_, m, n.ty, false);
-            return Value { fact: fact, exits: container.exits, .. };
+            if !blot_check_storage_types::isShared(m.types, input_ty) && blot_check_storage_types::arrayElement(m.types, n.ty).present && elementHolds(self_, m, n.ty) { escape(self_, container); }
+            if blot_check_storage_types::arrayElement(m.types, n.ty).present {
+                let fact = freshContainer(self_, m, n.ty, blot_check_storage_types::isShared(m.types, input_ty));
+                return Value { fact: fact, exits: container.exits, .. };
+            }
+            return Value { fact: deep, exits: container.exits, .. };
+        }
+        if operation == blot_check_storage_ops::Op.share {
+            // `freeze x`: takes over a linear value in O(1) and produces `*T`.
+            let child = children[0];
+            let input_ty = m.typeOf(child);
+            if blot_check_storage_types::isShared(m.types, input_ty) || !holds(self_, m, input_ty) {
+                let container = visit(self_, m, child);
+                return Value { fact: none, exits: container.exits, .. };
+            }
+            var named: u32 = 0;
+            if m.node(child).tag == blot_check_core::Tag.reference {
+                let target = m.reference(child);
+                if (target.unit == 0 || target.unit == m.unit) && local(self_, target.binding) { named = target.binding; }
+            }
+            var part = Place { .. };
+            if named == 0 {
+                let target, found = place(self_, m, child);
+                if found && target.len != 0 && local(self_, target.binding) { part = target; }
+            }
+            var was_spent = named != 0 && self_.facts[named] == spent;
+            if part.len != 0 && partFact(self_, self_.facts[part.binding], part.fields[..part.len]) == spent { was_spent = true; }
+            let value = visit(self_, m, child);
+            if was_spent { return Value { fact: none, exits: value.exits, .. }; }
+            var accepted = false;
+            var loop_id: u32 = 0;
+            if self_.loops.len != 0 { loop_id = self_.loops[self_.loops.len - 1].id; }
+            if value.origin == 0 {
+                accepted = ownedAs(self_, m, value.fact, input_ty, 0);
+            } else if named != 0 {
+                accepted = self_.born[named] == loop_id && ownedAs(self_, m, self_.facts[named], input_ty, 0);
+            } else if part.len != 0 && value.origin == part.binding {
+                let fact = partFact(self_, self_.facts[part.binding], part.fields[..part.len]);
+                accepted = self_.born[part.binding] == loop_id && fact != spent && ownedAs(self_, m, fact, input_ty, 0);
+            }
+            if !accepted { reject(self_, m, child, blot_check_core::Code.own_argument); }
+            if accepted && named != 0 {
+                set(self_, named, spent);
+            } else if accepted && part.len != 0 && value.origin == part.binding {
+                let given = replace(self_, self_.facts[part.binding], part.fields[..part.len], spent);
+                set(self_, part.binding, given);
+            } else {
+                escape(self_, value);
+            }
+            return Value { fact: none, exits: value.exits, .. };
         }
         if operation == blot_check_storage_ops::Op.freeze {
             let container = visit(self_, m, children[0]);

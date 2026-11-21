@@ -10,7 +10,7 @@ type Op=blot_check_core::Op;
 fn supported(op:Op,floating:bool)->bool {
  match op {
   add,sub,mul,div,equal,not_equal,less,less_equal,greater,greater_equal,convert_u32_f32,convert_f32_u32=>{return true;},
-  rem,bit_and,bit_or,bit_xor,shift_left,shift_right,from_bits=>{return !floating;},
+  rem,bit_and,bit_or,bit_xor,shift_left,shift_right,from_bits,not_=>{return !floating;},
   neg,abs,ceil,floor,trunc,sqrt,min,max,bits=>{return floating;},
   _=>{return false;},
  }

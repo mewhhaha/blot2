@@ -2739,6 +2739,9 @@ return blot_check_core::Op.convert_f32_i32,blot_error::Error.none;},
 continue_=>{
 return blot_check_core::Op.continue_,blot_error::Error.none;},
 
+not_=>{
+return blot_check_core::Op.not_,blot_error::Error.none;},
+
 }
 
 }
@@ -6520,6 +6523,9 @@ convert_f32_i32=>{
 },
 
 continue_=>{
+},
+
+not_=>{
 },
 
 }
