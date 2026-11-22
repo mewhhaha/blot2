@@ -1,5 +1,52 @@
 # Working on Blot and Gdev
 
+## Next step: Blot vNext Concurrency, Data-Parallelism & Kernel Architecture (`tasks/CONCURRENCY_VNEXT.md`)
+
+The approved end-to-end architecture plan is finalized and checked in at
+[tasks/CONCURRENCY_VNEXT.md](tasks/CONCURRENCY_VNEXT.md) (`v38`, commit
+`4d1ded71`; dual-audited to **9.0/10** by GPT 6.2 Sol High and **10.0/10** by
+Second Neon on `v37`, with the final `v37` box-aware 4-lane `@simd.load`/`@simd.store`,
+standalone native repackaging, and Pen Web asset-list polish folded in).
+
+- **Hard invariants preserved:** Guest ABI 8 (`blot:abi` v8, `blot:invocation`
+  v1, zero extra exports), Session Protocol 2 (`Operation 0..=6`, live-only
+  unrecorded `CAP`, `request == 0` kernel provenance), Save Schema 26
+  (`ink/lib/services.blot` `max_id = 16,777,215` untouched), and canonical
+  `0x7fc00000` quiet NaN determinism.
+- **Live checkouts at plan lock:** `blot2` (`4d1ded71`), `../pen` (`1505604`,
+  preserve existing uncommitted local edits), `../ink` (`4adfd09`, preserve
+  untracked `tools/native/target/`), `../gdev` (`a13c3f1`).
+- **Start here when resuming ([tasks/CONCURRENCY_VNEXT.md §6.2](tasks/CONCURRENCY_VNEXT.md#62-phased-rollout--checkpoints)):**
+  1. **Pre-Phase 1:** Capture and pin the exact pre-change Gdev `pen test-blot`
+     passing/failing test identities on live `../gdev` `HEAD` (`a13c3f1`) before
+     making any code edits.
+  2. **Phase 1:** Language spec updates, lexer/parser/checker/Core for `spark`,
+     `entry kernel`, `entry process`, §2.5 context-sensitive relational purity
+     proof, `@flat.*` frontend/Core, Phase 1 direct-backend `k == 1` tuple-record
+     fixes, escape-safe scalar `Tag.spark` lowering, Phase 1 syntax cleanup
+     (incl. renaming both `spark` bindings in `../gdev/src/actors/kites.blot:536, 540`),
+     Goose adapters, and Baba/formatter/Tree-sitter (`deno task test:compiler` +
+     Law #3).
+  3. **Phase 2:** `function_spark.goose` 4-wide Wasm SIMD `v128` auto-vectorization,
+     uniform producer-site `0x7fc00000` NaN canonicalization across all 4 emitters,
+     `offset = -2` `unpatchableOperand`, and fixture requalification.
+  4. **Phase 3:** Persistent arena runtime (active-only exact-cap stack free lists,
+     unified transport pool + `blot:reset` release, zero-export Page-0 offset `640`
+     `arena_oom_flag`, `rt.escape_min_slot` + `must_undo` + box-aware 4-lane
+     `@simd.load`/`@simd.store`, iterative two-phase staging, recursive
+     physical-stride `FlatNumeric`, `[0xffffffff]` sentinel, `blot:kernels` /
+     `blot:processes`, transitive `LayoutReceipt`) + Laws #1 & #2.
+  5. **Phase 4:** Unified `KernelPool` & deterministic `Processes` across Pen
+     Rust, Deno TS (`Deno.Command` subprocesses), and Pen Web (`kernels.js` +
+     worker script wired into `build.sh`, `Justfile`, and `project.rs:918`),
+     plus lockstep migration/retirement of legacy workers/sparks + Laws #4 & #5.
+  6. **Phase 5:** Pen `service::KERNEL = 15`, `std/kernel`, `KernelService`,
+     Gdev shared `colony_paths.build_mesh_into` + query-keyed route pre-warm,
+     Law #6, canonical Save-26/render equivalence, and inspected hardware
+     `frame.png`.
+
+Commit and push verified checkpoints to `origin/main` after each phase.
+
 ## Phase 1 compiler pruning, on-demand memory, and Batch 1B–1D completion (22 November 2026)
 
 All Phase 1 compiler pruning batches ([docs/compiler/VNEXT_ROADMAP.md](docs/compiler/VNEXT_ROADMAP.md)
@@ -470,7 +517,12 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
 
 ## Remaining work
 
-1. **Migrate remaining borrowed-mutator `=` stores (`tasks/MEMORY_MODEL.md`
+1. **Execute Blot vNext concurrency, SIMD `spark`, `KernelPool` & `Processes`
+   ([tasks/CONCURRENCY_VNEXT.md](tasks/CONCURRENCY_VNEXT.md), Pre-Phase 1 →
+   Phase 5).**
+   Start with Pre-Phase 1 live Gdev baseline capture on `a13c3f1`, then land
+   Phases 1–5 with verified checkpoints pushed to `origin/main`.
+2. **Migrate remaining borrowed-mutator `=` stores (`tasks/MEMORY_MODEL.md`
    Phase 3) and remove the ~25-LOC `=` compatibility shim.**
    `lent` is completely retired (0 occurrences across all four repos), and
    `#[+T]` / `#[~T]` ownership checks cover array length changes. The remaining
@@ -480,11 +532,11 @@ The historical Ink physics source at `58e6b02` still exhausts its stack in
    (including Gdev's `salt.decode_rows_into` / `write_rows`, tracked by
    [count_stores.py](scripts/integration/count_stores.py)). Once those callers
    migrate to `own` / `:=`, remove the `=` shim completely.
-2. **Work through the remaining 83 Gdev `pen test-blot` failures by name.**
+3. **Work through the remaining 83 Gdev `pen test-blot` failures by name.**
    Down from 108 failures at `be489b79` to **83** (`1,291 passed, 83 failed`
    across all 218 modules). Compare affected tests and the 120-frame replay
    against the pinned reference ([raw evidence](benchmarks/evidence/qualification/2026-11-17-owned-runtime.raw.json.gz)).
-3. **Compile-speed & runtime follow-ups.**
+4. **Compile-speed & runtime follow-ups.**
    The [compile-speed plan](tasks/FAST_COMPILE.md) retains the subsecond and
    Wasm-size targets (cold Gdev Main is 565 ms `-O2` / 432 ms PGO; retained
    edits are 26–37 ms). Further `trees` / `view` / `write` runtime tuning can
