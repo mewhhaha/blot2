@@ -142,6 +142,12 @@ fn get(receiver:Reader&,value:u32[:]&) {
 fn putExecutionCore(writer:Writer&,module:blot_check_core::Module) {
     var header=module;
     header.constructors=default<blot_check_core::Constructor[:]>();
+    header.runtime_names=default<blot_check_core::RuntimeName[:]>();
+    header.source_names=default<blot_check_core::RuntimeName[:]>();
+    header.declaration_dependencies=default<blot_check_core::DeclarationDependencies[:]>();
+    header.dependency_references=default<blot_check_core::BindingRef[:]>();
+    header.dependency_members=default<blot_check_core::DependencyMember[:]>();
+    header.erased_declaration_references=default<blot_check_core::ErasedDeclarationReference[:]>();
     put(writer,header);
     count(writer,module.constructors.len);
     for c in module.constructors {

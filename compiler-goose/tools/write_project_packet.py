@@ -221,11 +221,7 @@ FLAT_SLICES = (
     'blot_check_core::Primitive',
     'blot_check_core::Projection',
     'blot_check_core::ProjectionVariant',
-    'blot_check_core::RequestArm',
-    'blot_check_core::RequestLoopInfo',
-    'blot_check_core::ResolverInfo',
     'blot_check_core::RuntimeName',
-    'blot_check_core::SelectedUse',
     'blot_check_core::TypeTag',
     'blot_check_core::UpdateInfo',
     'blot_check_core::UpdateStep',
@@ -236,7 +232,6 @@ FLAT_SLICES = (
     'blot_check_types::Operation',
     'blot_parse_ast::Span',
     'blot_reuse_frozen_dependency::Export',
-    'blot_reuse_frozen_dependency::Fixity',
     'blot_reuse_principal_interface::Associated',
     'blot_reuse_principal_interface::Binding',
     'blot_reuse_principal_interface::Constructor',
@@ -248,7 +243,6 @@ FLAT_SLICES = (
     'blot_reuse_principal_interface::ImplementationMember',
     'blot_reuse_principal_interface::MemberTemplate',
     'blot_reuse_principal_interface::Nominal',
-    'blot_reuse_principal_interface::SelectedProof',
     'blot_reuse_project_check::Export',
 )
 def has_tagged_union(t, ns='blot_project_packet'):

@@ -36,8 +36,6 @@ fn implementations<T,M>(storage:Owner&,owner:T&,map:M) {
  for &value in storage.mutable(owner.implementations) {identity(map,value.identity);identity(map,value.contract);value.name=map.symbol(value.name);}
  for &value in storage.mutable(owner.implementation_members) {value.name=map.symbol(value.name);target(map,value.target);}
  for &value in storage.mutable(owner.member_templates) {identity(map,value.contract);value.name=map.symbol(value.name);}
- for &value in storage.mutable(owner.selected_members) {value.name=map.symbol(value.name);target(map,value.target);}
- for &value in storage.mutable(owner.selected_proofs) {target(map,value.predicate_target);value.context=map.unit(value.context);identity(map,value.implementation);identity(map,value.contract);identity(map,value.predicate.identity);value.predicate.name=map.symbol(value.predicate.name);value.predicate.qualification_unit=map.unit(value.predicate.qualification_unit);}
 }
 fn predicate<M,P>(map:M,value:P&) {value.name=map.symbol(value.name);identity(map,value.identity);value.qualification_unit=map.unit(value.qualification_unit);}
 fn interfaceUnits(storage:Owner&,owner:Interface&,units:const u32[:])->Error {var rejected=false;interfaceWith(storage,owner,Retained {units,rejected, ..});if rejected {return blot_error::Error.invalid_artifact;}return blot_error::Error.none;}
@@ -73,7 +71,6 @@ fn moduleWith<M>(storage:Owner&,owner:Module&,map:M) {
  for &value in storage.mutable(owner.nominals) {identity(map,value.identity);}for &value in storage.mutable(owner.operation_names) {identity(map,value.identity);}for &value in storage.mutable(owner.constructors) {identity(map,value.identity);}
  for &value in storage.mutable(owner.projections) {identity(map,value.nominal);value.field=map.symbol(value.field);}
  for &value in storage.mutable(owner.associated) {identity(map,value.identity);value.member=map.symbol(value.member);target(map,value.target);}
- for &value in storage.mutable(owner.resolver_ops) {value.member=map.symbol(value.member);target(map,value.method);}
  for &value in storage.mutable(owner.operation_values) {identity(map,value.identity);value.instance.unit=map.unit(value.instance.unit);}
 }
 fn checkWords(words:const u32[:],roles:const u8[:],count:i64)->Error {for word,index in words {if roles[index]==1&&word>=count {return blot_error::Error.invalid_artifact;}}return blot_error::Error.none;}
@@ -100,7 +97,7 @@ fn relink(storage:Owner&,value:blot_reuse_frozen_dependency::FrozenDependency&,p
   let entry=roles[index];blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.graph.extra),entry.interface_types,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.interface.patterns.extra),entry.patterns,names);blot_reuse_dependency_symbol_slots::rewrite(storage.mutable(owner.core.types.extra),entry.core_types,names);
   interfaceWith(storage,owner.interface,map);module(storage,owner.core,names,units);
   for &dependency in owner.imports {dependency=map.unit(dependency);}for &request in owner.source_imports {request.target=map.unit(request.target);}
-  for &exported in owner.exports {exported.name=map.symbol(exported.name);target(map,exported.target);}for &fixity in owner.fixities {fixity.operator=map.symbol(fixity.operator);fixity.target=map.symbol(fixity.target);target(map,fixity.producer);}
+  for &exported in owner.exports {exported.name=map.symbol(exported.name);target(map,exported.target);}
  }
  for &entry in roles {entry.deinit();}candidate.deinit();return blot_error::Error.none;
 }

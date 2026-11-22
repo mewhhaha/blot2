@@ -149,11 +149,6 @@
           "exports",
           "[]reuse.frozen_dependency.Export",
           "exports"
-        ],
-        [
-          "fixities",
-          "[]reuse.frozen_dependency.Fixity",
-          "fixities"
         ]
       ],
       "unwired": []
@@ -251,16 +246,6 @@
           "source_names",
           "[]check.core.RuntimeName",
           "source_names"
-        ],
-        [
-          "request_loops",
-          "[]check.core.RequestLoopInfo",
-          "request_loops"
-        ],
-        [
-          "request_arms",
-          "[]check.core.RequestArm",
-          "request_arms"
         ],
         [
           "tag_calls",
@@ -428,26 +413,6 @@
           "member_templates"
         ],
         [
-          "selected_proofs",
-          "[]reuse.principal_interface.SelectedProof",
-          "selected_proofs"
-        ],
-        [
-          "selected_members",
-          "[]reuse.principal_interface.ImplementationMember",
-          "selected_members"
-        ],
-        [
-          "selected_edges",
-          "[]u32",
-          "selected_edges"
-        ],
-        [
-          "selected_uses",
-          "[]check.core.SelectedUse",
-          "selected_uses"
-        ],
-        [
           "primitives",
           "[]check.core.Primitive",
           "primitives"
@@ -461,11 +426,6 @@
           "loop_carries",
           "[]check.core.LoopCarry",
           "loop_carries"
-        ],
-        [
-          "resolver_ops",
-          "[]check.core.ResolverInfo",
-          "resolver_ops"
         ],
         [
           "operation_values",
@@ -585,69 +545,6 @@
       ]
     },
     {
-      "name": "check.core.RequestLoopInfo",
-      "kind": "struct",
-      "goose": "blot_check_core::RequestLoopInfo",
-      "fields": [
-        [
-          "computation",
-          "u32",
-          "computation"
-        ],
-        [
-          "action_type",
-          "u32",
-          "action_type"
-        ],
-        [
-          "value_type",
-          "u32",
-          "value_type"
-        ],
-        [
-          "result_type",
-          "u32",
-          "result_type"
-        ],
-        [
-          "state_type",
-          "u32",
-          "state_type"
-        ],
-        [
-          "arms",
-          "check.core.List",
-          "arms"
-        ],
-        [
-          "completion_pattern",
-          "u32",
-          "completion_pattern"
-        ],
-        [
-          "completion_body",
-          "u32",
-          "completion_body"
-        ],
-        [
-          "completion_state_bindings",
-          "check.core.List",
-          "completion_state_bindings"
-        ],
-        [
-          "carries",
-          "check.core.List",
-          "carries"
-        ],
-        [
-          "return_target",
-          "u32",
-          "return_target"
-        ]
-      ],
-      "unwired": []
-    },
-    {
       "name": "check.core.List",
       "kind": "struct",
       "goose": "blot_check_core::List",
@@ -664,45 +561,6 @@
         ]
       ],
       "unwired": []
-    },
-    {
-      "name": "[]check.core.RequestLoopInfo",
-      "kind": "slice",
-      "goose": "blot_check_core::RequestLoopInfo[:]",
-      "children": [
-        "check.core.RequestLoopInfo"
-      ]
-    },
-    {
-      "name": "check.core.RequestArm",
-      "kind": "struct",
-      "goose": "blot_check_core::RequestArm",
-      "fields": [
-        [
-          "operation",
-          "u32",
-          "operation"
-        ],
-        [
-          "callback",
-          "u32",
-          "callback"
-        ],
-        [
-          "selector",
-          "u32",
-          "selector"
-        ]
-      ],
-      "unwired": []
-    },
-    {
-      "name": "[]check.core.RequestArm",
-      "kind": "slice",
-      "goose": "blot_check_core::RequestArm[:]",
-      "children": [
-        "check.core.RequestArm"
-      ]
     },
     {
       "name": "check.core.Types",
@@ -1257,84 +1115,59 @@
           "result_dispatch"
         ],
         [
-          "monad_factory",
-          8,
-          "monad_factory"
-        ],
-        [
-          "resolver_dispatch",
-          9,
-          "resolver_dispatch"
-        ],
-        [
-          "resolver_shape",
-          10,
-          "resolver_shape"
-        ],
-        [
           "effect_operation",
-          11,
+          8,
           "effect_operation"
         ],
         [
           "effect_handler",
-          12,
+          9,
           "effect_handler"
         ],
         [
           "receiver",
-          13,
+          10,
           "receiver"
         ],
         [
           "update",
-          14,
+          11,
           "update"
         ],
         [
           "type_rep",
-          15,
+          12,
           "type_rep"
         ],
         [
           "effect_rep",
-          16,
+          13,
           "effect_rep"
         ],
         [
           "type_head",
-          17,
+          14,
           "type_head"
         ],
         [
           "collection",
-          18,
+          15,
           "collection"
         ],
         [
-          "record_merge",
-          19,
-          "record_merge"
-        ],
-        [
           "callee_use",
-          20,
+          16,
           "callee_use"
         ],
         [
           "type_eq",
-          21,
+          17,
           "type_eq"
         ],
         [
           "contract",
-          22,
+          18,
           "contract"
-        ],
-        [
-          "task_receive",
-          23,
-          "task_receive"
         ]
       ]
     },
@@ -1668,148 +1501,68 @@
           "type_constructor"
         ],
         [
-          "resolver_op",
-          32,
-          "resolver_op"
-        ],
-        [
           "operation_value",
-          33,
+          32,
           "operation_value"
         ],
         [
           "effect_provider",
-          34,
+          33,
           "effect_provider"
         ],
         [
           "state_provider",
-          35,
+          34,
           "state_provider"
         ],
         [
           "handle",
-          36,
+          35,
           "handle"
         ],
         [
           "effect_reflection",
-          37,
+          36,
           "effect_reflection"
         ],
         [
-          "computation",
-          38,
-          "computation"
-        ],
-        [
-          "request_loop",
-          39,
-          "request_loop"
-        ],
-        [
-          "request_decision",
-          40,
-          "request_decision"
-        ],
-        [
-          "record_merge",
-          41,
-          "record_merge"
-        ],
-        [
           "contract_method",
-          42,
+          37,
           "contract_method"
         ],
         [
-          "effect_scope",
-          43,
-          "effect_scope"
-        ],
-        [
-          "proof_guard",
-          44,
-          "proof_guard"
-        ],
-        [
-          "package_pack",
-          45,
-          "package_pack"
-        ],
-        [
-          "package_unpack",
-          46,
-          "package_unpack"
-        ],
-        [
           "staging",
-          47,
+          38,
           "staging"
         ],
         [
-          "usage_borrow",
-          48,
-          "usage_borrow"
-        ],
-        [
-          "usage_read",
-          49,
-          "usage_read"
-        ],
-        [
-          "resource_scope",
-          50,
-          "resource_scope"
-        ],
-        [
-          "usage_share",
-          51,
-          "usage_share"
-        ],
-        [
-          "resource_acquire",
-          52,
-          "resource_acquire"
-        ],
-        [
-          "resource_release",
-          53,
-          "resource_release"
-        ],
-        [
-          "task",
-          54,
-          "task"
-        ],
-        [
           "storage",
-          55,
+          39,
           "storage"
         ],
         [
           "fork_",
-          56,
+          40,
           "fork_"
         ],
         [
           "with_handle",
-          57,
+          41,
           "with_handle"
         ],
         [
           "comptime_for",
-          58,
+          42,
           "comptime_for"
         ],
         [
           "comptime_if",
-          59,
+          43,
           "comptime_if"
         ],
         [
           "comptime_meta",
-          60,
+          44,
           "comptime_meta"
         ]
       ]
@@ -3578,110 +3331,6 @@
       ]
     },
     {
-      "name": "reuse.principal_interface.SelectedProof",
-      "kind": "struct",
-      "goose": "blot_reuse_principal_interface::SelectedProof",
-      "fields": [
-        [
-          "predicate_target",
-          "reuse.principal_interface.ExternalTarget",
-          "predicate_target"
-        ],
-        [
-          "context",
-          "u32",
-          "context"
-        ],
-        [
-          "kind",
-          "reuse.principal_interface.SelectedProof.kind",
-          "kind"
-        ],
-        [
-          "predicate",
-          "check.types.Obligation",
-          "predicate"
-        ],
-        [
-          "implementation",
-          "check.types.NominalIdentity",
-          "implementation"
-        ],
-        [
-          "contract",
-          "check.types.NominalIdentity",
-          "contract"
-        ],
-        [
-          "arguments",
-          "check.types.List",
-          "arguments"
-        ],
-        [
-          "members",
-          "check.types.List",
-          "members"
-        ],
-        [
-          "prerequisites",
-          "check.types.List",
-          "prerequisites"
-        ]
-      ],
-      "unwired": []
-    },
-    {
-      "name": "reuse.principal_interface.SelectedProof.kind",
-      "kind": "enum",
-      "goose": "blot_reuse_principal_interface::SelectedProofKind",
-      "variants": [
-        [
-          "implementation",
-          0,
-          "implementation"
-        ],
-        [
-          "predicate",
-          1,
-          "predicate"
-        ]
-      ]
-    },
-    {
-      "name": "[]reuse.principal_interface.SelectedProof",
-      "kind": "slice",
-      "goose": "blot_reuse_principal_interface::SelectedProof[:]",
-      "children": [
-        "reuse.principal_interface.SelectedProof"
-      ]
-    },
-    {
-      "name": "check.core.SelectedUse",
-      "kind": "struct",
-      "goose": "blot_check_core::SelectedUse",
-      "fields": [
-        [
-          "node",
-          "u32",
-          "node"
-        ],
-        [
-          "proof",
-          "u32",
-          "proof"
-        ]
-      ],
-      "unwired": []
-    },
-    {
-      "name": "[]check.core.SelectedUse",
-      "kind": "slice",
-      "goose": "blot_check_core::SelectedUse[:]",
-      "children": [
-        "check.core.SelectedUse"
-      ]
-    },
-    {
       "name": "check.core.Primitive",
       "kind": "struct",
       "goose": "blot_check_core::Primitive",
@@ -3916,89 +3565,6 @@
       ]
     },
     {
-      "name": "check.core.ResolverInfo",
-      "kind": "struct",
-      "goose": "blot_check_core::ResolverInfo",
-      "fields": [
-        [
-          "operation",
-          "check.core.ResolverOperation",
-          "operation"
-        ],
-        [
-          "resolver",
-          "u32",
-          "resolver"
-        ],
-        [
-          "arguments",
-          "check.core.List",
-          "arguments"
-        ],
-        [
-          "member",
-          "u32",
-          "member"
-        ],
-        [
-          "method",
-          "check.core.BindingRef",
-          "method"
-        ],
-        [
-          "method_type",
-          "u32",
-          "method_type"
-        ]
-      ],
-      "unwired": []
-    },
-    {
-      "name": "check.core.ResolverOperation",
-      "kind": "enum",
-      "goose": "blot_check_core::ResolverOperation",
-      "variants": [
-        [
-          "monad",
-          0,
-          "monad"
-        ],
-        [
-          "pure",
-          1,
-          "pure"
-        ],
-        [
-          "bind",
-          2,
-          "bind"
-        ],
-        [
-          "forward",
-          3,
-          "forward"
-        ],
-        [
-          "iterate",
-          4,
-          "iterate"
-        ],
-        [
-          "run",
-          5,
-          "run"
-        ]
-      ]
-    },
-    {
-      "name": "[]check.core.ResolverInfo",
-      "kind": "slice",
-      "goose": "blot_check_core::ResolverInfo[:]",
-      "children": [
-        "check.core.ResolverInfo"
-      ]
-    },
-    {
       "name": "check.core.OperationValue",
       "kind": "struct",
       "goose": "blot_check_core::OperationValue",
@@ -4220,11 +3786,6 @@
           "obligations"
         ],
         [
-          "obligation_spans",
-          "[]parse.ast.Span",
-          "obligation_spans"
-        ],
-        [
           "nominals",
           "[]reuse.principal_interface.Nominal",
           "nominals"
@@ -4283,21 +3844,6 @@
           "member_templates",
           "[]reuse.principal_interface.MemberTemplate",
           "member_templates"
-        ],
-        [
-          "selected_proofs",
-          "[]reuse.principal_interface.SelectedProof",
-          "selected_proofs"
-        ],
-        [
-          "selected_members",
-          "[]reuse.principal_interface.ImplementationMember",
-          "selected_members"
-        ],
-        [
-          "selected_edges",
-          "[]u32",
-          "selected_edges"
         ]
       ],
       "unwired": []
@@ -4929,52 +4475,6 @@
       "goose": "blot_reuse_frozen_dependency::Export[:]",
       "children": [
         "reuse.frozen_dependency.Export"
-      ]
-    },
-    {
-      "name": "reuse.frozen_dependency.Fixity",
-      "kind": "struct",
-      "goose": "blot_reuse_frozen_dependency::Fixity",
-      "fields": [
-        [
-          "operator",
-          "u32",
-          "operator"
-        ],
-        [
-          "target",
-          "u32",
-          "target"
-        ],
-        [
-          "precedence",
-          "u32",
-          "precedence"
-        ],
-        [
-          "association",
-          "u32",
-          "association"
-        ],
-        [
-          "named",
-          "bool",
-          "named"
-        ],
-        [
-          "producer",
-          "reuse.principal_interface.ExternalTarget",
-          "producer"
-        ]
-      ],
-      "unwired": []
-    },
-    {
-      "name": "[]reuse.frozen_dependency.Fixity",
-      "kind": "slice",
-      "goose": "blot_reuse_frozen_dependency::Fixity[:]",
-      "children": [
-        "reuse.frozen_dependency.Fixity"
       ]
     },
     {

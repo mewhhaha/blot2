@@ -95,7 +95,6 @@ for name, variants in {
     'blot_reuse_principal_interface::Kind': ['global','local','parameter','external'],
     'blot_reuse_principal_interface::ContractMemberKind': ['defined_type','abstract_type','value'],
     'blot_reuse_principal_interface::ImplementationMemberKind': ['type_','value'],
-    'blot_reuse_principal_interface::SelectedProofKind': ['implementation','predicate'],
     'blot_backend_opaque_storage::Kind': ['unknown','unit','boolean','unsigned32','floating32','reference','parameter'],
 }.items():
     if name not in custom_equal:

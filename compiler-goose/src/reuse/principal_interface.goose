@@ -64,26 +64,14 @@ struct ImplementationMember {
     target: ExternalTarget = ExternalTarget { 0, 0 , ..},
 }
 struct MemberTemplate { binding: u32, contract: Identity, name: u32, arguments: List }
-struct SelectedUse { source: u32, proof: u32 }
-enum SelectedProofKind { implementation, predicate }
-struct SelectedProof {
-    predicate_target: ExternalTarget = ExternalTarget { 0, 0 , ..}, context: u32 = 0,
-    kind: SelectedProofKind = SelectedProofKind.implementation,
-    predicate: blot_check_types::Obligation = blot_check_types::Obligation {
-        ty: 0, kind: blot_check_types::ObligationKind.type_rep, source: 0,
-     ..},
-    implementation: Identity, contract: Identity, arguments: List, members: List, prerequisites: List,
-}
 struct Interface {
     unit: u32, graph: blot_check_frozen_types::Graph, patterns: blot_check_frozen_types::PatternGraph,
     bindings: const Binding[:], obligations: const blot_check_types::Obligation[:],
-    obligation_spans: const blot_parse_ast::Span[:], nominals: const Nominal[:],
+    nominals: const Nominal[:],
     constructors: const Constructor[:], effect_families: const EffectFamily[:],
     effect_templates: const EffectTemplate[:], associated: const Associated[:],
     contracts: const Contract[:], contract_predicates: const blot_check_types::Obligation[:],
     contract_members: const ContractMember[:], implementations: const Implementation[:],
     implementation_predicates: const blot_check_types::Obligation[:],
     implementation_members: const ImplementationMember[:], member_templates: const MemberTemplate[:],
-    selected_proofs: const SelectedProof[:], selected_members: const ImplementationMember[:],
-    selected_edges: const u32[:],
 }

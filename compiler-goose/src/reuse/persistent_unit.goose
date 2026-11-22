@@ -6,7 +6,6 @@ import reuse.dependency_snapshot;
 import support.project_packet;
 import phase_profile;
 
-type PersistentFixity=blot_reuse_frozen_dependency::Fixity;
 type PersistentSummary=blot_check_check::SchemeSummary;
 reusable[] var persistent_summaries:PersistentSummary[>..]=[];
 struct PersistentProducer {
@@ -14,7 +13,6 @@ struct PersistentProducer {
     interface:blot_reuse_principal_interface::Interface=default<blot_reuse_principal_interface::Interface>(),
     exports:const Export[:]=default<const Export[:]>(),
     summaries:const PersistentSummary[:]=default<const PersistentSummary[:]>(),
-    fixities:const PersistentFixity[:]=default<const PersistentFixity[:]>(),
 }
 reusable[] var persistent_producers:PersistentProducer[>..]=[];
 struct PersistentCache {
@@ -128,11 +126,8 @@ fn decodePersistentProducer(destination:PersistentProducer&,unit:u32,packet:cons
     var selected=PersistentProducer{owner:owner, ..};
     blot_project_packet::get(reader,selected.interface);
     var exports:Export[:]=default<Export[:]>();
-    var fixities:PersistentFixity[:]=default<PersistentFixity[:]>();
     blot_project_packet::get(reader,exports);
-    blot_project_packet::get(reader,fixities);
     selected.exports=exports;
-    selected.fixities=fixities;
     selected.summaries=readPersistentSummaries(reader,selected.interface.bindings.len);
     if reader.failure!=blot_error::Error.none {
         let error=reader.failure;
@@ -246,11 +241,9 @@ fn encodePersistentInterface(prelude:u32,tree:const blot_parse_ast::Tree&,module
     var summaries:blot_reuse_dependency_snapshot::ProjectedSchemeSummary[>..]=[];
     var frozen,error=blot_reuse_dependency_snapshot::freezePersistent(tree,module.checked,summaries);
     if error!=blot_error::Error.none {return error;}
-    var fixities:PersistentFixity[>..<]=[];
     var writer=blot_project_packet::Writer{packet};
     blot_project_packet::put(writer,frozen.value);
     blot_project_packet::put(writer,module.exports);
-    blot_project_packet::put(writer,fixities[..]);
     blot_project_packet::count(writer,summaries.len);
     for entry in summaries {
         blot_project_packet::put(writer,entry.binding);

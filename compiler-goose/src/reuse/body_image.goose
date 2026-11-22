@@ -313,7 +313,7 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             }
             return resolveRef(old_units,a,ra)==resolveRef(new_units,b,rb);
         },
-        scalar,logical,apply,record_merge=>{
+        scalar,logical,apply=>{
             if na.tag==blot_check_core::Tag.scalar && na.c!=nb.c { return false; }
             return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1) &&
                    sameCoreExpr(old_units,a,na.b,new_units,b,nb.b,locals,blocks,depth+1);
@@ -481,10 +481,6 @@ recursive fn sameCoreExpr(old_units:const Core[:],a:const Core&,ia:u32,new_units
             return true;
         },
         panic=>{ return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1); },
-        usage_borrow,usage_read,usage_share=>{
-            if na.b!=nb.b || na.c!=nb.c { return false; }
-            return sameCoreExpr(old_units,a,na.a,new_units,b,nb.a,locals,blocks,depth+1);
-        },
         constructor_function,primitive_function=>{ return na.a==nb.a; },
         result_associated=>{
             if !sameFieldSymbol(a,na.b,b,nb.b) { return false; }
@@ -626,15 +622,12 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     let a .= old_units[unit-1];
     let b .= new_units[unit-1];
     if a.unit!=b.unit || a.bodies.len!=b.bodies.len || a.diagnostics.len!=0 || b.diagnostics.len!=0 { return false; }
-    if a.request_loops.len!=0 || b.request_loops.len!=0 || a.request_arms.len!=0 || b.request_arms.len!=0 { return false; }
     if a.nominals.len!=b.nominals.len || a.constructors.len!=b.constructors.len ||
        a.contracts.len!=b.contracts.len || a.contract_members.len!=b.contract_members.len ||
        a.implementations.len!=b.implementations.len || a.implementation_members.len!=b.implementation_members.len ||
        a.member_templates.len!=b.member_templates.len || a.associated.len!=b.associated.len ||
        a.primitives.len!=b.primitives.len || a.operation_names.len!=b.operation_names.len ||
-       a.type_tags.len!=b.type_tags.len || a.tag_calls.len!=b.tag_calls.len ||
-       a.selected_proofs.len!=b.selected_proofs.len || a.selected_members.len!=b.selected_members.len ||
-       a.selected_edges.len!=b.selected_edges.len || a.selected_uses.len!=b.selected_uses.len {
+       a.type_tags.len!=b.type_tags.len || a.tag_calls.len!=b.tag_calls.len {
         return false;
     }
     for i in 0..a.nominals.len {
@@ -653,7 +646,6 @@ fn findEditedBindings(old_units:const Core[:],new_units:const Core[:],unit:u32,e
     if a.primitives!=b.primitives || a.operation_names!=b.operation_names || a.type_tags!=b.type_tags || a.tag_calls!=b.tag_calls { return false; }
     if a.contracts.len!=0 && (a.contracts!=b.contracts || a.contract_members!=b.contract_members) { return false; }
     if a.implementations.len!=0 && (!blot_reuse_body_shape::same___reuse_principal_interface_Implementation(a.implementations,b.implementations) || a.implementation_members!=b.implementation_members || a.member_templates!=b.member_templates) { return false; }
-    if a.selected_proofs.len!=0 && (!blot_reuse_body_shape::same___reuse_principal_interface_SelectedProof(a.selected_proofs,b.selected_proofs) || a.selected_members!=b.selected_members || a.selected_edges!=b.selected_edges || a.selected_uses!=b.selected_uses) { return false; }
 
     // Check every global/external binding keeps its ID, metadata and structural type.
     for ob,bi in a.bindings {

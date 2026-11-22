@@ -1539,17 +1539,6 @@ recursive fn visit(self_: Analyzer&, m: const Module&, id: u32) -> Value {
         return Value { fact: fact, exits: exits, .. };
     }
     if tag == blot_check_core::Tag.record { return recordLiteral(self_, m, id); }
-    if tag == blot_check_core::Tag.record_merge {
-        // The merged record holds the parts of both: it is its holder's
-        // own when each side was.
-        let left = visit(self_, m, n.a);
-        let left_fact = taken(self_, m, n.a, left);
-        let right = visit(self_, m, n.b);
-        let right_fact = taken(self_, m, n.b, right);
-        var fact: Fact = none;
-        if ownedAs(self_, m, left_fact, m.typeOf(n.a), 0) && ownedAs(self_, m, right_fact, m.typeOf(n.b), 0) { fact = deep; }
-        return Value { fact: fact, exits: left.exits || right.exits, .. };
-    }
     if tag == blot_check_core::Tag.construct {
         if id == self_.result_node { self_.result_node = n.b; }
         let payload = visit(self_, m, n.b);

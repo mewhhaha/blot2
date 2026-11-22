@@ -55,7 +55,7 @@ fn scheme(self_: Capture&, value: blot_check_types::Scheme) {
         }
         if self_.selection { self_.member(obligation.name, obligation.operator); continue; } if !obligation.explicit { continue; }
         match obligation.kind {
-            dispatch, result_dispatch, resolver_dispatch,
+            dispatch, result_dispatch,
             receiver, field, writable_field, update => { self_.member(obligation.name, obligation.operator); },
             _ => {},
         }
@@ -82,13 +82,11 @@ fn scanNode(self_: Capture&, id: u32) {
     while low < high { let middle = low + (high - low) / 2; if m.erased_declaration_references[middle].node < id { low = middle + 1; } else { high = middle; } }
     if low < m.erased_declaration_references.len && m.erased_declaration_references[low].node == id { self_.reference(m.erased_declaration_references[low].target, id); }
     match n.tag {
-        package_pack => { self_.nodes(m.children(id)); },
-        resource_release, usage_share, usage_read, fork_ => { self_.node(n.a); },
+        fork_ => { self_.node(n.a); },
         with_handle => { self_.nodes(m.children(id)); self_.node(n.a); },
         comptime_for => { self_.node(n.b); },
         comptime_if => { self_.node(n.c); self_.node(n.b); self_.node(n.a); },
         comptime_meta => { if n.c == 0 { self_.node(n.a); } else if n.c == 8 || n.c == 9 { self_.node(n.b); } },
-        package_unpack => { self_.node(m.packageOpening(id).body); self_.node(n.a); },
         contract_method => {
             self_.nodes(m.children(id)); let template = m.member_templates[n.a];
             for implementation in m.implementations {
@@ -98,17 +96,17 @@ fn scanNode(self_: Capture&, id: u32) {
         },
         constant, primitive_function, panic, constructor_function, type_constructor => {},
         reference => { self_.reference(m.reference(id), id); },
-        staging, scalar, logical, associated, record_merge,
-        type_same, effect_provider, handle, proof_guard, resource_acquire, usage_borrow => {
+        staging, scalar, logical, associated,
+        type_same, effect_provider, handle => {
             self_.node(n.b); self_.node(n.a); if n.tag == blot_check_core::Tag.associated { self_.member(n.c); }
             if n.tag == blot_check_core::Tag.scalar && n.c != 0 { let op = operator(n.op); if op.present { self_.member(0, op.value); } }
         },
         call => { self_.reference(m.call(id).target, id); self_.nodes(m.children(id)); },
-        task, block_, suite, product, record,
+        block_, suite, product, record,
         array, array_op, storage => { self_.nodes(m.children(id)); },
-        resource_scope, if_value, if_stmt, state_provider => { self_.node(n.c); self_.node(n.b); self_.node(n.a); },
+        if_value, if_stmt, state_provider => { self_.node(n.c); self_.node(n.b); self_.node(n.a); },
         bind => { self_.scheme(m.binding(n.a).scheme); self_.node(n.b); },
-        return_, project, computation, effect_scope => {
+        return_, project => {
             if self_.selection && n.tag == blot_check_core::Tag.project { if n.b >= m.projections.len { self_.failure = blot_error::Error.core_limit; return; } self_.member(m.projection(n.b).field); } self_.node(n.a);
         },
         result_associated => { self_.member(n.b); self_.node(n.a); },
@@ -120,12 +118,6 @@ fn scanNode(self_: Capture&, id: u32) {
             if n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.count) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.has) || n.a == blot_check_check::reflectionKindCode(blot_check_check::ReflectionKind.same) { self_.node(n.c); self_.node(n.b); }
         },
         operation_value => { self_.node(m.operation_values[n.a].witness); },
-        request_decision => { self_.node(n.c); self_.node(n.b); },
-        request_loop => {
-            let metadata = m.requestLoopInfo(id); self_.node(metadata.completion_body); self_.pattern(metadata.completion_pattern);
-            let arms = m.requestArms(id); var index = arms.len; while index != 0 { index--; self_.node(arms[index].callback); self_.node(arms[index].selector); } self_.node(metadata.computation);
-        },
-        resolver_op => { let metadata = m.resolverInfo(id); self_.member(metadata.member); if metadata.method.binding != 0 { self_.reference(metadata.method, id); } self_.nodes(m.resolverArguments(id)); self_.node(metadata.resolver); },
         pattern_bind => { self_.node(n.c); self_.node(n.b); self_.pattern(n.a); },
         match_ => {
             let arms = m.matchArms(id); var index = arms.len;

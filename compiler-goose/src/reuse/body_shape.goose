@@ -209,38 +209,6 @@ fn same___reuse_principal_interface_Implementation(a:blot_reuse_principal_interf
     for i in 0..a.len { if !same_reuse_principal_interface_Implementation(a[i],b[i]) { return false; } }
     return true;
 }
-fn same_check_types_Obligation(a:blot_check_types::Obligation,b:blot_check_types::Obligation)->bool {
-    if a.ty!=b.ty { return false; }
-    if a.kind!=b.kind { return false; }
-    if a.source!=b.source { return false; }
-    if a.name!=b.name { return false; }
-    if a.result!=b.result { return false; }
-    if a.other!=b.other { return false; }
-    if a.signature!=b.signature { return false; }
-    if a.operator!=b.operator { return false; }
-    if a.identity!=b.identity { return false; }
-    if a.explicit!=b.explicit { return false; }
-    if !same__parse_ast_Span(a.qualification_span,b.qualification_span) { return false; }
-    if a.qualification_unit!=b.qualification_unit { return false; }
-    return true;
-}
-fn same_reuse_principal_interface_SelectedProof(a:blot_reuse_principal_interface::SelectedProof,b:blot_reuse_principal_interface::SelectedProof)->bool {
-    if a.predicate_target!=b.predicate_target { return false; }
-    if a.context!=b.context { return false; }
-    if a.kind!=b.kind { return false; }
-    if !same_check_types_Obligation(a.predicate,b.predicate) { return false; }
-    if a.implementation!=b.implementation { return false; }
-    if a.contract!=b.contract { return false; }
-    if a.arguments!=b.arguments { return false; }
-    if a.members!=b.members { return false; }
-    if a.prerequisites!=b.prerequisites { return false; }
-    return true;
-}
-fn same___reuse_principal_interface_SelectedProof(a:blot_reuse_principal_interface::SelectedProof[:],b:blot_reuse_principal_interface::SelectedProof[:])->bool {
-    if a.len!=b.len { return false; }
-    for i in 0..a.len { if !same_reuse_principal_interface_SelectedProof(a[i],b[i]) { return false; } }
-    return true;
-}
 fn same_check_core_Diagnostic(a:blot_check_core::Diagnostic,b:blot_check_core::Diagnostic)->bool {
     if a.code!=b.code { return false; }
     if !same_parse_ast_Span(a.span,b.span) { return false; }
@@ -255,8 +223,6 @@ fn same_check_core_Module(a:blot_check_core::Module,b:blot_check_core::Module)->
     if !sameSlice(a.field_names,b.field_names) { return false; }
     if !same___check_core_RuntimeName(a.runtime_names,b.runtime_names) { return false; }
     if !same___check_core_RuntimeName(a.source_names,b.source_names) { return false; }
-    if !sameSlice(a.request_loops,b.request_loops) { return false; }
-    if !sameSlice(a.request_arms,b.request_arms) { return false; }
     if !sameSlice(a.tag_calls,b.tag_calls) { return false; }
     if a.unit!=b.unit { return false; }
     if !same_check_core_Types(a.types,b.types) { return false; }
@@ -290,14 +256,9 @@ fn same_check_core_Module(a:blot_check_core::Module,b:blot_check_core::Module)->
     if !same___reuse_principal_interface_Implementation(a.implementations,b.implementations) { return false; }
     if !sameSlice(a.implementation_members,b.implementation_members) { return false; }
     if !sameSlice(a.member_templates,b.member_templates) { return false; }
-    if !same___reuse_principal_interface_SelectedProof(a.selected_proofs,b.selected_proofs) { return false; }
-    if !sameSlice(a.selected_members,b.selected_members) { return false; }
-    if !sameSlice(a.selected_edges,b.selected_edges) { return false; }
-    if !sameSlice(a.selected_uses,b.selected_uses) { return false; }
     if !sameSlice(a.primitives,b.primitives) { return false; }
     if !sameSlice(a.loops,b.loops) { return false; }
     if !sameSlice(a.loop_carries,b.loop_carries) { return false; }
-    if !sameSlice(a.resolver_ops,b.resolver_ops) { return false; }
     if !sameSlice(a.operation_values,b.operation_values) { return false; }
     if !sameSlice(a.handle_effects,b.handle_effects) { return false; }
     if !sameSlice(a.dispatch_signatures,b.dispatch_signatures) { return false; }

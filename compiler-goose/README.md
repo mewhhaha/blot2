@@ -59,6 +59,7 @@ python3 compiler-goose/tools/write_project_packet.py
 python3 compiler-goose/tools/write_project_packet_contexts.py
 python3 compiler-goose/tools/write_dependency_codecs.py
 python3 compiler-goose/tools/write_dependency_owned_headers.py
+python3 compiler-goose/tools/write_dependency_payload.py
 ```
 
 Two of them read a model that is edited by hand:

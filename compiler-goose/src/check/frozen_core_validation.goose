@@ -37,7 +37,7 @@ fn ownerBounds(module: const Module&) -> OwnerBounds { return OwnerBounds { modu
 fn reusableModules(modules: const ModuleRef[:], caller: bool) -> bool {
     for ref in modules {
         let module .= ref.value;
-        for node in module.nodes { if node.tag == blot_check_core::Tag.staging || node.tag == blot_check_core::Tag.effect_scope { return false; } }
+        for node in module.nodes { if node.tag == blot_check_core::Tag.staging { return false; } }
         for node in module.types.nodes { if node.tag == blot_check_types::Tag.existential || node.tag == blot_check_types::Tag.forall || node.tag == blot_check_types::Tag.instance_version || node.tag == blot_check_types::Tag.scoped { return false; } }
     } return true;
 }

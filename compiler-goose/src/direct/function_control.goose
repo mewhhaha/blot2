@@ -366,12 +366,12 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
         comptime_for => {
             if n.a != binder { collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1); }
         },
-        comptime_if, if_value, if_stmt, state_provider, resource_scope => {
+        comptime_if, if_value, if_stmt, state_provider => {
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
             collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
             collectComptimeProjectVars(m, n.c, binder, vars, count, depth + 1);
         },
-        suite, block_, product, record, array, array_op, storage, task => {
+        suite, block_, product, record, array, array_op, storage => {
             for child in m.children(id) { collectComptimeProjectVars(m, child, binder, vars, count, depth + 1); }
         },
         call, contract_method, break_ => {
@@ -382,10 +382,10 @@ recursive fn collectComptimeProjectVars(m: const Module&, id: u32, binder: u32, 
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
         },
         bind, construct => { collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1); },
-        return_, project, result_associated, computation, effect_scope, fork_, resource_release, usage_share, usage_read => {
+        return_, project, result_associated, fork_ => {
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
         },
-        scalar, logical, apply, associated, type_same, effect_provider, handle, proof_guard, resource_acquire, usage_borrow, staging => {
+        scalar, logical, apply, associated, type_same, effect_provider, handle, staging => {
             collectComptimeProjectVars(m, n.a, binder, vars, count, depth + 1);
             collectComptimeProjectVars(m, n.b, binder, vars, count, depth + 1);
         },

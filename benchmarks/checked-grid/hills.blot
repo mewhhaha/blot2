@@ -1,18 +1,20 @@
 import * as grid from "./grid"
 import * as array from "std/array"
-import * as iter from "std/iter"
 
 const unseen: U32 = 0xFFFF_FFFF
 func elevation (ch: U32): U32 => return
   if ch == 83 then 97 else if ch == 69 then 122 else ch
 
 func marker (target: U32) -> (cells: Array U32): U32 => do:
-  let matches = func ch => return ch == target
-  let $Some index = iter.position matches cells else:
+  let found = unseen
+  for i in 0..cells.length:
+    if cells[i] == target:
+      if found != unseen:
+        @panic "duplicate marker"
+      found := i
+  if found == unseen:
     @panic "missing marker"
-  if iter.any matches (iter.drop (index + 1) cells):
-    @panic "duplicate marker"
-  return index
+  return found
 
 // One reverse breadth-first search finds the distance from every reachable cell.
 func distances (map: grid.Grid) -> (finish: U32): Array U32 => do:
@@ -49,7 +51,7 @@ entry func solve (source: Text): Array U32 => do:
   let finish = marker 69 map.cells
   let steps = distances map finish
   let best = unseen
-  for (i, ch) in iter.enumerate map.cells:
-    if elevation ch == 97:
+  for i in 0..map.cells.length:
+    if elevation map.cells[i] == 97:
       best := min self steps[i]
   return #[steps[start], best]

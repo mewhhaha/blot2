@@ -32,7 +32,7 @@ struct FieldName {
     symbol: u32,
     spelling: Name
 }
-enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, resolver_op, operation_value, effect_provider, state_provider, handle, effect_reflection, computation, request_loop, request_decision, record_merge, contract_method, effect_scope, proof_guard, package_pack, package_unpack, staging, usage_borrow, usage_read, resource_scope, usage_share, resource_acquire, resource_release, task, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta }
+enum Tag { invalid, constant, reference, scalar, logical, call, if_value, block_, suite, bind, return_, if_stmt, product, record, construct, project, match_, pattern_bind, update, array, array_op, closure, apply, constructor_function, associated, primitive_function, panic, loop_, break_, type_same, result_associated, type_constructor, operation_value, effect_provider, state_provider, handle, effect_reflection, contract_method, staging, storage, fork_, with_handle, comptime_for, comptime_if, comptime_meta }
 enum PrimitiveKind { scalar, array }
 struct Primitive {
     kind: PrimitiveKind,
@@ -239,15 +239,6 @@ struct ClosureInfo {
     function_type: blot_check_types::Id = 0,
     closed_rows: blot_check_types::List = blot_check_types::List {..}
 }
-enum ResolverOperation { monad, pure, bind, forward, iterate, run }
-struct ResolverInfo {
-    operation: ResolverOperation,
-    resolver: Id,
-    arguments: List = List {..},
-    member: u32 = 0,
-    method: BindingRef = BindingRef { binding: 0 , ..},
-    method_type: blot_check_types::Id = 0
-}
 struct OperationValue {
     identity: blot_check_types::NominalIdentity,
     arguments: blot_check_types::List,
@@ -263,25 +254,6 @@ struct HandleEffects {
     second: blot_check_types::Id = 0,
     extended: blot_check_effects::Id,
     residual: blot_check_effects::Id
-}
-enum RequestDecisionKind { reply, cancel, break_ }
-struct RequestArm {
-    operation: blot_check_effects::Label,
-    callback: Id,
-    selector: Id = 0
-}
-struct RequestLoopInfo {
-    computation: Id,
-    action_type: blot_check_types::Id,
-    value_type: blot_check_types::Id,
-    result_type: blot_check_types::Id,
-    state_type: blot_check_types::Id,
-    arms: List = List {..},
-    completion_pattern: PatternId = 0,
-    completion_body: Id = 0,
-    completion_state_bindings: List = List {..},
-    carries: List = List {..},
-    return_target: Id = 0
 }
 enum LoopKind { forever, range, array }
 struct LoopCarry {
@@ -322,10 +294,6 @@ struct Contract {
     row_parameter_names: blot_check_types::List = blot_check_types::List {..},
     row_parameters: blot_check_types::List = blot_check_types::List {..}
 }
-struct SelectedUse {
-    node: Id,
-    proof: u32
-}
 struct Types {
     owner_id: u64 = 0,
     nodes: const blot_check_types::Node[:],
@@ -343,8 +311,6 @@ struct Module {
     dependency_references: BindingRef[:] = default<BindingRef[:]>(),
     dependency_members: DependencyMember[:] = default<DependencyMember[:]>(),
     erased_declaration_references: ErasedDeclarationReference[:] = default<ErasedDeclarationReference[:]>(),
-    request_loops: RequestLoopInfo[:] = default<RequestLoopInfo[:]>(),
-    request_arms: RequestArm[:] = default<RequestArm[:]>(),
     tag_calls: Id[:] = default<Id[:]>(),
     unit: u32 = 0,
     types: Types,
@@ -378,14 +344,9 @@ struct Module {
     implementations: Implementation[:] = default<Implementation[:]>(),
     implementation_members: ImplementationMember[:] = default<ImplementationMember[:]>(),
     member_templates: MemberTemplate[:] = default<MemberTemplate[:]>(),
-    selected_proofs: SelectedProof[:] = default<SelectedProof[:]>(),
-    selected_members: ImplementationMember[:] = default<ImplementationMember[:]>(),
-    selected_edges: u32[:] = default<u32[:]>(),
-    selected_uses: SelectedUse[:] = default<SelectedUse[:]>(),
     primitives: Primitive[:] = default<Primitive[:]>(),
     loops: LoopInfo[:] = default<LoopInfo[:]>(),
     loop_carries: LoopCarry[:] = default<LoopCarry[:]>(),
-    resolver_ops: ResolverInfo[:] = default<ResolverInfo[:]>(),
     operation_values: OperationValue[:] = default<OperationValue[:]>(),
     handle_effects: HandleEffects[:] = default<HandleEffects[:]>(),
     dispatch_signatures: blot_check_types::Id[:] = default<blot_check_types::Id[:]>(),
@@ -403,7 +364,6 @@ type ContractMember = blot_reuse_principal_interface::ContractMember;
 type Implementation = blot_reuse_principal_interface::Implementation;
 type ImplementationMember = blot_reuse_principal_interface::ImplementationMember;
 type MemberTemplate = blot_reuse_principal_interface::MemberTemplate;
-type SelectedProof = blot_reuse_principal_interface::SelectedProof;
 fn message(self_: Diagnostic) -> const u8[:] {
     match self_.code {
         unchecked => { return "Typed core requires successful semantic checking"; },
@@ -480,12 +440,6 @@ fn isTagCall(self_: const Module&, id: Id) -> bool {
     }
     return false;
 }
-struct PackageOpening { body: Id, binders: blot_check_types::List }
-fn packageOpening(self_: const Module&, id: Id) -> PackageOpening {
-    let value = self_.node(id); assert(value.tag == Tag.package_unpack);
-    let metadata = self_.extra[value.c..value.c + 3];
-    return PackageOpening { metadata[0], blot_check_types::List { metadata[1], metadata[2] , ..} , ..};
-}
 fn typeOf(self_: const Module&, id: Id) -> blot_check_types::Id { return self_.nodes[id].ty; }
 fn operationValue(self_: const Module&, id: Id) -> OperationValue {
     assert(self_.node(id).tag == Tag.operation_value); return self_.operation_values[self_.node(id).a];
@@ -502,7 +456,7 @@ fn dispatchSignature(self_: const Module&, id: Id) -> blot_check_types::Id {
 fn children(self_: const Module&, id: Id) -> const Id[:] {
     let value = self_.node(id);
     match value.tag {
-        block_, suite, product, record, array, array_op, storage, task => { return self_.extra[value.a..value.a + value.b]; },
+        block_, suite, product, record, array, array_op, storage => { return self_.extra[value.a..value.a + value.b]; },
         call, contract_method, break_, with_handle => { return self_.extra[value.b..value.b + value.c]; },
         _ => { return self_.extra[..0]; },
     }
@@ -518,10 +472,6 @@ fn body(self_: const Module&, id: BindingId) -> const Body? {
 }
 fn bodyParameters(self_: const Module&, value: const Body&) -> const Parameter[:] { return self_.parameters[value.parameters.start..value.parameters.start + value.parameters.len]; }
 fn branchMerges(self_: const Module&, id: Id) -> const Merge[:] { let range = self_.merge_ranges[id]; return self_.merges[range.start..range.start + range.len]; }
-fn requestLoopInfo(self_: const Module&, id: Id) -> RequestLoopInfo { assert(self_.node(id).tag == Tag.request_loop); return self_.request_loops[self_.node(id).a]; }
-fn requestArms(self_: const Module&, id: Id) -> const RequestArm[:] { let range = self_.requestLoopInfo(id).arms; return self_.request_arms[range.start..range.start + range.len]; }
-fn requestLoopCarries(self_: const Module&, id: Id) -> const LoopCarry[:] { let range = self_.requestLoopInfo(id).carries; return self_.loop_carries[range.start..range.start + range.len]; }
-fn requestCompletionBindings(self_: const Module&, id: Id) -> const BindingId[:] { let range = self_.requestLoopInfo(id).completion_state_bindings; return self_.extra[range.start..range.start + range.len]; }
 fn loopInfo(self_: const Module&, id: Id) -> LoopInfo { let value = self_.node(id); assert(value.tag == Tag.loop_); return self_.loops[value.a]; }
 fn loopCarries(self_: const Module&, id: Id) -> const LoopCarry[:] { let range = self_.loopInfo(id).carries; return self_.loop_carries[range.start..range.start + range.len]; }
 fn breakValues(self_: const Module&, id: Id) -> const Id[:] { assert(self_.node(id).tag == Tag.break_); return self_.children(id); }
@@ -558,8 +508,6 @@ fn arrayOperation(self_: const Module&, id: Id) -> ArrayOp {
 }
 fn closure(self_: const Module&, id: Id) -> ClosureInfo { let value = self_.node(id); assert(value.tag == Tag.closure); return self_.closures[value.a]; }
 fn closureCaptures(self_: const Module&, id: Id) -> const BindingId[:] { let range = self_.closure(id).captures; return self_.extra[range.start..range.start + range.len]; }
-fn resolverInfo(self_: const Module&, id: Id) -> ResolverInfo { let value = self_.node(id); assert(value.tag == Tag.resolver_op); return self_.resolver_ops[value.a]; }
-fn resolverArguments(self_: const Module&, id: Id) -> const Id[:] { let range = self_.resolverInfo(id).arguments; return self_.extra[range.start..range.start + range.len]; }
 fn primitive(self_: const Module&, id: Id) -> Primitive { let value = self_.node(id); assert(value.tag == Tag.primitive_function); return self_.primitives[value.a]; }
 fn panicMessage(self_: const Module&, id: Id) -> const u8[:] { let value = self_.node(id); assert(value.tag == Tag.panic); return self_.name(Name { value.a, value.b , ..}); }
 
@@ -597,35 +545,19 @@ fn tagCode(value: Tag) -> u32 {
         type_same => { return 29; },
         result_associated => { return 30; },
         type_constructor => { return 31; },
-        resolver_op => { return 32; },
-        operation_value => { return 33; },
-        effect_provider => { return 34; },
-        state_provider => { return 35; },
-        handle => { return 36; },
-        effect_reflection => { return 37; },
-        computation => { return 38; },
-        request_loop => { return 39; },
-        request_decision => { return 40; },
-        record_merge => { return 41; },
-        contract_method => { return 42; },
-        effect_scope => { return 43; },
-        proof_guard => { return 44; },
-        package_pack => { return 45; },
-        package_unpack => { return 46; },
-        staging => { return 47; },
-        usage_borrow => { return 48; },
-        usage_read => { return 49; },
-        resource_scope => { return 50; },
-        usage_share => { return 51; },
-        resource_acquire => { return 52; },
-        resource_release => { return 53; },
-        task => { return 54; },
-        storage => { return 55; },
-        fork_ => { return 56; },
-        with_handle => { return 57; },
-        comptime_for => { return 58; },
-        comptime_if => { return 59; },
-        comptime_meta => { return 60; },
+        operation_value => { return 32; },
+        effect_provider => { return 33; },
+        state_provider => { return 34; },
+        handle => { return 35; },
+        effect_reflection => { return 36; },
+        contract_method => { return 37; },
+        staging => { return 38; },
+        storage => { return 39; },
+        fork_ => { return 40; },
+        with_handle => { return 41; },
+        comptime_for => { return 42; },
+        comptime_if => { return 43; },
+        comptime_meta => { return 44; },
     }
 }
 fn tagFromCode(code: u32) -> Tag, blot_error::Error {
@@ -662,35 +594,19 @@ fn tagFromCode(code: u32) -> Tag, blot_error::Error {
         29 => { return Tag.type_same, blot_error::Error.none; },
         30 => { return Tag.result_associated, blot_error::Error.none; },
         31 => { return Tag.type_constructor, blot_error::Error.none; },
-        32 => { return Tag.resolver_op, blot_error::Error.none; },
-        33 => { return Tag.operation_value, blot_error::Error.none; },
-        34 => { return Tag.effect_provider, blot_error::Error.none; },
-        35 => { return Tag.state_provider, blot_error::Error.none; },
-        36 => { return Tag.handle, blot_error::Error.none; },
-        37 => { return Tag.effect_reflection, blot_error::Error.none; },
-        38 => { return Tag.computation, blot_error::Error.none; },
-        39 => { return Tag.request_loop, blot_error::Error.none; },
-        40 => { return Tag.request_decision, blot_error::Error.none; },
-        41 => { return Tag.record_merge, blot_error::Error.none; },
-        42 => { return Tag.contract_method, blot_error::Error.none; },
-        43 => { return Tag.effect_scope, blot_error::Error.none; },
-        44 => { return Tag.proof_guard, blot_error::Error.none; },
-        45 => { return Tag.package_pack, blot_error::Error.none; },
-        46 => { return Tag.package_unpack, blot_error::Error.none; },
-        47 => { return Tag.staging, blot_error::Error.none; },
-        48 => { return Tag.usage_borrow, blot_error::Error.none; },
-        49 => { return Tag.usage_read, blot_error::Error.none; },
-        50 => { return Tag.resource_scope, blot_error::Error.none; },
-        51 => { return Tag.usage_share, blot_error::Error.none; },
-        52 => { return Tag.resource_acquire, blot_error::Error.none; },
-        53 => { return Tag.resource_release, blot_error::Error.none; },
-        54 => { return Tag.task, blot_error::Error.none; },
-        55 => { return Tag.storage, blot_error::Error.none; },
-        56 => { return Tag.fork_, blot_error::Error.none; },
-        57 => { return Tag.with_handle, blot_error::Error.none; },
-        58 => { return Tag.comptime_for, blot_error::Error.none; },
-        59 => { return Tag.comptime_if, blot_error::Error.none; },
-        60 => { return Tag.comptime_meta, blot_error::Error.none; },
+        32 => { return Tag.operation_value, blot_error::Error.none; },
+        33 => { return Tag.effect_provider, blot_error::Error.none; },
+        34 => { return Tag.state_provider, blot_error::Error.none; },
+        35 => { return Tag.handle, blot_error::Error.none; },
+        36 => { return Tag.effect_reflection, blot_error::Error.none; },
+        37 => { return Tag.contract_method, blot_error::Error.none; },
+        38 => { return Tag.staging, blot_error::Error.none; },
+        39 => { return Tag.storage, blot_error::Error.none; },
+        40 => { return Tag.fork_, blot_error::Error.none; },
+        41 => { return Tag.with_handle, blot_error::Error.none; },
+        42 => { return Tag.comptime_for, blot_error::Error.none; },
+        43 => { return Tag.comptime_if, blot_error::Error.none; },
+        44 => { return Tag.comptime_meta, blot_error::Error.none; },
         _ => { return Tag.invalid, blot_error::Error.core_limit; },
     }
 }
@@ -851,44 +767,6 @@ fn updateKindFromCode(code: u32) -> UpdateKind, blot_error::Error {
     }
 }
 
-fn resolverOperationCode(value: ResolverOperation) -> u32 {
-    match value {
-        monad => { return 0; },
-        pure => { return 1; },
-        bind => { return 2; },
-        forward => { return 3; },
-        iterate => { return 4; },
-        run => { return 5; },
-    }
-}
-fn resolverOperationFromCode(code: u32) -> ResolverOperation, blot_error::Error {
-    match code {
-        0 => { return ResolverOperation.monad, blot_error::Error.none; },
-        1 => { return ResolverOperation.pure, blot_error::Error.none; },
-        2 => { return ResolverOperation.bind, blot_error::Error.none; },
-        3 => { return ResolverOperation.forward, blot_error::Error.none; },
-        4 => { return ResolverOperation.iterate, blot_error::Error.none; },
-        5 => { return ResolverOperation.run, blot_error::Error.none; },
-        _ => { return ResolverOperation.monad, blot_error::Error.core_limit; },
-    }
-}
-
-fn requestDecisionKindCode(value: RequestDecisionKind) -> u32 {
-    match value {
-        reply => { return 0; },
-        cancel => { return 1; },
-        break_ => { return 2; },
-    }
-}
-fn requestDecisionKindFromCode(code: u32) -> RequestDecisionKind, blot_error::Error {
-    match code {
-        0 => { return RequestDecisionKind.reply, blot_error::Error.none; },
-        1 => { return RequestDecisionKind.cancel, blot_error::Error.none; },
-        2 => { return RequestDecisionKind.break_, blot_error::Error.none; },
-        _ => { return RequestDecisionKind.reply, blot_error::Error.core_limit; },
-    }
-}
-
 fn loopKindCode(value: LoopKind) -> u32 {
     match value {
         forever => { return 0; },
@@ -947,8 +825,6 @@ fn deinit(self_: Module&) {
     self_.dependency_references = default<blot_check_core::BindingRef[:]>();
     self_.dependency_members = default<blot_check_core::DependencyMember[:]>();
     self_.erased_declaration_references = default<blot_check_core::ErasedDeclarationReference[:]>();
-    self_.request_loops = default<blot_check_core::RequestLoopInfo[:]>();
-    self_.request_arms = default<blot_check_core::RequestArm[:]>();
     self_.tag_calls = default<blot_check_core::Id[:]>();
     self_.nodes = default<blot_check_core::Node[:]>();
     self_.spans = default<blot_check_core::Span[:]>();
@@ -980,14 +856,9 @@ fn deinit(self_: Module&) {
     self_.implementations = default<blot_check_core::Implementation[:]>();
     self_.implementation_members = default<blot_check_core::ImplementationMember[:]>();
     self_.member_templates = default<blot_check_core::MemberTemplate[:]>();
-    self_.selected_proofs = default<blot_check_core::SelectedProof[:]>();
-    self_.selected_members = default<blot_check_core::ImplementationMember[:]>();
-    self_.selected_edges = default<u32[:]>();
-    self_.selected_uses = default<blot_check_core::SelectedUse[:]>();
     self_.primitives = default<blot_check_core::Primitive[:]>();
     self_.loops = default<blot_check_core::LoopInfo[:]>();
     self_.loop_carries = default<blot_check_core::LoopCarry[:]>();
-    self_.resolver_ops = default<blot_check_core::ResolverInfo[:]>();
     self_.operation_values = default<blot_check_core::OperationValue[:]>();
     self_.handle_effects = default<blot_check_core::HandleEffects[:]>();
     self_.dispatch_signatures = default<blot_check_types::Id[:]>();
@@ -1013,12 +884,6 @@ fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::PatternTag,sin
 fn blot_structural::equal(left: blot_check_core::UpdateKind, right: blot_check_core::UpdateKind) -> bool { return left == right; }
 fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::UpdateKind,sink: S&) { blot_structural::hash(sink, blot_check_core::updateKindCode(value) as! u8); }
 
-fn blot_structural::equal(left: blot_check_core::ResolverOperation, right: blot_check_core::ResolverOperation) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::ResolverOperation,sink: S&) { blot_structural::hash(sink, blot_check_core::resolverOperationCode(value) as! u8); }
-
-fn blot_structural::equal(left: blot_check_core::RequestDecisionKind, right: blot_check_core::RequestDecisionKind) -> bool { return left == right; }
-fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::RequestDecisionKind,sink: S&) { blot_structural::hash(sink, blot_check_core::requestDecisionKindCode(value) as! u32); }
-
 fn blot_structural::equal(left: blot_check_core::LoopKind, right: blot_check_core::LoopKind) -> bool { return left == right; }
 fn blot_check_core::blotStructuralHash<S>(value: blot_check_core::LoopKind,sink: S&) { blot_structural::hash(sink, blot_check_core::loopKindCode(value) as! u8); }
 
@@ -1043,8 +908,6 @@ struct StampView {
     dependency_references: const BindingRef[:] = default<const BindingRef[:]>(),
     dependency_members: const DependencyMember[:] = default<const DependencyMember[:]>(),
     erased_declaration_references: const ErasedDeclarationReference[:] = default<const ErasedDeclarationReference[:]>(),
-    request_loops: const RequestLoopInfo[:] = default<const RequestLoopInfo[:]>(),
-    request_arms: const RequestArm[:] = default<const RequestArm[:]>(),
     tag_calls: const Id[:] = default<const Id[:]>(),
     unit: u32 = 0,
     types: TypesStampView,
@@ -1078,14 +941,9 @@ struct StampView {
     implementations: const Implementation[:] = default<const Implementation[:]>(),
     implementation_members: const ImplementationMember[:] = default<const ImplementationMember[:]>(),
     member_templates: const MemberTemplate[:] = default<const MemberTemplate[:]>(),
-    selected_proofs: const SelectedProof[:] = default<const SelectedProof[:]>(),
-    selected_members: const ImplementationMember[:] = default<const ImplementationMember[:]>(),
-    selected_edges: const u32[:] = default<const u32[:]>(),
-    selected_uses: const SelectedUse[:] = default<const SelectedUse[:]>(),
     primitives: const Primitive[:] = default<const Primitive[:]>(),
     loops: const LoopInfo[:] = default<const LoopInfo[:]>(),
     loop_carries: const LoopCarry[:] = default<const LoopCarry[:]>(),
-    resolver_ops: const ResolverInfo[:] = default<const ResolverInfo[:]>(),
     operation_values: const OperationValue[:] = default<const OperationValue[:]>(),
     handle_effects: const HandleEffects[:] = default<const HandleEffects[:]>(),
     dispatch_signatures: const blot_check_types::Id[:] = default<const blot_check_types::Id[:]>(),
@@ -1094,12 +952,11 @@ struct StampView {
     body_lowerings: i64
 }
 fn stampView(self_: const Module&) -> StampView {
-    return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.request_loops, self_.request_arms, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.selected_proofs, self_.selected_members, self_.selected_edges, self_.selected_uses, self_.primitives, self_.loops, self_.loop_carries, self_.resolver_ops, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
+    return StampView { self_.field_names, self_.runtime_names, self_.source_names, self_.declaration_dependencies, self_.dependency_references, self_.dependency_members, self_.erased_declaration_references, self_.tag_calls, self_.unit, typesStampView(self_.types), self_.nodes, self_.spans, self_.extra, self_.bindings, self_.bodies, self_.parameters, self_.references, self_.calls, self_.merges, self_.merge_ranges, self_.names, self_.obligations, self_.nominals, self_.operation_names, self_.constructors, self_.projections, self_.projection_variants, self_.patterns, self_.pattern_rows, self_.match_arms, self_.matches, self_.updates, self_.update_steps, self_.closures, self_.associated, self_.contracts, self_.contract_members, self_.implementations, self_.implementation_members, self_.member_templates, self_.primitives, self_.loops, self_.loop_carries, self_.operation_values, self_.handle_effects, self_.dispatch_signatures, self_.type_tags, self_.diagnostics, self_.body_lowerings , ..};
 }
 
 type ImplementationMemberKind = blot_reuse_principal_interface::ImplementationMemberKind;
 type ContractMemberKind = blot_reuse_principal_interface::ContractMemberKind;
 
-type SelectedProofKind = blot_reuse_principal_interface::SelectedProofKind;
 // Named binding classification is shared by all immutable consumers.
 type BindingKind = blot_check_check::Kind;

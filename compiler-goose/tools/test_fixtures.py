@@ -56,6 +56,15 @@ fixtures exercising retired features were removed (109 fixtures remain) and
 expected.json was re-recorded against the slimmer `std/prelude.blot` and direct
 operator lowering.
 
+Batch 1D (22 November 2026) collapsed `reuse/dependency_payload.goose` via
+`write_dependency_payload.py`, slimmed worker interface replies, restored
+direct `Tag.scalar` / `Tag.associated` lowering for built-in scalar operators
+(`!=`, `<=`, `>`, `>=`, etc.), and taught `core_builder.goose::directArity` to
+recognize primitive intrinsic aliases (`const F32.add = @f32.add`, etc.). All
+109 fixtures kept identical exit codes and diagnostics while shedding 131
+`std/prelude.blot` Core nodes and eliminating closure allocations / indirect
+calls in scalar comparison and prelude math helpers.
+
 Usage: python3 compiler-goose/tools/test_fixtures.py [--compiler EXE] [NAME ...]
        --record EXE writes expected.json from that compiler instead.
 """

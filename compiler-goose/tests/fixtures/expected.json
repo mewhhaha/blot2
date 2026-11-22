@@ -21,7 +21,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 2957,
+     "core_nodes": 2826,
      "effect_rows": 6494,
      "emitted_functions": 2073,
      "filename": "alias-project-fixtures/logical-long-2048.blot",
@@ -61,7 +61,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 999,
+     "core_nodes": 868,
      "effect_rows": 2508,
      "emitted_functions": 44,
      "filename": "bottom_bindings.blot",
@@ -101,7 +101,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 933,
+     "core_nodes": 802,
      "effect_rows": 2441,
      "emitted_functions": 30,
      "filename": "callback-fixtures/capture.blot",
@@ -141,7 +141,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 926,
+     "core_nodes": 795,
      "effect_rows": 2432,
      "emitted_functions": 29,
      "filename": "callback-fixtures/parameter.blot",
@@ -181,7 +181,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 933,
+     "core_nodes": 802,
      "effect_rows": 2439,
      "emitted_functions": 29,
      "filename": "callback-fixtures/record.blot",
@@ -221,7 +221,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 949,
+     "core_nodes": 818,
      "effect_rows": 2492,
      "emitted_functions": 36,
      "filename": "captured-callable-fixtures/bound-cache-effects.blot",
@@ -270,7 +270,7 @@
       "shared_uses": 6,
       "use_expansions": 3
      },
-     "core_nodes": 931,
+     "core_nodes": 800,
      "effect_rows": 2450,
      "emitted_functions": 0,
      "filename": "captured-callable-fixtures/bound-cache-missing.blot",
@@ -308,7 +308,7 @@
       "shared_uses": 6,
       "use_expansions": 3
      },
-     "core_nodes": 937,
+     "core_nodes": 806,
      "effect_rows": 2478,
      "emitted_functions": 35,
      "filename": "captured-callable-fixtures/bound-cache-nominals.blot",
@@ -348,7 +348,7 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 926,
+     "core_nodes": 795,
      "effect_rows": 2436,
      "emitted_functions": 32,
      "filename": "captured-callable-fixtures/bound-method.blot",
@@ -388,7 +388,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 941,
+     "core_nodes": 810,
      "effect_rows": 2509,
      "emitted_functions": 40,
      "filename": "captured-callable-fixtures/captured-builtin.blot",
@@ -428,7 +428,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 951,
+     "core_nodes": 820,
      "effect_rows": 2536,
      "emitted_functions": 41,
      "filename": "captured-callable-fixtures/captured-effect.blot",
@@ -477,7 +477,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 941,
+     "core_nodes": 810,
      "effect_rows": 2574,
      "emitted_functions": 0,
      "filename": "closure-fixtures/left.blot",
@@ -515,7 +515,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 948,
+     "core_nodes": 817,
      "effect_rows": 2720,
      "emitted_functions": 32,
      "filename": "closure-fixtures/main.blot",
@@ -564,7 +564,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 928,
+     "core_nodes": 797,
      "effect_rows": 2544,
      "emitted_functions": 0,
      "filename": "closure-fixtures/right.blot",
@@ -611,7 +611,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 925,
+     "core_nodes": 794,
      "effect_rows": 2472,
      "emitted_functions": 0,
      "filename": "closure-fixtures/shared.blot",
@@ -649,7 +649,7 @@
       "shared_uses": 5,
       "use_expansions": 5
      },
-     "core_nodes": 1249,
+     "core_nodes": 1118,
      "effect_rows": 2761,
      "emitted_functions": 39,
      "filename": "deferred_join.blot",
@@ -698,7 +698,7 @@
       "shared_uses": 6,
       "use_expansions": 6
      },
-     "core_nodes": 1597,
+     "core_nodes": 1466,
      "effect_rows": 4629,
      "emitted_functions": 0,
      "filename": "dependency-fixtures/prelude.blot",
@@ -745,7 +745,7 @@
       "shared_uses": 6,
       "use_expansions": 6
      },
-     "core_nodes": 1597,
+     "core_nodes": 1466,
      "effect_rows": 4629,
      "emitted_functions": 0,
      "filename": "dependency-prelude.blot",
@@ -783,9 +783,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1068,
+     "core_nodes": 937,
      "effect_rows": 2621,
-     "emitted_functions": 38,
+     "emitted_functions": 35,
      "filename": "direct/boxed_records.blot",
      "files": 2,
      "imported_schemes": 27,
@@ -797,11 +797,11 @@
      "syntax_nodes": 2258,
      "type_nodes": 5044,
      "type_versions": 725,
-     "wasm_bytes": 5092
+     "wasm_bytes": 4848
     }
    ],
-   "wasm_bytes": 5092,
-   "wasm_sha256": "9c42878b8c41ae1b0e72bdbd1eca52f208e5019cf46a95c58352abe9e66f0801"
+   "wasm_bytes": 4848,
+   "wasm_sha256": "6c5c5a9cd2039250078c2cc82c20955fb9193c23d95ea7a5977a4830a8080afe"
   },
   "direct/branch_appends.blot": {
    "exit": 0,
@@ -823,9 +823,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 975,
+     "core_nodes": 844,
      "effect_rows": 2495,
-     "emitted_functions": 29,
+     "emitted_functions": 26,
      "filename": "direct/branch_appends.blot",
      "files": 2,
      "imported_schemes": 26,
@@ -837,11 +837,11 @@
      "syntax_nodes": 2066,
      "type_nodes": 4887,
      "type_versions": 702,
-     "wasm_bytes": 3589
+     "wasm_bytes": 3345
     }
    ],
-   "wasm_bytes": 3589,
-   "wasm_sha256": "a4bb0906ffe002eeb2d49a75f44f2a9d8ecf40d6971189d900a2655b7fd8479d"
+   "wasm_bytes": 3345,
+   "wasm_sha256": "9f0122b04b500c3faab420a2f17098c8b78b58b912f99b8991a45471d49e6805"
   },
   "direct/calls.blot": {
    "exit": 0,
@@ -863,7 +863,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 914,
+     "core_nodes": 783,
      "effect_rows": 2424,
      "emitted_functions": 26,
      "filename": "direct/calls.blot",
@@ -877,11 +877,11 @@
      "syntax_nodes": 1987,
      "type_nodes": 4765,
      "type_versions": 679,
-     "wasm_bytes": 2711
+     "wasm_bytes": 2718
     }
    ],
-   "wasm_bytes": 2711,
-   "wasm_sha256": "be3d5174134e7472665b48562064294e3d912a9f77481080b447a9b5d577f50c"
+   "wasm_bytes": 2718,
+   "wasm_sha256": "e5d7506f46f71a253bfd63b5c9886555933a4ac542586dfccedee685d12cbcc2"
   },
   "direct/captured_generalized.blot": {
    "exit": 0,
@@ -903,7 +903,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 933,
+     "core_nodes": 802,
      "effect_rows": 2454,
      "emitted_functions": 32,
      "filename": "direct/captured_generalized.blot",
@@ -943,7 +943,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1026,
+     "core_nodes": 895,
      "effect_rows": 2633,
      "emitted_functions": 33,
      "filename": "direct/carried_owners.blot",
@@ -983,7 +983,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1024,
+     "core_nodes": 893,
      "effect_rows": 2728,
      "emitted_functions": 51,
      "filename": "direct/closures.blot",
@@ -1023,7 +1023,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 938,
+     "core_nodes": 807,
      "effect_rows": 2441,
      "emitted_functions": 30,
      "filename": "direct/closures_in_data.blot",
@@ -1063,9 +1063,9 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1130,
+     "core_nodes": 999,
      "effect_rows": 2714,
-     "emitted_functions": 40,
+     "emitted_functions": 36,
      "filename": "direct/comprehensions.blot",
      "files": 2,
      "imported_schemes": 31,
@@ -1077,11 +1077,11 @@
      "syntax_nodes": 2389,
      "type_nodes": 5356,
      "type_versions": 789,
-     "wasm_bytes": 6041
+     "wasm_bytes": 5669
     }
    ],
-   "wasm_bytes": 6041,
-   "wasm_sha256": "355485752d9f175002272fe4aee30549549f19222e056b7617033bc723a656ae"
+   "wasm_bytes": 5669,
+   "wasm_sha256": "1fdbb67feaa523fc4b8d2359f37639bc6864c16adb3301dfe38b43beb944c5d4"
   },
   "direct/constants.blot": {
    "exit": 0,
@@ -1103,9 +1103,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 924,
+     "core_nodes": 793,
      "effect_rows": 2438,
-     "emitted_functions": 38,
+     "emitted_functions": 35,
      "filename": "direct/constants.blot",
      "files": 2,
      "imported_schemes": 25,
@@ -1117,11 +1117,11 @@
      "syntax_nodes": 1995,
      "type_nodes": 4765,
      "type_versions": 683,
-     "wasm_bytes": 3393
+     "wasm_bytes": 3149
     }
    ],
-   "wasm_bytes": 3393,
-   "wasm_sha256": "a12c4ff2f42d13ca5b40c7ac3d3dd3ba1a4d14521275c209effc3009996f36f4"
+   "wasm_bytes": 3149,
+   "wasm_sha256": "e52eb7796bd49eaa107c5c3368df8e495c3453bff4cc7b86e43dba6dc0001f8c"
   },
   "direct/data_and_control.blot": {
    "exit": 0,
@@ -1143,9 +1143,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1046,
+     "core_nodes": 915,
      "effect_rows": 2647,
-     "emitted_functions": 44,
+     "emitted_functions": 40,
      "filename": "direct/data_and_control.blot",
      "files": 2,
      "imported_schemes": 31,
@@ -1157,11 +1157,11 @@
      "syntax_nodes": 2247,
      "type_nodes": 5134,
      "type_versions": 752,
-     "wasm_bytes": 4452
+     "wasm_bytes": 4081
     }
    ],
-   "wasm_bytes": 4452,
-   "wasm_sha256": "2a5eac39ac58fe6d38facad4b560fa238413722c95fa2802ffb47d0f7fe1981d"
+   "wasm_bytes": 4081,
+   "wasm_sha256": "e6aac83c33860836409a4ae7a3b0472355ddb7c1a2d29d678daedd951294c595"
   },
   "direct/dispatch.blot": {
    "exit": 0,
@@ -1183,7 +1183,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1217,
+     "core_nodes": 1086,
      "effect_rows": 3119,
      "emitted_functions": 31,
      "filename": "direct/dispatch.blot",
@@ -1223,7 +1223,7 @@
       "shared_uses": 13,
       "use_expansions": 12
      },
-     "core_nodes": 1447,
+     "core_nodes": 1316,
      "effect_rows": 3252,
      "emitted_functions": 32,
      "filename": "direct/empty_literals.blot",
@@ -1263,7 +1263,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 937,
+     "core_nodes": 806,
      "effect_rows": 2453,
      "emitted_functions": 31,
      "filename": "direct/generalized_values.blot",
@@ -1303,7 +1303,7 @@
       "shared_uses": 11,
       "use_expansions": 10
      },
-     "core_nodes": 1472,
+     "core_nodes": 1341,
      "effect_rows": 3251,
      "emitted_functions": 30,
      "filename": "direct/generated_from_filter.blot",
@@ -1343,9 +1343,9 @@
       "shared_uses": 5,
       "use_expansions": 5
      },
-     "core_nodes": 1061,
+     "core_nodes": 930,
      "effect_rows": 2608,
-     "emitted_functions": 38,
+     "emitted_functions": 34,
      "filename": "direct/generic_comprehensions.blot",
      "files": 2,
      "imported_schemes": 28,
@@ -1357,11 +1357,11 @@
      "syntax_nodes": 2201,
      "type_nodes": 5245,
      "type_versions": 761,
-     "wasm_bytes": 5366
+     "wasm_bytes": 4994
     }
    ],
-   "wasm_bytes": 5366,
-   "wasm_sha256": "09e2c9c3b1ee84f28393cc82be2fad89dd0f87da6c12a5d32e61c5188e3a3cd7"
+   "wasm_bytes": 4994,
+   "wasm_sha256": "faffdd5b7c3a792bbf4a7237083d0577610d5f3878e030735479af3956c88b0c"
   },
   "direct/host.blot": {
    "exit": 0,
@@ -1383,7 +1383,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 950,
+     "core_nodes": 819,
      "effect_rows": 2512,
      "emitted_functions": 31,
      "filename": "direct/host.blot",
@@ -1423,9 +1423,9 @@
       "shared_uses": 12,
       "use_expansions": 11
      },
-     "core_nodes": 1462,
+     "core_nodes": 1331,
      "effect_rows": 3222,
-     "emitted_functions": 35,
+     "emitted_functions": 32,
      "filename": "direct/inferred_types.blot",
      "files": 3,
      "imported_schemes": 58,
@@ -1437,11 +1437,11 @@
      "syntax_nodes": 2831,
      "type_nodes": 6821,
      "type_versions": 932,
-     "wasm_bytes": 3831
+     "wasm_bytes": 3613
     }
    ],
-   "wasm_bytes": 3831,
-   "wasm_sha256": "1773b5fcdd52036adcba3b703ad12e943d1fda762a796961646a031772eab870"
+   "wasm_bytes": 3613,
+   "wasm_sha256": "fa94a5265f6ac231fbe4b39e38b17f9b1bd08f611773a3ff114984b2ad186f86"
   },
   "direct/miscompiles.blot": {
    "exit": 0,
@@ -1463,9 +1463,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 979,
+     "core_nodes": 848,
      "effect_rows": 2497,
-     "emitted_functions": 37,
+     "emitted_functions": 34,
      "filename": "direct/miscompiles.blot",
      "files": 2,
      "imported_schemes": 28,
@@ -1477,11 +1477,11 @@
      "syntax_nodes": 2100,
      "type_nodes": 4870,
      "type_versions": 699,
-     "wasm_bytes": 3876
+     "wasm_bytes": 3632
     }
    ],
-   "wasm_bytes": 3876,
-   "wasm_sha256": "9fe60ebc18ddff7436370815cc98415a4c2ef6610032b19135c0fcf9a31c0434"
+   "wasm_bytes": 3632,
+   "wasm_sha256": "f14a9daa5e9dd7e12a39b3be28c86083de489bddf71793f594a0d409ddedbb44"
   },
   "direct/nested_updates.blot": {
    "exit": 0,
@@ -1503,7 +1503,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 971,
+     "core_nodes": 840,
      "effect_rows": 2464,
      "emitted_functions": 27,
      "filename": "direct/nested_updates.blot",
@@ -1543,7 +1543,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 982,
+     "core_nodes": 851,
      "effect_rows": 2451,
      "emitted_functions": 28,
      "filename": "direct/nested_updates_indexed.blot",
@@ -1583,7 +1583,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 935,
+     "core_nodes": 804,
      "effect_rows": 2460,
      "emitted_functions": 34,
      "filename": "direct/open_codec.blot",
@@ -1623,7 +1623,7 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 927,
+     "core_nodes": 796,
      "effect_rows": 2484,
      "emitted_functions": 31,
      "filename": "direct/policy_record.blot",
@@ -1663,7 +1663,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 941,
+     "core_nodes": 810,
      "effect_rows": 2451,
      "emitted_functions": 37,
      "filename": "direct/pools.blot",
@@ -1703,9 +1703,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1026,
+     "core_nodes": 895,
      "effect_rows": 2616,
-     "emitted_functions": 49,
+     "emitted_functions": 46,
      "filename": "direct/providers.blot",
      "files": 2,
      "imported_schemes": 25,
@@ -1717,11 +1717,11 @@
      "syntax_nodes": 2162,
      "type_nodes": 4983,
      "type_versions": 722,
-     "wasm_bytes": 4744
+     "wasm_bytes": 4519
     }
    ],
-   "wasm_bytes": 4744,
-   "wasm_sha256": "3aeeb0da2a595d3b6bf7d7f8292b15461439d79d1075d7a9b139368d6ca49c29"
+   "wasm_bytes": 4519,
+   "wasm_sha256": "6f1a41b9bddf69c8168345aec8d52a42611407fbda777bd8fc824de5928a6889"
   },
   "direct/recursive_data.blot": {
    "exit": 0,
@@ -1743,7 +1743,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 977,
+     "core_nodes": 846,
      "effect_rows": 2492,
      "emitted_functions": 31,
      "filename": "direct/recursive_data.blot",
@@ -1783,7 +1783,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 950,
+     "core_nodes": 819,
      "effect_rows": 2441,
      "emitted_functions": 27,
      "filename": "direct/shared_field_update.blot",
@@ -1823,7 +1823,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 943,
+     "core_nodes": 812,
      "effect_rows": 2441,
      "emitted_functions": 27,
      "filename": "direct/shared_fields.blot",
@@ -1863,7 +1863,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1270,
+     "core_nodes": 1139,
      "effect_rows": 3899,
      "emitted_functions": 28,
      "filename": "direct/simd_conversions.blot",
@@ -1903,7 +1903,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1325,
+     "core_nodes": 1194,
      "effect_rows": 4011,
      "emitted_functions": 32,
      "filename": "direct/simd_lanes.blot",
@@ -1943,7 +1943,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 929,
+     "core_nodes": 798,
      "effect_rows": 2460,
      "emitted_functions": 28,
      "filename": "direct/staged_scalar.blot",
@@ -1983,7 +1983,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1097,
+     "core_nodes": 966,
      "effect_rows": 2616,
      "emitted_functions": 40,
      "filename": "direct/storage.blot",
@@ -2023,7 +2023,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1347,
+     "core_nodes": 1216,
      "effect_rows": 2963,
      "emitted_functions": 54,
      "filename": "direct/terminal_scratch_reads.blot",
@@ -2063,7 +2063,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 930,
+     "core_nodes": 799,
      "effect_rows": 2474,
      "emitted_functions": 33,
      "filename": "direct/unused_generic_fields.blot",
@@ -2103,7 +2103,7 @@
       "shared_uses": 5,
       "use_expansions": 5
      },
-     "core_nodes": 951,
+     "core_nodes": 820,
      "effect_rows": 2593,
      "emitted_functions": 36,
      "filename": "direct/unused_stages.blot",
@@ -2143,9 +2143,9 @@
       "shared_uses": 4,
       "use_expansions": 4
      },
-     "core_nodes": 1005,
+     "core_nodes": 874,
      "effect_rows": 2586,
-     "emitted_functions": 36,
+     "emitted_functions": 33,
      "filename": "direct/view_calls.blot",
      "files": 2,
      "imported_schemes": 25,
@@ -2157,11 +2157,11 @@
      "syntax_nodes": 2159,
      "type_nodes": 5022,
      "type_versions": 722,
-     "wasm_bytes": 4058
+     "wasm_bytes": 3813
     }
    ],
-   "wasm_bytes": 4058,
-   "wasm_sha256": "b4ee1f05280df9793248fba9ffa0676bbf4c09e42ad8a6dea453487d39dc73da"
+   "wasm_bytes": 3813,
+   "wasm_sha256": "5f7edb551de758d6856980120a12a407825a15be8814f33f81e5bcb8e17312f2"
   },
   "discard-fixtures/deferred-alias.blot": {
    "exit": 1,
@@ -2192,7 +2192,7 @@
       "shared_uses": 5,
       "use_expansions": 4
      },
-     "core_nodes": 921,
+     "core_nodes": 790,
      "effect_rows": 2427,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-alias.blot",
@@ -2239,7 +2239,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 918,
+     "core_nodes": 787,
      "effect_rows": 2408,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-anonymous.blot",
@@ -2286,7 +2286,7 @@
       "shared_uses": 4,
       "use_expansions": 3
      },
-     "core_nodes": 923,
+     "core_nodes": 792,
      "effect_rows": 2422,
      "emitted_functions": 0,
      "filename": "discard-fixtures/deferred-body.blot",
@@ -2324,7 +2324,7 @@
       "shared_uses": 11,
       "use_expansions": 11
      },
-     "core_nodes": 997,
+     "core_nodes": 866,
      "effect_rows": 2576,
      "emitted_functions": 43,
      "filename": "discard-fixtures/eager-order.blot",
@@ -2364,7 +2364,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 915,
+     "core_nodes": 784,
      "effect_rows": 2401,
      "emitted_functions": 26,
      "filename": "discard-fixtures/explicit-qualifier.blot",
@@ -2404,7 +2404,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 919,
+     "core_nodes": 788,
      "effect_rows": 2416,
      "emitted_functions": 28,
      "filename": "discard-fixtures/generate-panic.blot",
@@ -2444,7 +2444,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 984,
+     "core_nodes": 853,
      "effect_rows": 2463,
      "emitted_functions": 33,
      "filename": "discard-fixtures/implicit-uses.blot",
@@ -2484,7 +2484,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 934,
+     "core_nodes": 803,
      "effect_rows": 2462,
      "emitted_functions": 37,
      "filename": "discard-fixtures/original.blot",
@@ -2524,7 +2524,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 922,
+     "core_nodes": 791,
      "effect_rows": 2417,
      "emitted_functions": 29,
      "filename": "discard-fixtures/runtime-panic.blot",
@@ -2564,7 +2564,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1002,
+     "core_nodes": 871,
      "effect_rows": 2499,
      "emitted_functions": 42,
      "filename": "fallbacks.blot",
@@ -2604,7 +2604,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1227,
+     "core_nodes": 1096,
      "effect_rows": 2857,
      "emitted_functions": 49,
      "filename": "fixed_scalar_spans.blot",
@@ -2644,7 +2644,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 932,
+     "core_nodes": 801,
      "effect_rows": 2411,
      "emitted_functions": 27,
      "filename": "fresh_owner_borrow_escape.blot",
@@ -2684,7 +2684,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1006,
+     "core_nodes": 875,
      "effect_rows": 2524,
      "emitted_functions": 30,
      "filename": "fresh_owner_cleanup.blot",
@@ -2733,7 +2733,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 949,
+     "core_nodes": 818,
      "effect_rows": 2423,
      "emitted_functions": 0,
      "filename": "fresh_owner_stored_borrow_escape.blot",
@@ -2771,7 +2771,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 927,
+     "core_nodes": 796,
      "effect_rows": 2418,
      "emitted_functions": 31,
      "filename": "global_call_borrow_escape.blot",
@@ -2811,7 +2811,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 934,
+     "core_nodes": 803,
      "effect_rows": 2437,
      "emitted_functions": 30,
      "filename": "global_call_conditional.blot",
@@ -2851,7 +2851,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 925,
+     "core_nodes": 794,
      "effect_rows": 2404,
      "emitted_functions": 30,
      "filename": "global_call_freeze.blot",
@@ -2891,7 +2891,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 966,
+     "core_nodes": 835,
      "effect_rows": 2492,
      "emitted_functions": 37,
      "filename": "global_call_initialization.blot",
@@ -2931,7 +2931,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1068,
+     "core_nodes": 937,
      "effect_rows": 2577,
      "emitted_functions": 42,
      "filename": "global_call_mutation.blot",
@@ -2971,7 +2971,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 939,
+     "core_nodes": 808,
      "effect_rows": 2470,
      "emitted_functions": 32,
      "filename": "global_call_read.blot",
@@ -3011,7 +3011,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1133,
+     "core_nodes": 1002,
      "effect_rows": 2767,
      "emitted_functions": 36,
      "filename": "identity_join.blot",
@@ -3051,7 +3051,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 980,
+     "core_nodes": 849,
      "effect_rows": 2502,
      "emitted_functions": 29,
      "filename": "identity_join_address.blot",
@@ -3091,7 +3091,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1001,
+     "core_nodes": 870,
      "effect_rows": 2513,
      "emitted_functions": 31,
      "filename": "immutable_survivor.blot",
@@ -3131,7 +3131,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 931,
+     "core_nodes": 800,
      "effect_rows": 2422,
      "emitted_functions": 26,
      "filename": "input_alias_borrow_escape.blot",
@@ -3171,7 +3171,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1106,
+     "core_nodes": 975,
      "effect_rows": 2693,
      "emitted_functions": 27,
      "filename": "input_alias_descriptors.blot",
@@ -3211,7 +3211,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 982,
+     "core_nodes": 851,
      "effect_rows": 2500,
      "emitted_functions": 27,
      "filename": "input_alias_partition.blot",
@@ -3251,7 +3251,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 947,
+     "core_nodes": 816,
      "effect_rows": 2428,
      "emitted_functions": 27,
      "filename": "mutating_owner_return_fresh.blot",
@@ -3300,7 +3300,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 939,
+     "core_nodes": 808,
      "effect_rows": 2422,
      "emitted_functions": 0,
      "filename": "mutating_owner_return_truncate.blot",
@@ -3338,7 +3338,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 930,
+     "core_nodes": 799,
      "effect_rows": 2456,
      "emitted_functions": 33,
      "filename": "named-closure-parameter-fixtures/applied-provider-capture.blot",
@@ -3378,7 +3378,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 910,
+     "core_nodes": 779,
      "effect_rows": 2400,
      "emitted_functions": 27,
      "filename": "named-closure-parameter-fixtures/direct-cell-cycle.blot",
@@ -3418,7 +3418,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 921,
+     "core_nodes": 790,
      "effect_rows": 2451,
      "emitted_functions": 38,
      "filename": "named-closure-parameter-fixtures/generic-unit-captures.blot",
@@ -3458,7 +3458,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 920,
+     "core_nodes": 789,
      "effect_rows": 2435,
      "emitted_functions": 30,
      "filename": "named-closure-parameter-fixtures/lexical-generic-capture.blot",
@@ -3498,7 +3498,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 915,
+     "core_nodes": 784,
      "effect_rows": 2429,
      "emitted_functions": 30,
      "filename": "named-closure-parameter-fixtures/nonunit-applied-export.blot",
@@ -3538,7 +3538,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 916,
+     "core_nodes": 785,
      "effect_rows": 2414,
      "emitted_functions": 31,
      "filename": "named-closure-parameter-fixtures/returned-closure-cycle.blot",
@@ -3578,7 +3578,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 924,
+     "core_nodes": 793,
      "effect_rows": 2438,
      "emitted_functions": 32,
      "filename": "named-closure-parameter-fixtures/unit-applied-effect-row.blot",
@@ -3618,7 +3618,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 915,
+     "core_nodes": 784,
      "effect_rows": 2429,
      "emitted_functions": 30,
      "filename": "named-closure-parameter-fixtures/unit-applied-export.blot",
@@ -3658,7 +3658,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 917,
+     "core_nodes": 786,
      "effect_rows": 2430,
      "emitted_functions": 26,
      "filename": "nominal/compiler-binary-type-call.blot",
@@ -3698,7 +3698,7 @@
       "shared_uses": 7,
       "use_expansions": 7
      },
-     "core_nodes": 945,
+     "core_nodes": 814,
      "effect_rows": 2489,
      "emitted_functions": 32,
      "filename": "nominal/generic-fields-and-associated.blot",
@@ -3855,7 +3855,7 @@
       "shared_uses": 7,
       "use_expansions": 8
      },
-     "core_nodes": 1004,
+     "core_nodes": 873,
      "effect_rows": 2528,
      "emitted_functions": 27,
      "filename": "packed_input_oom.blot",
@@ -3904,7 +3904,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 912,
+     "core_nodes": 781,
      "effect_rows": 2403,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/a.blot",
@@ -3951,7 +3951,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 912,
+     "core_nodes": 781,
      "effect_rows": 2403,
      "emitted_functions": 0,
      "filename": "partial-runtime-fixtures/b.blot",
@@ -3989,7 +3989,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 982,
+     "core_nodes": 851,
      "effect_rows": 2655,
      "emitted_functions": 44,
      "filename": "partial-runtime-fixtures/namespace-ab.blot",
@@ -4029,9 +4029,9 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1438,
+     "core_nodes": 1244,
      "effect_rows": 3919,
-     "emitted_functions": 128,
+     "emitted_functions": 89,
      "filename": "primitive-aliases.blot",
      "files": 2,
      "imported_schemes": 22,
@@ -4043,11 +4043,11 @@
      "syntax_nodes": 2804,
      "type_nodes": 6647,
      "type_versions": 975,
-     "wasm_bytes": 14521
+     "wasm_bytes": 11289
     }
    ],
-   "wasm_bytes": 14521,
-   "wasm_sha256": "9534a1ea808425bada8849cc23c22538c2cede186fc0b0d053a43c11fe289497"
+   "wasm_bytes": 11289,
+   "wasm_sha256": "9ff5bbf7d4118b235eeb69b05f7808269a6511f787dd70482840eddb7addee6b"
   },
   "qualified-row-fixtures/associated-direct.blot": {
    "exit": 0,
@@ -4069,7 +4069,7 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 945,
+     "core_nodes": 814,
      "effect_rows": 2469,
      "emitted_functions": 32,
      "filename": "qualified-row-fixtures/associated-direct.blot",
@@ -4109,7 +4109,7 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 945,
+     "core_nodes": 814,
      "effect_rows": 2469,
      "emitted_functions": 32,
      "filename": "qualified-row-fixtures/associated.blot",
@@ -4149,7 +4149,7 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 948,
+     "core_nodes": 817,
      "effect_rows": 2475,
      "emitted_functions": 33,
      "filename": "qualified-row-fixtures/reject-effectful.blot",
@@ -4189,7 +4189,7 @@
       "shared_uses": 5,
       "use_expansions": 3
      },
-     "core_nodes": 945,
+     "core_nodes": 814,
      "effect_rows": 2470,
      "emitted_functions": 32,
      "filename": "qualified-row-fixtures/reject-pure.blot",
@@ -4229,7 +4229,7 @@
       "shared_uses": 12,
       "use_expansions": 12
      },
-     "core_nodes": 969,
+     "core_nodes": 838,
      "effect_rows": 2590,
      "emitted_functions": 39,
      "filename": "result_selected_operand.blot",
@@ -4269,7 +4269,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1243,
+     "core_nodes": 1112,
      "effect_rows": 2821,
      "emitted_functions": 56,
      "filename": "scoped-loop-cleanup.blot",
@@ -4309,9 +4309,9 @@
       "shared_uses": 11,
       "use_expansions": 10
      },
-     "core_nodes": 2039,
+     "core_nodes": 1908,
      "effect_rows": 4203,
-     "emitted_functions": 43,
+     "emitted_functions": 42,
      "filename": "scoped-loop-refinement.blot",
      "files": 4,
      "imported_schemes": 94,
@@ -4323,11 +4323,11 @@
      "syntax_nodes": 3799,
      "type_nodes": 8675,
      "type_versions": 1188,
-     "wasm_bytes": 9000
+     "wasm_bytes": 8888
     }
    ],
-   "wasm_bytes": 9000,
-   "wasm_sha256": "b18e263eb727dd16219d9b7799433fa836b56c8c671b6a99b47eac8440b4e941"
+   "wasm_bytes": 8888,
+   "wasm_sha256": "cb64a90e54c9e0fda976c3690313b512623f60fe810c6a2294e20679383b7790"
   },
   "scoped-opaque/facade.blot": {
    "exit": 1,
@@ -4358,7 +4358,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 933,
+     "core_nodes": 802,
      "effect_rows": 2489,
      "emitted_functions": 0,
      "filename": "scoped-opaque/facade.blot",
@@ -4396,7 +4396,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 1097,
+     "core_nodes": 966,
      "effect_rows": 2811,
      "emitted_functions": 33,
      "filename": "scoped-opaque/main.blot",
@@ -4445,7 +4445,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 933,
+     "core_nodes": 802,
      "effect_rows": 2431,
      "emitted_functions": 0,
      "filename": "scoped-opaque/tokens.blot",
@@ -4483,7 +4483,7 @@
       "shared_uses": 3,
       "use_expansions": 3
      },
-     "core_nodes": 930,
+     "core_nodes": 799,
      "effect_rows": 2428,
      "emitted_functions": 26,
      "filename": "staged_catalog.blot",

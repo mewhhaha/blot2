@@ -56,7 +56,6 @@ fn implementationLists<O>(slots: u8[:], owner: const O&) -> Error {
         { let propagated_error = list(slots, value.row_variables, 2); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = list(slots, value.row_parameter_names, 1); if propagated_error != blot_error::Error.none { return propagated_error; } } { let propagated_error = list(slots, value.row_parameters, 2); if propagated_error != blot_error::Error.none { return propagated_error; } }
     }
     for value in owner.member_templates { { let propagated_error = list(slots, value.arguments, 2); if propagated_error != blot_error::Error.none { return propagated_error; } } }
-    for value in owner.selected_proofs { { let propagated_error = list(slots, value.arguments, 2); if propagated_error != blot_error::Error.none { return propagated_error; } } }
     return blot_error::Error.none;
 }
 fn coreRoles(slots: u8[:], ir: const blot_check_core::Module&) -> Error {
